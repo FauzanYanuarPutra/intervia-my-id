@@ -1,0 +1,353 @@
+/**
+ * Sector + ContentType specific fields for create form and display.
+ * Each industry sector has different marketing data & display needs.
+ */
+
+export type FieldKind = 'text' | 'number' | 'currency' | 'select' | 'multiline' | 'url' | 'images' | 'date';
+
+export interface SectorField {
+  key: string;
+  kind: FieldKind;
+  labelEn: string;
+  labelId: string;
+  placeholderEn?: string;
+  placeholderId?: string;
+  hintEn?: string;
+  hintId?: string;
+  required?: boolean;
+  options?: { value: string; labelEn: string; labelId: string }[];
+  /** Show in create form */
+  inCreate: boolean;
+  /** Show in card/list preview */
+  inCard: boolean;
+  /** Show in detail view */
+  inDetail: boolean;
+}
+
+/** Fields that need images (gallery/carousel) - typically product, property, retail */
+export const IMAGE_HEAVY_TYPES = ['product', 'property', 'company', 'tool_rental'] as const;
+export const IMAGE_HEAVY_SECTORS = ['retail', 'realestate', 'automotive', 'hospitality', 'textiles', 'food'] as const;
+
+export function needsImageGallery(type: string, sector?: string): boolean {
+  if (IMAGE_HEAVY_TYPES.includes(type as (typeof IMAGE_HEAVY_TYPES)[number])) return true;
+  if (sector && IMAGE_HEAVY_SECTORS.includes(sector as (typeof IMAGE_HEAVY_SECTORS)[number])) return true;
+  return false;
+}
+
+/** Base fields for all content */
+export const BASE_FIELDS: SectorField[] = [
+  { key: 'title', kind: 'text', labelEn: 'Title', labelId: 'Judul', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'summary', kind: 'text', labelEn: 'Summary', labelId: 'Ringkasan', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'body', kind: 'multiline', labelEn: 'Description', labelId: 'Deskripsi', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'price_cents', kind: 'currency', labelEn: 'Price', labelId: 'Harga', inCreate: true, inCard: true, inDetail: true },
+  { key: 'location', kind: 'text', labelEn: 'Location', labelId: 'Lokasi', placeholderEn: 'e.g. Jakarta', placeholderId: 'mis. Jakarta', inCreate: true, inCard: true, inDetail: true },
+  { key: 'tags', kind: 'text', labelEn: 'Tags', labelId: 'Tag', placeholderEn: 'Comma separated', placeholderId: 'Pisah koma', inCreate: true, inCard: true, inDetail: true },
+  { key: 'images', kind: 'images', labelEn: 'Images', labelId: 'Gambar', inCreate: true, inCard: true, inDetail: true },
+];
+
+/** Work mode: online (remote) vs offline (onsite) vs hybrid - for jobs & services */
+export const WORK_MODE_OPTIONS = [
+  { value: 'remote', labelEn: 'Remote (Online)', labelId: 'Remote (Online)', shortEn: 'Remote', shortId: 'Remote', icon: '🏠', descEn: 'Work from anywhere', descId: 'Kerja dari mana saja' },
+  { value: 'onsite', labelEn: 'On-site (Offline)', labelId: 'On-site (Offline)', shortEn: 'On-site', shortId: 'On-site', icon: '🏢', descEn: 'Must work at office/location', descId: 'Harus ke kantor/lokasi' },
+  { value: 'hybrid', labelEn: 'Hybrid', labelId: 'Hybrid', shortEn: 'Hybrid', shortId: 'Hybrid', icon: '🔄', descEn: 'Mix of remote & on-site', descId: 'Campuran remote & on-site' },
+] as const;
+
+/** Type-specific extra fields */
+const JOB_FIELDS: SectorField[] = [
+  { key: 'work_mode', kind: 'select', labelEn: 'Work mode', labelId: 'Mode kerja', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: WORK_MODE_OPTIONS.map((o) => ({ value: o.value, labelEn: o.labelEn, labelId: o.labelId })) },
+  { key: 'company_name', kind: 'text', labelEn: 'Company', labelId: 'Perusahaan', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'level', kind: 'select', labelEn: 'Level', labelId: 'Level', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'intern', labelEn: 'Intern', labelId: 'Magang' },
+      { value: 'entry', labelEn: 'Entry', labelId: 'Pemula' },
+      { value: 'junior', labelEn: 'Junior', labelId: 'Junior' },
+      { value: 'mid', labelEn: 'Mid-level', labelId: 'Menengah' },
+      { value: 'senior', labelEn: 'Senior', labelId: 'Senior' },
+      { value: 'lead', labelEn: 'Lead', labelId: 'Lead' },
+      { value: 'manager', labelEn: 'Manager', labelId: 'Manajer' },
+      { value: 'director', labelEn: 'Director', labelId: 'Direktur' },
+      { value: 'executive', labelEn: 'Executive', labelId: 'Eksekutif' },
+    ] },
+  { key: 'employment_type', kind: 'select', labelEn: 'Employment', labelId: 'Tipe', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'fulltime', labelEn: 'Full-time', labelId: 'Penuh waktu' },
+      { value: 'parttime', labelEn: 'Part-time', labelId: 'Paruh waktu' },
+      { value: 'contract', labelEn: 'Contract', labelId: 'Kontrak' },
+      { value: 'freelance', labelEn: 'Freelance', labelId: 'Freelance' },
+      { value: 'internship', labelEn: 'Internship', labelId: 'Magang' },
+    ] },
+  { key: 'company_size', kind: 'select', labelEn: 'Company size', labelId: 'Ukuran perusahaan', inCreate: true, inCard: false, inDetail: true,
+    options: [
+      { value: '1-10', labelEn: '1-10', labelId: '1-10' },
+      { value: '11-50', labelEn: '11-50', labelId: '11-50' },
+      { value: '51-200', labelEn: '51-200', labelId: '51-200' },
+      { value: '201-500', labelEn: '201-500', labelId: '201-500' },
+      { value: '501-1000', labelEn: '501-1000', labelId: '501-1000' },
+      { value: '1000+', labelEn: '1000+', labelId: '1000+' },
+    ] },
+  { key: 'openings', kind: 'number', labelEn: 'Openings', labelId: 'Jumlah posisi', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'salary_range', kind: 'text', labelEn: 'Salary range', labelId: 'Range gaji', placeholderEn: 'e.g. 10-15M', placeholderId: 'mis. 10-15jt', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'compensation_period', kind: 'select', labelEn: 'Compensation period', labelId: 'Periode kompensasi', required: true, inCreate: true, inCard: false, inDetail: true,
+    options: [
+      { value: 'hourly', labelEn: 'Per hour', labelId: 'Per jam' },
+      { value: 'daily', labelEn: 'Per day', labelId: 'Per hari' },
+      { value: 'monthly', labelEn: 'Per month', labelId: 'Per bulan' },
+      { value: 'yearly', labelEn: 'Per year', labelId: 'Per tahun' },
+      { value: 'project', labelEn: 'Per project', labelId: 'Per proyek' },
+    ] },
+  { key: 'experience_years', kind: 'number', labelEn: 'Experience years', labelId: 'Pengalaman (tahun)', inCreate: true, inCard: false, inDetail: true },
+  { key: 'experience', kind: 'text', labelEn: 'Experience required', labelId: 'Pengalaman', placeholderEn: 'e.g. 3+ years', placeholderId: 'mis. 3+ tahun', inCreate: true, inCard: false, inDetail: true },
+  { key: 'must_have_skills', kind: 'text', labelEn: 'Must-have skills', labelId: 'Skill wajib', placeholderEn: 'e.g. React, SQL, Communication', placeholderId: 'mis. React, SQL, Komunikasi', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'responsibilities', kind: 'multiline', labelEn: 'Responsibilities', labelId: 'Tanggung jawab', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'start_date', kind: 'date', labelEn: 'Start date', labelId: 'Tanggal mulai', inCreate: true, inCard: false, inDetail: true },
+  { key: 'application_deadline', kind: 'date', labelEn: 'Application deadline', labelId: 'Batas lamaran', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'application_url', kind: 'url', labelEn: 'Application link', labelId: 'Link lamaran', inCreate: true, inCard: false, inDetail: true },
+  { key: 'benefits', kind: 'multiline', labelEn: 'Benefits', labelId: 'Benefit', inCreate: true, inCard: false, inDetail: true },
+];
+
+const COMPANY_FIELDS: SectorField[] = [
+  { key: 'company_name', kind: 'text', labelEn: 'Company name', labelId: 'Nama perusahaan', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'industry_focus', kind: 'text', labelEn: 'Industry', labelId: 'Industri', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'company_size', kind: 'select', labelEn: 'Company size', labelId: 'Ukuran perusahaan', inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: '1-10', labelEn: '1-10', labelId: '1-10' },
+      { value: '11-50', labelEn: '11-50', labelId: '11-50' },
+      { value: '51-200', labelEn: '51-200', labelId: '51-200' },
+      { value: '201-500', labelEn: '201-500', labelId: '201-500' },
+      { value: '501-1000', labelEn: '501-1000', labelId: '501-1000' },
+      { value: '1000+', labelEn: '1000+', labelId: '1000+' },
+    ] },
+  { key: 'founded_year', kind: 'number', labelEn: 'Founded year', labelId: 'Tahun berdiri', inCreate: true, inCard: true, inDetail: true },
+  { key: 'website', kind: 'url', labelEn: 'Website', labelId: 'Website', inCreate: true, inCard: false, inDetail: true },
+  { key: 'headquarters', kind: 'text', labelEn: 'Headquarters', labelId: 'Kantor pusat', inCreate: true, inCard: true, inDetail: true },
+  { key: 'hiring_email', kind: 'text', labelEn: 'Hiring email', labelId: 'Email hiring', inCreate: true, inCard: false, inDetail: true },
+  { key: 'contact_phone', kind: 'text', labelEn: 'Contact phone', labelId: 'Nomor kontak', inCreate: true, inCard: false, inDetail: true },
+  { key: 'about_company', kind: 'multiline', labelEn: 'About company', labelId: 'Tentang perusahaan', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'company_values', kind: 'multiline', labelEn: 'Company values', labelId: 'Nilai perusahaan', inCreate: true, inCard: false, inDetail: true },
+  { key: 'hiring_focus', kind: 'text', labelEn: 'Hiring focus', labelId: 'Fokus hiring', inCreate: true, inCard: false, inDetail: true },
+];
+
+const PROPERTY_FIELDS: SectorField[] = [
+  { key: 'listing_purpose', kind: 'select', labelEn: 'Listing purpose', labelId: 'Tujuan listing', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'sell', labelEn: 'For sale', labelId: 'Dijual' },
+      { value: 'rent', labelEn: 'For rent', labelId: 'Disewakan' },
+    ] },
+  { key: 'property_type', kind: 'select', labelEn: 'Type', labelId: 'Tipe', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'house', labelEn: 'House', labelId: 'Rumah' },
+      { value: 'apartment', labelEn: 'Apartment', labelId: 'Apartemen' },
+      { value: 'land', labelEn: 'Land', labelId: 'Tanah' },
+      { value: 'commercial', labelEn: 'Commercial', labelId: 'Komersial' },
+      { value: 'warehouse', labelEn: 'Warehouse', labelId: 'Gudang' },
+    ] },
+  { key: 'availability_status', kind: 'select', labelEn: 'Availability status', labelId: 'Status ketersediaan', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'available', labelEn: 'Available', labelId: 'Tersedia' },
+      { value: 'booked', labelEn: 'Booked', labelId: 'Terpesan' },
+      { value: 'sold', labelEn: 'Sold', labelId: 'Terjual' },
+    ] },
+  { key: 'bedrooms', kind: 'number', labelEn: 'Bedrooms', labelId: 'Kamar tidur', inCreate: true, inCard: true, inDetail: true },
+  { key: 'bathrooms', kind: 'number', labelEn: 'Bathrooms', labelId: 'Kamar mandi', inCreate: true, inCard: true, inDetail: true },
+  { key: 'area_sqm', kind: 'number', labelEn: 'Building area (m2)', labelId: 'Luas bangunan (m2)', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'land_area_sqm', kind: 'number', labelEn: 'Land area (m2)', labelId: 'Luas tanah (m2)', inCreate: true, inCard: false, inDetail: true },
+  { key: 'floor_level', kind: 'text', labelEn: 'Floor level', labelId: 'Lantai', inCreate: true, inCard: false, inDetail: true },
+  { key: 'parking_spaces', kind: 'number', labelEn: 'Parking spaces', labelId: 'Jumlah parkir', inCreate: true, inCard: false, inDetail: true },
+  { key: 'furnishing', kind: 'select', labelEn: 'Furnishing', labelId: 'Furnish', inCreate: true, inCard: false, inDetail: true,
+    options: [
+      { value: 'unfurnished', labelEn: 'Unfurnished', labelId: 'Tanpa furnitur' },
+      { value: 'semi_furnished', labelEn: 'Semi furnished', labelId: 'Semi furnished' },
+      { value: 'fully_furnished', labelEn: 'Fully furnished', labelId: 'Fully furnished' },
+    ] },
+  { key: 'available_from', kind: 'date', labelEn: 'Available from', labelId: 'Tersedia mulai', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'ownership', kind: 'select', labelEn: 'Ownership', labelId: 'Kepemilikan', required: true, inCreate: true, inCard: false, inDetail: true,
+    options: [
+      { value: 'freehold', labelEn: 'Freehold', labelId: 'Hak milik' },
+      { value: 'leasehold', labelEn: 'Leasehold', labelId: 'Hak sewa' },
+      { value: 'strata', labelEn: 'Strata', labelId: 'Strata' },
+    ] },
+  { key: 'year_built', kind: 'number', labelEn: 'Year built', labelId: 'Tahun bangun', inCreate: true, inCard: false, inDetail: true },
+  { key: 'lease_term', kind: 'text', labelEn: 'Lease term', labelId: 'Durasi sewa', inCreate: true, inCard: false, inDetail: true, hintEn: 'For rental listings only.', hintId: 'Isi untuk listing sewa.' },
+  { key: 'address', kind: 'text', labelEn: 'Address', labelId: 'Alamat', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'amenities', kind: 'text', labelEn: 'Amenities', labelId: 'Fasilitas', inCreate: true, inCard: false, inDetail: true },
+  { key: 'legal_docs', kind: 'text', labelEn: 'Legal documents', labelId: 'Dokumen legal', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Example: SHM, HGB, IMB/PBG.', hintId: 'Contoh: SHM, HGB, IMB/PBG.' },
+  { key: 'inspection_status', kind: 'select', labelEn: 'Inspection status', labelId: 'Status inspeksi', inCreate: true, inCard: false, inDetail: true,
+    options: [
+      { value: 'available', labelEn: 'Available', labelId: 'Tersedia' },
+      { value: 'scheduled', labelEn: 'Scheduled', labelId: 'Terjadwal' },
+      { value: 'not_available', labelEn: 'Not available', labelId: 'Tidak tersedia' },
+    ] },
+  { key: 'tour_booking_url', kind: 'url', labelEn: 'Tour booking link', labelId: 'Link booking survey', inCreate: true, inCard: false, inDetail: true },
+];
+
+const PRODUCT_FIELDS: SectorField[] = [
+  { key: 'brand', kind: 'text', labelEn: 'Brand', labelId: 'Merek', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'sku', kind: 'text', labelEn: 'SKU / Seller ID', labelId: 'SKU / ID penjual', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'gtin', kind: 'text', labelEn: 'GTIN (optional)', labelId: 'GTIN (opsional)', inCreate: true, inCard: false, inDetail: true, hintEn: 'Required if your product has manufacturer GTIN.', hintId: 'Wajib jika produk punya GTIN dari produsen.' },
+  { key: 'mpn', kind: 'text', labelEn: 'MPN', labelId: 'MPN', inCreate: true, inCard: false, inDetail: true, hintEn: 'Use when GTIN is unavailable.', hintId: 'Gunakan jika GTIN tidak tersedia.' },
+  { key: 'condition', kind: 'select', labelEn: 'Condition', labelId: 'Kondisi', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'new', labelEn: 'New', labelId: 'Baru' },
+      { value: 'like_new', labelEn: 'Like new', labelId: 'Seperti baru' },
+      { value: 'good', labelEn: 'Good', labelId: 'Baik' },
+      { value: 'fair', labelEn: 'Fair', labelId: 'Cukup' },
+      { value: 'refurbished', labelEn: 'Refurbished', labelId: 'Rekondisi' },
+    ] },
+  { key: 'availability', kind: 'select', labelEn: 'Availability', labelId: 'Ketersediaan', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'in_stock', labelEn: 'In stock', labelId: 'Stok tersedia' },
+      { value: 'out_of_stock', labelEn: 'Out of stock', labelId: 'Stok habis' },
+      { value: 'preorder', labelEn: 'Pre-order', labelId: 'Pre-order' },
+      { value: 'backorder', labelEn: 'Backorder', labelId: 'Backorder' },
+    ] },
+  { key: 'stock', kind: 'number', labelEn: 'Stock', labelId: 'Stok', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'delivery_estimate', kind: 'text', labelEn: 'Delivery estimate', labelId: 'Estimasi kirim', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'shipping_method', kind: 'select', labelEn: 'Shipping method', labelId: 'Metode pengiriman', required: true, inCreate: true, inCard: false, inDetail: true,
+    options: [
+      { value: 'courier', labelEn: 'Courier', labelId: 'Kurir' },
+      { value: 'pickup', labelEn: 'Pickup', labelId: 'Ambil sendiri' },
+      { value: 'digital', labelEn: 'Digital delivery', labelId: 'Pengiriman digital' },
+    ] },
+  { key: 'shipping_fee', kind: 'currency', labelEn: 'Shipping fee', labelId: 'Biaya kirim', inCreate: true, inCard: false, inDetail: true },
+  { key: 'weight_grams', kind: 'number', labelEn: 'Weight (grams)', labelId: 'Berat (gram)', inCreate: true, inCard: false, inDetail: true },
+  { key: 'min_order_qty', kind: 'number', labelEn: 'Minimum order qty', labelId: 'Minimum order', inCreate: true, inCard: false, inDetail: true },
+  { key: 'specs', kind: 'multiline', labelEn: 'Specifications', labelId: 'Spesifikasi', inCreate: true, inCard: false, inDetail: true },
+  { key: 'return_policy', kind: 'text', labelEn: 'Return policy', labelId: 'Kebijakan retur', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'warranty', kind: 'text', labelEn: 'Warranty', labelId: 'Garansi', inCreate: true, inCard: false, inDetail: true },
+];
+
+const RENTAL_RATE_OPTIONS = [
+  { value: 'hourly', labelEn: 'Hourly', labelId: 'Per jam' },
+  { value: 'daily', labelEn: 'Daily', labelId: 'Per hari' },
+  { value: 'weekly', labelEn: 'Weekly', labelId: 'Per minggu' },
+  { value: 'monthly', labelEn: 'Monthly', labelId: 'Per bulan' },
+] as const;
+
+const RENTAL_EVIDENCE_POLICY_OPTIONS = [
+  { value: 'required', labelEn: 'Required', labelId: 'Wajib' },
+  { value: 'optional', labelEn: 'Optional', labelId: 'Opsional' },
+] as const;
+
+const TOOL_RENTAL_FIELDS: SectorField[] = [
+  { key: 'brand', kind: 'text', labelEn: 'Brand', labelId: 'Merek', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'model_name', kind: 'text', labelEn: 'Model name', labelId: 'Nama model', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'asset_identity_code', kind: 'text', labelEn: 'Asset code / serial number', labelId: 'Kode aset / nomor seri', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Use manufacturer serial number or your internal asset code.', hintId: 'Gunakan nomor seri pabrik atau kode aset internal.' },
+  { key: 'specs', kind: 'multiline', labelEn: 'Detailed specifications', labelId: 'Spesifikasi detail', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Include dimensions, capacity, power, age, and compatibility.', hintId: 'Isi ukuran, kapasitas, daya, usia, dan kompatibilitas.' },
+  { key: 'condition', kind: 'select', labelEn: 'Condition grade', labelId: 'Grade kondisi', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'excellent', labelEn: 'Excellent', labelId: 'Sangat baik' },
+      { value: 'good', labelEn: 'Good', labelId: 'Baik' },
+      { value: 'fair', labelEn: 'Fair', labelId: 'Cukup' },
+      { value: 'heavy_use', labelEn: 'Heavy use', labelId: 'Banyak pemakaian' },
+    ] },
+  { key: 'condition_notes', kind: 'multiline', labelEn: 'Condition notes', labelId: 'Catatan kondisi', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Describe the real condition at handover.', hintId: 'Jelaskan kondisi nyata saat serah terima.' },
+  { key: 'known_defects', kind: 'multiline', labelEn: 'Known defects / missing parts', labelId: 'Kekurangan / cacat yang diketahui', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Write "none" if there are no known defects.', hintId: 'Tulis "tidak ada" jika tidak ada kekurangan.' },
+  { key: 'included_items', kind: 'multiline', labelEn: 'Included items', labelId: 'Item yang ikut', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Example: charger, bag, battery, tripod plate.', hintId: 'Contoh: charger, tas, baterai, plate tripod.' },
+  { key: 'operating_instructions', kind: 'multiline', labelEn: 'Operating instructions', labelId: 'Petunjuk penggunaan', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'usage_restrictions', kind: 'multiline', labelEn: 'Usage restrictions', labelId: 'Batasan penggunaan', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Explain prohibited use, area limits, or operator requirements.', hintId: 'Jelaskan penggunaan terlarang, batas area, atau syarat operator.' },
+  { key: 'rental_rate_type', kind: 'select', labelEn: 'Rental rate type', labelId: 'Tipe tarif sewa', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: RENTAL_RATE_OPTIONS.map((option) => ({ value: option.value, labelEn: option.labelEn, labelId: option.labelId })) },
+  { key: 'deposit_amount_cents', kind: 'currency', labelEn: 'Security deposit (IDR)', labelId: 'Uang jaminan (IDR)', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'replacement_value_cents', kind: 'currency', labelEn: 'Replacement value (IDR)', labelId: 'Nilai pengganti (IDR)', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Used as cap reference when the item is lost or totalled.', hintId: 'Dipakai sebagai acuan batas bila barang hilang atau rusak total.' },
+  { key: 'minimum_rental_days', kind: 'number', labelEn: 'Minimum rental duration', labelId: 'Durasi sewa minimum', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'maximum_rental_days', kind: 'number', labelEn: 'Maximum rental duration', labelId: 'Durasi sewa maksimum', inCreate: true, inCard: false, inDetail: true },
+  { key: 'late_fee_cents_per_day', kind: 'currency', labelEn: 'Late fee per day (IDR)', labelId: 'Denda telat per hari (IDR)', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'pickup_location', kind: 'text', labelEn: 'Pickup location', labelId: 'Lokasi ambil', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'return_location', kind: 'text', labelEn: 'Return location', labelId: 'Lokasi kembali', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'availability_status', kind: 'select', labelEn: 'Availability status', labelId: 'Status ketersediaan', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'available', labelEn: 'Available', labelId: 'Tersedia' },
+      { value: 'booked', labelEn: 'Booked', labelId: 'Terpesan' },
+      { value: 'maintenance', labelEn: 'Under maintenance', labelId: 'Sedang perawatan' },
+    ] },
+  { key: 'inspection_checklist', kind: 'multiline', labelEn: 'Check-in / check-out checklist', labelId: 'Checklist serah terima / pengembalian', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'List points that must be checked by both parties.', hintId: 'Daftar poin yang wajib dicek dua pihak.' },
+  { key: 'complaint_window_hours', kind: 'number', labelEn: 'Complaint window (hours)', labelId: 'Jendela komplain (jam)', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'How long the borrower can report mismatch after pickup.', hintId: 'Berapa lama peminjam boleh melapor setelah barang diterima.' },
+  { key: 'identity_requirements', kind: 'multiline', labelEn: 'Borrower identity requirements', labelId: 'Syarat identitas peminjam', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Example: KTP, selfie, company card, NPWP.', hintId: 'Contoh: KTP, selfie, kartu perusahaan, NPWP.' },
+  { key: 'ownership_proof', kind: 'text', labelEn: 'Ownership / authority proof', labelId: 'Bukti kepemilikan / kuasa', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Example: invoice, asset register, authorization letter.', hintId: 'Contoh: invoice, daftar aset, surat kuasa.' },
+  { key: 'cancellation_policy', kind: 'text', labelEn: 'Cancellation policy', labelId: 'Kebijakan pembatalan', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'return_terms', kind: 'multiline', labelEn: 'Return terms', labelId: 'Ketentuan pengembalian', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'dispute_process', kind: 'multiline', labelEn: 'Dispute process summary', labelId: 'Ringkasan proses sengketa', required: true, inCreate: true, inCard: false, inDetail: true, hintEn: 'Explain evidence, deadline, and how deductions are handled.', hintId: 'Jelaskan bukti, tenggat, dan cara potongan dihitung.' },
+  { key: 'requires_video_checkin', kind: 'select', labelEn: 'Start handover video', labelId: 'Video awal serah terima', required: true, inCreate: true, inCard: false, inDetail: true,
+    options: RENTAL_EVIDENCE_POLICY_OPTIONS.map((option) => ({ value: option.value, labelEn: option.labelEn, labelId: option.labelId })) },
+  { key: 'requires_video_checkout', kind: 'select', labelEn: 'Return video', labelId: 'Video saat pengembalian', required: true, inCreate: true, inCard: false, inDetail: true,
+    options: RENTAL_EVIDENCE_POLICY_OPTIONS.map((option) => ({ value: option.value, labelEn: option.labelEn, labelId: option.labelId })) },
+  { key: 'requires_photo_inventory', kind: 'select', labelEn: 'Photo inventory checklist', labelId: 'Checklist foto inventaris', required: true, inCreate: true, inCard: false, inDetail: true,
+    options: RENTAL_EVIDENCE_POLICY_OPTIONS.map((option) => ({ value: option.value, labelEn: option.labelEn, labelId: option.labelId })) },
+  { key: 'maintenance_history', kind: 'multiline', labelEn: 'Maintenance history', labelId: 'Riwayat perawatan', inCreate: true, inCard: false, inDetail: true },
+];
+
+const SERVICE_FIELDS: SectorField[] = [
+  { key: 'work_mode', kind: 'select', labelEn: 'Delivery mode', labelId: 'Mode pengiriman', required: true, inCreate: true, inCard: true, inDetail: true,
+    options: WORK_MODE_OPTIONS.map((o) => ({ value: o.value, labelEn: o.labelEn, labelId: o.labelId })) },
+  { key: 'service_scope', kind: 'multiline', labelEn: 'Service scope', labelId: 'Ruang lingkup layanan', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'deliverables', kind: 'multiline', labelEn: 'Deliverables', labelId: 'Output yang diterima', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'level', kind: 'select', labelEn: 'Level', labelId: 'Level', inCreate: true, inCard: true, inDetail: true,
+    options: [
+      { value: 'basic', labelEn: 'Basic', labelId: 'Dasar' },
+      { value: 'standard', labelEn: 'Standard', labelId: 'Standar' },
+      { value: 'premium', labelEn: 'Premium', labelId: 'Premium' },
+      { value: 'enterprise', labelEn: 'Enterprise', labelId: 'Enterprise' },
+    ] },
+  { key: 'rate_type', kind: 'select', labelEn: 'Rate type', labelId: 'Tipe tarif', required: true, inCreate: true, inCard: false, inDetail: true,
+    options: [
+      { value: 'hourly', labelEn: 'Hourly', labelId: 'Per jam' },
+      { value: 'daily', labelEn: 'Daily', labelId: 'Per hari' },
+      { value: 'project', labelEn: 'Per project', labelId: 'Per proyek' },
+      { value: 'monthly', labelEn: 'Monthly', labelId: 'Per bulan' },
+    ] },
+  { key: 'availability', kind: 'text', labelEn: 'Availability', labelId: 'Ketersediaan', placeholderEn: 'e.g. Mon-Fri', placeholderId: 'mis. Sen-Jum', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'area_served', kind: 'text', labelEn: 'Area served', labelId: 'Area layanan', placeholderEn: 'e.g. Indonesia / Global / Jakarta', placeholderId: 'mis. Indonesia / Global / Jakarta', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'delivery_time', kind: 'text', labelEn: 'Delivery time', labelId: 'Waktu pengerjaan', placeholderEn: 'e.g. 5-7 days', placeholderId: 'mis. 5-7 hari', required: true, inCreate: true, inCard: true, inDetail: true },
+  { key: 'revisions_included', kind: 'number', labelEn: 'Revisions included', labelId: 'Jumlah revisi', required: true, inCreate: true, inCard: false, inDetail: true },
+  { key: 'client_requirements', kind: 'multiline', labelEn: 'Requirements from client', labelId: 'Data yang dibutuhkan dari klien', inCreate: true, inCard: false, inDetail: true },
+  { key: 'next_available', kind: 'date', labelEn: 'Next available', labelId: 'Mulai tersedia', inCreate: true, inCard: false, inDetail: true },
+  { key: 'portfolio_url', kind: 'url', labelEn: 'Portfolio link', labelId: 'Link portofolio', inCreate: true, inCard: false, inDetail: true },
+  { key: 'certifications', kind: 'text', labelEn: 'Certifications', labelId: 'Sertifikasi', inCreate: true, inCard: false, inDetail: true },
+  { key: 'revision_policy', kind: 'text', labelEn: 'Revision policy', labelId: 'Kebijakan revisi', inCreate: true, inCard: false, inDetail: true },
+  { key: 'sla', kind: 'text', labelEn: 'Service level', labelId: 'Service level', inCreate: true, inCard: false, inDetail: true },
+];
+
+/** Sector-specific overrides (additional fields per sector) */
+const SECTOR_EXTRA: Record<string, SectorField[]> = {
+  realestate: [...PROPERTY_FIELDS],
+  retail: PRODUCT_FIELDS,
+  technology: [...PRODUCT_FIELDS, { key: 'tech_stack', kind: 'text', labelEn: 'Tech stack', labelId: 'Tech stack', inCreate: true, inCard: false, inDetail: true }],
+  automotive: [...PRODUCT_FIELDS, { key: 'year', kind: 'number', labelEn: 'Year', labelId: 'Tahun', inCreate: true, inCard: true, inDetail: true }, { key: 'mileage', kind: 'number', labelEn: 'Mileage (km)', labelId: 'Km tempuh', inCreate: true, inCard: true, inDetail: true }],
+  manufacturing: [...PRODUCT_FIELDS],
+  textiles: PRODUCT_FIELDS,
+  food: [...PRODUCT_FIELDS, { key: 'serving', kind: 'text', labelEn: 'Serving', labelId: 'Porsi', inCreate: true, inCard: false, inDetail: true }],
+  hospitality: [...PROPERTY_FIELDS, { key: 'amenities', kind: 'text', labelEn: 'Amenities', labelId: 'Fasilitas', inCreate: true, inCard: false, inDetail: true }],
+  healthcare: [...SERVICE_FIELDS],
+  consulting: SERVICE_FIELDS,
+  education: [...SERVICE_FIELDS],
+};
+
+export function getFieldsForCreate(type: string, sector?: string): SectorField[] {
+  const base = BASE_FIELDS.filter(f => f.inCreate && f.key !== 'images' && !(type === 'company' && f.key === 'price_cents'));
+  const needsImages = needsImageGallery(type, sector);
+  if (needsImages) {
+    base.push(BASE_FIELDS.find(f => f.key === 'images')!);
+  }
+
+  const typeFields: SectorField[] = [];
+  if (type === 'job') typeFields.push(...JOB_FIELDS);
+  else if (type === 'company') typeFields.push(...COMPANY_FIELDS);
+  else if (type === 'property') typeFields.push(...PROPERTY_FIELDS);
+  else if (type === 'product') typeFields.push(...PRODUCT_FIELDS);
+  else if (type === 'tool_rental') typeFields.push(...TOOL_RENTAL_FIELDS);
+  else if (type === 'service') typeFields.push(...SERVICE_FIELDS);
+
+  const sectorExtra = sector ? SECTOR_EXTRA[sector] || [] : [];
+  const seen = new Set<string>();
+  const merged: SectorField[] = [];
+  for (const f of [...base, ...typeFields, ...sectorExtra]) {
+    if (!seen.has(f.key)) { seen.add(f.key); merged.push(f); }
+  }
+  return merged;
+}
+
+export function getFieldsForDisplay(type: string, sector?: string, mode: 'card' | 'detail' = 'detail'): SectorField[] {
+  const all = getFieldsForCreate(type, sector);
+  return all.filter(f => (mode === 'card' ? f.inCard : f.inDetail));
+}

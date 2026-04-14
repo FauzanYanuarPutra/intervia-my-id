@@ -1,0 +1,23 @@
+<svg width="1200" height="520" viewBox="0 0 1200 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="520" rx="36" fill="#1F2937"/>
+  <rect x="28" y="28" width="1144" height="464" rx="32" fill="url(#bg)"/>
+  <rect x="90" y="92" width="362" height="132" rx="26" fill="#FFFFFF" fill-opacity="0.96"/>
+  <rect x="90" y="250" width="362" height="168" rx="26" fill="#ECFEFF"/>
+  <rect x="620" y="88" width="470" height="336" rx="34" fill="#FFFFFF" fill-opacity="0.14" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="666" y="132" width="378" height="220" rx="28" fill="#F8FAFC"/>
+  <circle cx="846" cy="242" r="38" fill="#0EA5E9"/>
+  <path d="M846 204C830.536 204 818 216.536 818 232C818 253 846 286 846 286C846 286 874 253 874 232C874 216.536 861.464 204 846 204ZM846 246C838.268 246 832 239.732 832 232C832 224.268 838.268 218 846 218C853.732 218 860 224.268 860 232C860 239.732 853.732 246 846 246Z" fill="white"/>
+  <rect x="120" y="132" width="202" height="18" rx="9" fill="#0F172A"/>
+  <rect x="120" y="164" width="264" height="14" rx="7" fill="#64748B"/>
+  <rect x="120" y="282" width="162" height="16" rx="8" fill="#0F172A"/>
+  <rect x="120" y="312" width="232" height="12" rx="6" fill="#64748B"/>
+  <rect x="120" y="338" width="196" height="12" rx="6" fill="#94A3B8"/>
+  <text x="86" y="68" fill="#E2E8F0" font-size="30" font-family="Arial, sans-serif" font-weight="700">Cari kios, ruko, booth, dan titik jualan</text>
+  <defs>
+    <linearGradient id="bg" x1="600" y1="28" x2="600" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#0369A1"/>
+    </linearGradient>
+  </defs>
+</svg>
+

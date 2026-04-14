@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "common",
+    "marketplace_service",
+    "ai_service",
+    "identity_service"
+]
+resolver = "2"

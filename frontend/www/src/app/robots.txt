@@ -1,0 +1,22 @@
+# robots.txt untuk https://www.lajukan.com
+
+User-agent: *
+Allow: /
+Disallow: /private/
+Disallow: /admin/
+Disallow: /tmp/
+
+User-agent: Googlebot
+Allow: /
+Disallow: /private/
+Disallow: /admin/
+Disallow: /tmp/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /private/
+Disallow: /admin/
+Disallow: /tmp/
+
+Host: https://www.lajukan.com
+Sitemap: https://www.lajukan.com/sitemap.xml

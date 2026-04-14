@@ -1,0 +1,226 @@
+{
+  "Home": {
+    "hero": {
+      "badge": "🔥 Alert 2026: Ekonomi Berbagi Bergerak Tanpa Anda",
+      "title_part1": "Berhenti Buang Uang,",
+      "title_highlight": "Setiap Detik Aset Anda Menganggur.",
+      "description": "Saat Anda menunggu, ribuan orang sudah mengubah aset diam mereka menjadi aliran cuan harian yang konsisten. Jangan biarkan potensi Anda menguap—gabung ke ekosistem sekarang sebelum akses gratis ditutup.",
+      "cta": "Amankan Slot Anda Sekarang",
+      "user_count": "12.400+ Sudah Menghasilkan",
+      "trust_label": "Ekosistem Terverifikasi",
+      "trust_sublabel": "Pendaftaran Gratis Segera Berakhir",
+      "feature1": "Aktivasi Instan",
+      "feature2": "Jaringan Permintaan Tinggi"
+    },
+    "visual": {
+      "badge": "Wujudkan Impianmu",
+      "core_title": "Mulai Melaju,\nPanen Cuan",
+      "item1": "Cuan",
+      "item2": "Mobil",
+      "item3": "Aset",
+      "item4": "Rumah",
+      "item5": "Hobi",
+      "item6": "Bisnis",
+      "notif1": "Aset Tersewa! +Rp2jt",
+      "notif2": "Barang Terjual! ✅"
+    },
+    "activityCard": {
+      "badge": "🚀 Peluang Tanpa Batas",
+      "title_part1": "Ubah Aset Jadi",
+      "title_highlight": "Penghasilan.",
+      "description": "Jangan biarkan barang atau keahlianmu menganggur. Mulai sewakan, jual, atau tawarkan jasamu sekarang juga.",
+      "cta": "Mulai Melaju",
+      "features": {
+        "f1": "Passive Income",
+        "f2": "Ekosistem Aman",
+        "f3": "Pasar Global",
+        "f4": "Cair Instan"
+      }
+    },
+    "heroSection": {
+      "ariaLabel": "Ringkasan platform dan metrik kinerja"
+    },
+    "heroTagline": "Tingkatkan Kariermu",
+    "heroMain": "Temukan Pekerjaan, Proyek & Peluang Global",
+    "heroDesc": "Bergabung dengan Lajukan untuk bekerja, menghasilkan, dan menjelajah dunia—pekerjaan, freelance, marketplace, properti, dan travel.",
+    "audienceTitle": "Untuk Semua Orang, Di Mana Saja",
+    "audiences": {
+      "cariKerja": "Cari Pekerjaan Cepat",
+      "jualJasa": "Dapatkan Proyek Freelance",
+      "marketplace": "Beli & Jual Apa Saja",
+      "properti": "Investasi & Temukan Properti",
+      "travel": "Jelajahi Trip & Promo"
+    },
+    "btnStart": "Mulai Sekarang",
+    "btnFeatures": "Lihat Fitur",
+    "Overview": {
+      "kpi": {
+        "transaksi": "Transaksi",
+        "pengguna": "Pengguna"
+      },
+      "socialProof": "Dipercaya oleh ribuan pengguna di seluruh dunia."
+    },
+    "Marketplace": {
+      "kpi": {
+        "pelakuUsaha": "Penjual",
+        "pesanan": "Pesanan"
+      },
+      "socialProof": "Lebih dari 15.000 penjual aktif secara global."
+    },
+    "Properties": {
+      "kpi": {
+        "listing": "Listing Properti",
+        "transaksi": "Transaksi"
+      },
+      "socialProof": "Platform terkemuka untuk listing properti terpercaya."
+    },
+    "featured": {
+      "title": "Fitur Unggulan"
+    },
+    "news": {
+      "trendingDescription": "Berita dan tren terbaru yang dikurasi untukmu."
+    },
+    "community": {
+      "trendingDescription": "Ikuti diskusi dan dapatkan wawasan dari para ahli."
+    },
+    "features": {
+      "title": "Modul & Fitur Utama",
+      "description": "Lajukan adalah SuperApp untuk bekerja, aset, belajar, dan menjelajah.",
+      "jobs": {
+        "title": "Pasar Kerja",
+        "desc": "Lamar pekerjaan global"
+      },
+      "freelancers": {
+        "title": "Marketplace Freelancer",
+        "desc": "Terhubung dengan klien & dapatkan bayaran"
+      },
+      "microgigs": {
+        "title": "Micro-Gigs",
+        "desc": "Tugas kecil, bayar instan"
+      },
+      "marketplace": {
+        "title": "Marketplace & UMKM",
+        "desc": "Beli & jual secara global"
+      },
+      "property": {
+        "title": "Marketplace Properti",
+        "desc": "Temukan & kelola listing"
+      },
+      "travel": {
+        "title": "Travel & Booking",
+        "desc": "Pesan hotel & tur dengan mudah"
+      },
+      "game": {
+        "title": "Marketplace Game",
+        "desc": "Jual beli aset game aman"
+      },
+      "payments": {
+        "title": "Escrow & Pembayaran Pintar",
+        "desc": "Transaksi global aman"
+      },
+      "education": {
+        "title": "Pendidikan & Sertifikasi",
+        "desc": "Tingkatkan keterampilanmu"
+      },
+      "crm": {
+        "title": "CRM & Penjualan",
+        "desc": "Kelola prospek & pelanggan"
+      },
+      "hr": {
+        "title": "HR & Payroll",
+        "desc": "Otomatisasi HR & gaji"
+      },
+      "community": {
+        "title": "Komunitas & Forum",
+        "desc": "Ikuti diskusi global"
+      },
+      "vendor": {
+        "title": "Marketplace Vendor",
+        "desc": "Temukan penyedia layanan"
+      },
+      "analytics": {
+        "title": "AI Insights",
+        "desc": "Analisis bisnis pintar"
+      },
+      "support": {
+        "title": "Dukungan 24/7",
+        "desc": "Bantuan kapan saja"
+      },
+      "news": {
+        "title": "Berita & Tren",
+        "desc": "Update & analisis terbaru"
+      },
+      "wellness": {
+        "title": "Wellness & Kesehatan",
+        "desc": "Tetap sehat & bugar"
+      },
+      "charity": {
+        "title": "Donasi & Sosial",
+        "desc": "Dukung program global"
+      },
+      "financial": {
+        "title": "Keuangan & Investasi",
+        "desc": "Alat keuangan terpercaya"
+      }
+    },
+    "jobs": {
+      "title": "Lowongan Terbaru",
+      "description": "Temukan pekerjaan impianmu di seluruh dunia.",
+      "1": {
+        "title": "Frontend Developer"
+      },
+      "2": {
+        "title": "Senior Backend Developer"
+      }
+    },
+    "freelancers": {
+      "title": "Freelancer Terpercaya",
+      "description": "Terhubung dengan profesional berbakat di seluruh dunia.",
+      "1": {
+        "coverAlt": "Muhammad Fauzan Cover",
+        "avatarAlt": "Muhammad Fauzan Avatar",
+        "tagline": "Fullstack Developer",
+        "achievements": {
+          "topSeller": "Top Rated",
+          "risingStar": "Rising Star"
+        }
+      },
+      "2": {
+        "coverAlt": "Jane Doe Cover",
+        "avatarAlt": "Jane Doe Avatar",
+        "tagline": "Frontend Engineer",
+        "achievements": {
+          "topSeller": "Top Rated",
+          "risingStar": "Rising Star"
+        }
+      }
+    },
+    "financial": {
+      "title": "Produk Keuangan Unggulan",
+      "description": "Jelajahi pinjaman, investasi, dan asuransi terpercaya."
+    },
+    "wellness": {
+      "title": "Wellness & Gaya Hidup Sehat",
+      "description": "Panduan mudah untuk hidup lebih sehat dan bugar."
+    },
+    "charity": {
+      "title": "Donasi & Inisiatif Sosial",
+      "description": "Buat dampak positif di seluruh dunia."
+    },
+    "analytics": {
+      "title": "Analitik & AI Insights",
+      "description": "Gunakan AI untuk temukan tren & peluang bisnis."
+    },
+    "crm": {
+      "title": "CRM & Manajemen Pelanggan",
+      "description": "Kelola prospek dan jaga hubungan kuat dengan pelanggan."
+    },
+    "hr": {
+      "title": "Otomatisasi HR & Payroll",
+      "description": "Sederhanakan manajemen SDM dan penggajian global."
+    },
+    "welcomeBack": "Selamat datang kembali",
+    "dashboardReady": "Dashboard Anda siap digunakan.",
+    "seeMore": "Lihat Lainnya"
+  }
+}

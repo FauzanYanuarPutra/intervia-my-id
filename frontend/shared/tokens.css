@@ -1,0 +1,78 @@
+:root {
+  --font-family: 'Manrope', 'Segoe UI', 'Noto Sans', sans-serif;
+  --font-family-display: 'Manrope', 'Segoe UI', 'Noto Sans', sans-serif;
+  --font-size-base: 16px;
+  --line-height-base: 1.6;
+
+  --radius-xs: 0.5rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --color-bg: #f6f7fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eef2f7;
+  --color-border: #dde5ef;
+  --color-text: #0b1220;
+  --color-text-soft: #4b5563;
+  --color-text-inverse: #ffffff;
+  --color-primary: #138884;
+  --color-primary-strong: #0f6b67;
+  --color-primary-soft: #ccfbf1;
+  --color-primary-border: color-mix(in srgb, var(--color-primary) 38%, transparent);
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-danger-border: color-mix(in srgb, var(--color-danger) 38%, transparent);
+  --color-warning: #d97706;
+  --color-warning-soft: #ffedd5;
+  --color-warning-border: color-mix(in srgb, var(--color-warning) 38%, transparent);
+  --color-success: #15803d;
+  --color-success-soft: #dcfce7;
+  --color-success-border: color-mix(in srgb, var(--color-success) 38%, transparent);
+
+  --color-shadow: 0 18px 40px -30px rgba(15, 23, 42, 0.32);
+  --color-shadow-strong: 0 26px 50px -32px rgba(15, 23, 42, 0.42);
+  --color-overlay: #000000;
+
+  --ring: 19 136 132;
+  --ring-offset: 246 247 251;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-bg: #0b111a;
+  --color-surface: #0f1724;
+  --color-surface-muted: #121c2b;
+  --color-border: #1e2a3b;
+  --color-text: #e6edf6;
+  --color-text-soft: #95a4bd;
+  --color-text-inverse: #ffffff;
+  --color-primary: #1fb5ad;
+  --color-primary-strong: #138884;
+  --color-primary-soft: #0e2d2b;
+  --color-primary-border: color-mix(in srgb, var(--color-primary) 38%, transparent);
+  --color-danger: #f87171;
+  --color-danger-soft: #3f1d1d;
+  --color-danger-border: color-mix(in srgb, var(--color-danger) 38%, transparent);
+  --color-warning: #f59e0b;
+  --color-warning-soft: #3b2a0a;
+  --color-warning-border: color-mix(in srgb, var(--color-warning) 38%, transparent);
+  --color-success: #22c55e;
+  --color-success-soft: #0f2f1f;
+  --color-success-border: color-mix(in srgb, var(--color-success) 38%, transparent);
+
+  --color-shadow: 0 18px 40px -30px rgba(2, 6, 23, 0.68);
+  --color-shadow-strong: 0 26px 50px -32px rgba(2, 6, 23, 0.78);
+  --color-overlay: #000000;
+  --ring: 31 181 173;
+  --ring-offset: 11 17 26;
+}

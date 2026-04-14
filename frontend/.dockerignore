@@ -1,0 +1,16 @@
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+**/ios
+**/android
+**/.gradle
+**/.cache
+**/coverage
+**/playwright-report
+**/test-results
+**/.eslintcache
+**/*.tsbuildinfo
+www-apk
+**/.git
+**/.DS_Store

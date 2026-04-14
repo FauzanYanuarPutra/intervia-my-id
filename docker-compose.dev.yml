@@ -1,0 +1,210 @@
+# ======================================================
+# 🔥 Docker Compose Override for Development
+# ======================================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Benefits:
+# - Hot reload (no rebuild needed)
+# - Faster development cycle
+# - Volume mounts for instant changes
+#
+# WARNING: DO NOT use in production!
+# ======================================================
+
+services:
+  # ---------------- Frontend www (Hot Reload) ----------------
+  www:
+    build:
+      context: ./frontend
+      dockerfile: www/Dockerfile
+      target: www_dev # Use dev stage agar devDependencies tidak dipruning
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    command: npm run dev -- -H 0.0.0.0 -p 3000
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_APP_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      EMAIL_TRANSPORT: smtp
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USER: ""
+      SMTP_PASS: ""
+    volumes:
+      # Mount source code (hot reload)
+      - ./frontend/shared:/app/shared:delegated
+      - ./frontend/www/src:/app/www/src:delegated
+      - ./frontend/www/public:/app/www/public:delegated
+      - ./frontend/www/messages:/app/www/messages:delegated
+      - ./frontend/www/next.config.ts:/app/www/next.config.ts:ro
+      - ./frontend/www/tailwind.config.ts:/app/www/tailwind.config.ts:ro
+      - ./frontend/www/tsconfig.json:/app/www/tsconfig.json:ro
+      
+      # Prevent overwriting node_modules
+      - /app/www/node_modules
+      - /app/www/.next
+    ports:
+      - "${PORT_FRONTEND:-3000}:3000"
+
+  # ---------------- MailHog (Dev Email Inbox) ----------------
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "${PORT_MAILHOG_SMTP:-1025}:1025"
+      - "${PORT_MAILHOG_UI:-8025}:8025"
+
+  # ---------------- CMS (Hot Reload) ----------------
+  cms:
+    build:
+      context: ./frontend
+      dockerfile: cms/Dockerfile
+      target: cms_dev
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    command: npm run dev -- -H 0.0.0.0 -p 3001
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend/shared:/app/shared:delegated
+      - ./frontend/cms/src:/app/cms/src:delegated
+      - ./frontend/cms/public:/app/cms/public:delegated
+      - /app/cms/node_modules
+      - /app/cms/.next
+    ports:
+      - "${PORT_CMS:-3001}:3001"
+
+  # ---------------- CRM (Hot Reload) ----------------
+  crm:
+    build:
+      context: ./frontend
+      dockerfile: crm/Dockerfile
+      target: crm_dev
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    command: npm run dev -- -H 0.0.0.0 -p 3002
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend/shared:/app/shared:delegated
+      - ./frontend/crm/src:/app/crm/src:delegated
+      - ./frontend/crm/public:/app/crm/public:delegated
+      - /app/crm/node_modules
+      - /app/crm/.next
+    ports:
+      - "${PORT_CRM:-3002}:3002"
+
+  # ---------------- Rust Services (Hot Reload) ----------------
+  identity_service:
+    build:
+      context: ./backend/rust_apps
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        SERVICE_NAME: identity_service
+        INSTALL_SQLX: "true"
+    command:
+      - cargo
+      - watch
+      - -x
+      - run -p identity_service
+    environment:
+      CARGO_TARGET_DIR: /app/target/identity_service
+    volumes:
+      - ./backend/rust_apps:/app:delegated
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+      - rust_target_identity:/app/target
+
+  marketplace_service:
+    build:
+      context: ./backend/rust_apps
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        SERVICE_NAME: marketplace_service
+        INSTALL_SQLX: "true"
+    command:
+      - cargo
+      - watch
+      - -x
+      - run -p marketplace_service
+    environment:
+      CARGO_TARGET_DIR: /app/target/marketplace_service
+    volumes:
+      - ./backend/rust_apps:/app:delegated
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+      - rust_target_marketplace:/app/target
+
+  ai_service:
+    build:
+      context: ./backend/rust_apps
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        SERVICE_NAME: ai_service
+        INSTALL_SQLX: "false"
+    command:
+      - cargo
+      - watch
+      - -x
+      - run -p ai_service
+    environment:
+      CARGO_TARGET_DIR: /app/target/ai_service
+    volumes:
+      - ./backend/rust_apps:/app:delegated
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+      - rust_target_ai:/app/target
+
+  # ---------------- Chat Service (Hot Reload) ----------------
+  chat_service:
+    build:
+      context: ./backend/chat_service
+      dockerfile: Dockerfile
+      target: chat_service_dev
+    command: sh -c "mix deps.get && mix phx.server"
+    environment:
+      MIX_ENV: dev
+    volumes:
+      - ./backend/chat_service:/app:delegated
+      - chat_deps:/app/deps
+      - chat_build:/app/_build
+
+  # ---------------- OCR & Liveness (Hot Reload) ----------------
+  ocr_service:
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      USE_GPU: "0"
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ./ai/ocr_paddle:/app:delegated
+
+  liveness_service:
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ./ai/liveness:/app:delegated
+
+# NOTE:
+# - Volume mounts use 'delegated' for better performance on macOS/Windows
+# - node_modules tetap di container (tidak di-mount dari host)
+# - Hot reload hanya work untuk src/ changes
+# - Kalau ubah package.json, tetap perlu rebuild
+
+volumes:
+  cargo_registry:
+  cargo_git:
+  rust_target_identity:
+  rust_target_marketplace:
+  rust_target_ai:
+  chat_deps:
+  chat_build:

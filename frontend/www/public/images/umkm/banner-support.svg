@@ -1,0 +1,23 @@
+<svg width="1200" height="520" viewBox="0 0 1200 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="520" rx="36" fill="#0F172A"/>
+  <rect x="28" y="28" width="1144" height="464" rx="32" fill="url(#bg)"/>
+  <rect x="88" y="106" width="394" height="116" rx="26" fill="#FFFFFF" fill-opacity="0.96"/>
+  <rect x="88" y="246" width="394" height="164" rx="26" fill="#FFF7ED"/>
+  <rect x="664" y="96" width="432" height="324" rx="34" fill="#FFFFFF" fill-opacity="0.14" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="708" y="136" width="160" height="110" rx="24" fill="#EFF6FF"/>
+  <rect x="884" y="136" width="168" height="110" rx="24" fill="#F0FDF4"/>
+  <rect x="708" y="268" width="344" height="106" rx="24" fill="#FFFFFF" fill-opacity="0.8"/>
+  <rect x="118" y="144" width="222" height="18" rx="9" fill="#0F172A"/>
+  <rect x="118" y="176" width="286" height="14" rx="7" fill="#64748B"/>
+  <rect x="118" y="286" width="180" height="16" rx="8" fill="#9A3412"/>
+  <rect x="118" y="316" width="226" height="12" rx="6" fill="#9A3412" fill-opacity="0.7"/>
+  <rect x="118" y="342" width="204" height="12" rx="6" fill="#C2410C" fill-opacity="0.55"/>
+  <text x="86" y="74" fill="#E2E8F0" font-size="30" font-family="Arial, sans-serif" font-weight="700">Jasa operasional dan talent UMKM</text>
+  <defs>
+    <linearGradient id="bg" x1="600" y1="28" x2="600" y2="492" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+  </defs>
+</svg>
+

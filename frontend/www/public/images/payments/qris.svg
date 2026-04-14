@@ -1,0 +1,10 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="20" fill="#0F172A"/>
+  <rect x="18" y="18" width="84" height="84" rx="12" fill="#111827" stroke="#22D3EE" stroke-width="3"/>
+  <rect x="30" y="30" width="16" height="16" fill="#22D3EE"/>
+  <rect x="74" y="30" width="16" height="16" fill="#22D3EE"/>
+  <rect x="30" y="74" width="16" height="16" fill="#22D3EE"/>
+  <path d="M58 58H90V90H58V58Z" fill="#34D399"/>
+  <path d="M62 62H86V86H62V62Z" fill="#0F172A"/>
+  <text x="60" y="109" text-anchor="middle" fill="#E2E8F0" font-size="12" font-family="Arial, sans-serif">QRIS</text>
+</svg>

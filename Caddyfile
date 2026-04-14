@@ -1,0 +1,39 @@
+# Akses lokal langsung tanpa hostname www
+http://localhost, http://127.0.0.1 {
+    @chat_socket path /socket /socket/*
+    reverse_proxy @chat_socket chat_service:4000
+    reverse_proxy www:3000
+    encode gzip zstd
+}
+
+# Blok Utama: WWW
+http://www.{$APP_DOMAIN} {
+    @chat_socket path /socket /socket/*
+    reverse_proxy @chat_socket chat_service:4000
+    @notifications_socket path /v1/notifications/stream /v1/notifications/stream/*
+    reverse_proxy @notifications_socket marketplace_service:8081
+    reverse_proxy www:3000
+    
+    header {
+        Content-Security-Policy "default-src 'self'; connect-src 'self' *.{$APP_DOMAIN} wss://www.{$APP_DOMAIN} wss://chat.{$APP_DOMAIN};"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+    encode gzip zstd
+}
+
+# Service lain gunakan http:// agar tidak loop
+http://auth.{$APP_DOMAIN} {
+    reverse_proxy identity_service:8080
+}
+
+http://chat.{$APP_DOMAIN} {
+    reverse_proxy chat_service:4000
+}
+
+http://cdn.{$APP_DOMAIN} {
+    reverse_proxy minio:9000
+}
+
+http://console.{$APP_DOMAIN} {
+    reverse_proxy minio:9001
+}

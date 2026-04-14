@@ -1,0 +1,211 @@
+{
+  "industry_groups": [
+    {
+      "group_name": "Production & Resources",
+      "theme_color": "#10b981",
+      "sectors": [
+        {
+          "id": "GRP-A",
+          "short_title": "Agriculture & Nature",
+          "emoji": "🌾",
+          "sectors_count": "150+",
+          "keywords": ["Food Security", "Agrotech"],
+          "description": "Management of biological natural resources and sustainable food."
+        },
+        {
+          "id": "GRP-B",
+          "short_title": "Mining & Extraction",
+          "emoji": "⛏️",
+          "sectors_count": "50+",
+          "keywords": ["Energy", "Minerals"],
+          "description": "Extraction of earth's riches and minerals as raw materials."
+        },
+        {
+          "id": "GRP-C",
+          "short_title": "Manufacturing",
+          "emoji": "🏭",
+          "sectors_count": "250+",
+          "keywords": ["Production", "Fabrication"],
+          "description": "Transformation of raw materials into value-added products."
+        },
+        {
+          "id": "GRP-D",
+          "short_title": "Energy & Utilities",
+          "emoji": "⚡",
+          "sectors_count": "20+",
+          "keywords": ["Power Grid", "Renewables"],
+          "description": "Provision of power and energy infrastructure for economic growth."
+        },
+        {
+          "id": "GRP-E",
+          "short_title": "Water & Sustainability",
+          "emoji": "💧",
+          "sectors_count": "30+",
+          "keywords": ["Sanitation", "Recycling"],
+          "description": "Water treatment and recycling solutions for a sustainable future."
+        }
+      ]
+    },
+    {
+      "group_name": "Infrastructure & Logistics",
+      "theme_color": "#3b82f6",
+      "sectors": [
+        {
+          "id": "GRP-F",
+          "short_title": "Construction",
+          "emoji": "🏗️",
+          "sectors_count": "80+",
+          "keywords": ["Projects", "Civil"],
+          "description": "Construction of public facilities and urban installations."
+        },
+        {
+          "id": "GRP-G",
+          "short_title": "Trade & Commerce",
+          "emoji": "🛒",
+          "sectors_count": "150+",
+          "keywords": ["Retail", "Distribution"],
+          "description": "Distribution of consumer goods and after-sales services."
+        },
+        {
+          "id": "GRP-H",
+          "short_title": "Logistics & Transport",
+          "emoji": "📦",
+          "sectors_count": "60+",
+          "keywords": ["Cargo", "Shipping"],
+          "description": "Efficient mobility of goods and passengers via all routes."
+        },
+        {
+          "id": "GRP-L",
+          "short_title": "Real Estate",
+          "emoji": "🏢",
+          "sectors_count": "15+",
+          "keywords": ["Property", "Housing"],
+          "description": "Property development and management of residential spaces."
+        }
+      ]
+    },
+    {
+      "group_name": "Business & Professional",
+      "theme_color": "#6366f1",
+      "sectors": [
+        {
+          "id": "GRP-K",
+          "short_title": "Finance & Banking",
+          "emoji": "🏦",
+          "sectors_count": "40+",
+          "keywords": ["Investment", "Fintech"],
+          "description": "Asset management and financial technology innovations."
+        },
+        {
+          "id": "GRP-M",
+          "short_title": "Professional Services",
+          "emoji": "⚖️",
+          "sectors_count": "60+",
+          "keywords": ["Consultancy", "R&D"],
+          "description": "Expert consultancy and technical research for business."
+        },
+        {
+          "id": "GRP-N",
+          "short_title": "Business Support",
+          "emoji": "💼",
+          "sectors_count": "50+",
+          "keywords": ["Outsourcing", "Admin"],
+          "description": "Provision of operational support and workforce management."
+        }
+      ]
+    },
+    {
+      "group_name": "Public Services & Social",
+      "theme_color": "#f59e0b",
+      "sectors": [
+        {
+          "id": "GRP-O",
+          "short_title": "Government",
+          "emoji": "🏛️",
+          "sectors_count": "20+",
+          "keywords": ["Policy", "Defense"],
+          "description": "State governance and compulsory social security systems."
+        },
+        {
+          "id": "GRP-P",
+          "short_title": "Education",
+          "emoji": "🎓",
+          "sectors_count": "30+",
+          "keywords": ["EdTech", "Learning"],
+          "description": "HR development through formal and vocational training."
+        },
+        {
+          "id": "GRP-Q",
+          "short_title": "Healthcare",
+          "emoji": "🏥",
+          "sectors_count": "30+",
+          "keywords": ["Medical", "Wellness"],
+          "description": "Professional medical services and community welfare."
+        },
+        {
+          "id": "GRP-S",
+          "short_title": "Other Services",
+          "emoji": "🛠️",
+          "sectors_count": "30+",
+          "keywords": ["Personal", "Repair"],
+          "description": "Various personal services supporting daily needs."
+        },
+        {
+          "id": "GRP-T",
+          "short_title": "Household Services",
+          "emoji": "🏠",
+          "sectors_count": "5+",
+          "keywords": ["Domestic", "Staff"],
+          "description": "Household management and domestic employment."
+        },
+        {
+          "id": "GRP-U",
+          "short_title": "Global Bodies",
+          "emoji": "🌐",
+          "sectors_count": "5+",
+          "keywords": ["Diplomatic", "Global"],
+          "description": "Activities of diplomatic and international bodies."
+        }
+      ]
+    },
+    {
+      "group_name": "Creative & Future",
+      "theme_color": "#ec4899",
+      "sectors": [
+        {
+          "id": "GRP-I",
+          "short_title": "Hospitality & Tourism",
+          "emoji": "🏨",
+          "sectors_count": "40+",
+          "keywords": ["Travel", "Dining"],
+          "description": "Accommodation, travel, and culinary industries."
+        },
+        {
+          "id": "GRP-J",
+          "short_title": "Digital & Media",
+          "emoji": "📱",
+          "sectors_count": "50+",
+          "keywords": ["Tech", "Media"],
+          "description": "Digital content and telecom infrastructure development."
+        },
+        {
+          "id": "GRP-R",
+          "short_title": "Arts & Leisure",
+          "emoji": "🎨",
+          "sectors_count": "40+",
+          "keywords": ["Creative", "Culture"],
+          "description": "Creative activities and recreational facilities."
+        },
+        {
+          "id": "GRP-V",
+          "short_title": "Future Tech & AI",
+          "emoji": "🚀",
+          "sectors_count": "Emerging",
+          "keywords": ["AI", "Space"],
+          "description": "High-level innovations shaping the future economy.",
+          "is_featured": true
+        }
+      ]
+    }
+  ]
+}

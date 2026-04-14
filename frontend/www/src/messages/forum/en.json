@@ -1,0 +1,28 @@
+{
+  "ForumPage": {
+    "title": "Forum",
+    "subtitle": "Join discussions with the community — share ideas, experiences, and insights together.",
+    "footer": "🚀 Stay connected — more exciting topics are coming every week!",
+    "noResults": "Oops! No posts found matching these filters.",
+    "filters": {
+      "title": "Filters",
+      "searchPlaceholder": "Search by post title...",
+      "clearSearch": "Clear search",
+      "categories": "Categories",
+      "category_all": "All",
+      "category_design": "Design",
+      "category_development": "Development",
+      "category_marketing": "Marketing",
+      "category_ai": "AI",
+      "category_other": "Other",
+      "sortBy": "Sort by",
+      "sort_latest": "Latest",
+      "sort_popular": "Most Popular",
+      "sort_trending": "Trending",
+      "reset": "Clear All Filters",
+      "activeFilters": "Active Filters",
+      "category_label": "Category",
+      "search_label": "Search"
+    }
+  }
+}

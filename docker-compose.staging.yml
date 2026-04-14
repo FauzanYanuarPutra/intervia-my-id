@@ -1,0 +1,49 @@
+services:
+  identity_service:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-identity:${IMAGE_TAG:-staging}
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      RUST_LOG: ${RUST_LOG:-info}
+
+  marketplace_service:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-marketplace:${IMAGE_TAG:-staging}
+    environment:
+      ENV: staging
+      APP_ENV: staging
+
+  ai_service:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-ai:${IMAGE_TAG:-staging}
+    environment:
+      ENV: staging
+      APP_ENV: staging
+
+  chat_service:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-chat:${IMAGE_TAG:-staging}
+    environment:
+      ENV: staging
+      APP_ENV: staging
+
+  ocr_service:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-ocr:${IMAGE_TAG:-staging}
+
+  liveness_service:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-liveness:${IMAGE_TAG:-staging}
+
+  www:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-www:${IMAGE_TAG:-staging}
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_ENV: staging
+
+  cms:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-cms:${IMAGE_TAG:-staging}
+    environment:
+      NODE_ENV: production
+
+  crm:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-crm:${IMAGE_TAG:-staging}
+    environment:
+      NODE_ENV: production

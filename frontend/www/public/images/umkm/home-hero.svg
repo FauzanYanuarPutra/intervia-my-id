@@ -1,0 +1,40 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="900" rx="48" fill="#0F172A"/>
+  <rect x="40" y="40" width="1120" height="820" rx="40" fill="url(#bg)"/>
+  <circle cx="180" cy="160" r="120" fill="#38BDF8" fill-opacity="0.15"/>
+  <circle cx="1000" cy="170" r="150" fill="#FACC15" fill-opacity="0.12"/>
+  <circle cx="980" cy="720" r="170" fill="#34D399" fill-opacity="0.14"/>
+  <rect x="112" y="160" width="400" height="180" rx="28" fill="#FFFFFF" fill-opacity="0.96"/>
+  <rect x="112" y="376" width="298" height="140" rx="24" fill="#082F49" fill-opacity="0.9"/>
+  <rect x="438" y="376" width="272" height="140" rx="24" fill="#EFF6FF"/>
+  <rect x="740" y="160" width="348" height="528" rx="34" fill="#FFFFFF" fill-opacity="0.1" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="772" y="196" width="284" height="120" rx="24" fill="#F8FAFC"/>
+  <rect x="772" y="340" width="284" height="96" rx="24" fill="#0EA5E9" fill-opacity="0.16"/>
+  <rect x="772" y="460" width="132" height="184" rx="24" fill="#E0F2FE"/>
+  <rect x="924" y="460" width="132" height="184" rx="24" fill="#FEF3C7"/>
+  <rect x="152" y="202" width="230" height="20" rx="10" fill="#0F172A"/>
+  <rect x="152" y="238" width="286" height="16" rx="8" fill="#475569"/>
+  <rect x="152" y="270" width="216" height="16" rx="8" fill="#94A3B8"/>
+  <rect x="152" y="410" width="180" height="18" rx="9" fill="#FFFFFF"/>
+  <rect x="152" y="444" width="220" height="14" rx="7" fill="#BFDBFE"/>
+  <rect x="466" y="408" width="146" height="18" rx="9" fill="#0F172A"/>
+  <rect x="466" y="442" width="180" height="14" rx="7" fill="#475569"/>
+  <rect x="466" y="472" width="154" height="14" rx="7" fill="#94A3B8"/>
+  <rect x="804" y="228" width="154" height="16" rx="8" fill="#0F172A"/>
+  <rect x="804" y="260" width="204" height="14" rx="7" fill="#475569"/>
+  <rect x="804" y="372" width="208" height="14" rx="7" fill="#0F172A"/>
+  <rect x="804" y="402" width="166" height="14" rx="7" fill="#475569"/>
+  <rect x="804" y="514" width="72" height="72" rx="20" fill="#0284C7"/>
+  <rect x="956" y="514" width="72" height="72" rx="20" fill="#F59E0B"/>
+  <path d="M840 548H868V572H840V548Z" fill="#E0F2FE"/>
+  <path d="M992 548H1016V572H992V548Z" fill="#FFF7ED"/>
+  <text x="112" y="96" fill="#E2E8F0" font-size="34" font-family="Arial, sans-serif" font-weight="700">Lajukan UMKM control room</text>
+  <defs>
+    <linearGradient id="bg" x1="600" y1="40" x2="600" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="0.58" stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+  </defs>
+</svg>
+

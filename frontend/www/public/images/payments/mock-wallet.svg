@@ -1,0 +1,8 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="20" fill="#065F46"/>
+  <rect x="22" y="34" width="76" height="52" rx="12" fill="#10B981"/>
+  <rect x="28" y="40" width="64" height="16" rx="8" fill="#6EE7B7"/>
+  <circle cx="84" cy="68" r="8" fill="#D1FAE5"/>
+  <path d="M34 68H66" stroke="#ECFDF5" stroke-width="6" stroke-linecap="round"/>
+  <text x="60" y="109" text-anchor="middle" fill="#D1FAE5" font-size="12" font-family="Arial, sans-serif">MOCK DEV</text>
+</svg>

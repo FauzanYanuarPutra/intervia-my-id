@@ -1,0 +1,66 @@
+defmodule ChatServiceWeb.Endpoint do
+  use Phoenix.Endpoint, otp_app: :chat_service
+
+  @allowed_origins [
+    "https://lajukan.com",
+    "https://www.lajukan.com",
+    "https://chat.lajukan.com",
+    "http://lajukan.com",
+    "http://www.lajukan.com",
+    "http://chat.lajukan.com",
+    "http://127.0.0.1",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002"
+  ]
+
+  @socket_allowed_origins [
+    "//lajukan.com",
+    "//www.lajukan.com",
+    "//chat.lajukan.com",
+    "//127.0.0.1",
+    "//127.0.0.1:3000",
+    "//127.0.0.1:3001",
+    "//127.0.0.1:3002",
+    "//localhost",
+    "//localhost:3000",
+    "//localhost:3001",
+    "//localhost:3002"
+  ]
+
+  socket "/socket", ChatServiceWeb.UserSocket,
+    websocket: [
+      check_origin: @socket_allowed_origins,
+      connect_info: [:peer_data, :x_headers],
+      serializer: [
+        {Phoenix.Socket.V1.JSONSerializer, "~> 1.0.0"},
+        {Phoenix.Socket.V2.JSONSerializer, "~> 2.0.0"}
+      ]
+    ],
+    longpoll: [
+      check_origin: @socket_allowed_origins
+    ]
+
+  plug :health_check
+
+  defp health_check(%{path_info: ["api", "health"]} = conn, _opts) do
+    conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"status":"ok"})) |> halt()
+  end
+  defp health_check(conn, _opts), do: conn
+
+  plug Plug.RequestId
+  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+
+  plug CORSPlug, origin: @allowed_origins
+
+  plug Plug.Parsers,
+    parsers: [:urlencoded, :multipart, :json],
+    pass: ["*/*"],
+    json_decoder: Phoenix.json_library()
+
+  plug ChatServiceWeb.Router
+end

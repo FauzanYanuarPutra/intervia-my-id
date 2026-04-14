@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.lajukan.www.twa",
+      "sha256_cert_fingerprints": [
+        "E8:56:6E:E2:AE:3A:BF:F0:38:0B:77:46:D4:7B:2F:D6:CB:83:6C:45:0E:F2:0F:8F:45:93:5D:61:4D:02:01:58"
+      ]
+    }
+  }
+]

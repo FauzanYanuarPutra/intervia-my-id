@@ -1,0 +1,99 @@
+# ------------------------------------------------------------
+# OS / Editor
+# ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+
+.vscode/
+.idea/
+*.iml
+
+# ------------------------------------------------------------
+# Environment / Secrets
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.staging.example
+!.env.production.example
+
+# ------------------------------------------------------------
+# Node / Frontend
+# ------------------------------------------------------------
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/out/
+**/.turbo/
+**/.cache/
+**/.parcel-cache/
+**/.vite/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# ------------------------------------------------------------
+# Python
+# ------------------------------------------------------------
+**/__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ------------------------------------------------------------
+# Rust
+# ------------------------------------------------------------
+**/target/
+
+# ------------------------------------------------------------
+# Elixir
+# ------------------------------------------------------------
+**/_build/
+**/deps/
+erl_crash.dump
+*.ez
+
+# ------------------------------------------------------------
+# Docker / Local Data / Build Artifacts
+# ------------------------------------------------------------
+.dockerbuildkit/
+docker-data/
+qdrant_storage/
+postgres_data/
+redis_data/
+scylla_data/
+minio_data/
+meili_data/
+ollama_data/
+caddy_data/
+caddy_config/
+rabbitmq_data/
+.docker-build-state.*
+
+# ------------------------------------------------------------
+# Misc
+# ------------------------------------------------------------
+*.log
+.npmrc
+ubuntu.tar
+ubuntu.tar
+ubuntu.tar

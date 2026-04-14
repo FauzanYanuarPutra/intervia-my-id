@@ -1,0 +1,172 @@
+-- Seed super-app provider accounts (food merchants, couriers, and service partners)
+-- Password for all seeded accounts: "Test123!@#"
+
+INSERT INTO users (
+    id, email, password_hash,
+    email_verified, status, created_at, updated_at
+) VALUES
+(
+    '00000000-0000-0000-0000-000000000101',
+    'merchant.nusantara@lajukan.com',
+    '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068',
+    TRUE,
+    'active',
+    NOW(),
+    NOW()
+),
+(
+    '00000000-0000-0000-0000-000000000102',
+    'merchant.kopisenja@lajukan.com',
+    '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068',
+    TRUE,
+    'active',
+    NOW(),
+    NOW()
+),
+(
+    '00000000-0000-0000-0000-000000000103',
+    'merchant.dapursehat@lajukan.com',
+    '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068',
+    TRUE,
+    'active',
+    NOW(),
+    NOW()
+),
+(
+    '00000000-0000-0000-0000-000000000201',
+    'driver.one@lajukan.com',
+    '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068',
+    TRUE,
+    'active',
+    NOW(),
+    NOW()
+),
+(
+    '00000000-0000-0000-0000-000000000202',
+    'driver.two@lajukan.com',
+    '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068',
+    TRUE,
+    'active',
+    NOW(),
+    NOW()
+),
+(
+    '00000000-0000-0000-0000-000000000301',
+    'mart.seller@lajukan.com',
+    '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068',
+    TRUE,
+    'active',
+    NOW(),
+    NOW()
+),
+(
+    '00000000-0000-0000-0000-000000000401',
+    'service.partner@lajukan.com',
+    '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068',
+    TRUE,
+    'active',
+    NOW(),
+    NOW()
+)
+ON CONFLICT (email) DO UPDATE
+SET
+    password_hash = EXCLUDED.password_hash,
+    email_verified = EXCLUDED.email_verified,
+    status = EXCLUDED.status,
+    failed_login_attempts = 0,
+    lockout_expires_at = NULL,
+    deleted_at = NULL,
+    updated_at = NOW();
+
+INSERT INTO user_profiles (user_id, full_name, bio, username, location, metadata, updated_at)
+VALUES
+    (
+      '00000000-0000-0000-0000-000000000101',
+      'Warung Nusantara Owner',
+      'Merchant food partner - masakan nusantara.',
+      'merchant_nusantara',
+      'Jakarta',
+      '{"roles":["merchant_food","provider"],"business_type":"food"}'::jsonb,
+      NOW()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000102',
+      'Kopi Senja Owner',
+      'Merchant food partner - coffee and bites.',
+      'merchant_kopisenja',
+      'Jakarta',
+      '{"roles":["merchant_food","provider"],"business_type":"food"}'::jsonb,
+      NOW()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000103',
+      'Dapur Sehat Owner',
+      'Merchant food partner - healthy food.',
+      'merchant_dapursehat',
+      'Jakarta',
+      '{"roles":["merchant_food","provider"],"business_type":"food"}'::jsonb,
+      NOW()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000201',
+      'Driver One',
+      'Courier partner for super app dispatch.',
+      'driver_one',
+      'Jakarta',
+      '{"roles":["driver","courier_partner"],"vehicle_type":"motorbike"}'::jsonb,
+      NOW()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000202',
+      'Driver Two',
+      'Courier partner for super app dispatch.',
+      'driver_two',
+      'Jakarta',
+      '{"roles":["driver","courier_partner"],"vehicle_type":"car"}'::jsonb,
+      NOW()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000301',
+      'Mart Seller',
+      'Local mart seller partner.',
+      'mart_seller',
+      'Jakarta',
+      '{"roles":["merchant_mart","seller"],"business_type":"mart"}'::jsonb,
+      NOW()
+    ),
+    (
+      '00000000-0000-0000-0000-000000000401',
+      'Service Partner',
+      'Professional service provider partner.',
+      'service_partner',
+      'Jakarta',
+      '{"roles":["provider_services","freelancer"],"business_type":"services"}'::jsonb,
+      NOW()
+    )
+ON CONFLICT (user_id) DO UPDATE
+SET
+  full_name = EXCLUDED.full_name,
+  bio = EXCLUDED.bio,
+  username = EXCLUDED.username,
+  location = EXCLUDED.location,
+  metadata = COALESCE(user_profiles.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+  updated_at = EXCLUDED.updated_at;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT
+  u.id::uuid,
+  r.id
+FROM (VALUES
+    ('00000000-0000-0000-0000-000000000101'),
+    ('00000000-0000-0000-0000-000000000102'),
+    ('00000000-0000-0000-0000-000000000103'),
+    ('00000000-0000-0000-0000-000000000201'),
+    ('00000000-0000-0000-0000-000000000202'),
+    ('00000000-0000-0000-0000-000000000301'),
+    ('00000000-0000-0000-0000-000000000401')
+) AS u(id)
+CROSS JOIN roles r
+WHERE r.name = 'buyer'
+ON CONFLICT DO NOTHING;
+
+SELECT 1;

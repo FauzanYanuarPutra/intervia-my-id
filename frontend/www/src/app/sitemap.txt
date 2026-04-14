@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset 
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" 
+  xmlns:xhtml="http://www.w3.org/1999/xhtml"
+>
+  <!-- Looping homepage + paths for all locales -->
+  <!-- Homepage default (tanpa prefix bahasa) -->
+  <url>
+    <loc>https://www.lajukan.com/</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en"/>
+  </url>
+
+  <!-- Paths for all locales -->
+  <!-- Example path: home, search, forum, login, register -->
+  <!-- Structure is the same, just loop in generator if programmatically -->
+  <url>
+    <loc>https://www.lajukan.com/id/home</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/home"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/home"/>
+  </url>
+  <url>
+    <loc>https://www.lajukan.com/en/home</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/home"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/home"/>
+  </url>
+
+  <!-- search -->
+  <url>
+    <loc>https://www.lajukan.com/id/search</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/search"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/search"/>
+  </url>
+  <url>
+    <loc>https://www.lajukan.com/en/search</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/search"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/search"/>
+  </url>
+
+  <!-- forum -->
+  <url>
+    <loc>https://www.lajukan.com/id/forum</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/forum"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/forum"/>
+  </url>
+  <url>
+    <loc>https://www.lajukan.com/en/forum</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/forum"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/forum"/>
+  </url>
+
+  <!-- login -->
+  <url>
+    <loc>https://www.lajukan.com/id/login</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/login"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/login"/>
+  </url>
+  <url>
+    <loc>https://www.lajukan.com/en/login</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/login"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/login"/>
+  </url>
+
+  <!-- register -->
+  <url>
+    <loc>https://www.lajukan.com/id/register</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/register"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/register"/>
+  </url>
+  <url>
+    <loc>https://www.lajukan.com/en/register</loc>
+    <lastmod>2025-12-12T12:34:56.789Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/register"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/register"/>
+  </url>
+</urlset>

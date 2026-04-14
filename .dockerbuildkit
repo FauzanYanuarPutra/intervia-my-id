@@ -1,0 +1,10 @@
+# Docker BuildKit Configuration
+# Untuk mempercepat build Docker dengan caching yang lebih baik
+
+# CARA PAKAI:
+# export DOCKER_BUILDKIT=1
+# export BUILDKIT_PROGRESS=plain
+
+# Atau tambahkan ke ~/.bashrc atau ~/.zshrc:
+# echo 'export DOCKER_BUILDKIT=1' >> ~/.bashrc
+# echo 'export BUILDKIT_PROGRESS=plain' >> ~/.bashrc

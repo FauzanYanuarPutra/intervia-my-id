@@ -1,0 +1,147 @@
+'use client';
+
+import { useEffect, useState, type FormEvent } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
+import { ArrowRight, Clapperboard, Search } from 'lucide-react';
+
+type ReelItem = {
+  id: string;
+  mediaUrl: string;
+  mediaType: 'video' | 'image';
+  title: string;
+  caption: string;
+  hook: string;
+  store: {
+    id: string;
+    slug: string;
+    name: string;
+    city: string;
+    phone?: string | null;
+    storefrontPath: string;
+  };
+};
+
+export default function ReelsFeedClient({ isId }: { isId: boolean }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get('q') || '');
+  const [city, setCity] = useState(searchParams.get('city') || '');
+  const search = searchParams.toString();
+  const requestSearch = search ? `${search}&limit=18` : 'limit=18';
+  const [items, setItems] = useState<ReelItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const storeHint = searchParams.get('store') || '';
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/reels/feed?${requestSearch}`, { cache: 'no-store' })
+      .then(res => res.json())
+      .then(payload => {
+        if (alive) setItems(payload.data || []);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [requestSearch]);
+
+  const submitFilters = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    const params = new URLSearchParams(searchParams.toString());
+    if (query) {
+      params.set('q', query);
+    } else {
+      params.delete('q');
+    }
+    if (city) {
+      params.set('city', city);
+    } else {
+      params.delete('city');
+    }
+    const next = params.toString();
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+  };
+
+  return (
+    <main className="page-shell page-rhythm py-8">
+      <section className="ui-panel ui-hero-panel rounded-3xl p-6">
+        <p className="ui-kicker">
+          <Clapperboard className="h-3.5 w-3.5" />
+          {isId ? 'Reels usaha' : 'Business reels'}
+        </p>
+        <h1 className="mt-3 text-3xl font-black tracking-tight text-[color:var(--app-text)]">
+          {storeHint
+            ? isId
+              ? `Reels untuk ${storeHint}`
+              : `Reels for ${storeHint}`
+            : isId
+              ? 'Scroll bukti usaha, lalu masuk ke toko'
+              : 'Scroll business proof, then open the store'}
+        </h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+          {isId
+            ? 'Reels di Lajukan bukan buat hiburan kosong. Fungsinya untuk nunjukin proses, produk unggulan, dan ritme order yang benar-benar jalan.'
+            : 'These reels are not for empty scrolling. They show process, hero products, and a real operating rhythm.'}
+        </p>
+      </section>
+
+      <form onSubmit={submitFilters} className="ui-panel mt-4 rounded-3xl p-5">
+        <div className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-[color:var(--app-text-soft)]" />
+            <input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder={isId ? 'Cari nama toko atau produk' : 'Search store or product'}
+              className="w-full rounded-2xl border border-[color:var(--app-border)] bg-white px-10 py-3 text-sm text-[color:var(--app-text)]"
+            />
+          </label>
+          <input
+            value={city}
+            onChange={event => setCity(event.target.value)}
+            placeholder={isId ? 'Filter kota' : 'City filter'}
+            className="rounded-2xl border border-[color:var(--app-border)] bg-white px-3 py-3 text-sm text-[color:var(--app-text)]"
+          />
+          <button type="submit" className="ui-button-primary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold">
+            <ArrowRight className="h-4 w-4" />
+            {isId ? 'Refresh feed' : 'Refresh feed'}
+          </button>
+        </div>
+      </form>
+
+      <section className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {loading ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Memuat reels...' : 'Loading reels...'}</p> : null}
+        {!loading && items.length === 0 ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Belum ada reels yang cocok dengan filter ini.' : 'No reels match the current filters.'}</p> : null}
+        {items.map(item => (
+          <article key={item.id} className="overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-white shadow-[0_22px_40px_-32px_rgba(15,23,42,0.2)]">
+            <div className="relative aspect-[9/14] overflow-hidden bg-slate-100">
+              {item.mediaType === 'video' ? (
+                <video src={item.mediaUrl} className="h-full w-full object-cover" controls playsInline preload="metadata" />
+              ) : (
+                <img src={item.mediaUrl} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
+              )}
+            </div>
+            <div className="space-y-3 p-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--app-accent)]">{item.store.name}</p>
+                <h2 className="mt-1 text-base font-semibold text-[color:var(--app-text)]">{item.title}</h2>
+                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{item.store.city}</p>
+              </div>
+              <p className="text-sm leading-6 text-[color:var(--app-text-soft)]">{item.hook}</p>
+              <p className="text-sm leading-6 text-[color:var(--app-text-soft)]">{item.caption}</p>
+              <div className="flex flex-wrap gap-2">
+                <Link href={item.store.storefrontPath} className="ui-button-primary inline-flex items-center justify-center px-4 text-sm font-semibold">{isId ? 'Masuk ke toko' : 'Open store'}</Link>
+                <Link href={`${item.store.storefrontPath}?tab=reels`} className="ui-button-secondary inline-flex items-center justify-center px-4 text-sm font-semibold">{isId ? 'Lihat reels toko' : 'Store reels'}</Link>
+              </div>
+            </div>
+          </article>
+        ))}
+      </section>
+    </main>
+  );
+}

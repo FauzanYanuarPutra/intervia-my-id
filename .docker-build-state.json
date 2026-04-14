@@ -1,0 +1,41 @@
+{
+    "updated_at":  "2026-03-13T18:48:21.8949311+07:00",
+    "services":  {
+                     "chat_service":  {
+                                          "built_at":  "bootstrap-no-build",
+                                          "input_ticks":  639089044292283658
+                                      },
+                     "ai_service":  {
+                                        "built_at":  "2026-03-13T10:55:23.9097658+07:00",
+                                        "input_ticks":  639089695028712293
+                                    },
+                     "identity_service":  {
+                                              "built_at":  "2026-03-13T10:55:23.9215304+07:00",
+                                              "input_ticks":  639089695028712293
+                                          },
+                     "cms":  {
+                                 "built_at":  "2026-03-13T18:41:01.3067594+07:00",
+                                 "input_ticks":  639089973125046475
+                             },
+                     "liveness_service":  {
+                                              "built_at":  "bootstrap-no-build",
+                                              "input_ticks":  639089132927177023
+                                          },
+                     "www":  {
+                                 "built_at":  "2026-03-13T18:41:01.3208776+07:00",
+                                 "input_ticks":  639089973125046475
+                             },
+                     "marketplace_service":  {
+                                                 "built_at":  "2026-03-13T10:55:23.9225985+07:00",
+                                                 "input_ticks":  639089695028712293
+                                             },
+                     "crm":  {
+                                 "built_at":  "2026-03-13T18:41:01.3218827+07:00",
+                                 "input_ticks":  639089973125046475
+                             },
+                     "ocr_service":  {
+                                         "built_at":  "bootstrap-no-build",
+                                         "input_ticks":  639089132881423718
+                                     }
+                 }
+}

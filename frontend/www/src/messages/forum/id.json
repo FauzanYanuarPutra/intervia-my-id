@@ -1,0 +1,28 @@
+{
+  "ForumPage": {
+    "title": "Forum",
+    "subtitle": "Bergabunglah dalam diskusi menarik bersama komunitas — berbagi ide, pengalaman, dan solusi bersama.",
+    "footer": "🚀 Tetap terhubung — lebih banyak topik baru akan datang setiap minggu!",
+    "noResults": "Ups! Tidak ada postingan yang ditemukan dengan filter ini.",
+    "filters": {
+      "title": "Filter",
+      "searchPlaceholder": "Cari berdasarkan judul postingan...",
+      "clearSearch": "Hapus pencarian",
+      "categories": "Kategori",
+      "category_all": "Semua",
+      "category_design": "Desain",
+      "category_development": "Pengembangan",
+      "category_marketing": "Pemasaran",
+      "category_ai": "Kecerdasan Buatan",
+      "category_other": "Lainnya",
+      "sortBy": "Urutkan berdasarkan",
+      "sort_latest": "Terbaru",
+      "sort_popular": "Terpopuler",
+      "sort_trending": "Sedang Tren",
+      "reset": "Hapus Semua Filter",
+      "activeFilters": "Filter Aktif",
+      "category_label": "Kategori",
+      "search_label": "Pencarian"
+    }
+  }
+}

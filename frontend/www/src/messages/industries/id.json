@@ -1,0 +1,211 @@
+{
+  "industry_groups": [
+    {
+      "group_name": "Produksi & Sumber Daya",
+      "theme_color": "#10b981",
+      "sectors": [
+        {
+          "id": "GRP-A",
+          "short_title": "Pertanian & Alam",
+          "emoji": "🌾",
+          "sectors_count": "150+",
+          "keywords": ["Pangan", "Agroteknologi", "Kelautan"],
+          "description": "Pengelolaan sumber daya alam hayati dan sektor pangan berkelanjutan."
+        },
+        {
+          "id": "GRP-B",
+          "short_title": "Tambang & Mineral",
+          "emoji": "⛏️",
+          "sectors_count": "50+",
+          "keywords": ["Energi", "Mineral", "Batubara"],
+          "description": "Ekstraksi kekayaan bumi dan mineral sebagai bahan baku industri."
+        },
+        {
+          "id": "GRP-C",
+          "short_title": "Manufaktur",
+          "emoji": "🏭",
+          "sectors_count": "250+",
+          "keywords": ["Produksi", "Pabrik", "Hilirisasi"],
+          "description": "Transformasi bahan mentah menjadi produk bernilai tambah."
+        },
+        {
+          "id": "GRP-D",
+          "short_title": "Energi & Listrik",
+          "emoji": "⚡",
+          "sectors_count": "20+",
+          "keywords": ["Listrik", "EBT", "Utilitas"],
+          "description": "Penyediaan infrastruktur daya dan energi nasional."
+        },
+        {
+          "id": "GRP-E",
+          "short_title": "Air & Lingkungan",
+          "emoji": "💧",
+          "sectors_count": "30+",
+          "keywords": ["Sanitasi", "Limbah", "Daur Ulang"],
+          "description": "Pengelolaan air bersih dan solusi keberlanjutan lingkungan."
+        }
+      ]
+    },
+    {
+      "group_name": "Infrastruktur & Logistik",
+      "theme_color": "#3b82f6",
+      "sectors": [
+        {
+          "id": "GRP-F",
+          "short_title": "Konstruksi",
+          "emoji": "🏗️",
+          "sectors_count": "80+",
+          "keywords": ["Proyek", "Sipil", "Bangunan"],
+          "description": "Pembangunan sarana publik, gedung, dan instalasi infrastruktur."
+        },
+        {
+          "id": "GRP-G",
+          "short_title": "Perdagangan",
+          "emoji": "🛒",
+          "sectors_count": "150+",
+          "keywords": ["Retail", "Distribusi", "Grosir"],
+          "description": "Distribusi barang konsumsi dan layanan jual beli masyarakat."
+        },
+        {
+          "id": "GRP-H",
+          "short_title": "Logistik & Transport",
+          "emoji": "📦",
+          "sectors_count": "60+",
+          "keywords": ["Kargo", "Kurir", "Logistik"],
+          "description": "Mobilitas barang dan penumpang via darat, laut, dan udara."
+        },
+        {
+          "id": "GRP-L",
+          "short_title": "Properti & Aset",
+          "emoji": "🏢",
+          "sectors_count": "15+",
+          "keywords": ["Real Estate", "Hunian", "Apartemen"],
+          "description": "Pengembangan aset properti dan manajemen hunian."
+        }
+      ]
+    },
+    {
+      "group_name": "Bisnis & Profesional",
+      "theme_color": "#6366f1",
+      "sectors": [
+        {
+          "id": "GRP-K",
+          "short_title": "Keuangan & Bank",
+          "emoji": "🏦",
+          "sectors_count": "40+",
+          "keywords": ["Investasi", "Fintech", "Asuransi"],
+          "description": "Layanan pengelolaan aset dan inovasi teknologi finansial."
+        },
+        {
+          "id": "GRP-M",
+          "short_title": "Layanan Ahli",
+          "emoji": "⚖️",
+          "sectors_count": "60+",
+          "keywords": ["Konsultan", "Hukum", "Riset"],
+          "description": "Layanan konsultasi ahli dan penelitian teknis spesifik."
+        },
+        {
+          "id": "GRP-N",
+          "short_title": "Dukungan Bisnis",
+          "emoji": "💼",
+          "sectors_count": "50+",
+          "keywords": ["Outsourcing", "Admin", "HR"],
+          "description": "Jasa pendukung operasional kantor dan tenaga kerja."
+        }
+      ]
+    },
+    {
+      "group_name": "Layanan Publik & Sosial",
+      "theme_color": "#f59e0b",
+      "sectors": [
+        {
+          "id": "GRP-O",
+          "short_title": "Pemerintahan",
+          "emoji": "🏛️",
+          "sectors_count": "20+",
+          "keywords": ["Publik", "Negara", "Birokrasi"],
+          "description": "Penyelenggaraan negara dan sistem jaminan sosial."
+        },
+        {
+          "id": "GRP-P",
+          "short_title": "Pendidikan",
+          "emoji": "🎓",
+          "sectors_count": "30+",
+          "keywords": ["Sekolah", "Skill", "Edukasi"],
+          "description": "Pengembangan SDM melalui jalur formal dan pelatihan."
+        },
+        {
+          "id": "GRP-Q",
+          "short_title": "Kesehatan",
+          "emoji": "🏥",
+          "sectors_count": "30+",
+          "keywords": ["Medis", "Klinik", "Sosial"],
+          "description": "Layanan medis profesional dan dukungan kesejahteraan."
+        },
+        {
+          "id": "GRP-S",
+          "short_title": "Jasa Lainnya",
+          "emoji": "🛠️",
+          "sectors_count": "30+",
+          "keywords": ["Laundry", "Bengkel", "Personal"],
+          "description": "Layanan jasa personal pendukung kebutuhan harian."
+        },
+        {
+          "id": "GRP-T",
+          "short_title": "Rumah Tangga",
+          "emoji": "🏠",
+          "sectors_count": "5+",
+          "keywords": ["Domestik", "ART", "Staf"],
+          "description": "Aktivitas pengelolaan rumah tangga sebagai pemberi kerja."
+        },
+        {
+          "id": "GRP-U",
+          "short_title": "Lembaga Global",
+          "emoji": "🌐",
+          "sectors_count": "5+",
+          "keywords": ["Diplomatik", "PBB", "Internasional"],
+          "description": "Kegiatan organisasi internasional lintas kedaulatan."
+        }
+      ]
+    },
+    {
+      "group_name": "Kreatif & Masa Depan",
+      "theme_color": "#ec4899",
+      "sectors": [
+        {
+          "id": "GRP-I",
+          "short_title": "Wisata & Kuliner",
+          "emoji": "🏨",
+          "sectors_count": "40+",
+          "keywords": ["Hotel", "Travel", "Resto"],
+          "description": "Layanan akomodasi, wisata, dan industri kuliner."
+        },
+        {
+          "id": "GRP-J",
+          "short_title": "Digital & Media",
+          "emoji": "📱",
+          "sectors_count": "50+",
+          "keywords": ["Internet", "Konten", "IT"],
+          "description": "Konten digital, telekomunikasi, dan teknologi media."
+        },
+        {
+          "id": "GRP-R",
+          "short_title": "Seni & Hiburan",
+          "emoji": "🎨",
+          "sectors_count": "40+",
+          "keywords": ["Kreatif", "Musik", "Budaya"],
+          "description": "Aktivitas seni, hiburan, dan fasilitas rekreasi."
+        },
+        {
+          "id": "GRP-V",
+          "short_title": "Future Tech & AI",
+          "emoji": "🚀",
+          "sectors_count": "Emerging",
+          "keywords": ["AI", "Robotik", "Antariksa"],
+          "description": "Inovasi teknologi tinggi yang membentuk masa depan.",
+          "is_featured": true
+        }
+      ]
+    }
+  ]
+}

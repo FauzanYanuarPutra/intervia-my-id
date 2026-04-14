@@ -1,0 +1,226 @@
+{
+  "Home": {
+    "hero": {
+      "badge": "🔥 2026 Alert: The Market is Moving Without You",
+      "title_part1": "Stop Losing Money",
+      "title_highlight": "Every Day Your Assets Stay Idle.",
+      "description": "While you wait, thousands are already turning their idle assets into consistent daily revenue. Don't let your potential evaporate—connect to the ecosystem and start earning before the window closes.",
+      "cta": "Secure Your Spot Now",
+      "user_count": "12,400+ Already Earning",
+      "trust_label": "Verified Ecosystem",
+      "trust_sublabel": "Free Access Closing Soon",
+      "feature1": "Instant Activation",
+      "feature2": "High-Demand Network"
+    },
+    "visual": {
+      "badge": "Make It Happen",
+      "core_title": "Accelerate Now,\nHarvest Wealth",
+      "item1": "Profit",
+      "item2": "Car",
+      "item3": "Assets",
+      "item4": "House",
+      "item5": "Hobby",
+      "item6": "Business",
+      "notif1": "Asset Rented! +$200",
+      "notif2": "Item Sold! ✅"
+    },
+    "activityCard": {
+      "badge": "🚀 Boundless Opportunity",
+      "title_part1": "Turn Assets into",
+      "title_highlight": "Revenue.",
+      "description": "Don't let your goods or skills sit idle. Start renting, selling, or offering your services right now.",
+      "cta": "Get Started",
+      "features": {
+        "f1": "Passive Income",
+        "f2": "Safe Ecosystem",
+        "f3": "Global Market",
+        "f4": "Instant Payout"
+      }
+    },
+    "heroSection": {
+      "ariaLabel": "Platform overview and performance metrics"
+    },
+    "heroTagline": "Empower Your Career",
+    "heroMain": "Find Jobs, Projects & Opportunities Globally",
+    "heroDesc": "Join Lajukan to work, earn, and explore worldwide—jobs, freelance gigs, marketplace, property, and travel.",
+    "audienceTitle": "For Everyone, Everywhere",
+    "audiences": {
+      "cariKerja": "Find Jobs Fast",
+      "jualJasa": "Get Freelance Projects",
+      "marketplace": "Buy & Sell Anything",
+      "properti": "Invest & Discover Property",
+      "travel": "Explore Trips & Deals"
+    },
+    "btnStart": "Get Started Now",
+    "btnFeatures": "Explore Features",
+    "Overview": {
+      "kpi": {
+        "transaksi": "Transactions",
+        "pengguna": "Users"
+      },
+      "socialProof": "Trusted by thousands worldwide."
+    },
+    "Marketplace": {
+      "kpi": {
+        "pelakuUsaha": "Sellers",
+        "pesanan": "Orders"
+      },
+      "socialProof": "Over 15,000 active sellers globally."
+    },
+    "Properties": {
+      "kpi": {
+        "listing": "Listings",
+        "transaksi": "Transactions"
+      },
+      "socialProof": "Leading platform for trusted property listings."
+    },
+    "featured": {
+      "title": "Key Feature Highlights"
+    },
+    "news": {
+      "trendingDescription": "Latest news and trends curated for you."
+    },
+    "community": {
+      "trendingDescription": "Join discussions and get expert insights."
+    },
+    "features": {
+      "title": "Core Modules & Features",
+      "description": "Lajukan is a SuperApp for work, assets, learning, and exploration.",
+      "jobs": {
+        "title": "Job Market",
+        "desc": "Apply for global jobs"
+      },
+      "freelancers": {
+        "title": "Freelancer Marketplace",
+        "desc": "Connect with clients & get paid"
+      },
+      "microgigs": {
+        "title": "Micro-Gigs",
+        "desc": "Small tasks, instant pay"
+      },
+      "marketplace": {
+        "title": "Marketplace & MSMEs",
+        "desc": "Buy & sell globally"
+      },
+      "property": {
+        "title": "Property Marketplace",
+        "desc": "Find & manage listings"
+      },
+      "travel": {
+        "title": "Travel & Booking",
+        "desc": "Book hotels & tours easily"
+      },
+      "game": {
+        "title": "Gaming Marketplace",
+        "desc": "Trade gaming assets securely"
+      },
+      "payments": {
+        "title": "Smart Escrow & Payments",
+        "desc": "Secure global payments"
+      },
+      "education": {
+        "title": "Education & Certification",
+        "desc": "Boost your skills"
+      },
+      "crm": {
+        "title": "CRM & Sales",
+        "desc": "Manage leads & customers"
+      },
+      "hr": {
+        "title": "HR & Payroll",
+        "desc": "Automate HR & payroll"
+      },
+      "community": {
+        "title": "Community & Forums",
+        "desc": "Join global discussions"
+      },
+      "vendor": {
+        "title": "Vendor Marketplace",
+        "desc": "Hire service providers"
+      },
+      "analytics": {
+        "title": "AI Insights",
+        "desc": "Smart business analytics"
+      },
+      "support": {
+        "title": "24/7 Support",
+        "desc": "Help anytime"
+      },
+      "news": {
+        "title": "News & Trends",
+        "desc": "Latest updates & analysis"
+      },
+      "wellness": {
+        "title": "Wellness & Health",
+        "desc": "Stay healthy & fit"
+      },
+      "charity": {
+        "title": "Donations & Social",
+        "desc": "Support global causes"
+      },
+      "financial": {
+        "title": "Finance & Investment",
+        "desc": "Trusted financial tools"
+      }
+    },
+    "jobs": {
+      "title": "Latest Job Opportunities",
+      "description": "Find your dream job globally.",
+      "1": {
+        "title": "Frontend Developer"
+      },
+      "2": {
+        "title": "Senior Backend Developer"
+      }
+    },
+    "freelancers": {
+      "title": "Top Freelancers",
+      "description": "Connect with skilled professionals worldwide.",
+      "1": {
+        "coverAlt": "Muhammad Fauzan Cover",
+        "avatarAlt": "Muhammad Fauzan Avatar",
+        "tagline": "Fullstack Developer",
+        "achievements": {
+          "topSeller": "Top Rated",
+          "risingStar": "Rising Star"
+        }
+      },
+      "2": {
+        "coverAlt": "Jane Doe Cover",
+        "avatarAlt": "Jane Doe Avatar",
+        "tagline": "Frontend Engineer",
+        "achievements": {
+          "topSeller": "Top Rated",
+          "risingStar": "Rising Star"
+        }
+      }
+    },
+    "financial": {
+      "title": "Featured Financial Products",
+      "description": "Explore verified loans, investments, and insurance."
+    },
+    "wellness": {
+      "title": "Wellness & Healthy Lifestyle",
+      "description": "Easy guides to live healthier and fitter."
+    },
+    "charity": {
+      "title": "Donations & Social Initiatives",
+      "description": "Make a positive impact globally."
+    },
+    "analytics": {
+      "title": "Analytics & AI Insights",
+      "description": "Use AI to find trends & opportunities."
+    },
+    "crm": {
+      "title": "CRM & Customer Management",
+      "description": "Manage leads and maintain strong relationships."
+    },
+    "hr": {
+      "title": "HR & Payroll Automation",
+      "description": "Simplify HR and global payroll."
+    },
+    "welcomeBack": "Welcome back",
+    "dashboardReady": "Your dashboard is ready.",
+    "seeMore": "See More"
+  }
+}

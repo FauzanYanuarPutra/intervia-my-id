@@ -1,0 +1,2 @@
+export const DEFAULT_TAX_BPS = 1100;
+export const DEFAULT_ONLINE_SERVICE_FEE_CENTS = 500_000;

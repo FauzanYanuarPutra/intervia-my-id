@@ -1,0 +1,10 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="20" fill="#334155"/>
+  <path d="M18 44L60 22L102 44V50H18V44Z" fill="#E2E8F0"/>
+  <rect x="22" y="52" width="12" height="26" fill="#CBD5E1"/>
+  <rect x="40" y="52" width="12" height="26" fill="#CBD5E1"/>
+  <rect x="58" y="52" width="12" height="26" fill="#CBD5E1"/>
+  <rect x="76" y="52" width="12" height="26" fill="#CBD5E1"/>
+  <rect x="18" y="80" width="84" height="10" rx="5" fill="#94A3B8"/>
+  <text x="60" y="109" text-anchor="middle" fill="#E2E8F0" font-size="12" font-family="Arial, sans-serif">BANK TRANSFER</text>
+</svg>

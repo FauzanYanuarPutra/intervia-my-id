@@ -1,0 +1,13354 @@
+use axum::{
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Path, Query, State,
+    },
+    http::{header, HeaderMap, HeaderValue, Method, StatusCode},
+    response::IntoResponse,
+    routing::{get, post, put},
+    Json, Router,
+};
+use chrono::{DateTime, Duration as ChronoDuration, Utc};
+use futures_util::{SinkExt, StreamExt};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use lapin::{
+    options::{BasicPublishOptions, ExchangeDeclareOptions},
+    types::FieldTable,
+    BasicProperties, Channel, Connection, ConnectionProperties, ExchangeKind,
+};
+use reqwest::{
+    header::{ACCEPT, CONTENT_TYPE},
+    Client, RequestBuilder,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha512};
+use sqlx::{postgres::PgPoolOptions, FromRow, PgPool};
+use std::{
+    collections::{HashMap, HashSet},
+    env,
+    error::Error,
+    sync::Arc,
+};
+use tokio::net::TcpListener;
+use tokio::sync::broadcast;
+use tokio::time::{sleep, Duration};
+use tower_http::cors::CorsLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use uuid::Uuid;
+
+#[derive(Clone)]
+struct AppState {
+    db: PgPool,
+    jwt_secret: String,
+    identity_base_url: String,
+    http_client: Client,
+    notification_tx: broadcast::Sender<RealtimeNotificationEnvelope>,
+}
+
+const OUTBOX_DEFAULT_BATCH_SIZE: i64 = 50;
+const OUTBOX_DEFAULT_POLL_MS: u64 = 1500;
+const MAX_TITLE_LEN: usize = 180;
+const MAX_SUMMARY_LEN: usize = 1000;
+const MAX_BODY_LEN: usize = 20_000;
+const MAX_METADATA_BYTES: usize = 64 * 1024;
+const MAX_TAGS: usize = 20;
+const MAX_TAG_LEN: usize = 40;
+const MAX_CONTENT_MEDIA_URLS: usize = 12;
+const MAX_EVIDENCE_ATTACHMENTS: usize = 10;
+const MAX_REASON_CODE_LEN: usize = 80;
+const MAX_EVIDENCE_NOTE_LEN: usize = 4_000;
+const MAX_DELIVERY_ATTEMPTS: usize = 3;
+const MAX_DELIVERY_ATTACHMENTS: usize = 10;
+const MAX_DELIVERY_TITLE_LEN: usize = 180;
+const MAX_DELIVERY_ATTACHMENT_LABEL_LEN: usize = 120;
+const MAX_DELIVERY_REFERENCE_LEN: usize = 2_000;
+const EVIDENCE_HASH_SHA256_LEN: usize = 64;
+const MIN_TOPUP_CENTS_DEV: i64 = 1_000;
+const MAX_TOPUP_CENTS_DEV: i64 = 100_000_000_000;
+const MIN_TOPUP_CENTS_LIVE: i64 = 10_000;
+const MAX_TOPUP_CENTS_LIVE: i64 = 5_000_000_000_000;
+const WALLET_MAX_FETCH_LIMIT: i64 = 200;
+const NOTIFICATION_WS_CHANNEL_CAP: usize = 2048;
+const NOTIFICATION_MAX_FETCH_LIMIT: i64 = 200;
+
+#[derive(Debug, Clone)]
+struct RealtimeNotificationEnvelope {
+    user_id: Uuid,
+    payload: Value,
+}
+
+#[derive(Debug, Clone)]
+struct LinkedTransactionFundingOutcome {
+    transaction_id: Uuid,
+    buyer_id: Uuid,
+    seller_id: Uuid,
+    transaction_status: String,
+    protection_status: String,
+    payment_status: String,
+    wallet_environment: String,
+    amount_cents: i64,
+    currency: String,
+}
+
+#[derive(Debug, FromRow, Clone)]
+struct OutboxEventRow {
+    id: Uuid,
+    routing_key: String,
+    payload: Value,
+    retry_count: i32,
+}
+
+fn parse_cors_origins() -> Vec<HeaderValue> {
+    let raw = env::var("CORS_ORIGINS")
+        .ok()
+        .or_else(|| env::var("CORS_ORIGIN").ok())
+        .unwrap_or_else(|| {
+            "http://localhost:3000,http://localhost:3001,http://localhost:3002".to_string()
+        });
+
+    raw.split(',')
+        .filter_map(|origin| origin.trim().parse::<HeaderValue>().ok())
+        .collect()
+}
+
+#[derive(Debug, Deserialize)]
+struct AccessClaims {
+    sub: String,
+    exp: usize,
+    #[serde(default)]
+    roles: Vec<String>,
+    #[serde(default)]
+    perms: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListContentQuery {
+    #[serde(alias = "content_type")]
+    r#type: Option<String>,
+    q: Option<String>,
+    location: Option<String>,
+    level: Option<String>,
+    sector: Option<String>,
+    sub_sector: Option<String>,
+    status: Option<String>,
+    owner_id: Option<Uuid>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpsertContentRequest {
+    owner_id: Option<Uuid>,
+    content_type: Option<String>,
+    #[serde(rename = "type")]
+    type_alias: Option<String>,
+    title: Option<String>,
+    summary: Option<String>,
+    body: Option<String>,
+    pricing_mode: Option<String>,
+    price_cents: Option<i64>,
+    original_price_cents: Option<i64>,
+    promo_label: Option<String>,
+    promo_start_at: Option<DateTime<Utc>>,
+    promo_end_at: Option<DateTime<Utc>>,
+    currency: Option<String>,
+    tags: Option<Vec<String>>,
+    cover_image: Option<String>,
+    category: Option<String>,
+    metadata: Option<Value>,
+    content_status: Option<String>,
+    slug: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateOfferRequest {
+    amount_cents: Option<i64>,
+    currency: Option<String>,
+    offer_message: Option<String>,
+    wallet_environment: Option<String>,
+    deal_kind: Option<String>,
+    fulfillment_mode: Option<String>,
+    transaction_meta: Option<Value>,
+    safety_checklist: Option<Value>,
+    risk_flags: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateCounterOfferRequest {
+    amount_cents: Option<i64>,
+    currency: Option<String>,
+    offer_message: Option<String>,
+    deal_kind: Option<String>,
+    fulfillment_mode: Option<String>,
+    transaction_meta: Option<Value>,
+    safety_checklist: Option<Value>,
+    risk_flags: Option<Value>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct ContentRow {
+    id: Uuid,
+    owner_id: Uuid,
+    content_type: String,
+    slug: Option<String>,
+    title: String,
+    summary: Option<String>,
+    body: String,
+    price_cents: Option<i64>,
+    currency: Option<String>,
+    tags: Option<Vec<String>>,
+    cover_image: Option<String>,
+    category: Option<String>,
+    content_status: String,
+    pricing_mode: String,
+    original_price_cents: Option<i64>,
+    promo_label: Option<String>,
+    promo_start_at: Option<DateTime<Utc>>,
+    promo_end_at: Option<DateTime<Utc>>,
+    rating: Option<f32>,
+    review_count: Option<i32>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Default, Clone)]
+struct SellerStats {
+    rating: f32,
+    review_count: i32,
+    total_transactions: i32,
+    completed_transactions: i32,
+    accepted_transactions: i32,
+    cancelled_transactions: i32,
+    pending_transactions: i32,
+    completion_rate: f32,
+    acceptance_rate: f32,
+    cancel_rate: f32,
+}
+
+#[derive(Debug, FromRow)]
+struct SellerReviewAggRow {
+    user_id: Uuid,
+    rating_avg: Option<f32>,
+    review_count: i64,
+}
+
+#[derive(Debug, FromRow)]
+struct SellerTxnAggRow {
+    user_id: Uuid,
+    total_transactions: i64,
+    completed_transactions: i64,
+    accepted_transactions: i64,
+    cancelled_transactions: i64,
+    pending_transactions: i64,
+}
+
+#[derive(Debug, Default)]
+struct ContentActivityCounts {
+    transaction_count: i64,
+    review_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct ContentResponse {
+    id: Uuid,
+    owner_id: Uuid,
+    content_type: String,
+    #[serde(rename = "type")]
+    type_alias: String,
+    slug: Option<String>,
+    title: String,
+    summary: Option<String>,
+    body: String,
+    price_cents: Option<i64>,
+    currency: Option<String>,
+    tags: Option<Vec<String>>,
+    cover_image: Option<String>,
+    category: Option<String>,
+    content_status: String,
+    status: String,
+    pricing_mode: String,
+    original_price_cents: Option<i64>,
+    promo_label: Option<String>,
+    promo_start_at: Option<DateTime<Utc>>,
+    promo_end_at: Option<DateTime<Utc>>,
+    rating: Option<f32>,
+    review_count: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seller_stats: Option<SellerStats>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl ContentResponse {
+    fn from_row(value: ContentRow, seller_stats: Option<SellerStats>) -> Self {
+        Self {
+            id: value.id,
+            owner_id: value.owner_id,
+            type_alias: value.content_type.clone(),
+            content_type: value.content_type,
+            slug: value.slug,
+            title: value.title,
+            summary: value.summary,
+            body: value.body,
+            price_cents: value.price_cents,
+            currency: value.currency,
+            tags: value.tags,
+            cover_image: value.cover_image,
+            category: value.category,
+            status: value.content_status.clone(),
+            content_status: value.content_status,
+            pricing_mode: value.pricing_mode,
+            original_price_cents: value.original_price_cents,
+            promo_label: value.promo_label,
+            promo_start_at: value.promo_start_at,
+            promo_end_at: value.promo_end_at,
+            rating: value.rating,
+            review_count: value.review_count,
+            seller_stats,
+            metadata: value.metadata,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct ListContentResponse {
+    items: Vec<ContentResponse>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListSupportTicketsQuery {
+    status: Option<String>,
+    priority: Option<String>,
+    category: Option<String>,
+    assigned: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateSupportTicketRequest {
+    requester_email: Option<String>,
+    requester_name: Option<String>,
+    category: Option<String>,
+    subject: String,
+    message: String,
+    priority: Option<String>,
+    source: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateSupportTicketRequest {
+    status: Option<String>,
+    priority: Option<String>,
+    assigned_agent_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateSupportReplyRequest {
+    body: String,
+    is_internal: Option<bool>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct SupportTicketRow {
+    id: Uuid,
+    requester_user_id: Option<Uuid>,
+    requester_email: String,
+    requester_name: Option<String>,
+    category: String,
+    subject: String,
+    status: String,
+    priority: String,
+    assigned_agent_id: Option<Uuid>,
+    support_room_id: Option<String>,
+    source: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    resolved_at: Option<DateTime<Utc>>,
+    first_response_at: Option<DateTime<Utc>>,
+    latest_message: Option<String>,
+    latest_message_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, FromRow, Clone)]
+struct SupportLeadSourceRow {
+    id: Uuid,
+    requester_user_id: Option<Uuid>,
+    requester_email: String,
+    requester_name: Option<String>,
+    category: String,
+    subject: String,
+    priority: String,
+    support_room_id: Option<String>,
+    assigned_agent_id: Option<Uuid>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct SupportReplyRow {
+    id: Uuid,
+    ticket_id: Uuid,
+    author_user_id: Option<Uuid>,
+    author_role: String,
+    body: String,
+    is_internal: bool,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListSupportTicketsResponse {
+    items: Vec<SupportTicketRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct SupportTicketDetailResponse {
+    ticket: SupportTicketRow,
+    replies: Vec<SupportReplyRow>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListCrmLeadsQuery {
+    stage: Option<String>,
+    source: Option<String>,
+    owner_id: Option<Uuid>,
+    requester_id: Option<Uuid>,
+    contact_user_id: Option<Uuid>,
+    chat_room_id: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateCrmLeadRequest {
+    requester_email: Option<String>,
+    requester_name: Option<String>,
+    owner_id: Option<Uuid>,
+    contact_user_id: Option<Uuid>,
+    content_id: Option<Uuid>,
+    chat_room_id: Option<String>,
+    name: Option<String>,
+    sector: Option<String>,
+    stage: Option<String>,
+    source: Option<String>,
+    value_cents: Option<i64>,
+    currency: Option<String>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpdateCrmLeadRequest {
+    owner_id: Option<Uuid>,
+    contact_user_id: Option<Uuid>,
+    chat_room_id: Option<String>,
+    name: Option<String>,
+    sector: Option<String>,
+    stage: Option<String>,
+    source: Option<String>,
+    value_cents: Option<i64>,
+    currency: Option<String>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct CrmLeadRow {
+    id: Uuid,
+    requester_user_id: Option<Uuid>,
+    requester_email: Option<String>,
+    requester_name: Option<String>,
+    owner_id: Option<Uuid>,
+    contact_user_id: Option<Uuid>,
+    content_id: Option<Uuid>,
+    chat_room_id: Option<String>,
+    name: String,
+    sector: Option<String>,
+    stage: String,
+    source: String,
+    value_cents: Option<i64>,
+    currency: Option<String>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListCrmLeadsResponse {
+    items: Vec<CrmLeadRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListCrmActivitiesQuery {
+    lead_id: Option<Uuid>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct CrmActivityRow {
+    id: Uuid,
+    lead_id: Uuid,
+    actor_user_id: Option<Uuid>,
+    actor_role: String,
+    action: String,
+    message: String,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListCrmActivitiesResponse {
+    items: Vec<CrmActivityRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListSuperAppOrdersQuery {
+    status: Option<String>,
+    #[serde(alias = "service")]
+    service_type: Option<String>,
+    requester_id: Option<Uuid>,
+    partner_id: Option<Uuid>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpdateSuperAppOrderRequest {
+    status: Option<String>,
+    partner_id: Option<Uuid>,
+    amount_final_cents: Option<i64>,
+    metadata: Option<Value>,
+    event_type: Option<String>,
+    note: Option<String>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct SuperAppOrderRow {
+    id: Uuid,
+    requester_id: Uuid,
+    partner_id: Option<Uuid>,
+    merchant_id: Option<Uuid>,
+    provider_id: Option<Uuid>,
+    service_type: String,
+    status: String,
+    payment_mode: String,
+    currency: String,
+    amount_estimate_cents: i64,
+    amount_final_cents: i64,
+    pickup_address: Option<String>,
+    pickup_lat: Option<f64>,
+    pickup_lng: Option<f64>,
+    dropoff_address: Option<String>,
+    dropoff_lat: Option<f64>,
+    dropoff_lng: Option<f64>,
+    risk_score: i32,
+    risk_flags: Value,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct SuperAppOrderEventRow {
+    id: i64,
+    order_id: Uuid,
+    actor_id: Option<Uuid>,
+    actor_role: String,
+    event_type: String,
+    payload: Value,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListSuperAppOrdersResponse {
+    items: Vec<SuperAppOrderRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListSuperAppTrustProfilesQuery {
+    tier: Option<String>,
+    crm_approval_status: Option<String>,
+    user_id: Option<Uuid>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpsertSuperAppTrustProfileRequest {
+    tier: Option<String>,
+    kyc_status: Option<String>,
+    crm_approval_status: Option<String>,
+    marketing_segment: Option<String>,
+    manual_hold: Option<bool>,
+    manual_per_order_cap_cents: Option<i64>,
+    manual_daily_cap_cents: Option<i64>,
+    manual_monthly_cap_cents: Option<i64>,
+    legal_terms_version: Option<String>,
+    legal_terms_accepted_at: Option<DateTime<Utc>>,
+    risk_strike_count: Option<i32>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct SuperAppTrustProfileRow {
+    user_id: Uuid,
+    tier: String,
+    kyc_status: String,
+    crm_approval_status: String,
+    marketing_segment: String,
+    manual_hold: bool,
+    manual_per_order_cap_cents: Option<i64>,
+    manual_daily_cap_cents: Option<i64>,
+    manual_monthly_cap_cents: Option<i64>,
+    legal_terms_version: Option<String>,
+    legal_terms_accepted_at: Option<DateTime<Utc>>,
+    risk_strike_count: i32,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListSuperAppTrustProfilesResponse {
+    items: Vec<SuperAppTrustProfileRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListSectorsQuery {
+    active: Option<bool>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateSectorRequest {
+    id: Option<String>,
+    name_id: Option<String>,
+    name_en: Option<String>,
+    description_id: Option<String>,
+    description_en: Option<String>,
+    color: Option<String>,
+    icon_key: Option<String>,
+    is_active: Option<bool>,
+    sort_order: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpdateSectorRequest {
+    name_id: Option<String>,
+    name_en: Option<String>,
+    description_id: Option<String>,
+    description_en: Option<String>,
+    color: Option<String>,
+    icon_key: Option<String>,
+    is_active: Option<bool>,
+    sort_order: Option<i32>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct SectorRow {
+    id: String,
+    name_id: String,
+    name_en: String,
+    description_id: Option<String>,
+    description_en: Option<String>,
+    color: Option<String>,
+    icon_key: Option<String>,
+    is_active: bool,
+    sort_order: i32,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListSectorsResponse {
+    items: Vec<SectorRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListBannersQuery {
+    location: Option<String>,
+    status: Option<String>,
+    active_only: Option<bool>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateBannerRequest {
+    name: Option<String>,
+    location: Option<String>,
+    status: Option<String>,
+    image_url: Option<String>,
+    link_url: Option<String>,
+    headline: Option<String>,
+    subheadline: Option<String>,
+    start_at: Option<DateTime<Utc>>,
+    end_at: Option<DateTime<Utc>>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpdateBannerRequest {
+    name: Option<String>,
+    location: Option<String>,
+    status: Option<String>,
+    image_url: Option<String>,
+    link_url: Option<String>,
+    headline: Option<String>,
+    subheadline: Option<String>,
+    start_at: Option<DateTime<Utc>>,
+    end_at: Option<DateTime<Utc>>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct BannerRow {
+    id: Uuid,
+    name: String,
+    location: String,
+    status: String,
+    image_url: Option<String>,
+    link_url: Option<String>,
+    headline: Option<String>,
+    subheadline: Option<String>,
+    start_at: Option<DateTime<Utc>>,
+    end_at: Option<DateTime<Utc>>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListBannersResponse {
+    items: Vec<BannerRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let identity_base_url = env::var("IDENTITY_SERVICE_URL")
+        .or_else(|_| env::var("INTERNAL_API_URL"))
+        .unwrap_or_else(|_| "http://identity_service:8080".to_string());
+    let port = env::var("APP_PORT").unwrap_or_else(|_| "8081".to_string());
+    let addr = format!("0.0.0.0:{port}");
+
+    let db = PgPoolOptions::new()
+        .max_connections(20)
+        .connect(&database_url)
+        .await?;
+
+    let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
+    let strict_migrations =
+        app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
+
+    let mut migrator = sqlx::migrate!("./migrations");
+    if !strict_migrations {
+        migrator.set_ignore_missing(true);
+    }
+    if let Err(error) = migrator.run(&db).await {
+        let message = error.to_string();
+        let checksum_mismatch = message.contains("was previously applied but has been modified");
+        let missing_migration =
+            message.contains("was previously applied but is missing in the resolved migrations");
+
+        if !strict_migrations && (checksum_mismatch || missing_migration) {
+            tracing::warn!(
+                "Shared DB migration drift in {} (ignored): {}",
+                app_env,
+                message
+            );
+        } else {
+            return Err(error.into());
+        }
+    }
+
+    let http_client = Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(20))
+        .build()?;
+    let (notification_tx, _notification_rx) =
+        broadcast::channel::<RealtimeNotificationEnvelope>(NOTIFICATION_WS_CHANNEL_CAP);
+    let state = Arc::new(AppState {
+        db,
+        jwt_secret,
+        identity_base_url,
+        http_client,
+        notification_tx,
+    });
+
+    if let Ok(rabbitmq_url) = env::var("RABBITMQ_URL") {
+        let outbox_db = state.db.clone();
+        let exchange =
+            env::var("OUTBOX_EXCHANGE").unwrap_or_else(|_| "marketplace.outbox".to_string());
+        let batch_size = env::var("OUTBOX_BATCH_SIZE")
+            .ok()
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(OUTBOX_DEFAULT_BATCH_SIZE)
+            .clamp(1, 500);
+        let poll_ms = env::var("OUTBOX_POLL_INTERVAL_MS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(OUTBOX_DEFAULT_POLL_MS)
+            .max(250);
+
+        tokio::spawn(async move {
+            run_outbox_publisher(outbox_db, rabbitmq_url, exchange, batch_size, poll_ms).await;
+        });
+    } else {
+        tracing::warn!("RABBITMQ_URL not set. Transactional outbox publisher is disabled.");
+    }
+
+    let configured_origins = parse_cors_origins();
+    let mut cors = CorsLayer::new()
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT]);
+
+    if !configured_origins.is_empty() {
+        cors = cors.allow_origin(configured_origins);
+    } else if app_env.eq_ignore_ascii_case("production") {
+        if let Ok(frontend_url) = env::var("FRONTEND_URL") {
+            if let Ok(value) = frontend_url.parse::<HeaderValue>() {
+                cors = cors.allow_origin(value);
+            }
+        }
+    } else {
+        cors = cors.allow_origin([
+            "http://localhost:3000".parse::<HeaderValue>()?,
+            "http://localhost:3001".parse::<HeaderValue>()?,
+            "http://localhost:3002".parse::<HeaderValue>()?,
+        ]);
+    }
+
+    let app = Router::new()
+        .route("/health", get(health))
+        .route("/", get(root))
+        .route("/v1/content", get(list_content).post(create_content))
+        .route(
+            "/v1/content/{id}",
+            get(get_content).put(update_content).patch(update_content),
+        )
+        .route("/v1/content/{id}/reviews", get(list_reviews))
+        .route("/v1/content/{id}/offers", post(create_offer))
+        .route("/v1/transactions", get(list_transactions))
+        .route("/v1/transactions/{id}", get(get_transaction))
+        .route(
+            "/v1/transactions/{id}/counter-offer",
+            put(counter_offer_transaction),
+        )
+        .route("/v1/transactions/{id}/fund", post(fund_transaction))
+        .route("/v1/transactions/{id}/accept", put(accept_transaction))
+        .route("/v1/transactions/{id}/start", put(start_transaction))
+        .route("/v1/transactions/{id}/deliver", put(deliver_transaction))
+        .route(
+            "/v1/transactions/{id}/delivery-review",
+            put(review_delivery_transaction),
+        )
+        .route("/v1/transactions/{id}/dispute", put(dispute_transaction))
+        .route(
+            "/v1/transactions/{id}/resolve",
+            put(resolve_transaction_dispute),
+        )
+        .route("/v1/transactions/{id}/cancel", put(cancel_transaction))
+        .route("/v1/transactions/{id}/complete", put(complete_transaction))
+        .route("/v1/transactions/{id}/review", post(create_review))
+        .route("/v1/wallet/balance", get(get_wallet_balances))
+        .route("/v1/wallet/ledger", get(list_wallet_ledger))
+        .route(
+            "/v1/wallet/topups",
+            get(list_wallet_topups).post(create_wallet_topup),
+        )
+        .route(
+            "/v1/wallet/topups/{id}/settle-dev",
+            post(settle_wallet_topup_dev),
+        )
+        .route(
+            "/v1/wallet/topups/{id}/sync",
+            post(sync_wallet_topup_status),
+        )
+        .route("/v1/wallet/topups/{id}/cancel", post(cancel_wallet_topup))
+        .route(
+            "/v1/wallet/providers/midtrans/notify",
+            post(handle_midtrans_wallet_notify),
+        )
+        .route("/v1/notifications", get(list_notifications))
+        .route(
+            "/v1/notifications/unread-count",
+            get(get_notification_unread_count),
+        )
+        .route("/v1/notifications/{id}/read", post(mark_notification_read))
+        .route(
+            "/v1/notifications/read-all",
+            post(mark_all_notifications_read),
+        )
+        .route("/v1/notifications/stream", get(notification_stream_socket))
+        .route(
+            "/v1/support/tickets",
+            get(list_support_tickets).post(create_support_ticket),
+        )
+        .route(
+            "/v1/support/tickets/{id}",
+            get(get_support_ticket).patch(update_support_ticket),
+        )
+        .route(
+            "/v1/support/tickets/{id}/replies",
+            post(create_support_reply),
+        )
+        .route("/v1/crm/leads", get(list_crm_leads).post(create_crm_lead))
+        .route(
+            "/v1/crm/leads/{id}",
+            get(get_crm_lead).patch(update_crm_lead),
+        )
+        .route("/v1/crm/activities", get(list_crm_activities))
+        .route("/v1/super-app/orders", get(list_super_app_orders))
+        .route(
+            "/v1/super-app/orders/{id}",
+            get(get_super_app_order).patch(update_super_app_order),
+        )
+        .route(
+            "/v1/super-app/trust-profiles",
+            get(list_super_app_trust_profiles),
+        )
+        .route(
+            "/v1/super-app/trust-profiles/{user_id}",
+            get(get_super_app_trust_profile).put(upsert_super_app_trust_profile),
+        )
+        .route("/v1/sectors", get(list_sectors).post(create_sector))
+        .route(
+            "/v1/sectors/{id}",
+            get(get_sector).patch(update_sector).delete(delete_sector),
+        )
+        .route("/v1/banners", get(list_banners).post(create_banner))
+        .route(
+            "/v1/banners/{id}",
+            get(get_banner).patch(update_banner).delete(delete_banner),
+        )
+        .layer(cors)
+        .with_state(state);
+
+    let listener = TcpListener::bind(&addr).await?;
+    println!("marketplace_service listening on {}", addr);
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+async fn health() -> impl IntoResponse {
+    Json(json!({"status":"ok","service":"marketplace_service"}))
+}
+
+async fn root() -> impl IntoResponse {
+    Json(json!({"service":"marketplace_service","ready":true}))
+}
+
+fn err(status: StatusCode, message: &str) -> impl IntoResponse {
+    (status, Json(json!({ "error": message })))
+}
+
+fn clean_text(value: Option<String>) -> Option<String> {
+    value.and_then(|v| {
+        let t = v.trim();
+        if t.is_empty() {
+            None
+        } else {
+            Some(t.to_string())
+        }
+    })
+}
+
+fn clean_text_limited(
+    value: Option<String>,
+    max_len: usize,
+) -> Result<Option<String>, &'static str> {
+    let cleaned = clean_text(value);
+    if let Some(ref text) = cleaned {
+        if text.len() > max_len {
+            return Err("text is too long");
+        }
+    }
+    Ok(cleaned)
+}
+
+fn normalize_reason_code_candidate(value: Option<String>) -> Option<String> {
+    let raw = clean_text(value)?;
+    if raw.len() > MAX_REASON_CODE_LEN {
+        return None;
+    }
+    Some(
+        raw.trim()
+            .to_lowercase()
+            .replace('-', "_")
+            .replace(' ', "_"),
+    )
+}
+
+fn normalize_cancel_reason_code(value: Option<String>) -> Option<String> {
+    let normalized = normalize_reason_code_candidate(value)?;
+    match normalized.as_str() {
+        "buyer_changed_mind"
+        | "seller_unresponsive"
+        | "schedule_issue"
+        | "duplicate_order"
+        | "other" => Some(normalized),
+        _ => None,
+    }
+}
+
+fn normalize_dispute_reason_code(value: Option<String>) -> Option<String> {
+    let normalized = normalize_reason_code_candidate(value)?;
+    match normalized.as_str() {
+        "non_delivery"
+        | "item_not_as_described"
+        | "damaged_item"
+        | "missing_parts"
+        | "fake_tracking"
+        | "service_not_delivered"
+        | "unauthorized_charge"
+        | "buyer_no_response"
+        | "buyer_rejected_without_basis"
+        | "rental_damage"
+        | "late_delivery"
+        | "policy_violation"
+        | "other" => Some(normalized),
+        _ => None,
+    }
+}
+
+fn normalize_dispute_decision(value: Option<String>) -> Option<String> {
+    let raw = clean_text(value)?;
+    let normalized = raw
+        .trim()
+        .to_lowercase()
+        .replace('-', "_")
+        .replace(' ', "_");
+    match normalized.as_str() {
+        "buyer_win_full_refund"
+        | "seller_win_full_release"
+        | "partial_split"
+        | "return_required_then_refund"
+        | "damage_deduction" => Some(normalized),
+        _ => None,
+    }
+}
+
+fn normalize_evidence_type(value: Option<String>) -> String {
+    let raw = clean_text(value)
+        .unwrap_or_else(|| "other".to_string())
+        .trim()
+        .to_lowercase()
+        .replace('-', "_")
+        .replace(' ', "_");
+    match raw.as_str() {
+        "photo" | "video" | "tracking" | "invoice" | "chat_export" | "inspection_report"
+        | "other" => raw,
+        _ => "other".to_string(),
+    }
+}
+
+fn is_valid_sha256_hex(value: &str) -> bool {
+    value.len() == EVIDENCE_HASH_SHA256_LEN && value.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn normalize_dispute_evidence_attachment(
+    entry: DisputeEvidenceAttachmentInput,
+) -> Result<Value, &'static str> {
+    let uploaded_at = Utc::now();
+    match entry {
+        DisputeEvidenceAttachmentInput::Url(raw) => {
+            let cleaned = clean_text(Some(raw)).ok_or("evidence attachment cannot be empty")?;
+            let mut parts = cleaned.splitn(2, '|');
+            let file_url = clean_text(parts.next().map(|v| v.to_string()))
+                .ok_or("evidence attachment file_url is required")?;
+            let hash = clean_text(parts.next().map(|v| v.to_string()))
+                .ok_or("evidence attachment hash is required")?;
+            let normalized_hash = hash.to_lowercase();
+            if !is_valid_sha256_hex(normalized_hash.as_str()) {
+                return Err("evidence attachment hash must be sha256 hex");
+            }
+            Ok(json!({
+                "evidence_type": "other",
+                "file_url": file_url,
+                "external_ref": Value::Null,
+                "file_hash_sha256": normalized_hash,
+                "captured_at": Value::Null,
+                "uploaded_at": uploaded_at,
+                "description": Value::Null,
+                "device_info": Value::Null
+            }))
+        }
+        DisputeEvidenceAttachmentInput::Rich(payload) => {
+            let file_url = clean_text(payload.file_url);
+            let external_ref = clean_text(payload.external_ref);
+            if file_url.is_none() && external_ref.is_none() {
+                return Err("evidence attachment requires file_url or external_ref");
+            }
+            let hash = clean_text(payload.file_hash_sha256)
+                .ok_or("evidence attachment hash is required")?
+                .to_lowercase();
+            if !is_valid_sha256_hex(hash.as_str()) {
+                return Err("evidence attachment hash must be sha256 hex");
+            }
+            let description = clean_text_limited(payload.description, 1_000)?;
+            Ok(json!({
+                "evidence_type": normalize_evidence_type(payload.evidence_type),
+                "file_url": file_url,
+                "external_ref": external_ref,
+                "file_hash_sha256": hash,
+                "captured_at": payload.captured_at,
+                "uploaded_at": uploaded_at,
+                "description": description,
+                "device_info": payload.device_info.unwrap_or(Value::Null)
+            }))
+        }
+    }
+}
+
+fn normalize_dispute_evidence_attachments(
+    attachments: Option<Vec<DisputeEvidenceAttachmentInput>>,
+) -> Result<Vec<Value>, &'static str> {
+    let mut dedup = HashSet::new();
+    let mut normalized = Vec::new();
+    for entry in attachments.unwrap_or_default().into_iter() {
+        if normalized.len() >= MAX_EVIDENCE_ATTACHMENTS {
+            break;
+        }
+        let item = normalize_dispute_evidence_attachment(entry)?;
+        let file_url = item
+            .get("file_url")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let external_ref = item
+            .get("external_ref")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let hash = item
+            .get("file_hash_sha256")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let dedup_key = format!("{}|{}|{}", file_url, external_ref, hash);
+        if dedup.insert(dedup_key) {
+            normalized.push(item);
+        }
+    }
+    if normalized.is_empty() {
+        return Err("dispute requires at least one evidence attachment");
+    }
+    Ok(normalized)
+}
+
+fn normalize_delivery_review_decision(value: Option<String>) -> Option<String> {
+    let raw = clean_text(value)?;
+    let normalized = raw
+        .trim()
+        .to_lowercase()
+        .replace('-', "_")
+        .replace(' ', "_");
+    match normalized.as_str() {
+        "accept" | "request_revision" => Some(normalized),
+        _ => None,
+    }
+}
+
+fn normalize_delivery_attachment_entry(raw: String) -> Result<Value, &'static str> {
+    let cleaned = clean_text(Some(raw)).ok_or("delivery attachment cannot be empty")?;
+    let mut parts = cleaned.splitn(2, '|');
+    let first = clean_text_limited(
+        parts.next().map(|value| value.to_string()),
+        MAX_DELIVERY_REFERENCE_LEN,
+    )?
+    .ok_or("delivery attachment cannot be empty")?;
+    let second = clean_text_limited(
+        parts.next().map(|value| value.to_string()),
+        MAX_DELIVERY_REFERENCE_LEN,
+    )?;
+
+    let (label, target) = if let Some(location) = second {
+        (
+            clean_text_limited(Some(first), MAX_DELIVERY_ATTACHMENT_LABEL_LEN)?,
+            location,
+        )
+    } else {
+        (None, first)
+    };
+
+    let (url, external_ref) = if target.starts_with("http://") || target.starts_with("https://") {
+        (Some(target), None)
+    } else {
+        (None, Some(target))
+    };
+
+    Ok(json!({
+        "label": label,
+        "url": url,
+        "external_ref": external_ref,
+    }))
+}
+
+fn normalize_delivery_attachments(
+    attachments: Option<Vec<String>>,
+) -> Result<Vec<Value>, &'static str> {
+    let mut dedup = HashSet::new();
+    let mut normalized = Vec::new();
+    for entry in attachments.unwrap_or_default().into_iter() {
+        if normalized.len() >= MAX_DELIVERY_ATTACHMENTS {
+            break;
+        }
+        let item = normalize_delivery_attachment_entry(entry)?;
+        let label = item
+            .get("label")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let url = item
+            .get("url")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let external_ref = item
+            .get("external_ref")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let dedup_key = format!("{}|{}|{}", label, url, external_ref);
+        if dedup.insert(dedup_key) {
+            normalized.push(item);
+        }
+    }
+    Ok(normalized)
+}
+
+fn json_value_as_usize(value: Option<&Value>) -> Option<usize> {
+    value
+        .and_then(Value::as_u64)
+        .and_then(|raw| usize::try_from(raw).ok())
+        .or_else(|| {
+            value.and_then(Value::as_i64).and_then(|raw| {
+                if raw < 0 {
+                    None
+                } else {
+                    usize::try_from(raw).ok()
+                }
+            })
+        })
+}
+
+fn delivery_attempts_from_meta(meta: &Value) -> Vec<Value> {
+    meta.get("delivery")
+        .and_then(|value| value.get("submissions"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn build_legacy_delivery_submission(txn: &TransactionRow) -> Value {
+    json!({
+        "id": Uuid::new_v4(),
+        "attempt_number": 1,
+        "title": Value::Null,
+        "note": clean_text(txn.response_message.clone())
+            .unwrap_or_else(|| "Legacy delivery note".to_string()),
+        "attachments": [],
+        "submitted_by": txn.seller_id,
+        "submitted_at": txn.updated_at,
+        "review_status": "awaiting_buyer_review",
+        "reviewed_at": Value::Null,
+        "reviewed_by": Value::Null,
+        "buyer_feedback_note": Value::Null,
+        "buyer_feedback_attachments": [],
+        "source": "legacy_delivery_status"
+    })
+}
+
+fn build_delivery_crm_message(
+    txn_id: Uuid,
+    next_status: &str,
+    status_context: Option<&Value>,
+) -> String {
+    let delivery = status_context.and_then(|ctx| ctx.get("delivery"));
+    let delivery_review = status_context.and_then(|ctx| ctx.get("delivery_review"));
+    let attempt_number = json_value_as_usize(
+        delivery
+            .and_then(|ctx| ctx.get("attempt_number"))
+            .or_else(|| delivery_review.and_then(|ctx| ctx.get("attempt_number"))),
+    )
+    .unwrap_or(0);
+    let max_attempts = json_value_as_usize(
+        delivery
+            .and_then(|ctx| ctx.get("max_attempts"))
+            .or_else(|| delivery_review.and_then(|ctx| ctx.get("max_attempts"))),
+    )
+    .unwrap_or(MAX_DELIVERY_ATTEMPTS);
+    let attachments_count = json_value_as_usize(
+        delivery
+            .and_then(|ctx| ctx.get("attachments_count"))
+            .or_else(|| delivery_review.and_then(|ctx| ctx.get("attachments_count"))),
+    )
+    .unwrap_or(0);
+    let auto_escalated = delivery_review
+        .and_then(|ctx| ctx.get("auto_escalated"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let decision = delivery_review
+        .and_then(|ctx| ctx.get("decision"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+
+    match next_status {
+        "delivered" if attempt_number > 0 => format!(
+            "Seller mengirim hasil kerja attempt {}/{} untuk transaksi {} dengan {} bukti/link.",
+            attempt_number, max_attempts, txn_id, attachments_count
+        ),
+        "in_progress" if decision == "request_revision" => format!(
+            "Buyer meminta revisi untuk attempt {}/{} pada transaksi {}.",
+            attempt_number, max_attempts, txn_id
+        ),
+        "completed" if decision == "accept" => format!(
+            "Buyer menerima hasil kerja attempt {}/{} dan menyelesaikan transaksi {}.",
+            attempt_number, max_attempts, txn_id
+        ),
+        "disputed" if auto_escalated => format!(
+            "Transaksi {} otomatis dieskalasi ke dispute setelah batas pengiriman {}/{} tercapai.",
+            txn_id, attempt_number, max_attempts
+        ),
+        _ => format!("Transaction {} berubah ke status {}.", txn_id, next_status),
+    }
+}
+
+fn normalize_currency(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| v.to_uppercase())
+}
+
+fn is_valid_currency(value: &str) -> bool {
+    value.len() == 3 && value.chars().all(|c| c.is_ascii_uppercase())
+}
+
+fn parse_env_bool(key: &str, default: bool) -> bool {
+    match env::var(key) {
+        Ok(raw) => matches!(
+            raw.trim().to_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        ),
+        Err(_) => default,
+    }
+}
+
+fn wallet_default_environment() -> String {
+    normalize_wallet_environment(env::var("WALLET_DEFAULT_ENV").ok())
+        .unwrap_or_else(|| "development".to_string())
+}
+
+fn wallet_live_enabled() -> bool {
+    parse_env_bool("WALLET_LIVE_ENABLED", false)
+}
+
+fn wallet_default_provider() -> String {
+    normalize_payment_provider(env::var("WALLET_DEFAULT_PROVIDER").ok())
+        .unwrap_or_else(|| "mock".to_string())
+}
+
+fn normalize_wallet_environment(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "dev" | "development" | "sandbox" | "test" => "development".to_string(),
+        "live" | "production" | "prod" => "live".to_string(),
+        other => other.to_string(),
+    })
+}
+
+fn is_valid_wallet_environment(value: &str) -> bool {
+    matches!(value, "development" | "live")
+}
+
+fn normalize_payment_provider(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "midtrans" => "midtrans".to_string(),
+        "stripe" => "stripe".to_string(),
+        "xendit" => "xendit".to_string(),
+        "paypal" => "paypal".to_string(),
+        "adyen" => "adyen".to_string(),
+        "manual" => "manual".to_string(),
+        "mock" | "test" | "sandbox" => "mock".to_string(),
+        other => other.to_string(),
+    })
+}
+
+fn is_valid_payment_provider(value: &str) -> bool {
+    matches!(
+        value,
+        "midtrans" | "stripe" | "xendit" | "paypal" | "adyen" | "manual" | "mock"
+    )
+}
+
+fn normalize_topup_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "pending" => "pending".to_string(),
+        "paid" | "success" | "settled" => "paid".to_string(),
+        "failed" => "failed".to_string(),
+        "cancelled" | "canceled" => "cancelled".to_string(),
+        "expired" => "expired".to_string(),
+        other => other.to_string(),
+    })
+}
+
+fn is_valid_topup_status(value: &str) -> bool {
+    matches!(
+        value,
+        "pending" | "paid" | "failed" | "cancelled" | "expired"
+    )
+}
+
+fn normalize_payment_method(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| v.to_lowercase())
+}
+
+fn topup_amount_range(environment: &str) -> (i64, i64) {
+    if environment == "live" {
+        (MIN_TOPUP_CENTS_LIVE, MAX_TOPUP_CENTS_LIVE)
+    } else {
+        (MIN_TOPUP_CENTS_DEV, MAX_TOPUP_CENTS_DEV)
+    }
+}
+
+fn parse_env_i64(key: &str) -> Option<i64> {
+    env::var(key)
+        .ok()
+        .and_then(|raw| raw.trim().parse::<i64>().ok())
+        .filter(|v| *v > 0)
+}
+
+fn wallet_topup_timeout_minutes(environment: &str, provider: &str) -> i64 {
+    let provider_tag = provider.trim().to_uppercase().replace('-', "_");
+    let env_suffix = if environment == "live" { "LIVE" } else { "DEV" };
+    let provider_env_key = format!(
+        "WALLET_{}_TOPUP_TIMEOUT_MINUTES_{}",
+        provider_tag, env_suffix
+    );
+    let provider_key = format!("WALLET_{}_TOPUP_TIMEOUT_MINUTES", provider_tag);
+    let env_key = format!("WALLET_TOPUP_TIMEOUT_MINUTES_{}", env_suffix);
+
+    let fallback_default = if provider == "midtrans" { 24 * 60 } else { 60 };
+    parse_env_i64(&provider_env_key)
+        .or_else(|| parse_env_i64(&provider_key))
+        .or_else(|| parse_env_i64(&env_key))
+        .or_else(|| parse_env_i64("WALLET_TOPUP_TIMEOUT_MINUTES"))
+        .unwrap_or(fallback_default)
+        .clamp(1, 7 * 24 * 60)
+}
+
+fn parse_wallet_datetime(value: &str) -> Option<DateTime<Utc>> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    DateTime::parse_from_rfc3339(trimmed)
+        .map(|dt| dt.with_timezone(&Utc))
+        .ok()
+        .or_else(|| {
+            DateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S %z")
+                .map(|dt| dt.with_timezone(&Utc))
+                .ok()
+        })
+}
+
+fn extract_topup_payment_due_at(payment_payload: &Value) -> Option<DateTime<Utc>> {
+    let candidates = [
+        payment_payload
+            .pointer("/wallet_flow/payment_due_at")
+            .and_then(Value::as_str),
+        payment_payload
+            .pointer("/midtrans/expiry_time")
+            .and_then(Value::as_str),
+        payment_payload
+            .pointer("/charge/expiry_time")
+            .and_then(Value::as_str),
+        payment_payload
+            .pointer("/snap/expiry_time")
+            .and_then(Value::as_str),
+    ];
+    candidates
+        .into_iter()
+        .flatten()
+        .find_map(parse_wallet_datetime)
+}
+
+fn midtrans_api_base_url(environment: &str) -> &'static str {
+    if environment == "live" {
+        "https://api.midtrans.com"
+    } else {
+        "https://api.sandbox.midtrans.com"
+    }
+}
+
+fn midtrans_snap_base_url(environment: &str) -> &'static str {
+    if environment == "live" {
+        "https://app.midtrans.com"
+    } else {
+        "https://app.sandbox.midtrans.com"
+    }
+}
+
+fn describe_reqwest_error(error: &reqwest::Error) -> String {
+    let kind = if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connect"
+    } else if error.is_request() {
+        "request"
+    } else if error.is_decode() {
+        "decode"
+    } else if error.is_body() {
+        "body"
+    } else if error.is_status() {
+        "status"
+    } else {
+        "unknown"
+    };
+
+    let mut causes = Vec::new();
+    let mut current = error.source();
+    while let Some(cause) = current {
+        causes.push(cause.to_string());
+        current = cause.source();
+    }
+
+    if causes.is_empty() {
+        format!("type={kind}; message={error}")
+    } else {
+        format!(
+            "type={kind}; message={error}; causes={}",
+            causes.join(" | ")
+        )
+    }
+}
+
+fn build_external_reference(environment: &str, provider: &str, user_id: Uuid) -> String {
+    let prefix = if environment == "live" {
+        "TOPUP-LIVE"
+    } else {
+        "TOPUP-DEV"
+    };
+    let provider_tag = provider.to_uppercase();
+    let user_tag = user_id.simple().to_string()[..8].to_uppercase();
+    let random_tag = Uuid::new_v4().simple().to_string()[..10].to_uppercase();
+    format!("{prefix}-{provider_tag}-{user_tag}-{random_tag}")
+}
+
+fn midtrans_server_key_for_environment(environment: &str) -> Option<String> {
+    let fallback = env::var("MIDTRANS_SERVER_KEY").ok();
+    if environment == "live" {
+        env::var("MIDTRANS_SERVER_KEY_LIVE").ok().or(fallback)
+    } else {
+        env::var("MIDTRANS_SERVER_KEY_SANDBOX").ok().or(fallback)
+    }
+}
+
+fn midtrans_notification_url() -> Option<String> {
+    env::var("WALLET_MIDTRANS_NOTIFICATION_URL")
+        .ok()
+        .or_else(|| env::var("MIDTRANS_PAYMENT_NOTIFICATION_URL").ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn with_midtrans_notification_header(request: RequestBuilder) -> RequestBuilder {
+    if let Some(url) = midtrans_notification_url() {
+        request.header("X-Override-Notification", url)
+    } else {
+        request
+    }
+}
+
+fn midtrans_redirect_url(topup_id: Uuid, kind: &str) -> Option<String> {
+    let (legacy_key, key, status_value) = match kind {
+        "finish" => (
+            "MIDTRANS_FINISH_REDIRECT_URL",
+            "WALLET_MIDTRANS_FINISH_REDIRECT_URL",
+            "finish",
+        ),
+        "unfinish" => (
+            "MIDTRANS_UNFINISH_REDIRECT_URL",
+            "WALLET_MIDTRANS_UNFINISH_REDIRECT_URL",
+            "unfinish",
+        ),
+        "error" => (
+            "MIDTRANS_ERROR_REDIRECT_URL",
+            "WALLET_MIDTRANS_ERROR_REDIRECT_URL",
+            "error",
+        ),
+        _ => return None,
+    };
+
+    let base = env::var(key)
+        .ok()
+        .or_else(|| env::var(legacy_key).ok())
+        .or_else(|| env::var("FRONTEND_URL").ok())?;
+    let base = base.trim().trim_end_matches('/').to_string();
+    if base.is_empty() {
+        return None;
+    }
+
+    let mut url = if base.contains("/payments") {
+        base
+    } else {
+        format!("{base}/payments")
+    };
+    let joiner = if url.contains('?') { '&' } else { '?' };
+    url.push(joiner);
+    url.push_str("topup_status=");
+    url.push_str(status_value);
+    url.push_str("&topup_id=");
+    url.push_str(&topup_id.to_string());
+    Some(url)
+}
+
+fn midtrans_enabled_payments(payment_method: Option<&str>) -> Vec<String> {
+    let normalized = payment_method
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty());
+
+    let methods: Vec<&str> = match normalized.as_deref() {
+        None | Some("auto") | Some("all") | Some("any") => vec![
+            "gopay",
+            "shopeepay",
+            "qris",
+            "bca_va",
+            "bni_va",
+            "bri_va",
+            "permata_va",
+            "echannel",
+            "cimb_va",
+            "credit_card",
+        ],
+        Some("gopay") => vec!["gopay"],
+        Some("shopeepay") => vec!["shopeepay"],
+        Some("qris") => vec!["qris"],
+        Some("credit_card") | Some("card") => vec!["credit_card"],
+        Some("bca_va") | Some("bca") => vec!["bca_va"],
+        Some("bni_va") | Some("bni") => vec!["bni_va"],
+        Some("bri_va") | Some("bri") => vec!["bri_va"],
+        Some("permata_va") | Some("permata") => vec!["permata_va"],
+        Some("mandiri_va") | Some("mandiri") | Some("echannel") => vec!["echannel"],
+        Some("cimb_va") | Some("cimb") => vec!["cimb_va"],
+        Some("bank_transfer") | Some("va") | Some("virtual_account") => vec![
+            "bca_va",
+            "bni_va",
+            "bri_va",
+            "permata_va",
+            "echannel",
+            "cimb_va",
+        ],
+        Some("ewallet") | Some("e_wallet") => vec!["gopay", "shopeepay", "qris"],
+        Some(_) => vec![
+            "gopay",
+            "shopeepay",
+            "qris",
+            "bca_va",
+            "bni_va",
+            "bri_va",
+            "permata_va",
+            "echannel",
+            "cimb_va",
+            "credit_card",
+        ],
+    };
+
+    methods.into_iter().map(|v| v.to_string()).collect()
+}
+
+fn midtrans_direct_bank_from_method(method: &str) -> Option<&'static str> {
+    match method {
+        "bca_va" | "bca" => Some("bca"),
+        "bni_va" | "bni" => Some("bni"),
+        "bri_va" | "bri" => Some("bri"),
+        "permata_va" | "permata" => Some("permata"),
+        "cimb_va" | "cimb" => Some("cimb"),
+        "bank_transfer" | "va" | "virtual_account" => Some("bca"),
+        _ => None,
+    }
+}
+
+fn build_midtrans_direct_charge_request(
+    external_reference: &str,
+    gross_amount: i64,
+    payment_method: Option<&str>,
+) -> Option<(String, Value)> {
+    let normalized = payment_method
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty())?;
+
+    if normalized == "gopay" {
+        return Some((
+            normalized,
+            json!({
+                "payment_type": "gopay",
+                "transaction_details": {
+                    "order_id": external_reference,
+                    "gross_amount": gross_amount
+                },
+                "gopay": {
+                    "enable_callback": false
+                }
+            }),
+        ));
+    }
+
+    if normalized == "shopeepay" {
+        return Some((
+            normalized,
+            json!({
+                "payment_type": "shopeepay",
+                "transaction_details": {
+                    "order_id": external_reference,
+                    "gross_amount": gross_amount
+                },
+                "shopeepay": {}
+            }),
+        ));
+    }
+
+    if normalized == "qris" {
+        return Some((
+            normalized,
+            json!({
+                "payment_type": "qris",
+                "transaction_details": {
+                    "order_id": external_reference,
+                    "gross_amount": gross_amount
+                },
+                "qris": {
+                    "acquirer": "gopay"
+                }
+            }),
+        ));
+    }
+
+    if matches!(normalized.as_str(), "mandiri_va" | "mandiri" | "echannel") {
+        return Some((
+            normalized,
+            json!({
+                "payment_type": "echannel",
+                "transaction_details": {
+                    "order_id": external_reference,
+                    "gross_amount": gross_amount
+                },
+                "echannel": {
+                    "bill_info1": "Payment For",
+                    "bill_info2": "Wallet Topup"
+                }
+            }),
+        ));
+    }
+
+    let bank = midtrans_direct_bank_from_method(&normalized)?;
+    Some((
+        normalized,
+        json!({
+            "payment_type": "bank_transfer",
+            "transaction_details": {
+                "order_id": external_reference,
+                "gross_amount": gross_amount
+            },
+            "bank_transfer": {
+                "bank": bank
+            }
+        }),
+    ))
+}
+
+fn midtrans_action_url(payload: &Value, candidates: &[&str]) -> Option<String> {
+    let actions = payload.get("actions").and_then(Value::as_array)?;
+    for action in actions {
+        let name = action
+            .get("name")
+            .and_then(Value::as_str)
+            .map(|value| value.trim().to_lowercase())
+            .unwrap_or_default();
+        if name.is_empty() {
+            continue;
+        }
+        if candidates.iter().any(|candidate| name.contains(candidate)) {
+            if let Some(url) = action.get("url").and_then(Value::as_str) {
+                let trimmed = url.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn midtrans_checkout_hint_from_charge(payload: &Value) -> Option<String> {
+    midtrans_action_url(
+        payload,
+        &[
+            "deeplink",
+            "deep_link",
+            "generate-qr",
+            "qr",
+            "checkout",
+            "desktop",
+            "mobile",
+        ],
+    )
+    .or_else(|| {
+        payload
+            .get("redirect_url")
+            .and_then(Value::as_str)
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn midtrans_signature(
+    order_id: &str,
+    status_code: &str,
+    gross_amount: &str,
+    server_key: &str,
+) -> String {
+    let raw = format!("{order_id}{status_code}{gross_amount}{server_key}");
+    let mut hasher = Sha512::new();
+    hasher.update(raw.as_bytes());
+    let digest = hasher.finalize();
+    format!("{digest:x}")
+}
+
+fn normalize_deal_kind(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| v.to_lowercase())
+}
+
+fn is_valid_deal_kind(value: &str) -> bool {
+    matches!(
+        value,
+        "product"
+            | "service"
+            | "job"
+            | "property"
+            | "profile"
+            | "ride"
+            | "delivery"
+            | "food"
+            | "other"
+    )
+}
+
+fn normalize_fulfillment_mode(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| v.to_lowercase())
+}
+
+fn is_valid_fulfillment_mode(value: &str) -> bool {
+    matches!(
+        value,
+        "standard" | "shipping" | "pickup" | "remote" | "onsite" | "instant"
+    )
+}
+
+fn normalize_content_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| v.to_lowercase())
+}
+
+fn is_valid_content_status(value: &str) -> bool {
+    matches!(
+        value,
+        "draft" | "active" | "paused" | "archived" | "deleted"
+    )
+}
+
+fn canonical_content_type(value: &str) -> String {
+    match value {
+        "jobs" | "job_listing" | "job_posting" => "job".to_string(),
+        "properties" | "property_listing" | "real_estate" | "realestate" => "property".to_string(),
+        "products" => "product".to_string(),
+        "services" => "service".to_string(),
+        "tool-rental" | "rental" | "rentals" | "equipment_rental" | "sewa_alat" | "alat_sewa" => {
+            "tool_rental".to_string()
+        }
+        _ => value.to_string(),
+    }
+}
+
+fn normalize_content_type(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| canonical_content_type(&v.to_lowercase()))
+}
+
+fn resolve_requested_content_type(
+    content_type: Option<String>,
+    type_alias: Option<String>,
+    category: Option<String>,
+    default: Option<&str>,
+) -> Result<String, &'static str> {
+    let mut unique = Vec::new();
+    for candidate in [
+        normalize_content_type(content_type),
+        normalize_content_type(type_alias),
+        normalize_content_type(category),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if !unique.iter().any(|value: &String| value == &candidate) {
+            unique.push(candidate);
+        }
+    }
+
+    match unique.len() {
+        0 => Ok(default.unwrap_or("product").to_string()),
+        1 => Ok(unique.remove(0)),
+        _ => Err("conflicting content_type values"),
+    }
+}
+
+fn normalize_pricing_mode(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| v.to_lowercase())
+}
+
+fn is_valid_pricing_mode(value: &str) -> bool {
+    matches!(value, "fixed" | "request")
+}
+
+fn is_valid_content_type(value: &str) -> bool {
+    matches!(
+        value,
+        "product"
+            | "service"
+            | "job"
+            | "property"
+            | "guide"
+            | "project"
+            | "material"
+            | "tool_rental"
+            | "talent"
+            | "profile"
+            | "freelancer"
+            | "request"
+            | "news"
+            | "article"
+            | "image"
+            | "user"
+    )
+}
+
+fn content_type_requires_primary_image(value: &str) -> bool {
+    matches!(
+        value,
+        "product" | "property" | "material" | "tool_rental" | "image"
+    )
+}
+
+fn strip_url_suffix(value: &str) -> &str {
+    let without_query = value.split('?').next().unwrap_or(value);
+    without_query.split('#').next().unwrap_or(without_query)
+}
+
+fn has_known_image_extension(value: &str) -> bool {
+    let path = strip_url_suffix(value.trim());
+    let lowered = path.to_lowercase();
+    [
+        ".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif", ".bmp", ".avif", ".svg",
+    ]
+    .iter()
+    .any(|extension| lowered.ends_with(extension))
+}
+
+fn is_likely_image_url(value: &str) -> bool {
+    let lowered = value.trim().to_lowercase();
+    lowered.starts_with("http://")
+        || lowered.starts_with("https://")
+        || lowered.starts_with("ipfs://")
+        || lowered.starts_with("data:image/")
+        || (lowered.starts_with('/') && has_known_image_extension(&lowered))
+}
+
+fn collect_metadata_image_urls(metadata: &Value) -> Vec<String> {
+    let mut urls = Vec::new();
+    let mut seen = HashSet::new();
+
+    let mut push_candidate = |raw: &str| {
+        if urls.len() >= MAX_CONTENT_MEDIA_URLS {
+            return;
+        }
+        let Some(cleaned) = clean_text(Some(raw.to_string())) else {
+            return;
+        };
+        if !is_likely_image_url(&cleaned) {
+            return;
+        }
+        let dedup_key = cleaned.to_lowercase();
+        if seen.insert(dedup_key) {
+            urls.push(cleaned);
+        }
+    };
+
+    let Value::Object(map) = metadata else {
+        return urls;
+    };
+
+    for key in ["image_urls", "images", "gallery", "gallery_images"] {
+        if let Some(Value::Array(items)) = map.get(key) {
+            for item in items {
+                if let Some(raw) = item.as_str() {
+                    push_candidate(raw);
+                }
+            }
+        }
+    }
+
+    for key in ["cover_image", "image", "thumbnail"] {
+        if let Some(Value::String(raw)) = map.get(key) {
+            push_candidate(raw);
+        }
+    }
+
+    urls
+}
+
+fn clean_json_string(value: Option<&Value>) -> Option<String> {
+    value
+        .and_then(Value::as_str)
+        .map(|raw| raw.trim().to_lowercase())
+        .filter(|raw| !raw.is_empty())
+}
+
+fn validate_tool_rental_review_gate(
+    content_status: &str,
+    metadata: &Value,
+) -> Result<(), &'static str> {
+    let review = metadata
+        .get("lajukan_rental_review")
+        .and_then(Value::as_object);
+    let review_state = clean_json_string(review.and_then(|map| map.get("review_state")));
+    let public_visibility = clean_json_string(review.and_then(|map| map.get("public_visibility")));
+    let custody_mode = clean_json_string(review.and_then(|map| map.get("custody_mode")));
+    let return_shipping_payer =
+        clean_json_string(review.and_then(|map| map.get("return_shipping_payer_if_rejected")));
+
+    if content_status == "active" && review_state.as_deref() != Some("approved") {
+        return Err(
+            "active tool_rental listing requires lajukan_rental_review.review_state=approved",
+        );
+    }
+
+    if review_state.as_deref() == Some("pending_lajukan_review") {
+        if content_status != "draft" {
+            return Err("pending_lajukan_review tool_rental must remain draft until approved");
+        }
+        if public_visibility.as_deref() != Some("hidden_until_approved") {
+            return Err(
+                "pending_lajukan_review tool_rental must set public_visibility=hidden_until_approved",
+            );
+        }
+        if custody_mode.as_deref() != Some("lajukan_physical_hold") {
+            return Err(
+                "pending_lajukan_review tool_rental must set custody_mode=lajukan_physical_hold",
+            );
+        }
+        if return_shipping_payer.as_deref() != Some("owner_sender") {
+            return Err(
+                "pending_lajukan_review tool_rental must set return_shipping_payer_if_rejected=owner_sender",
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_content_media_requirements(
+    content_type: &str,
+    content_status: &str,
+    cover_image: Option<&str>,
+    metadata: &Value,
+) -> Result<(), &'static str> {
+    if cover_image.is_some_and(|url| !is_likely_image_url(url)) {
+        return Err("cover_image must be a valid image URL");
+    }
+
+    let has_metadata_image = !collect_metadata_image_urls(metadata).is_empty();
+    let has_primary_image = cover_image.is_some() || has_metadata_image;
+    let is_active = content_status == "active";
+
+    if content_type == "image" && is_active && !has_primary_image {
+        return Err("active image listing requires at least one image");
+    }
+    if content_type_requires_primary_image(content_type) && is_active && !has_primary_image {
+        return Err(
+            "active listing requires at least one image (cover_image or metadata.image_urls)",
+        );
+    }
+    if content_type == "tool_rental" {
+        validate_tool_rental_review_gate(content_status, metadata)?;
+    }
+    Ok(())
+}
+
+fn can_change_content_type(
+    current_type: &str,
+    next_type: &str,
+    current_status: &str,
+    activity: &ContentActivityCounts,
+) -> Result<(), &'static str> {
+    if current_type == next_type {
+        return Ok(());
+    }
+    if activity.transaction_count > 0 {
+        return Err("content_type cannot be changed after transactions exist");
+    }
+    if activity.review_count > 0 {
+        return Err("content_type cannot be changed after reviews exist");
+    }
+    if current_status != "draft" {
+        return Err("content_type can only be changed while listing is draft");
+    }
+    Ok(())
+}
+
+fn sanitize_content_metadata(content_type: &str, metadata: Value) -> Result<Value, &'static str> {
+    let Value::Object(mut map) = metadata else {
+        return Err("metadata must be an object");
+    };
+
+    let normalized_sector = map
+        .get("sector")
+        .and_then(Value::as_str)
+        .map(make_slug)
+        .filter(|v| !v.is_empty());
+    let normalized_sub_sector = map
+        .get("sub_sector")
+        .and_then(Value::as_str)
+        .map(make_slug)
+        .filter(|v| !v.is_empty());
+
+    if content_type == "property" {
+        map.insert(
+            "sector".to_string(),
+            Value::String("realestate".to_string()),
+        );
+        map.remove("sub_sector");
+    } else {
+        if let Some(sector) = normalized_sector {
+            map.insert("sector".to_string(), Value::String(sector));
+        } else {
+            map.remove("sector");
+        }
+        if map.contains_key("sector") {
+            if let Some(sub_sector) = normalized_sub_sector {
+                map.insert("sub_sector".to_string(), Value::String(sub_sector));
+            } else {
+                map.remove("sub_sector");
+            }
+        } else {
+            map.remove("sub_sector");
+        }
+    }
+
+    let normalized_image_urls = collect_metadata_image_urls(&Value::Object(map.clone()));
+    if normalized_image_urls.is_empty() {
+        map.remove("image_urls");
+    } else {
+        map.insert(
+            "image_urls".to_string(),
+            Value::Array(
+                normalized_image_urls
+                    .into_iter()
+                    .map(Value::String)
+                    .collect(),
+            ),
+        );
+    }
+
+    Ok(Value::Object(map))
+}
+
+fn protection_status_for_transaction(status: &str) -> &'static str {
+    match status {
+        "pending" => "awaiting_funding",
+        "accepted" => "funds_held",
+        "in_progress" => "funds_held",
+        "delivered" => "on_hold",
+        "completed" => "released",
+        "cancelled" => "refunded",
+        "disputed" => "on_hold",
+        _ => "awaiting_funding",
+    }
+}
+
+fn merge_json_objects(base: Value, extension: Value) -> Value {
+    let mut merged = match base {
+        Value::Object(map) => map,
+        _ => serde_json::Map::new(),
+    };
+    if let Value::Object(extra) = extension {
+        for (key, value) in extra {
+            merged.insert(key, value);
+        }
+    }
+    Value::Object(merged)
+}
+
+fn sanitize_risk_flags(value: Option<Value>) -> Value {
+    let mut flags: Vec<String> = Vec::new();
+    if let Some(Value::Array(items)) = value {
+        for entry in items {
+            if let Some(raw) = entry.as_str() {
+                let cleaned = raw.trim().to_lowercase();
+                if cleaned.is_empty() || cleaned.len() > 80 {
+                    continue;
+                }
+                if !flags.iter().any(|existing| existing == &cleaned) {
+                    flags.push(cleaned);
+                }
+                if flags.len() >= 12 {
+                    break;
+                }
+            }
+        }
+    }
+    Value::Array(flags.into_iter().map(Value::String).collect())
+}
+
+fn has_required_safety_checklist(checklist: &Value) -> bool {
+    let required = [
+        "identity_confirmed",
+        "platform_payment_confirmed",
+        "item_detail_confirmed",
+        "anti_scam_acknowledged",
+    ];
+    required.iter().all(|key| {
+        checklist
+            .get(*key)
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    })
+}
+
+fn parse_verification_state(payload: &Value) -> (bool, bool, bool, bool) {
+    let verification = payload.get("verification");
+    let email_verified = verification
+        .and_then(|v| v.get("email_verified"))
+        .or_else(|| payload.get("email_verified"))
+        .or_else(|| payload.get("emailVerified"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let phone_verified = verification
+        .and_then(|v| v.get("phone_verified"))
+        .or_else(|| payload.get("phone_verified"))
+        .or_else(|| payload.get("phoneVerified"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let document_verified = verification
+        .and_then(|v| v.get("document_verified"))
+        .or_else(|| payload.get("document_verified"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let liveness_verified = verification
+        .and_then(|v| v.get("liveness_verified"))
+        .or_else(|| payload.get("liveness_verified"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let identity_verified = verification
+        .and_then(|v| v.get("identity_verified"))
+        .or_else(|| payload.get("identity_verified"))
+        .or_else(|| payload.get("is_verified"))
+        .or_else(|| payload.get("verified"))
+        .and_then(Value::as_bool)
+        .unwrap_or(phone_verified || (document_verified && liveness_verified));
+    let transaction_eligible = verification
+        .and_then(|v| v.get("transaction_eligible"))
+        .or_else(|| payload.get("transaction_eligible"))
+        .and_then(Value::as_bool)
+        .unwrap_or(identity_verified || phone_verified);
+    (
+        transaction_eligible,
+        identity_verified,
+        email_verified,
+        phone_verified,
+    )
+}
+
+async fn fetch_user_verification_snapshot(
+    state: &AppState,
+    user_id: Uuid,
+) -> Result<Value, reqwest::Error> {
+    let endpoint = format!(
+        "{}/users/public/{}",
+        state.identity_base_url.trim_end_matches('/'),
+        user_id
+    );
+    let response = state
+        .http_client
+        .get(endpoint)
+        .header(reqwest::header::ACCEPT, "application/json")
+        .send()
+        .await?;
+    let status = response.status();
+    let payload: Value = response.json().await.unwrap_or_else(|_| json!({}));
+    if !status.is_success() {
+        return Ok(json!({}));
+    }
+    Ok(payload)
+}
+
+async fn ensure_transaction_actor_verified(
+    state: &AppState,
+    user_id: Uuid,
+    actor_role: &str,
+) -> Option<axum::response::Response> {
+    let profile = fetch_user_verification_snapshot(state, user_id)
+        .await
+        .unwrap_or_else(|_| json!({}));
+    let (eligible, _, _, _) = parse_verification_state(&profile);
+    if eligible {
+        return None;
+    }
+
+    Some(
+        (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "error": format!("{} must complete verification before continuing this transaction.", actor_role),
+                "code": "verification_required",
+                "buyer_verified": if actor_role == "buyer" { false } else { true },
+                "seller_verified": if actor_role == "seller" { false } else { true }
+            })),
+        )
+            .into_response(),
+    )
+}
+
+fn build_listing_snapshot(content: &ContentRow) -> Value {
+    json!({
+        "content_id": content.id,
+        "title": content.title,
+        "slug": content.slug,
+        "content_type": content.content_type,
+        "cover_image": content.cover_image,
+        "location": content.metadata.get("location")
+            .or_else(|| content.metadata.get("city"))
+            .or_else(|| content.metadata.get("region"))
+            .and_then(Value::as_str)
+            .unwrap_or(""),
+        "pricing_mode": content.pricing_mode,
+        "price_cents": content.price_cents,
+        "original_price_cents": content.original_price_cents,
+        "promo_label": content.promo_label,
+        "promo_start_at": content.promo_start_at,
+        "promo_end_at": content.promo_end_at,
+        "currency": content.currency,
+    })
+}
+
+fn sanitize_tags(tags: Option<Vec<String>>) -> Result<Option<Vec<String>>, &'static str> {
+    let Some(raw) = tags else {
+        return Ok(None);
+    };
+
+    if raw.len() > MAX_TAGS {
+        return Err("too many tags");
+    }
+
+    let mut normalized: Vec<String> = Vec::with_capacity(raw.len());
+    for tag in raw {
+        let clean = tag.trim().to_lowercase();
+        if clean.is_empty() {
+            continue;
+        }
+        if clean.len() > MAX_TAG_LEN {
+            return Err("tag is too long");
+        }
+        if !clean
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ' ')
+        {
+            return Err("tag contains invalid characters");
+        }
+        normalized.push(clean);
+    }
+
+    normalized.sort();
+    normalized.dedup();
+    Ok(Some(normalized))
+}
+
+fn metadata_within_limit(metadata: &Value) -> bool {
+    serde_json::to_vec(metadata)
+        .map(|bytes| bytes.len() <= MAX_METADATA_BYTES)
+        .unwrap_or(false)
+}
+
+fn make_slug(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut last_dash = false;
+    for ch in input.chars().flat_map(|c| c.to_lowercase()) {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+            last_dash = false;
+        } else if !last_dash {
+            out.push('-');
+            last_dash = true;
+        }
+    }
+    let out = out.trim_matches('-').to_string();
+    if out.is_empty() {
+        format!("item-{}", Uuid::new_v4().simple())
+    } else {
+        out
+    }
+}
+
+fn auth_claims_from_headers(headers: &HeaderMap, jwt_secret: &str) -> Option<AccessClaims> {
+    let header = headers
+        .get("authorization")
+        .or_else(|| headers.get("Authorization"))
+        .and_then(|v| v.to_str().ok())?;
+    if !header.starts_with("Bearer ") {
+        return None;
+    }
+    let token = header.trim_start_matches("Bearer ").trim();
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.validate_exp = true;
+    decode::<AccessClaims>(
+        token,
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
+        &validation,
+    )
+    .ok()
+    .map(|d| d.claims)
+}
+
+fn user_id_from_auth(headers: &HeaderMap, jwt_secret: &str) -> Option<Uuid> {
+    auth_claims_from_headers(headers, jwt_secret).and_then(|c| Uuid::parse_str(&c.sub).ok())
+}
+
+fn user_id_from_token_string(token: &str, jwt_secret: &str) -> Option<Uuid> {
+    let cleaned = token
+        .trim()
+        .trim_start_matches("Bearer ")
+        .trim_start_matches("bearer ")
+        .trim();
+    if cleaned.is_empty() {
+        return None;
+    }
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.validate_exp = true;
+    decode::<AccessClaims>(
+        cleaned,
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
+        &validation,
+    )
+    .ok()
+    .and_then(|decoded| Uuid::parse_str(&decoded.claims.sub).ok())
+}
+
+fn parse_transaction_wallet_environment(transaction_meta: &Value) -> String {
+    let candidate = transaction_meta
+        .get("flow")
+        .and_then(|v| v.get("wallet_environment"))
+        .and_then(Value::as_str)
+        .map(|v| v.to_string());
+    normalize_wallet_environment(candidate).unwrap_or_else(wallet_default_environment)
+}
+
+fn parse_linked_transaction_id_from_topup_payload(payment_payload: &Value) -> Option<Uuid> {
+    let transaction_id = payment_payload
+        .get("client_metadata")
+        .and_then(|v| v.get("transaction_id"))
+        .and_then(Value::as_str)
+        .or_else(|| {
+            payment_payload
+                .get("transaction_id")
+                .and_then(Value::as_str)
+        })
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    Uuid::parse_str(transaction_id).ok()
+}
+
+fn parse_linked_transaction_id_from_topup_metadata(metadata: &Value) -> Option<Uuid> {
+    let transaction_id = metadata
+        .get("transaction_id")
+        .or_else(|| metadata.get("transactionId"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    Uuid::parse_str(transaction_id).ok()
+}
+
+fn normalize_reusable_payment_method(value: Option<&str>) -> Option<String> {
+    value
+        .map(|raw| raw.trim().to_lowercase())
+        .filter(|raw| !raw.is_empty() && raw != "auto" && raw != "all" && raw != "any")
+}
+
+async fn find_reusable_pending_topup_for_transaction(
+    db: &PgPool,
+    user_id: Uuid,
+    transaction_id: Uuid,
+    environment: &str,
+    currency: &str,
+    amount_cents: i64,
+    payment_provider: &str,
+    payment_method: Option<&str>,
+) -> Result<Option<WalletTopupRow>, sqlx::Error> {
+    let expected_method = normalize_reusable_payment_method(payment_method);
+    let rows = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE user_id = $1
+          AND status = 'pending'
+          AND environment = $2
+          AND currency = $3
+          AND amount_cents = $4
+          AND payment_provider = $5
+          AND (payment_payload #>> '{client_metadata,transaction_id}') = $6
+        ORDER BY created_at DESC
+        LIMIT 8
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment)
+    .bind(currency)
+    .bind(amount_cents)
+    .bind(payment_provider)
+    .bind(transaction_id.to_string())
+    .fetch_all(db)
+    .await?;
+
+    for topup in rows {
+        let linked_txn_id = parse_linked_transaction_id_from_topup_payload(&topup.payment_payload);
+        if linked_txn_id != Some(transaction_id) {
+            continue;
+        }
+        if normalize_reusable_payment_method(topup.payment_method.as_deref()) != expected_method {
+            continue;
+        }
+        let expired = extract_topup_payment_due_at(&topup.payment_payload)
+            .map(|deadline| Utc::now() > deadline)
+            .unwrap_or(false);
+        if expired {
+            continue;
+        }
+        return Ok(Some(topup));
+    }
+
+    Ok(None)
+}
+
+fn linked_transaction_outcome_json(outcome: &LinkedTransactionFundingOutcome) -> Value {
+    json!({
+        "transaction_id": outcome.transaction_id,
+        "transaction_status": outcome.transaction_status,
+        "protection_status": outcome.protection_status,
+        "payment_status": outcome.payment_status,
+        "wallet_environment": outcome.wallet_environment,
+        "amount_cents": outcome.amount_cents,
+        "currency": outcome.currency
+    })
+}
+
+fn format_currency_from_cents(amount_cents: i64, currency: &str) -> String {
+    if currency.eq_ignore_ascii_case("IDR") && amount_cents % 100 == 0 {
+        let rupiah = amount_cents / 100;
+        format!("{} {}", currency, rupiah)
+    } else {
+        let major = amount_cents as f64 / 100.0;
+        format!("{} {:.2}", currency, major)
+    }
+}
+
+fn emit_realtime_event(state: &Arc<AppState>, user_id: Uuid, payload: Value) {
+    let _ = state
+        .notification_tx
+        .send(RealtimeNotificationEnvelope { user_id, payload });
+}
+
+async fn create_notification(
+    db: &PgPool,
+    user_id: Uuid,
+    category: &str,
+    event_type: &str,
+    title: &str,
+    message: &str,
+    data: Value,
+) -> Result<UserNotificationRow, sqlx::Error> {
+    sqlx::query_as::<_, UserNotificationRow>(
+        r#"
+        INSERT INTO user_notifications (
+            user_id, category, event_type, title, message, data, is_read, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, FALSE, NOW(), NOW())
+        RETURNING
+            id, user_id, category, event_type, title, message, data, is_read,
+            read_at, created_at, updated_at
+        "#,
+    )
+    .bind(user_id)
+    .bind(category)
+    .bind(event_type)
+    .bind(title)
+    .bind(message)
+    .bind(data)
+    .fetch_one(db)
+    .await
+}
+
+async fn unread_notification_count(db: &PgPool, user_id: Uuid) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(1) FROM user_notifications WHERE user_id = $1 AND is_read = FALSE",
+    )
+    .bind(user_id)
+    .fetch_one(db)
+    .await
+}
+
+async fn push_notification_best_effort(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+    category: &str,
+    event_type: &str,
+    title: &str,
+    message: &str,
+    data: Value,
+) {
+    match create_notification(
+        &state.db, user_id, category, event_type, title, message, data,
+    )
+    .await
+    {
+        Ok(row) => {
+            let payload = json!({
+                "event": "notification.created",
+                "notification": UserNotificationResponse::from(row.clone())
+            });
+            emit_realtime_event(state, row.user_id, payload);
+            if let Ok(count) = unread_notification_count(&state.db, row.user_id).await {
+                emit_realtime_event(
+                    state,
+                    row.user_id,
+                    json!({
+                        "event": "notification.unread_count",
+                        "unread_count": count,
+                        "generated_at": Utc::now()
+                    }),
+                );
+            }
+        }
+        Err(e) => {
+            tracing::warn!("push_notification_best_effort error: {:?}", e);
+        }
+    }
+}
+
+async fn notify_linked_transaction_funding_outcome(
+    state: &Arc<AppState>,
+    outcome: &LinkedTransactionFundingOutcome,
+) {
+    let amount_label = format_currency_from_cents(outcome.amount_cents, outcome.currency.as_str());
+    if outcome.payment_status == "paid" {
+        push_notification_best_effort(
+            state,
+            outcome.buyer_id,
+            "transaction",
+            "transaction.payment_confirmed",
+            "Pembayaran transaksi terkonfirmasi",
+            &format!(
+                "Pembayaran {} untuk transaksi {} sudah terkonfirmasi dan dana ditahan.",
+                amount_label, outcome.transaction_id
+            ),
+            linked_transaction_outcome_json(outcome),
+        )
+        .await;
+        push_notification_best_effort(
+            state,
+            outcome.seller_id,
+            "transaction",
+            "transaction.buyer_funded",
+            "Buyer sudah bayar",
+            &format!(
+                "Buyer sudah bayar transaksi {} ({}). Kamu bisa lanjutkan proses transaksi.",
+                outcome.transaction_id, amount_label
+            ),
+            linked_transaction_outcome_json(outcome),
+        )
+        .await;
+    } else if outcome.payment_status == "partial" {
+        push_notification_best_effort(
+            state,
+            outcome.buyer_id,
+            "wallet",
+            "wallet.topup.partial_for_transaction",
+            "Saldo belum cukup untuk transaksi",
+            &format!(
+                "Top-up terbayar, tapi saldo untuk transaksi {} belum cukup. Tambah saldo lalu coba lagi.",
+                outcome.transaction_id
+            ),
+            linked_transaction_outcome_json(outcome),
+        )
+        .await;
+    }
+}
+
+fn has_agent_access(claims: &AccessClaims) -> bool {
+    claims.roles.iter().any(|r| {
+        matches!(
+            r.to_lowercase().as_str(),
+            "admin" | "sales" | "support" | "ops" | "super_admin"
+        )
+    })
+}
+
+fn has_cms_access(claims: &AccessClaims) -> bool {
+    claims.roles.iter().any(|r| {
+        matches!(
+            r.to_lowercase().as_str(),
+            "admin" | "content_admin" | "super_admin"
+        )
+    })
+}
+
+fn normalize_sector_id(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| make_slug(&v))
+}
+
+fn normalize_banner_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "active" => "active".to_string(),
+        "scheduled" => "scheduled".to_string(),
+        "disabled" => "disabled".to_string(),
+        _ => "active".to_string(),
+    })
+}
+
+fn normalize_ticket_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "open" => "open".to_string(),
+        "in_progress" => "in_progress".to_string(),
+        "pending_customer" => "pending_customer".to_string(),
+        "resolved" => "resolved".to_string(),
+        "closed" => "closed".to_string(),
+        _ => "open".to_string(),
+    })
+}
+
+fn normalize_ticket_priority(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "low" => "low".to_string(),
+        "normal" => "normal".to_string(),
+        "high" => "high".to_string(),
+        "urgent" => "urgent".to_string(),
+        _ => "normal".to_string(),
+    })
+}
+
+fn normalize_lead_stage(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "lead" => "lead".to_string(),
+        "qualified" => "qualified".to_string(),
+        "negotiation" | "negotiating" => "negotiation".to_string(),
+        "contract" | "proposal" => "contract".to_string(),
+        "won" | "closed_won" => "won".to_string(),
+        "lost" | "closed_lost" => "lost".to_string(),
+        _ => "lead".to_string(),
+    })
+}
+
+fn normalize_lead_source(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| v.to_lowercase())
+}
+
+fn normalize_super_app_order_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "pending_verification" => "pending_verification".to_string(),
+        "ready_for_dispatch" => "ready_for_dispatch".to_string(),
+        "dispatching" => "dispatching".to_string(),
+        "in_progress" => "in_progress".to_string(),
+        "delivered" => "delivered".to_string(),
+        "completed" => "completed".to_string(),
+        "cancelled" => "cancelled".to_string(),
+        "disputed" => "disputed".to_string(),
+        _ => "pending_verification".to_string(),
+    })
+}
+
+fn normalize_super_app_service_type(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "ride" => "ride".to_string(),
+        "car" => "car".to_string(),
+        "food" => "food".to_string(),
+        "send" => "send".to_string(),
+        "mart" => "mart".to_string(),
+        "services" => "services".to_string(),
+        _ => "ride".to_string(),
+    })
+}
+
+fn normalize_super_app_trust_tier(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "rookie" => "rookie".to_string(),
+        "verified" => "verified".to_string(),
+        "trusted_pro" | "trusted" | "pro" => "trusted_pro".to_string(),
+        "elite" => "elite".to_string(),
+        "influencer" => "influencer".to_string(),
+        "enterprise" => "enterprise".to_string(),
+        _ => "rookie".to_string(),
+    })
+}
+
+fn normalize_super_app_kyc_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "none" => "none".to_string(),
+        "basic" => "basic".to_string(),
+        "full" => "full".to_string(),
+        "enhanced" => "enhanced".to_string(),
+        _ => "none".to_string(),
+    })
+}
+
+fn normalize_super_app_crm_approval_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "pending" => "pending".to_string(),
+        "approved" => "approved".to_string(),
+        "rejected" => "rejected".to_string(),
+        "restricted" => "restricted".to_string(),
+        _ => "pending".to_string(),
+    })
+}
+
+fn normalize_super_app_marketing_segment(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| {
+        v.to_lowercase()
+            .chars()
+            .take(MAX_TAG_LEN * 2)
+            .collect::<String>()
+    })
+}
+
+fn ratio_2dp(numerator: i32, denominator: i32) -> f32 {
+    if denominator <= 0 {
+        return 0.0;
+    }
+    let ratio = numerator as f32 / denominator as f32;
+    ((ratio * 100.0).round()) / 100.0
+}
+
+async fn fetch_seller_stats(
+    db: &PgPool,
+    owner_ids: &[Uuid],
+) -> Result<HashMap<Uuid, SellerStats>, sqlx::Error> {
+    let mut stats_map: HashMap<Uuid, SellerStats> = HashMap::new();
+    if owner_ids.is_empty() {
+        return Ok(stats_map);
+    }
+
+    for owner_id in owner_ids {
+        stats_map.insert(*owner_id, SellerStats::default());
+    }
+
+    let ids: Vec<Uuid> = owner_ids.to_vec();
+
+    let review_rows = sqlx::query_as::<_, SellerReviewAggRow>(
+        r#"
+        SELECT
+            reviewee_id AS user_id,
+            AVG(rating)::REAL AS rating_avg,
+            COUNT(*)::INT AS review_count
+        FROM reviews
+        WHERE reviewee_id = ANY($1)
+        GROUP BY reviewee_id
+        "#,
+    )
+    .bind(&ids)
+    .fetch_all(db)
+    .await?;
+
+    for row in review_rows {
+        let entry = stats_map.entry(row.user_id).or_default();
+        entry.review_count = row.review_count as i32;
+        entry.rating = if row.review_count > 0 {
+            row.rating_avg.unwrap_or(0.0)
+        } else {
+            0.0
+        };
+    }
+
+    let txn_rows = sqlx::query_as::<_, SellerTxnAggRow>(
+        r#"
+        SELECT
+            seller_id AS user_id,
+            COUNT(*)::INT AS total_transactions,
+            COUNT(*) FILTER (WHERE transaction_status = 'completed')::INT AS completed_transactions,
+            COUNT(*) FILTER (WHERE transaction_status = 'accepted')::INT AS accepted_transactions,
+            COUNT(*) FILTER (WHERE transaction_status = 'cancelled')::INT AS cancelled_transactions,
+            COUNT(*) FILTER (WHERE transaction_status = 'pending')::INT AS pending_transactions
+        FROM transactions
+        WHERE seller_id = ANY($1)
+        GROUP BY seller_id
+        "#,
+    )
+    .bind(&ids)
+    .fetch_all(db)
+    .await?;
+
+    for row in txn_rows {
+        let entry = stats_map.entry(row.user_id).or_default();
+        entry.total_transactions = row.total_transactions as i32;
+        entry.completed_transactions = row.completed_transactions as i32;
+        entry.accepted_transactions = row.accepted_transactions as i32;
+        entry.cancelled_transactions = row.cancelled_transactions as i32;
+        entry.pending_transactions = row.pending_transactions as i32;
+    }
+
+    for entry in stats_map.values_mut() {
+        let total = entry.total_transactions;
+        let accepted_total = entry.completed_transactions + entry.accepted_transactions;
+        entry.completion_rate = ratio_2dp(entry.completed_transactions, total);
+        entry.acceptance_rate = ratio_2dp(accepted_total, total);
+        entry.cancel_rate = ratio_2dp(entry.cancelled_transactions, total);
+    }
+
+    Ok(stats_map)
+}
+
+fn actor_role_from_claims(claims: &AccessClaims) -> String {
+    if has_agent_access(claims) {
+        "agent".to_string()
+    } else {
+        "user".to_string()
+    }
+}
+
+async fn list_content(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListContentQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let typ = normalize_content_type(query.r#type);
+    let q = clean_text(query.q);
+    let location = clean_text(query.location);
+    let level = clean_text(query.level);
+    let sector = clean_text(query.sector).map(|s| s.to_lowercase());
+    let sub_sector = clean_text(query.sub_sector).map(|s| s.to_lowercase());
+    let status = clean_text(query.status).map(|s| s.to_lowercase());
+    let owner_id = query.owner_id;
+
+    let rows = sqlx::query_as::<_, ContentRow>(
+        r#"
+        SELECT
+            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
+            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            metadata, created_at, updated_at
+        FROM content_items
+        WHERE content_status <> 'deleted'
+          AND ($1::text IS NULL OR content_type = $1)
+          AND (
+              $2::text IS NULL OR
+              title ILIKE ('%' || $2 || '%') OR
+              coalesce(summary, '') ILIKE ('%' || $2 || '%') OR
+              body ILIKE ('%' || $2 || '%') OR
+              coalesce(slug, '') ILIKE ('%' || $2 || '%')
+          )
+          AND (
+              $3::text IS NULL OR
+              coalesce(metadata->>'location', '') ILIKE ('%' || $3 || '%') OR
+              coalesce(metadata->>'city', '') ILIKE ('%' || $3 || '%')
+          )
+          AND (
+              $4::text IS NULL OR
+              coalesce(metadata->>'level', '') ILIKE ('%' || $4 || '%') OR
+              coalesce(metadata->>'seniority', '') ILIKE ('%' || $4 || '%')
+          )
+          AND (
+              $5::text IS NULL OR
+              regexp_replace(lower(coalesce(metadata->>'sector', '')), '[^a-z0-9]+', '', 'g') =
+                regexp_replace(lower($5), '[^a-z0-9]+', '', 'g') OR
+              coalesce(metadata->>'sector', '') ILIKE ('%' || $5 || '%')
+          )
+          AND (
+              $6::text IS NULL OR
+              regexp_replace(lower(coalesce(metadata->>'sub_sector', '')), '[^a-z0-9]+', '', 'g') =
+                regexp_replace(lower($6), '[^a-z0-9]+', '', 'g') OR
+              coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $6 || '%')
+          )
+          AND (
+              $7::text IS NULL OR
+              lower(content_status) = $7
+          )
+          AND (
+              $8::uuid IS NULL OR owner_id = $8
+          )
+        ORDER BY created_at DESC
+        LIMIT $9 OFFSET $10
+        "#,
+    )
+    .bind(typ)
+    .bind(q)
+    .bind(location)
+    .bind(level)
+    .bind(sector)
+    .bind(sub_sector)
+    .bind(status)
+    .bind(owner_id)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut rows) => {
+            let has_more = rows.len() as i64 > limit;
+            if has_more {
+                rows.truncate(limit as usize);
+            }
+
+            let owner_ids: Vec<Uuid> = {
+                let mut seen = HashSet::new();
+                rows.iter()
+                    .filter_map(|row| {
+                        if seen.insert(row.owner_id) {
+                            Some(row.owner_id)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            };
+
+            let stats_map = match fetch_seller_stats(&state.db, &owner_ids).await {
+                Ok(map) => map,
+                Err(e) => {
+                    tracing::error!("list_content seller_stats error: {:?}", e);
+                    HashMap::new()
+                }
+            };
+
+            (
+                StatusCode::OK,
+                Json(ListContentResponse {
+                    items: rows
+                        .into_iter()
+                        .map(|row| {
+                            let seller_stats = stats_map.get(&row.owner_id).cloned();
+                            ContentResponse::from_row(row, seller_stats)
+                        })
+                        .collect(),
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_content error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content").into_response()
+        }
+    }
+}
+
+async fn get_content(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match find_content(&state.db, &id).await {
+        Ok(Some(row)) => {
+            let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
+                Ok(map) => map.get(&row.owner_id).cloned(),
+                Err(e) => {
+                    tracing::error!("get_content seller_stats error: {:?}", e);
+                    None
+                }
+            };
+            (
+                StatusCode::OK,
+                Json(ContentResponse::from_row(row, seller_stats)),
+            )
+                .into_response()
+        }
+        Ok(None) => err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_content error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content").into_response()
+        }
+    }
+}
+
+async fn create_content(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<UpsertContentRequest>,
+) -> impl IntoResponse {
+    let owner_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let content_type = match resolve_requested_content_type(
+        payload.content_type.clone(),
+        payload.type_alias.clone(),
+        payload.category.clone(),
+        Some("product"),
+    ) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if !is_valid_content_type(&content_type) {
+        return err(StatusCode::BAD_REQUEST, "invalid content_type").into_response();
+    }
+
+    let title = match clean_text(payload.title) {
+        Some(v) => v,
+        None => return err(StatusCode::BAD_REQUEST, "title is required").into_response(),
+    };
+    if title.len() > MAX_TITLE_LEN {
+        return err(StatusCode::BAD_REQUEST, "title is too long").into_response();
+    }
+
+    let summary = clean_text(payload.summary);
+    if summary.as_ref().is_some_and(|v| v.len() > MAX_SUMMARY_LEN) {
+        return err(StatusCode::BAD_REQUEST, "summary is too long").into_response();
+    }
+
+    let body = clean_text(payload.body)
+        .unwrap_or_else(|| summary.clone().unwrap_or_else(|| title.clone()));
+    if body.len() > MAX_BODY_LEN {
+        return err(StatusCode::BAD_REQUEST, "body is too long").into_response();
+    }
+
+    let slug = clean_text(payload.slug).unwrap_or_else(|| make_slug(&title));
+    let category = Some(content_type.clone());
+
+    let currency = normalize_currency(payload.currency).unwrap_or_else(|| "IDR".to_string());
+    if !is_valid_currency(&currency) {
+        return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3").into_response();
+    }
+
+    let pricing_mode = normalize_pricing_mode(payload.pricing_mode).unwrap_or_else(|| {
+        if payload.price_cents.unwrap_or(0) > 0 {
+            "fixed".to_string()
+        } else {
+            "request".to_string()
+        }
+    });
+    if !is_valid_pricing_mode(&pricing_mode) {
+        return err(StatusCode::BAD_REQUEST, "invalid pricing_mode").into_response();
+    }
+
+    let mut price_cents = payload.price_cents;
+    if let Some(price) = price_cents {
+        if price <= 0 || price > 1_000_000_000_000 {
+            return err(StatusCode::BAD_REQUEST, "invalid price_cents").into_response();
+        }
+    }
+    if pricing_mode == "fixed" && price_cents.unwrap_or(0) <= 0 {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "fixed pricing_mode requires price_cents",
+        )
+        .into_response();
+    }
+    if pricing_mode == "request" {
+        price_cents = None;
+    }
+
+    let mut original_price_cents = payload.original_price_cents;
+    if let Some(original) = original_price_cents {
+        if original <= 0 || original > 1_000_000_000_000 {
+            return err(StatusCode::BAD_REQUEST, "invalid original_price_cents").into_response();
+        }
+    }
+    if pricing_mode == "request" {
+        original_price_cents = None;
+    }
+    if let (Some(original), Some(price)) = (original_price_cents, price_cents) {
+        if original < price {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "original_price_cents must be >= price_cents",
+            )
+            .into_response();
+        }
+    }
+
+    let promo_label = clean_text(payload.promo_label);
+    let promo_start_at = payload.promo_start_at;
+    let promo_end_at = payload.promo_end_at;
+    if let (Some(start), Some(end)) = (promo_start_at, promo_end_at) {
+        if end < start {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "promo_end_at must be after promo_start_at",
+            )
+            .into_response();
+        }
+    }
+
+    let content_status =
+        normalize_content_status(payload.content_status).unwrap_or_else(|| "active".to_string());
+    if !matches!(content_status.as_str(), "draft" | "active") {
+        return err(StatusCode::BAD_REQUEST, "invalid content_status for create").into_response();
+    }
+
+    let metadata = match sanitize_content_metadata(
+        &content_type,
+        payload.metadata.unwrap_or_else(|| json!({})),
+    ) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+    }
+
+    let tags = match sanitize_tags(payload.tags) {
+        Ok(v) => v,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    let cover_image = clean_text(payload.cover_image);
+    if let Err(message) = validate_content_media_requirements(
+        &content_type,
+        &content_status,
+        cover_image.as_deref(),
+        &metadata,
+    ) {
+        return err(StatusCode::BAD_REQUEST, message).into_response();
+    }
+
+    let inserted = sqlx::query_as::<_, ContentRow>(
+        r#"
+        INSERT INTO content_items (
+            owner_id, content_type, slug, title, summary, body, pricing_mode, price_cents,
+            original_price_cents, promo_label, promo_start_at, promo_end_at, currency,
+            tags, cover_image, category, content_status, metadata
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+        )
+        RETURNING
+            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
+            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            metadata, created_at, updated_at
+        "#,
+    )
+    .bind(owner_id)
+    .bind(content_type)
+    .bind(slug)
+    .bind(title)
+    .bind(summary)
+    .bind(body)
+    .bind(pricing_mode)
+    .bind(price_cents)
+    .bind(original_price_cents)
+    .bind(promo_label)
+    .bind(promo_start_at)
+    .bind(promo_end_at)
+    .bind(currency)
+    .bind(tags)
+    .bind(cover_image)
+    .bind(category)
+    .bind(content_status)
+    .bind(metadata)
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(row) => {
+            let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
+                Ok(map) => map.get(&row.owner_id).cloned(),
+                Err(e) => {
+                    tracing::error!("create_content seller_stats error: {:?}", e);
+                    None
+                }
+            };
+            (
+                StatusCode::CREATED,
+                Json(ContentResponse::from_row(row, seller_stats)),
+            )
+                .into_response()
+        }
+        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
+            err(StatusCode::CONFLICT, "content slug already exists").into_response()
+        }
+        Err(e) => {
+            tracing::error!("create_content error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create content",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn update_content(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<UpsertContentRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let existing = match find_content(&state.db, &id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(e) => {
+            tracing::error!("update_content read error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update content",
+            )
+            .into_response();
+        }
+    };
+    if existing.owner_id != user_id {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let current_content_type = canonical_content_type(&existing.content_type.to_lowercase());
+    let content_type = match resolve_requested_content_type(
+        payload.content_type.clone(),
+        payload.type_alias.clone(),
+        payload.category.clone(),
+        Some(current_content_type.as_str()),
+    ) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if !is_valid_content_type(&content_type) {
+        return err(StatusCode::BAD_REQUEST, "invalid content_type").into_response();
+    }
+    if current_content_type != content_type {
+        let activity = match load_content_activity_counts(&state.db, existing.id).await {
+            Ok(row) => row,
+            Err(e) => {
+                tracing::error!("update_content activity error: {:?}", e);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to validate content updates",
+                )
+                .into_response();
+            }
+        };
+        if let Err(message) = can_change_content_type(
+            &current_content_type,
+            &content_type,
+            &existing.content_status.to_lowercase(),
+            &activity,
+        ) {
+            return err(StatusCode::CONFLICT, message).into_response();
+        }
+    }
+
+    let title = clean_text(payload.title).unwrap_or(existing.title.clone());
+    if title.len() > MAX_TITLE_LEN {
+        return err(StatusCode::BAD_REQUEST, "title is too long").into_response();
+    }
+
+    let summary = clean_text(payload.summary).or(existing.summary.clone());
+    if summary.as_ref().is_some_and(|v| v.len() > MAX_SUMMARY_LEN) {
+        return err(StatusCode::BAD_REQUEST, "summary is too long").into_response();
+    }
+
+    let body = clean_text(payload.body).unwrap_or(existing.body.clone());
+    if body.len() > MAX_BODY_LEN {
+        return err(StatusCode::BAD_REQUEST, "body is too long").into_response();
+    }
+
+    let slug = clean_text(payload.slug)
+        .map(|s| make_slug(&s))
+        .or(existing.slug.clone())
+        .unwrap_or_else(|| make_slug(&title));
+    let category = Some(content_type.clone());
+
+    let currency = normalize_currency(payload.currency)
+        .or_else(|| existing.currency.clone().map(|v| v.to_uppercase()));
+    if let Some(ref curr) = currency {
+        if !is_valid_currency(curr) {
+            return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3")
+                .into_response();
+        }
+    }
+
+    let content_status = normalize_content_status(payload.content_status)
+        .unwrap_or_else(|| existing.content_status.clone().to_lowercase());
+    if !is_valid_content_status(&content_status) {
+        return err(StatusCode::BAD_REQUEST, "invalid content_status").into_response();
+    }
+
+    let pricing_mode = normalize_pricing_mode(payload.pricing_mode)
+        .unwrap_or_else(|| existing.pricing_mode.clone());
+    if !is_valid_pricing_mode(&pricing_mode) {
+        return err(StatusCode::BAD_REQUEST, "invalid pricing_mode").into_response();
+    }
+
+    let mut price_cents = payload.price_cents.or(existing.price_cents);
+    if let Some(price) = price_cents {
+        if price <= 0 || price > 1_000_000_000_000 {
+            return err(StatusCode::BAD_REQUEST, "invalid price_cents").into_response();
+        }
+    }
+    if pricing_mode == "fixed" && price_cents.unwrap_or(0) <= 0 {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "fixed pricing_mode requires price_cents",
+        )
+        .into_response();
+    }
+    if pricing_mode == "request" {
+        price_cents = None;
+    }
+
+    let mut original_price_cents = payload
+        .original_price_cents
+        .or(existing.original_price_cents);
+    if let Some(original) = original_price_cents {
+        if original <= 0 || original > 1_000_000_000_000 {
+            return err(StatusCode::BAD_REQUEST, "invalid original_price_cents").into_response();
+        }
+    }
+    if pricing_mode == "request" {
+        original_price_cents = None;
+    }
+    if let (Some(original), Some(price)) = (original_price_cents, price_cents) {
+        if original < price {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "original_price_cents must be >= price_cents",
+            )
+            .into_response();
+        }
+    }
+
+    let promo_label = clean_text(payload.promo_label).or(existing.promo_label.clone());
+    let promo_start_at = payload.promo_start_at.or(existing.promo_start_at);
+    let promo_end_at = payload.promo_end_at.or(existing.promo_end_at);
+    if let (Some(start), Some(end)) = (promo_start_at, promo_end_at) {
+        if end < start {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "promo_end_at must be after promo_start_at",
+            )
+            .into_response();
+        }
+    }
+
+    let tags = match sanitize_tags(payload.tags) {
+        Ok(Some(v)) => Some(v),
+        Ok(None) => existing.tags.clone(),
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+
+    let metadata = match sanitize_content_metadata(
+        &content_type,
+        payload.metadata.unwrap_or(existing.metadata.clone()),
+    ) {
+        Ok(value) => value,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+    }
+    let cover_image = clean_text(payload.cover_image).or(existing.cover_image.clone());
+    if let Err(message) = validate_content_media_requirements(
+        &content_type,
+        &content_status,
+        cover_image.as_deref(),
+        &metadata,
+    ) {
+        return err(StatusCode::BAD_REQUEST, message).into_response();
+    }
+
+    let updated = sqlx::query_as::<_, ContentRow>(
+        r#"
+        UPDATE content_items
+        SET
+            content_type = $2,
+            slug = $3,
+            title = $4,
+            summary = $5,
+            body = $6,
+            pricing_mode = $7,
+            price_cents = $8,
+            original_price_cents = $9,
+            promo_label = $10,
+            promo_start_at = $11,
+            promo_end_at = $12,
+            currency = $13,
+            tags = $14,
+            cover_image = $15,
+            category = $16,
+            content_status = $17,
+            metadata = $18,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
+            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            metadata, created_at, updated_at
+        "#,
+    )
+    .bind(existing.id)
+    .bind(content_type)
+    .bind(slug)
+    .bind(title)
+    .bind(summary)
+    .bind(body)
+    .bind(pricing_mode)
+    .bind(price_cents)
+    .bind(original_price_cents)
+    .bind(promo_label)
+    .bind(promo_start_at)
+    .bind(promo_end_at)
+    .bind(currency)
+    .bind(tags)
+    .bind(cover_image)
+    .bind(category)
+    .bind(content_status)
+    .bind(metadata)
+    .fetch_one(&state.db)
+    .await;
+
+    match updated {
+        Ok(row) => {
+            let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
+                Ok(map) => map.get(&row.owner_id).cloned(),
+                Err(e) => {
+                    tracing::error!("update_content seller_stats error: {:?}", e);
+                    None
+                }
+            };
+            (
+                StatusCode::OK,
+                Json(ContentResponse::from_row(row, seller_stats)),
+            )
+                .into_response()
+        }
+        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
+            err(StatusCode::CONFLICT, "content slug already exists").into_response()
+        }
+        Err(e) => {
+            tracing::error!("update_content write error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update content",
+            )
+            .into_response()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct ReviewRow {
+    id: Uuid,
+    transaction_id: Option<Uuid>,
+    content_id: Uuid,
+    reviewer_id: Uuid,
+    reviewee_id: Uuid,
+    rating: i32,
+    comment: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
+async fn list_reviews(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let content_id = match resolve_content_id(&state.db, &id).await {
+        Ok(Some(id)) => id,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(e) => {
+            tracing::error!("list_reviews resolve error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load reviews")
+                .into_response();
+        }
+    };
+
+    match sqlx::query_as::<_, ReviewRow>(
+        r#"
+        SELECT id, transaction_id, content_id, reviewer_id, reviewee_id, rating, comment, created_at
+        FROM reviews
+        WHERE content_id = $1
+        ORDER BY created_at DESC
+        "#,
+    )
+    .bind(content_id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => (StatusCode::OK, Json(rows)).into_response(),
+        Err(e) => {
+            tracing::error!("list_reviews query error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load reviews").into_response()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct TransactionRow {
+    id: Uuid,
+    content_id: Uuid,
+    buyer_id: Uuid,
+    seller_id: Uuid,
+    amount_cents: i64,
+    currency: String,
+    status: String,
+    protection_status: String,
+    deal_kind: String,
+    fulfillment_mode: String,
+    snapshot_listing: Value,
+    safety_checklist: Value,
+    risk_flags: Value,
+    transaction_meta: Value,
+    offer_message: Option<String>,
+    response_message: Option<String>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct TransactionResponse {
+    id: Uuid,
+    content_id: Uuid,
+    buyer_id: Uuid,
+    seller_id: Uuid,
+    amount_cents: i64,
+    currency: String,
+    status: String,
+    transaction_status: String,
+    protection_status: String,
+    deal_kind: String,
+    fulfillment_mode: String,
+    snapshot_listing: Value,
+    safety_checklist: Value,
+    risk_flags: Value,
+    transaction_meta: Value,
+    offer_message: Option<String>,
+    response_message: Option<String>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<TransactionRow> for TransactionResponse {
+    fn from(value: TransactionRow) -> Self {
+        Self {
+            id: value.id,
+            content_id: value.content_id,
+            buyer_id: value.buyer_id,
+            seller_id: value.seller_id,
+            amount_cents: value.amount_cents,
+            currency: value.currency,
+            transaction_status: value.status.clone(),
+            status: value.status,
+            protection_status: value.protection_status,
+            deal_kind: value.deal_kind,
+            fulfillment_mode: value.fulfillment_mode,
+            snapshot_listing: value.snapshot_listing,
+            safety_checklist: value.safety_checklist,
+            risk_flags: value.risk_flags,
+            transaction_meta: value.transaction_meta,
+            offer_message: value.offer_message,
+            response_message: value.response_message,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct TransactionDisputeRow {
+    id: Uuid,
+    transaction_id: Uuid,
+    buyer_id: Uuid,
+    seller_id: Uuid,
+    opened_by: Uuid,
+    status: String,
+    reason_code: String,
+    evidence_note: String,
+    evidence_attachments: Value,
+    counterparty_evidence: Value,
+    resolution_code: Option<String>,
+    resolution_reason_code: Option<String>,
+    resolution_notes: Option<String>,
+    seller_fault_ratio: Option<i32>,
+    platform_fee_cents: i64,
+    refund_amount_cents: i64,
+    release_amount_cents: i64,
+    currency: String,
+    metadata: Value,
+    opened_at: DateTime<Utc>,
+    resolved_at: Option<DateTime<Utc>>,
+    closed_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ResolveDisputeResponse {
+    transaction: TransactionResponse,
+    dispute: TransactionDisputeRow,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct WalletAccountRow {
+    id: Uuid,
+    user_id: Uuid,
+    environment: String,
+    currency: String,
+    available_balance_cents: i64,
+    held_balance_cents: i64,
+    total_topup_cents: i64,
+    total_spend_cents: i64,
+    status: String,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct WalletTopupRow {
+    id: Uuid,
+    user_id: Uuid,
+    account_id: Uuid,
+    environment: String,
+    amount_cents: i64,
+    fee_cents: i64,
+    net_amount_cents: i64,
+    currency: String,
+    payment_provider: String,
+    payment_method: Option<String>,
+    external_reference: Option<String>,
+    checkout_url: Option<String>,
+    payment_payload: Value,
+    description: Option<String>,
+    status: String,
+    paid_at: Option<DateTime<Utc>>,
+    expired_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct WalletLedgerRow {
+    id: Uuid,
+    user_id: Uuid,
+    account_id: Uuid,
+    environment: String,
+    currency: String,
+    direction: String,
+    amount_cents: i64,
+    balance_after_cents: i64,
+    entry_type: String,
+    status: String,
+    reference_type: Option<String>,
+    reference_id: Option<Uuid>,
+    description: Option<String>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct WalletAccountResponse {
+    id: Uuid,
+    environment: String,
+    currency: String,
+    available_balance_cents: i64,
+    held_balance_cents: i64,
+    total_balance_cents: i64,
+    total_topup_cents: i64,
+    total_spend_cents: i64,
+    status: String,
+    metadata: Value,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<WalletAccountRow> for WalletAccountResponse {
+    fn from(value: WalletAccountRow) -> Self {
+        Self {
+            id: value.id,
+            environment: value.environment,
+            currency: value.currency,
+            available_balance_cents: value.available_balance_cents,
+            held_balance_cents: value.held_balance_cents,
+            total_balance_cents: value.available_balance_cents + value.held_balance_cents,
+            total_topup_cents: value.total_topup_cents,
+            total_spend_cents: value.total_spend_cents,
+            status: value.status,
+            metadata: value.metadata,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct WalletTopupResponse {
+    id: Uuid,
+    account_id: Uuid,
+    environment: String,
+    amount_cents: i64,
+    fee_cents: i64,
+    net_amount_cents: i64,
+    currency: String,
+    payment_provider: String,
+    payment_method: Option<String>,
+    external_reference: Option<String>,
+    checkout_url: Option<String>,
+    payment_payload: Value,
+    description: Option<String>,
+    status: String,
+    payment_due_at: Option<DateTime<Utc>>,
+    paid_at: Option<DateTime<Utc>>,
+    expired_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<WalletTopupRow> for WalletTopupResponse {
+    fn from(value: WalletTopupRow) -> Self {
+        let payment_due_at = extract_topup_payment_due_at(&value.payment_payload);
+        Self {
+            id: value.id,
+            account_id: value.account_id,
+            environment: value.environment,
+            amount_cents: value.amount_cents,
+            fee_cents: value.fee_cents,
+            net_amount_cents: value.net_amount_cents,
+            currency: value.currency,
+            payment_provider: value.payment_provider,
+            payment_method: value.payment_method,
+            external_reference: value.external_reference,
+            checkout_url: value.checkout_url,
+            payment_payload: value.payment_payload,
+            description: value.description,
+            status: value.status,
+            payment_due_at,
+            paid_at: value.paid_at,
+            expired_at: value.expired_at,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct WalletLedgerResponse {
+    id: Uuid,
+    account_id: Uuid,
+    environment: String,
+    currency: String,
+    direction: String,
+    amount_cents: i64,
+    balance_after_cents: i64,
+    entry_type: String,
+    status: String,
+    reference_type: Option<String>,
+    reference_id: Option<Uuid>,
+    description: Option<String>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+}
+
+impl From<WalletLedgerRow> for WalletLedgerResponse {
+    fn from(value: WalletLedgerRow) -> Self {
+        Self {
+            id: value.id,
+            account_id: value.account_id,
+            environment: value.environment,
+            currency: value.currency,
+            direction: value.direction,
+            amount_cents: value.amount_cents,
+            balance_after_cents: value.balance_after_cents,
+            entry_type: value.entry_type,
+            status: value.status,
+            reference_type: value.reference_type,
+            reference_id: value.reference_id,
+            description: value.description,
+            metadata: value.metadata,
+            created_at: value.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct WalletBalancesResponse {
+    accounts: Vec<WalletAccountResponse>,
+    default_environment: String,
+    live_enabled: bool,
+    provider_default: String,
+    generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct UserNotificationRow {
+    id: Uuid,
+    user_id: Uuid,
+    category: String,
+    event_type: String,
+    title: String,
+    message: String,
+    data: Value,
+    is_read: bool,
+    read_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct UserNotificationResponse {
+    id: Uuid,
+    category: String,
+    event_type: String,
+    title: String,
+    message: String,
+    data: Value,
+    is_read: bool,
+    read_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<UserNotificationRow> for UserNotificationResponse {
+    fn from(value: UserNotificationRow) -> Self {
+        Self {
+            id: value.id,
+            category: value.category,
+            event_type: value.event_type,
+            title: value.title,
+            message: value.message,
+            data: value.data,
+            is_read: value.is_read,
+            read_at: value.read_at,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListNotificationsQuery {
+    unread_only: Option<bool>,
+    category: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct NotificationSocketQuery {
+    token: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListWalletTopupsQuery {
+    environment: Option<String>,
+    status: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListWalletLedgerQuery {
+    environment: Option<String>,
+    currency: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateWalletTopupRequest {
+    amount_cents: Option<i64>,
+    currency: Option<String>,
+    environment: Option<String>,
+    payment_provider: Option<String>,
+    payment_method: Option<String>,
+    description: Option<String>,
+    metadata: Option<Value>,
+    auto_settle: Option<bool>,
+}
+
+async fn create_offer(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<CreateOfferRequest>,
+) -> impl IntoResponse {
+    let buyer_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let content = match find_content(&state.db, &id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(e) => {
+            tracing::error!("create_offer content error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create offer")
+                .into_response();
+        }
+    };
+    if content.owner_id == buyer_id {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "cannot create offer for your own content",
+        )
+        .into_response();
+    }
+    if content.content_status.trim().to_lowercase() != "active" {
+        return err(
+            StatusCode::CONFLICT,
+            "only active listings can receive offers",
+        )
+        .into_response();
+    }
+    if let Some(amount) = payload.amount_cents {
+        if amount <= 0 || amount > 1_000_000_000_000 {
+            return err(StatusCode::BAD_REQUEST, "invalid amount_cents").into_response();
+        }
+    }
+    let listing_mode = content.pricing_mode.trim().to_lowercase();
+    let amount_cents = if listing_mode == "request" {
+        payload.amount_cents.filter(|v| *v > 0).unwrap_or(0)
+    } else {
+        payload
+            .amount_cents
+            .or(content.price_cents)
+            .filter(|v| *v > 0)
+            .unwrap_or(0)
+    };
+    if amount_cents <= 0 {
+        return err(
+            StatusCode::BAD_REQUEST,
+            if listing_mode == "request" {
+                "amount_cents is required for pricing_mode=request"
+            } else {
+                "amount_cents must be greater than 0"
+            },
+        )
+        .into_response();
+    }
+
+    let (buyer_profile, seller_profile) = tokio::join!(
+        fetch_user_verification_snapshot(&state, buyer_id),
+        fetch_user_verification_snapshot(&state, content.owner_id)
+    );
+    let buyer_profile = buyer_profile.unwrap_or_else(|_| json!({}));
+    let seller_profile = seller_profile.unwrap_or_else(|_| json!({}));
+    let (buyer_eligible, buyer_identity_verified, buyer_email_verified, buyer_phone_verified) =
+        parse_verification_state(&buyer_profile);
+    let (seller_eligible, seller_identity_verified, seller_email_verified, seller_phone_verified) =
+        parse_verification_state(&seller_profile);
+    if !buyer_eligible {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "error": "Buyer must complete verification before transacting.",
+                "code": "verification_required",
+                "buyer_verified": buyer_eligible,
+                "seller_verified": seller_eligible
+            })),
+        )
+            .into_response();
+    }
+
+    let safety_checklist = payload
+        .safety_checklist
+        .filter(|v| !v.is_null())
+        .unwrap_or_else(|| json!({}));
+    if !has_required_safety_checklist(&safety_checklist) {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "safety_checklist is required and must confirm all anti-scam checks",
+        )
+        .into_response();
+    }
+
+    let risk_flags = sanitize_risk_flags(payload.risk_flags);
+    let currency = normalize_currency(payload.currency).unwrap_or_else(|| "IDR".to_string());
+    if !is_valid_currency(&currency) {
+        return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3").into_response();
+    }
+    let deal_kind = normalize_deal_kind(payload.deal_kind).unwrap_or_else(|| {
+        let t = content.content_type.to_lowercase();
+        if t.contains("job") {
+            "job".to_string()
+        } else if t.contains("service") {
+            "service".to_string()
+        } else if t.contains("property") {
+            "property".to_string()
+        } else if t.contains("profile") || t.contains("talent") {
+            "profile".to_string()
+        } else if t.contains("ride") {
+            "ride".to_string()
+        } else if t.contains("food") {
+            "food".to_string()
+        } else if t.contains("delivery") {
+            "delivery".to_string()
+        } else {
+            "product".to_string()
+        }
+    });
+    if !is_valid_deal_kind(&deal_kind) {
+        return err(StatusCode::BAD_REQUEST, "invalid deal_kind").into_response();
+    }
+    let fulfillment_mode = normalize_fulfillment_mode(payload.fulfillment_mode)
+        .unwrap_or_else(|| "standard".to_string());
+    if !is_valid_fulfillment_mode(&fulfillment_mode) {
+        return err(StatusCode::BAD_REQUEST, "invalid fulfillment_mode").into_response();
+    }
+    let wallet_environment = normalize_wallet_environment(payload.wallet_environment)
+        .unwrap_or_else(wallet_default_environment);
+    if !is_valid_wallet_environment(&wallet_environment) {
+        return err(StatusCode::BAD_REQUEST, "invalid wallet_environment").into_response();
+    }
+    let base_meta = payload
+        .transaction_meta
+        .filter(|v| !v.is_null())
+        .unwrap_or_else(|| json!({}));
+    let transaction_meta = merge_json_objects(
+        base_meta,
+        json!({
+            "flow": {
+                "safety_mode": "strict",
+                "pricing_mode": listing_mode,
+                "offer_channel": "chat_or_content",
+                "wallet_environment": wallet_environment
+            },
+            "payment": {
+                "status": "awaiting_payment",
+                "funded": false
+            },
+            "verification": {
+                "buyer": {
+                    "identity_verified": buyer_identity_verified,
+                    "email_verified": buyer_email_verified,
+                    "phone_verified": buyer_phone_verified,
+                    "transaction_eligible": buyer_eligible
+                },
+                "seller": {
+                    "identity_verified": seller_identity_verified,
+                    "email_verified": seller_email_verified,
+                    "phone_verified": seller_phone_verified,
+                    "transaction_eligible": seller_eligible
+                }
+            }
+        }),
+    );
+    let snapshot_listing = build_listing_snapshot(&content);
+    let protection_status = protection_status_for_transaction("pending");
+
+    let inserted = sqlx::query_as::<_, TransactionRow>(
+        r#"
+        INSERT INTO transactions (
+            content_id, buyer_id, seller_id, amount_cents, currency, transaction_status,
+            protection_status, deal_kind, fulfillment_mode, snapshot_listing,
+            safety_checklist, risk_flags, transaction_meta, offer_message
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, 'pending',
+            $6, $7, $8, $9, $10, $11, $12, $13
+        )
+        RETURNING
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        "#,
+    )
+    .bind(content.id)
+    .bind(buyer_id)
+    .bind(content.owner_id)
+    .bind(amount_cents)
+    .bind(currency)
+    .bind(protection_status)
+    .bind(deal_kind)
+    .bind(fulfillment_mode)
+    .bind(snapshot_listing)
+    .bind(safety_checklist)
+    .bind(risk_flags)
+    .bind(transaction_meta)
+    .bind(clean_text(payload.offer_message))
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(row) => {
+            let amount_label = format_currency_from_cents(row.amount_cents, row.currency.as_str());
+            push_notification_best_effort(
+                &state,
+                row.seller_id,
+                "transaction",
+                "transaction.offer_received",
+                "Offer baru masuk",
+                &format!(
+                    "Kamu menerima offer {} untuk transaksi {}.",
+                    amount_label, row.id
+                ),
+                json!({
+                    "transaction_id": row.id,
+                    "content_id": row.content_id,
+                    "status": row.status,
+                    "wallet_environment": wallet_environment
+                }),
+            )
+            .await;
+            push_notification_best_effort(
+                &state,
+                row.buyer_id,
+                "transaction",
+                "transaction.offer_created",
+                "Offer berhasil dikirim",
+                &format!(
+                    "Offer {} untuk transaksi {} berhasil dibuat.",
+                    amount_label, row.id
+                ),
+                json!({
+                    "transaction_id": row.id,
+                    "content_id": row.content_id,
+                    "status": row.status,
+                    "wallet_environment": wallet_environment
+                }),
+            )
+            .await;
+            record_crm_activity_for_transaction(
+                &state.db,
+                &row,
+                buyer_id,
+                "buyer",
+                "transaction.offer_created",
+                format!("Offer {} dibuat untuk transaksi {}.", amount_label, row.id),
+                json!({
+                    "wallet_environment": wallet_environment
+                }),
+            )
+            .await;
+            (StatusCode::CREATED, Json(TransactionResponse::from(row))).into_response()
+        }
+        Err(e) => {
+            tracing::error!("create_offer query error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create offer").into_response()
+        }
+    }
+}
+
+async fn counter_offer_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<CreateCounterOfferRequest>,
+) -> impl IntoResponse {
+    let actor_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("counter_offer_transaction begin tx error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create counter offer",
+            )
+            .into_response();
+        }
+    };
+
+    let current = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(e) => {
+            tracing::error!("counter_offer_transaction load error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create counter offer",
+            )
+            .into_response();
+        }
+    };
+
+    if actor_id != current.buyer_id && actor_id != current.seller_id {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+    if actor_id == current.seller_id {
+        if let Some(response) = ensure_transaction_actor_verified(&state, actor_id, "seller").await
+        {
+            return response;
+        }
+    }
+    if current.status != "pending" {
+        return err(
+            StatusCode::CONFLICT,
+            "counter offer is only allowed while transaction is pending",
+        )
+        .into_response();
+    }
+
+    let amount_cents = payload.amount_cents.unwrap_or(0);
+    if amount_cents <= 0 || amount_cents > 1_000_000_000_000 {
+        return err(StatusCode::BAD_REQUEST, "invalid amount_cents").into_response();
+    }
+
+    let currency =
+        normalize_currency(payload.currency.clone()).unwrap_or_else(|| current.currency.clone());
+    if !is_valid_currency(&currency) {
+        return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3").into_response();
+    }
+
+    let deal_kind =
+        normalize_deal_kind(payload.deal_kind.clone()).unwrap_or_else(|| current.deal_kind.clone());
+    if !is_valid_deal_kind(&deal_kind) {
+        return err(StatusCode::BAD_REQUEST, "invalid deal_kind").into_response();
+    }
+
+    let fulfillment_mode = normalize_fulfillment_mode(payload.fulfillment_mode.clone())
+        .unwrap_or_else(|| current.fulfillment_mode.clone());
+    if !is_valid_fulfillment_mode(&fulfillment_mode) {
+        return err(StatusCode::BAD_REQUEST, "invalid fulfillment_mode").into_response();
+    }
+
+    let safety_checklist = payload
+        .safety_checklist
+        .filter(|v| !v.is_null())
+        .unwrap_or_else(|| current.safety_checklist.clone());
+    if !has_required_safety_checklist(&safety_checklist) {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "safety_checklist is required and must confirm all anti-scam checks",
+        )
+        .into_response();
+    }
+
+    let risk_flags = sanitize_risk_flags(payload.risk_flags.or(Some(current.risk_flags.clone())));
+
+    let current_round = current
+        .transaction_meta
+        .get("negotiation")
+        .and_then(|n| n.get("round"))
+        .and_then(Value::as_i64)
+        .unwrap_or(1);
+    let wallet_environment = parse_transaction_wallet_environment(&current.transaction_meta);
+    let base_meta = payload
+        .transaction_meta
+        .filter(|v| !v.is_null())
+        .unwrap_or_else(|| json!({}));
+    let transaction_meta = merge_json_objects(
+        merge_json_objects(current.transaction_meta.clone(), base_meta),
+        json!({
+            "flow": {
+                "safety_mode": "strict",
+                "offer_channel": "chat_or_content",
+                "wallet_environment": wallet_environment
+            },
+            "payment": {
+                "status": "awaiting_payment",
+                "funded": false
+            },
+            "negotiation": {
+                "type": "counter_offer",
+                "parent_transaction_id": current.id,
+                "round": current_round + 1,
+                "proposed_by": actor_id,
+                "proposed_at": Utc::now(),
+            }
+        }),
+    );
+
+    let new_txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        INSERT INTO transactions (
+            content_id, buyer_id, seller_id, amount_cents, currency, transaction_status,
+            protection_status, deal_kind, fulfillment_mode, snapshot_listing,
+            safety_checklist, risk_flags, transaction_meta, offer_message
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, 'pending',
+            $6, $7, $8, $9, $10, $11, $12, $13
+        )
+        RETURNING
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        "#,
+    )
+    .bind(current.content_id)
+    .bind(current.buyer_id)
+    .bind(current.seller_id)
+    .bind(amount_cents)
+    .bind(currency.as_str())
+    .bind(protection_status_for_transaction("pending"))
+    .bind(deal_kind.as_str())
+    .bind(fulfillment_mode.as_str())
+    .bind(current.snapshot_listing.clone())
+    .bind(safety_checklist)
+    .bind(risk_flags)
+    .bind(transaction_meta)
+    .bind(clean_text(payload.offer_message))
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("counter_offer_transaction insert error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create counter offer",
+            )
+            .into_response();
+        }
+    };
+
+    if let Err(e) = sqlx::query(
+        r#"
+        UPDATE transactions
+        SET
+            transaction_status = 'cancelled',
+            protection_status = $2,
+            response_message = COALESCE($3, response_message),
+            transaction_meta = $4,
+            updated_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(current.id)
+    .bind(protection_status_for_transaction("cancelled"))
+    .bind(Some("Superseded by counter offer".to_string()))
+    .bind(merge_json_objects(
+        current.transaction_meta.clone(),
+        json!({
+            "status_context": {
+                "status": "cancelled",
+                "data": {
+                    "reason_code": "counter_offer_superseded",
+                    "superseded_by_transaction_id": new_txn.id,
+                    "superseded_at": Utc::now(),
+                    "superseded_by": actor_id
+                }
+            }
+        }),
+    ))
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("counter_offer_transaction supersede update error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create counter offer",
+        )
+        .into_response();
+    }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("counter_offer_transaction commit error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create counter offer",
+        )
+        .into_response();
+    }
+
+    let proposer_is_buyer = actor_id == new_txn.buyer_id;
+    let recipient_id = if proposer_is_buyer {
+        new_txn.seller_id
+    } else {
+        new_txn.buyer_id
+    };
+    let amount_label = format_currency_from_cents(new_txn.amount_cents, new_txn.currency.as_str());
+    push_notification_best_effort(
+        &state,
+        recipient_id,
+        "transaction",
+        "transaction.counter_offer_received",
+        "Counter offer baru",
+        &format!(
+            "Counter offer {} diterima untuk transaksi {}.",
+            amount_label, new_txn.id
+        ),
+        json!({
+            "transaction_id": new_txn.id,
+            "parent_transaction_id": id,
+            "status": new_txn.status
+        }),
+    )
+    .await;
+    let proposer_role = if proposer_is_buyer { "buyer" } else { "seller" };
+    record_crm_activity_for_transaction(
+        &state.db,
+        &new_txn,
+        actor_id,
+        proposer_role,
+        "transaction.counter_offer_created",
+        format!(
+            "Counter offer {} diajukan untuk transaksi {}.",
+            amount_label, new_txn.id
+        ),
+        json!({
+            "parent_transaction_id": id
+        }),
+    )
+    .await;
+
+    (
+        StatusCode::CREATED,
+        Json(TransactionResponse::from(new_txn)),
+    )
+        .into_response()
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListTransactionsQuery {
+    status: Option<String>,
+    deal_kind: Option<String>,
+    fulfillment_mode: Option<String>,
+    counterparty_id: Option<Uuid>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+async fn list_transactions(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListTransactionsQuery>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let status = clean_text(query.status).map(|s| s.to_lowercase());
+    let deal_kind = normalize_deal_kind(query.deal_kind);
+    let counterparty_id = query.counterparty_id;
+    if let Some(ref dk) = deal_kind {
+        if !is_valid_deal_kind(dk) {
+            return err(StatusCode::BAD_REQUEST, "invalid deal_kind").into_response();
+        }
+    }
+    let fulfillment_mode = normalize_fulfillment_mode(query.fulfillment_mode);
+    if let Some(ref fm) = fulfillment_mode {
+        if !is_valid_fulfillment_mode(fm) {
+            return err(StatusCode::BAD_REQUEST, "invalid fulfillment_mode").into_response();
+        }
+    }
+
+    let rows = sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE (buyer_id = $1 OR seller_id = $1)
+          AND ($2::text IS NULL OR transaction_status = $2)
+          AND ($3::text IS NULL OR deal_kind = $3)
+          AND ($4::text IS NULL OR fulfillment_mode = $4)
+          AND ($5::uuid IS NULL OR buyer_id = $5 OR seller_id = $5)
+        ORDER BY created_at DESC
+        LIMIT $6 OFFSET $7
+        "#,
+    )
+    .bind(user_id)
+    .bind(status)
+    .bind(deal_kind)
+    .bind(fulfillment_mode)
+    .bind(counterparty_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(
+                rows.into_iter()
+                    .map(TransactionResponse::from)
+                    .collect::<Vec<_>>(),
+            ),
+        )
+            .into_response(),
+        Err(e) => {
+            tracing::error!("list_transactions error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load transactions",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    match find_transaction_for_user(&state.db, id, user_id).await {
+        Ok(Some(row)) => (StatusCode::OK, Json(TransactionResponse::from(row))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_transaction error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load transaction",
+            )
+            .into_response()
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpdateTransactionRequest {
+    response_message: Option<String>,
+    reason_code: Option<String>,
+    evidence_note: Option<String>,
+    evidence_attachments: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct DeliverTransactionRequest {
+    response_message: Option<String>,
+    delivery_title: Option<String>,
+    delivery_note: Option<String>,
+    delivery_attachments: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct ReviewDeliveryRequest {
+    decision: Option<String>,
+    response_message: Option<String>,
+    evidence_note: Option<String>,
+    evidence_attachments: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+enum DisputeEvidenceAttachmentInput {
+    Url(String),
+    Rich(DisputeEvidenceAttachmentPayload),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct DisputeEvidenceAttachmentPayload {
+    evidence_type: Option<String>,
+    file_url: Option<String>,
+    external_ref: Option<String>,
+    file_hash_sha256: Option<String>,
+    captured_at: Option<DateTime<Utc>>,
+    description: Option<String>,
+    device_info: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct DisputeTransactionRequest {
+    response_message: Option<String>,
+    evidence_note: Option<String>,
+    reason_code: Option<String>,
+    evidence_attachments: Option<Vec<DisputeEvidenceAttachmentInput>>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ResolveDisputeRequest {
+    decision: Option<String>,
+    reason_code: Option<String>,
+    resolution_notes: Option<String>,
+    seller_fault_ratio: Option<i32>,
+    platform_fee_cents: Option<i64>,
+    verified_damage_cost_cents: Option<i64>,
+    deposit_amount_cents: Option<i64>,
+}
+
+async fn fund_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("fund_transaction begin tx error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to fund transaction",
+            )
+            .into_response();
+        }
+    };
+
+    let txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(e) => {
+            tracing::error!("fund_transaction read error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to fund transaction",
+            )
+            .into_response();
+        }
+    };
+
+    if txn.buyer_id != user_id {
+        return err(
+            StatusCode::FORBIDDEN,
+            "only buyer can fund this transaction",
+        )
+        .into_response();
+    }
+
+    let payment_status = txn
+        .transaction_meta
+        .get("payment")
+        .and_then(Value::as_object)
+        .and_then(|payment| payment.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_lowercase();
+    let protection_status = txn.protection_status.trim().to_lowercase();
+    if payment_status == "paid"
+        || protection_status == "funds_held"
+        || protection_status == "on_hold"
+    {
+        return Json(TransactionResponse::from(txn)).into_response();
+    }
+
+    if !matches!(txn.status.as_str(), "pending" | "accepted") {
+        return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
+    }
+
+    let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
+    if let Err(e) = hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str()).await {
+        match e {
+            WalletTransitionError::InsufficientFunds => {
+                return (
+                    StatusCode::CONFLICT,
+                    Json(json!({
+                        "error": "insufficient wallet balance to process transaction",
+                        "code": "insufficient_wallet_balance"
+                    })),
+                )
+                    .into_response();
+            }
+            WalletTransitionError::InvalidHeldBalance => {
+                return (
+                    StatusCode::CONFLICT,
+                    Json(json!({
+                        "error": "transaction wallet hold state is invalid",
+                        "code": "invalid_wallet_hold_state"
+                    })),
+                )
+                    .into_response();
+            }
+            WalletTransitionError::Database(db_err) => {
+                tracing::error!("fund_transaction wallet transition db error: {:?}", db_err);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to fund transaction",
+                )
+                .into_response();
+            }
+        }
+    }
+
+    let funded_at = Utc::now();
+    let merged_meta = merge_json_objects(
+        txn.transaction_meta.clone(),
+        json!({
+            "payment": {
+                "status": "paid",
+                "funded": true,
+                "funded_at": funded_at,
+                "payment_provider": "wallet",
+                "payment_method": "wallet_balance",
+                "wallet_environment": wallet_environment.as_str(),
+                "source": "wallet_balance"
+            }
+        }),
+    );
+
+    let updated = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        UPDATE transactions
+        SET
+            protection_status = $2,
+            transaction_meta = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        "#,
+    )
+    .bind(txn.id)
+    .bind("funds_held")
+    .bind(merged_meta)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("fund_transaction update error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to fund transaction",
+            )
+            .into_response();
+        }
+    };
+
+    let outcome = LinkedTransactionFundingOutcome {
+        transaction_id: updated.id,
+        buyer_id: updated.buyer_id,
+        seller_id: updated.seller_id,
+        transaction_status: updated.status.clone(),
+        protection_status: updated.protection_status.clone(),
+        payment_status: "paid".to_string(),
+        wallet_environment: wallet_environment.clone(),
+        amount_cents: updated.amount_cents,
+        currency: updated.currency.clone(),
+    };
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("fund_transaction commit error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to fund transaction",
+        )
+        .into_response();
+    }
+
+    notify_linked_transaction_funding_outcome(&state, &outcome).await;
+
+    Json(TransactionResponse::from(updated)).into_response()
+}
+
+async fn accept_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if let Some(response) = ensure_transaction_actor_verified(&state, user_id, "seller").await {
+        return response;
+    }
+    update_transaction_status(
+        &state,
+        id,
+        user_id,
+        "accepted",
+        &["pending"],
+        true,
+        false,
+        clean_text(payload.response_message),
+        None,
+        None,
+    )
+    .await
+}
+
+async fn cancel_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let reason_code = match normalize_cancel_reason_code(payload.reason_code) {
+        Some(value) => value,
+        None => {
+            return err(StatusCode::BAD_REQUEST, "invalid reason_code").into_response();
+        }
+    };
+    update_transaction_status(
+        &state,
+        id,
+        user_id,
+        "cancelled",
+        &["pending", "accepted", "in_progress"],
+        false,
+        false,
+        clean_text(payload.response_message),
+        Some(json!({
+            "reason_code": reason_code,
+            "cancelled_by": user_id,
+            "cancelled_at": Utc::now(),
+        })),
+        None,
+    )
+    .await
+}
+
+async fn start_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    update_transaction_status(
+        &state,
+        id,
+        user_id,
+        "in_progress",
+        &["accepted"],
+        true,
+        false,
+        clean_text(payload.response_message),
+        None,
+        None,
+    )
+    .await
+}
+
+async fn deliver_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<DeliverTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let delivery_title = match clean_text_limited(payload.delivery_title, MAX_DELIVERY_TITLE_LEN) {
+        Ok(value) => value,
+        Err(_) => {
+            return err(StatusCode::BAD_REQUEST, "delivery_title is too long").into_response()
+        }
+    };
+    let response_message = match clean_text_limited(payload.response_message, MAX_EVIDENCE_NOTE_LEN)
+    {
+        Ok(value) => value,
+        Err(_) => {
+            return err(StatusCode::BAD_REQUEST, "response_message is too long").into_response()
+        }
+    };
+    let delivery_note = match clean_text_limited(payload.delivery_note, MAX_EVIDENCE_NOTE_LEN) {
+        Ok(value) => value.or_else(|| response_message.clone()),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "delivery_note is too long").into_response(),
+    };
+    let delivery_attachments = match normalize_delivery_attachments(payload.delivery_attachments) {
+        Ok(items) => items,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if delivery_note.is_none() && delivery_attachments.is_empty() {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "delivery requires a note or at least one attachment",
+        )
+        .into_response();
+    }
+
+    let txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(error) => {
+            tracing::error!("deliver_transaction read error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to prepare transaction delivery",
+            )
+            .into_response();
+        }
+    };
+
+    if txn.seller_id != user_id {
+        return err(StatusCode::FORBIDDEN, "only seller can perform this action").into_response();
+    }
+    if txn.status != "in_progress" {
+        return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
+    }
+
+    let mut submissions = delivery_attempts_from_meta(&txn.transaction_meta);
+    if submissions.len() >= MAX_DELIVERY_ATTEMPTS {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "error": "delivery attempt limit reached",
+                "code": "delivery_attempt_limit_reached"
+            })),
+        )
+            .into_response();
+    }
+
+    let submitted_at = Utc::now();
+    let submission_id = Uuid::new_v4();
+    let attempt_number = submissions.len() + 1;
+    let attachments_count = delivery_attachments.len();
+    let submission_note = delivery_note.clone();
+    let submission_title = delivery_title.clone();
+    submissions.push(json!({
+        "id": submission_id,
+        "attempt_number": attempt_number,
+        "title": submission_title,
+        "note": submission_note,
+        "attachments": delivery_attachments,
+        "submitted_by": user_id,
+        "submitted_at": submitted_at,
+        "review_status": "awaiting_buyer_review",
+        "reviewed_at": Value::Null,
+        "reviewed_by": Value::Null,
+        "buyer_feedback_note": Value::Null,
+        "buyer_feedback_attachments": []
+    }));
+
+    let attempts_used = submissions.len();
+    let transaction_meta_patch = json!({
+        "delivery": {
+            "submissions": submissions,
+            "attempts_used": attempts_used,
+            "max_attempts": MAX_DELIVERY_ATTEMPTS,
+            "latest_submission_id": submission_id,
+            "latest_status": "awaiting_buyer_review",
+            "last_submitted_at": submitted_at,
+            "last_reviewed_at": Value::Null
+        }
+    });
+    let status_context = json!({
+        "delivery": {
+            "submission_id": submission_id,
+            "attempt_number": attempt_number,
+            "max_attempts": MAX_DELIVERY_ATTEMPTS,
+            "attachments_count": attachments_count,
+            "attachments": delivery_attachments.clone(),
+            "title": delivery_title.clone(),
+            "note": delivery_note.clone(),
+            "submitted_at": submitted_at
+        }
+    });
+
+    update_transaction_status(
+        &state,
+        id,
+        user_id,
+        "delivered",
+        &["in_progress"],
+        true,
+        false,
+        response_message
+            .or_else(|| submission_note.clone())
+            .or_else(|| delivery_title.clone()),
+        Some(status_context),
+        Some(transaction_meta_patch),
+    )
+    .await
+}
+
+async fn review_delivery_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<ReviewDeliveryRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let decision = match normalize_delivery_review_decision(payload.decision) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "invalid decision").into_response(),
+    };
+    let response_message = match clean_text_limited(payload.response_message, MAX_EVIDENCE_NOTE_LEN)
+    {
+        Ok(value) => value,
+        Err(_) => {
+            return err(StatusCode::BAD_REQUEST, "response_message is too long").into_response()
+        }
+    };
+    let evidence_note = match clean_text_limited(payload.evidence_note, MAX_EVIDENCE_NOTE_LEN) {
+        Ok(value) => value.or_else(|| response_message.clone()),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "evidence_note is too long").into_response(),
+    };
+    let evidence_attachments = match normalize_delivery_attachments(payload.evidence_attachments) {
+        Ok(items) => items,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+    if decision == "request_revision" && evidence_note.is_none() {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "revision request requires evidence_note",
+        )
+        .into_response();
+    }
+
+    let txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(error) => {
+            tracing::error!("review_delivery_transaction read error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to review transaction delivery",
+            )
+            .into_response();
+        }
+    };
+
+    if txn.buyer_id != user_id {
+        return err(StatusCode::FORBIDDEN, "only buyer can perform this action").into_response();
+    }
+    if txn.status != "delivered" {
+        return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
+    }
+
+    let mut submissions = delivery_attempts_from_meta(&txn.transaction_meta);
+    if submissions.is_empty() {
+        submissions.push(build_legacy_delivery_submission(&txn));
+    }
+    let attempts_used = submissions.len();
+    let latest_index = attempts_used.saturating_sub(1);
+    let reviewed_at = Utc::now();
+
+    let latest_submission = submissions
+        .get_mut(latest_index)
+        .and_then(Value::as_object_mut);
+    let Some(latest_submission) = latest_submission else {
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to review transaction delivery",
+        )
+        .into_response();
+    };
+
+    let submission_id = latest_submission
+        .get("id")
+        .and_then(Value::as_str)
+        .and_then(|raw| Uuid::parse_str(raw).ok())
+        .unwrap_or_else(Uuid::new_v4);
+    latest_submission.insert(
+        "review_status".to_string(),
+        Value::String(if decision == "accept" {
+            "accepted".to_string()
+        } else {
+            "revision_requested".to_string()
+        }),
+    );
+    latest_submission.insert("reviewed_at".to_string(), json!(reviewed_at));
+    latest_submission.insert("reviewed_by".to_string(), json!(user_id));
+    latest_submission.insert("buyer_feedback_note".to_string(), json!(evidence_note));
+    latest_submission.insert(
+        "buyer_feedback_attachments".to_string(),
+        Value::Array(evidence_attachments.clone()),
+    );
+
+    let attempt_number =
+        json_value_as_usize(latest_submission.get("attempt_number")).unwrap_or(attempts_used);
+    let auto_escalated = decision == "request_revision" && attempts_used >= MAX_DELIVERY_ATTEMPTS;
+    let latest_status = if decision == "accept" {
+        "accepted"
+    } else if auto_escalated {
+        "auto_escalated"
+    } else {
+        "revision_requested"
+    };
+    let remaining_attempts = MAX_DELIVERY_ATTEMPTS.saturating_sub(attempts_used);
+    let transaction_meta_patch = json!({
+        "delivery": {
+            "submissions": submissions,
+            "attempts_used": attempts_used,
+            "max_attempts": MAX_DELIVERY_ATTEMPTS,
+            "latest_submission_id": submission_id,
+            "latest_status": latest_status,
+            "last_reviewed_at": reviewed_at
+        }
+    });
+
+    let review_context = json!({
+        "delivery_review": {
+            "decision": decision,
+            "submission_id": submission_id,
+            "attempt_number": attempt_number,
+            "max_attempts": MAX_DELIVERY_ATTEMPTS,
+            "remaining_attempts": remaining_attempts,
+            "attachments_count": evidence_attachments.len(),
+            "attachments": evidence_attachments.clone(),
+            "auto_escalated": auto_escalated,
+            "reviewed_at": reviewed_at,
+            "note": evidence_note.clone()
+        }
+    });
+
+    if decision == "accept" {
+        return update_transaction_status(
+            &state,
+            id,
+            user_id,
+            "completed",
+            &["delivered"],
+            false,
+            true,
+            response_message.or_else(|| evidence_note.clone()),
+            Some(review_context),
+            Some(transaction_meta_patch),
+        )
+        .await;
+    }
+
+    if auto_escalated {
+        return update_transaction_status(
+            &state,
+            id,
+            user_id,
+            "disputed",
+            &["delivered"],
+            false,
+            true,
+            response_message.or_else(|| evidence_note.clone()),
+            Some(json!({
+                "dispute_id": Uuid::new_v4(),
+                "reason_code": "other",
+                "case_state": "open",
+                "evidence_note": evidence_note.clone().unwrap_or_else(|| {
+                    format!(
+                        "Buyer requested revision again after attempt {}/{}.",
+                        attempt_number, MAX_DELIVERY_ATTEMPTS
+                    )
+                }),
+                "evidence_attachments": evidence_attachments,
+                "reported_by": user_id,
+                "reported_at": reviewed_at,
+                "delivery_review": review_context.get("delivery_review").cloned().unwrap_or(Value::Null)
+            })),
+            Some(transaction_meta_patch),
+        )
+        .await;
+    }
+
+    update_transaction_status(
+        &state,
+        id,
+        user_id,
+        "in_progress",
+        &["delivered"],
+        false,
+        true,
+        response_message.or_else(|| evidence_note.clone()),
+        Some(review_context),
+        Some(transaction_meta_patch),
+    )
+    .await
+}
+
+async fn dispute_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<DisputeTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let reason_code = match normalize_dispute_reason_code(payload.reason_code) {
+        Some(value) => value,
+        None => {
+            return err(StatusCode::BAD_REQUEST, "invalid reason_code").into_response();
+        }
+    };
+    let evidence_note = match clean_text_limited(payload.evidence_note, MAX_EVIDENCE_NOTE_LEN) {
+        Ok(value) => value,
+        Err(_) => {
+            return err(StatusCode::BAD_REQUEST, "evidence_note is too long").into_response();
+        }
+    }
+    .or_else(|| clean_text(payload.response_message.clone()));
+    let Some(evidence_note) = evidence_note else {
+        return err(StatusCode::BAD_REQUEST, "dispute requires evidence_note").into_response();
+    };
+    let evidence_attachments =
+        match normalize_dispute_evidence_attachments(payload.evidence_attachments) {
+            Ok(items) => items,
+            Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+        };
+    let dispute_id = Uuid::new_v4();
+    let reported_at = Utc::now();
+
+    update_transaction_status(
+        &state,
+        id,
+        user_id,
+        "disputed",
+        &["accepted", "in_progress", "delivered"],
+        false,
+        false,
+        clean_text(payload.response_message).or(Some(evidence_note.clone())),
+        Some(json!({
+            "dispute_id": dispute_id,
+            "reason_code": reason_code,
+            "case_state": "open",
+            "evidence_note": evidence_note,
+            "evidence_attachments": evidence_attachments,
+            "reported_by": user_id,
+            "reported_at": reported_at,
+        })),
+        None,
+    )
+    .await
+}
+
+async fn resolve_transaction_dispute(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<ResolveDisputeRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_agent_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "agent role required").into_response();
+    }
+    let resolver_user_id = match Uuid::parse_str(claims.sub.as_str()) {
+        Ok(id) => id,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let decision = match normalize_dispute_decision(payload.decision) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "invalid decision").into_response(),
+    };
+    let reason_code = match normalize_dispute_reason_code(payload.reason_code) {
+        Some(value) => value,
+        None => return err(StatusCode::BAD_REQUEST, "invalid reason_code").into_response(),
+    };
+    let resolution_notes =
+        match clean_text_limited(payload.resolution_notes.clone(), MAX_EVIDENCE_NOTE_LEN) {
+            Ok(value) => value,
+            Err(_) => {
+                return err(StatusCode::BAD_REQUEST, "resolution_notes is too long").into_response()
+            }
+        };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("resolve_transaction_dispute begin tx error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to resolve dispute",
+            )
+            .into_response();
+        }
+    };
+
+    let txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(e) => {
+            tracing::error!(
+                "resolve_transaction_dispute transaction query error: {:?}",
+                e
+            );
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to resolve dispute",
+            )
+            .into_response();
+        }
+    };
+
+    if txn.status != "disputed" {
+        return err(StatusCode::CONFLICT, "transaction is not in disputed state").into_response();
+    }
+
+    let dispute = match sqlx::query_as::<_, TransactionDisputeRow>(
+        r#"
+        SELECT
+            id, transaction_id, buyer_id, seller_id, opened_by, status, reason_code, evidence_note,
+            evidence_attachments, counterparty_evidence, resolution_code, resolution_reason_code,
+            resolution_notes, seller_fault_ratio, platform_fee_cents, refund_amount_cents,
+            release_amount_cents, currency, metadata, opened_at, resolved_at, closed_at,
+            created_at, updated_at
+        FROM transaction_disputes
+        WHERE transaction_id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "dispute case not found").into_response(),
+        Err(e) => {
+            tracing::error!("resolve_transaction_dispute dispute query error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to resolve dispute",
+            )
+            .into_response();
+        }
+    };
+
+    if dispute.resolved_at.is_some() || dispute.status == "resolved" || dispute.status == "closed" {
+        return err(StatusCode::CONFLICT, "dispute already resolved").into_response();
+    }
+
+    let settlement = match calculate_dispute_settlement_amounts(
+        txn.amount_cents,
+        decision.as_str(),
+        payload.seller_fault_ratio,
+        payload.platform_fee_cents,
+        payload.verified_damage_cost_cents,
+        payload.deposit_amount_cents,
+    ) {
+        Ok(v) => v,
+        Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
+    };
+
+    let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
+    if let Err(e) = settle_dispute_funds_tx(
+        &mut tx,
+        &txn,
+        wallet_environment.as_str(),
+        decision.as_str(),
+        resolver_user_id,
+        &settlement,
+    )
+    .await
+    {
+        match e {
+            WalletTransitionError::InsufficientFunds
+            | WalletTransitionError::InvalidHeldBalance => {
+                return err(
+                    StatusCode::CONFLICT,
+                    "transaction wallet hold state is invalid",
+                )
+                .into_response();
+            }
+            WalletTransitionError::Database(db_err) => {
+                tracing::error!(
+                    "resolve_transaction_dispute settle_dispute_funds_tx db error: {:?}",
+                    db_err
+                );
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to resolve dispute",
+                )
+                .into_response();
+            }
+        }
+    }
+
+    let next_status = if settlement.release_amount_cents > 0 {
+        "completed"
+    } else {
+        "cancelled"
+    };
+    let next_protection_status = if settlement.release_amount_cents > 0 {
+        "released"
+    } else {
+        "refunded"
+    };
+    let resolved_at = Utc::now();
+    let updated_meta = merge_json_objects(
+        txn.transaction_meta.clone(),
+        json!({
+            "dispute_resolution": {
+                "dispute_id": dispute.id,
+                "decision": decision,
+                "reason_code": reason_code,
+                "resolved_by": resolver_user_id,
+                "resolved_at": resolved_at,
+                "seller_fault_ratio": settlement.seller_fault_ratio,
+                "refund_amount_cents": settlement.refund_amount_cents,
+                "release_amount_cents": settlement.release_amount_cents,
+                "platform_fee_cents": settlement.platform_fee_cents,
+                "currency": txn.currency,
+                "wallet_environment": wallet_environment
+            }
+        }),
+    );
+
+    let updated_txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        UPDATE transactions
+        SET
+            transaction_status = $2,
+            protection_status = $3,
+            response_message = COALESCE($4, response_message),
+            transaction_meta = $5,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        "#,
+    )
+    .bind(txn.id)
+    .bind(next_status)
+    .bind(next_protection_status)
+    .bind(resolution_notes.clone())
+    .bind(updated_meta)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!(
+                "resolve_transaction_dispute transaction update error: {:?}",
+                e
+            );
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to resolve dispute",
+            )
+            .into_response();
+        }
+    };
+
+    let updated_dispute = match sqlx::query_as::<_, TransactionDisputeRow>(
+        r#"
+        UPDATE transaction_disputes
+        SET
+            status = 'resolved',
+            resolution_code = $2,
+            resolution_reason_code = $3,
+            resolution_notes = $4,
+            seller_fault_ratio = $5,
+            platform_fee_cents = $6,
+            refund_amount_cents = $7,
+            release_amount_cents = $8,
+            resolved_at = $9,
+            closed_at = $9,
+            metadata = COALESCE(metadata, '{}'::jsonb) || $10::jsonb,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, transaction_id, buyer_id, seller_id, opened_by, status, reason_code, evidence_note,
+            evidence_attachments, counterparty_evidence, resolution_code, resolution_reason_code,
+            resolution_notes, seller_fault_ratio, platform_fee_cents, refund_amount_cents,
+            release_amount_cents, currency, metadata, opened_at, resolved_at, closed_at,
+            created_at, updated_at
+        "#,
+    )
+    .bind(dispute.id)
+    .bind(decision.as_str())
+    .bind(reason_code.as_str())
+    .bind(resolution_notes.clone())
+    .bind(settlement.seller_fault_ratio)
+    .bind(settlement.platform_fee_cents)
+    .bind(settlement.refund_amount_cents)
+    .bind(settlement.release_amount_cents)
+    .bind(resolved_at)
+    .bind(json!({
+        "resolved_by": resolver_user_id,
+        "resolved_at": resolved_at,
+        "wallet_environment": wallet_environment
+    }))
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("resolve_transaction_dispute dispute update error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to resolve dispute",
+            )
+            .into_response();
+        }
+    };
+
+    let dispute_support_room_id = format!("support:txn:{}", updated_txn.id);
+    let resolved_support_ticket_id = match sqlx::query_scalar::<_, Uuid>(
+        r#"
+        UPDATE support_tickets
+        SET
+            status = 'resolved',
+            assigned_agent_id = COALESCE(assigned_agent_id, $2),
+            resolved_at = COALESCE(resolved_at, $3),
+            updated_at = NOW()
+        WHERE support_room_id = $1
+          AND status <> 'closed'
+        RETURNING id
+        "#,
+    )
+    .bind(&dispute_support_room_id)
+    .bind(resolver_user_id)
+    .bind(resolved_at)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(value) => value,
+        Err(e) => {
+            tracing::warn!(
+                "resolve_transaction_dispute support ticket resolve update error: {:?}",
+                e
+            );
+            None
+        }
+    };
+
+    if let Some(ticket_id) = resolved_support_ticket_id {
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO support_ticket_replies (id, ticket_id, author_user_id, author_role, body, is_internal)
+            VALUES ($1, $2, $3, 'agent', $4, false)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(ticket_id)
+        .bind(Some(resolver_user_id))
+        .bind(format!(
+            "Dispute resolved. Decision: {}. Reason: {}. Refund: {}. Release: {}.",
+            decision,
+            reason_code,
+            settlement.refund_amount_cents,
+            settlement.release_amount_cents
+        ))
+        .execute(&mut *tx)
+        .await;
+    }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("resolve_transaction_dispute commit error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to resolve dispute",
+        )
+        .into_response();
+    }
+
+    let refund_label = format_currency_from_cents(
+        settlement.refund_amount_cents,
+        updated_txn.currency.as_str(),
+    );
+    let release_label = format_currency_from_cents(
+        settlement.release_amount_cents,
+        updated_txn.currency.as_str(),
+    );
+    let summary = format!(
+        "Dispute {} resolved: refund {}, release {}.",
+        updated_dispute.id, refund_label, release_label
+    );
+    let event_payload = json!({
+        "transaction_id": updated_txn.id,
+        "dispute_id": updated_dispute.id,
+        "decision": decision,
+        "reason_code": reason_code,
+        "refund_amount_cents": settlement.refund_amount_cents,
+        "release_amount_cents": settlement.release_amount_cents,
+        "platform_fee_cents": settlement.platform_fee_cents,
+        "currency": updated_txn.currency,
+        "wallet_environment": wallet_environment,
+        "resolved_by": resolver_user_id,
+        "resolved_at": resolved_at,
+        "support_room_id": dispute_support_room_id,
+        "support_ticket_id": resolved_support_ticket_id
+    });
+    record_crm_activity_for_transaction(
+        &state.db,
+        &updated_txn,
+        resolver_user_id,
+        "agent",
+        "dispute.resolved",
+        format!(
+            "Dispute {} resolved with decision {} (reason: {}).",
+            updated_dispute.id, decision, reason_code
+        ),
+        event_payload.clone(),
+    )
+    .await;
+    push_notification_best_effort(
+        &state,
+        updated_txn.buyer_id,
+        "support",
+        "dispute.resolved",
+        "Dispute selesai",
+        &summary,
+        event_payload.clone(),
+    )
+    .await;
+    push_notification_best_effort(
+        &state,
+        updated_txn.seller_id,
+        "support",
+        "dispute.resolved",
+        "Dispute selesai",
+        &summary,
+        event_payload.clone(),
+    )
+    .await;
+
+    if settlement.refund_amount_cents > 0 {
+        push_notification_best_effort(
+            &state,
+            updated_txn.buyer_id,
+            "wallet",
+            "wallet.refund_posted",
+            "Refund dispute diposting",
+            &format!(
+                "Refund {} sudah diposting untuk transaksi {}.",
+                refund_label, updated_txn.id
+            ),
+            event_payload.clone(),
+        )
+        .await;
+    }
+    if settlement.release_amount_cents > 0 {
+        push_notification_best_effort(
+            &state,
+            updated_txn.seller_id,
+            "wallet",
+            "wallet.payment_released",
+            "Payout dispute diposting",
+            &format!(
+                "Payout {} sudah diposting untuk transaksi {}.",
+                release_label, updated_txn.id
+            ),
+            event_payload.clone(),
+        )
+        .await;
+    }
+
+    (
+        StatusCode::OK,
+        Json(ResolveDisputeResponse {
+            transaction: TransactionResponse::from(updated_txn),
+            dispute: updated_dispute,
+        }),
+    )
+        .into_response()
+}
+
+async fn complete_transaction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateTransactionRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    update_transaction_status(
+        &state,
+        id,
+        user_id,
+        "completed",
+        &["in_progress", "delivered"],
+        false,
+        true,
+        clean_text(payload.response_message),
+        None,
+        None,
+    )
+    .await
+}
+
+#[derive(Debug, Clone)]
+struct ProviderCheckout {
+    external_reference: String,
+    checkout_url: Option<String>,
+    payment_payload: Value,
+}
+
+async fn get_wallet_balances(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let default_env = wallet_default_environment();
+    let live_enabled = wallet_live_enabled();
+    let provider_default = wallet_default_provider();
+
+    if let Err(e) = ensure_wallet_account_exists(&state.db, user_id, "development", "IDR").await {
+        tracing::error!("ensure_wallet_account_exists development error: {:?}", e);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load wallet").into_response();
+    }
+    if live_enabled {
+        let _ = ensure_wallet_account_exists(&state.db, user_id, "live", "IDR").await;
+    }
+
+    reconcile_pending_midtrans_topups_for_user(&state, user_id, None).await;
+
+    let rows = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        SELECT
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        FROM wallet_accounts
+        WHERE user_id = $1
+        ORDER BY environment ASC, currency ASC
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let response = WalletBalancesResponse {
+                accounts: rows.into_iter().map(WalletAccountResponse::from).collect(),
+                default_environment: default_env,
+                live_enabled,
+                provider_default,
+                generated_at: Utc::now(),
+            };
+            (StatusCode::OK, Json(response)).into_response()
+        }
+        Err(e) => {
+            tracing::error!("get_wallet_balances query error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load wallet").into_response()
+        }
+    }
+}
+
+async fn list_wallet_topups(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListWalletTopupsQuery>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let environment = normalize_wallet_environment(query.environment);
+    if let Some(ref env_name) = environment {
+        if !is_valid_wallet_environment(env_name) {
+            return err(StatusCode::BAD_REQUEST, "invalid environment").into_response();
+        }
+    }
+
+    let status = normalize_topup_status(query.status);
+    if let Some(ref status_name) = status {
+        if !is_valid_topup_status(status_name) {
+            return err(StatusCode::BAD_REQUEST, "invalid status").into_response();
+        }
+    }
+
+    let limit = query.limit.unwrap_or(30).clamp(1, WALLET_MAX_FETCH_LIMIT);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    reconcile_pending_midtrans_topups_for_user(&state, user_id, environment.as_deref()).await;
+
+    if let Err(e) = sqlx::query(
+        r#"
+        UPDATE wallet_topups
+        SET
+            status = 'expired',
+            expired_at = COALESCE(expired_at, NOW()),
+            updated_at = NOW()
+        WHERE user_id = $1
+          AND status = 'pending'
+          AND ($2::text IS NULL OR environment = $2)
+          AND (payment_payload #>> '{wallet_flow,payment_due_at}') IS NOT NULL
+          AND (payment_payload #>> '{wallet_flow,payment_due_at}') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'
+          AND ((payment_payload #>> '{wallet_flow,payment_due_at}')::timestamptz <= NOW())
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment.as_deref())
+    .execute(&state.db)
+    .await
+    {
+        tracing::warn!("list_wallet_topups auto-expire pending error: {:?}", e);
+    }
+
+    let rows = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE user_id = $1
+          AND ($2::text IS NULL OR environment = $2)
+          AND ($3::text IS NULL OR status = $3)
+        ORDER BY created_at DESC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment)
+    .bind(status)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let has_more = rows.len() as i64 > limit;
+            let mut items = rows;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "items": items.into_iter().map(WalletTopupResponse::from).collect::<Vec<_>>(),
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": has_more
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_wallet_topups query error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load topups").into_response()
+        }
+    }
+}
+
+async fn list_wallet_ledger(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListWalletLedgerQuery>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let environment = normalize_wallet_environment(query.environment);
+    if let Some(ref env_name) = environment {
+        if !is_valid_wallet_environment(env_name) {
+            return err(StatusCode::BAD_REQUEST, "invalid environment").into_response();
+        }
+    }
+
+    let currency = normalize_currency(query.currency);
+    if let Some(ref curr) = currency {
+        if !is_valid_currency(curr) {
+            return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3")
+                .into_response();
+        }
+    }
+
+    let limit = query.limit.unwrap_or(40).clamp(1, WALLET_MAX_FETCH_LIMIT);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let rows = sqlx::query_as::<_, WalletLedgerRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, currency, direction, amount_cents,
+            balance_after_cents, entry_type, status, reference_type, reference_id,
+            description, metadata, created_at
+        FROM wallet_ledger_entries
+        WHERE user_id = $1
+          AND ($2::text IS NULL OR environment = $2)
+          AND ($3::text IS NULL OR currency = $3)
+        ORDER BY created_at DESC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment)
+    .bind(currency)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let has_more = rows.len() as i64 > limit;
+            let mut items = rows;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "items": items.into_iter().map(WalletLedgerResponse::from).collect::<Vec<_>>(),
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": has_more
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_wallet_ledger query error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load ledger").into_response()
+        }
+    }
+}
+
+async fn list_notifications(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListNotificationsQuery>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let unread_only = query.unread_only.unwrap_or(false);
+    let limit = query
+        .limit
+        .unwrap_or(30)
+        .clamp(1, NOTIFICATION_MAX_FETCH_LIMIT);
+    let limit_with_sentinel = limit + 1;
+    let offset = query.offset.unwrap_or(0).max(0);
+    let category = clean_text(query.category).map(|v| v.to_lowercase());
+
+    let rows = sqlx::query_as::<_, UserNotificationRow>(
+        r#"
+        SELECT
+            id, user_id, category, event_type, title, message, data, is_read,
+            read_at, created_at, updated_at
+        FROM user_notifications
+        WHERE user_id = $1
+          AND (NOT $2::bool OR is_read = FALSE)
+          AND ($3::text IS NULL OR category = $3)
+        ORDER BY created_at DESC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(user_id)
+    .bind(unread_only)
+    .bind(category)
+    .bind(limit_with_sentinel)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let has_more = rows.len() as i64 > limit;
+            let mut items = rows;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            let unread_count = unread_notification_count(&state.db, user_id)
+                .await
+                .unwrap_or(0);
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "items": items.into_iter().map(UserNotificationResponse::from).collect::<Vec<_>>(),
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": has_more,
+                    "unread_count": unread_count
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_notifications query error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load notifications",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_notification_unread_count(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    match unread_notification_count(&state.db, user_id).await {
+        Ok(unread_count) => (
+            StatusCode::OK,
+            Json(json!({
+                "unread_count": unread_count,
+                "generated_at": Utc::now()
+            })),
+        )
+            .into_response(),
+        Err(e) => {
+            tracing::error!("get_notification_unread_count error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load unread count",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn mark_notification_read(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let updated = sqlx::query_as::<_, UserNotificationRow>(
+        r#"
+        UPDATE user_notifications
+        SET
+            is_read = TRUE,
+            read_at = COALESCE(read_at, NOW()),
+            updated_at = NOW()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, category, event_type, title, message, data, is_read,
+            read_at, created_at, updated_at
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(row)) => {
+            let unread_count = unread_notification_count(&state.db, user_id)
+                .await
+                .unwrap_or(0);
+            emit_realtime_event(
+                &state,
+                user_id,
+                json!({
+                    "event": "notification.read",
+                    "notification_id": row.id,
+                    "unread_count": unread_count,
+                    "read_at": row.read_at
+                }),
+            );
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "notification": UserNotificationResponse::from(row),
+                    "unread_count": unread_count
+                })),
+            )
+                .into_response()
+        }
+        Ok(None) => err(StatusCode::NOT_FOUND, "notification not found").into_response(),
+        Err(e) => {
+            tracing::error!("mark_notification_read error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update notification",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn mark_all_notifications_read(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    match sqlx::query(
+        r#"
+        UPDATE user_notifications
+        SET
+            is_read = TRUE,
+            read_at = COALESCE(read_at, NOW()),
+            updated_at = NOW()
+        WHERE user_id = $1 AND is_read = FALSE
+        "#,
+    )
+    .bind(user_id)
+    .execute(&state.db)
+    .await
+    {
+        Ok(result) => {
+            emit_realtime_event(
+                &state,
+                user_id,
+                json!({
+                    "event": "notification.read_all",
+                    "updated_count": result.rows_affected(),
+                    "unread_count": 0
+                }),
+            );
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "updated_count": result.rows_affected(),
+                    "unread_count": 0
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("mark_all_notifications_read error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update notifications",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn notification_stream_socket(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<NotificationSocketQuery>,
+) -> impl IntoResponse {
+    let user_id = query
+        .token
+        .as_deref()
+        .and_then(|token| user_id_from_token_string(token, &state.jwt_secret))
+        .or_else(|| user_id_from_auth(&headers, &state.jwt_secret));
+
+    match user_id {
+        Some(id) => ws.on_upgrade(move |socket| notification_stream_loop(socket, state, id)),
+        None => err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    }
+}
+
+async fn notification_stream_loop(mut socket: WebSocket, state: Arc<AppState>, user_id: Uuid) {
+    let mut rx = state.notification_tx.subscribe();
+    let unread_count = unread_notification_count(&state.db, user_id)
+        .await
+        .unwrap_or(0);
+    let hello = json!({
+        "event": "notification.connected",
+        "unread_count": unread_count,
+        "connected_at": Utc::now()
+    })
+    .to_string();
+    if socket.send(Message::Text(hello.into())).await.is_err() {
+        return;
+    }
+
+    let mut heartbeat = tokio::time::interval(Duration::from_secs(20));
+    loop {
+        tokio::select! {
+            _ = heartbeat.tick() => {
+                if socket.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    break;
+                }
+            }
+            evt = rx.recv() => {
+                match evt {
+                    Ok(envelope) => {
+                        if envelope.user_id != user_id {
+                            continue;
+                        }
+                        if socket.send(Message::Text(envelope.payload.to_string().into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        continue;
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+            incoming = socket.next() => {
+                match incoming {
+                    Some(Ok(Message::Close(_))) | None => break,
+                    Some(Ok(Message::Ping(payload))) => {
+                        if socket.send(Message::Pong(payload)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Some(Ok(_)) => {}
+                    Some(Err(_)) => break,
+                }
+            }
+        }
+    }
+}
+
+async fn create_wallet_topup(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateWalletTopupRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let environment = normalize_wallet_environment(payload.environment)
+        .unwrap_or_else(wallet_default_environment);
+    if !is_valid_wallet_environment(&environment) {
+        return err(StatusCode::BAD_REQUEST, "invalid environment").into_response();
+    }
+
+    if environment == "live" {
+        if !wallet_live_enabled() {
+            return err(StatusCode::FORBIDDEN, "live top-up is disabled").into_response();
+        }
+        let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
+        let allow_non_prod_live = parse_env_bool("WALLET_ALLOW_LIVE_IN_NON_PROD", false);
+        if !allow_non_prod_live && !app_env.eq_ignore_ascii_case("production") {
+            return err(
+                StatusCode::FORBIDDEN,
+                "live top-up is blocked outside production",
+            )
+            .into_response();
+        }
+    }
+
+    let amount_cents = payload.amount_cents.unwrap_or(0);
+    let (min_amount, max_amount) = topup_amount_range(&environment);
+    if amount_cents < min_amount || amount_cents > max_amount {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "amount_cents is outside allowed range for this environment",
+        )
+        .into_response();
+    }
+
+    let currency = normalize_currency(payload.currency).unwrap_or_else(|| "IDR".to_string());
+    if !is_valid_currency(&currency) {
+        return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3").into_response();
+    }
+    if currency == "IDR" && amount_cents % 100 != 0 {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "for IDR top-up, amount_cents must be in full rupiah (multiple of 100)",
+        )
+        .into_response();
+    }
+
+    let payment_provider = normalize_payment_provider(payload.payment_provider)
+        .unwrap_or_else(wallet_default_provider);
+    if !is_valid_payment_provider(&payment_provider) {
+        return err(StatusCode::BAD_REQUEST, "invalid payment_provider").into_response();
+    }
+    if environment == "live"
+        && payment_provider == "mock"
+        && !parse_env_bool("WALLET_ALLOW_MOCK_IN_LIVE", false)
+    {
+        return err(
+            StatusCode::FORBIDDEN,
+            "mock provider is blocked for live environment",
+        )
+        .into_response();
+    }
+
+    let payment_method = normalize_payment_method(payload.payment_method);
+    let description = clean_text(payload.description);
+    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+    }
+
+    let auto_settle_allowed = payment_provider != "midtrans";
+    let should_auto_settle = if environment == "development" && auto_settle_allowed {
+        payload
+            .auto_settle
+            .unwrap_or_else(|| parse_env_bool("WALLET_DEV_AUTO_SETTLE", true))
+    } else {
+        false
+    };
+    let payment_due_at = if should_auto_settle {
+        None
+    } else {
+        Some(
+            Utc::now()
+                + ChronoDuration::minutes(wallet_topup_timeout_minutes(
+                    &environment,
+                    &payment_provider,
+                )),
+        )
+    };
+    let payment_due_at_iso = payment_due_at.as_ref().map(|value| value.to_rfc3339());
+
+    if let Some(transaction_id) = parse_linked_transaction_id_from_topup_metadata(&metadata) {
+        match find_reusable_pending_topup_for_transaction(
+            &state.db,
+            user_id,
+            transaction_id,
+            &environment,
+            &currency,
+            amount_cents,
+            &payment_provider,
+            payment_method.as_deref(),
+        )
+        .await
+        {
+            Ok(Some(existing_topup)) => {
+                let account = match sqlx::query_as::<_, WalletAccountRow>(
+                    r#"
+                    SELECT
+                        id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+                        total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+                    FROM wallet_accounts
+                    WHERE id = $1 AND user_id = $2
+                    LIMIT 1
+                    "#,
+                )
+                .bind(existing_topup.account_id)
+                .bind(user_id)
+                .fetch_optional(&state.db)
+                .await
+                {
+                    Ok(Some(value)) => value,
+                    Ok(None) => {
+                        tracing::warn!(
+                            "create_wallet_topup reusable pending topup account not found topup_id={} user_id={}",
+                            existing_topup.id,
+                            user_id
+                        );
+                        match ensure_wallet_account_exists(&state.db, user_id, &environment, &currency)
+                            .await
+                        {
+                            Ok(value) => value,
+                            Err(e) => {
+                                tracing::error!(
+                                    "create_wallet_topup ensure account for reusable topup error: {:?}",
+                                    e
+                                );
+                                return err(
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    "failed to create top-up",
+                                )
+                                .into_response();
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            "create_wallet_topup query reusable account error: {:?}",
+                            e
+                        );
+                        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create top-up")
+                            .into_response();
+                    }
+                };
+
+                return (
+                    StatusCode::OK,
+                    Json(json!({
+                        "topup": WalletTopupResponse::from(existing_topup),
+                        "account": WalletAccountResponse::from(account),
+                        "linked_transaction": Value::Null,
+                        "next_action": "continue_payment",
+                        "reused_pending_topup": true
+                    })),
+                )
+                    .into_response();
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(
+                    "create_wallet_topup reusable pending lookup error user_id={} transaction_id={} error={:?}",
+                    user_id,
+                    transaction_id,
+                    e
+                );
+            }
+        }
+    }
+
+    let topup_id = Uuid::new_v4();
+    let provider_checkout = match build_provider_checkout(
+        &state,
+        &payment_provider,
+        &environment,
+        &currency,
+        amount_cents,
+        user_id,
+        topup_id,
+        payment_method.as_deref(),
+        description.as_deref(),
+        payment_due_at,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(message) => return err(StatusCode::BAD_REQUEST, &message).into_response(),
+    };
+
+    let fee_cents = 0i64;
+    let net_amount_cents = amount_cents - fee_cents;
+    if net_amount_cents <= 0 {
+        return err(StatusCode::BAD_REQUEST, "invalid net amount").into_response();
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("create_wallet_topup begin tx error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create top-up")
+                .into_response();
+        }
+    };
+
+    let account = match ensure_wallet_account_tx(&mut tx, user_id, &environment, &currency).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("create_wallet_topup ensure account error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create top-up")
+                .into_response();
+        }
+    };
+
+    let inserted = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        INSERT INTO wallet_topups (
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, created_at, updated_at
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10, $11, $12, $13, $14, 'pending', NOW(), NOW()
+        )
+        RETURNING
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        "#,
+    )
+    .bind(topup_id)
+    .bind(user_id)
+    .bind(account.id)
+    .bind(&environment)
+    .bind(amount_cents)
+    .bind(fee_cents)
+    .bind(net_amount_cents)
+    .bind(&currency)
+    .bind(&payment_provider)
+    .bind(&payment_method)
+    .bind(&provider_checkout.external_reference)
+    .bind(&provider_checkout.checkout_url)
+    .bind(merge_json_objects(
+        provider_checkout.payment_payload.clone(),
+        json!({
+            "client_metadata": metadata,
+            "wallet_flow": {
+                "environment": environment,
+                "auto_settle": should_auto_settle,
+                "payment_due_at": payment_due_at_iso,
+                "timeout_minutes": wallet_topup_timeout_minutes(&environment, &payment_provider)
+            }
+        }),
+    ))
+    .bind(&description)
+    .fetch_one(&mut *tx)
+    .await;
+
+    let mut topup_row = match inserted {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("create_wallet_topup insert error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create top-up")
+                .into_response();
+        }
+    };
+
+    let mut account_after = account.clone();
+    let mut linked_transaction_outcome: Option<LinkedTransactionFundingOutcome> = None;
+    if should_auto_settle {
+        match settle_wallet_topup_in_tx(&mut tx, topup_id, user_id, "development").await {
+            Ok((updated_topup, updated_account)) => {
+                topup_row = updated_topup;
+                account_after = updated_account;
+            }
+            Err(e) => {
+                tracing::error!("create_wallet_topup auto settle error: {:?}", e);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up")
+                    .into_response();
+            }
+        }
+    }
+    if topup_row.status == "paid" {
+        match sync_linked_transaction_after_topup_paid_tx(&mut tx, &topup_row).await {
+            Ok(outcome) => linked_transaction_outcome = outcome,
+            Err(e) => {
+                tracing::error!("create_wallet_topup linked transaction sync error: {:?}", e);
+            }
+        }
+    }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("create_wallet_topup commit error: {:?}", e);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create top-up").into_response();
+    }
+
+    let amount_label =
+        format_currency_from_cents(topup_row.amount_cents, topup_row.currency.as_str());
+    if topup_row.status == "paid" {
+        push_notification_best_effort(
+            &state,
+            user_id,
+            "wallet",
+            "wallet.topup.paid",
+            "Top-up berhasil",
+            &format!(
+                "Top-up {} sudah masuk ke saldo {}.",
+                amount_label, topup_row.environment
+            ),
+            json!({
+                "topup_id": topup_row.id,
+                "status": topup_row.status,
+                "environment": topup_row.environment,
+                "amount_cents": topup_row.amount_cents,
+                "currency": topup_row.currency
+            }),
+        )
+        .await;
+    } else {
+        push_notification_best_effort(
+            &state,
+            user_id,
+            "wallet",
+            "wallet.topup.pending",
+            "Top-up menunggu pembayaran",
+            &format!(
+                "Top-up {} di {} masih pending. Lanjutkan pembayaran via checkout.",
+                amount_label, topup_row.environment
+            ),
+            json!({
+                "topup_id": topup_row.id,
+                "status": topup_row.status,
+                "environment": topup_row.environment,
+                "amount_cents": topup_row.amount_cents,
+                "currency": topup_row.currency,
+                "checkout_url": topup_row.checkout_url,
+                "payment_due_at": extract_topup_payment_due_at(&topup_row.payment_payload)
+                    .map(|value| value.to_rfc3339())
+            }),
+        )
+        .await;
+    }
+    if let Some(outcome) = linked_transaction_outcome.as_ref() {
+        notify_linked_transaction_funding_outcome(&state, outcome).await;
+    }
+
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "topup": WalletTopupResponse::from(topup_row),
+            "account": WalletAccountResponse::from(account_after),
+            "linked_transaction": linked_transaction_outcome
+                .as_ref()
+                .map(linked_transaction_outcome_json),
+            "next_action": if should_auto_settle { "none" } else { "await_payment" }
+        })),
+    )
+        .into_response()
+}
+
+async fn settle_wallet_topup_dev(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("settle_wallet_topup_dev begin tx error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up")
+                .into_response();
+        }
+    };
+
+    let current = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await;
+
+    let current = match current {
+        Ok(Some(v)) => v,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "top-up not found").into_response(),
+        Err(e) => {
+            tracing::error!("settle_wallet_topup_dev query error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up")
+                .into_response();
+        }
+    };
+
+    if current.environment != "development" {
+        return err(
+            StatusCode::FORBIDDEN,
+            "only development top-up can be settled manually",
+        )
+        .into_response();
+    }
+
+    let due_at = extract_topup_payment_due_at(&current.payment_payload);
+    let payment_window_expired = due_at.map(|value| Utc::now() > value).unwrap_or(false);
+
+    let (topup, account) = if current.status == "paid" {
+        let account = match sqlx::query_as::<_, WalletAccountRow>(
+            r#"
+            SELECT
+                id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+                total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+            FROM wallet_accounts
+            WHERE id = $1 AND user_id = $2
+            LIMIT 1
+            "#,
+        )
+        .bind(current.account_id)
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("settle_wallet_topup_dev account fetch error: {:?}", e);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up")
+                    .into_response();
+            }
+        };
+        (current, account)
+    } else if current.status == "pending" {
+        if payment_window_expired {
+            let updated_topup = match sqlx::query_as::<_, WalletTopupRow>(
+                r#"
+                UPDATE wallet_topups
+                SET
+                    status = 'expired',
+                    expired_at = COALESCE(expired_at, NOW()),
+                    updated_at = NOW()
+                WHERE id = $1
+                RETURNING
+                    id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+                    currency, payment_provider, payment_method, external_reference, checkout_url,
+                    payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+                "#,
+            )
+            .bind(current.id)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::error!("settle_wallet_topup_dev expire overdue top-up error: {:?}", e);
+                    return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up")
+                        .into_response();
+                }
+            };
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "top-up payment window has expired",
+                    "topup": WalletTopupResponse::from(updated_topup)
+                })),
+            )
+                .into_response();
+        }
+        match settle_wallet_topup_in_tx(&mut tx, id, user_id, "development").await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("settle_wallet_topup_dev settle error: {:?}", e);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up")
+                    .into_response();
+            }
+        }
+    } else {
+        return err(
+            StatusCode::CONFLICT,
+            "top-up cannot be settled in current state",
+        )
+        .into_response();
+    };
+    let linked_transaction_outcome = if topup.status == "paid" {
+        match sync_linked_transaction_after_topup_paid_tx(&mut tx, &topup).await {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                tracing::error!(
+                    "settle_wallet_topup_dev linked transaction sync error: {:?}",
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("settle_wallet_topup_dev commit error: {:?}", e);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up").into_response();
+    }
+
+    if topup.status == "paid" {
+        push_notification_best_effort(
+            &state,
+            user_id,
+            "wallet",
+            "wallet.topup.paid",
+            "Top-up development settled",
+            &format!(
+                "Top-up {} berhasil diposting ke saldo {}.",
+                format_currency_from_cents(topup.amount_cents, topup.currency.as_str()),
+                topup.environment
+            ),
+            json!({
+                "topup_id": topup.id,
+                "status": topup.status,
+                "environment": topup.environment,
+                "amount_cents": topup.amount_cents,
+                "currency": topup.currency
+            }),
+        )
+        .await;
+    }
+    if let Some(outcome) = linked_transaction_outcome.as_ref() {
+        notify_linked_transaction_funding_outcome(&state, outcome).await;
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "topup": WalletTopupResponse::from(topup),
+            "account": WalletAccountResponse::from(account),
+            "linked_transaction": linked_transaction_outcome
+                .as_ref()
+                .map(linked_transaction_outcome_json)
+        })),
+    )
+        .into_response()
+}
+
+async fn sync_wallet_topup_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let current = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await;
+
+    let current = match current {
+        Ok(Some(value)) => value,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "top-up not found").into_response(),
+        Err(e) => {
+            tracing::error!("sync_wallet_topup_status query error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to sync top-up status",
+            )
+            .into_response();
+        }
+    };
+
+    let account = match sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        SELECT
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        FROM wallet_accounts
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1
+        "#,
+    )
+    .bind(current.account_id)
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(value)) => value,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "wallet account not found").into_response(),
+        Err(e) => {
+            tracing::error!("sync_wallet_topup_status account query error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to sync top-up status",
+            )
+            .into_response();
+        }
+    };
+
+    if current.payment_provider != "midtrans" {
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "synced": false,
+                "reason": "top-up provider is not midtrans",
+                "topup": WalletTopupResponse::from(current),
+                "account": WalletAccountResponse::from(account)
+            })),
+        )
+            .into_response();
+    }
+
+    if current.status != "pending" {
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "synced": false,
+                "reason": "top-up is not pending",
+                "topup": WalletTopupResponse::from(current),
+                "account": WalletAccountResponse::from(account)
+            })),
+        )
+            .into_response();
+    }
+
+    let order_id = match current.external_reference.clone() {
+        Some(value) if !value.trim().is_empty() => value,
+        _ => return err(StatusCode::BAD_REQUEST, "missing external_reference").into_response(),
+    };
+    let server_key = match midtrans_server_key_for_environment(&current.environment) {
+        Some(value) if !value.trim().is_empty() => value,
+        _ => {
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "midtrans key not configured",
+            )
+            .into_response()
+        }
+    };
+
+    let endpoint = format!(
+        "{}/v2/{}/status",
+        midtrans_api_base_url(&current.environment),
+        order_id
+    );
+    let provider_response = match state
+        .http_client
+        .get(endpoint)
+        .basic_auth(server_key.clone(), Some(""))
+        .header(ACCEPT, "application/json")
+        .send()
+        .await
+    {
+        Ok(response) => response,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": format!("midtrans status request failed: {}", describe_reqwest_error(&e))
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    let provider_status = provider_response.status();
+    let provider_body = match provider_response.text().await {
+        Ok(value) => value,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": format!("midtrans status body read failed: {}", describe_reqwest_error(&e))
+                })),
+            )
+                .into_response();
+        }
+    };
+    let provider_payload = match serde_json::from_str::<Value>(&provider_body) {
+        Ok(value) => value,
+        Err(e) => {
+            let snippet: String = provider_body.chars().take(240).collect();
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": format!("midtrans status parse failed: {}", e),
+                    "status": provider_status.as_u16(),
+                    "body_snippet": snippet
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    if !provider_status.is_success() {
+        let provider_code = midtrans_text_field(&provider_payload, "status_code")
+            .unwrap_or_else(|| provider_status.as_u16().to_string());
+        let provider_message = midtrans_text_field(&provider_payload, "status_message")
+            .unwrap_or_default()
+            .to_lowercase();
+        let provider_not_found = provider_status.as_u16() == 404
+            || provider_code == "404"
+            || provider_message.contains("doesn't exist")
+            || provider_message.contains("does not exist")
+            || provider_message.contains("not found");
+
+        if provider_not_found {
+            let gross_amount = midtrans_text_field(&provider_payload, "gross_amount")
+                .unwrap_or_else(|| format!("{:.2}", current.amount_cents as f64 / 100.0));
+            let signature_key =
+                midtrans_signature(&order_id, &provider_code, &gross_amount, &server_key);
+
+            let callback_response = handle_midtrans_wallet_notify(
+                State(state.clone()),
+                Json(json!({
+                    "order_id": order_id,
+                    "status_code": provider_code,
+                    "gross_amount": gross_amount,
+                    "signature_key": signature_key,
+                    "transaction_status": "failure",
+                    "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
+                    "payment_type": midtrans_text_field(&provider_payload, "payment_type"),
+                    "transaction_id": midtrans_text_field(&provider_payload, "transaction_id"),
+                    "settlement_time": midtrans_text_field(&provider_payload, "settlement_time")
+                })),
+            )
+            .await
+            .into_response();
+
+            if !callback_response.status().is_success() {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(json!({
+                        "error": format!(
+                            "midtrans callback replay failed with status {}",
+                            callback_response.status().as_u16()
+                        )
+                    })),
+                )
+                    .into_response();
+            }
+
+            let updated_topup = match sqlx::query_as::<_, WalletTopupRow>(
+                r#"
+                SELECT
+                    id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+                    currency, payment_provider, payment_method, external_reference, checkout_url,
+                    payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+                FROM wallet_topups
+                WHERE id = $1 AND user_id = $2
+                LIMIT 1
+                "#,
+            )
+            .bind(id)
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await
+            {
+                Ok(value) => value,
+                Err(e) => {
+                    tracing::error!("sync_wallet_topup_status updated topup query error: {:?}", e);
+                    return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to sync top-up status")
+                        .into_response();
+                }
+            };
+
+            let updated_account = match sqlx::query_as::<_, WalletAccountRow>(
+                r#"
+                SELECT
+                    id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+                    total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+                FROM wallet_accounts
+                WHERE id = $1 AND user_id = $2
+                LIMIT 1
+                "#,
+            )
+            .bind(updated_topup.account_id)
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await
+            {
+                Ok(value) => value,
+                Err(e) => {
+                    tracing::error!(
+                        "sync_wallet_topup_status updated account query error: {:?}",
+                        e
+                    );
+                    return err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to sync top-up status",
+                    )
+                    .into_response();
+                }
+            };
+
+            return (
+                StatusCode::OK,
+                Json(json!({
+                    "synced": true,
+                    "reason": "provider_not_found_mapped_to_failed",
+                    "provider_payload": provider_payload,
+                    "topup": WalletTopupResponse::from(updated_topup),
+                    "account": WalletAccountResponse::from(updated_account)
+                })),
+            )
+                .into_response();
+        }
+
+        return (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({
+                "error": format!("midtrans status request returned {}", provider_status.as_u16()),
+                "provider_payload": provider_payload
+            })),
+        )
+            .into_response();
+    }
+
+    let transaction_status = midtrans_text_field(&provider_payload, "transaction_status")
+        .unwrap_or_else(|| "pending".to_string())
+        .to_lowercase();
+
+    if !midtrans_reconcile_candidate_status(transaction_status.as_str()) {
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "synced": false,
+                "reason": "provider status is not final",
+                "provider_status": transaction_status,
+                "provider_payload": provider_payload,
+                "topup": WalletTopupResponse::from(current),
+                "account": WalletAccountResponse::from(account)
+            })),
+        )
+            .into_response();
+    }
+
+    let status_code = midtrans_text_field(&provider_payload, "status_code")
+        .unwrap_or_else(|| provider_status.as_u16().to_string());
+    let gross_amount = midtrans_text_field(&provider_payload, "gross_amount")
+        .unwrap_or_else(|| format!("{:.2}", current.amount_cents as f64 / 100.0));
+    let signature_key = midtrans_signature(&order_id, &status_code, &gross_amount, &server_key);
+
+    let callback_response = handle_midtrans_wallet_notify(
+        State(state.clone()),
+        Json(json!({
+            "order_id": order_id,
+            "status_code": status_code,
+            "gross_amount": gross_amount,
+            "signature_key": signature_key,
+            "transaction_status": transaction_status,
+            "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
+            "payment_type": midtrans_text_field(&provider_payload, "payment_type"),
+            "transaction_id": midtrans_text_field(&provider_payload, "transaction_id"),
+            "settlement_time": midtrans_text_field(&provider_payload, "settlement_time")
+        })),
+    )
+    .await
+    .into_response();
+
+    if !callback_response.status().is_success() {
+        return (
+            StatusCode::BAD_GATEWAY,
+            Json(json!({
+                "error": format!(
+                    "midtrans callback replay failed with status {}",
+                    callback_response.status().as_u16()
+                )
+            })),
+        )
+            .into_response();
+    }
+
+    let updated_topup = match sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(e) => {
+            tracing::error!(
+                "sync_wallet_topup_status updated topup query error: {:?}",
+                e
+            );
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to sync top-up status",
+            )
+            .into_response();
+        }
+    };
+
+    let updated_account = match sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        SELECT
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        FROM wallet_accounts
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1
+        "#,
+    )
+    .bind(updated_topup.account_id)
+    .bind(user_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(e) => {
+            tracing::error!(
+                "sync_wallet_topup_status updated account query error: {:?}",
+                e
+            );
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to sync top-up status",
+            )
+            .into_response();
+        }
+    };
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "synced": true,
+            "provider_status": transaction_status,
+            "provider_payload": provider_payload,
+            "topup": WalletTopupResponse::from(updated_topup),
+            "account": WalletAccountResponse::from(updated_account)
+        })),
+    )
+        .into_response()
+}
+
+async fn cancel_wallet_topup(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("cancel_wallet_topup begin tx error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to cancel top-up")
+                .into_response();
+        }
+    };
+
+    let current = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await;
+
+    let current = match current {
+        Ok(Some(v)) => v,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "top-up not found").into_response(),
+        Err(e) => {
+            tracing::error!("cancel_wallet_topup query error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to cancel top-up")
+                .into_response();
+        }
+    };
+
+    let topup = if current.status == "pending" {
+        match sqlx::query_as::<_, WalletTopupRow>(
+            r#"
+            UPDATE wallet_topups
+            SET
+                status = 'cancelled',
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING
+                id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+                currency, payment_provider, payment_method, external_reference, checkout_url,
+                payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+            "#,
+        )
+        .bind(current.id)
+        .fetch_one(&mut *tx)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("cancel_wallet_topup update error: {:?}", e);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to cancel top-up")
+                    .into_response();
+            }
+        }
+    } else if current.status == "cancelled" {
+        current
+    } else {
+        return err(
+            StatusCode::CONFLICT,
+            "top-up cannot be cancelled in current state",
+        )
+        .into_response();
+    };
+
+    let account = match sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        SELECT
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        FROM wallet_accounts
+        WHERE id = $1 AND user_id = $2
+        LIMIT 1
+        "#,
+    )
+    .bind(topup.account_id)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("cancel_wallet_topup account fetch error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to cancel top-up")
+                .into_response();
+        }
+    };
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("cancel_wallet_topup commit error: {:?}", e);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to cancel top-up").into_response();
+    }
+
+    if topup.status == "cancelled" {
+        push_notification_best_effort(
+            &state,
+            user_id,
+            "wallet",
+            "wallet.topup.cancelled",
+            "Top-up dibatalkan",
+            &format!(
+                "Top-up {} di {} berhasil dibatalkan.",
+                format_currency_from_cents(topup.amount_cents, topup.currency.as_str()),
+                topup.environment
+            ),
+            json!({
+                "topup_id": topup.id,
+                "status": topup.status,
+                "environment": topup.environment,
+                "amount_cents": topup.amount_cents,
+                "currency": topup.currency
+            }),
+        )
+        .await;
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "topup": WalletTopupResponse::from(topup),
+            "account": WalletAccountResponse::from(account)
+        })),
+    )
+        .into_response()
+}
+
+fn midtrans_text_field(payload: &Value, key: &str) -> Option<String> {
+    payload.get(key).and_then(|value| {
+        value
+            .as_str()
+            .map(|v| v.trim().to_string())
+            .or_else(|| value.as_i64().map(|v| v.to_string()))
+            .or_else(|| value.as_u64().map(|v| v.to_string()))
+            .or_else(|| value.as_f64().map(|v| v.to_string()))
+    })
+}
+
+fn midtrans_target_topup_status(
+    transaction_status: &str,
+    fraud_status: Option<&str>,
+) -> &'static str {
+    match transaction_status {
+        "settlement" => "paid",
+        "capture" => {
+            let fraud = fraud_status.unwrap_or("").trim().to_lowercase();
+            if fraud == "challenge" {
+                "pending"
+            } else {
+                "paid"
+            }
+        }
+        "pending" => "pending",
+        "deny" | "failure" => "failed",
+        "cancel" => "cancelled",
+        "expire" => "expired",
+        _ => "pending",
+    }
+}
+
+fn midtrans_reconcile_candidate_status(transaction_status: &str) -> bool {
+    matches!(
+        transaction_status,
+        "settlement" | "capture" | "deny" | "failure" | "cancel" | "expire"
+    )
+}
+
+async fn reconcile_pending_midtrans_topups_for_user(
+    state: &Arc<AppState>,
+    user_id: Uuid,
+    environment: Option<&str>,
+) {
+    let reconcile_limit = parse_env_i64("WALLET_MIDTRANS_RECONCILE_LIMIT")
+        .unwrap_or(10)
+        .clamp(1, 30);
+    let reconcile_cooldown_seconds = parse_env_i64("WALLET_MIDTRANS_RECONCILE_COOLDOWN_SECONDS")
+        .unwrap_or(45)
+        .clamp(5, 3600);
+
+    let pending_rows = match sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE user_id = $1
+          AND status = 'pending'
+          AND payment_provider = 'midtrans'
+          AND external_reference IS NOT NULL
+          AND ($2::text IS NULL OR environment = $2)
+        ORDER BY created_at DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment)
+    .bind(reconcile_limit)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!(
+                "reconcile_pending_midtrans_topups_for_user query error: {:?}",
+                e
+            );
+            return;
+        }
+    };
+
+    for topup in pending_rows {
+        if Utc::now().signed_duration_since(topup.updated_at)
+            < ChronoDuration::seconds(reconcile_cooldown_seconds)
+        {
+            continue;
+        }
+
+        let order_id = match topup.external_reference.clone() {
+            Some(value) if !value.trim().is_empty() => value,
+            _ => continue,
+        };
+
+        if extract_topup_payment_due_at(&topup.payment_payload)
+            .as_ref()
+            .map(|deadline| Utc::now() > deadline.to_owned())
+            .unwrap_or(false)
+        {
+            continue;
+        }
+
+        let server_key = match midtrans_server_key_for_environment(&topup.environment) {
+            Some(value) if !value.trim().is_empty() => value,
+            _ => continue,
+        };
+
+        let endpoint = format!(
+            "{}/v2/{}/status",
+            midtrans_api_base_url(&topup.environment),
+            order_id
+        );
+        let provider_response = match state
+            .http_client
+            .get(endpoint)
+            .basic_auth(server_key.clone(), Some(""))
+            .header(ACCEPT, "application/json")
+            .send()
+            .await
+        {
+            Ok(response) => response,
+            Err(e) => {
+                tracing::warn!(
+                    "reconcile_pending_midtrans_topups_for_user status request error topup_id={} order_id={} err={}",
+                    topup.id,
+                    order_id,
+                    describe_reqwest_error(&e)
+                );
+                continue;
+            }
+        };
+        let provider_status = provider_response.status();
+        let provider_content_type = provider_response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        let provider_body = match provider_response.text().await {
+            Ok(body) => body,
+            Err(e) => {
+                tracing::warn!(
+                    "reconcile_pending_midtrans_topups_for_user read body error topup_id={} order_id={} status={} err={}",
+                    topup.id,
+                    order_id,
+                    provider_status.as_u16(),
+                    describe_reqwest_error(&e)
+                );
+                continue;
+            }
+        };
+        let provider_payload = match serde_json::from_str::<Value>(&provider_body) {
+            Ok(payload) => payload,
+            Err(e) => {
+                let snippet: String = provider_body.chars().take(240).collect();
+                tracing::warn!(
+                    "reconcile_pending_midtrans_topups_for_user parse error topup_id={} order_id={} status={} content_type={} err={} body_snippet={}",
+                    topup.id,
+                    order_id,
+                    provider_status.as_u16(),
+                    provider_content_type,
+                    e,
+                    snippet
+                );
+                continue;
+            }
+        };
+        if !provider_status.is_success() {
+            let provider_code = midtrans_text_field(&provider_payload, "status_code")
+                .unwrap_or_else(|| provider_status.as_u16().to_string());
+            let provider_message = midtrans_text_field(&provider_payload, "status_message")
+                .unwrap_or_default()
+                .to_lowercase();
+            let provider_not_found = provider_status.as_u16() == 404
+                || provider_code == "404"
+                || provider_message.contains("doesn't exist")
+                || provider_message.contains("does not exist")
+                || provider_message.contains("not found");
+
+            if provider_not_found {
+                let gross_amount = midtrans_text_field(&provider_payload, "gross_amount")
+                    .unwrap_or_else(|| format!("{:.2}", topup.amount_cents as f64 / 100.0));
+                let signature_key =
+                    midtrans_signature(&order_id, &provider_code, &gross_amount, &server_key);
+
+                let response = handle_midtrans_wallet_notify(
+                    State(state.clone()),
+                    Json(json!({
+                        "order_id": order_id,
+                        "status_code": provider_code,
+                        "gross_amount": gross_amount,
+                        "signature_key": signature_key,
+                        "transaction_status": "failure",
+                        "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
+                        "payment_type": midtrans_text_field(&provider_payload, "payment_type"),
+                        "transaction_id": midtrans_text_field(&provider_payload, "transaction_id"),
+                        "settlement_time": midtrans_text_field(&provider_payload, "settlement_time")
+                    })),
+                )
+                .await
+                .into_response();
+
+                if !response.status().is_success() {
+                    tracing::warn!(
+                        "reconcile_pending_midtrans_topups_for_user not-found replay failed topup_id={} order_id={} status={}",
+                        topup.id,
+                        topup.external_reference.as_deref().unwrap_or_default(),
+                        response.status().as_u16()
+                    );
+                }
+                continue;
+            }
+
+            tracing::debug!(
+                "reconcile_pending_midtrans_topups_for_user non-success status={} topup_id={} order_id={} payload={}",
+                provider_status.as_u16(),
+                topup.id,
+                order_id,
+                provider_payload
+            );
+            continue;
+        }
+
+        let transaction_status = midtrans_text_field(&provider_payload, "transaction_status")
+            .unwrap_or_else(|| "pending".to_string())
+            .to_lowercase();
+        if !midtrans_reconcile_candidate_status(transaction_status.as_str()) {
+            continue;
+        }
+
+        let status_code = midtrans_text_field(&provider_payload, "status_code")
+            .unwrap_or_else(|| provider_status.as_u16().to_string());
+        let gross_amount = midtrans_text_field(&provider_payload, "gross_amount")
+            .unwrap_or_else(|| format!("{:.2}", topup.amount_cents as f64 / 100.0));
+        let signature_key = midtrans_signature(&order_id, &status_code, &gross_amount, &server_key);
+
+        let response = handle_midtrans_wallet_notify(
+            State(state.clone()),
+            Json(json!({
+                "order_id": order_id,
+                "status_code": status_code,
+                "gross_amount": gross_amount,
+                "signature_key": signature_key,
+                "transaction_status": transaction_status,
+                "fraud_status": midtrans_text_field(&provider_payload, "fraud_status"),
+                "payment_type": midtrans_text_field(&provider_payload, "payment_type"),
+                "transaction_id": midtrans_text_field(&provider_payload, "transaction_id"),
+                "settlement_time": midtrans_text_field(&provider_payload, "settlement_time")
+            })),
+        )
+        .await
+        .into_response();
+
+        if !response.status().is_success() {
+            tracing::warn!(
+                "reconcile_pending_midtrans_topups_for_user callback replay failed topup_id={} order_id={} status={}",
+                topup.id,
+                topup
+                    .external_reference
+                    .as_deref()
+                    .unwrap_or_default(),
+                response.status().as_u16()
+            );
+        }
+    }
+}
+
+async fn handle_midtrans_wallet_notify(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<Value>,
+) -> impl IntoResponse {
+    let order_id = match midtrans_text_field(&payload, "order_id") {
+        Some(v) if !v.is_empty() => v,
+        _ => return err(StatusCode::BAD_REQUEST, "order_id is required").into_response(),
+    };
+    let status_code = match midtrans_text_field(&payload, "status_code") {
+        Some(v) if !v.is_empty() => v,
+        _ => return err(StatusCode::BAD_REQUEST, "status_code is required").into_response(),
+    };
+    let gross_amount = match midtrans_text_field(&payload, "gross_amount") {
+        Some(v) if !v.is_empty() => v,
+        _ => return err(StatusCode::BAD_REQUEST, "gross_amount is required").into_response(),
+    };
+    let signature_key = match midtrans_text_field(&payload, "signature_key") {
+        Some(v) if !v.is_empty() => v.to_lowercase(),
+        _ => return err(StatusCode::BAD_REQUEST, "signature_key is required").into_response(),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("handle_midtrans_wallet_notify begin tx error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to process callback",
+            )
+            .into_response();
+        }
+    };
+
+    let current = match sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE external_reference = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(&order_id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(v)) => v,
+        Ok(None) => {
+            if let Err(e) = tx.commit().await {
+                tracing::error!(
+                    "handle_midtrans_wallet_notify commit unknown order error: {:?}",
+                    e
+                );
+            }
+            return (
+                StatusCode::OK,
+                Json(json!({
+                    "acknowledged": true,
+                    "ignored": true,
+                    "reason": "topup not found"
+                })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            tracing::error!("handle_midtrans_wallet_notify topup query error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to process callback",
+            )
+            .into_response();
+        }
+    };
+
+    if current.payment_provider != "midtrans" {
+        if let Err(e) = tx.commit().await {
+            tracing::error!(
+                "handle_midtrans_wallet_notify commit non-midtrans error: {:?}",
+                e
+            );
+        }
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "acknowledged": true,
+                "ignored": true,
+                "reason": "topup provider is not midtrans"
+            })),
+        )
+            .into_response();
+    }
+    let previous_status = current.status.clone();
+
+    let server_key = match midtrans_server_key_for_environment(&current.environment) {
+        Some(v) if !v.trim().is_empty() => v,
+        _ => {
+            tracing::error!(
+                "handle_midtrans_wallet_notify missing key for environment={}",
+                current.environment
+            );
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "midtrans key not configured",
+            )
+            .into_response();
+        }
+    };
+    let expected_signature =
+        midtrans_signature(&order_id, &status_code, &gross_amount, &server_key);
+    if expected_signature != signature_key {
+        return err(StatusCode::UNAUTHORIZED, "invalid callback signature").into_response();
+    }
+
+    let transaction_status = midtrans_text_field(&payload, "transaction_status")
+        .unwrap_or_else(|| "pending".to_string())
+        .to_lowercase();
+    let fraud_status = midtrans_text_field(&payload, "fraud_status").map(|v| v.to_lowercase());
+    let payment_type = midtrans_text_field(&payload, "payment_type").map(|v| v.to_lowercase());
+    let mut target_status =
+        midtrans_target_topup_status(&transaction_status, fraud_status.as_deref()).to_string();
+    let payment_due_at = extract_topup_payment_due_at(&current.payment_payload);
+    if target_status == "paid"
+        && current.status == "pending"
+        && payment_due_at
+            .as_ref()
+            .map(|deadline| Utc::now() > deadline.to_owned())
+            .unwrap_or(false)
+    {
+        target_status = "expired".to_string();
+    }
+    let late_paid_rejected = target_status == "expired"
+        && matches!(transaction_status.as_str(), "settlement" | "capture");
+
+    let callback_meta = json!({
+        "midtrans": {
+            "order_id": order_id,
+            "transaction_status": transaction_status,
+            "fraud_status": fraud_status,
+            "payment_type": payment_type,
+            "status_code": status_code,
+            "gross_amount": gross_amount,
+            "transaction_id": midtrans_text_field(&payload, "transaction_id"),
+            "settlement_time": midtrans_text_field(&payload, "settlement_time")
+        },
+        "wallet_flow": {
+            "payment_due_at": payment_due_at.as_ref().map(|value| value.to_rfc3339()),
+            "late_paid_rejected": late_paid_rejected
+        }
+    });
+
+    let topup: WalletTopupRow;
+    let account: WalletAccountRow;
+
+    if target_status == "paid" {
+        if current.status == "paid" {
+            topup = current.clone();
+            account = match sqlx::query_as::<_, WalletAccountRow>(
+                r#"
+                SELECT
+                    id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+                    total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+                FROM wallet_accounts
+                WHERE id = $1
+                LIMIT 1
+                "#,
+            )
+            .bind(current.account_id)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::error!("handle_midtrans_wallet_notify account fetch error: {:?}", e);
+                    return err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to process callback",
+                    )
+                    .into_response();
+                }
+            };
+        } else if current.status != "pending" {
+            return err(
+                StatusCode::CONFLICT,
+                "top-up cannot be moved to paid from current state",
+            )
+            .into_response();
+        } else {
+            if let Err(e) = sqlx::query(
+                r#"
+                UPDATE wallet_topups
+                SET
+                    payment_method = COALESCE(payment_method, $2),
+                    payment_payload = COALESCE(payment_payload, '{}'::jsonb) || $3::jsonb,
+                    updated_at = NOW()
+                WHERE id = $1
+                "#,
+            )
+            .bind(current.id)
+            .bind(payment_type.clone())
+            .bind(callback_meta.clone())
+            .execute(&mut *tx)
+            .await
+            {
+                tracing::error!(
+                    "handle_midtrans_wallet_notify callback payload update error: {:?}",
+                    e
+                );
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to process callback",
+                )
+                .into_response();
+            }
+
+            match settle_wallet_topup_in_tx(
+                &mut tx,
+                current.id,
+                current.user_id,
+                current.environment.as_str(),
+            )
+            .await
+            {
+                Ok((updated_topup, updated_account)) => {
+                    topup = updated_topup;
+                    account = updated_account;
+                }
+                Err(e) => {
+                    tracing::error!("handle_midtrans_wallet_notify settle error: {:?}", e);
+                    return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to settle top-up")
+                        .into_response();
+                }
+            }
+        }
+    } else {
+        let next_status = if current.status == "pending" {
+            target_status.as_str()
+        } else {
+            current.status.as_str()
+        };
+
+        topup = match sqlx::query_as::<_, WalletTopupRow>(
+            r#"
+            UPDATE wallet_topups
+            SET
+                status = $2,
+                payment_method = COALESCE(payment_method, $3),
+                payment_payload = COALESCE(payment_payload, '{}'::jsonb) || $4::jsonb,
+                expired_at = CASE WHEN $2 = 'expired' THEN NOW() ELSE expired_at END,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING
+                id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+                currency, payment_provider, payment_method, external_reference, checkout_url,
+                payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+            "#,
+        )
+        .bind(current.id)
+        .bind(next_status)
+        .bind(payment_type.clone())
+        .bind(callback_meta.clone())
+        .fetch_one(&mut *tx)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("handle_midtrans_wallet_notify status update error: {:?}", e);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to process callback",
+                )
+                .into_response();
+            }
+        };
+
+        account = match sqlx::query_as::<_, WalletAccountRow>(
+            r#"
+            SELECT
+                id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+                total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+            FROM wallet_accounts
+            WHERE id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(topup.account_id)
+        .fetch_one(&mut *tx)
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(
+                    "handle_midtrans_wallet_notify account fetch (non-paid) error: {:?}",
+                    e
+                );
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to process callback",
+                )
+                .into_response();
+            }
+        };
+    }
+    let linked_transaction_outcome = if topup.status == "paid" {
+        match sync_linked_transaction_after_topup_paid_tx(&mut tx, &topup).await {
+            Ok(outcome) => outcome,
+            Err(e) => {
+                tracing::error!(
+                    "handle_midtrans_wallet_notify linked transaction sync error: {:?}",
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("handle_midtrans_wallet_notify commit error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to process callback",
+        )
+        .into_response();
+    }
+
+    if topup.status != previous_status {
+        let event_type = format!("wallet.topup.{}", topup.status);
+        let title = match topup.status.as_str() {
+            "paid" => "Top-up berhasil",
+            "failed" => "Top-up gagal",
+            "cancelled" => "Top-up dibatalkan",
+            "expired" => "Top-up kedaluwarsa",
+            _ => "Status top-up diperbarui",
+        };
+        let message = match topup.status.as_str() {
+            "paid" => format!(
+                "Pembayaran {} berhasil. Saldo {} sudah diperbarui.",
+                format_currency_from_cents(topup.amount_cents, topup.currency.as_str()),
+                topup.environment
+            ),
+            "failed" => format!(
+                "Pembayaran top-up {} gagal di provider.",
+                format_currency_from_cents(topup.amount_cents, topup.currency.as_str())
+            ),
+            "cancelled" => "Pembayaran top-up dibatalkan.".to_string(),
+            "expired" => "Pembayaran top-up kedaluwarsa.".to_string(),
+            _ => format!("Status top-up menjadi {}.", topup.status),
+        };
+        push_notification_best_effort(
+            &state,
+            topup.user_id,
+            "wallet",
+            event_type.as_str(),
+            title,
+            message.as_str(),
+            json!({
+                "topup_id": topup.id,
+                "previous_status": previous_status,
+                "status": topup.status,
+                "environment": topup.environment,
+                "amount_cents": topup.amount_cents,
+                "currency": topup.currency,
+                "provider": topup.payment_provider,
+                "account_id": account.id,
+                "payment_due_at": extract_topup_payment_due_at(&topup.payment_payload)
+                    .map(|value| value.to_rfc3339())
+            }),
+        )
+        .await;
+    }
+    if let Some(outcome) = linked_transaction_outcome.as_ref() {
+        notify_linked_transaction_funding_outcome(&state, outcome).await;
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "acknowledged": true,
+            "topup": WalletTopupResponse::from(topup),
+            "account": WalletAccountResponse::from(account),
+            "linked_transaction": linked_transaction_outcome
+                .as_ref()
+                .map(linked_transaction_outcome_json)
+        })),
+    )
+        .into_response()
+}
+
+async fn ensure_wallet_account_exists(
+    db: &PgPool,
+    user_id: Uuid,
+    environment: &str,
+    currency: &str,
+) -> Result<WalletAccountRow, sqlx::Error> {
+    sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        INSERT INTO wallet_accounts (
+            user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        )
+        VALUES (
+            $1, $2, $3, 0, 0, 0, 0, 'active', '{}'::jsonb, NOW(), NOW()
+        )
+        ON CONFLICT (user_id, environment, currency)
+        DO UPDATE SET updated_at = NOW()
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment)
+    .bind(currency)
+    .fetch_one(db)
+    .await
+}
+
+async fn ensure_wallet_account_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+    environment: &str,
+    currency: &str,
+) -> Result<WalletAccountRow, sqlx::Error> {
+    sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        INSERT INTO wallet_accounts (
+            user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        )
+        VALUES (
+            $1, $2, $3, 0, 0, 0, 0, 'active', '{}'::jsonb, NOW(), NOW()
+        )
+        ON CONFLICT (user_id, environment, currency)
+        DO UPDATE SET updated_at = NOW()
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment)
+    .bind(currency)
+    .fetch_one(&mut **tx)
+    .await
+}
+
+#[derive(Debug)]
+enum WalletTransitionError {
+    InsufficientFunds,
+    InvalidHeldBalance,
+    Database(sqlx::Error),
+}
+
+impl From<sqlx::Error> for WalletTransitionError {
+    fn from(value: sqlx::Error) -> Self {
+        Self::Database(value)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct DisputeSettlementAmounts {
+    refund_amount_cents: i64,
+    release_amount_cents: i64,
+    platform_fee_cents: i64,
+    seller_fault_ratio: i32,
+}
+
+fn calculate_dispute_settlement_amounts(
+    escrow_amount_cents: i64,
+    decision: &str,
+    seller_fault_ratio: Option<i32>,
+    platform_fee_cents: Option<i64>,
+    verified_damage_cost_cents: Option<i64>,
+    deposit_amount_cents: Option<i64>,
+) -> Result<DisputeSettlementAmounts, &'static str> {
+    if escrow_amount_cents <= 0 {
+        return Err("invalid escrow amount");
+    }
+    let fee = platform_fee_cents.unwrap_or(0);
+    if fee < 0 || fee > escrow_amount_cents {
+        return Err("invalid platform_fee_cents");
+    }
+
+    let outcome = match decision {
+        "buyer_win_full_refund" | "return_required_then_refund" => {
+            // Default policy: fee waived for full refund.
+            DisputeSettlementAmounts {
+                refund_amount_cents: escrow_amount_cents,
+                release_amount_cents: 0,
+                platform_fee_cents: 0,
+                seller_fault_ratio: 100,
+            }
+        }
+        "seller_win_full_release" => DisputeSettlementAmounts {
+            refund_amount_cents: 0,
+            release_amount_cents: escrow_amount_cents - fee,
+            platform_fee_cents: fee,
+            seller_fault_ratio: 0,
+        },
+        "partial_split" => {
+            let ratio =
+                seller_fault_ratio.ok_or("seller_fault_ratio is required for partial_split")?;
+            if !(0..=100).contains(&ratio) {
+                return Err("seller_fault_ratio must be between 0 and 100");
+            }
+            let refund_rounded = ((escrow_amount_cents as i128 * ratio as i128) + 50i128) / 100i128;
+            let refund_amount_cents = i64::try_from(refund_rounded).unwrap_or(escrow_amount_cents);
+            if refund_amount_cents + fee > escrow_amount_cents {
+                return Err("partial split exceeds escrow amount");
+            }
+            DisputeSettlementAmounts {
+                refund_amount_cents,
+                release_amount_cents: escrow_amount_cents - refund_amount_cents - fee,
+                platform_fee_cents: fee,
+                seller_fault_ratio: ratio,
+            }
+        }
+        "damage_deduction" => {
+            let verified = verified_damage_cost_cents
+                .ok_or("verified_damage_cost_cents is required for damage_deduction")?;
+            if verified < 0 {
+                return Err("verified_damage_cost_cents must be non-negative");
+            }
+            let deposit_cap = deposit_amount_cents.unwrap_or(escrow_amount_cents);
+            if deposit_cap < 0 {
+                return Err("deposit_amount_cents must be non-negative");
+            }
+            let capped_deposit = deposit_cap.min(escrow_amount_cents);
+            let deduction = verified.min(capped_deposit);
+            if deduction + fee > escrow_amount_cents {
+                return Err("damage deduction exceeds escrow amount");
+            }
+            let refund_amount_cents = escrow_amount_cents - deduction - fee;
+            let seller_fault_ratio = if escrow_amount_cents == 0 {
+                0
+            } else {
+                (((refund_amount_cents as i128 * 100i128) + (escrow_amount_cents as i128 / 2i128))
+                    / escrow_amount_cents as i128) as i32
+            };
+            DisputeSettlementAmounts {
+                refund_amount_cents,
+                release_amount_cents: deduction,
+                platform_fee_cents: fee,
+                seller_fault_ratio,
+            }
+        }
+        _ => return Err("invalid dispute decision"),
+    };
+
+    if outcome.refund_amount_cents < 0
+        || outcome.release_amount_cents < 0
+        || outcome.platform_fee_cents < 0
+    {
+        return Err("settlement amounts must be non-negative");
+    }
+    if outcome.refund_amount_cents + outcome.release_amount_cents + outcome.platform_fee_cents
+        != escrow_amount_cents
+    {
+        return Err("settlement invariant violated");
+    }
+    Ok(outcome)
+}
+
+async fn lock_wallet_account_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+    environment: &str,
+    currency: &str,
+) -> Result<WalletAccountRow, sqlx::Error> {
+    let ensured = ensure_wallet_account_tx(tx, user_id, environment, currency).await?;
+    sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        SELECT
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        FROM wallet_accounts
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(ensured.id)
+    .fetch_one(&mut **tx)
+    .await
+}
+
+async fn insert_wallet_ledger_entry_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+    account: &WalletAccountRow,
+    direction: &str,
+    amount_cents: i64,
+    balance_after_cents: i64,
+    entry_type: &str,
+    reference_type: &str,
+    reference_id: Uuid,
+    description: String,
+    metadata: Value,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO wallet_ledger_entries (
+            user_id, account_id, environment, currency, direction, amount_cents,
+            balance_after_cents, entry_type, status, reference_type, reference_id,
+            description, metadata, created_at
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, 'posted', $9, $10, $11, $12, NOW()
+        )
+        "#,
+    )
+    .bind(user_id)
+    .bind(account.id)
+    .bind(account.environment.as_str())
+    .bind(account.currency.as_str())
+    .bind(direction)
+    .bind(amount_cents)
+    .bind(balance_after_cents)
+    .bind(entry_type)
+    .bind(reference_type)
+    .bind(reference_id)
+    .bind(description)
+    .bind(metadata)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn hold_transaction_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    let existing_hold_count = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(1)
+        FROM wallet_ledger_entries
+        WHERE user_id = $1
+          AND reference_type = 'transaction'
+          AND reference_id = $2
+          AND entry_type = 'payment_hold'
+          AND status = 'posted'
+        "#,
+    )
+    .bind(txn.buyer_id)
+    .bind(txn.id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if existing_hold_count > 0 {
+        return Ok(());
+    }
+
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+
+    if buyer_account.available_balance_cents < txn.amount_cents {
+        return Err(WalletTransitionError::InsufficientFunds);
+    }
+
+    let next_available = buyer_account.available_balance_cents - txn.amount_cents;
+    let next_held = buyer_account.held_balance_cents + txn.amount_cents;
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            held_balance_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(next_available)
+    .bind(next_held)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.buyer_id,
+        &updated_buyer,
+        "debit",
+        txn.amount_cents,
+        updated_buyer.available_balance_cents,
+        "payment_hold",
+        "transaction",
+        txn.id,
+        format!("Funds held for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.seller_id,
+            "flow": "escrow_hold",
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn sync_linked_transaction_after_topup_paid_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    topup: &WalletTopupRow,
+) -> Result<Option<LinkedTransactionFundingOutcome>, sqlx::Error> {
+    let Some(transaction_id) =
+        parse_linked_transaction_id_from_topup_payload(&topup.payment_payload)
+    else {
+        return Ok(None);
+    };
+
+    let maybe_txn = sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1 AND buyer_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(transaction_id)
+    .bind(topup.user_id)
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    let Some(txn) = maybe_txn else {
+        return Ok(None);
+    };
+
+    if !matches!(
+        txn.status.as_str(),
+        "pending" | "accepted" | "in_progress" | "delivered"
+    ) {
+        return Ok(None);
+    }
+
+    let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
+    if !wallet_environment.eq_ignore_ascii_case(topup.environment.as_str()) {
+        return Ok(None);
+    }
+    if !txn.currency.eq_ignore_ascii_case(topup.currency.as_str()) {
+        return Ok(None);
+    }
+
+    let (payment_status, protection_status) =
+        match hold_transaction_funds_tx(tx, &txn, wallet_environment.as_str()).await {
+            Ok(_) => ("paid".to_string(), "funds_held".to_string()),
+            Err(WalletTransitionError::InsufficientFunds) => {
+                ("partial".to_string(), txn.protection_status.clone())
+            }
+            Err(WalletTransitionError::InvalidHeldBalance) => {
+                ("hold_error".to_string(), txn.protection_status.clone())
+            }
+            Err(WalletTransitionError::Database(db_err)) => return Err(db_err),
+        };
+
+    let funded_at = Utc::now();
+    let is_paid = payment_status == "paid";
+    let merged_meta = merge_json_objects(
+        txn.transaction_meta.clone(),
+        json!({
+            "payment": {
+                "status": payment_status.as_str(),
+                "funded": is_paid,
+                "funded_at": funded_at,
+                "topup_id": topup.id,
+                "payment_provider": topup.payment_provider.as_str(),
+                "payment_method": topup.payment_method.as_deref(),
+                "wallet_environment": topup.environment.as_str(),
+                "external_reference": topup.external_reference.as_deref()
+            }
+        }),
+    );
+
+    let updated = sqlx::query_as::<_, TransactionRow>(
+        r#"
+        UPDATE transactions
+        SET
+            protection_status = $2,
+            transaction_meta = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        "#,
+    )
+    .bind(txn.id)
+    .bind(protection_status.as_str())
+    .bind(merged_meta)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(Some(LinkedTransactionFundingOutcome {
+        transaction_id: updated.id,
+        buyer_id: updated.buyer_id,
+        seller_id: updated.seller_id,
+        transaction_status: updated.status,
+        protection_status: updated.protection_status,
+        payment_status,
+        wallet_environment,
+        amount_cents: updated.amount_cents,
+        currency: updated.currency,
+    }))
+}
+
+async fn release_transaction_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+    let seller_account =
+        lock_wallet_account_tx(tx, txn.seller_id, environment, txn.currency.as_str()).await?;
+
+    let (next_buyer_available, next_buyer_held) =
+        if buyer_account.held_balance_cents >= txn.amount_cents {
+            (
+                buyer_account.available_balance_cents,
+                buyer_account.held_balance_cents - txn.amount_cents,
+            )
+        } else if buyer_account.available_balance_cents >= txn.amount_cents {
+            (
+                buyer_account.available_balance_cents - txn.amount_cents,
+                buyer_account.held_balance_cents,
+            )
+        } else {
+            return Err(WalletTransitionError::InsufficientFunds);
+        };
+
+    if next_buyer_held < 0 {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    }
+
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            held_balance_cents = $3,
+            total_spend_cents = $4,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(next_buyer_available)
+    .bind(next_buyer_held)
+    .bind(buyer_account.total_spend_cents + txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let updated_seller = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(seller_account.id)
+    .bind(seller_account.available_balance_cents + txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.buyer_id,
+        &updated_buyer,
+        "debit",
+        txn.amount_cents,
+        updated_buyer.available_balance_cents,
+        "payment_release",
+        "transaction",
+        txn.id,
+        format!("Payment released for transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.seller_id,
+            "flow": "escrow_release",
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.seller_id,
+        &updated_seller,
+        "credit",
+        txn.amount_cents,
+        updated_seller.available_balance_cents,
+        "payment_release",
+        "transaction",
+        txn.id,
+        format!("Payment received from transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.buyer_id,
+            "flow": "escrow_release",
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn refund_transaction_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+) -> Result<(), WalletTransitionError> {
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+    if buyer_account.held_balance_cents < txn.amount_cents {
+        return Ok(());
+    }
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            held_balance_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(buyer_account.available_balance_cents + txn.amount_cents)
+    .bind(buyer_account.held_balance_cents - txn.amount_cents)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        txn.buyer_id,
+        &updated_buyer,
+        "credit",
+        txn.amount_cents,
+        updated_buyer.available_balance_cents,
+        "refund",
+        "transaction",
+        txn.id,
+        format!("Refund for cancelled transaction {}", txn.id),
+        json!({
+            "transaction_id": txn.id,
+            "counterparty_user_id": txn.seller_id,
+            "flow": "escrow_refund",
+            "environment": environment
+        }),
+    )
+    .await?;
+    Ok(())
+}
+
+async fn settle_dispute_funds_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    txn: &TransactionRow,
+    environment: &str,
+    decision: &str,
+    resolved_by: Uuid,
+    settlement: &DisputeSettlementAmounts,
+) -> Result<(), WalletTransitionError> {
+    let buyer_account =
+        lock_wallet_account_tx(tx, txn.buyer_id, environment, txn.currency.as_str()).await?;
+    let seller_account =
+        lock_wallet_account_tx(tx, txn.seller_id, environment, txn.currency.as_str()).await?;
+
+    let total_to_settle = settlement.refund_amount_cents
+        + settlement.release_amount_cents
+        + settlement.platform_fee_cents;
+    if buyer_account.held_balance_cents < total_to_settle {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    }
+
+    let next_buyer_available =
+        buyer_account.available_balance_cents + settlement.refund_amount_cents;
+    let next_buyer_held = buyer_account.held_balance_cents - total_to_settle;
+    let next_buyer_spend = buyer_account.total_spend_cents
+        + settlement.release_amount_cents
+        + settlement.platform_fee_cents;
+    if next_buyer_held < 0 || next_buyer_available < 0 || next_buyer_spend < 0 {
+        return Err(WalletTransitionError::InvalidHeldBalance);
+    }
+
+    let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            held_balance_cents = $3,
+            total_spend_cents = $4,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(buyer_account.id)
+    .bind(next_buyer_available)
+    .bind(next_buyer_held)
+    .bind(next_buyer_spend)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let updated_seller = if settlement.release_amount_cents > 0 {
+        Some(
+            sqlx::query_as::<_, WalletAccountRow>(
+                r#"
+                UPDATE wallet_accounts
+                SET
+                    available_balance_cents = $2,
+                    updated_at = NOW()
+                WHERE id = $1
+                RETURNING
+                    id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+                    total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+                "#,
+            )
+            .bind(seller_account.id)
+            .bind(seller_account.available_balance_cents + settlement.release_amount_cents)
+            .fetch_one(&mut **tx)
+            .await?,
+        )
+    } else {
+        None
+    };
+
+    if settlement.refund_amount_cents > 0 {
+        insert_wallet_ledger_entry_tx(
+            tx,
+            txn.buyer_id,
+            &updated_buyer,
+            "credit",
+            settlement.refund_amount_cents,
+            updated_buyer.available_balance_cents,
+            "refund",
+            "transaction",
+            txn.id,
+            format!("Dispute refund for transaction {}", txn.id),
+            json!({
+                "transaction_id": txn.id,
+                "counterparty_user_id": txn.seller_id,
+                "flow": "dispute_resolution_refund",
+                "environment": environment,
+                "decision": decision,
+                "resolved_by": resolved_by
+            }),
+        )
+        .await?;
+    }
+
+    if settlement.release_amount_cents > 0 {
+        insert_wallet_ledger_entry_tx(
+            tx,
+            txn.buyer_id,
+            &updated_buyer,
+            "debit",
+            settlement.release_amount_cents,
+            updated_buyer.available_balance_cents,
+            "payment_release",
+            "transaction",
+            txn.id,
+            format!("Dispute release to seller for transaction {}", txn.id),
+            json!({
+                "transaction_id": txn.id,
+                "counterparty_user_id": txn.seller_id,
+                "flow": "dispute_resolution_release",
+                "environment": environment,
+                "decision": decision,
+                "resolved_by": resolved_by
+            }),
+        )
+        .await?;
+    }
+
+    if settlement.platform_fee_cents > 0 {
+        insert_wallet_ledger_entry_tx(
+            tx,
+            txn.buyer_id,
+            &updated_buyer,
+            "debit",
+            settlement.platform_fee_cents,
+            updated_buyer.available_balance_cents,
+            "fee",
+            "transaction",
+            txn.id,
+            format!("Dispute platform fee for transaction {}", txn.id),
+            json!({
+                "transaction_id": txn.id,
+                "counterparty_user_id": txn.seller_id,
+                "flow": "dispute_resolution_fee",
+                "environment": environment,
+                "decision": decision,
+                "resolved_by": resolved_by
+            }),
+        )
+        .await?;
+    }
+
+    if let Some(updated_seller) = updated_seller {
+        insert_wallet_ledger_entry_tx(
+            tx,
+            txn.seller_id,
+            &updated_seller,
+            "credit",
+            settlement.release_amount_cents,
+            updated_seller.available_balance_cents,
+            "payment_release",
+            "transaction",
+            txn.id,
+            format!("Dispute settlement received for transaction {}", txn.id),
+            json!({
+                "transaction_id": txn.id,
+                "counterparty_user_id": txn.buyer_id,
+                "flow": "dispute_resolution_release",
+                "environment": environment,
+                "decision": decision,
+                "resolved_by": resolved_by
+            }),
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn settle_wallet_topup_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    topup_id: Uuid,
+    user_id: Uuid,
+    expected_environment: &str,
+) -> Result<(WalletTopupRow, WalletAccountRow), sqlx::Error> {
+    let topup = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        FROM wallet_topups
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(topup_id)
+    .bind(user_id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    if topup.environment != expected_environment || topup.status != "pending" {
+        return Err(sqlx::Error::Protocol(
+            "top-up is not in expected pending state".to_string(),
+        ));
+    }
+
+    let locked_account = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        SELECT
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        FROM wallet_accounts
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(topup.account_id)
+    .bind(user_id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    let next_available = locked_account.available_balance_cents + topup.net_amount_cents;
+    let next_total_topup = locked_account.total_topup_cents + topup.net_amount_cents;
+
+    let updated_account = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            total_topup_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(locked_account.id)
+    .bind(next_available)
+    .bind(next_total_topup)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    sqlx::query(
+        r#"
+        INSERT INTO wallet_ledger_entries (
+            user_id, account_id, environment, currency, direction, amount_cents,
+            balance_after_cents, entry_type, status, reference_type, reference_id,
+            description, metadata, created_at
+        )
+        VALUES (
+            $1, $2, $3, $4, 'credit', $5,
+            $6, 'topup', 'posted', 'wallet_topup', $7, $8, $9, NOW()
+        )
+        "#,
+    )
+    .bind(user_id)
+    .bind(updated_account.id)
+    .bind(updated_account.environment.as_str())
+    .bind(updated_account.currency.as_str())
+    .bind(topup.net_amount_cents)
+    .bind(updated_account.available_balance_cents)
+    .bind(topup.id)
+    .bind(
+        topup
+            .description
+            .clone()
+            .unwrap_or_else(|| "Wallet top-up".to_string()),
+    )
+    .bind(json!({
+        "provider": topup.payment_provider,
+        "payment_method": topup.payment_method,
+        "external_reference": topup.external_reference
+    }))
+    .execute(&mut **tx)
+    .await?;
+
+    let updated_topup = sqlx::query_as::<_, WalletTopupRow>(
+        r#"
+        UPDATE wallet_topups
+        SET
+            status = 'paid',
+            paid_at = NOW(),
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, payment_provider, payment_method, external_reference, checkout_url,
+            payment_payload, description, status, paid_at, expired_at, created_at, updated_at
+        "#,
+    )
+    .bind(topup.id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok((updated_topup, updated_account))
+}
+
+async fn build_provider_checkout(
+    state: &Arc<AppState>,
+    provider: &str,
+    environment: &str,
+    currency: &str,
+    amount_cents: i64,
+    user_id: Uuid,
+    topup_id: Uuid,
+    payment_method: Option<&str>,
+    description: Option<&str>,
+    payment_due_at: Option<DateTime<Utc>>,
+) -> Result<ProviderCheckout, String> {
+    let external_reference = build_external_reference(environment, provider, user_id);
+
+    if provider == "midtrans" {
+        if currency != "IDR" {
+            return Err("midtrans currently supports IDR top-up only in this flow".to_string());
+        }
+
+        let server_key = midtrans_server_key_for_environment(environment);
+        if server_key.is_none() {
+            let fallback_to_mock = environment == "development"
+                && parse_env_bool("WALLET_MIDTRANS_FALLBACK_TO_MOCK", true);
+            if fallback_to_mock {
+                return Ok(ProviderCheckout {
+                    external_reference,
+                    checkout_url: Some(format!(
+                        "/payments/mock-checkout?provider=midtrans&environment={}&topup_id={}",
+                        environment, topup_id
+                    )),
+                    payment_payload: json!({
+                        "provider": "midtrans",
+                        "environment": environment,
+                        "mode": "mock_fallback",
+                        "reason": "midtrans server key is not configured"
+                    }),
+                });
+            }
+            return Err("midtrans server key is not configured".to_string());
+        }
+        let server_key = server_key.unwrap_or_default();
+
+        let gross_amount = (amount_cents / 100).max(1);
+        let normalized_method = payment_method
+            .map(|value| value.trim().to_lowercase())
+            .filter(|value| !value.is_empty());
+        let is_explicit_method = normalized_method
+            .as_deref()
+            .map(|method| method != "auto" && method != "all" && method != "any")
+            .unwrap_or(false);
+
+        if let Some((direct_method, direct_request_body)) = build_midtrans_direct_charge_request(
+            &external_reference,
+            gross_amount,
+            normalized_method.as_deref(),
+        ) {
+            let endpoint = format!("{}/v2/charge", midtrans_api_base_url(environment));
+            let request = with_midtrans_notification_header(
+                state
+                    .http_client
+                    .post(endpoint.clone())
+                    .basic_auth(server_key.clone(), Some(""))
+                    .json(&direct_request_body),
+            );
+            match request.send().await {
+                Ok(response) => {
+                    let status = response.status();
+                    match response.json::<Value>().await {
+                        Ok(payload) if status.is_success() => {
+                            let checkout_hint = midtrans_checkout_hint_from_charge(&payload);
+                            return Ok(ProviderCheckout {
+                                external_reference,
+                                checkout_url: checkout_hint.clone(),
+                                payment_payload: json!({
+                                    "provider": "midtrans",
+                                    "environment": environment,
+                                    "mode": "direct_charge",
+                                    "requested_method": direct_method,
+                                    "charge": payload,
+                                    "checkout_hint": checkout_hint
+                                }),
+                            });
+                        }
+                        Ok(payload) => {
+                            if is_explicit_method {
+                                return Err(format!(
+                                    "midtrans direct charge rejected for method={} status={} payload={}",
+                                    direct_method,
+                                    status.as_u16(),
+                                    payload
+                                ));
+                            }
+                            tracing::warn!(
+                                "midtrans direct charge rejected, fallback to snap; status={} method={} payload={}",
+                                status.as_u16(),
+                                direct_method,
+                                payload
+                            );
+                        }
+                        Err(error) => {
+                            if is_explicit_method {
+                                return Err(format!(
+                                    "midtrans direct charge parse failed for method={}: {}",
+                                    direct_method, error
+                                ));
+                            }
+                            tracing::warn!(
+                                "midtrans direct charge parse failed, fallback to snap; method={} error={}",
+                                direct_method,
+                                error
+                            );
+                        }
+                    }
+                }
+                Err(error) => {
+                    if is_explicit_method {
+                        return Err(format!(
+                            "midtrans direct charge failed for method={}: {}",
+                            direct_method,
+                            describe_reqwest_error(&error)
+                        ));
+                    }
+                    tracing::warn!(
+                        "midtrans direct charge failed, fallback to snap; method={} endpoint={} error={}",
+                        direct_method,
+                        endpoint,
+                        describe_reqwest_error(&error)
+                    );
+                }
+            }
+        }
+
+        let enabled_payments = midtrans_enabled_payments(payment_method);
+        let finish_url = midtrans_redirect_url(topup_id, "finish");
+        let unfinish_url = midtrans_redirect_url(topup_id, "unfinish");
+        let error_url = midtrans_redirect_url(topup_id, "error");
+        let mut request_body = json!({
+            "transaction_details": {
+                "order_id": external_reference,
+                "gross_amount": gross_amount
+            },
+            "credit_card": {
+                "secure": true
+            },
+            "enabled_payments": enabled_payments,
+            "custom_field1": topup_id.to_string(),
+            "custom_field2": description.unwrap_or("wallet_topup"),
+            "custom_field3": user_id.to_string(),
+            "custom_field4": payment_method.unwrap_or("auto")
+        });
+        if let Some(due_at) = payment_due_at {
+            let start_at = Utc::now();
+            let duration_minutes = (due_at - start_at).num_minutes().clamp(1, 7 * 24 * 60);
+            request_body["expiry"] = json!({
+                "start_time": start_at.format("%Y-%m-%d %H:%M:%S %z").to_string(),
+                "unit": "minute",
+                "duration": duration_minutes
+            });
+        }
+        let mut callbacks = serde_json::Map::new();
+        if let Some(url) = finish_url {
+            callbacks.insert("finish".to_string(), Value::String(url));
+        }
+        if let Some(url) = unfinish_url {
+            callbacks.insert("unfinish".to_string(), Value::String(url));
+        }
+        if let Some(url) = error_url {
+            callbacks.insert("error".to_string(), Value::String(url));
+        }
+        if !callbacks.is_empty() {
+            request_body["callbacks"] = Value::Object(callbacks);
+        }
+        if let Some(channel) = payment_method {
+            request_body["item_details"] = json!([
+                {
+                    "id": "wallet-topup",
+                    "price": gross_amount,
+                    "quantity": 1,
+                    "name": format!("Wallet Topup [{}]", channel)
+                }
+            ]);
+        }
+
+        let endpoint = format!(
+            "{}/snap/v1/transactions",
+            midtrans_snap_base_url(environment)
+        );
+        let request = with_midtrans_notification_header(
+            state
+                .http_client
+                .post(endpoint)
+                .basic_auth(server_key, Some(""))
+                .json(&request_body),
+        );
+        let response = request
+            .send()
+            .await
+            .map_err(|e| format!("midtrans request failed: {}", describe_reqwest_error(&e)))?;
+
+        let status = response.status();
+        let payload = response.json::<Value>().await.map_err(|e| {
+            format!(
+                "midtrans response parse failed: {}",
+                describe_reqwest_error(&e)
+            )
+        })?;
+
+        if !status.is_success() {
+            return Err(format!(
+                "midtrans rejected payment link creation: status {}",
+                status.as_u16()
+            ));
+        }
+
+        let checkout_url = payload
+            .get("redirect_url")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        return Ok(ProviderCheckout {
+            external_reference,
+            checkout_url,
+            payment_payload: json!({
+                "provider": "midtrans",
+                "environment": environment,
+                "mode": "snap_redirect",
+                "requested_method": normalized_method,
+                "snap": payload
+            }),
+        });
+    }
+
+    let checkout_url = if provider == "mock" {
+        Some(format!(
+            "/payments/mock-checkout?provider={}&environment={}&topup_id={}",
+            provider, environment, topup_id
+        ))
+    } else {
+        None
+    };
+
+    Ok(ProviderCheckout {
+        external_reference,
+        checkout_url,
+        payment_payload: json!({
+            "provider": provider,
+            "environment": environment,
+            "instructions": if provider == "manual" {
+                "Manual transfer flow. Upload proof then call settlement endpoint via backoffice."
+            } else if provider == "mock" {
+                "Mock checkout generated. Suitable for development/testing."
+            } else {
+                "Provider adapter is prepared. Implement provider-specific API here."
+            }
+        }),
+    })
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateReviewRequest {
+    rating: i32,
+    comment: Option<String>,
+}
+
+async fn create_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<CreateReviewRequest>,
+) -> impl IntoResponse {
+    let reviewer_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !(1..=5).contains(&payload.rating) {
+        return err(StatusCode::BAD_REQUEST, "rating must be between 1 and 5").into_response();
+    }
+    let txn = match find_transaction_for_user(&state.db, id, reviewer_id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(e) => {
+            tracing::error!("create_review transaction error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create review")
+                .into_response();
+        }
+    };
+    if txn.status != "completed" {
+        return err(
+            StatusCode::CONFLICT,
+            "transaction must be completed before review",
+        )
+        .into_response();
+    }
+    let existing = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(1) FROM reviews WHERE transaction_id = $1 AND reviewer_id = $2",
+    )
+    .bind(id)
+    .bind(reviewer_id)
+    .fetch_one(&state.db)
+    .await;
+    match existing {
+        Ok(count) if count > 0 => {
+            return err(StatusCode::CONFLICT, "review already submitted").into_response()
+        }
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!("create_review duplicate check error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create review")
+                .into_response();
+        }
+    }
+    let reviewee_id = if reviewer_id == txn.buyer_id {
+        txn.seller_id
+    } else {
+        txn.buyer_id
+    };
+    let inserted = sqlx::query_as::<_, ReviewRow>(
+        r#"
+        INSERT INTO reviews (transaction_id, content_id, reviewer_id, reviewee_id, rating, comment)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, transaction_id, content_id, reviewer_id, reviewee_id, rating, comment, created_at
+        "#,
+    )
+    .bind(id)
+    .bind(txn.content_id)
+    .bind(reviewer_id)
+    .bind(reviewee_id)
+    .bind(payload.rating)
+    .bind(clean_text(payload.comment))
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(row) => (StatusCode::CREATED, Json(row)).into_response(),
+        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
+            err(StatusCode::CONFLICT, "review already submitted").into_response()
+        }
+        Err(e) => {
+            tracing::error!("create_review insert error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create review").into_response()
+        }
+    }
+}
+
+async fn create_support_ticket(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateSupportTicketRequest>,
+) -> impl IntoResponse {
+    let auth_claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let requester_user_id = auth_claims
+        .as_ref()
+        .and_then(|c| Uuid::parse_str(&c.sub).ok());
+
+    let requester_email = match clean_text(payload.requester_email).map(|v| v.to_lowercase()) {
+        Some(v) => v,
+        None => return err(StatusCode::BAD_REQUEST, "requester_email is required").into_response(),
+    };
+
+    let requester_name = clean_text(payload.requester_name);
+    let category = clean_text(payload.category)
+        .unwrap_or_else(|| "general".to_string())
+        .to_lowercase();
+    let priority =
+        normalize_ticket_priority(payload.priority).unwrap_or_else(|| "normal".to_string());
+    let source = clean_text(payload.source)
+        .unwrap_or_else(|| "web".to_string())
+        .to_lowercase();
+    let subject = match clean_text(Some(payload.subject)) {
+        Some(v) if v.len() >= 5 => v,
+        _ => return err(StatusCode::BAD_REQUEST, "subject is too short").into_response(),
+    };
+    let message = match clean_text(Some(payload.message)) {
+        Some(v) if v.len() >= 5 => v,
+        _ => return err(StatusCode::BAD_REQUEST, "message is too short").into_response(),
+    };
+
+    let ticket_id = Uuid::new_v4();
+    let support_room_id = format!("support:{}", ticket_id);
+    let insert_ticket = sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        INSERT INTO support_tickets (
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, source, support_room_id
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, 'open', $7, $8, $9
+        )
+        RETURNING
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, assigned_agent_id, support_room_id, source, created_at, updated_at, resolved_at,
+            first_response_at,
+            NULL::text AS latest_message,
+            NULL::timestamptz AS latest_message_at
+        "#,
+    )
+    .bind(ticket_id)
+    .bind(requester_user_id)
+    .bind(requester_email)
+    .bind(requester_name)
+    .bind(category)
+    .bind(subject)
+    .bind(priority)
+    .bind(source)
+    .bind(&support_room_id)
+    .fetch_one(&state.db)
+    .await;
+
+    let ticket = match insert_ticket {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("create_support_ticket insert ticket error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create support ticket",
+            )
+            .into_response();
+        }
+    };
+
+    if let Err(e) = sqlx::query(
+        r#"
+        INSERT INTO support_ticket_replies (id, ticket_id, author_user_id, author_role, body, is_internal)
+        VALUES ($1, $2, $3, 'customer', $4, false)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ticket.id)
+    .bind(requester_user_id)
+    .bind(message)
+    .execute(&state.db)
+    .await
+    {
+        tracing::error!("create_support_ticket insert message error: {:?}", e);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create support ticket")
+            .into_response();
+    }
+
+    if let Some(lead) = upsert_crm_lead_from_support_ticket(&state.db, ticket.id, None).await {
+        record_crm_activity(
+            &state.db,
+            lead.id,
+            requester_user_id,
+            "customer",
+            "support_ticket_created",
+            format!("Support ticket created: {}", ticket.subject),
+            json!({
+                "ticket_id": ticket.id,
+                "category": ticket.category,
+                "priority": ticket.priority,
+                "source": ticket.source,
+                "support_room_id": ticket.support_room_id
+            }),
+        )
+        .await;
+    }
+
+    (StatusCode::CREATED, Json(json!({ "ticket": ticket }))).into_response()
+}
+
+async fn list_support_tickets(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListSupportTicketsQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+
+    let status = normalize_ticket_status(query.status);
+    let priority = normalize_ticket_priority(query.priority);
+    let category = clean_text(query.category).map(|v| v.to_lowercase());
+    let assigned = clean_text(query.assigned).map(|v| v.to_lowercase());
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let rows = if is_agent {
+        sqlx::query_as::<_, SupportTicketRow>(
+            r#"
+            SELECT
+                t.id, t.requester_user_id, t.requester_email, t.requester_name, t.category, t.subject,
+                t.status, t.priority, t.assigned_agent_id, t.support_room_id, t.source, t.created_at, t.updated_at,
+                t.resolved_at, t.first_response_at,
+                last_reply.body AS latest_message,
+                last_reply.created_at AS latest_message_at
+            FROM support_tickets t
+            LEFT JOIN LATERAL (
+                SELECT body, created_at
+                FROM support_ticket_replies r
+                WHERE r.ticket_id = t.id AND r.is_internal = false
+                ORDER BY r.created_at DESC
+                LIMIT 1
+            ) last_reply ON true
+            WHERE ($1::text IS NULL OR t.status = $1)
+              AND ($2::text IS NULL OR t.priority = $2)
+              AND ($3::text IS NULL OR t.category = $3)
+              AND (
+                  $4::text IS NULL
+                  OR ($4 = 'me' AND t.assigned_agent_id = $5)
+                  OR ($4 = 'unassigned' AND t.assigned_agent_id IS NULL)
+              )
+            ORDER BY t.updated_at DESC
+            LIMIT $6 OFFSET $7
+            "#,
+        )
+        .bind(status)
+        .bind(priority)
+        .bind(category)
+        .bind(assigned)
+        .bind(user_id)
+        .bind(limit + 1)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await
+    } else {
+        sqlx::query_as::<_, SupportTicketRow>(
+            r#"
+            SELECT
+                t.id, t.requester_user_id, t.requester_email, t.requester_name, t.category, t.subject,
+                t.status, t.priority, t.assigned_agent_id, t.support_room_id, t.source, t.created_at, t.updated_at,
+                t.resolved_at, t.first_response_at,
+                last_reply.body AS latest_message,
+                last_reply.created_at AS latest_message_at
+            FROM support_tickets t
+            LEFT JOIN LATERAL (
+                SELECT body, created_at
+                FROM support_ticket_replies r
+                WHERE r.ticket_id = t.id AND r.is_internal = false
+                ORDER BY r.created_at DESC
+                LIMIT 1
+            ) last_reply ON true
+            WHERE t.requester_user_id = $1
+              AND ($2::text IS NULL OR t.status = $2)
+              AND ($3::text IS NULL OR t.priority = $3)
+              AND ($4::text IS NULL OR t.category = $4)
+            ORDER BY t.updated_at DESC
+            LIMIT $5 OFFSET $6
+            "#,
+        )
+        .bind(user_id)
+        .bind(status)
+        .bind(priority)
+        .bind(category)
+        .bind(limit + 1)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await
+    };
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+
+            (
+                StatusCode::OK,
+                Json(ListSupportTicketsResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_support_tickets error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load support tickets",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_support_ticket(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+
+    let ticket = match sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        SELECT
+            t.id, t.requester_user_id, t.requester_email, t.requester_name, t.category, t.subject,
+            t.status, t.priority, t.assigned_agent_id, t.support_room_id, t.source, t.created_at, t.updated_at,
+            t.resolved_at, t.first_response_at,
+            last_reply.body AS latest_message,
+            last_reply.created_at AS latest_message_at
+        FROM support_tickets t
+        LEFT JOIN LATERAL (
+            SELECT body, created_at
+            FROM support_ticket_replies r
+            WHERE r.ticket_id = t.id AND r.is_internal = false
+            ORDER BY r.created_at DESC
+            LIMIT 1
+        ) last_reply ON true
+        WHERE t.id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "ticket not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_support_ticket query error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load ticket").into_response();
+        }
+    };
+
+    if !is_agent && ticket.requester_user_id != Some(user_id) {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let replies = if is_agent {
+        sqlx::query_as::<_, SupportReplyRow>(
+            r#"
+            SELECT id, ticket_id, author_user_id, author_role, body, is_internal, created_at
+            FROM support_ticket_replies
+            WHERE ticket_id = $1
+            ORDER BY created_at ASC
+            "#,
+        )
+        .bind(ticket.id)
+        .fetch_all(&state.db)
+        .await
+    } else {
+        sqlx::query_as::<_, SupportReplyRow>(
+            r#"
+            SELECT id, ticket_id, author_user_id, author_role, body, is_internal, created_at
+            FROM support_ticket_replies
+            WHERE ticket_id = $1 AND is_internal = false
+            ORDER BY created_at ASC
+            "#,
+        )
+        .bind(ticket.id)
+        .fetch_all(&state.db)
+        .await
+    };
+
+    match replies {
+        Ok(rows) => (
+            StatusCode::OK,
+            Json(SupportTicketDetailResponse {
+                ticket,
+                replies: rows,
+            }),
+        )
+            .into_response(),
+        Err(e) => {
+            tracing::error!("get_support_ticket replies error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load replies").into_response()
+        }
+    }
+}
+
+async fn update_support_ticket(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateSupportTicketRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_agent_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "agent role required").into_response();
+    }
+
+    let status = normalize_ticket_status(payload.status);
+    let priority = normalize_ticket_priority(payload.priority);
+    let assigned_agent_id = payload.assigned_agent_id;
+    if status.is_none() && priority.is_none() && assigned_agent_id.is_none() {
+        return err(StatusCode::BAD_REQUEST, "no updatable fields provided").into_response();
+    }
+
+    let updated = sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        WITH updated AS (
+            UPDATE support_tickets
+            SET
+                status = COALESCE($2, status),
+                priority = COALESCE($3, priority),
+                assigned_agent_id = COALESCE($4, assigned_agent_id),
+                resolved_at = CASE
+                    WHEN COALESCE($2, status) IN ('resolved', 'closed') THEN COALESCE(resolved_at, NOW())
+                    WHEN COALESCE($2, status) NOT IN ('resolved', 'closed') THEN NULL
+                    ELSE resolved_at
+                END,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        )
+        SELECT
+            u.id, u.requester_user_id, u.requester_email, u.requester_name, u.category, u.subject,
+            u.status, u.priority, u.assigned_agent_id, u.support_room_id, u.source, u.created_at, u.updated_at,
+            u.resolved_at, u.first_response_at,
+            last_reply.body AS latest_message,
+            last_reply.created_at AS latest_message_at
+        FROM updated u
+        LEFT JOIN LATERAL (
+            SELECT body, created_at
+            FROM support_ticket_replies r
+            WHERE r.ticket_id = u.id AND r.is_internal = false
+            ORDER BY r.created_at DESC
+            LIMIT 1
+        ) last_reply ON true
+        "#,
+    )
+    .bind(id)
+    .bind(status)
+    .bind(priority)
+    .bind(assigned_agent_id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(ticket)) => (StatusCode::OK, Json(json!({ "ticket": ticket }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "ticket not found").into_response(),
+        Err(e) => {
+            tracing::error!("update_support_ticket error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update ticket").into_response()
+        }
+    }
+}
+
+async fn create_support_reply(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<CreateSupportReplyRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+    let is_internal = payload.is_internal.unwrap_or(false) && is_agent;
+
+    let body = match clean_text(Some(payload.body)) {
+        Some(v) if v.len() >= 2 => v,
+        _ => return err(StatusCode::BAD_REQUEST, "reply body is required").into_response(),
+    };
+
+    let ticket_context = match sqlx::query_as::<_, SupportLeadSourceRow>(
+        r#"
+        SELECT
+            id, requester_user_id, requester_email, requester_name, category, subject, priority,
+            support_room_id, assigned_agent_id
+        FROM support_tickets
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "ticket not found").into_response(),
+        Err(e) => {
+            tracing::error!("create_support_reply ticket lookup error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create reply")
+                .into_response();
+        }
+    };
+
+    if !is_agent && ticket_context.requester_user_id != Some(user_id) {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let author_role = if is_agent { "agent" } else { "customer" };
+    let inserted = sqlx::query_as::<_, SupportReplyRow>(
+        r#"
+        INSERT INTO support_ticket_replies (
+            id, ticket_id, author_user_id, author_role, body, is_internal
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, ticket_id, author_user_id, author_role, body, is_internal, created_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(id)
+    .bind(Some(user_id))
+    .bind(author_role)
+    .bind(body)
+    .bind(is_internal)
+    .fetch_one(&state.db)
+    .await;
+
+    let reply = match inserted {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("create_support_reply insert error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create reply")
+                .into_response();
+        }
+    };
+
+    if is_agent {
+        let update_result = if is_internal {
+            sqlx::query("UPDATE support_tickets SET updated_at = NOW() WHERE id = $1")
+                .bind(id)
+                .execute(&state.db)
+                .await
+        } else {
+            sqlx::query(
+                "UPDATE support_tickets SET status = 'pending_customer', assigned_agent_id = COALESCE(assigned_agent_id, $2), first_response_at = COALESCE(first_response_at, NOW()), updated_at = NOW() WHERE id = $1",
+            )
+            .bind(id)
+            .bind(user_id)
+            .execute(&state.db)
+            .await
+        };
+        if let Err(e) = update_result {
+            tracing::warn!("create_support_reply ticket update failed: {:?}", e);
+        }
+    } else if let Err(e) =
+        sqlx::query("UPDATE support_tickets SET status = 'open', updated_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&state.db)
+            .await
+    {
+        tracing::warn!(
+            "create_support_reply customer status update failed: {:?}",
+            e
+        );
+    }
+
+    let lead_owner = if is_agent && !is_internal {
+        Some(user_id)
+    } else {
+        ticket_context.assigned_agent_id
+    };
+    if let Some(lead) = upsert_crm_lead_from_support_ticket(&state.db, id, lead_owner).await {
+        let actor_role = if is_agent { "agent" } else { "customer" };
+        let action = if is_agent {
+            if is_internal {
+                "support_internal_note"
+            } else {
+                "support_agent_reply"
+            }
+        } else {
+            "support_customer_reply"
+        };
+        let activity_message = if is_internal {
+            format!("Internal note on ticket: {}", ticket_context.subject)
+        } else {
+            format!("Reply on ticket: {}", ticket_context.subject)
+        };
+        record_crm_activity(
+            &state.db,
+            lead.id,
+            Some(user_id),
+            actor_role,
+            action,
+            activity_message,
+            json!({
+                "ticket_id": id,
+                "is_internal": is_internal,
+                "reply_id": reply.id,
+                "support_room_id": ticket_context.support_room_id
+            }),
+        )
+        .await;
+    }
+
+    (StatusCode::CREATED, Json(json!({ "reply": reply }))).into_response()
+}
+
+async fn upsert_crm_lead_from_support_ticket(
+    db: &PgPool,
+    ticket_id: Uuid,
+    owner_override: Option<Uuid>,
+) -> Option<CrmLeadRow> {
+    let ticket = match sqlx::query_as::<_, SupportLeadSourceRow>(
+        r#"
+        SELECT
+            id, requester_user_id, requester_email, requester_name, category, subject, priority,
+            support_room_id, assigned_agent_id
+        FROM support_tickets
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(ticket_id)
+    .fetch_optional(db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return None,
+        Err(err) => {
+            tracing::warn!(
+                "upsert_crm_lead_from_support_ticket ticket lookup failed: {:?}",
+                err
+            );
+            return None;
+        }
+    };
+
+    let room_id = ticket
+        .support_room_id
+        .clone()
+        .unwrap_or_else(|| format!("support:{}", ticket.id));
+    let owner_id = owner_override.or(ticket.assigned_agent_id);
+
+    let existing = match sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        SELECT
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        FROM crm_leads
+        WHERE chat_room_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(&room_id)
+    .fetch_optional(db)
+    .await
+    {
+        Ok(row) => row,
+        Err(err) => {
+            tracing::warn!(
+                "upsert_crm_lead_from_support_ticket find lead failed: {:?}",
+                err
+            );
+            return None;
+        }
+    };
+
+    if let Some(existing_lead) = existing {
+        if let Some(next_owner) = owner_id {
+            if existing_lead.owner_id != Some(next_owner) {
+                let updated = sqlx::query_as::<_, CrmLeadRow>(
+                    r#"
+                    UPDATE crm_leads
+                    SET owner_id = $2, updated_at = NOW()
+                    WHERE id = $1
+                    RETURNING
+                        id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+                        content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+                        metadata, created_at, updated_at
+                    "#,
+                )
+                .bind(existing_lead.id)
+                .bind(next_owner)
+                .fetch_optional(db)
+                .await;
+
+                if let Ok(Some(row)) = updated {
+                    return Some(row);
+                }
+            }
+        }
+        return Some(existing_lead);
+    }
+
+    let metadata = json!({
+        "ticket_id": ticket.id,
+        "ticket_category": ticket.category,
+        "ticket_priority": ticket.priority,
+    });
+
+    let inserted = sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        INSERT INTO crm_leads (
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency, metadata
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6, NULL, $7, $8, $9, 'lead', 'support_ticket', NULL, NULL, $10
+        )
+        RETURNING
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ticket.requester_user_id)
+    .bind(Some(ticket.requester_email))
+    .bind(ticket.requester_name)
+    .bind(owner_id)
+    .bind(ticket.requester_user_id)
+    .bind(Some(room_id))
+    .bind(ticket.subject)
+    .bind(Some(ticket.category))
+    .bind(metadata)
+    .fetch_optional(db)
+    .await;
+
+    match inserted {
+        Ok(Some(row)) => Some(row),
+        Ok(None) => None,
+        Err(err) => {
+            tracing::warn!(
+                "upsert_crm_lead_from_support_ticket insert lead failed: {:?}",
+                err
+            );
+            None
+        }
+    }
+}
+
+async fn record_crm_activity(
+    db: &PgPool,
+    lead_id: Uuid,
+    actor_user_id: Option<Uuid>,
+    actor_role: &str,
+    action: &str,
+    message: String,
+    metadata: Value,
+) {
+    let insert = sqlx::query(
+        r#"
+        INSERT INTO crm_activities (
+            id, lead_id, actor_user_id, actor_role, action, message, metadata
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(lead_id)
+    .bind(actor_user_id)
+    .bind(actor_role)
+    .bind(action)
+    .bind(message)
+    .bind(metadata)
+    .execute(db)
+    .await;
+
+    if let Err(err) = insert {
+        tracing::warn!("record_crm_activity failed: {:?}", err);
+    }
+}
+
+fn crm_stage_for_transaction_status(status: &str) -> &'static str {
+    match status {
+        "pending" => "qualified",
+        "accepted" | "in_progress" | "delivered" | "disputed" => "negotiation",
+        "completed" => "won",
+        "cancelled" => "lost",
+        _ => "lead",
+    }
+}
+
+fn build_transaction_lead_name(txn: &TransactionRow) -> String {
+    let from_snapshot = txn
+        .snapshot_listing
+        .get("title")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(|v| v.chars().take(MAX_TITLE_LEN).collect::<String>());
+    from_snapshot.unwrap_or_else(|| format!("Transaction {}", txn.id))
+}
+
+async fn upsert_crm_lead_from_transaction(
+    db: &PgPool,
+    txn: &TransactionRow,
+    source: &str,
+) -> Option<CrmLeadRow> {
+    let existing = match sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        SELECT
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        FROM crm_leads
+        WHERE content_id = $1
+          AND (
+            (requester_user_id = $2 AND contact_user_id = $3)
+            OR (requester_user_id = $3 AND contact_user_id = $2)
+          )
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(txn.content_id)
+    .bind(txn.buyer_id)
+    .bind(txn.seller_id)
+    .fetch_optional(db)
+    .await
+    {
+        Ok(row) => row,
+        Err(err) => {
+            tracing::warn!("upsert_crm_lead_from_transaction find failed: {:?}", err);
+            return None;
+        }
+    };
+
+    let next_stage = crm_stage_for_transaction_status(txn.status.as_str());
+    let metadata_patch = json!({
+        "last_transaction_id": txn.id,
+        "last_transaction_status": txn.status,
+        "last_transaction_updated_at": txn.updated_at,
+        "deal_kind": txn.deal_kind,
+        "fulfillment_mode": txn.fulfillment_mode,
+        "protection_status": txn.protection_status
+    });
+
+    if let Some(lead) = existing {
+        let updated = sqlx::query_as::<_, CrmLeadRow>(
+            r#"
+            UPDATE crm_leads
+            SET
+              stage = $2,
+              value_cents = COALESCE($3, value_cents),
+              currency = COALESCE($4, currency),
+              metadata = COALESCE(metadata, '{}'::jsonb) || $5,
+              updated_at = NOW()
+            WHERE id = $1
+            RETURNING
+              id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+              content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+              metadata, created_at, updated_at
+            "#,
+        )
+        .bind(lead.id)
+        .bind(next_stage)
+        .bind(Some(txn.amount_cents))
+        .bind(Some(txn.currency.clone()))
+        .bind(metadata_patch)
+        .fetch_optional(db)
+        .await;
+
+        return match updated {
+            Ok(Some(row)) => Some(row),
+            Ok(None) => Some(lead),
+            Err(err) => {
+                tracing::warn!("upsert_crm_lead_from_transaction update failed: {:?}", err);
+                Some(lead)
+            }
+        };
+    }
+
+    let inserted = sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        INSERT INTO crm_leads (
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency, metadata
+        )
+        VALUES (
+            $1, $2, NULL, NULL, NULL, $3,
+            $4, NULL, $5, $6, $7, $8, $9, $10, $11
+        )
+        RETURNING
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(Some(txn.buyer_id))
+    .bind(Some(txn.seller_id))
+    .bind(Some(txn.content_id))
+    .bind(build_transaction_lead_name(txn))
+    .bind(Some(txn.deal_kind.clone()))
+    .bind(next_stage)
+    .bind(source)
+    .bind(Some(txn.amount_cents))
+    .bind(Some(txn.currency.clone()))
+    .bind(json!({
+        "first_transaction_id": txn.id,
+        "last_transaction_id": txn.id,
+        "last_transaction_status": txn.status,
+        "deal_kind": txn.deal_kind,
+        "fulfillment_mode": txn.fulfillment_mode,
+        "protection_status": txn.protection_status
+    }))
+    .fetch_optional(db)
+    .await;
+
+    match inserted {
+        Ok(Some(row)) => Some(row),
+        Ok(None) => None,
+        Err(err) => {
+            tracing::warn!("upsert_crm_lead_from_transaction insert failed: {:?}", err);
+            None
+        }
+    }
+}
+
+async fn record_crm_activity_for_transaction(
+    db: &PgPool,
+    txn: &TransactionRow,
+    actor_user_id: Uuid,
+    actor_role: &str,
+    action: &str,
+    message: String,
+    extra_metadata: Value,
+) {
+    if let Some(lead) = upsert_crm_lead_from_transaction(db, txn, "transaction").await {
+        record_crm_activity(
+            db,
+            lead.id,
+            Some(actor_user_id),
+            actor_role,
+            action,
+            message,
+            merge_json_objects(
+                json!({
+                    "transaction_id": txn.id,
+                    "content_id": txn.content_id,
+                    "buyer_id": txn.buyer_id,
+                    "seller_id": txn.seller_id,
+                    "status": txn.status,
+                    "protection_status": txn.protection_status,
+                    "amount_cents": txn.amount_cents,
+                    "currency": txn.currency
+                }),
+                extra_metadata,
+            ),
+        )
+        .await;
+    }
+}
+
+async fn ensure_support_ticket_for_dispute(
+    db: &PgPool,
+    txn: &TransactionRow,
+    opened_by: Uuid,
+    reason_code: &str,
+    evidence_note: &str,
+) -> Option<SupportTicketRow> {
+    let support_room_id = format!("support:txn:{}", txn.id);
+    let existing = sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        SELECT
+            t.id, t.requester_user_id, t.requester_email, t.requester_name, t.category,
+            t.subject, t.status, t.priority, t.assigned_agent_id, t.support_room_id, t.source,
+            t.created_at, t.updated_at, t.resolved_at, t.first_response_at,
+            latest.body AS latest_message, latest.created_at AS latest_message_at
+        FROM support_tickets t
+        LEFT JOIN LATERAL (
+            SELECT body, created_at
+            FROM support_ticket_replies r
+            WHERE r.ticket_id = t.id AND r.is_internal = false
+            ORDER BY r.created_at DESC
+            LIMIT 1
+        ) latest ON true
+        WHERE t.support_room_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(&support_room_id)
+    .fetch_optional(db)
+    .await;
+    if let Ok(Some(ticket)) = existing {
+        return Some(ticket);
+    }
+
+    let requester_email = format!("user-{}@lajukan.com", opened_by);
+    let subject = format!("Transaction dispute {}", txn.id);
+    let ticket = match sqlx::query_as::<_, SupportTicketRow>(
+        r#"
+        INSERT INTO support_tickets (
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, source, support_room_id
+        )
+        VALUES (
+            $1, $2, $3, $4, 'transaction_dispute', $5,
+            'open', 'high', 'transaction_dispute', $6
+        )
+        RETURNING
+            id, requester_user_id, requester_email, requester_name, category, subject,
+            status, priority, assigned_agent_id, support_room_id, source, created_at, updated_at,
+            resolved_at, first_response_at, NULL::text AS latest_message, NULL::timestamptz AS latest_message_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(Some(opened_by))
+    .bind(requester_email)
+    .bind(Some(format!("User {}", &opened_by.to_string()[..8])))
+    .bind(subject)
+    .bind(&support_room_id)
+    .fetch_optional(db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return None,
+        Err(err) => {
+            tracing::warn!("ensure_support_ticket_for_dispute insert ticket failed: {:?}", err);
+            return None;
+        }
+    };
+
+    let _ = sqlx::query(
+        r#"
+        INSERT INTO support_ticket_replies (id, ticket_id, author_user_id, author_role, body, is_internal)
+        VALUES ($1, $2, $3, 'customer', $4, false)
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(ticket.id)
+    .bind(Some(opened_by))
+    .bind(format!(
+        "Auto-escalated from transaction dispute.\nReason: {}\nNote: {}",
+        reason_code,
+        if evidence_note.trim().is_empty() {
+            "-"
+        } else {
+            evidence_note
+        }
+    ))
+    .execute(db)
+    .await;
+
+    Some(ticket)
+}
+
+async fn list_crm_leads(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListCrmLeadsQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let is_agent = has_agent_access(&claims);
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let stage = normalize_lead_stage(query.stage);
+    let source = normalize_lead_source(query.source);
+    let owner_id = query.owner_id;
+    let contact_user_id = query.contact_user_id;
+    let chat_room_id = clean_text(query.chat_room_id);
+    let requester_id = if is_agent {
+        query.requester_id
+    } else {
+        Some(user_id)
+    };
+
+    let rows = sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        SELECT
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        FROM crm_leads
+        WHERE ($1::text IS NULL OR stage = $1)
+          AND ($2::text IS NULL OR source = $2)
+          AND ($3::uuid IS NULL OR owner_id = $3)
+          AND ($4::uuid IS NULL OR requester_user_id = $4)
+          AND ($5::uuid IS NULL OR contact_user_id = $5)
+          AND ($6::text IS NULL OR chat_room_id = $6)
+        ORDER BY updated_at DESC
+        LIMIT $7 OFFSET $8
+        "#,
+    )
+    .bind(stage)
+    .bind(source)
+    .bind(owner_id)
+    .bind(requester_id)
+    .bind(contact_user_id)
+    .bind(chat_room_id)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListCrmLeadsResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_crm_leads error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load leads").into_response()
+        }
+    }
+}
+
+async fn get_crm_lead(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+
+    let lead = match sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        SELECT
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        FROM crm_leads
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "lead not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_crm_lead error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load lead").into_response();
+        }
+    };
+
+    if !is_agent && lead.requester_user_id != Some(user_id) {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    (StatusCode::OK, Json(json!({ "lead": lead }))).into_response()
+}
+
+async fn create_crm_lead(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateCrmLeadRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+
+    let mut name = clean_text(payload.name);
+    let mut sector = clean_text(payload.sector);
+    let mut value_cents = payload.value_cents.filter(|v| *v >= 0);
+    let mut currency = normalize_currency(payload.currency);
+    let stage = normalize_lead_stage(payload.stage).unwrap_or_else(|| "lead".to_string());
+    let source = normalize_lead_source(payload.source).unwrap_or_else(|| "web".to_string());
+    let chat_room_id = clean_text(payload.chat_room_id);
+
+    if let Some(ref room_id) = chat_room_id {
+        if let Ok(Some(existing)) = sqlx::query_as::<_, CrmLeadRow>(
+            r#"
+            SELECT
+                id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+                content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+                metadata, created_at, updated_at
+            FROM crm_leads
+            WHERE chat_room_id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(room_id)
+        .fetch_optional(&state.db)
+        .await
+        {
+            let can_update_existing = is_agent
+                || existing.requester_user_id == Some(user_id)
+                || existing.contact_user_id == Some(user_id);
+            if can_update_existing {
+                let incoming_metadata = payload.metadata.clone().unwrap_or_else(|| json!({}));
+                let merged_metadata =
+                    merge_json_objects(existing.metadata.clone(), incoming_metadata);
+                if !metadata_within_limit(&merged_metadata) {
+                    return err(StatusCode::BAD_REQUEST, "metadata too large").into_response();
+                }
+
+                let allow_flow_stage_update = is_agent || existing.source == "super_app";
+                let next_stage = if allow_flow_stage_update {
+                    stage.clone()
+                } else {
+                    existing.stage.clone()
+                };
+                let next_source = if allow_flow_stage_update {
+                    source.clone()
+                } else {
+                    existing.source.clone()
+                };
+                let requested_contact = payload.contact_user_id;
+                let next_contact_user_id = if is_agent {
+                    requested_contact.or(existing.contact_user_id)
+                } else if existing.contact_user_id.is_some() {
+                    existing.contact_user_id
+                } else if requested_contact == Some(user_id) {
+                    requested_contact
+                } else {
+                    existing.contact_user_id
+                };
+
+                if let Ok(Some(updated_lead)) = sqlx::query_as::<_, CrmLeadRow>(
+                    r#"
+                    WITH updated AS (
+                        UPDATE crm_leads
+                        SET
+                            stage = $2,
+                            source = $3,
+                            contact_user_id = $4,
+                            metadata = $5,
+                            updated_at = NOW()
+                        WHERE id = $1
+                        RETURNING *
+                    )
+                    SELECT
+                        id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+                        content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+                        metadata, created_at, updated_at
+                    FROM updated
+                    "#,
+                )
+                .bind(existing.id)
+                .bind(next_stage.clone())
+                .bind(next_source.clone())
+                .bind(next_contact_user_id)
+                .bind(merged_metadata.clone())
+                .fetch_optional(&state.db)
+                .await
+                {
+                    if updated_lead.stage != existing.stage {
+                        let actor_role = actor_role_from_claims(&claims);
+                        let message = format!("Stage updated to {}", updated_lead.stage);
+                        record_crm_activity(
+                            &state.db,
+                            updated_lead.id,
+                            Some(user_id),
+                            &actor_role,
+                            "lead.stage_updated",
+                            message,
+                            json!({
+                                "stage": updated_lead.stage,
+                                "chat_room_id": room_id,
+                                "source": updated_lead.source,
+                                "upsert": true
+                            }),
+                        )
+                        .await;
+                    }
+
+                    return (
+                        StatusCode::OK,
+                        Json(json!({ "lead": updated_lead, "deduped": true, "updated": true })),
+                    )
+                        .into_response();
+                }
+            }
+
+            return (
+                StatusCode::OK,
+                Json(json!({ "lead": existing, "deduped": true })),
+            )
+                .into_response();
+        }
+    }
+
+    if let Some(content_id) = payload.content_id {
+        if let Ok(Some(content)) = find_content(&state.db, &content_id.to_string()).await {
+            if name.is_none() {
+                name = Some(content.title);
+            }
+            if sector.is_none() {
+                let meta_sector = content
+                    .metadata
+                    .get("sector")
+                    .and_then(|v| v.as_str())
+                    .map(|v| v.to_string());
+                sector = meta_sector.or(content.category);
+            }
+            if value_cents.is_none() {
+                value_cents = content.price_cents;
+            }
+            if currency.is_none() {
+                currency = content.currency;
+            }
+        }
+    }
+
+    let name = name
+        .unwrap_or_else(|| "New lead".to_string())
+        .chars()
+        .take(MAX_TITLE_LEN)
+        .collect::<String>();
+
+    if let Some(ref cur) = currency {
+        if !is_valid_currency(cur) {
+            return err(StatusCode::BAD_REQUEST, "invalid currency").into_response();
+        }
+    }
+
+    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata too large").into_response();
+    }
+
+    let lead_owner = if is_agent { payload.owner_id } else { None };
+
+    let inserted = sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        INSERT INTO crm_leads (
+            id, requester_user_id, requester_email, requester_name, owner_id,
+            contact_user_id, content_id, chat_room_id, name, sector, stage, source,
+            value_cents, currency, metadata
+        )
+        VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10, $11, $12,
+            $13, $14, $15
+        )
+        RETURNING
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(Some(user_id))
+    .bind(clean_text(payload.requester_email))
+    .bind(clean_text(payload.requester_name))
+    .bind(lead_owner)
+    .bind(payload.contact_user_id)
+    .bind(payload.content_id)
+    .bind(chat_room_id.clone())
+    .bind(name.clone())
+    .bind(sector.clone())
+    .bind(stage.clone())
+    .bind(source.clone())
+    .bind(value_cents)
+    .bind(currency.clone())
+    .bind(metadata.clone())
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(lead) => {
+            let actor_role = actor_role_from_claims(&claims);
+            let message = format!("Lead created via {}", source);
+            record_crm_activity(
+                &state.db,
+                lead.id,
+                Some(user_id),
+                &actor_role,
+                "lead.created",
+                message,
+                json!({ "source": source, "chat_room_id": chat_room_id }),
+            )
+            .await;
+
+            (StatusCode::CREATED, Json(json!({ "lead": lead }))).into_response()
+        }
+        Err(e) => {
+            tracing::error!("create_crm_lead error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create lead").into_response()
+        }
+    }
+}
+
+async fn update_crm_lead(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateCrmLeadRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_agent_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "agent role required").into_response();
+    }
+
+    let name = clean_text(payload.name).map(|v| v.chars().take(MAX_TITLE_LEN).collect::<String>());
+    let sector = clean_text(payload.sector);
+    let stage = normalize_lead_stage(payload.stage);
+    let source = normalize_lead_source(payload.source);
+    let chat_room_id = clean_text(payload.chat_room_id);
+    let value_cents = payload.value_cents.filter(|v| *v >= 0);
+    let currency = normalize_currency(payload.currency);
+
+    if let Some(ref cur) = currency {
+        if !is_valid_currency(cur) {
+            return err(StatusCode::BAD_REQUEST, "invalid currency").into_response();
+        }
+    }
+
+    let metadata = match payload.metadata {
+        Some(meta) => {
+            if !metadata_within_limit(&meta) {
+                return err(StatusCode::BAD_REQUEST, "metadata too large").into_response();
+            }
+            Some(meta)
+        }
+        None => None,
+    };
+
+    let has_updates = name.is_some()
+        || sector.is_some()
+        || stage.is_some()
+        || source.is_some()
+        || value_cents.is_some()
+        || currency.is_some()
+        || payload.owner_id.is_some()
+        || payload.contact_user_id.is_some()
+        || chat_room_id.is_some()
+        || metadata.is_some();
+
+    if !has_updates {
+        return err(StatusCode::BAD_REQUEST, "no updatable fields provided").into_response();
+    }
+
+    let updated = sqlx::query_as::<_, CrmLeadRow>(
+        r#"
+        WITH updated AS (
+            UPDATE crm_leads
+            SET
+                name = COALESCE($2, name),
+                sector = COALESCE($3, sector),
+                stage = COALESCE($4, stage),
+                source = COALESCE($5, source),
+                value_cents = COALESCE($6, value_cents),
+                currency = COALESCE($7, currency),
+                owner_id = COALESCE($8, owner_id),
+                contact_user_id = COALESCE($9, contact_user_id),
+                chat_room_id = COALESCE($10, chat_room_id),
+                metadata = COALESCE($11, metadata),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        )
+        SELECT
+            id, requester_user_id, requester_email, requester_name, owner_id, contact_user_id,
+            content_id, chat_room_id, name, sector, stage, source, value_cents, currency,
+            metadata, created_at, updated_at
+        FROM updated
+        "#,
+    )
+    .bind(id)
+    .bind(name)
+    .bind(sector)
+    .bind(stage.clone())
+    .bind(source)
+    .bind(value_cents)
+    .bind(currency)
+    .bind(payload.owner_id)
+    .bind(payload.contact_user_id)
+    .bind(chat_room_id.clone())
+    .bind(metadata)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(lead)) => {
+            if let Some(new_stage) = stage {
+                let actor_role = actor_role_from_claims(&claims);
+                let message = format!("Stage updated to {}", new_stage);
+                record_crm_activity(
+                    &state.db,
+                    lead.id,
+                    Some(user_id),
+                    &actor_role,
+                    "lead.stage_updated",
+                    message,
+                    json!({ "stage": new_stage, "chat_room_id": chat_room_id }),
+                )
+                .await;
+            }
+
+            (StatusCode::OK, Json(json!({ "lead": lead }))).into_response()
+        }
+        Ok(None) => err(StatusCode::NOT_FOUND, "lead not found").into_response(),
+        Err(e) => {
+            tracing::error!("update_crm_lead error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update lead").into_response()
+        }
+    }
+}
+
+async fn list_crm_activities(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListCrmActivitiesQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+
+    let limit = query.limit.unwrap_or(20).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let lead_id = query.lead_id;
+
+    let rows = if is_agent {
+        sqlx::query_as::<_, CrmActivityRow>(
+            r#"
+            SELECT id, lead_id, actor_user_id, actor_role, action, message, metadata, created_at
+            FROM crm_activities
+            WHERE ($1::uuid IS NULL OR lead_id = $1)
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+            "#,
+        )
+        .bind(lead_id)
+        .bind(limit + 1)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await
+    } else {
+        sqlx::query_as::<_, CrmActivityRow>(
+            r#"
+            SELECT a.id, a.lead_id, a.actor_user_id, a.actor_role, a.action, a.message, a.metadata, a.created_at
+            FROM crm_activities a
+            JOIN crm_leads l ON l.id = a.lead_id
+            WHERE l.requester_user_id = $1
+              AND ($2::uuid IS NULL OR a.lead_id = $2)
+            ORDER BY a.created_at DESC
+            LIMIT $3 OFFSET $4
+            "#,
+        )
+        .bind(user_id)
+        .bind(lead_id)
+        .bind(limit + 1)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await
+    };
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListCrmActivitiesResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_crm_activities error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load activities",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn list_super_app_orders(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListSuperAppOrdersQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let status = normalize_super_app_order_status(query.status);
+    let service_type = normalize_super_app_service_type(query.service_type);
+    let actor_filter = if is_agent { None } else { Some(user_id) };
+    let requester_id = if is_agent { query.requester_id } else { None };
+    let partner_id = if is_agent { query.partner_id } else { None };
+
+    let rows = sqlx::query_as::<_, SuperAppOrderRow>(
+        r#"
+        SELECT
+            id, requester_id, partner_id, merchant_id, provider_id, service_type, status,
+            payment_mode, currency, amount_estimate_cents, amount_final_cents,
+            pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng,
+            risk_score, risk_flags, metadata, created_at, updated_at
+        FROM super_app_orders
+        WHERE ($1::text IS NULL OR status = $1)
+          AND ($2::text IS NULL OR service_type = $2)
+          AND ($3::uuid IS NULL OR requester_id = $3 OR partner_id = $3)
+          AND ($4::uuid IS NULL OR requester_id = $4)
+          AND ($5::uuid IS NULL OR partner_id = $5)
+        ORDER BY created_at DESC
+        LIMIT $6 OFFSET $7
+        "#,
+    )
+    .bind(status)
+    .bind(service_type)
+    .bind(actor_filter)
+    .bind(requester_id)
+    .bind(partner_id)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListSuperAppOrdersResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_super_app_orders error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load super app orders",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_super_app_order(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+
+    let order = match sqlx::query_as::<_, SuperAppOrderRow>(
+        r#"
+        SELECT
+            id, requester_id, partner_id, merchant_id, provider_id, service_type, status,
+            payment_mode, currency, amount_estimate_cents, amount_final_cents,
+            pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng,
+            risk_score, risk_flags, metadata, created_at, updated_at
+        FROM super_app_orders
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "order not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_super_app_order error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load super app order",
+            )
+            .into_response();
+        }
+    };
+
+    if !is_agent && order.requester_id != user_id && order.partner_id != Some(user_id) {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let events = match sqlx::query_as::<_, SuperAppOrderEventRow>(
+        r#"
+        SELECT id, order_id, actor_id, actor_role, event_type, payload, created_at
+        FROM super_app_order_events
+        WHERE order_id = $1
+        ORDER BY created_at DESC
+        LIMIT 200
+        "#,
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::error!("get_super_app_order events error: {:?}", e);
+            vec![]
+        }
+    };
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "order": order,
+            "events": events
+        })),
+    )
+        .into_response()
+}
+
+async fn update_super_app_order(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateSuperAppOrderRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_agent_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "agent role required").into_response();
+    }
+
+    let status = normalize_super_app_order_status(payload.status);
+    let amount_final_cents = match payload.amount_final_cents {
+        Some(value) if value < 0 => {
+            return err(StatusCode::BAD_REQUEST, "amount_final_cents must be >= 0").into_response()
+        }
+        Some(value) => Some(value),
+        None => None,
+    };
+    let metadata_patch = match payload.metadata {
+        Some(meta) => {
+            if !metadata_within_limit(&meta) {
+                return err(StatusCode::BAD_REQUEST, "metadata too large").into_response();
+            }
+            Some(meta)
+        }
+        None => None,
+    };
+    let event_type = match clean_text_limited(payload.event_type, MAX_REASON_CODE_LEN) {
+        Ok(Some(v)) => v,
+        Ok(None) => "super_app.order.updated".to_string(),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "event_type is too long").into_response(),
+    };
+    let note = match clean_text_limited(payload.note, MAX_EVIDENCE_NOTE_LEN) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "note is too long").into_response(),
+    };
+    let has_updates = status.is_some()
+        || payload.partner_id.is_some()
+        || amount_final_cents.is_some()
+        || metadata_patch.is_some();
+    if !has_updates {
+        return err(StatusCode::BAD_REQUEST, "no updatable fields provided").into_response();
+    }
+
+    let updated = sqlx::query_as::<_, SuperAppOrderRow>(
+        r#"
+        WITH updated AS (
+            UPDATE super_app_orders
+            SET
+                status = COALESCE($2, status),
+                partner_id = COALESCE($3, partner_id),
+                amount_final_cents = COALESCE($4, amount_final_cents),
+                metadata = CASE
+                    WHEN $5::jsonb IS NULL THEN metadata
+                    ELSE COALESCE(metadata, '{}'::jsonb) || $5::jsonb
+                END,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        )
+        SELECT
+            id, requester_id, partner_id, merchant_id, provider_id, service_type, status,
+            payment_mode, currency, amount_estimate_cents, amount_final_cents,
+            pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng,
+            risk_score, risk_flags, metadata, created_at, updated_at
+        FROM updated
+        "#,
+    )
+    .bind(id)
+    .bind(status.clone())
+    .bind(payload.partner_id)
+    .bind(amount_final_cents)
+    .bind(metadata_patch.clone())
+    .fetch_optional(&state.db)
+    .await;
+
+    let order = match updated {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "order not found").into_response(),
+        Err(e) => {
+            tracing::error!("update_super_app_order error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update super app order",
+            )
+            .into_response();
+        }
+    };
+
+    let actor_role = actor_role_from_claims(&claims);
+    let event_payload = json!({
+        "status": order.status,
+        "partner_id": order.partner_id,
+        "amount_final_cents": order.amount_final_cents,
+        "metadata_patch": metadata_patch,
+        "note": note
+    });
+    if let Err(e) = sqlx::query(
+        r#"
+        INSERT INTO super_app_order_events (
+            order_id, actor_id, actor_role, event_type, payload
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        "#,
+    )
+    .bind(order.id)
+    .bind(Some(user_id))
+    .bind(actor_role.clone())
+    .bind(event_type.clone())
+    .bind(event_payload)
+    .execute(&state.db)
+    .await
+    {
+        tracing::warn!("update_super_app_order activity insert failed: {:?}", e);
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "order": order,
+            "event_type": event_type,
+            "actor_role": actor_role
+        })),
+    )
+        .into_response()
+}
+
+async fn list_super_app_trust_profiles(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListSuperAppTrustProfilesQuery>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_agent_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "agent role required").into_response();
+    }
+
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let tier = normalize_super_app_trust_tier(query.tier);
+    let crm_approval_status = normalize_super_app_crm_approval_status(query.crm_approval_status);
+    let user_id = query.user_id;
+
+    let rows = sqlx::query_as::<_, SuperAppTrustProfileRow>(
+        r#"
+        SELECT
+            user_id, tier, kyc_status, crm_approval_status, marketing_segment, manual_hold,
+            manual_per_order_cap_cents, manual_daily_cap_cents, manual_monthly_cap_cents,
+            legal_terms_version, legal_terms_accepted_at, risk_strike_count, metadata,
+            created_at, updated_at
+        FROM super_app_trust_profiles
+        WHERE ($1::text IS NULL OR tier = $1)
+          AND ($2::text IS NULL OR crm_approval_status = $2)
+          AND ($3::uuid IS NULL OR user_id = $3)
+        ORDER BY updated_at DESC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(tier)
+    .bind(crm_approval_status)
+    .bind(user_id)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListSuperAppTrustProfilesResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_super_app_trust_profiles error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load super app trust profiles",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_super_app_trust_profile(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(target_user_id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let actor_user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+    if !is_agent && actor_user_id != target_user_id {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let row = sqlx::query_as::<_, SuperAppTrustProfileRow>(
+        r#"
+        SELECT
+            user_id, tier, kyc_status, crm_approval_status, marketing_segment, manual_hold,
+            manual_per_order_cap_cents, manual_daily_cap_cents, manual_monthly_cap_cents,
+            legal_terms_version, legal_terms_accepted_at, risk_strike_count, metadata,
+            created_at, updated_at
+        FROM super_app_trust_profiles
+        WHERE user_id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(target_user_id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(profile)) => (StatusCode::OK, Json(json!({ "profile": profile }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "trust profile not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_super_app_trust_profile error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load super app trust profile",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn upsert_super_app_trust_profile(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(target_user_id): Path<Uuid>,
+    Json(payload): Json<UpsertSuperAppTrustProfileRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let actor_user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(v) => v,
+        Err(_) => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let is_agent = has_agent_access(&claims);
+    if !is_agent && actor_user_id != target_user_id {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let tier = normalize_super_app_trust_tier(payload.tier);
+    let kyc_status = normalize_super_app_kyc_status(payload.kyc_status);
+    let crm_approval_status = normalize_super_app_crm_approval_status(payload.crm_approval_status);
+    let marketing_segment = normalize_super_app_marketing_segment(payload.marketing_segment);
+    let legal_terms_version = clean_text_limited(payload.legal_terms_version, MAX_TAG_LEN * 3);
+    let legal_terms_version = match legal_terms_version {
+        Ok(value) => value,
+        Err(_) => {
+            return err(StatusCode::BAD_REQUEST, "legal_terms_version is too long").into_response()
+        }
+    };
+
+    if !is_agent {
+        let attempted_policy_mutation = tier.is_some()
+            || kyc_status.is_some()
+            || crm_approval_status.is_some()
+            || marketing_segment.is_some()
+            || payload.manual_hold.is_some()
+            || payload.manual_per_order_cap_cents.is_some()
+            || payload.manual_daily_cap_cents.is_some()
+            || payload.manual_monthly_cap_cents.is_some()
+            || payload.risk_strike_count.is_some()
+            || payload.metadata.is_some();
+        if attempted_policy_mutation {
+            return err(
+                StatusCode::FORBIDDEN,
+                "only legal terms acceptance can be updated by non-agent user",
+            )
+            .into_response();
+        }
+    }
+
+    if let Some(value) = payload.manual_per_order_cap_cents {
+        if value < 0 {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "manual_per_order_cap_cents must be >= 0",
+            )
+            .into_response();
+        }
+    }
+    if let Some(value) = payload.manual_daily_cap_cents {
+        if value < 0 {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "manual_daily_cap_cents must be >= 0",
+            )
+            .into_response();
+        }
+    }
+    if let Some(value) = payload.manual_monthly_cap_cents {
+        if value < 0 {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "manual_monthly_cap_cents must be >= 0",
+            )
+            .into_response();
+        }
+    }
+    if let Some(value) = payload.risk_strike_count {
+        if value < 0 {
+            return err(StatusCode::BAD_REQUEST, "risk_strike_count must be >= 0").into_response();
+        }
+    }
+
+    let metadata = match payload.metadata {
+        Some(meta) => {
+            if !metadata_within_limit(&meta) {
+                return err(StatusCode::BAD_REQUEST, "metadata too large").into_response();
+            }
+            Some(meta)
+        }
+        None => None,
+    };
+
+    let upserted = sqlx::query_as::<_, SuperAppTrustProfileRow>(
+        r#"
+        INSERT INTO super_app_trust_profiles (
+            user_id,
+            tier,
+            kyc_status,
+            crm_approval_status,
+            marketing_segment,
+            manual_hold,
+            manual_per_order_cap_cents,
+            manual_daily_cap_cents,
+            manual_monthly_cap_cents,
+            legal_terms_version,
+            legal_terms_accepted_at,
+            risk_strike_count,
+            metadata,
+            created_at,
+            updated_at
+        )
+        VALUES (
+            $1,
+            COALESCE($2, 'rookie'),
+            COALESCE($3, 'none'),
+            COALESCE($4, 'pending'),
+            COALESCE($5, 'general'),
+            COALESCE($6, false),
+            $7,
+            $8,
+            $9,
+            $10,
+            $11,
+            COALESCE($12, 0),
+            COALESCE($13::jsonb, '{}'::jsonb),
+            NOW(),
+            NOW()
+        )
+        ON CONFLICT (user_id) DO UPDATE SET
+            tier = COALESCE($2, super_app_trust_profiles.tier),
+            kyc_status = COALESCE($3, super_app_trust_profiles.kyc_status),
+            crm_approval_status = COALESCE($4, super_app_trust_profiles.crm_approval_status),
+            marketing_segment = COALESCE($5, super_app_trust_profiles.marketing_segment),
+            manual_hold = COALESCE($6, super_app_trust_profiles.manual_hold),
+            manual_per_order_cap_cents = COALESCE($7, super_app_trust_profiles.manual_per_order_cap_cents),
+            manual_daily_cap_cents = COALESCE($8, super_app_trust_profiles.manual_daily_cap_cents),
+            manual_monthly_cap_cents = COALESCE($9, super_app_trust_profiles.manual_monthly_cap_cents),
+            legal_terms_version = COALESCE($10, super_app_trust_profiles.legal_terms_version),
+            legal_terms_accepted_at = COALESCE($11, super_app_trust_profiles.legal_terms_accepted_at),
+            risk_strike_count = COALESCE($12, super_app_trust_profiles.risk_strike_count),
+            metadata = CASE
+                WHEN $13::jsonb IS NULL THEN super_app_trust_profiles.metadata
+                ELSE COALESCE(super_app_trust_profiles.metadata, '{}'::jsonb) || $13::jsonb
+            END,
+            updated_at = NOW()
+        RETURNING
+            user_id, tier, kyc_status, crm_approval_status, marketing_segment, manual_hold,
+            manual_per_order_cap_cents, manual_daily_cap_cents, manual_monthly_cap_cents,
+            legal_terms_version, legal_terms_accepted_at, risk_strike_count, metadata,
+            created_at, updated_at
+        "#,
+    )
+    .bind(target_user_id)
+    .bind(if is_agent { tier } else { None })
+    .bind(if is_agent { kyc_status } else { None })
+    .bind(if is_agent { crm_approval_status } else { None })
+    .bind(if is_agent { marketing_segment } else { None })
+    .bind(if is_agent { payload.manual_hold } else { None })
+    .bind(if is_agent {
+        payload.manual_per_order_cap_cents
+    } else {
+        None
+    })
+    .bind(if is_agent {
+        payload.manual_daily_cap_cents
+    } else {
+        None
+    })
+    .bind(if is_agent {
+        payload.manual_monthly_cap_cents
+    } else {
+        None
+    })
+    .bind(legal_terms_version)
+    .bind(payload.legal_terms_accepted_at)
+    .bind(if is_agent { payload.risk_strike_count } else { None })
+    .bind(if is_agent { metadata } else { None })
+    .fetch_one(&state.db)
+    .await;
+
+    match upserted {
+        Ok(profile) => (StatusCode::OK, Json(json!({ "profile": profile }))).into_response(),
+        Err(e) => {
+            tracing::error!("upsert_super_app_trust_profile error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to save super app trust profile",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn list_sectors(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListSectorsQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(200).clamp(1, 500);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let active = query.active;
+
+    let rows = sqlx::query_as::<_, SectorRow>(
+        r#"
+        SELECT
+            id, name_id, name_en, description_id, description_en, color, icon_key,
+            is_active, sort_order, created_at, updated_at
+        FROM sectors
+        WHERE ($1::bool IS NULL OR is_active = $1)
+        ORDER BY sort_order ASC, name_en ASC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(active)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListSectorsResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_sectors error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load sectors").into_response()
+        }
+    }
+}
+
+async fn get_sector(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let row = sqlx::query_as::<_, SectorRow>(
+        r#"
+        SELECT
+            id, name_id, name_en, description_id, description_en, color, icon_key,
+            is_active, sort_order, created_at, updated_at
+        FROM sectors
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(sector)) => (StatusCode::OK, Json(json!({ "sector": sector }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "sector not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_sector error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load sector").into_response()
+        }
+    }
+}
+
+async fn create_sector(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateSectorRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_cms_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "cms role required").into_response();
+    }
+
+    let name_id = clean_text(payload.name_id);
+    let name_en = clean_text(payload.name_en);
+    let name_seed = name_en.clone().or(name_id.clone());
+    let id =
+        normalize_sector_id(payload.id).or_else(|| name_seed.clone().as_deref().map(make_slug));
+
+    let id = match id {
+        Some(v) if !v.is_empty() => v,
+        _ => return err(StatusCode::BAD_REQUEST, "id or name is required").into_response(),
+    };
+    let name_id = name_id.unwrap_or_else(|| id.clone());
+    let name_en = name_en.unwrap_or_else(|| name_id.clone());
+
+    let inserted = sqlx::query_as::<_, SectorRow>(
+        r#"
+        INSERT INTO sectors (
+            id, name_id, name_en, description_id, description_en,
+            color, icon_key, is_active, sort_order
+        ) VALUES (
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9
+        )
+        RETURNING
+            id, name_id, name_en, description_id, description_en, color, icon_key,
+            is_active, sort_order, created_at, updated_at
+        "#,
+    )
+    .bind(id)
+    .bind(name_id)
+    .bind(name_en)
+    .bind(clean_text(payload.description_id))
+    .bind(clean_text(payload.description_en))
+    .bind(clean_text(payload.color))
+    .bind(clean_text(payload.icon_key))
+    .bind(payload.is_active.unwrap_or(true))
+    .bind(payload.sort_order.unwrap_or(0))
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(sector) => (StatusCode::CREATED, Json(json!({ "sector": sector }))).into_response(),
+        Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("23505") => {
+            err(StatusCode::CONFLICT, "sector id already exists").into_response()
+        }
+        Err(e) => {
+            tracing::error!("create_sector error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create sector").into_response()
+        }
+    }
+}
+
+async fn update_sector(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateSectorRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_cms_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "cms role required").into_response();
+    }
+
+    let has_updates = payload.name_id.is_some()
+        || payload.name_en.is_some()
+        || payload.description_id.is_some()
+        || payload.description_en.is_some()
+        || payload.color.is_some()
+        || payload.icon_key.is_some()
+        || payload.is_active.is_some()
+        || payload.sort_order.is_some();
+    if !has_updates {
+        return err(StatusCode::BAD_REQUEST, "no updatable fields provided").into_response();
+    }
+
+    let updated = sqlx::query_as::<_, SectorRow>(
+        r#"
+        WITH updated AS (
+            UPDATE sectors
+            SET
+                name_id = COALESCE($2, name_id),
+                name_en = COALESCE($3, name_en),
+                description_id = COALESCE($4, description_id),
+                description_en = COALESCE($5, description_en),
+                color = COALESCE($6, color),
+                icon_key = COALESCE($7, icon_key),
+                is_active = COALESCE($8, is_active),
+                sort_order = COALESCE($9, sort_order),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        )
+        SELECT
+            id, name_id, name_en, description_id, description_en, color, icon_key,
+            is_active, sort_order, created_at, updated_at
+        FROM updated
+        "#,
+    )
+    .bind(id)
+    .bind(clean_text(payload.name_id))
+    .bind(clean_text(payload.name_en))
+    .bind(clean_text(payload.description_id))
+    .bind(clean_text(payload.description_en))
+    .bind(clean_text(payload.color))
+    .bind(clean_text(payload.icon_key))
+    .bind(payload.is_active)
+    .bind(payload.sort_order)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(sector)) => (StatusCode::OK, Json(json!({ "sector": sector }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "sector not found").into_response(),
+        Err(e) => {
+            tracing::error!("update_sector error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update sector").into_response()
+        }
+    }
+}
+
+async fn delete_sector(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_cms_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "cms role required").into_response();
+    }
+
+    let updated = sqlx::query_as::<_, SectorRow>(
+        r#"
+        WITH updated AS (
+            UPDATE sectors
+            SET is_active = false, updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        )
+        SELECT
+            id, name_id, name_en, description_id, description_en, color, icon_key,
+            is_active, sort_order, created_at, updated_at
+        FROM updated
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(sector)) => (StatusCode::OK, Json(json!({ "sector": sector }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "sector not found").into_response(),
+        Err(e) => {
+            tracing::error!("delete_sector error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to delete sector").into_response()
+        }
+    }
+}
+
+async fn list_banners(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListBannersQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let location = clean_text(query.location);
+    let status = normalize_banner_status(query.status);
+    let active_only = query.active_only.unwrap_or(false);
+
+    let rows = sqlx::query_as::<_, BannerRow>(
+        r#"
+        SELECT
+            id, name, location, status, image_url, link_url, headline, subheadline,
+            start_at, end_at, metadata, created_at, updated_at
+        FROM banners
+        WHERE ($1::text IS NULL OR location = $1)
+          AND ($2::text IS NULL OR status = $2)
+          AND (
+            $3::bool = false OR (
+              status = 'active'
+              AND (start_at IS NULL OR start_at <= NOW())
+              AND (end_at IS NULL OR end_at >= NOW())
+            )
+          )
+        ORDER BY updated_at DESC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(location)
+    .bind(status)
+    .bind(active_only)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(mut items) => {
+            let has_more = items.len() as i64 > limit;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(ListBannersResponse {
+                    items,
+                    limit,
+                    offset,
+                    has_more,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_banners error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load banners").into_response()
+        }
+    }
+}
+
+async fn get_banner(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>) -> impl IntoResponse {
+    let row = sqlx::query_as::<_, BannerRow>(
+        r#"
+        SELECT
+            id, name, location, status, image_url, link_url, headline, subheadline,
+            start_at, end_at, metadata, created_at, updated_at
+        FROM banners
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match row {
+        Ok(Some(banner)) => (StatusCode::OK, Json(json!({ "banner": banner }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "banner not found").into_response(),
+        Err(e) => {
+            tracing::error!("get_banner error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load banner").into_response()
+        }
+    }
+}
+
+async fn create_banner(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateBannerRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_cms_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "cms role required").into_response();
+    }
+
+    let name = match clean_text(payload.name) {
+        Some(v) => v,
+        None => return err(StatusCode::BAD_REQUEST, "name is required").into_response(),
+    };
+    let location = match clean_text(payload.location) {
+        Some(v) => v,
+        None => return err(StatusCode::BAD_REQUEST, "location is required").into_response(),
+    };
+    let status = normalize_banner_status(payload.status).unwrap_or_else(|| "active".to_string());
+
+    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+    }
+
+    let inserted = sqlx::query_as::<_, BannerRow>(
+        r#"
+        INSERT INTO banners (
+            id, name, location, status, image_url, link_url, headline, subheadline,
+            start_at, end_at, metadata
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11
+        )
+        RETURNING
+            id, name, location, status, image_url, link_url, headline, subheadline,
+            start_at, end_at, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(Uuid::new_v4())
+    .bind(name)
+    .bind(location)
+    .bind(status)
+    .bind(clean_text(payload.image_url))
+    .bind(clean_text(payload.link_url))
+    .bind(clean_text(payload.headline))
+    .bind(clean_text(payload.subheadline))
+    .bind(payload.start_at)
+    .bind(payload.end_at)
+    .bind(metadata)
+    .fetch_one(&state.db)
+    .await;
+
+    match inserted {
+        Ok(banner) => (StatusCode::CREATED, Json(json!({ "banner": banner }))).into_response(),
+        Err(e) => {
+            tracing::error!("create_banner error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create banner").into_response()
+        }
+    }
+}
+
+async fn update_banner(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<UpdateBannerRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_cms_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "cms role required").into_response();
+    }
+
+    let has_updates = payload.name.is_some()
+        || payload.location.is_some()
+        || payload.status.is_some()
+        || payload.image_url.is_some()
+        || payload.link_url.is_some()
+        || payload.headline.is_some()
+        || payload.subheadline.is_some()
+        || payload.start_at.is_some()
+        || payload.end_at.is_some()
+        || payload.metadata.is_some();
+    if !has_updates {
+        return err(StatusCode::BAD_REQUEST, "no updatable fields provided").into_response();
+    }
+
+    let metadata = match payload.metadata {
+        Some(meta) => {
+            if !metadata_within_limit(&meta) {
+                return err(StatusCode::BAD_REQUEST, "metadata payload is too large")
+                    .into_response();
+            }
+            Some(meta)
+        }
+        None => None,
+    };
+
+    let status = normalize_banner_status(payload.status);
+
+    let updated = sqlx::query_as::<_, BannerRow>(
+        r#"
+        WITH updated AS (
+            UPDATE banners
+            SET
+                name = COALESCE($2, name),
+                location = COALESCE($3, location),
+                status = COALESCE($4, status),
+                image_url = COALESCE($5, image_url),
+                link_url = COALESCE($6, link_url),
+                headline = COALESCE($7, headline),
+                subheadline = COALESCE($8, subheadline),
+                start_at = COALESCE($9, start_at),
+                end_at = COALESCE($10, end_at),
+                metadata = COALESCE($11, metadata),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        )
+        SELECT
+            id, name, location, status, image_url, link_url, headline, subheadline,
+            start_at, end_at, metadata, created_at, updated_at
+        FROM updated
+        "#,
+    )
+    .bind(id)
+    .bind(clean_text(payload.name))
+    .bind(clean_text(payload.location))
+    .bind(status)
+    .bind(clean_text(payload.image_url))
+    .bind(clean_text(payload.link_url))
+    .bind(clean_text(payload.headline))
+    .bind(clean_text(payload.subheadline))
+    .bind(payload.start_at)
+    .bind(payload.end_at)
+    .bind(metadata)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(banner)) => (StatusCode::OK, Json(json!({ "banner": banner }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "banner not found").into_response(),
+        Err(e) => {
+            tracing::error!("update_banner error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update banner").into_response()
+        }
+    }
+}
+
+async fn delete_banner(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(c) => c,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    if !has_cms_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "cms role required").into_response();
+    }
+
+    let updated = sqlx::query_as::<_, BannerRow>(
+        r#"
+        WITH updated AS (
+            UPDATE banners
+            SET status = 'disabled', updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        )
+        SELECT
+            id, name, location, status, image_url, link_url, headline, subheadline,
+            start_at, end_at, metadata, created_at, updated_at
+        FROM updated
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await;
+
+    match updated {
+        Ok(Some(banner)) => (StatusCode::OK, Json(json!({ "banner": banner }))).into_response(),
+        Ok(None) => err(StatusCode::NOT_FOUND, "banner not found").into_response(),
+        Err(e) => {
+            tracing::error!("delete_banner error: {:?}", e);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to delete banner").into_response()
+        }
+    }
+}
+
+async fn update_transaction_status(
+    state: &Arc<AppState>,
+    id: Uuid,
+    user_id: Uuid,
+    next_status: &str,
+    allowed_current: &[&str],
+    seller_only: bool,
+    buyer_only: bool,
+    response_message: Option<String>,
+    status_context: Option<Value>,
+    transaction_meta_patch: Option<Value>,
+) -> axum::response::Response {
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("update_transaction_status begin tx error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update transaction",
+            )
+            .into_response();
+        }
+    };
+
+    let txn = match sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "transaction not found").into_response(),
+        Err(e) => {
+            tracing::error!("update_transaction_status read error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update transaction",
+            )
+            .into_response();
+        }
+    };
+
+    let is_buyer = txn.buyer_id == user_id;
+    let is_seller = txn.seller_id == user_id;
+    let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
+    if seller_only && !is_seller {
+        return err(StatusCode::FORBIDDEN, "only seller can perform this action").into_response();
+    }
+    if buyer_only && !is_buyer {
+        return err(StatusCode::FORBIDDEN, "only buyer can perform this action").into_response();
+    }
+    if !seller_only && !buyer_only && !is_buyer && !is_seller {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+    if !allowed_current.iter().any(|s| *s == txn.status.as_str()) {
+        return err(StatusCode::CONFLICT, "invalid transaction state").into_response();
+    }
+
+    let wallet_transition_result = match next_status {
+        "accepted" => hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
+            .await
+            .map(|_| ()),
+        "completed" => release_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
+            .await
+            .map(|_| ()),
+        "cancelled"
+            if matches!(
+                txn.status.as_str(),
+                "pending" | "accepted" | "in_progress" | "delivered"
+            ) =>
+        {
+            refund_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str())
+                .await
+                .map(|_| ())
+        }
+        _ => Ok(()),
+    };
+    if let Err(e) = wallet_transition_result {
+        match e {
+            WalletTransitionError::InsufficientFunds => {
+                return err(
+                    StatusCode::CONFLICT,
+                    "insufficient wallet balance to process transaction",
+                )
+                .into_response();
+            }
+            WalletTransitionError::InvalidHeldBalance => {
+                return err(
+                    StatusCode::CONFLICT,
+                    "transaction wallet hold state is invalid",
+                )
+                .into_response();
+            }
+            WalletTransitionError::Database(db_err) => {
+                tracing::error!(
+                    "update_transaction_status wallet transition db error: {:?}",
+                    db_err
+                );
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to update transaction",
+                )
+                .into_response();
+            }
+        }
+    }
+
+    let protection_status = protection_status_for_transaction(next_status);
+    let mut merged_transaction_meta = txn.transaction_meta.clone();
+    if let Some(meta_patch) = transaction_meta_patch {
+        merged_transaction_meta = merge_json_objects(merged_transaction_meta, meta_patch);
+    }
+    if let Some(context) = status_context.as_ref() {
+        merged_transaction_meta = merge_json_objects(
+            merged_transaction_meta,
+            json!({
+                "status_context": {
+                    "status": next_status,
+                    "data": context
+                }
+            }),
+        );
+    }
+
+    let updated = sqlx::query_as::<_, TransactionRow>(
+        r#"
+        UPDATE transactions
+        SET
+            transaction_status = $2,
+            response_message = COALESCE($3, response_message),
+            protection_status = $4,
+            transaction_meta = $5,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        "#,
+    )
+    .bind(id)
+    .bind(next_status)
+    .bind(response_message)
+    .bind(protection_status)
+    .bind(merged_transaction_meta)
+    .fetch_one(&mut *tx)
+    .await;
+
+    match updated {
+        Ok(row) => {
+            if next_status == "disputed" {
+                let dispute_id = status_context
+                    .as_ref()
+                    .and_then(|ctx| ctx.get("dispute_id"))
+                    .and_then(Value::as_str)
+                    .and_then(|raw| Uuid::parse_str(raw).ok())
+                    .unwrap_or_else(Uuid::new_v4);
+                let reason_code = status_context
+                    .as_ref()
+                    .and_then(|ctx| ctx.get("reason_code"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("other")
+                    .to_string();
+                let evidence_note = status_context
+                    .as_ref()
+                    .and_then(|ctx| ctx.get("evidence_note"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("Dispute opened")
+                    .to_string();
+                let evidence_attachments = status_context
+                    .as_ref()
+                    .and_then(|ctx| ctx.get("evidence_attachments"))
+                    .cloned()
+                    .unwrap_or_else(|| json!([]));
+                let opened_by = status_context
+                    .as_ref()
+                    .and_then(|ctx| ctx.get("reported_by"))
+                    .and_then(Value::as_str)
+                    .and_then(|raw| Uuid::parse_str(raw).ok())
+                    .unwrap_or(user_id);
+                let opened_at = status_context
+                    .as_ref()
+                    .and_then(|ctx| ctx.get("reported_at"))
+                    .and_then(Value::as_str)
+                    .and_then(|raw| DateTime::parse_from_rfc3339(raw).ok())
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap_or_else(Utc::now);
+                let metadata = json!({
+                    "opened_by": opened_by,
+                    "opened_at": opened_at
+                });
+
+                if let Err(e) = sqlx::query(
+                    r#"
+                    INSERT INTO transaction_disputes (
+                        id, transaction_id, buyer_id, seller_id, opened_by, status, reason_code,
+                        evidence_note, evidence_attachments, counterparty_evidence, currency,
+                        metadata, opened_at, created_at, updated_at
+                    )
+                    VALUES (
+                        $1, $2, $3, $4, $5, 'open', $6,
+                        $7, $8, '[]'::jsonb, $9,
+                        $10, $11, NOW(), NOW()
+                    )
+                    ON CONFLICT (transaction_id)
+                    DO UPDATE SET
+                        opened_by = EXCLUDED.opened_by,
+                        status = 'open',
+                        reason_code = EXCLUDED.reason_code,
+                        evidence_note = EXCLUDED.evidence_note,
+                        evidence_attachments = EXCLUDED.evidence_attachments,
+                        resolution_code = NULL,
+                        resolution_reason_code = NULL,
+                        resolution_notes = NULL,
+                        seller_fault_ratio = NULL,
+                        platform_fee_cents = 0,
+                        refund_amount_cents = 0,
+                        release_amount_cents = 0,
+                        resolved_at = NULL,
+                        closed_at = NULL,
+                        metadata = COALESCE(transaction_disputes.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+                        updated_at = NOW()
+                    "#,
+                )
+                .bind(dispute_id)
+                .bind(row.id)
+                .bind(row.buyer_id)
+                .bind(row.seller_id)
+                .bind(opened_by)
+                .bind(reason_code)
+                .bind(evidence_note)
+                .bind(evidence_attachments)
+                .bind(row.currency.as_str())
+                .bind(metadata)
+                .bind(opened_at)
+                .execute(&mut *tx)
+                .await
+                {
+                    tracing::error!("update_transaction_status dispute upsert error: {:?}", e);
+                    return err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to update transaction",
+                    )
+                    .into_response();
+                }
+            }
+
+            if let Err(e) = tx.commit().await {
+                tracing::error!("update_transaction_status commit error: {:?}", e);
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to update transaction",
+                )
+                .into_response();
+            }
+            let amount_label = format_currency_from_cents(row.amount_cents, row.currency.as_str());
+
+            let delivery_context = status_context.as_ref().and_then(|ctx| ctx.get("delivery"));
+            let delivery_review_context = status_context
+                .as_ref()
+                .and_then(|ctx| ctx.get("delivery_review"));
+            let delivery_attempt_number = json_value_as_usize(
+                delivery_context
+                    .and_then(|ctx| ctx.get("attempt_number"))
+                    .or_else(|| delivery_review_context.and_then(|ctx| ctx.get("attempt_number"))),
+            )
+            .unwrap_or(0);
+            let delivery_max_attempts = json_value_as_usize(
+                delivery_context
+                    .and_then(|ctx| ctx.get("max_attempts"))
+                    .or_else(|| delivery_review_context.and_then(|ctx| ctx.get("max_attempts"))),
+            )
+            .unwrap_or(MAX_DELIVERY_ATTEMPTS);
+            let delivery_attachment_count = json_value_as_usize(
+                delivery_context
+                    .and_then(|ctx| ctx.get("attachments_count"))
+                    .or_else(|| {
+                        delivery_review_context.and_then(|ctx| ctx.get("attachments_count"))
+                    }),
+            )
+            .unwrap_or(0);
+            let delivery_review_decision = delivery_review_context
+                .and_then(|ctx| ctx.get("decision"))
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let delivery_auto_escalated = delivery_review_context
+                .and_then(|ctx| ctx.get("auto_escalated"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let delivery_remaining_attempts = json_value_as_usize(
+                delivery_review_context.and_then(|ctx| ctx.get("remaining_attempts")),
+            )
+            .unwrap_or_else(|| delivery_max_attempts.saturating_sub(delivery_attempt_number));
+
+            match next_status {
+                "accepted" => {
+                    push_notification_best_effort(
+                        state,
+                        row.buyer_id,
+                        "transaction",
+                        "transaction.accepted",
+                        "Transaksi diterima penjual",
+                        &format!(
+                            "Penjual menerima transaksi {}. Dana {} ditahan di wallet {}.",
+                            row.id, amount_label, wallet_environment
+                        ),
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status,
+                            "wallet_environment": wallet_environment,
+                            "protection_status": row.protection_status
+                        }),
+                    )
+                    .await;
+                    push_notification_best_effort(
+                        state,
+                        row.seller_id,
+                        "transaction",
+                        "transaction.accepted",
+                        "Kamu menerima transaksi",
+                        &format!(
+                            "Kamu menerima transaksi {} senilai {}.",
+                            row.id, amount_label
+                        ),
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status,
+                            "wallet_environment": wallet_environment,
+                            "protection_status": row.protection_status
+                        }),
+                    )
+                    .await;
+                }
+                "in_progress" => {
+                    let buyer_msg = if delivery_review_decision == "request_revision" {
+                        format!(
+                            "Permintaan revisi untuk attempt {}/{} sudah dikirim. Seller bisa menyiapkan kiriman berikutnya.",
+                            delivery_attempt_number, delivery_max_attempts
+                        )
+                    } else {
+                        format!("Transaksi {} masuk proses pengerjaan.", row.id)
+                    };
+                    let seller_msg = if delivery_review_decision == "request_revision" {
+                        format!(
+                            "Buyer meminta revisi untuk attempt {}/{}. Sisa kesempatan kirim: {}.",
+                            delivery_attempt_number,
+                            delivery_max_attempts,
+                            delivery_remaining_attempts
+                        )
+                    } else {
+                        format!("Transaksi {} masuk proses pengerjaan.", row.id)
+                    };
+                    push_notification_best_effort(
+                        state,
+                        row.buyer_id,
+                        "transaction",
+                        "transaction.in_progress",
+                        if delivery_review_decision == "request_revision" {
+                            "Permintaan revisi terkirim"
+                        } else {
+                            "Pekerjaan dimulai"
+                        },
+                        &buyer_msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                    push_notification_best_effort(
+                        state,
+                        row.seller_id,
+                        "transaction",
+                        "transaction.in_progress",
+                        if delivery_review_decision == "request_revision" {
+                            "Buyer meminta revisi"
+                        } else {
+                            "Status transaksi: in_progress"
+                        },
+                        &seller_msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                }
+                "delivered" => {
+                    let buyer_msg = if delivery_attempt_number > 0 {
+                        format!(
+                            "Seller mengirim hasil kerja attempt {}/{} dengan {} bukti/link. Silakan cek lalu terima atau minta revisi.",
+                            delivery_attempt_number,
+                            delivery_max_attempts,
+                            delivery_attachment_count
+                        )
+                    } else {
+                        format!(
+                            "Transaksi {} ditandai delivered. Silakan cek lalu konfirmasi selesai.",
+                            row.id
+                        )
+                    };
+                    let seller_msg = if delivery_attempt_number > 0 {
+                        format!(
+                            "Hasil kerja attempt {}/{} sudah dikirim dan menunggu review buyer.",
+                            delivery_attempt_number, delivery_max_attempts
+                        )
+                    } else {
+                        format!("Transaksi {} sudah ditandai delivered.", row.id)
+                    };
+                    push_notification_best_effort(
+                        state,
+                        row.buyer_id,
+                        "transaction",
+                        "transaction.delivered",
+                        "Pesanan sudah dikirim",
+                        &buyer_msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                    push_notification_best_effort(
+                        state,
+                        row.seller_id,
+                        "transaction",
+                        "transaction.delivered",
+                        "Status transaksi: delivered",
+                        &seller_msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                }
+                "completed" => {
+                    let seller_msg = if delivery_review_decision == "accept" {
+                        format!(
+                            "Buyer menerima hasil kerja attempt {}/{}. Saldo {} sudah masuk ke wallet {}.",
+                            delivery_attempt_number, delivery_max_attempts, amount_label, wallet_environment
+                        )
+                    } else {
+                        format!(
+                            "Saldo {} sudah masuk ke wallet {} dari transaksi {}.",
+                            amount_label, wallet_environment, row.id
+                        )
+                    };
+                    let buyer_msg = if delivery_review_decision == "accept" {
+                        format!(
+                            "Anda menerima hasil kerja attempt {}/{}. Pembayaran {} dirilis ke penjual.",
+                            delivery_attempt_number, delivery_max_attempts, amount_label
+                        )
+                    } else {
+                        format!(
+                            "Pembayaran {} telah dirilis ke penjual untuk transaksi {}.",
+                            amount_label, row.id
+                        )
+                    };
+                    push_notification_best_effort(
+                        state,
+                        row.seller_id,
+                        "wallet",
+                        "wallet.payment_released",
+                        "Saldo masuk dari transaksi selesai",
+                        &seller_msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "amount_cents": row.amount_cents,
+                            "currency": row.currency,
+                            "wallet_environment": wallet_environment,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                    push_notification_best_effort(
+                        state,
+                        row.buyer_id,
+                        "transaction",
+                        "transaction.completed",
+                        "Transaksi selesai",
+                        &buyer_msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "amount_cents": row.amount_cents,
+                            "currency": row.currency,
+                            "wallet_environment": wallet_environment,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                }
+                "cancelled" => {
+                    let refund_note = if txn.protection_status == "funds_held"
+                        || txn.protection_status == "on_hold"
+                    {
+                        "Dana otomatis dikembalikan ke saldo buyer jika sebelumnya sudah ditahan."
+                    } else {
+                        "Belum ada dana yang ditahan."
+                    };
+                    push_notification_best_effort(
+                        state,
+                        row.buyer_id,
+                        "transaction",
+                        "transaction.cancelled",
+                        "Transaksi dibatalkan",
+                        &format!("Transaksi {} dibatalkan. {}", row.id, refund_note),
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status,
+                            "wallet_environment": wallet_environment
+                        }),
+                    )
+                    .await;
+                    push_notification_best_effort(
+                        state,
+                        row.seller_id,
+                        "transaction",
+                        "transaction.cancelled",
+                        "Transaksi dibatalkan",
+                        &format!("Transaksi {} dibatalkan.", row.id),
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status,
+                            "wallet_environment": wallet_environment
+                        }),
+                    )
+                    .await;
+                }
+                "disputed" => {
+                    let msg = if delivery_auto_escalated {
+                        format!(
+                            "Batas pengiriman {}/{} tercapai dan transaksi {} otomatis masuk dispute. Tim support akan meninjau bukti dari kedua pihak.",
+                            delivery_attempt_number, delivery_max_attempts, row.id
+                        )
+                    } else {
+                        format!(
+                            "Transaksi {} masuk status disputed. Tim support akan meninjau bukti.",
+                            row.id
+                        )
+                    };
+                    push_notification_best_effort(
+                        state,
+                        row.buyer_id,
+                        "transaction",
+                        "transaction.disputed",
+                        "Transaksi dalam sengketa",
+                        &msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                    push_notification_best_effort(
+                        state,
+                        row.seller_id,
+                        "transaction",
+                        "transaction.disputed",
+                        "Transaksi dalam sengketa",
+                        &msg,
+                        json!({
+                            "transaction_id": row.id,
+                            "status": row.status
+                        }),
+                    )
+                    .await;
+                }
+                _ => {}
+            }
+
+            let actor_role = if user_id == row.seller_id {
+                "seller"
+            } else if user_id == row.buyer_id {
+                "buyer"
+            } else {
+                "system"
+            };
+            let reason_code = status_context
+                .as_ref()
+                .and_then(|ctx| ctx.get("reason_code"))
+                .and_then(Value::as_str)
+                .unwrap_or("other");
+            let evidence_note = status_context
+                .as_ref()
+                .and_then(|ctx| ctx.get("evidence_note"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+
+            record_crm_activity_for_transaction(
+                &state.db,
+                &row,
+                user_id,
+                actor_role,
+                &format!("transaction.{}", next_status),
+                build_delivery_crm_message(row.id, next_status, status_context.as_ref()),
+                json!({
+                    "reason_code": reason_code,
+                    "response_message": row.response_message,
+                    "status_context": status_context
+                }),
+            )
+            .await;
+
+            if next_status == "disputed" {
+                if let Some(ticket) = ensure_support_ticket_for_dispute(
+                    &state.db,
+                    &row,
+                    user_id,
+                    reason_code,
+                    evidence_note,
+                )
+                .await
+                {
+                    record_crm_activity_for_transaction(
+                        &state.db,
+                        &row,
+                        user_id,
+                        actor_role,
+                        "transaction.dispute_escalated",
+                        format!(
+                            "Dispute transaksi {} dieskalasi ke support ticket {}.",
+                            row.id, ticket.id
+                        ),
+                        json!({
+                            "ticket_id": ticket.id,
+                            "support_room_id": ticket.support_room_id
+                        }),
+                    )
+                    .await;
+                }
+            }
+            (StatusCode::OK, Json(TransactionResponse::from(row))).into_response()
+        }
+        Err(e) => {
+            tracing::error!("update_transaction_status write error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update transaction",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn connect_outbox_channel(rabbitmq_url: &str, exchange: &str) -> anyhow::Result<Channel> {
+    let conn = Connection::connect(rabbitmq_url, ConnectionProperties::default()).await?;
+    let channel = conn.create_channel().await?;
+    channel
+        .exchange_declare(
+            exchange,
+            ExchangeKind::Topic,
+            ExchangeDeclareOptions {
+                durable: true,
+                ..Default::default()
+            },
+            FieldTable::default(),
+        )
+        .await?;
+    Ok(channel)
+}
+
+async fn publish_outbox_batch(
+    db: &PgPool,
+    channel: &Channel,
+    exchange: &str,
+    batch_size: i64,
+) -> anyhow::Result<usize> {
+    let events = sqlx::query_as::<_, OutboxEventRow>(
+        r#"
+        SELECT id, routing_key, payload, retry_count
+        FROM event_outbox
+        WHERE status = 'pending' AND available_at <= NOW()
+        ORDER BY created_at ASC
+        LIMIT $1
+        "#,
+    )
+    .bind(batch_size)
+    .fetch_all(db)
+    .await?;
+
+    if events.is_empty() {
+        return Ok(0);
+    }
+
+    for event in events.iter() {
+        let claimed = sqlx::query(
+            "UPDATE event_outbox SET status = 'processing' WHERE id = $1 AND status = 'pending'",
+        )
+        .bind(event.id)
+        .execute(db)
+        .await?;
+
+        if claimed.rows_affected() == 0 {
+            continue;
+        }
+
+        let payload_bytes = serde_json::to_vec(&event.payload)?;
+        let publish_result = channel
+            .basic_publish(
+                exchange,
+                &event.routing_key,
+                BasicPublishOptions::default(),
+                &payload_bytes,
+                BasicProperties::default()
+                    .with_content_type("application/json".into())
+                    .with_delivery_mode(2u8),
+            )
+            .await;
+
+        match publish_result {
+            Ok(confirm) => {
+                if let Err(err) = confirm.await {
+                    let error_text = format!("publish_confirm_failed: {:?}", err);
+                    let _ = sqlx::query(
+                        r#"
+                        UPDATE event_outbox
+                        SET
+                          status = 'pending',
+                          retry_count = retry_count + 1,
+                          available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
+                          error_message = $2
+                        WHERE id = $1
+                        "#,
+                    )
+                    .bind(event.id)
+                    .bind(error_text)
+                    .execute(db)
+                    .await;
+                    continue;
+                }
+            }
+            Err(err) => {
+                let error_text = format!("publish_failed: {:?}", err);
+                let _ = sqlx::query(
+                    r#"
+                    UPDATE event_outbox
+                    SET
+                      status = 'pending',
+                      retry_count = retry_count + 1,
+                      available_at = NOW() + (INTERVAL '5 second' * LEAST(60, retry_count + 1)),
+                      error_message = $2
+                    WHERE id = $1
+                    "#,
+                )
+                .bind(event.id)
+                .bind(error_text)
+                .execute(db)
+                .await;
+                continue;
+            }
+        }
+
+        sqlx::query(
+            r#"
+            UPDATE event_outbox
+            SET status = 'published', published_at = NOW(), error_message = NULL
+            WHERE id = $1
+            "#,
+        )
+        .bind(event.id)
+        .execute(db)
+        .await?;
+    }
+
+    Ok(events.len())
+}
+
+async fn run_outbox_publisher(
+    db: PgPool,
+    rabbitmq_url: String,
+    exchange: String,
+    batch_size: i64,
+    poll_ms: u64,
+) {
+    loop {
+        match connect_outbox_channel(&rabbitmq_url, &exchange).await {
+            Ok(channel) => loop {
+                match publish_outbox_batch(&db, &channel, &exchange, batch_size).await {
+                    Ok(count) if count == 0 => sleep(Duration::from_millis(poll_ms)).await,
+                    Ok(_) => {}
+                    Err(error) => {
+                        tracing::warn!("outbox publish error: {:?}", error);
+                        sleep(Duration::from_secs(2)).await;
+                        break;
+                    }
+                }
+            },
+            Err(error) => {
+                tracing::warn!("outbox connection error: {:?}", error);
+                sleep(Duration::from_secs(3)).await;
+            }
+        }
+    }
+}
+
+async fn find_content(db: &PgPool, id_or_slug: &str) -> Result<Option<ContentRow>, sqlx::Error> {
+    sqlx::query_as::<_, ContentRow>(
+        r#"
+        SELECT
+            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
+            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            metadata, created_at, updated_at
+        FROM content_items
+        WHERE id::text = $1 OR slug = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id_or_slug)
+    .fetch_optional(db)
+    .await
+}
+
+async fn load_content_activity_counts(
+    db: &PgPool,
+    content_id: Uuid,
+) -> Result<ContentActivityCounts, sqlx::Error> {
+    let transaction_count =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(1) FROM transactions WHERE content_id = $1")
+            .bind(content_id)
+            .fetch_one(db)
+            .await?;
+    let review_count =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(1) FROM reviews WHERE content_id = $1")
+            .bind(content_id)
+            .fetch_one(db)
+            .await?;
+
+    Ok(ContentActivityCounts {
+        transaction_count,
+        review_count,
+    })
+}
+
+async fn resolve_content_id(db: &PgPool, id_or_slug: &str) -> Result<Option<Uuid>, sqlx::Error> {
+    sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM content_items WHERE id::text = $1 OR slug = $1 LIMIT 1",
+    )
+    .bind(id_or_slug)
+    .fetch_optional(db)
+    .await
+}
+
+async fn find_transaction(db: &PgPool, id: Uuid) -> Result<Option<TransactionRow>, sqlx::Error> {
+    sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await
+}
+
+async fn find_transaction_for_user(
+    db: &PgPool,
+    id: Uuid,
+    user_id: Uuid,
+) -> Result<Option<TransactionRow>, sqlx::Error> {
+    sqlx::query_as::<_, TransactionRow>(
+        r#"
+        SELECT
+            id, content_id, buyer_id, seller_id, amount_cents, currency,
+            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
+            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
+            offer_message, response_message, created_at, updated_at
+        FROM transactions
+        WHERE id = $1 AND (buyer_id = $2 OR seller_id = $2)
+        LIMIT 1
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(db)
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_content_type_normalizes_aliases() {
+        assert_eq!(canonical_content_type("jobs"), "job");
+        assert_eq!(canonical_content_type("properties"), "property");
+        assert_eq!(canonical_content_type("products"), "product");
+        assert_eq!(canonical_content_type("service"), "service");
+        assert_eq!(canonical_content_type("rental"), "tool_rental");
+    }
+
+    #[test]
+    fn resolve_requested_content_type_accepts_matching_aliases() {
+        let resolved = resolve_requested_content_type(
+            Some("property".to_string()),
+            Some("properties".to_string()),
+            Some("property".to_string()),
+            Some("product"),
+        )
+        .expect("matching aliases should resolve");
+        assert_eq!(resolved, "property");
+    }
+
+    #[test]
+    fn resolve_requested_content_type_rejects_conflicting_aliases() {
+        let error = resolve_requested_content_type(
+            Some("property".to_string()),
+            Some("job".to_string()),
+            None,
+            Some("product"),
+        )
+        .expect_err("conflicting aliases must be rejected");
+        assert_eq!(error, "conflicting content_type values");
+    }
+
+    #[test]
+    fn upsert_request_deserializes_legacy_type_and_content_type_fields() {
+        let parsed: UpsertContentRequest = serde_json::from_value(json!({
+            "type": "property",
+            "content_type": "property",
+            "title": "Rumah contoh"
+        }))
+        .expect("request should deserialize with both aliases present");
+        assert_eq!(parsed.type_alias.as_deref(), Some("property"));
+        assert_eq!(parsed.content_type.as_deref(), Some("property"));
+    }
+
+    #[test]
+    fn content_type_change_requires_draft_and_clean_activity() {
+        let clean = ContentActivityCounts {
+            transaction_count: 0,
+            review_count: 0,
+        };
+        assert!(
+            can_change_content_type("property", "job", "draft", &clean).is_ok(),
+            "draft listing without activity should be allowed to change type"
+        );
+
+        let with_tx = ContentActivityCounts {
+            transaction_count: 1,
+            review_count: 0,
+        };
+        assert!(
+            can_change_content_type("property", "job", "draft", &with_tx).is_err(),
+            "listing with transactions must be type-locked"
+        );
+
+        let with_review = ContentActivityCounts {
+            transaction_count: 0,
+            review_count: 1,
+        };
+        assert!(
+            can_change_content_type("property", "job", "draft", &with_review).is_err(),
+            "listing with reviews must be type-locked"
+        );
+
+        assert!(
+            can_change_content_type("property", "job", "active", &clean).is_err(),
+            "non-draft listing must be type-locked"
+        );
+
+        let with_activity = ContentActivityCounts {
+            transaction_count: 3,
+            review_count: 2,
+        };
+        assert!(
+            can_change_content_type("property", "property", "archived", &with_activity).is_ok(),
+            "no-op type update should stay valid even for locked listings"
+        );
+    }
+
+    #[test]
+    fn property_metadata_forces_realestate_sector() {
+        let metadata = json!({
+            "sector": "manufacturing",
+            "sub_sector": "heavy_industry",
+            "property_type": "house"
+        });
+        let normalized = sanitize_content_metadata("property", metadata).expect("valid metadata");
+        assert_eq!(
+            normalized.get("sector").and_then(Value::as_str),
+            Some("realestate")
+        );
+        assert!(
+            normalized.get("sub_sector").is_none(),
+            "property listing should not carry generic sub_sector"
+        );
+    }
+
+    #[test]
+    fn non_property_metadata_keeps_normalized_sector_and_sub_sector() {
+        let metadata = json!({
+            "sector": "Technology Services",
+            "sub_sector": "Cloud Security"
+        });
+        let normalized = sanitize_content_metadata("job", metadata).expect("valid metadata");
+        assert_eq!(
+            normalized.get("sector").and_then(Value::as_str),
+            Some("technology-services")
+        );
+        assert_eq!(
+            normalized.get("sub_sector").and_then(Value::as_str),
+            Some("cloud-security")
+        );
+    }
+
+    #[test]
+    fn metadata_must_be_json_object() {
+        assert!(
+            sanitize_content_metadata("property", json!("invalid")).is_err(),
+            "metadata must be object to avoid malformed writes"
+        );
+    }
+
+    #[test]
+    fn sanitize_metadata_normalizes_image_urls() {
+        let metadata = json!({
+            "images": [
+                "https://cdn.example.com/one.jpg",
+                "https://cdn.example.com/one.jpg",
+                "invalid-path"
+            ],
+            "gallery_images": ["https://cdn.example.com/two.png"]
+        });
+        let normalized = sanitize_content_metadata("product", metadata).expect("valid metadata");
+        let image_urls = normalized
+            .get("image_urls")
+            .and_then(Value::as_array)
+            .expect("image_urls should be normalized into array");
+        assert_eq!(image_urls.len(), 2);
+    }
+
+    #[test]
+    fn sanitize_metadata_keeps_relative_internal_image_urls() {
+        let metadata = json!({
+            "images": [
+                "/api/content/media/laju-chat/content/example.jpeg",
+                "/uploads/content/example-two.PNG",
+                "/uploads/content/readme.txt"
+            ]
+        });
+        let normalized = sanitize_content_metadata("product", metadata).expect("valid metadata");
+        let image_urls = normalized
+            .get("image_urls")
+            .and_then(Value::as_array)
+            .expect("image_urls should be normalized into array");
+        assert_eq!(image_urls.len(), 2);
+        assert_eq!(
+            image_urls[0].as_str(),
+            Some("/api/content/media/laju-chat/content/example.jpeg")
+        );
+    }
+
+    #[test]
+    fn active_product_requires_primary_image() {
+        let result = validate_content_media_requirements("product", "active", None, &json!({}));
+        assert!(result.is_err(), "active product should require an image");
+    }
+
+    #[test]
+    fn active_product_accepts_relative_cover_image_path() {
+        let result = validate_content_media_requirements(
+            "product",
+            "active",
+            Some("/api/content/media/laju-chat/content/example.jpeg"),
+            &json!({}),
+        );
+        assert!(
+            result.is_ok(),
+            "internal relative image paths should be accepted"
+        );
+    }
+
+    #[test]
+    fn draft_product_allows_missing_image() {
+        let result = validate_content_media_requirements("product", "draft", None, &json!({}));
+        assert!(result.is_ok(), "draft product can be saved without image");
+    }
+
+    #[test]
+    fn active_tool_rental_requires_lajukan_approval() {
+        let result = validate_content_media_requirements(
+            "tool_rental",
+            "active",
+            Some("https://cdn.example.com/tool.jpg"),
+            &json!({
+                "image_urls": ["https://cdn.example.com/tool.jpg"],
+                "lajukan_rental_review": {
+                    "review_state": "pending_lajukan_review",
+                    "public_visibility": "hidden_until_approved",
+                    "custody_mode": "lajukan_physical_hold",
+                    "return_shipping_payer_if_rejected": "owner_sender"
+                }
+            }),
+        );
+        assert!(
+            result.is_err(),
+            "tool_rental must not become active before Lajukan approval"
+        );
+    }
+
+    #[test]
+    fn draft_tool_rental_pending_review_requires_lajukan_hold_metadata() {
+        let result = validate_content_media_requirements(
+            "tool_rental",
+            "draft",
+            Some("https://cdn.example.com/tool.jpg"),
+            &json!({
+                "image_urls": ["https://cdn.example.com/tool.jpg"],
+                "lajukan_rental_review": {
+                    "review_state": "pending_lajukan_review",
+                    "public_visibility": "listed",
+                    "custody_mode": "owner_holds",
+                    "return_shipping_payer_if_rejected": "borrower"
+                }
+            }),
+        );
+        assert!(
+            result.is_err(),
+            "pending review tool_rental must stay hidden and held by Lajukan with owner-paid return shipping"
+        );
+    }
+
+    #[test]
+    fn active_tool_rental_with_lajukan_approval_is_valid() {
+        let result = validate_content_media_requirements(
+            "tool_rental",
+            "active",
+            Some("https://cdn.example.com/tool.jpg"),
+            &json!({
+                "image_urls": ["https://cdn.example.com/tool.jpg"],
+                "lajukan_rental_review": {
+                    "review_state": "approved",
+                    "public_visibility": "hidden_until_approved",
+                    "custody_mode": "lajukan_physical_hold",
+                    "return_shipping_payer_if_rejected": "owner_sender"
+                }
+            }),
+        );
+        assert!(
+            result.is_ok(),
+            "approved tool_rental should be allowed to become active"
+        );
+    }
+
+    #[test]
+    fn dispute_settlement_partial_split_preserves_invariant() {
+        let settlement = calculate_dispute_settlement_amounts(
+            1_000_000,
+            "partial_split",
+            Some(30),
+            Some(20_000),
+            None,
+            None,
+        )
+        .expect("valid partial split");
+        assert_eq!(settlement.refund_amount_cents, 300_000);
+        assert_eq!(settlement.release_amount_cents, 680_000);
+        assert_eq!(settlement.platform_fee_cents, 20_000);
+        assert_eq!(
+            settlement.refund_amount_cents
+                + settlement.release_amount_cents
+                + settlement.platform_fee_cents,
+            1_000_000
+        );
+    }
+
+    #[test]
+    fn dispute_settlement_full_refund_waives_fee() {
+        let settlement = calculate_dispute_settlement_amounts(
+            500_000,
+            "buyer_win_full_refund",
+            None,
+            Some(10_000),
+            None,
+            None,
+        )
+        .expect("valid full refund");
+        assert_eq!(settlement.refund_amount_cents, 500_000);
+        assert_eq!(settlement.release_amount_cents, 0);
+        assert_eq!(settlement.platform_fee_cents, 0);
+        assert_eq!(settlement.seller_fault_ratio, 100);
+    }
+
+    #[test]
+    fn dispute_evidence_attachment_requires_sha256_hash() {
+        let invalid = normalize_dispute_evidence_attachments(Some(vec![
+            DisputeEvidenceAttachmentInput::Url("https://example.com/a.jpg".to_string()),
+        ]));
+        assert!(
+            invalid.is_err(),
+            "hash is mandatory for evidence attachment"
+        );
+
+        let valid = normalize_dispute_evidence_attachments(Some(vec![
+            DisputeEvidenceAttachmentInput::Url(format!(
+                "https://example.com/a.jpg|{}",
+                "a".repeat(EVIDENCE_HASH_SHA256_LEN)
+            )),
+        ]))
+        .expect("valid evidence");
+        assert_eq!(valid.len(), 1);
+    }
+
+    #[test]
+    fn normalize_cancel_reason_code_accepts_known_values() {
+        assert_eq!(
+            normalize_cancel_reason_code(Some("schedule_issue".to_string())),
+            Some("schedule_issue".to_string())
+        );
+        assert_eq!(
+            normalize_cancel_reason_code(Some("totally_new_reason".to_string())),
+            None
+        );
+    }
+
+    #[test]
+    fn normalize_dispute_reason_code_rejects_unknown_values() {
+        assert_eq!(
+            normalize_dispute_reason_code(Some("item_not_as_described".to_string())),
+            Some("item_not_as_described".to_string())
+        );
+        assert_eq!(
+            normalize_dispute_reason_code(Some("schedule_issue".to_string())),
+            None
+        );
+    }
+}

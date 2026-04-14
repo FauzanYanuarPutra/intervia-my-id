@@ -1,0 +1,8 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="20" fill="#0B3A6E"/>
+  <circle cx="60" cy="48" r="26" fill="#0EA5E9"/>
+  <circle cx="60" cy="48" r="16" fill="#BAE6FD"/>
+  <rect x="33" y="72" width="54" height="20" rx="10" fill="#38BDF8"/>
+  <text x="60" y="86" text-anchor="middle" fill="#082F49" font-size="10" font-family="Arial, sans-serif" font-weight="700">E-WALLET</text>
+  <text x="60" y="109" text-anchor="middle" fill="#E0F2FE" font-size="12" font-family="Arial, sans-serif">GOPAY</text>
+</svg>

@@ -1,0 +1,31 @@
+{
+  "name": "cms",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lajukan-ui": "file:../shared",
+    "next": "^16.0.7",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "tailwind-merge": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.22",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.1",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.18",
+    "typescript": "5.9.3"
+  }
+}

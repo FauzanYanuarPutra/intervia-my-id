@@ -1,0 +1,214 @@
+# ==============================================================================
+# LAJUKAN PLATFORM - ENVIRONMENT CONFIGURATION
+# ==============================================================================
+# Copy this file to .env.development or .env.production and fill in the values
+# ==============================================================================
+
+# ==============================================================================
+# 1. BASIC CONFIG & IDENTITY
+# ==============================================================================
+ENV=development
+APP_NAME=Lajukan
+APP_DOMAIN=localhost
+ADMIN_EMAIL=admin@localhost
+APP_VERSION=0.1.0
+RUST_LOG=info
+
+# Secret Key untuk JWT (Minimal 32 karakter)
+# Generate: openssl rand -base64 48
+JWT_SECRET=your_super_secure_jwt_secret_key_min_32_chars_here
+JWT_ISSUER=laju
+JWT_AUDIENCE=laju_users
+
+# ==============================================================================
+# 2. DATABASE (PostgreSQL)
+# ==============================================================================
+DB_USER=app
+DB_PASS=your_db_password_here
+DB_NAME=laju_db
+PORT_POSTGRES=5432
+# Internal container connection URL
+DATABASE_URL=postgres://app:your_db_password_here@postgres_db:5432/laju_db
+
+# ==============================================================================
+# 3. INFRASTRUCTURE & CACHE
+# ==============================================================================
+# Redis (Cache & Session)
+REDIS_PASS=your_redis_password
+PORT_REDIS=6379
+REDIS_URL=redis://:your_redis_password@redis_cache:6379
+
+# RabbitMQ (Message Broker)
+RABBIT_USER=identity_service
+RABBIT_PASS=your_rabbitmq_password
+RABBIT_URL=amqp://identity_service:your_rabbitmq_password@rabbitmq:5672/%2f
+
+# Meilisearch (Search Engine)
+MEILI_KEY=your_meilisearch_master_key
+MEILI_ENV=development
+
+# Qdrant (Vector DB for Face Recognition)
+PORT_QDRANT=6333
+
+# ==============================================================================
+# 4. AI STACK CONFIGURATION
+# ==============================================================================
+# vLLM Engine
+MODEL_URL=http://vllm_engine:8000/v1
+
+# OCR & Liveness Services
+OCR_URL=http://ocr_service:8000/predict
+LIVENESS_URL=http://liveness_service:8000/check
+
+# CompreFace (Face Matching)
+COMPREFACE_URL=http://compreface-api:8000
+
+# AI Chat (Asisten Lajukan - pilih salah satu)
+# Gratis: daftar di https://console.groq.com dan isi GROQ_API_KEY
+GROQ_API_KEY=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
+# Alternatif: OpenAI (bayar) atau internal service
+OPENAI_API_KEY=
+AI_MODEL=gpt-3.5-turbo
+INTERNAL_AI_URL=
+
+# ==============================================================================
+# 5. STORAGE (MinIO)
+# ==============================================================================
+MINIO_USER=laju_admin
+MINIO_PASS=your_minio_password
+PORT_MINIO_API=9000
+PORT_MINIO_UI=9090
+# For www uploads: set when using MinIO (Docker auto-sets; local dev use same as MINIO_USER/MINIO_PASS)
+# MINIO_ENDPOINT=http://localhost:9000
+# MINIO_ACCESS_KEY=laju_admin
+# MINIO_SECRET_KEY=your_minio_password
+# MINIO_BUCKET=laju-chat
+
+# ==============================================================================
+# 6. CHAT SERVICE (Elixir/Phoenix)
+# ==============================================================================
+# Phoenix secret key base (minimum 64 characters)
+# Generate: mix phx.gen.secret
+SECRET_KEY_BASE=your_phoenix_secret_key_base_minimum_64_characters_long_here_xxxx
+PHX_SERVER=true
+SCYLLA_HOST=scylla_db
+SCYLLA_PORT=9042
+SCYLLA_KEYSPACE=laju_chat
+
+
+# ==============================================================================
+# 9. WALLET & PAYMENTS (TOP-UP)
+# ==============================================================================
+# Environment separation
+WALLET_DEFAULT_ENV=development
+WALLET_LIVE_ENABLED=false
+WALLET_DEFAULT_PROVIDER=midtrans
+WALLET_DEV_AUTO_SETTLE=true
+WALLET_ALLOW_LIVE_IN_NON_PROD=false
+WALLET_ALLOW_MOCK_IN_LIVE=false
+WALLET_MIDTRANS_FALLBACK_TO_MOCK=true
+
+# Midtrans (Sandbox for development)
+# Merchant ID is used for dashboard/admin reference
+MIDTRANS_MERCHANT_ID=G594225657
+MIDTRANS_CLIENT_KEY=SB-Mid-client-Tt2boJ-QnJ9t1kE0
+MIDTRANS_SERVER_KEY_SANDBOX=SB-Mid-server-Rq4vNkeWJZWM5RWaV5trcf_F
+MIDTRANS_SERVER_KEY_LIVE=
+
+# Midtrans callback and redirect endpoints
+# Notification URL from Midtrans server callback
+MIDTRANS_PAYMENT_NOTIFICATION_URL=https://www.lajukan.com/api/wallet/providers/midtrans/notify
+WALLET_MIDTRANS_NOTIFICATION_URL=https://www.lajukan.com/api/wallet/providers/midtrans/notify
+# Customer redirect URL from Midtrans Snap
+MIDTRANS_FINISH_REDIRECT_URL=https://www.lajukan.com/payments?topup_status=finish
+MIDTRANS_UNFINISH_REDIRECT_URL=https://www.lajukan.com/payments?topup_status=unfinish
+MIDTRANS_ERROR_REDIRECT_URL=https://www.lajukan.com/payments?topup_status=error
+WALLET_MIDTRANS_FINISH_REDIRECT_URL=https://www.lajukan.com/payments?topup_status=finish
+WALLET_MIDTRANS_UNFINISH_REDIRECT_URL=https://www.lajukan.com/payments?topup_status=unfinish
+WALLET_MIDTRANS_ERROR_REDIRECT_URL=https://www.lajukan.com/payments?topup_status=error
+# 
+
+# ==============================================================================
+# 7. FRONTEND & CORS
+# ==============================================================================
+PORT_FRONTEND=3000
+PORT_CMS=3001
+PORT_CRM=3002
+FRONTEND_URL=http://localhost:3000
+CORS_ORIGIN=http://localhost:3000,http://localhost:3001,http://localhost:3002
+
+# Public API URLs (accessed by browser)
+NEXT_PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_MARKETPLACE_URL=http://localhost:8081
+NEXT_PUBLIC_CHAT_WS_URL=ws://localhost:4000/socket
+NEXT_PUBLIC_WWW_URL=http://localhost:3000
+NEXT_PUBLIC_CMS_URL=http://localhost:3001
+NEXT_PUBLIC_CRM_URL=http://localhost:3002
+
+# WebRTC ICE Servers (STUN/TURN)
+# Multiple URLs can be comma-separated. TURN requires username + credential.
+NEXT_PUBLIC_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+NEXT_PUBLIC_TURN_URLS=
+NEXT_PUBLIC_TURN_USERNAME=
+NEXT_PUBLIC_TURN_CREDENTIAL=
+
+# Internal service URLs (container-to-container)
+INTERNAL_API_URL=http://identity_service:8080
+INTERNAL_CHAT_URL=http://chat_service:4000
+INTERNAL_MARKETPLACE_URL=http://marketplace_service:8081
+
+# ==============================================================================
+# 8. AUTH POLICY (Rust Identity Config)
+# ==============================================================================
+ACCESS_TOKEN_EXP_HOURS=1
+REFRESH_TOKEN_EXP_DAYS=30
+MAX_LOGIN_ATTEMPTS=5
+LOCKOUT_DURATION_MIN=15
+FAILED_LOGIN_DELAY_MS=1000
+AUTH_PASSWORD_MIN_LENGTH=10
+REGISTER_RATE_LIMIT_PER_HOUR=20
+REGISTER_EMAIL_RATE_LIMIT_PER_HOUR=5
+LOGIN_RATE_LIMIT_PER_15_MIN=20
+LOGIN_EMAIL_RATE_LIMIT_PER_15_MIN=10
+OTP_LIMIT_PER_TARGET_PER_HOUR=5
+OTP_LIMIT_PER_IP_PER_HOUR=30
+
+# ==============================================================================
+# 9. TOOLS & DASHBOARDS
+# ==============================================================================
+PORT_PGADMIN=5050
+PORT_DBUI=3005
+REPLICAS_UI=1
+
+# ==============================================================================
+# 10. EMAIL SMTP (DEV Gratis: MailHog)
+# ==============================================================================
+EMAIL_TRANSPORT=smtp
+SMTP_HOST=mailhog
+SMTP_PORT=1025
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM="Lajukan Dev <noreply@localhost>"
+FROM_EMAIL=noreply@localhost
+FROM_NAME=Lajukan
+LOGIN_OTP_REQUIRED=false
+NEXT_PUBLIC_LOGIN_OTP_REQUIRED=false
+REGISTER_OTP_REQUIRED=true
+REGISTER_PHONE_OTP_REQUIRED=false
+
+# ==============================================================================
+# 11. GOOGLE OAUTH (Optional - for Google Sign-In)
+# ==============================================================================
+# Get these from: https://console.cloud.google.com/apis/credentials
+GOOGLE_CLIENT_ID=289875119273-iafvd0iji2h15k4l0r4aojt64kc5up1g.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+GOOGLE_REDIRECT_URI=http://www:3000/api/auth/google/callback
+
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoiYzc2Zjg5OWJjMmFkMWNlNzJjNjYzNTZlZDkyOGFiNzMiLCJ0IjoiYzIxYzFhNDktMmFiZS00Mjk1LTg5OGMtMmVjZDU0ZTUxZDk0IiwicyI6IlpETXhOR1ZtT1RBdFlXUTBNUzAwTURBMUxXRmlaV1l0Wm1KalpERmtaV1kwTUdReSJ9
+
+DISABLE_PWA=true
+
+
+NEXT_PUBLIC_OSM_TILE_URL=https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
+NEXT_PUBLIC_OSM_TILE_ATTRIBUTION=&copy; OpenStreetMap contributors
+OSRM_BASE_URL=https://router.project-osrm.org
