@@ -1,28 +1,18 @@
 import { redirect } from 'next/navigation';
-import { UsahaFlowLandingClient } from '@/components/super-app/UsahaFlowLandingClient';
 import {
-  buildUsahaPath,
   readSurfaceStoreId,
   type SurfaceSearchParams,
 } from '@/lib/umkmSurface';
+import { resolveUsahaOwnerGatewayTarget } from '@/lib/server/usahaOwnerGateway';
 
 type PageProps = {
-  params: Promise<{ locale: string }>;
   searchParams: Promise<SurfaceSearchParams>;
 };
 
-export default async function UsahaPage({ params, searchParams }: PageProps) {
-  const { locale } = await params;
+export default async function UsahaPage({ searchParams }: PageProps) {
   const storeId = readSurfaceStoreId(await searchParams);
-
-  if (storeId) {
-    redirect(`/${locale}${buildUsahaPath('dashboard', { storeId })}`);
-  }
-
-  return (
-    <UsahaFlowLandingClient
-      locale={locale}
-      isId={locale === 'id'}
-    />
-  );
+  const target = await resolveUsahaOwnerGatewayTarget({
+    preferredStoreId: storeId,
+  });
+  redirect(target.href);
 }

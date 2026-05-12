@@ -28,7 +28,7 @@ export default function ClientBottomNav() {
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.5rem)' }}
       aria-label="Mobile primary navigation"
     >
-      <div className="mx-auto max-w-lg rounded-[28px] border border-[color:color-mix(in_srgb,_var(--app-border)_88%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] px-2 pb-2 pt-1.5 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_68%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)]">
+      <div className="mx-auto max-w-lg rounded-[30px] border border-[color:color-mix(in_srgb,_var(--app-border)_82%,_white_8%)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_97%,_transparent)] px-2 pb-2 pt-1.5 shadow-[0_28px_48px_-30px_rgba(15,23,42,0.22)] backdrop-blur-xl dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_62%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_98%,_transparent)]">
         <ul className="grid grid-cols-5 items-end gap-1">
           {items.map(item => {
             const Icon = item.icon;
@@ -62,16 +62,16 @@ export default function ClientBottomNav() {
                         ? 'text-[color:var(--app-accent)]'
                         : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]',
                   )}
-                >
-                  <span
-                    className={cn(
-                      'pointer-events-none inline-flex items-center justify-center transition',
-                      isCreate
-                        ? cn(
-                            'h-12 w-12 rounded-full border shadow-[var(--app-shadow)] min-[360px]:h-[3.25rem] min-[360px]:w-[3.25rem]',
+                  >
+                    <span
+                      className={cn(
+                        'pointer-events-none inline-flex items-center justify-center transition',
+                        isCreate
+                          ? cn(
+                            'h-[3.35rem] w-[3.35rem] rounded-full border shadow-[var(--app-shadow-strong)] min-[360px]:h-[3.55rem] min-[360px]:w-[3.55rem]',
                             active
                               ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                              : 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_72%,_transparent)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]',
+                              : 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_72%,_transparent)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)]',
                           )
                         : cn(
                             'h-10 w-10 rounded-full',
@@ -79,7 +79,7 @@ export default function ClientBottomNav() {
                               ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                               : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
                           ),
-                    )}
+                      )}
                   >
                     <Icon
                       className={cn(
@@ -93,6 +93,7 @@ export default function ClientBottomNav() {
                   <span
                     className={cn(
                       'pointer-events-none truncate leading-none',
+                      isCreate && 'sr-only',
                       active && !isCreate && 'text-[color:var(--app-accent)]',
                     )}
                   >

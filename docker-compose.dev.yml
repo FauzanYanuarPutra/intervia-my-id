@@ -47,6 +47,40 @@ services:
     ports:
       - "${PORT_FRONTEND:-3000}:3000"
 
+  # ---------------- Frontend usaha (Hot Reload) ----------------
+  usaha:
+    build:
+      context: ./frontend
+      dockerfile: usaha/Dockerfile
+      target: usaha_dev
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    command: npm run dev -- -H 0.0.0.0 -p 3003
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_APP_ENV: development
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      EMAIL_TRANSPORT: smtp
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USER: ""
+      SMTP_PASS: ""
+    volumes:
+      - ./frontend/shared:/app/shared:delegated
+      - ./frontend/usaha/src:/app/usaha/src:delegated
+      - ./frontend/usaha/messages:/app/usaha/messages:delegated
+      - ./frontend/usaha/next.config.ts:/app/usaha/next.config.ts:ro
+      - ./frontend/usaha/tailwind.config.ts:/app/usaha/tailwind.config.ts:ro
+      - ./frontend/usaha/postcss.config.mjs:/app/usaha/postcss.config.mjs:ro
+      - ./frontend/usaha/tsconfig.json:/app/usaha/tsconfig.json:ro
+      - /app/usaha/node_modules
+      - /app/usaha/.next
+    ports:
+      - "${PORT_USAHA:-3003}:3003"
+
   # ---------------- MailHog (Dev Email Inbox) ----------------
   mailhog:
     image: mailhog/mailhog:v1.0.1
@@ -177,22 +211,27 @@ services:
       - chat_build:/app/_build
 
   # ---------------- OCR & Liveness (Hot Reload) ----------------
-  ocr_service:
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    environment:
-      USE_GPU: "0"
-      PYTHONUNBUFFERED: "1"
-      PYTHONDONTWRITEBYTECODE: "1"
-    volumes:
-      - ./ai/ocr_paddle:/app:delegated
-
-  liveness_service:
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    environment:
-      PYTHONUNBUFFERED: "1"
-      PYTHONDONTWRITEBYTECODE: "1"
-    volumes:
-      - ./ai/liveness:/app:delegated
+  # Disabled here because these services are not declared in the base
+  # compose file. Keeping them uncommented makes
+  # `docker compose -f docker-compose.yml -f docker-compose.dev.yml ...`
+  # invalid, which blocks the dev usaha stack from starting.
+  #
+  # ocr_service:
+  #   command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  #   environment:
+  #     USE_GPU: "0"
+  #     PYTHONUNBUFFERED: "1"
+  #     PYTHONDONTWRITEBYTECODE: "1"
+  #   volumes:
+  #     - ./ai/ocr_paddle:/app:delegated
+  #
+  # liveness_service:
+  #   command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  #   environment:
+  #     PYTHONUNBUFFERED: "1"
+  #     PYTHONDONTWRITEBYTECODE: "1"
+  #   volumes:
+  #     - ./ai/liveness:/app:delegated
 
 # NOTE:
 # - Volume mounts use 'delegated' for better performance on macOS/Windows

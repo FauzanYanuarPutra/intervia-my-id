@@ -50,9 +50,9 @@ export default function ClientLayoutWrapper({ children, locale }: Props) {
       <GlobalLoader />
       <NetworkStatus />
       <LanguageModalProvider locale={locale}>
-        <AppShell showHeader={showNav} showBottomNav={showBottom} showFooter={showFooter}>
+          
           {children}
-        </AppShell>
+        {/* </AppShell> */}
         <Suspense fallback={null}>
           <LanguageModal />
         </Suspense>

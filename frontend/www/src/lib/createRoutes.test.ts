@@ -4,6 +4,7 @@ import {
   normalizeCreateTypeSegment,
   resolveMarketplaceCreatePath,
 } from './createRoutes';
+import { buildUsahaPath } from './umkmSurface';
 
 describe('createRoutes', () => {
   it('normalizes localized rental route segments', () => {
@@ -34,7 +35,7 @@ describe('createRoutes', () => {
       '/create/jual/profil-usaha',
     );
     expect(resolveMarketplaceCreatePath('id', 'company', 'supply')).toBe(
-      '/usaha/onboarding',
+      buildUsahaPath('onboarding'),
     );
     expect(resolveMarketplaceCreatePath('en', 'tool_rental', 'supply')).toBe(
       '/create/sell/tool-rental',

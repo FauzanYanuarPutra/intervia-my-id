@@ -5,6 +5,7 @@ import Image from 'next/image';
 import {
   Bell,
   ChevronRight,
+  LayoutGrid,
   MapPinned,
   Menu,
   MessageCircle,
@@ -34,8 +35,7 @@ import { WalletHeaderShortcut } from '@/components/wallet/WalletHeaderShortcut';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import {
   LEGACY_UMKM_OWNER_PATH,
-  UMKM_DISCOVERY_PATH,
-  UMKM_OWNER_PATH,
+  buildUsahaPath,
   getUmkmSurfaceCopy,
 } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
@@ -79,8 +79,8 @@ export function Header() {
   const localeKey = locale === 'id' ? 'id' : 'en';
   const cleanPath = normalizePathname(pathname);
   const createHref = isAuthenticated ? '/create' : '/register';
-  const mapHref = UMKM_DISCOVERY_PATH;
-  const manageHref = UMKM_OWNER_PATH;
+  const categoryHref = '/kategori';
+  const manageHref = buildUsahaPath('home');
   const accountHref = isAuthenticated ? '/profile' : '/login';
   const chatHref = isAuthenticated ? '/chat' : '/login';
   const surfaceCopy = getUmkmSurfaceCopy(locale);
@@ -92,7 +92,7 @@ export function Header() {
         ? 'Supplier, jasa, dan peluang usaha'
         : 'Suppliers, services, and business opportunities',
     search: locale === 'id' ? 'Cari' : 'Search',
-    mapLong: surfaceCopy.discovery,
+    category: locale === 'id' ? 'Kategori' : 'Categories',
     manage: surfaceCopy.owner,
     create: locale === 'id' ? 'Posting' : 'Post',
     createLong:
@@ -125,13 +125,13 @@ export function Header() {
         ],
       },
       {
-        href: mapHref,
-        label: text.mapLong,
-        icon: MapPinned,
-        matchers: ['/umkm', '/toko', '/super-app'],
+        href: categoryHref,
+        label: text.category,
+        icon: LayoutGrid,
+        matchers: ['/kategori'],
       },
     ],
-    [mapHref, text.mapLong, text.search],
+    [categoryHref, text.category, text.search],
   );
 
   const coreDrawerItems = useMemo(
@@ -472,13 +472,9 @@ export function Header() {
             <nav className="flex items-center gap-1">
               {desktopMenuItems.map(item => {
                 const Icon = item.icon;
-                const active =
-                  item.matchers.some(matcher => matchesRoute(cleanPath, matcher)) &&
-                  !(
-                    item.href === mapHref &&
-                    (matchesRoute(cleanPath, '/usaha') ||
-                      matchesRoute(cleanPath, LEGACY_UMKM_OWNER_PATH))
-                  );
+                const active = item.matchers.some(matcher =>
+                  matchesRoute(cleanPath, matcher),
+                );
 
                 return (
                   <Link

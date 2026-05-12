@@ -1,15 +1,14 @@
 'use client';
 
 import {
+  ClipboardList,
   Home,
-  MapPinned,
+  LayoutGrid,
   PlusCircle,
-  Search,
   User,
   type LucideIcon,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { UMKM_DISCOVERY_PATH, getUmkmSurfaceCopy } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 
 export type PrimaryNavItem = {
@@ -60,14 +59,14 @@ export function buildPrimaryNavItems(
   locale: 'id' | 'en',
 ): PrimaryNavItem[] {
   const createHref = isAuthenticated ? '/create' : '/register';
-  const mapHref = UMKM_DISCOVERY_PATH;
+  const categoryHref = '/kategori';
+  const requestHref = isAuthenticated ? '/my-projects' : '/login';
   const accountHref = isAuthenticated ? '/profile' : '/login';
-  const surfaceCopy = getUmkmSurfaceCopy(locale);
   const text = {
     home: locale === 'id' ? 'Beranda' : 'Home',
-    search: locale === 'id' ? 'Cari' : 'Search',
-    create: locale === 'id' ? 'Posting' : 'Post',
-    umkm: surfaceCopy.discoveryShort,
+    search: locale === 'id' ? 'Kategori' : 'Categories',
+    create: locale === 'id' ? 'Buat' : 'Create',
+    umkm: locale === 'id' ? 'Permintaan' : 'Requests',
     account: locale === 'id' ? 'Akun' : 'Account',
   };
 
@@ -82,9 +81,11 @@ export function buildPrimaryNavItems(
     {
       key: 'search',
       label: text.search,
-      href: '/search',
-      icon: Search,
+      href: categoryHref,
+      icon: LayoutGrid,
       matchers: [
+        '/kategori',
+        '/umkm',
         '/search',
         '/jobs',
         '/freelancers',
@@ -103,9 +104,9 @@ export function buildPrimaryNavItems(
     {
       key: 'umkm',
       label: text.umkm,
-      href: mapHref,
-      icon: MapPinned,
-      matchers: ['/umkm', '/toko', '/super-app'],
+      href: requestHref,
+      icon: ClipboardList,
+      matchers: ['/my-projects', '/projects'],
     },
     {
       key: 'account',

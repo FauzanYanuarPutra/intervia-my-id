@@ -39,7 +39,7 @@ import { useToast } from '@/components/system/feedback/ToastProvider';
 import { useAuth } from '@/context/AuthContext';
 import {
   UMKM_DISCOVERY_PATH,
-  UMKM_OWNER_PATH,
+  buildUsahaPath,
   buildUmkmDiscoveryPath,
   buildUmkmScanPath,
 } from '@/lib/umkmSurface';
@@ -2844,7 +2844,7 @@ export function UmkmStorefrontClient({
                   </LocalizedAnchor>
                   {isStoreOwner ? (
                     <LocalizedAnchor
-                      href={UMKM_OWNER_PATH}
+                      href={buildUsahaPath('home')}
                       className={utilityActionClass}
                     >
                       <LayoutDashboard className="h-3.5 w-3.5" />

@@ -6,7 +6,7 @@ import {
   getSuperAppService,
   type SuperAppServiceDefinition,
 } from '@/lib/super-app/catalog';
-import { UMKM_OWNER_PATH } from '@/lib/umkmSurface';
+import { buildUsahaPath } from '@/lib/umkmSurface';
 import {
   ArrowRight,
   ChevronLeft,
@@ -123,7 +123,7 @@ const MODULE_PLAYBOOKS: Record<string, Playbook> = {
     primaryHref: '#ops-panel',
     primaryLabelId: 'Lihat storefront',
     primaryLabelEn: 'Open storefronts',
-    secondaryHref: UMKM_OWNER_PATH,
+    secondaryHref: buildUsahaPath('home'),
     secondaryLabelId: 'Kelola outlet sendiri',
     secondaryLabelEn: 'Manage your own outlet',
   },

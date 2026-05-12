@@ -46,8 +46,8 @@ services:
       # --- Domain & CORS ---
       APP_DOMAIN: ${APP_DOMAIN:-localhost}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS_IDENTITY:-true}
 
     # Tambahkan Healthcheck supaya service lain tahu kalau identity sudah benar-benar up
@@ -194,7 +194,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASS}
       RABBITMQ_URL: amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672/%2f
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:4000/api/health" ]
       interval: 15s
@@ -232,7 +232,7 @@ services:
       RABBITMQ_USER: ${RABBIT_USER}
       RABBITMQ_PASSWORD: ${RABBIT_PASS} # Tambahkan ini agar entrypoint.sh bisa baca
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
       OUTBOX_EXCHANGE: ${OUTBOX_EXCHANGE:-marketplace.outbox}
       OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-50}
       OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-1500}
@@ -398,7 +398,7 @@ services:
   #     - RABBITMQ_HOST=rabbitmq
   #     - RABBITMQ_USER=${RABBIT_USER}
   #     - RABBITMQ_PASSWORD=${RABBIT_PASS}
-  #     - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002}
+  #     - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
   #     - RUN_MIGRATIONS=false
   #   depends_on:
   #     ocr_service: { condition: service_started }
@@ -444,14 +444,14 @@ services:
   minio:
     image: minio/minio
     ports:
-      - "${PORT_MINIO_API:-9000}:9000" # API
+      - "${PORT_MINIO_API:-9002}:9002" # API
       - "${PORT_MINIO_UI:-9005}:9001" # UI/Console (Changed default to 9005)
     environment:
       MINIO_ROOT_USER: ${MINIO_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_PASS}
     volumes:
       - minio_data:/data
-    command: server /data --console-address ":9001"
+    command: server /data --address ":9002" --console-address ":9001"
     networks:
       - web
 
@@ -476,13 +476,15 @@ services:
       NEXT_PUBLIC_MARKETPLACE_WS_URL: ${NEXT_PUBLIC_MARKETPLACE_WS_URL:-}
       NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-}
       NEXT_PUBLIC_NOTIFICATION_WS_URL: ${NEXT_PUBLIC_NOTIFICATION_WS_URL:-}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
       # URL untuk Server-side (Internal Docker)
       INTERNAL_API_URL: http://identity_service:8080
       INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
       MARKETPLACE_URL: http://marketplace_service:8081
       INTERNAL_CHAT_URL: http://chat_service:4000
       # INTERNAL_AI_URL: http://ai_service:8080
-      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ENDPOINT: http://minio:9002
       MINIO_ACCESS_KEY: ${MINIO_USER}
       MINIO_SECRET_KEY: ${MINIO_PASS}
       MINIO_BUCKET: ${MINIO_BUCKET:-laju-chat}
@@ -526,6 +528,74 @@ services:
       - web
     restart: unless-stopped
 
+  usaha:
+    build:
+      context: ./frontend
+      dockerfile: usaha/Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+    ports:
+      - "${PORT_USAHA:-3003}:3003"
+    environment:
+      NODE_ENV: production
+      ENV: ${ENV:-development}
+      APP_ENV: ${APP_ENV:-development}
+      NEXT_PUBLIC_APP_ENV: ${NEXT_PUBLIC_APP_ENV:-development}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      NEXT_PUBLIC_MARKETPLACE_URL: http://localhost:8081
+      NEXT_PUBLIC_MARKETPLACE_WS_URL: ${NEXT_PUBLIC_MARKETPLACE_WS_URL:-}
+      NEXT_PUBLIC_CHAT_WS_URL: ${NEXT_PUBLIC_CHAT_WS_URL:-}
+      NEXT_PUBLIC_NOTIFICATION_WS_URL: ${NEXT_PUBLIC_NOTIFICATION_WS_URL:-}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
+      INTERNAL_API_URL: http://identity_service:8080
+      INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
+      MARKETPLACE_URL: http://marketplace_service:8081
+      INTERNAL_CHAT_URL: http://chat_service:4000
+      MINIO_ENDPOINT: http://minio:9002
+      MINIO_ACCESS_KEY: ${MINIO_USER}
+      MINIO_SECRET_KEY: ${MINIO_PASS}
+      MINIO_BUCKET: ${MINIO_BUCKET:-laju-chat}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-}
+      DISABLE_PWA: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://:${REDIS_PASS}@redis_cache:6379
+      ALLOW_BEARER_AUTH: "true"
+      LOGIN_OTP_REQUIRED: ${LOGIN_OTP_REQUIRED:-false}
+      NEXT_PUBLIC_LOGIN_OTP_REQUIRED: ${NEXT_PUBLIC_LOGIN_OTP_REQUIRED:-false}
+      REGISTER_OTP_REQUIRED: ${REGISTER_OTP_REQUIRED:-true}
+      REGISTER_PHONE_OTP_REQUIRED: ${REGISTER_PHONE_OTP_REQUIRED:-false}
+      EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      FROM_EMAIL: ${FROM_EMAIL:-}
+      FROM_NAME: ${FROM_NAME:-Lajukan}
+      CAPTCHA_PROVIDER: ${CAPTCHA_PROVIDER:-turnstile}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      HCAPTCHA_SECRET_KEY: ${HCAPTCHA_SECRET_KEY:-}
+      NEXT_PUBLIC_CAPTCHA_PROVIDER: ${NEXT_PUBLIC_CAPTCHA_PROVIDER:-turnstile}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+      NEXT_PUBLIC_HCAPTCHA_SITE_KEY: ${NEXT_PUBLIC_HCAPTCHA_SITE_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    healthcheck:
+      test: [ "CMD", "node", "-e", "fetch('http://localhost:3003').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      identity_service: { condition: service_healthy }
+      marketplace_service: { condition: service_healthy }
+      chat_service: { condition: service_healthy }
+    networks:
+      - web
+    restart: unless-stopped
+
   cms:
     build:
       context: ./frontend
@@ -537,6 +607,7 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
       INTERNAL_API_URL: http://identity_service:8080
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://localhost:3001').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
@@ -561,6 +632,7 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
       NEXT_PUBLIC_MARKETPLACE_URL: http://localhost:8081
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
       INTERNAL_API_URL: http://identity_service:8080
       INTERNAL_CHAT_URL: http://chat_service:4000
       USE_OLLAMA: ${USE_OLLAMA:-false}
@@ -627,20 +699,20 @@ services:
     networks:
       - web
 
-  # db_ui:
-  #   image: dbgate/dbgate
-  #   deploy:
-  #     replicas: ${REPLICAS_UI:-1}
-  #   environment:
-  #     - CONNECTIONS=scylla_db_conn
-  #     - LABEL_scylla_db_conn=ScyllaDB
-  #     - ENGINE_scylla_db_conn=cassandra
-  #     - SERVER_scylla_db_conn=scylla_db
-  #     - PORT_scylla_db_conn=9042
-  #   ports:
-  #     - "${PORT_DBUI:-3005}:3000"
-  #   networks:
-  #     - web
+  db_ui:
+    image: dbgate/dbgate
+    deploy:
+      replicas: ${REPLICAS_UI:-1}
+    environment:
+      - CONNECTIONS=scylla_db_conn
+      - LABEL_scylla_db_conn=ScyllaDB
+      - ENGINE_scylla_db_conn=cassandra
+      - SERVER_scylla_db_conn=scylla_db
+      - PORT_scylla_db_conn=9042
+    ports:
+      - "${PORT_DBUI:-3005}:3000"
+    networks:
+      - web
 
   mailserver:
     image: ghcr.io/docker-mailserver/docker-mailserver:latest

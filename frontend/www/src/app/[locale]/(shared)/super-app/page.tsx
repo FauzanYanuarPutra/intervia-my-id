@@ -17,7 +17,7 @@ import {
   Store,
   Truck,
 } from 'lucide-react';
-import { UMKM_DISCOVERY_PATH, UMKM_OWNER_PATH } from '@/lib/umkmSurface';
+import { UMKM_DISCOVERY_PATH, buildUsahaPath } from '@/lib/umkmSurface';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -92,7 +92,7 @@ export default async function SuperAppPage({ params }: PageProps) {
     {
       title: isId ? 'Kelola toko' : 'Manage store',
       desc: isId ? 'QR, katalog, meja, dan order.' : 'QR, catalog, tables, and orders.',
-      href: UMKM_OWNER_PATH,
+      href: buildUsahaPath('home'),
       icon: QrCode,
     },
     {
@@ -104,7 +104,7 @@ export default async function SuperAppPage({ params }: PageProps) {
     {
       title: isId ? 'Pantau pertumbuhan' : 'Track growth',
       desc: isId ? 'Lihat repeat order dan ritme operasional.' : 'Watch repeat orders and operating rhythm.',
-      href: UMKM_OWNER_PATH,
+      href: buildUsahaPath('home'),
       icon: LineChart,
     },
   ] as const;

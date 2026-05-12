@@ -76,10 +76,10 @@ INTERNAL_AI_URL=
 # ==============================================================================
 MINIO_USER=laju_admin
 MINIO_PASS=your_minio_password
-PORT_MINIO_API=9000
+PORT_MINIO_API=9002
 PORT_MINIO_UI=9090
 # For www uploads: set when using MinIO (Docker auto-sets; local dev use same as MINIO_USER/MINIO_PASS)
-# MINIO_ENDPOINT=http://localhost:9000
+# MINIO_ENDPOINT=http://localhost:9002
 # MINIO_ACCESS_KEY=laju_admin
 # MINIO_SECRET_KEY=your_minio_password
 # MINIO_BUCKET=laju-chat

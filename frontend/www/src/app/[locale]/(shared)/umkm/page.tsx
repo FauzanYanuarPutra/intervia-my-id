@@ -6,6 +6,7 @@ type PageProps = {
     q?: string;
     city?: string;
     store?: string;
+    business?: string;
   }>;
 };
 
@@ -19,7 +20,7 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
       isId={locale === 'id'}
       initialQuery={resolvedSearchParams.q || ''}
       initialCity={resolvedSearchParams.city || ''}
-      initialStoreSlug={resolvedSearchParams.store || ''}
+      initialStoreSlug={resolvedSearchParams.store || resolvedSearchParams.business || ''}
     />
   );
 }

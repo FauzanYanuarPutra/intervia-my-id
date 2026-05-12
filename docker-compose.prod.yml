@@ -38,6 +38,14 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: production
 
+  usaha:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-usaha:${IMAGE_TAG:-latest}
+    environment:
+      ENV: production
+      APP_ENV: production
+      NODE_ENV: production
+      NEXT_PUBLIC_APP_ENV: production
+
   cms:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-cms:${IMAGE_TAG:-latest}
     environment:

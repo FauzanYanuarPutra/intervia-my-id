@@ -19,7 +19,7 @@ import { useRouter } from '@/i18n/navigation';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { useAuth } from '@/context/AuthContext';
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import { UMKM_OWNER_PATH } from '@/lib/umkmSurface';
+import { buildUsahaPath } from '@/lib/umkmSurface';
 
 function cn(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(' ');
@@ -186,7 +186,7 @@ export function PageAssistDock() {
             primary: true,
           },
           {
-            href: UMKM_OWNER_PATH,
+            href: buildUsahaPath('home'),
             label: isId ? 'Usaha Saya' : 'My Business',
             icon: Store,
           },

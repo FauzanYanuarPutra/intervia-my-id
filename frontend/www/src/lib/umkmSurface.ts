@@ -51,6 +51,7 @@ export const UMKM_ACTIVE_STORE_STORAGE_KEY = 'usaha.activeStoreId';
 export const LEGACY_UMKM_DISCOVERY_PATH = '/super-app/umkm';
 export const LEGACY_UMKM_OWNER_PATH = '/super-app/umkm/manage';
 export const LEGACY_UMKM_SCAN_PATH = '/super-app/umkm/scan';
+const DEFAULT_USAHA_PORTAL_URL = 'http://localhost:3003';
 
 const UMKM_SURFACE_COPY = {
   id: {
@@ -80,6 +81,10 @@ const UMKM_SURFACE_COPY = {
 function appendHash(pathname: string, hash?: string | null): string {
   const cleanHash = hash?.trim();
   return cleanHash ? `${pathname}#${cleanHash}` : pathname;
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
 }
 
 function buildScopedUsahaPath(
@@ -132,12 +137,23 @@ function appendStoreId(
   pathname: string,
   options: BuildPathOptions | undefined,
 ): string {
+  const storeId = options?.storeId?.trim();
+  const params = new URLSearchParams();
+  if (storeId) {
+    params.set('store', storeId);
+  }
+  const queryString = params.toString();
   const hash = options?.hash?.trim();
-  return appendHash(pathname, hash);
+  return appendHash(queryString ? `${pathname}?${queryString}` : pathname, hash);
 }
 
 export function getUmkmSurfaceCopy(locale: string) {
   return locale === 'id' ? UMKM_SURFACE_COPY.id : UMKM_SURFACE_COPY.en;
+}
+
+export function getUsahaPortalBaseUrl(): string {
+  const configuredUrl = process.env.NEXT_PUBLIC_USAHA_URL?.trim();
+  return trimTrailingSlash(configuredUrl || DEFAULT_USAHA_PORTAL_URL);
 }
 
 export function buildUmkmDiscoveryPath(
@@ -197,16 +213,69 @@ export function appendSurfaceSearchParams(
   return query ? `${pathname}?${query}` : pathname;
 }
 
-export function buildUsahaPath(
-  route: UsahaRouteId = 'home',
+function buildUsahaPortalPath(
+  route: UsahaRouteId,
   options?: BuildPathOptions,
 ): string {
   const storeId = options?.storeId?.trim();
   switch (route) {
+    case 'onboarding':
+      return '/businesses/new';
+    case 'dashboard':
+    case 'assistant':
+    case 'analytics':
+      if (storeId) {
+        return `/?business=${encodeURIComponent(storeId)}`;
+      }
+      return route === 'assistant' ? '/businesses/new' : '/';
+    case 'profile':
+      if (storeId) {
+        return `/businesses/${encodeURIComponent(storeId)}/info`;
+      }
+      return '/businesses/new';
+    case 'catalog':
+      if (storeId) {
+        return `/businesses/${encodeURIComponent(storeId)}/products`;
+      }
+      return '/businesses/new';
+    case 'order':
+      if (storeId) {
+        return `/businesses/${encodeURIComponent(storeId)}/orders`;
+      }
+      return '/businesses/new';
+    case 'qr':
+      if (storeId) {
+        return `/businesses/${encodeURIComponent(storeId)}/operations`;
+      }
+      return '/businesses/new';
+    case 'team':
+      if (storeId) {
+        return `/businesses/${encodeURIComponent(storeId)}/team`;
+      }
+      return '/businesses/new';
+    case 'operations':
+      if (storeId) {
+        return `/businesses/${encodeURIComponent(storeId)}/operations`;
+      }
+      return '/businesses/new';
+    case 'home':
+    default:
+      if (storeId) {
+        return `/?business=${encodeURIComponent(storeId)}`;
+      }
+      return '/';
+  }
+}
+
+function buildUsahaInternalPath(
+  route: UsahaRouteId,
+  options?: BuildPathOptions,
+): string {
+  switch (route) {
     case 'dashboard':
       return buildScopedUsahaPath(UMKM_OWNER_DASHBOARD_PATH, 'dashboard', options);
     case 'assistant':
-      return buildScopedUsahaPath(UMKM_OWNER_ASSISTANT_PATH, 'asisten', options);
+      return appendStoreId(UMKM_OWNER_ASSISTANT_PATH, options);
     case 'onboarding':
       return appendStoreId(UMKM_OWNER_ONBOARDING_PATH, options);
     case 'profile':
@@ -229,14 +298,25 @@ export function buildUsahaPath(
       return buildScopedUsahaPath(UMKM_OWNER_ANALYTICS_PATH, 'analytics', options);
     case 'home':
     default:
-      if (storeId) {
-        return appendHash(
-          `${UMKM_OWNER_STORE_PATH}/${encodeURIComponent(storeId)}/dashboard`,
-          options?.hash,
-        );
-      }
       return appendStoreId(UMKM_OWNER_PATH, options);
   }
+}
+
+export function buildUsahaPortalHref(
+  route: UsahaRouteId = 'home',
+  options?: BuildPathOptions,
+): string {
+  return appendHash(
+    `${getUsahaPortalBaseUrl()}${buildUsahaPortalPath(route, options)}`,
+    options?.hash,
+  );
+}
+
+export function buildUsahaPath(
+  route: UsahaRouteId = 'home',
+  options?: BuildPathOptions,
+): string {
+  return buildUsahaInternalPath(route, options);
 }
 
 export function buildUsahaPathFromWorkspace(

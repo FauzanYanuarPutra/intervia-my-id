@@ -1,20 +1,6 @@
-import { UmkmHubClient } from '@/components/super-app/UmkmHubClient';
+import { redirect } from 'next/navigation';
+import { buildUsahaPortalHref } from '@/lib/umkmSurface';
 
-type PageProps = {
-  params: Promise<{ locale: string }>;
-};
-
-export default async function UsahaTeamPage({
-  params,
-}: PageProps) {
-  const { locale } = await params;
-
-  return (
-    <UmkmHubClient
-      locale={locale}
-      isId={locale === 'id'}
-      initialWorkspace="team"
-      uiVariant="simple"
-    />
-  );
+export default async function UsahaTeamPage() {
+  redirect(buildUsahaPortalHref('team'));
 }

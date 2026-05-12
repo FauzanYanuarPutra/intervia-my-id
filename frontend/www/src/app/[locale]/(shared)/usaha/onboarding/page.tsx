@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
-import { UmkmHubClient } from '@/components/super-app/UmkmHubClient';
 import {
-  buildUsahaPath,
+  buildUsahaPortalHref,
   readSurfaceSearchParam,
   readSurfaceStoreId,
   type SurfaceSearchParams,
@@ -13,26 +12,15 @@ type PageProps = {
 };
 
 export default async function UsahaOnboardingPage({
-  params,
   searchParams,
 }: PageProps) {
-  const { locale } = await params;
   const resolvedSearchParams = await searchParams;
   const storeId = readSurfaceStoreId(resolvedSearchParams);
   const useAssistantRoute =
     readSurfaceSearchParam(resolvedSearchParams, 'assistant') === '1';
-
-  if (useAssistantRoute) {
-    redirect(`/${locale}${buildUsahaPath('assistant', { storeId })}`);
-  }
-
-  return (
-    <UmkmHubClient
-      locale={locale}
-      isId={locale === 'id'}
-      initialWorkspace="setup"
-      setupView="create"
-      uiVariant="simple"
-    />
+  redirect(
+    buildUsahaPortalHref(useAssistantRoute ? 'assistant' : 'onboarding', {
+      storeId,
+    }),
   );
 }

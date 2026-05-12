@@ -83,7 +83,7 @@ export function UmkmDiscoveryPanel({
   const [error, setError] = useState<string | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [filterKey, setFilterKey] = useState<FilterKey>('open');
+  const [filterKey, setFilterKey] = useState<FilterKey>('all');
   const [listPage, setListPage] = useState(1);
   const selectedPreviewRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollStoreIdRef = useRef<string | null>(null);
@@ -212,6 +212,7 @@ export function UmkmDiscoveryPanel({
     visibleStores[0] ||
     preparedStores[0] ||
     null;
+  const selectedPlaceId = selectedPlace?.store.id || null;
 
   const listedPlaces = visibleStores.filter(
     item => item.store.id !== selectedPlace?.store.id,
@@ -304,9 +305,9 @@ export function UmkmDiscoveryPanel({
   }, []);
 
   useEffect(() => {
-    if (!selectedPlace) return;
+    if (!selectedPlaceId) return;
     setRouteSummary(null);
-  }, [selectedPlace?.store.id]);
+  }, [selectedPlaceId]);
 
   useEffect(() => {
     if (showRoute && viewerLocation && selectedPlace) {
@@ -402,8 +403,8 @@ export function UmkmDiscoveryPanel({
             <p className="mt-1 text-[13px] leading-6 text-[color:var(--app-text-soft)] sm:text-[14px]">
               {description ||
                 (isId
-                  ? 'Pilih kategori yang kamu butuhin, lalu buka usaha yang cocok.'
-                  : 'Pick a category, then open the business that fits.')}
+                  ? 'Pilih cepat, buka cepat.'
+                  : 'Pick fast, open fast.')}
             </p>
           </div>
 

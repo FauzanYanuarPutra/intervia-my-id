@@ -43,7 +43,7 @@ function Get-Services {
     return @(
       "postgres_db", "redis_cache", "rabbitmq", "meilisearch",
       "identity_service", "marketplace_service",
-      "www", "cms", "crm", "mailhog"
+      "www", "usaha", "cms", "crm", "mailhog"
     )
   }
 
@@ -53,7 +53,7 @@ function Get-Services {
       "scylla_db", "scylla_keyspace_setup",
       "identity_service", "marketplace_service", "chat_service",
       "ocr_service", "liveness_service", "vllm_engine", "ai_service",
-      "qdrant", "minio", "www", "cms", "crm", "caddy"
+      "qdrant", "minio", "www", "usaha", "cms", "crm", "caddy"
     )
   }
 
@@ -63,7 +63,7 @@ function Get-Services {
     "identity_service", "marketplace_service", "chat_service",
     "ocr_service", "liveness_service", "vllm_engine", "ai_service",
     "compreface-db-init", "compreface-admin", "compreface-api", "compreface-core",
-    "qdrant", "minio", "www", "cms", "crm", "caddy", "cloudflare_tunnel"
+    "qdrant", "minio", "www", "usaha", "cms", "crm", "caddy", "cloudflare_tunnel"
   )
 }
 
@@ -136,7 +136,7 @@ if ($Action -eq "push") {
     throw "Set DOCKERHUB_NAMESPACE dulu. Contoh: `$env:DOCKERHUB_NAMESPACE='username'"
   }
   $env:IMAGE_TAG = $Tag
-  Run-Compose -ComposeFiles $composeFiles -EnvFile $envFile -ComposeArgs @("build", "identity_service", "marketplace_service", "ai_service", "chat_service", "ocr_service", "liveness_service", "www", "cms", "crm")
-  Run-Compose -ComposeFiles $composeFiles -EnvFile $envFile -ComposeArgs @("push", "identity_service", "marketplace_service", "ai_service", "chat_service", "ocr_service", "liveness_service", "www", "cms", "crm")
+  Run-Compose -ComposeFiles $composeFiles -EnvFile $envFile -ComposeArgs @("build", "identity_service", "marketplace_service", "ai_service", "chat_service", "ocr_service", "liveness_service", "www", "usaha", "cms", "crm")
+  Run-Compose -ComposeFiles $composeFiles -EnvFile $envFile -ComposeArgs @("push", "identity_service", "marketplace_service", "ai_service", "chat_service", "ocr_service", "liveness_service", "www", "usaha", "cms", "crm")
   exit 0
 }

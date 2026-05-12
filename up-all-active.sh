@@ -68,6 +68,7 @@ backend_services=(
 
 frontend_services=(
   www
+  usaha
   cms
   crm
 )

@@ -61,6 +61,12 @@ const DEFAULT_META: MetaType = {
   footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
 };
 
+const CATEGORY_META: MetaType = {
+  navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+  bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+  footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+};
+
 const APP_META: MetaType = {
   navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
   bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
@@ -83,14 +89,21 @@ export const routes: RouteConfig[] = [
   {
     path: RoutePath.HOME,
     name: 'Home',
-    meta: DEFAULT_META,
+    meta: HIDDEN_META,
     access: PUBLIC_ACCESS,
     shared: true,
   },
   {
     path: RoutePath.SEARCH,
     name: 'Search',
-    meta: DEFAULT_META,
+    meta: HIDDEN_META,
+    access: PUBLIC_ACCESS,
+    shared: true,
+  },
+  {
+    path: '/kategori',
+    name: 'Categories',
+    meta: CATEGORY_META,
     access: PUBLIC_ACCESS,
     shared: true,
   },

@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
-import { ArrowRight, Clapperboard, Search } from 'lucide-react';
+import { ArrowRight, Clapperboard, Search, Store, Volume2 } from 'lucide-react';
 
 type ReelItem = {
   id: string;
@@ -33,6 +33,24 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
   const [items, setItems] = useState<ReelItem[]>([]);
   const [loading, setLoading] = useState(true);
   const storeHint = searchParams.get('store') || '';
+  const quickLinks = [
+    {
+      label: isId ? 'Semua reels' : 'All reels',
+      href: '/reels',
+    },
+    {
+      label: isId ? 'Supplier' : 'Suppliers',
+      href: '/reels?q=supplier',
+    },
+    {
+      label: isId ? 'Packaging' : 'Packaging',
+      href: '/reels?q=packaging',
+    },
+    {
+      label: isId ? 'Kopi' : 'Coffee',
+      href: '/reels?q=kopi',
+    },
+  ];
 
   useEffect(() => {
     let alive = true;
@@ -88,6 +106,18 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
             ? 'Reels di Lajukan bukan buat hiburan kosong. Fungsinya untuk nunjukin proses, produk unggulan, dan ritme order yang benar-benar jalan.'
             : 'These reels are not for empty scrolling. They show process, hero products, and a real operating rhythm.'}
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {quickLinks.map(link => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white/90 px-3 py-2 text-xs font-semibold text-[color:var(--app-text)]"
+            >
+              <Store className="h-3.5 w-3.5" />
+              {link.label}
+            </Link>
+          ))}
+        </div>
       </section>
 
       <form onSubmit={submitFilters} className="ui-panel mt-4 rounded-3xl p-5">
@@ -109,8 +139,18 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
           />
           <button type="submit" className="ui-button-primary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold">
             <ArrowRight className="h-4 w-4" />
-            {isId ? 'Refresh feed' : 'Refresh feed'}
+            {isId ? 'Cari reels' : 'Search reels'}
           </button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-[color:var(--app-text-soft)]">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1.5">
+            <Search className="h-3.5 w-3.5" />
+            {isId ? 'Search untuk kumpulan reels per produk atau toko.' : 'Search to group reels by product or store.'}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1.5">
+            <Volume2 className="h-3.5 w-3.5" />
+            {isId ? 'Kalau video memang tanpa track audio, tombol suara tidak akan menghasilkan suara.' : 'If a video has no audio track, unmuting will not add sound.'}
+          </span>
         </div>
       </form>
 
@@ -134,9 +174,15 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
               </div>
               <p className="text-sm leading-6 text-[color:var(--app-text-soft)]">{item.hook}</p>
               <p className="text-sm leading-6 text-[color:var(--app-text-soft)]">{item.caption}</p>
+              <div className="rounded-2xl bg-[color:var(--app-surface-muted)] p-3 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Yang di bawah video ini bukan dekorasi. Tombolnya buat 3 hal: buka toko, lihat kumpulan reels toko itu, atau cari ulang feed dengan kata kunci lain.'
+                  : 'The actions below the video are functional: open the store, see that store’s reel collection, or search the feed again with another keyword.'}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Link href={item.store.storefrontPath} className="ui-button-primary inline-flex items-center justify-center px-4 text-sm font-semibold">{isId ? 'Masuk ke toko' : 'Open store'}</Link>
                 <Link href={`${item.store.storefrontPath}?tab=reels`} className="ui-button-secondary inline-flex items-center justify-center px-4 text-sm font-semibold">{isId ? 'Lihat reels toko' : 'Store reels'}</Link>
+                <Link href={`/reels?store=${encodeURIComponent(item.store.slug)}`} className="ui-button-secondary inline-flex items-center justify-center px-4 text-sm font-semibold">{isId ? 'Filter toko ini' : 'Filter this store'}</Link>
               </div>
             </div>
           </article>

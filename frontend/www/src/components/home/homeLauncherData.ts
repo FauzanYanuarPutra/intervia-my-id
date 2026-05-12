@@ -12,7 +12,7 @@ import {
   Truck,
   type LucideIcon,
 } from 'lucide-react';
-import { UMKM_DISCOVERY_PATH, UMKM_OWNER_PATH } from '@/lib/umkmSurface';
+import { UMKM_DISCOVERY_PATH, buildUsahaPath } from '@/lib/umkmSurface';
 
 export type ShortcutItem = {
   href: string;
@@ -190,7 +190,7 @@ export const shortcutItems: ShortcutItem[] = [
     tone: shortcutTones.indigo,
   },
   {
-    href: UMKM_OWNER_PATH,
+    href: buildUsahaPath('home'),
     labelId: 'Kelola usaha',
     labelEn: 'Manage business',
     hintId: 'QR, order, katalog',
@@ -256,7 +256,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.service,
   },
   {
-    href: UMKM_OWNER_PATH,
+    href: buildUsahaPath('home'),
     labelId: 'Kelola usaha',
     labelEn: 'Manage business',
     hintId: 'Produk, order, QR',
@@ -417,7 +417,7 @@ export const homeSecondaryFocusItems: HomeFocusLinkItem[] = [
     hintEn: 'Courier and fulfillment',
   },
   {
-    href: UMKM_OWNER_PATH,
+    href: buildUsahaPath('home'),
     labelId: 'Kelola usaha',
     labelEn: 'Manage business',
     hintId: 'QR, katalog, order',

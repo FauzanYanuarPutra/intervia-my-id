@@ -52,24 +52,24 @@
     transparent
   );
   --app-shadow:
-    0 24px 54px -34px rgba(15, 23, 42, 0.24),
-    0 10px 24px -18px rgba(22, 163, 74, 0.1);
+    0 24px 56px -38px rgba(15, 23, 42, 0.18),
+    0 10px 20px -18px rgba(22, 163, 74, 0.08);
   --app-shadow-strong:
-    0 30px 70px -38px rgba(15, 23, 42, 0.3),
-    0 14px 30px -20px rgba(22, 163, 74, 0.14);
+    0 34px 80px -44px rgba(15, 23, 42, 0.24),
+    0 14px 28px -22px rgba(22, 163, 74, 0.12);
   --app-shadow-soft:
-    0 18px 44px -34px rgba(15, 23, 42, 0.18),
-    0 8px 18px -14px rgba(22, 163, 74, 0.08);
-  --app-shadow-sheet: 0 34px 64px -32px rgba(15, 23, 42, 0.34);
+    0 18px 42px -34px rgba(15, 23, 42, 0.14),
+    0 8px 18px -16px rgba(22, 163, 74, 0.07);
+  --app-shadow-sheet: 0 38px 74px -36px rgba(15, 23, 42, 0.28);
   --app-shadow-color: #0f172a;
   --app-overlay: #000000;
-  --app-border: rgba(148, 163, 184, 0.22);
-  --app-border-strong: rgba(22, 163, 74, 0.24);
-  --app-surface: rgba(255, 255, 255, 0.88);
-  --app-surface-strong: rgba(255, 255, 255, 0.96);
-  --app-surface-muted: rgba(248, 250, 252, 0.96);
+  --app-border: rgba(148, 163, 184, 0.18);
+  --app-border-strong: rgba(22, 163, 74, 0.26);
+  --app-surface: rgba(255, 255, 255, 0.9);
+  --app-surface-strong: rgba(255, 255, 255, 0.97);
+  --app-surface-muted: rgba(246, 249, 247, 0.98);
   --app-text: #0f172a;
-  --app-text-soft: #475569;
+  --app-text-soft: #64748b;
   --app-text-inverse: #f8fbff;
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
@@ -148,13 +148,13 @@
     var(--app-brand-info) 38%,
     transparent
   );
-  --app-border: rgba(148, 163, 184, 0.22);
-  --app-border-strong: rgba(74, 222, 128, 0.36);
-  --app-surface: rgba(11, 18, 32, 0.9);
-  --app-surface-strong: rgba(15, 23, 42, 0.96);
-  --app-surface-muted: rgba(8, 16, 30, 0.94);
-  --app-text: #e2e8f0;
-  --app-text-soft: #94a3b8;
+  --app-border: rgba(148, 163, 184, 0.18);
+  --app-border-strong: rgba(74, 222, 128, 0.28);
+  --app-surface: rgba(9, 18, 29, 0.92);
+  --app-surface-strong: rgba(11, 22, 33, 0.98);
+  --app-surface-muted: rgba(5, 14, 24, 0.96);
+  --app-text: #e5eef7;
+  --app-text-soft: #9aabbe;
   --app-text-inverse: #f8fbff;
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
@@ -173,15 +173,15 @@
   --app-info-border: var(--app-brand-info-border);
   --app-highlight: color-mix(in srgb, var(--app-brand-action) 18%, transparent);
   --app-shadow:
-    0 28px 62px -38px rgba(2, 6, 23, 0.86),
-    0 14px 28px -18px rgba(34, 197, 94, 0.14);
+    0 28px 68px -42px rgba(2, 6, 23, 0.78),
+    0 14px 28px -18px rgba(34, 197, 94, 0.12);
   --app-shadow-strong:
-    0 34px 78px -42px rgba(2, 6, 23, 0.94),
-    0 18px 34px -20px rgba(34, 197, 94, 0.18);
+    0 38px 88px -44px rgba(2, 6, 23, 0.92),
+    0 18px 36px -22px rgba(34, 197, 94, 0.16);
   --app-shadow-soft:
-    0 22px 44px -34px rgba(2, 6, 23, 0.62),
-    0 10px 22px -16px rgba(34, 197, 94, 0.1);
-  --app-shadow-sheet: 0 38px 74px -38px rgba(2, 6, 23, 0.92);
+    0 22px 44px -34px rgba(2, 6, 23, 0.58),
+    0 10px 22px -18px rgba(34, 197, 94, 0.08);
+  --app-shadow-sheet: 0 42px 82px -42px rgba(2, 6, 23, 0.9);
   --app-shadow-color: #020617;
   --app-overlay: #000000;
   --app-dot: color-mix(in srgb, var(--app-text) 6%, transparent);
@@ -322,11 +322,33 @@ button,
     var(--route-accent) 24%,
     transparent
   );
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 24%, #f1f5f9 100%);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(22, 163, 74, 0.1),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(252, 211, 77, 0.12),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #fbfdfb 0%, #ffffff 24%, #f4f8f4 100%);
 }
 
 .dark .app-shell {
-  background: linear-gradient(180deg, #08111d 0%, #0b1220 24%, #060d18 100%);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(34, 197, 94, 0.14),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(56, 189, 248, 0.12),
+      transparent 24%
+    ),
+    linear-gradient(180deg, #06111b 0%, #091520 24%, #040c15 100%);
 }
 
 .app-shell::before {
@@ -334,10 +356,10 @@ button,
   pointer-events: none;
   position: absolute;
   inset: 0 0 auto 0;
-  height: min(260px, 34vh);
+  height: min(300px, 36vh);
   background: radial-gradient(
     circle at 50% 0%,
-    color-mix(in srgb, var(--route-accent) 18%, transparent),
+    color-mix(in srgb, var(--route-accent) 14%, transparent),
     transparent 70%
   );
   z-index: -1;
@@ -346,7 +368,7 @@ button,
 .dark .app-shell::before {
   background: radial-gradient(
     circle at 50% 0%,
-    color-mix(in srgb, var(--route-accent) 22%, transparent),
+    color-mix(in srgb, var(--route-accent) 18%, transparent),
     transparent 66%
   );
 }

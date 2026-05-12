@@ -21,26 +21,28 @@ Lajukan is a compact marketplace and super-app for jobs, services, property, ren
    WSL/Linux: `bash ./dev-live.sh`
    Ini akan menyalakan container core yang dibutuhkan lalu menjalankan Next dev server lokal dengan auto-reload.
    App lain:
+   PowerShell: `.\dev-live.ps1 -App usaha`
    PowerShell: `.\dev-live.ps1 -App cms`
    PowerShell: `.\dev-live.ps1 -App crm`
+   Bash: `bash ./dev-live.sh usaha`
    Bash: `bash ./dev-live.sh cms`
    Bash: `bash ./dev-live.sh crm`
    Kalau butuh chat/scylla juga:
    PowerShell: `.\dev-live.ps1 -FullStack`
    Bash: `FULL_STACK=1 bash ./dev-live.sh`
 6. Direct compose fallback, only if Docker Compose v2 (`docker compose`) is available:
-   `docker compose --env-file .env.development build identity_service marketplace_service www cms crm && docker compose --env-file .env.development up -d postgres_db redis_cache rabbitmq meilisearch identity_service marketplace_service www cms crm mailhog`
+   `docker compose --env-file .env.development build identity_service marketplace_service www usaha cms crm && docker compose --env-file .env.development up -d postgres_db redis_cache rabbitmq meilisearch identity_service marketplace_service www usaha cms crm mailhog`
 7. Open the web app based on the ports in `docker-compose.yml`.
 
 The `up-super-fast` scripts are the preferred local entrypoint because they serialize builds and warm missing base images first. That avoids common WSL/Docker Hub DNS timeouts during multi-service `docker compose build`.
 Untuk development di Windows, `dev-stack.ps1` adalah wrapper yang lebih aman dipakai dibanding `docker compose up -d --build` langsung karena build hanya dilakukan saat perlu dan ada mode cleanup yang eksplisit.
 
 Important for WSL/Linux:
-- Do not use legacy `docker-compose` v1 directly for this repo if you can avoid it. It can fail during recreate with `KeyError: 'ContainerConfig'`, especially on `www`, `cms`, and `crm`.
+- Do not use legacy `docker-compose` v1 directly for this repo if you can avoid it. It can fail during recreate with `KeyError: 'ContainerConfig'`, especially on `www`, `usaha`, `cms`, and `crm`.
 - Prefer `bash ./up-super-fast.sh` or `docker compose ...`.
 - If you are stuck on `docker-compose` v1 and hit that error, remove the stale service containers first, then start again:
-  `bash ./legacy-compose-cleanup.sh cms crm`
-  `docker-compose up -d cms crm`
+  `bash ./legacy-compose-cleanup.sh www usaha cms crm`
+  `docker-compose up -d www usaha cms crm`
 - To clear every stale container in the project before retrying:
   `bash ./legacy-compose-cleanup.sh --all`
   `bash ./up-super-fast.sh`

@@ -7,7 +7,7 @@ import { Link } from '@/i18n/navigation';
 import { describeGetUserMediaError, getUserMediaErrorName } from '@/lib/mediaDevices';
 import {
   UMKM_DISCOVERY_PATH,
-  UMKM_OWNER_PATH,
+  buildUsahaPath,
   buildUmkmScanPath,
 } from '@/lib/umkmSurface';
 
@@ -503,7 +503,7 @@ export function UmkmScanClient({ locale, isId }: UmkmScanClientProps) {
                 {isId ? 'Cari UMKM' : 'Map'}
               </Link>
               <Link
-                href={UMKM_OWNER_PATH}
+                href={buildUsahaPath('home')}
                 className="ui-button-secondary inline-flex min-h-[36px] items-center justify-center gap-2 px-3.5 text-[12px] font-bold"
               >
                 <LayoutDashboard className="h-4 w-4" />

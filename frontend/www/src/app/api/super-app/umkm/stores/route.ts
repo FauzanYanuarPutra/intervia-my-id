@@ -126,7 +126,12 @@ export async function GET(req: NextRequest) {
     const resolvedItems = await Promise.all(items);
     const visibleItems = (mine
       ? resolvedItems
-      : resolvedItems.filter((item) => item.metadata?.outlet_active !== false))
+      : resolvedItems.filter((item) => {
+          if (item.metadata?.source === 'usaha_portal') {
+            return item.is_active !== false;
+          }
+          return item.metadata?.outlet_active !== false;
+        }))
       .filter((item) => {
         if (!hasViewer || radiusKm === null) return true;
         if (typeof item.distance_km !== 'number' || !Number.isFinite(item.distance_km)) return false;

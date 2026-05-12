@@ -1,4 +1,5 @@
 import type { ListingSide } from '@/lib/content/listingSide';
+import { buildUsahaPath } from '@/lib/umkmSurface';
 
 export type CreateFlowIntent = 'demand' | 'supply';
 export type CreateRouteTypeId =
@@ -140,7 +141,7 @@ export function resolveMarketplaceCreatePath(
     normalizedType === 'business' ||
     normalizedType === 'company'
   ) {
-    return '/usaha/onboarding';
+    return buildUsahaPath('onboarding');
   }
   if (
     normalizedType === 'freelancer' ||

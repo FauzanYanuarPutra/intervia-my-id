@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("www", "cms", "crm")]
+    [ValidateSet("www", "usaha", "cms", "crm")]
     [string]$App = "www",
     [string]$EnvFile = ".env.development",
     [switch]$NoInstall,
@@ -101,12 +101,14 @@ Import-EnvFile -Path $EnvFile
 
 $appPath = switch ($App) {
     "www" { Join-Path $PSScriptRoot "frontend\\www" }
+    "usaha" { Join-Path $PSScriptRoot "frontend\\usaha" }
     "cms" { Join-Path $PSScriptRoot "frontend\\cms" }
     "crm" { Join-Path $PSScriptRoot "frontend\\crm" }
 }
 
 $port = switch ($App) {
     "www" { "3000" }
+    "usaha" { "3003" }
     "cms" { "3001" }
     "crm" { "3002" }
 }
@@ -123,6 +125,11 @@ if ($App -eq "www") {
     $env:INTERNAL_MARKETPLACE_URL = if ($env:INTERNAL_MARKETPLACE_URL) { $env:INTERNAL_MARKETPLACE_URL } else { "http://localhost:8081" }
     $env:MARKETPLACE_URL = if ($env:MARKETPLACE_URL) { $env:MARKETPLACE_URL } else { "http://localhost:8081" }
     $env:INTERNAL_CHAT_URL = if ($env:INTERNAL_CHAT_URL) { $env:INTERNAL_CHAT_URL } else { "http://localhost:4000" }
+}
+
+if ($App -eq "usaha") {
+    $env:NEXT_PUBLIC_WWW_URL = if ($env:NEXT_PUBLIC_WWW_URL) { $env:NEXT_PUBLIC_WWW_URL } else { "http://localhost:3000" }
+    $env:NEXT_PUBLIC_USAHA_URL = if ($env:NEXT_PUBLIC_USAHA_URL) { $env:NEXT_PUBLIC_USAHA_URL } else { "http://localhost:3003" }
 }
 
 if ($App -eq "crm") {

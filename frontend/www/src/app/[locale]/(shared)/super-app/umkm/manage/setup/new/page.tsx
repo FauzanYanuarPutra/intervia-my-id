@@ -1,13 +1,6 @@
 import { redirect } from 'next/navigation';
-import { buildUsahaPath } from '@/lib/umkmSurface';
+import { buildUsahaPortalHref } from '@/lib/umkmSurface';
 
-type PageProps = {
-  params: Promise<{ locale: string }>;
-};
-
-export default async function UmkmManageSetupCreatePage({
-  params,
-}: PageProps) {
-  const { locale } = await params;
-  redirect(`/${locale}${buildUsahaPath('onboarding')}`);
+export default async function UmkmManageSetupCreatePage() {
+  redirect(buildUsahaPortalHref('onboarding'));
 }

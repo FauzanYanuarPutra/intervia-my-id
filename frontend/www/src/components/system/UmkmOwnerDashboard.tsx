@@ -19,7 +19,7 @@ import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ZeroCapitalJourney } from '@/components/system/ZeroCapitalJourney';
-import { UMKM_OWNER_PATH } from '@/lib/umkmSurface';
+import { buildUsahaPath } from '@/lib/umkmSurface';
 
 type DashboardSummary = {
   total_listings: number;
@@ -579,7 +579,7 @@ export function UmkmOwnerDashboard() {
               <BellRing className="h-3.5 w-3.5" />
               {isId ? 'Buka chat' : 'Open chat'}
             </Link>
-            <Link href={UMKM_OWNER_PATH} className="ui-shell-button px-3 text-xs font-semibold">
+            <Link href={buildUsahaPath('home')} className="ui-shell-button px-3 text-xs font-semibold">
               <LayoutDashboard className="h-3.5 w-3.5" />
               {isId ? 'Kelola usaha' : 'Manage business'}
             </Link>

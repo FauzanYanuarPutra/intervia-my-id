@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import CreatePostingClient from '../../CreatePostingClient';
+import { buildUsahaPath } from '@/lib/umkmSurface';
 import {
   buildCreateBasePath,
   normalizeCreateFlowSegment,
@@ -78,7 +79,7 @@ export default async function CreateFlowListingPage({ params }: PageProps) {
   const intent = normalizeCreateFlowSegment(flow);
   const typeId = normalizeCreateTypeSegment(listing);
   if (intent === 'supply' && typeId === 'company') {
-    redirect(`/${locale}/usaha/onboarding`);
+    redirect(buildUsahaPath('onboarding'));
   }
   if (!intent || !typeId || !isTypeAllowedForIntent(intent, typeId)) notFound();
 
@@ -100,7 +101,7 @@ export async function generateMetadata({
   if (intent === 'supply' && typeId === 'company') {
     return {
       alternates: {
-        canonical: `https://www.lajukan.com/${locale}/usaha/onboarding`,
+        canonical: buildUsahaPath('onboarding'),
       },
       robots: { index: false, follow: true },
     };

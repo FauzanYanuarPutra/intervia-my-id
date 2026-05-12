@@ -41,6 +41,7 @@ function resolveRouteIntent(pathname: string): RouteIntent {
 
   if (cleanPath === '/' || cleanPath.startsWith('/home')) return 'home';
   if (
+    cleanPath.startsWith('/kategori') ||
     cleanPath.startsWith('/search') ||
     cleanPath.startsWith('/marketplace') ||
     cleanPath.startsWith('/jobs') ||
@@ -97,14 +98,23 @@ export function AppShell({
     <div
       data-route-intent={routeIntent}
       style={shellStyle}
-      className="app-shell flex min-h-[100svh] w-full flex-col text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+      className="app-shell relative isolate flex min-h-[100svh] w-full flex-col overflow-x-clip bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] text-[color:var(--app-text)] dark:bg-[radial-gradient(circle_at_top,#052e1d_0%,#07111d_38%,#020617_100%)] dark:text-[color:var(--app-text-soft)]"
     >
-      {showHeader ? <Header /> : null}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-[-7rem] top-[-5rem] h-72 w-72 rounded-full bg-emerald-100/80 blur-3xl dark:bg-emerald-500/10" />
+        <div className="absolute right-[-9rem] top-10 h-80 w-80 rounded-full bg-sky-100/75 blur-3xl dark:bg-sky-500/10" />
+        <div className="absolute bottom-[-12rem] left-1/3 h-80 w-80 rounded-full bg-white/70 blur-3xl dark:bg-white/5" />
+      </div>
+      {showHeader ? (
+        <div className="relative z-[1]">
+          <Header />
+        </div>
+      ) : null}
       <main
         id="main-content"
         style={mainStyle}
         className={cn(
-          'app-shell-main w-full flex-1',
+          'app-shell-main relative z-[1] w-full flex-1',
           showHeader
             ? 'pt-[calc(60px+env(safe-area-inset-top))] sm:pt-[calc(68px+env(safe-area-inset-top))]'
             : 'pt-0',
@@ -117,7 +127,11 @@ export function AppShell({
         {showHeader ? <PageAssistDock /> : null}
         {showFooter ? <Footer /> : null}
       </main>
-      {showBottomNav ? <ClientBottomNav /> : null}
+      {showBottomNav ? (
+        <div className="relative z-[1]">
+          <ClientBottomNav />
+        </div>
+      ) : null}
     </div>
   );
 }

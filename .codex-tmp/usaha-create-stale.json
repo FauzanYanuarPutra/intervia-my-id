@@ -1,0 +1,10 @@
+{
+  "name": "Warung Session Stale",
+  "category": "Makanan dan minuman",
+  "city": "Bogor",
+  "address": "Jl. Pajajaran No. 2",
+  "phone": "081233344455",
+  "ownerName": "Tester Session",
+  "ownerEmail": "stale@example.com",
+  "locationQuery": "Warung Session Stale, Jl. Pajajaran No. 2, Bogor"
+}

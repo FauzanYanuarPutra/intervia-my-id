@@ -87,8 +87,6 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       { protocol: 'https', hostname: 'placehold.co', pathname: '/**' },
-      { protocol: 'https', hostname: 'unsplash.com', pathname: '/**' },
-      { protocol: 'https', hostname: 'images.unsplash.com', pathname: '/**' },
       { protocol: 'https', hostname: 'randomuser.me', pathname: '/**' },
       { protocol: 'https', hostname: 'picsum.photos', pathname: '/**' },
       { protocol: 'https', hostname: 'via.placeholder.com', pathname: '/**' },
@@ -96,6 +94,7 @@ const nextConfig: NextConfig = {
     ],
   },
 };
+
 
 // =======================
 // PLUGINS
@@ -130,4 +129,3 @@ config.webpack = (webpackConfig, options) => {
 };
 
 export default config;
-

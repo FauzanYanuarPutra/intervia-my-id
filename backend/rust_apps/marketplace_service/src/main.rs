@@ -324,6 +324,249 @@ struct ListContentResponse {
 }
 
 #[derive(Debug, Deserialize, Default)]
+struct ListUmkmStoresQuery {
+    q: Option<String>,
+    city: Option<String>,
+    slug: Option<String>,
+    id: Option<Uuid>,
+    limit: Option<i64>,
+    active_only: Option<bool>,
+    owner_user_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListUmkmProductsQuery {
+    channel: Option<String>,
+    include_unavailable: Option<bool>,
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateUmkmStoreRequest {
+    owner_user_id: Uuid,
+    name: String,
+    slug: Option<String>,
+    description: Option<String>,
+    city: Option<String>,
+    address: String,
+    lat: f64,
+    lng: f64,
+    phone: Option<String>,
+    is_active: Option<bool>,
+    online_order_enabled: Option<bool>,
+    offline_order_enabled: Option<bool>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpdateUmkmStoreRequest {
+    name: Option<String>,
+    city: Option<String>,
+    address: Option<String>,
+    description: Option<String>,
+    lat: Option<f64>,
+    lng: Option<f64>,
+    phone: Option<String>,
+    is_active: Option<bool>,
+    online_order_enabled: Option<bool>,
+    offline_order_enabled: Option<bool>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateUmkmProductRequest {
+    name: String,
+    slug: Option<String>,
+    description: Option<String>,
+    category: Option<String>,
+    price_cents: i64,
+    stock_qty: Option<i32>,
+    is_available: Option<bool>,
+    image_url: Option<String>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListLajukanRequestsQuery {
+    limit: Option<i64>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct UmkmStoreRow {
+    id: Uuid,
+    owner_user_id: Uuid,
+    name: String,
+    slug: String,
+    description: Option<String>,
+    city: String,
+    address: String,
+    lat: f64,
+    lng: f64,
+    phone: Option<String>,
+    is_active: bool,
+    online_order_enabled: bool,
+    offline_order_enabled: bool,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct UmkmProductRow {
+    id: Uuid,
+    store_id: Uuid,
+    name: String,
+    slug: String,
+    description: Option<String>,
+    category: String,
+    price_cents: i64,
+    stock_qty: i32,
+    is_available: bool,
+    image_url: Option<String>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct LajukanSummaryAggRow {
+    total_live_listings: i64,
+    total_live_requests: i64,
+    supplier_count: i64,
+    product_count: i64,
+    service_count: i64,
+    location_count: i64,
+    talent_count: i64,
+}
+
+#[derive(Debug, FromRow)]
+struct LajukanStoreSummaryAggRow {
+    total_active_stores: i64,
+    active_cities: i64,
+    verified_stores: i64,
+}
+
+#[derive(Debug, FromRow)]
+struct LajukanRequestSummaryAggRow {
+    total: i64,
+    active_count: i64,
+    waiting_count: i64,
+    completed_count: i64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanCategoryCounts {
+    all: i64,
+    supplier: i64,
+    location: i64,
+    service: i64,
+    product: i64,
+    talent: i64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanRequestCounts {
+    total: i64,
+    active: i64,
+    waiting: i64,
+    completed: i64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanStoreCounts {
+    total: i64,
+    cities: i64,
+    verified: i64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanSummaryPayload {
+    categories: LajukanCategoryCounts,
+    requests: LajukanRequestCounts,
+    stores: LajukanStoreCounts,
+}
+
+#[derive(Debug, FromRow)]
+struct LajukanRequestRow {
+    id: Uuid,
+    slug: Option<String>,
+    title: String,
+    summary: Option<String>,
+    body: String,
+    content_type: String,
+    category: Option<String>,
+    price_cents: Option<i64>,
+    currency: Option<String>,
+    metadata: Value,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    offer_count: i64,
+}
+
+#[derive(Debug, FromRow)]
+struct LajukanRequestOfferRow {
+    id: Uuid,
+    content_id: Option<Uuid>,
+    amount_cents: i64,
+    currency: String,
+    transaction_status: String,
+    offer_message: Option<String>,
+    response_message: Option<String>,
+    transaction_meta: Value,
+    snapshot_listing: Value,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanRequestDetail {
+    category: String,
+    need_type: String,
+    amount_label: String,
+    deadline_label: String,
+    budget_label: String,
+    description: String,
+    location_label: String,
+    extra_label: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanOfferPreview {
+    id: String,
+    vendor: String,
+    rating_label: String,
+    review_label: String,
+    price_label: String,
+    delivery_label: String,
+    guarantee_label: String,
+    note: String,
+    status: String,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanRequestCard {
+    id: String,
+    slug: Option<String>,
+    title: String,
+    city: String,
+    created_at: DateTime<Utc>,
+    created_label: String,
+    offers_label: String,
+    offer_count: i64,
+    status: String,
+    status_key: String,
+    detail: LajukanRequestDetail,
+    offers: Vec<LajukanOfferPreview>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct LajukanRequestsPayload {
+    active: Vec<LajukanRequestCard>,
+    completed: Vec<LajukanRequestCard>,
+    counts: LajukanRequestCounts,
+}
+
+#[derive(Debug, Deserialize, Default)]
 struct ListSupportTicketsQuery {
     status: Option<String>,
     priority: Option<String>,
@@ -871,6 +1114,20 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/v1/content/{id}/reviews", get(list_reviews))
         .route("/v1/content/{id}/offers", post(create_offer))
+        .route("/v1/lajukan/summary", get(get_lajukan_summary))
+        .route("/v1/lajukan/requests", get(list_lajukan_requests))
+        .route(
+            "/v1/umkm/stores",
+            get(list_umkm_stores).post(create_umkm_store),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}",
+            get(get_umkm_store).put(update_umkm_store),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/products",
+            get(list_umkm_products).post(create_umkm_product),
+        )
         .route("/v1/transactions", get(list_transactions))
         .route("/v1/transactions/{id}", get(get_transaction))
         .route(
@@ -2958,6 +3215,975 @@ fn actor_role_from_claims(claims: &AccessClaims) -> String {
         "agent".to_string()
     } else {
         "user".to_string()
+    }
+}
+
+fn json_lookup<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    Some(current)
+}
+
+fn json_text_at(value: &Value, path: &[&str]) -> Option<String> {
+    match json_lookup(value, path) {
+        Some(Value::String(text)) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Some(Value::Number(number)) => Some(number.to_string()),
+        _ => None,
+    }
+}
+
+fn json_i64_at(value: &Value, path: &[&str]) -> Option<i64> {
+    match json_lookup(value, path) {
+        Some(Value::Number(number)) => number.as_i64(),
+        Some(Value::String(text)) => text.trim().parse::<i64>().ok(),
+        _ => None,
+    }
+}
+
+fn json_f64_at(value: &Value, path: &[&str]) -> Option<f64> {
+    match json_lookup(value, path) {
+        Some(Value::Number(number)) => number.as_f64(),
+        Some(Value::String(text)) => text.trim().parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+fn format_thousands_id(mut value: i64) -> String {
+    if value == 0 {
+        return "0".to_string();
+    }
+
+    let negative = value < 0;
+    if negative {
+        value = -value;
+    }
+
+    let digits = value.to_string();
+    let mut parts: Vec<String> = digits
+        .as_bytes()
+        .rchunks(3)
+        .rev()
+        .map(|chunk| String::from_utf8_lossy(chunk).into_owned())
+        .collect();
+
+    if parts.is_empty() {
+        parts.push("0".to_string());
+    }
+
+    let joined = parts.join(".");
+    if negative {
+        format!("-{}", joined)
+    } else {
+        joined
+    }
+}
+
+fn format_rupiah_from_cents(amount_cents: i64) -> String {
+    let rupiah = amount_cents.max(0) / 100;
+    format!("Rp {}", format_thousands_id(rupiah))
+}
+
+fn format_relative_time_id(timestamp: DateTime<Utc>) -> String {
+    let diff = Utc::now().signed_duration_since(timestamp);
+    if diff < ChronoDuration::minutes(1) {
+        return "Dibuat baru saja".to_string();
+    }
+    if diff < ChronoDuration::hours(1) {
+        return format!("Dibuat {} menit lalu", diff.num_minutes().max(1));
+    }
+    if diff < ChronoDuration::days(1) {
+        return format!("Dibuat {} jam lalu", diff.num_hours().max(1));
+    }
+    if diff < ChronoDuration::days(7) {
+        return format!("Dibuat {} hari lalu", diff.num_days().max(1));
+    }
+    if diff < ChronoDuration::days(30) {
+        return format!("Dibuat {} minggu lalu", (diff.num_days() / 7).max(1));
+    }
+    format!("Dibuat {} bulan lalu", (diff.num_days() / 30).max(1))
+}
+
+fn request_status_key(metadata: &Value, offer_count: i64) -> String {
+    match json_text_at(metadata, &["request_status"])
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "completed" | "selesai" => "completed".to_string(),
+        "waiting" | "menunggu" => "waiting".to_string(),
+        "active" | "aktif" => "active".to_string(),
+        _ if offer_count == 0 => "waiting".to_string(),
+        _ => "active".to_string(),
+    }
+}
+
+fn request_status_label(status_key: &str) -> &'static str {
+    match status_key {
+        "completed" => "Selesai",
+        "waiting" => "Menunggu",
+        _ => "Aktif",
+    }
+}
+
+fn transaction_status_label(status: &str) -> &'static str {
+    match status {
+        "completed" => "Selesai",
+        "accepted" => "Diterima",
+        "in_progress" => "Diproses",
+        "delivered" => "Dikirim",
+        "cancelled" => "Dibatalkan",
+        "disputed" => "Komplain",
+        _ => "Aktif",
+    }
+}
+
+fn request_need_type_label(content_type: &str) -> String {
+    match content_type {
+        "product" => "Supplier".to_string(),
+        "service" => "Jasa".to_string(),
+        "property" => "Lokasi Usaha".to_string(),
+        "freelancer" => "Talent".to_string(),
+        "tool_rental" => "Sewa Alat".to_string(),
+        "job" => "Rekrutmen".to_string(),
+        _ => "Kebutuhan Usaha".to_string(),
+    }
+}
+
+fn build_lajukan_request_detail(row: &LajukanRequestRow) -> LajukanRequestDetail {
+    let detail_text = |field: &str| {
+        json_lookup(&row.metadata, &["request_detail"])
+            .and_then(|detail| json_text_at(detail, &[field]))
+    };
+    let category = detail_text("category")
+        .or_else(|| json_text_at(&row.metadata, &["sector"]))
+        .or_else(|| row.category.clone())
+        .unwrap_or_else(|| "Kebutuhan Usaha".to_string());
+    let need_type = detail_text("need_type")
+        .unwrap_or_else(|| request_need_type_label(row.content_type.as_str()));
+    let amount_label = detail_text("quantity_label")
+        .or_else(|| json_text_at(&row.metadata, &["stock"]).map(|qty| format!("{} unit", qty)))
+        .or_else(|| json_text_at(&row.metadata, &["area_sqm"]).map(|area| format!("{} m2", area)))
+        .unwrap_or_else(|| "Sesuai kebutuhan".to_string());
+    let deadline_label = detail_text("deadline_label")
+        .or_else(|| json_text_at(&row.metadata, &["deadline"]))
+        .or_else(|| json_text_at(&row.metadata, &["delivery_time"]))
+        .or_else(|| json_text_at(&row.metadata, &["delivery_estimate"]))
+        .unwrap_or_else(|| "Fleksibel".to_string());
+    let budget_label = detail_text("budget_label").unwrap_or_else(|| {
+        if row.price_cents.unwrap_or(0) > 0 {
+            format_rupiah_from_cents(row.price_cents.unwrap_or(0))
+        } else {
+            "Menyesuaikan kebutuhan".to_string()
+        }
+    });
+    let description = detail_text("description")
+        .or_else(|| row.summary.clone())
+        .unwrap_or_else(|| row.body.clone());
+    let location_label = detail_text("location_label")
+        .or_else(|| json_text_at(&row.metadata, &["address"]))
+        .or_else(|| json_text_at(&row.metadata, &["location"]))
+        .or_else(|| json_text_at(&row.metadata, &["city"]))
+        .unwrap_or_else(|| "Indonesia".to_string());
+    let extra_label = detail_text("extra_label")
+        .or_else(|| json_text_at(&row.metadata, &["client_requirements"]))
+        .or_else(|| row.summary.clone())
+        .unwrap_or_else(|| {
+            "Butuh vendor yang responsif dan bisa menjaga ritme kerja sama.".to_string()
+        });
+
+    LajukanRequestDetail {
+        category,
+        need_type,
+        amount_label,
+        deadline_label,
+        budget_label,
+        description,
+        location_label,
+        extra_label,
+    }
+}
+
+fn build_lajukan_offer_preview(row: &LajukanRequestOfferRow) -> LajukanOfferPreview {
+    let vendor = json_text_at(&row.transaction_meta, &["vendor_name"])
+        .or_else(|| json_text_at(&row.snapshot_listing, &["title"]))
+        .unwrap_or_else(|| "Vendor Lajukan".to_string());
+    let rating_value = json_f64_at(&row.transaction_meta, &["vendor_rating"]);
+    let rating_label = rating_value
+        .map(|value| format!("{value:.1}"))
+        .unwrap_or_else(|| "-".to_string());
+    let review_count = json_i64_at(&row.transaction_meta, &["vendor_review_count"]).unwrap_or(0);
+    let review_label = if review_count > 0 {
+        format!("{} ulasan", review_count)
+    } else {
+        "Belum ada ulasan".to_string()
+    };
+    let price_label = format_rupiah_from_cents(row.amount_cents);
+    let delivery_label = json_text_at(&row.transaction_meta, &["delivery_label"])
+        .unwrap_or_else(|| "Negosiasi waktu".to_string());
+    let guarantee_label = json_text_at(&row.transaction_meta, &["guarantee_label"])
+        .unwrap_or_else(|| "Sesuai kesepakatan".to_string());
+    let note = json_text_at(&row.transaction_meta, &["offer_note"])
+        .or_else(|| row.response_message.clone())
+        .or_else(|| row.offer_message.clone())
+        .unwrap_or_else(|| "Vendor siap lanjut diskusi kebutuhan ini.".to_string());
+
+    LajukanOfferPreview {
+        id: row.id.to_string(),
+        vendor,
+        rating_label,
+        review_label,
+        price_label,
+        delivery_label,
+        guarantee_label,
+        note,
+        status: transaction_status_label(row.transaction_status.as_str()).to_string(),
+        updated_at: row.updated_at,
+    }
+}
+
+async fn fetch_lajukan_request_counts(db: &PgPool) -> Result<LajukanRequestCounts, sqlx::Error> {
+    let row = sqlx::query_as::<_, LajukanRequestSummaryAggRow>(
+        r#"
+        WITH request_statuses AS (
+          SELECT
+            CASE
+              WHEN lower(COALESCE(NULLIF(c.metadata->>'request_status', ''), '')) = 'completed' THEN 'completed'
+              WHEN lower(COALESCE(NULLIF(c.metadata->>'request_status', ''), '')) = 'waiting' THEN 'waiting'
+              WHEN COUNT(t.id) = 0 THEN 'waiting'
+              ELSE 'active'
+            END AS request_status
+          FROM content_items c
+          LEFT JOIN transactions t ON t.content_id = c.id
+          WHERE c.content_status = 'active'
+            AND c.pricing_mode = 'request'
+          GROUP BY c.id, c.metadata
+        )
+        SELECT
+          COUNT(*)::BIGINT AS total,
+          COUNT(*) FILTER (WHERE request_status = 'active')::BIGINT AS active_count,
+          COUNT(*) FILTER (WHERE request_status = 'waiting')::BIGINT AS waiting_count,
+          COUNT(*) FILTER (WHERE request_status = 'completed')::BIGINT AS completed_count
+        FROM request_statuses
+        "#,
+    )
+    .fetch_one(db)
+    .await?;
+
+    Ok(LajukanRequestCounts {
+        total: row.total,
+        active: row.active_count,
+        waiting: row.waiting_count,
+        completed: row.completed_count,
+    })
+}
+
+async fn find_umkm_store_row(
+    db: &PgPool,
+    store_ref: &str,
+) -> Result<Option<UmkmStoreRow>, sqlx::Error> {
+    let normalized = store_ref.trim().to_lowercase();
+    let parsed_id = Uuid::parse_str(store_ref.trim()).ok();
+
+    sqlx::query_as::<_, UmkmStoreRow>(
+        r#"
+        SELECT
+          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
+        FROM umkm_stores
+        WHERE (($1::uuid IS NOT NULL AND id = $1) OR lower(slug) = $2)
+        LIMIT 1
+        "#,
+    )
+    .bind(parsed_id)
+    .bind(normalized)
+    .fetch_optional(db)
+    .await
+}
+
+async fn get_lajukan_summary(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let listing_counts = sqlx::query_as::<_, LajukanSummaryAggRow>(
+        r#"
+        SELECT
+          COUNT(*) FILTER (WHERE content_status = 'active' AND pricing_mode <> 'request')::BIGINT AS total_live_listings,
+          COUNT(*) FILTER (WHERE content_status = 'active' AND pricing_mode = 'request')::BIGINT AS total_live_requests,
+          COUNT(DISTINCT owner_id) FILTER (
+            WHERE content_status = 'active'
+              AND content_type = 'product'
+              AND pricing_mode <> 'request'
+          )::BIGINT AS supplier_count,
+          COUNT(*) FILTER (
+            WHERE content_status = 'active'
+              AND content_type = 'product'
+              AND pricing_mode <> 'request'
+          )::BIGINT AS product_count,
+          COUNT(*) FILTER (
+            WHERE content_status = 'active'
+              AND content_type = 'service'
+              AND pricing_mode <> 'request'
+          )::BIGINT AS service_count,
+          COUNT(*) FILTER (
+            WHERE content_status = 'active'
+              AND content_type = 'property'
+              AND pricing_mode <> 'request'
+          )::BIGINT AS location_count,
+          COUNT(*) FILTER (
+            WHERE content_status = 'active'
+              AND content_type = 'freelancer'
+              AND pricing_mode <> 'request'
+          )::BIGINT AS talent_count
+        FROM content_items
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await;
+
+    let store_counts = sqlx::query_as::<_, LajukanStoreSummaryAggRow>(
+        r#"
+        SELECT
+          COUNT(*) FILTER (WHERE is_active = TRUE)::BIGINT AS total_active_stores,
+          COUNT(DISTINCT city) FILTER (WHERE is_active = TRUE)::BIGINT AS active_cities,
+          COUNT(*) FILTER (
+            WHERE is_active = TRUE
+              AND lower(COALESCE(metadata->>'verified', 'false')) IN ('true', '1', 'yes')
+          )::BIGINT AS verified_stores
+        FROM umkm_stores
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await;
+
+    let request_counts = fetch_lajukan_request_counts(&state.db).await;
+
+    match (listing_counts, store_counts, request_counts) {
+        (Ok(listing), Ok(stores), Ok(requests)) => {
+            let payload = LajukanSummaryPayload {
+                categories: LajukanCategoryCounts {
+                    all: listing.total_live_listings + listing.total_live_requests,
+                    supplier: listing.supplier_count,
+                    location: listing.location_count,
+                    service: listing.service_count,
+                    product: listing.product_count,
+                    talent: listing.talent_count,
+                },
+                requests,
+                stores: LajukanStoreCounts {
+                    total: stores.total_active_stores,
+                    cities: stores.active_cities,
+                    verified: stores.verified_stores,
+                },
+            };
+
+            (StatusCode::OK, Json(json!({ "data": payload }))).into_response()
+        }
+        (listing_result, store_result, request_result) => {
+            if let Err(error) = listing_result {
+                tracing::error!("get_lajukan_summary listing error: {:?}", error);
+            }
+            if let Err(error) = store_result {
+                tracing::error!("get_lajukan_summary store error: {:?}", error);
+            }
+            if let Err(error) = request_result {
+                tracing::error!("get_lajukan_summary request error: {:?}", error);
+            }
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load lajukan summary",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn list_lajukan_requests(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListLajukanRequestsQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(24).clamp(1, 60);
+
+    let request_rows = sqlx::query_as::<_, LajukanRequestRow>(
+        r#"
+        SELECT
+          c.id,
+          c.slug,
+          c.title,
+          c.summary,
+          c.body,
+          c.content_type,
+          c.category,
+          c.price_cents,
+          c.currency,
+          c.metadata,
+          c.created_at,
+          c.updated_at,
+          COUNT(t.id)::BIGINT AS offer_count
+        FROM content_items c
+        LEFT JOIN transactions t ON t.content_id = c.id
+        WHERE c.content_status = 'active'
+          AND c.pricing_mode = 'request'
+        GROUP BY
+          c.id, c.slug, c.title, c.summary, c.body, c.content_type, c.category,
+          c.price_cents, c.currency, c.metadata, c.created_at, c.updated_at
+        ORDER BY c.updated_at DESC
+        LIMIT $1
+        "#,
+    )
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await;
+
+    let request_counts = fetch_lajukan_request_counts(&state.db).await;
+
+    match (request_rows, request_counts) {
+        (Ok(rows), Ok(counts)) => {
+            let request_ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+            let offer_rows = if request_ids.is_empty() {
+                Ok(Vec::new())
+            } else {
+                sqlx::query_as::<_, LajukanRequestOfferRow>(
+                    r#"
+                    SELECT
+                      id,
+                      content_id,
+                      amount_cents,
+                      currency,
+                      transaction_status,
+                      offer_message,
+                      response_message,
+                      transaction_meta,
+                      snapshot_listing,
+                      updated_at
+                    FROM transactions
+                    WHERE content_id = ANY($1)
+                    ORDER BY updated_at DESC
+                    "#,
+                )
+                .bind(&request_ids)
+                .fetch_all(&state.db)
+                .await
+            };
+
+            match offer_rows {
+                Ok(offers) => {
+                    let mut offers_map: HashMap<Uuid, Vec<LajukanOfferPreview>> = HashMap::new();
+                    for offer in offers {
+                        if let Some(content_id) = offer.content_id {
+                            offers_map
+                                .entry(content_id)
+                                .or_default()
+                                .push(build_lajukan_offer_preview(&offer));
+                        }
+                    }
+
+                    let mut active = Vec::new();
+                    let mut completed = Vec::new();
+
+                    for row in rows {
+                        let status_key = request_status_key(&row.metadata, row.offer_count);
+                        let status = request_status_label(status_key.as_str()).to_string();
+                        let city = json_text_at(&row.metadata, &["city"])
+                            .or_else(|| json_text_at(&row.metadata, &["location"]))
+                            .unwrap_or_else(|| "Indonesia".to_string());
+                        let offers = offers_map.remove(&row.id).unwrap_or_default();
+                        let card = LajukanRequestCard {
+                            id: row.id.to_string(),
+                            slug: row.slug.clone(),
+                            title: row.title.clone(),
+                            city,
+                            created_at: row.created_at,
+                            created_label: format_relative_time_id(row.created_at),
+                            offers_label: format!("{} penawaran", row.offer_count),
+                            offer_count: row.offer_count,
+                            status,
+                            status_key: status_key.clone(),
+                            detail: build_lajukan_request_detail(&row),
+                            offers,
+                        };
+
+                        if status_key == "completed" {
+                            completed.push(card);
+                        } else {
+                            active.push(card);
+                        }
+                    }
+
+                    active.sort_by(|left, right| {
+                        if left.status_key == right.status_key {
+                            right.created_at.cmp(&left.created_at)
+                        } else if left.status_key == "active" {
+                            std::cmp::Ordering::Less
+                        } else {
+                            std::cmp::Ordering::Greater
+                        }
+                    });
+                    completed.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+
+                    let payload = LajukanRequestsPayload {
+                        active,
+                        completed,
+                        counts,
+                    };
+
+                    (StatusCode::OK, Json(json!({ "data": payload }))).into_response()
+                }
+                Err(error) => {
+                    tracing::error!("list_lajukan_requests offer error: {:?}", error);
+                    err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to load lajukan requests",
+                    )
+                    .into_response()
+                }
+            }
+        }
+        (Err(error), _) => {
+            tracing::error!("list_lajukan_requests query error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load lajukan requests",
+            )
+            .into_response()
+        }
+        (_, Err(error)) => {
+            tracing::error!("list_lajukan_requests counts error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load lajukan requests",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn list_umkm_stores(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<ListUmkmStoresQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(80).clamp(1, 500);
+    let active_only = query.active_only.unwrap_or(true);
+    let text_query = clean_text(query.q);
+    let city = clean_text(query.city);
+    let slug = clean_text(query.slug).map(|value| value.to_lowercase());
+    let id = query.id;
+    let owner_user_id = query.owner_user_id;
+
+    let rows = sqlx::query_as::<_, UmkmStoreRow>(
+        r#"
+        SELECT
+          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
+        FROM umkm_stores
+        WHERE ($1::uuid IS NULL OR id = $1)
+          AND ($2::uuid IS NULL OR owner_user_id = $2)
+          AND ($3::text IS NULL OR lower(slug) = $3)
+          AND (
+            $4::text IS NULL OR
+            name ILIKE ('%' || $4 || '%') OR
+            COALESCE(description, '') ILIKE ('%' || $4 || '%') OR
+            city ILIKE ('%' || $4 || '%') OR
+            address ILIKE ('%' || $4 || '%')
+          )
+          AND ($5::text IS NULL OR city ILIKE ('%' || $5 || '%'))
+          AND (NOT $6::bool OR is_active = TRUE)
+        ORDER BY updated_at DESC
+        LIMIT $7
+        "#,
+    )
+    .bind(id)
+    .bind(owner_user_id)
+    .bind(slug)
+    .bind(text_query)
+    .bind(city)
+    .bind(active_only)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({
+                "data": {
+                    "items": items,
+                    "count": items.len()
+                }
+            })),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!("list_umkm_stores error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load umkm stores",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn get_umkm_store(
+    State(state): State<Arc<AppState>>,
+    Path(store_ref): Path<String>,
+) -> impl IntoResponse {
+    match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(store)) => {
+            (StatusCode::OK, Json(json!({ "data": { "store": store } }))).into_response()
+        }
+        Ok(None) => err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(error) => {
+            tracing::error!("get_umkm_store error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load umkm store",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn create_umkm_store(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<CreateUmkmStoreRequest>,
+) -> impl IntoResponse {
+    let name = match clean_text(Some(payload.name)) {
+        Some(value) if value.len() >= 3 && value.len() <= 120 => value,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid store name").into_response(),
+    };
+    let address = match clean_text(Some(payload.address)) {
+        Some(value) if value.len() >= 3 && value.len() <= 240 => value,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid store address").into_response(),
+    };
+    let city = clean_text(payload.city).unwrap_or_else(|| "Jakarta".to_string());
+    if city.len() < 2 || city.len() > 80 {
+        return err(StatusCode::BAD_REQUEST, "invalid store city").into_response();
+    }
+    if !(-90.0..=90.0).contains(&payload.lat) || !(-180.0..=180.0).contains(&payload.lng) {
+        return err(StatusCode::BAD_REQUEST, "invalid store coordinates").into_response();
+    }
+
+    let slug = clean_text(payload.slug).unwrap_or_else(|| make_slug(&name));
+    let phone = clean_text(payload.phone);
+    let description = clean_text(payload.description);
+    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+    }
+
+    let result = sqlx::query_as::<_, UmkmStoreRow>(
+        r#"
+        INSERT INTO umkm_stores (
+          owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          is_active, online_order_enabled, offline_order_enabled, metadata
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9,
+          $10, $11, $12, $13
+        )
+        RETURNING
+          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(payload.owner_user_id)
+    .bind(name)
+    .bind(slug)
+    .bind(description)
+    .bind(city)
+    .bind(address)
+    .bind(payload.lat)
+    .bind(payload.lng)
+    .bind(phone)
+    .bind(payload.is_active.unwrap_or(true))
+    .bind(payload.online_order_enabled.unwrap_or(true))
+    .bind(payload.offline_order_enabled.unwrap_or(true))
+    .bind(metadata)
+    .fetch_one(&state.db)
+    .await;
+
+    match result {
+        Ok(store) => (
+            StatusCode::CREATED,
+            Json(json!({ "data": { "store": store } })),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!("create_umkm_store error: {:?}", error);
+            err(StatusCode::BAD_REQUEST, "failed to create umkm store").into_response()
+        }
+    }
+}
+
+async fn update_umkm_store(
+    State(state): State<Arc<AppState>>,
+    Path(store_ref): Path<String>,
+    Json(payload): Json<UpdateUmkmStoreRequest>,
+) -> impl IntoResponse {
+    let existing = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(store)) => store,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(error) => {
+            tracing::error!("update_umkm_store load error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update umkm store",
+            )
+            .into_response();
+        }
+    };
+
+    let name = payload
+        .name
+        .and_then(|value| clean_text(Some(value)))
+        .unwrap_or(existing.name.clone());
+    let city = payload
+        .city
+        .and_then(|value| clean_text(Some(value)))
+        .unwrap_or(existing.city.clone());
+    let address = payload
+        .address
+        .and_then(|value| clean_text(Some(value)))
+        .unwrap_or(existing.address.clone());
+    let description = payload
+        .description
+        .and_then(|value| clean_text(Some(value)))
+        .or(existing.description.clone());
+    let phone = payload
+        .phone
+        .and_then(|value| clean_text(Some(value)))
+        .or(existing.phone.clone());
+
+    if name.len() < 3 || name.len() > 120 {
+        return err(StatusCode::BAD_REQUEST, "invalid store name").into_response();
+    }
+    if city.len() < 2 || city.len() > 80 {
+        return err(StatusCode::BAD_REQUEST, "invalid store city").into_response();
+    }
+    if address.len() < 3 || address.len() > 240 {
+        return err(StatusCode::BAD_REQUEST, "invalid store address").into_response();
+    }
+
+    let merged_metadata = if let Some(metadata_patch) = payload.metadata {
+        let merged = merge_json_objects(existing.metadata.clone(), metadata_patch);
+        if !metadata_within_limit(&merged) {
+            return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+        }
+        merged
+    } else {
+        existing.metadata.clone()
+    };
+
+    let lat = payload.lat.unwrap_or(existing.lat);
+    let lng = payload.lng.unwrap_or(existing.lng);
+    if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lng) {
+        return err(StatusCode::BAD_REQUEST, "invalid store coordinates").into_response();
+    }
+
+    let result = sqlx::query_as::<_, UmkmStoreRow>(
+        r#"
+        UPDATE umkm_stores
+        SET
+          name = $2,
+          description = $3,
+          city = $4,
+          address = $5,
+          lat = $6,
+          lng = $7,
+          phone = $8,
+          is_active = $9,
+          online_order_enabled = $10,
+          offline_order_enabled = $11,
+          metadata = $12,
+          updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+          id, owner_user_id, name, slug, description, city, address, lat, lng, phone,
+          is_active, online_order_enabled, offline_order_enabled, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(existing.id)
+    .bind(name)
+    .bind(description)
+    .bind(city)
+    .bind(address)
+    .bind(lat)
+    .bind(lng)
+    .bind(phone)
+    .bind(payload.is_active.unwrap_or(existing.is_active))
+    .bind(
+        payload
+            .online_order_enabled
+            .unwrap_or(existing.online_order_enabled),
+    )
+    .bind(
+        payload
+            .offline_order_enabled
+            .unwrap_or(existing.offline_order_enabled),
+    )
+    .bind(merged_metadata)
+    .fetch_one(&state.db)
+    .await;
+
+    match result {
+        Ok(store) => (StatusCode::OK, Json(json!({ "data": { "store": store } }))).into_response(),
+        Err(error) => {
+            tracing::error!("update_umkm_store error: {:?}", error);
+            err(StatusCode::BAD_REQUEST, "failed to update umkm store").into_response()
+        }
+    }
+}
+
+async fn list_umkm_products(
+    State(state): State<Arc<AppState>>,
+    Path(store_ref): Path<String>,
+    Query(query): Query<ListUmkmProductsQuery>,
+) -> impl IntoResponse {
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(store)) => store,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(error) => {
+            tracing::error!("list_umkm_products load store error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load umkm products",
+            )
+            .into_response();
+        }
+    };
+
+    let limit = query.limit.unwrap_or(300).clamp(1, 1000);
+    let include_unavailable = query.include_unavailable.unwrap_or(false);
+    let channel = clean_text(query.channel);
+
+    let rows = sqlx::query_as::<_, UmkmProductRow>(
+        r#"
+        SELECT
+          id, store_id, name, slug, description, category, price_cents, stock_qty,
+          is_available, image_url, metadata, created_at, updated_at
+        FROM umkm_products
+        WHERE store_id = $1
+          AND ($2::bool OR is_available = TRUE)
+          AND (
+            $3::text IS NULL OR
+            COALESCE(jsonb_typeof(metadata->'channel'), 'null') <> 'array' OR
+            EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(metadata->'channel') AS channel_item(value)
+              WHERE channel_item.value = $3
+            )
+          )
+        ORDER BY category ASC, name ASC
+        LIMIT $4
+        "#,
+    )
+    .bind(store.id)
+    .bind(include_unavailable)
+    .bind(channel)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(items) => (
+            StatusCode::OK,
+            Json(json!({
+                "data": {
+                    "store": store,
+                    "items": items,
+                    "count": items.len()
+                }
+            })),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!("list_umkm_products error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load umkm products",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn create_umkm_product(
+    State(state): State<Arc<AppState>>,
+    Path(store_ref): Path<String>,
+    Json(payload): Json<CreateUmkmProductRequest>,
+) -> impl IntoResponse {
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(store)) => store,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "umkm store not found").into_response(),
+        Err(error) => {
+            tracing::error!("create_umkm_product load store error: {:?}", error);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create umkm product",
+            )
+            .into_response();
+        }
+    };
+
+    let name = match clean_text(Some(payload.name)) {
+        Some(value) if value.len() >= 2 && value.len() <= 160 => value,
+        _ => return err(StatusCode::BAD_REQUEST, "invalid product name").into_response(),
+    };
+    if payload.price_cents <= 0 {
+        return err(StatusCode::BAD_REQUEST, "invalid product price").into_response();
+    }
+
+    let slug = clean_text(payload.slug).unwrap_or_else(|| make_slug(&name));
+    let description = clean_text(payload.description);
+    let category = clean_text(payload.category).unwrap_or_else(|| "general".to_string());
+    let image_url = clean_text(payload.image_url);
+    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+    }
+
+    let result = sqlx::query_as::<_, UmkmProductRow>(
+        r#"
+        INSERT INTO umkm_products (
+          store_id, name, slug, description, category, price_cents, stock_qty,
+          is_available, image_url, metadata
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7,
+          $8, $9, $10
+        )
+        RETURNING
+          id, store_id, name, slug, description, category, price_cents, stock_qty,
+          is_available, image_url, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(store.id)
+    .bind(name)
+    .bind(slug)
+    .bind(description)
+    .bind(category)
+    .bind(payload.price_cents)
+    .bind(payload.stock_qty.unwrap_or(0))
+    .bind(payload.is_available.unwrap_or(true))
+    .bind(image_url)
+    .bind(metadata)
+    .fetch_one(&state.db)
+    .await;
+
+    match result {
+        Ok(product) => (
+            StatusCode::CREATED,
+            Json(json!({ "data": { "product": product } })),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!("create_umkm_product error: {:?}", error);
+            err(StatusCode::BAD_REQUEST, "failed to create umkm product").into_response()
+        }
     }
 }
 

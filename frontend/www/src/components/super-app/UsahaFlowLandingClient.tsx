@@ -399,7 +399,7 @@ export function UsahaFlowLandingClient({
 
   const snapshotRequestRef = useRef(0);
   const loginHref = `/login?callbackUrl=${encodeURIComponent(
-    `/${locale}${buildUsahaPath('home')}`,
+    buildUsahaPath('home'),
   )}`;
 
   const loadStores = useCallback(async () => {

@@ -9,9 +9,9 @@ NO_INSTALL="${NO_INSTALL:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case "$APP" in
-  www|cms|crm) ;;
+  www|usaha|cms|crm) ;;
   *)
-    echo "Usage: ./dev-live.sh [www|cms|crm] [env-file]" >&2
+    echo "Usage: ./dev-live.sh [www|usaha|cms|crm] [env-file]" >&2
     exit 1
     ;;
 esac
@@ -67,6 +67,12 @@ case "$APP" in
   cms)
     APP_DIR="frontend/cms"
     PORT="3001"
+    ;;
+  usaha)
+    APP_DIR="frontend/usaha"
+    PORT="3003"
+    export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}"
+    export NEXT_PUBLIC_WWW_URL="${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}"
     ;;
   crm)
     APP_DIR="frontend/crm"

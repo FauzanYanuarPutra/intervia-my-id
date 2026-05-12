@@ -64,6 +64,60 @@ compose_cmd() {
   "${COMPOSE_BIN[@]}" "$@"
 }
 
+compose_up_with_legacy_retry() {
+  local project_name="$1"
+  shift
+
+  local output_file exit_code=0
+  output_file="$(mktemp)"
+
+  set +e
+  compose_cmd "$@" > >(tee "$output_file") 2> >(tee -a "$output_file" >&2)
+  exit_code=$?
+  set -e
+
+  if (( exit_code == 0 )); then
+    rm -f "$output_file"
+    return 0
+  fi
+
+  if (( COMPOSE_IS_LEGACY_V1 == 1 )) && grep -Eq "ContainerConfig|KeyError: 'ContainerConfig'" "$output_file"; then
+    local service skip_next=0
+    local -a services_to_cleanup=()
+
+    for service in "$@"; do
+      if (( skip_next == 1 )); then
+        skip_next=0
+        continue
+      fi
+
+      case "$service" in
+        --env-file|-f|--project-name|-p)
+          skip_next=1
+          ;;
+        up|-d|--no-build|--no-recreate|--remove-orphans|--force-recreate|--build|start|stop|restart|ps)
+          ;;
+        --*)
+          ;;
+        *)
+          services_to_cleanup+=("$service")
+          ;;
+      esac
+    done
+
+    if [[ "${#services_to_cleanup[@]}" -gt 0 ]]; then
+      echo "Legacy docker-compose v1 hit ContainerConfig. Removing stale containers and retrying once: ${services_to_cleanup[*]}"
+      remove_legacy_compose_service_containers "$project_name" "${services_to_cleanup[@]}"
+      rm -f "$output_file"
+      compose_cmd "$@"
+      return $?
+    fi
+  fi
+
+  rm -f "$output_file"
+  return "$exit_code"
+}
+
 configure_build_backend() {
   local buildkit_requested compose_cli_requested
 
@@ -521,9 +575,9 @@ echo "Starting services..."
 if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]]; then
   if [[ "${#services_to_build[@]}" -gt 0 ]]; then
     remove_legacy_compose_service_containers "$compose_project_name" "${services_to_build[@]}"
-    compose_cmd --env-file "$ENV_FILE" up -d --no-build "${services_to_build[@]}"
+    compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build "${services_to_build[@]}"
     if ! compose_cmd --env-file "$ENV_FILE" start; then
-      compose_cmd --env-file "$ENV_FILE" up -d --no-build --no-recreate
+      compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build --no-recreate
     fi
   else
     mapfile -t all_project_container_ids < <(get_project_container_ids "$compose_project_name" 0)
@@ -546,7 +600,7 @@ if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]]; then
         echo "All containers already running. Skip start/recreate."
       fi
     else
-      compose_cmd --env-file "$ENV_FILE" up -d --no-build --no-recreate
+      compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build --no-recreate
     fi
   fi
   compose_cmd --env-file "$ENV_FILE" ps
@@ -556,6 +610,6 @@ else
   elif [[ "${#services_to_build[@]}" -gt 0 ]]; then
     remove_legacy_compose_service_containers "$compose_project_name" "${services_to_build[@]}"
   fi
-  compose_cmd --env-file "$ENV_FILE" up -d --no-build "${SELECTED_SERVICES[@]}"
+  compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build "${SELECTED_SERVICES[@]}"
   compose_cmd --env-file "$ENV_FILE" ps "${SELECTED_SERVICES[@]}"
 fi
