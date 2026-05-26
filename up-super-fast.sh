@@ -8,6 +8,8 @@ NO_BUILD=0
 PULL_LATEST=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_FILE="$SCRIPT_DIR/.docker-build-state.sh.tsv"
+RUNTIME_DIR="$SCRIPT_DIR/.runtime"
+STARTUP_STATE_FILE="$RUNTIME_DIR/stack-startup.json"
 COMPOSE_IS_LEGACY_V1=0
 COMPOSE_BIN=()
 
@@ -36,6 +38,57 @@ EOF
 die() {
   printf '%s\n' "$*" >&2
   exit 1
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+write_startup_state() {
+  local active="$1"
+  local status="$2"
+  local phase="$3"
+  local message="$4"
+  shift 4 || true
+
+  mkdir -p "$RUNTIME_DIR"
+
+  local now started_at service services_json separator
+  now="$(date -Iseconds)"
+  started_at="$now"
+  if [[ -f "$STARTUP_STATE_FILE" ]]; then
+    started_at="$(sed -n 's/.*"startedAt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$STARTUP_STATE_FILE" | head -n 1)"
+    started_at="${started_at:-$now}"
+  fi
+
+  services_json="["
+  separator=""
+  for service in "$@"; do
+    [[ -n "$service" ]] || continue
+    services_json+="${separator}\"$(json_escape "$service")\""
+    separator=","
+  done
+  services_json+="]"
+
+  cat > "$STARTUP_STATE_FILE" <<EOF
+{
+  "active": $active,
+  "status": "$(json_escape "$status")",
+  "phase": "$(json_escape "$phase")",
+  "message": "$(json_escape "$message")",
+  "script": "up-super-fast.sh",
+  "mode": "$(json_escape "$MODE")",
+  "services": $services_json,
+  "startedAt": "$(json_escape "$started_at")",
+  "updatedAt": "$(json_escape "$now")"
+}
+EOF
+}
+
+on_startup_error() {
+  local exit_code=$?
+  write_startup_state false failed failed "Startup failed." "${SELECTED_SERVICES[@]}"
+  exit "$exit_code"
 }
 
 init_compose() {
@@ -389,6 +442,8 @@ if [[ -z "$ENV_FILE" ]]; then
 fi
 
 cd "$SCRIPT_DIR"
+trap on_startup_error ERR
+write_startup_state true starting initializing "Preparing Docker startup." "${SELECTED_SERVICES[@]}"
 
 export DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-1}"
 export COMPOSE_DOCKER_CLI_BUILD="${COMPOSE_DOCKER_CLI_BUILD:-1}"
@@ -406,7 +461,13 @@ if (( COMPOSE_IS_LEGACY_V1 == 1 )); then
 fi
 
 if [[ "$MODE" == "prod" ]]; then
-  [[ -f "$ENV_FILE" ]] || die "Env file not found: $ENV_FILE"
+  if [[ ! -f "$ENV_FILE" ]]; then
+    if [[ "$ENV_FILE" == ".env.development" && -f .env ]]; then
+      ENV_FILE=".env"
+    else
+      die "Env file not found: $ENV_FILE"
+    fi
+  fi
   compose_files=(-f docker-compose.yml -f docker-compose.prod.yml)
 
   if [[ "$PULL_LATEST" -eq 1 ]]; then
@@ -426,10 +487,17 @@ if [[ "$MODE" == "prod" ]]; then
     compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" up -d --no-build --no-recreate --remove-orphans "${SELECTED_SERVICES[@]}"
     compose_cmd --env-file "$ENV_FILE" "${compose_files[@]}" ps "${SELECTED_SERVICES[@]}"
   fi
+  write_startup_state false ready ready "Production services are ready." "${SELECTED_SERVICES[@]}"
   exit 0
 fi
 
-[[ -f "$ENV_FILE" ]] || die "Env file not found: $ENV_FILE"
+if [[ ! -f "$ENV_FILE" ]]; then
+  if [[ "$ENV_FILE" == ".env.development" && -f .env ]]; then
+    ENV_FILE=".env"
+  else
+    die "Env file not found: $ENV_FILE"
+  fi
+fi
 
 mapfile -t AVAILABLE_SERVICES < <(compose_cmd --env-file "$ENV_FILE" config --services)
 declare -A AVAILABLE_SERVICE_LOOKUP=()
@@ -442,11 +510,13 @@ compose_project_name="${COMPOSE_PROJECT_NAME:-$(basename "$SCRIPT_DIR")}"
 declare -A SERVICE_INPUTS=(
   [identity_service]="backend/rust_apps docker-compose.yml"
   [marketplace_service]="backend/rust_apps docker-compose.yml"
+  [community_service]="backend/rust_apps docker-compose.yml"
   [ai_service]="backend/rust_apps docker-compose.yml"
   [chat_service]="backend/chat_service docker-compose.yml"
   [ocr_service]="ai/ocr_paddle docker-compose.yml"
   [liveness_service]="ai/liveness docker-compose.yml"
   [www]="frontend/www frontend/shared frontend/.dockerignore docker-compose.yml"
+  [usaha]="frontend/usaha frontend/shared frontend/.dockerignore docker-compose.yml"
   [cms]="frontend/cms frontend/shared frontend/.dockerignore docker-compose.yml"
   [crm]="frontend/crm frontend/shared frontend/.dockerignore docker-compose.yml"
 )
@@ -454,11 +524,13 @@ declare -A SERVICE_INPUTS=(
 declare -A SERVICE_IMAGES=(
   [identity_service]="${compose_project_name}-identity_service"
   [marketplace_service]="${compose_project_name}-marketplace_service"
+  [community_service]="${compose_project_name}-community_service"
   [ai_service]="${compose_project_name}-ai_service"
   [chat_service]="${compose_project_name}-chat_service"
   [ocr_service]="${compose_project_name}-ocr_service"
   [liveness_service]="${compose_project_name}-liveness_service"
   [www]="${compose_project_name}-www"
+  [usaha]="${compose_project_name}-usaha"
   [cms]="${compose_project_name}-cms"
   [crm]="${compose_project_name}-crm"
 )
@@ -466,20 +538,22 @@ declare -A SERVICE_IMAGES=(
 declare -A SERVICE_BASE_IMAGES=(
   [identity_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
   [marketplace_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
+  [community_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
   [ai_service]="rustlang/rust:nightly-bookworm debian:bookworm-slim"
   [chat_service]="docker/dockerfile:1.7 elixir:1.15-slim erlang:26-slim"
   [ocr_service]="python:3.9-slim"
   [liveness_service]="python:3.11-slim"
   [www]="docker/dockerfile:1.7 node:20-bullseye-slim"
+  [usaha]="docker/dockerfile:1.7 node:20-bullseye-slim"
   [cms]="docker/dockerfile:1.7 node:20-bullseye-slim"
   [crm]="docker/dockerfile:1.7 node:20-bullseye-slim"
 )
 
 build_groups=(
-  "identity_service marketplace_service ai_service"
+  "identity_service marketplace_service community_service ai_service"
   "chat_service"
   "ocr_service liveness_service"
-  "www cms crm"
+  "www usaha cms crm"
 )
 
 load_state_file "$STATE_FILE"
@@ -524,6 +598,7 @@ done
 
 if [[ "$NO_BUILD" -eq 0 ]]; then
   if [[ "${#services_to_build[@]}" -gt 0 ]]; then
+    write_startup_state true building building "Building changed services." "${services_to_build[@]}"
     warm_base_images_for_services "${services_to_build[@]}"
 
     local_group=()
@@ -572,6 +647,7 @@ else
 fi
 
 echo "Starting services..."
+write_startup_state true starting_services starting_services "Starting Docker services." "${SELECTED_SERVICES[@]}"
 if [[ "${#SELECTED_SERVICES[@]}" -eq 0 ]]; then
   if [[ "${#services_to_build[@]}" -gt 0 ]]; then
     remove_legacy_compose_service_containers "$compose_project_name" "${services_to_build[@]}"
@@ -613,3 +689,4 @@ else
   compose_up_with_legacy_retry "$compose_project_name" --env-file "$ENV_FILE" up -d --no-build "${SELECTED_SERVICES[@]}"
   compose_cmd --env-file "$ENV_FILE" ps "${SELECTED_SERVICES[@]}"
 fi
+write_startup_state false ready ready "All requested services are ready." "${SELECTED_SERVICES[@]}"

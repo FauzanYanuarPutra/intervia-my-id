@@ -162,9 +162,9 @@ export default async function LainnyaPage({ params }: PageProps) {
       hint: isId ? 'Mulai dari supplier atau kebutuhan usaha.' : 'Start from suppliers or a business need.',
       meta: isId ? 'Cari cepat' : 'Search fast',
       href: '/search',
-      cta: isId ? 'Buka pencarian' : 'Open search',
+      cta: isId ? 'Cari' : 'Open search',
       icon: Search,
-      toneClass: 'from-sky-500/18 via-sky-400/8 to-transparent',
+      toneClass: 'from-emerald-500/18 via-emerald-400/8 to-transparent',
     },
     {
       eyebrow: isId ? 'Kelola usaha' : 'Manage',
@@ -172,9 +172,9 @@ export default async function LainnyaPage({ params }: PageProps) {
       hint: isId ? 'Produk, order, operasional, tim.' : 'Products, orders, operations, and team.',
       meta: isId ? 'Satu pintu' : 'One doorway',
       href: buildUsahaPath('home'),
-      cta: isId ? 'Buka kelola usaha' : 'Open business control',
+      cta: isId ? 'Kelola' : 'Open business control',
       icon: Store,
-      toneClass: 'from-indigo-500/18 via-indigo-400/10 to-transparent',
+      toneClass: 'from-teal-500/18 via-teal-400/10 to-transparent',
     },
     {
       eyebrow: isId ? 'Pembayaran' : 'Finance',
@@ -182,7 +182,7 @@ export default async function LainnyaPage({ params }: PageProps) {
       hint: isId ? 'Kalau uang sudah mulai jalan.' : 'When money starts moving.',
       meta: isId ? 'Keuangan' : 'Finance',
       href: '/payments',
-      cta: isId ? 'Buka keuangan' : 'Open finance',
+      cta: isId ? 'Keuangan' : 'Open finance',
       icon: Wallet,
       toneClass: 'from-emerald-500/18 via-emerald-400/10 to-transparent',
     },
@@ -196,7 +196,7 @@ export default async function LainnyaPage({ params }: PageProps) {
             <div className="min-w-0">
               <p className="ui-page-eyebrow">{isId ? 'Lainnya' : 'More'}</p>
               <h1 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)] sm:text-[2rem]">
-                {isId ? 'Buka yang dibutuhkan sekarang.' : 'Open what you need now.'}
+                {isId ? 'Mau ke mana?' : 'Open what you need now.'}
               </h1>
               <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[color:var(--app-text-soft)]">
                 {isId
@@ -261,7 +261,7 @@ export default async function LainnyaPage({ params }: PageProps) {
               </p>
               <h2 className="mt-1.5 text-base font-black text-[color:var(--app-text)]">
                 {isId
-                  ? 'Empat tombol yang paling sering dipakai'
+                  ? 'Yang sering dipakai'
                   : 'The four most-used buttons'}
               </h2>
               <div className="mt-3 flex flex-wrap gap-2">

@@ -22,25 +22,25 @@ export default async function TrustCenterPage({ params }: PageProps) {
   const isId = locale === 'id';
 
   return (
-    <main className="page-shell page-rhythm pb-24 pt-6 lg:pb-10">
+    <main className="page-shell page-rhythm pb-6 pt-6 lg:pb-10">
       <section className="ui-panel ui-hero-panel rounded-[32px] p-6 sm:p-8">
-        <p className="ui-inline-meta bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
+        <p className="ui-inline-meta bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
           <ShieldCheck className="h-3.5 w-3.5" />
           {isId ? 'Pusat aman & aturan' : 'Trust Center'}
         </p>
         <h1 className="mt-4 max-w-3xl text-3xl font-black tracking-tight text-[color:var(--app-text)] sm:text-4xl">
           {isId
-            ? 'Hal penting soal data, transaksi, dan keamanan dibuat lebih gampang dipahami.'
+            ? 'Aman, jelas, nggak ribet.'
             : 'Transparency, controls, and safe flows for suppliers, services, and businesses.'}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
           {isId
-            ? 'Kalau kamu mau tahu soal privasi, pembayaran, keamanan akun, atau aturan pakai Lajukan, mulainya dari sini. Isinya sengaja dibuat ringkas dan langsung ke inti.'
+            ? 'Privasi, pembayaran, akun, aturan. Ringkas dulu.'
             : 'Quick summaries for supplier deals, storefronts, operational services, fulfillment, compliance, and transactions that need strong evidence.'}
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Link href="#trust-topics" className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm">
-            {isId ? 'Lihat topik penting' : 'View topics'}
+            {isId ? 'Topik penting' : 'View topics'}
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link href="/privacy" className="ui-button-secondary inline-flex items-center px-4 text-sm">
@@ -62,11 +62,11 @@ export default async function TrustCenterPage({ params }: PageProps) {
               {isId ? 'Yang sering dicari' : 'Core topics'}
             </p>
             <h2 className="mt-2 text-2xl font-black text-[color:var(--app-text)]">
-              {isId ? 'Topik yang paling sering ditanya' : 'Trust controls for the business economy'}
+              {isId ? 'Yang sering ditanya' : 'Trust controls for the business economy'}
             </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
               {isId
-                ? 'Pilih topik yang paling dekat dengan masalahmu. Fokusnya ke hal yang benar-benar terasa di akun, transaksi, supplier, dan operasional usaha.'
+                ? 'Pilih topik yang paling dekat.'
                 : 'Open a topic to see the controls and risks that matter most for sourcing, services, delivery, and storefronts.'}
             </p>
           </div>
@@ -99,10 +99,10 @@ export default async function TrustCenterPage({ params }: PageProps) {
 
       <section className="space-y-3">
         <SummaryCard
-          title={isId ? 'Aturan penting, dibikin lebih jelas' : 'Concise legal references'}
+          title={isId ? 'Aturan penting' : 'Concise legal references'}
           description={
             isId
-              ? 'Privasi, syarat pakai, dan cookie kami ringkas dulu di bagian pentingnya. Detail lengkapnya tetap ada kalau kamu perlu baca lebih dalam.'
+              ? 'Ringkas dulu. Detail tetap ada.'
               : 'Privacy, terms, and cookie policy stay concise, while technical detail covers supplier deals, escrow, fulfillment, and data rights.'
           }
           meta={isId ? 'Aturan dasar' : 'Legal'}
@@ -141,7 +141,7 @@ export default async function TrustCenterPage({ params }: PageProps) {
             </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
               {isId
-                ? 'Kalau ada supplier bermasalah, akun butuh verifikasi, transaksi macet, atau data yang perlu diklarifikasi, masuk lewat support supaya cepat ditindak.'
+                ? 'Masuk lewat support biar cepat ditindak.'
                 : 'Use support for problematic suppliers, disputed services, storefront verification, or transactions that require escalation.'}
             </p>
           </div>

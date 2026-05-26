@@ -433,6 +433,9 @@ export async function listUmkmStores(options?: ListUmkmStoresOptions): Promise<U
   if (backendStores) {
     return backendStores;
   }
+  if (options?.backendOnly) {
+    return [];
+  }
 
   const runtimeStores = listStoreRecords(options).map(cloneStore);
   const portalStores = await listUsahaPortalUmkmStores({

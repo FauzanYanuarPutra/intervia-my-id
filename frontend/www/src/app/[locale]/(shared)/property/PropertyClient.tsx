@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PropertyCard } from '@/components/ui-kit';
+import { Header } from '@/components/layout/Header';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   Search,
   RotateCcw,
@@ -158,6 +159,7 @@ export default function PropertyClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const fallbackHomePath = pathname.startsWith('/en') ? '/en/home' : '/id/home';
 
   const initialSearch = searchParams.get('q') ?? '';
   const initialLocation = searchParams.get('location') ?? '';
@@ -180,24 +182,10 @@ export default function PropertyClient() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
 
-  const [isVisible, setIsVisible] = useState(true);
-  const lastScrollYRef = useRef(0);
   const autoLoadTargetRef = useRef<HTMLDivElement>(null);
   const autoLoadLockRef = useRef(false);
 
-  // Sticky header visibility without re-subscribing on every scroll tick.
-  useEffect(() => {
-    const handleScroll = () => {
-      const y = window.scrollY;
-      const delta = y - lastScrollYRef.current;
-      if (y <= 10) setIsVisible(true);
-      else if (delta > 15) setIsVisible(false);
-      else if (delta < -10) setIsVisible(true);
-      lastScrollYRef.current = y;
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const handleBack = useAppBack(router, fallbackHomePath);
 
   // Keep URL query in sync with applied filters.
   useEffect(() => {
@@ -347,21 +335,21 @@ export default function PropertyClient() {
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <header
-        className={clsx(
-          'fixed top-0 left-0 right-0 z-50 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] backdrop-blur-xl border-b border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] transition-transform duration-300 ease-in-out',
-          isVisible ? 'translate-y-0' : '-translate-y-full',
-        )}
-      >
-        <div className="max-w-7xl mx-auto px-4 py-4 space-y-4">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex flex-grow gap-2 items-center">
+      <div className="hidden lg:block">
+        <Header />
+      </div>
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
+        <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
+          <div className="flex flex-col gap-2 md:flex-row">
+            <div className="flex flex-grow items-center gap-2">
               <button
+                type="button"
                 title="Kembali"
-                onClick={() => router.back()}
-                className="p-2.5 bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] border border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] rounded-2xl active:scale-95 transition-all"
+                aria-label="Kembali"
+                onClick={handleBack}
+                className="inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition-all active:scale-95 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               >
-                <ChevronLeft className="w-5 h-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
+                <ChevronLeft className="h-4.5 w-4.5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
               </button>
 
               <div className="relative flex-grow">
@@ -369,7 +357,7 @@ export default function PropertyClient() {
                 <input
                   type="text"
                   placeholder="Cari villa, apartemen, lokasi..."
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] outline-none text-sm focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)]"
+                  className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={tempSearch}
                   onChange={(e) => setTempSearch(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
@@ -377,11 +365,11 @@ export default function PropertyClient() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex min-w-0 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
               <input
                 type="text"
                 placeholder="Filter lokasi"
-                className="flex-1 md:w-44 px-4 py-3 rounded-2xl border border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] text-sm outline-none"
+                className="min-w-[150px] flex-1 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] md:w-44"
                 value={tempLocation}
                 onChange={(e) => setTempLocation(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
@@ -389,7 +377,7 @@ export default function PropertyClient() {
 
               <select
                 title="Filter Status"
-                className="flex-1 md:w-44 px-4 py-3 rounded-2xl border border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] text-sm outline-none appearance-none cursor-pointer"
+                className="min-w-[150px] flex-1 cursor-pointer appearance-none rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] md:w-44"
                 value={tempType}
                 onChange={(e) => setTempType(e.target.value as Filters['type'])}
               >
@@ -400,8 +388,8 @@ export default function PropertyClient() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 items-center min-h-[32px]">
-            <span className="text-[10px] font-black text-[color:var(--app-text-soft)] uppercase tracking-widest flex items-center gap-1">
+          <div className="flex min-h-[30px] flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-[color:var(--app-text-soft)]">
               <Filter className="w-3 h-3" /> Filter:
             </span>
             {!(
@@ -432,7 +420,7 @@ export default function PropertyClient() {
                 )}
                 <button
                   onClick={handleReset}
-                  className="text-[10px] text-[color:var(--app-danger)] font-bold uppercase hover:underline ml-1"
+                  className="ml-1 text-[10px] font-bold uppercase text-[color:var(--app-danger)] hover:underline"
                 >
                   Hapus Semua
                 </button>
@@ -440,13 +428,13 @@ export default function PropertyClient() {
             )}
           </div>
 
-          <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">Auto-apply filter aktif</p>
+          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">Auto-apply filter aktif</p>
         </div>
       </header>
 
-      <div className="h-[190px] md:h-[150px]" />
+      <div className="h-[126px] md:h-[112px] lg:h-[calc(112px+3.5rem+env(safe-area-inset-top))]" />
 
-      <main className="max-w-7xl mx-auto px-4 pb-20">
+      <main className="mx-auto max-w-[1500px] px-2 pb-5 sm:px-3">
         {loadError && (
           <div className="mb-4 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-warning-border)_70%,_transparent)] bg-[color:var(--app-warning-soft)] px-4 py-3 text-xs text-[color:var(--app-warning)] flex items-center justify-between gap-3">
             <span>{loadError}</span>
@@ -464,7 +452,7 @@ export default function PropertyClient() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="h-80 bg-[color:var(--app-surface)] dark:bg-[color:var(--app-surface-strong)] animate-pulse rounded-2xl"
+                className="ui-skeleton ui-skeleton-pulse h-80 rounded-2xl"
               />
             ))}
           </div>
@@ -488,7 +476,7 @@ export default function PropertyClient() {
 
             <div
               ref={autoLoadTargetRef}
-              className="w-full py-12 flex flex-col items-center justify-center min-h-[120px]"
+              className="flex min-h-[72px] w-full flex-col items-center justify-center py-5"
             >
               {loadingMore ? (
                 <div className="inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--app-text)]">
@@ -498,25 +486,25 @@ export default function PropertyClient() {
               ) : hasMore ? (
                 <span className="text-xs italic text-[color:var(--app-text-soft)]">Scroll untuk muat otomatis</span>
               ) : (
-                <div className="text-[color:var(--app-text-soft)] text-xs font-medium border-t border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] pt-8 w-full text-center italic">
+                <div className="w-full border-t border-[color:var(--app-border)] pt-4 text-center text-xs font-medium italic text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
                   Semua properti sudah dimuat
                 </div>
               )}
             </div>
           </>
         ) : (
-          <div className="py-24 text-center flex flex-col items-center">
-            <HomeIcon className="w-16 h-16 text-[color:var(--app-text-soft)] mb-4" />
+          <div className="flex flex-col items-center py-8 text-center">
+            <HomeIcon className="mb-3 h-12 w-12 text-[color:var(--app-text-soft)]" />
             <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">
               Properti tidak ditemukan
             </h2>
-            <p className="text-[color:var(--app-text)] text-sm mt-2 max-w-xs">
+            <p className="mt-2 max-w-xs text-sm text-[color:var(--app-text)]">
               Kami tidak menemukan properti yang sesuai dengan filter Anda.
               Silakan coba atur kembali filter Anda.
             </p>
             <button
               onClick={handleReset}
-              className="mt-6 flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-8 py-3 text-[color:var(--app-text-inverse)] font-bold transition-all shadow-lg hover:bg-[color:var(--app-accent-strong)] active:scale-95"
+              className="mt-4 flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-5 py-2.5 font-bold text-[color:var(--app-text-inverse)] shadow-lg transition-all hover:bg-[color:var(--app-accent-strong)] active:scale-95"
             >
               <RotateCcw className="w-4 h-4" /> Reset Semua Filter
             </button>

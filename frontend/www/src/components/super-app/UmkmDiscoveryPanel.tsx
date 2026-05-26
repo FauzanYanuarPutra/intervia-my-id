@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapPinned, Star } from 'lucide-react';
+import { MapPinned, MessageCircle, Navigation, Star, Store, X } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 import {
@@ -31,6 +31,7 @@ type UmkmDiscoveryPanelProps = {
   title?: string;
   description?: string;
   selectedSlug?: string;
+  openMapSignal?: number;
 };
 
 type DiscoveryStore = UmkmMapStore & {
@@ -77,6 +78,7 @@ export function UmkmDiscoveryPanel({
   title,
   description,
   selectedSlug,
+  openMapSignal = 0,
 }: UmkmDiscoveryPanelProps) {
   const [stores, setStores] = useState<DiscoveryStore[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,7 @@ export function UmkmDiscoveryPanel({
   const [mapInteractive, setMapInteractive] = useState(false);
   const [mapTheme, setMapTheme] = useState<UmkmMapTheme>('default');
   const [showRoute, setShowRoute] = useState(false);
+  const [mobileMapOpen, setMobileMapOpen] = useState(false);
   const [routeSummary, setRouteSummary] = useState<UmkmMapRouteSummary | null>(
     null,
   );
@@ -213,6 +216,17 @@ export function UmkmDiscoveryPanel({
     preparedStores[0] ||
     null;
   const selectedPlaceId = selectedPlace?.store.id || null;
+  const selectedContactHref =
+    selectedPlace?.ui.whatsappHref || selectedPlace?.ui.telHref || null;
+  const selectedContactLabel = selectedPlace?.ui.whatsappHref
+    ? 'Chat'
+    : selectedPlace?.ui.telHref
+      ? isId
+        ? 'Telepon'
+        : 'Call'
+      : 'Chat';
+  const selectedContactIsExternal =
+    selectedContactHref?.startsWith('http') || false;
 
   const listedPlaces = visibleStores.filter(
     item => item.store.id !== selectedPlace?.store.id,
@@ -283,15 +297,39 @@ export function UmkmDiscoveryPanel({
 
   const handleOpenMapPreview = useCallback(() => {
     if (typeof window === 'undefined') return;
+    if (window.innerWidth < 1024) {
+      setMobileMapOpen(true);
+    }
     const target =
       window.innerWidth >= 1024 ? desktopMapRef.current : mobileMapRef.current;
-    target?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
+    window.requestAnimationFrame(() => {
+      target?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
     });
   }, []);
 
-  const totalLabel = `${totalCount ?? stores.length} ${isId ? 'usaha' : 'businesses'}`;
+  useEffect(() => {
+    if (!openMapSignal) return;
+    handleOpenMapPreview();
+  }, [handleOpenMapPreview, openMapSignal]);
+
+  useEffect(() => {
+    if (!mobileMapOpen || typeof document === 'undefined') return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileMapOpen]);
+
+  const totalLabel =
+    loading && totalCount === null
+      ? isId
+        ? 'Memuat'
+        : 'Loading'
+      : `${totalCount ?? stores.length} ${isId ? 'usaha' : 'businesses'}`;
   const routeDistanceLabel = useMemo(() => {
     if (!routeSummary?.distance_m || routeSummary.used_fallback) return null;
     return formatUmkmPlaceDistance(routeSummary.distance_m / 1000, isId);
@@ -316,11 +354,15 @@ export function UmkmDiscoveryPanel({
   }, [bumpMapFocus, selectedPlace, showRoute, viewerLocation]);
 
   const renderDiscoveryMap = useCallback(
-    (className: string) => {
+    (className: string, edgeToEdge = false) => {
       if (!selectedPlace) return null;
 
       return (
-        <div className="relative isolate overflow-hidden rounded-[20px]">
+        <div
+          className={`relative isolate overflow-hidden ${
+            edgeToEdge ? 'h-full rounded-none' : 'rounded-[20px]'
+          }`}
+        >
           <UmkmStoreMap
             stores={visibleStores.map(item => item.store)}
             selectedStoreId={selectedPlace.store.id}
@@ -393,14 +435,14 @@ export function UmkmDiscoveryPanel({
   );
 
   return (
-    <section className="overflow-hidden bg-transparent pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-3">
-      <div className="flex flex-col gap-4 sm:gap-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-[1.8rem] font-black tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[2rem]">
+    <section className="min-w-0 overflow-hidden bg-transparent pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-3">
+      <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-[1.08rem] font-black tracking-[-0.035em] text-[color:var(--app-text)] sm:text-[1.35rem]">
               {title || (isId ? 'Usaha di sekitarmu' : 'Businesses near you')}
             </h2>
-            <p className="mt-1 text-[13px] leading-6 text-[color:var(--app-text-soft)] sm:text-[14px]">
+            <p className="mt-0.5 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
               {description ||
                 (isId
                   ? 'Pilih cepat, buka cepat.'
@@ -408,13 +450,13 @@ export function UmkmDiscoveryPanel({
             </p>
           </div>
 
-          <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_12px_26px_-22px_rgba(15,23,42,0.12)]">
+          <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_12px_26px_-22px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950">
             {totalLabel}
           </span>
         </div>
 
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="-mx-1 flex min-w-0 gap-2 overflow-x-auto px-1 pb-1 no-scrollbar">
             {filters.map(filter => (
               <FilterChip
                 key={filter.key}
@@ -429,10 +471,10 @@ export function UmkmDiscoveryPanel({
           <button
             type="button"
             onClick={handleOpenMapPreview}
-            className="inline-flex min-h-[42px] w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-[color:var(--app-accent)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_10%,white)]"
+            className="inline-flex min-h-[36px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-[12px] font-semibold text-[color:var(--app-accent)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_10%,white)] sm:w-fit dark:border-slate-800 dark:bg-slate-950"
           >
             <MapPinned className="h-4 w-4" />
-            {isId ? 'Buka peta' : 'Open map'}
+            {isId ? 'Buka Lajukan Maps' : 'Open Lajukan Maps'}
           </button>
         </div>
 
@@ -454,21 +496,21 @@ export function UmkmDiscoveryPanel({
               </p>
             ) : null}
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
-              <div className="min-w-0 space-y-3 sm:space-y-4">
+            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="min-w-0 space-y-3">
                 <article
                   ref={selectedPreviewRef}
-                  className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white p-3 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.12)] sm:rounded-[28px] sm:p-4"
+                  className="min-w-0 overflow-hidden rounded-[18px] border border-slate-200/80 bg-white p-2.5 shadow-[0_18px_38px_-28px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950/82 sm:rounded-[22px] sm:p-3"
                 >
-                  <div className="grid gap-3 sm:grid-cols-[240px_minmax(0,1fr)] sm:gap-4">
+                  <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] gap-2.5 min-[420px]:grid-cols-[128px_minmax(0,1fr)] sm:grid-cols-[minmax(0,170px)_minmax(0,1fr)] sm:gap-3 lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)]">
                     <PlaceThumb
                       src={selectedPlace.ui.gallery[0] || selectedPlace.ui.coverImage}
                       alt={selectedPlace.store.name}
-                      className="h-[180px] rounded-[20px] sm:h-[210px]"
+                      className="h-[112px] rounded-[15px] min-[420px]:h-[124px] sm:h-[150px] sm:rounded-[18px]"
                     />
 
                     <div className="min-w-0 self-center">
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold sm:text-[11px]">
                         <span className="inline-flex items-center gap-1 text-amber-600">
                           <Star className="h-3.5 w-3.5 fill-current" />
                           {selectedPlace.ui.ratingLabel}
@@ -483,13 +525,13 @@ export function UmkmDiscoveryPanel({
                         ) : null}
                       </div>
 
-                      <h3 className="mt-2 text-[1.45rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.7rem]">
+                      <h3 className="mt-1.5 line-clamp-2 text-[1.02rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.35rem]">
                         <Link href={buildUmkmStorefrontPath(selectedPlace.store.slug)}>
                           {selectedPlace.store.name}
                         </Link>
                       </h3>
 
-                      <p className="mt-2 inline-flex items-center gap-2 text-[14px] font-semibold text-emerald-600">
+                      <p className="mt-1.5 inline-flex items-center gap-2 text-[12px] font-semibold text-emerald-600 sm:text-[13px]">
                         <span
                           className={`h-2.5 w-2.5 rounded-full ${
                             selectedPlace.ui.openNow !== false
@@ -500,61 +542,155 @@ export function UmkmDiscoveryPanel({
                         {getOpenLabel(selectedPlace.ui.openNow !== false, isId)}
                       </p>
 
-                      <p className="mt-1 text-[14px] text-[color:var(--app-text-soft)]">
+                      <p className="mt-0.5 truncate text-[12px] text-[color:var(--app-text-soft)] sm:text-[13px]">
                         {selectedPlace.store.city}
                       </p>
 
-                      <p className="mt-3 line-clamp-2 text-[13px] leading-6 text-[color:var(--app-text-soft)]">
+                      <p className="mt-2 hidden text-[12px] leading-5 text-[color:var(--app-text-soft)] min-[420px]:line-clamp-2 min-[420px]:block">
                         {selectedPlace.store.description || selectedPlace.ui.addressLine}
                       </p>
 
-                      <div className="mt-4 flex flex-wrap gap-2">
+                      <div className="mt-2.5 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
                         <Link
                           href={buildUmkmStorefrontPath(selectedPlace.store.slug)}
-                          className="inline-flex min-h-[40px] items-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[12px] font-semibold text-white shadow-[0_16px_28px_-24px_color-mix(in_srgb,var(--app-accent)_40%,transparent)] transition hover:brightness-105"
+                          className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-2.5 text-[12px] font-semibold text-white shadow-[0_16px_28px_-24px_color-mix(in_srgb,var(--app-accent)_40%,transparent)] transition hover:brightness-105 sm:px-3"
                         >
-                          {isId ? 'Lihat detail' : 'View details'}
+                          <Store className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">
+                            {isId ? 'Profil' : 'Profile'}
+                          </span>
                         </Link>
-                        {selectedPlace.ui.whatsappHref ? (
+                        {selectedContactHref ? (
                           <a
-                            href={selectedPlace.ui.whatsappHref}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex min-h-[40px] items-center rounded-full border border-slate-200 bg-white px-4 text-[12px] font-semibold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
+                            href={selectedContactHref}
+                            target={selectedContactIsExternal ? '_blank' : undefined}
+                            rel={
+                              selectedContactIsExternal
+                                ? 'noreferrer'
+                                : undefined
+                            }
+                            className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 text-[12px] font-semibold text-[color:var(--app-accent)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_72%,white)] sm:px-3"
                           >
-                            WhatsApp
+                            <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{selectedContactLabel}</span>
                           </a>
-                        ) : (
-                          <a
-                            href={selectedPlace.ui.googleMapsDirectionsUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex min-h-[40px] items-center rounded-full border border-slate-200 bg-white px-4 text-[12px] font-semibold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
-                          >
-                            {isId ? 'Rute' : 'Directions'}
-                          </a>
-                        )}
+                        ) : null}
+                        <a
+                          href={selectedPlace.ui.googleMapsDirectionsUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-700 transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 sm:px-3"
+                        >
+                          <Navigation className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">
+                            {isId ? 'Rute' : 'Route'}
+                          </span>
+                        </a>
                       </div>
                     </div>
                   </div>
                 </article>
 
-                <div
-                  ref={mobileMapRef}
-                  className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white p-2 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.12)] lg:hidden"
-                >
-                  <div className="flex items-center justify-between px-2 pb-2 pt-1">
-                    <div>
-                      <p className="text-[13px] font-semibold text-[color:var(--app-text)]">
-                        {isId ? 'Peta usaha' : 'Business map'}
-                      </p>
-                      <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                        {activeFilter.label} | {visibleStores.length}
-                      </p>
-                    </div>
-                  </div>
+                <div ref={mobileMapRef} className="lg:hidden">
+                  {mobileMapOpen ? (
+                    <div className="fixed inset-0 z-[9999] flex min-h-[100dvh] flex-col bg-[color:var(--app-surface-strong)] dark:bg-slate-950">
+                      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:border-slate-800">
+                        <div>
+                          <p className="text-[15px] font-black tracking-[-0.03em] text-[color:var(--app-text)]">
+                            Lajukan Maps
+                          </p>
+                          <p className="text-[11px] text-[color:var(--app-text-soft)]">
+                            {activeFilter.label} | {visibleStores.length}{' '}
+                            {isId ? 'usaha aktif' : 'active businesses'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMobileMapOpen(false)}
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
+                          aria-label={isId ? 'Tutup peta' : 'Close map'}
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
 
-                  {renderDiscoveryMap('h-[280px] w-full')}
+                      <div className="min-h-0 flex-1">
+                        {renderDiscoveryMap('h-full w-full', true)}
+                      </div>
+
+                      <div className="shrink-0 space-y-2 border-t border-slate-200 bg-[color:var(--app-surface-strong)] px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 dark:border-slate-800 dark:bg-slate-950">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <PlaceThumb
+                            src={
+                              selectedPlace.ui.gallery[0] ||
+                              selectedPlace.ui.coverImage
+                            }
+                            alt={selectedPlace.store.name}
+                            className="h-12 w-12 rounded-[14px]"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-1 text-sm font-black text-[color:var(--app-text)]">
+                              {selectedPlace.store.name}
+                            </p>
+                            <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                              {selectedPlace.store.city ||
+                                selectedPlace.ui.addressLine}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <Link
+                            href={buildUmkmStorefrontPath(selectedPlace.store.slug)}
+                            className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-2 text-[11px] font-black text-white"
+                          >
+                            <Store className="h-3.5 w-3.5" />
+                            <span className="truncate">
+                              {isId ? 'Profil' : 'Profile'}
+                            </span>
+                          </Link>
+                          {selectedContactHref ? (
+                            <a
+                              href={selectedContactHref}
+                              target={
+                                selectedContactIsExternal ? '_blank' : undefined
+                              }
+                              rel={
+                                selectedContactIsExternal
+                                  ? 'noreferrer'
+                                  : undefined
+                              }
+                              className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-2 text-[11px] font-black text-[color:var(--app-accent)]"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              <span className="truncate">
+                                {selectedContactLabel}
+                              </span>
+                            </a>
+                          ) : (
+                            <Link
+                              href={buildUmkmStorefrontPath(selectedPlace.store.slug)}
+                              className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-2 text-[11px] font-black text-[color:var(--app-accent)]"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              <span className="truncate">Info</span>
+                            </Link>
+                          )}
+                          <a
+                            href={selectedPlace.ui.googleMapsDirectionsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[11px] font-black text-[color:var(--app-text)]"
+                          >
+                            <Navigation className="h-3.5 w-3.5" />
+                            <span className="truncate">
+                              {isId ? 'Rute' : 'Route'}
+                            </span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 {paginatedListedPlaces.length > 0 ? (
@@ -570,13 +706,13 @@ export function UmkmDiscoveryPanel({
                               scrollToPreview: true,
                             })
                           }
-                          className="w-full rounded-[22px] border border-slate-200/80 bg-white p-3 text-left shadow-[0_14px_30px_-24px_rgba(15,23,42,0.1)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_4%,white)] sm:rounded-[24px] sm:p-4"
+                          className="w-full min-w-0 rounded-[18px] border border-slate-200/80 bg-white p-2.5 text-left shadow-[0_14px_30px_-24px_rgba(15,23,42,0.1)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_4%,white)] sm:rounded-[24px] sm:p-4"
                         >
-                          <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 sm:grid-cols-[132px_minmax(0,1fr)] sm:gap-4">
+                          <div className="grid min-w-0 grid-cols-[92px_minmax(0,1fr)] gap-2.5 min-[380px]:grid-cols-[108px_minmax(0,1fr)] sm:grid-cols-[132px_minmax(0,1fr)] sm:gap-4">
                             <PlaceThumb
                               src={item.ui.gallery[0] || item.ui.coverImage}
                               alt={item.store.name}
-                              className="h-[104px] rounded-[18px] sm:h-[116px]"
+                              className="h-[92px] rounded-[16px] min-[380px]:h-[104px] sm:h-[116px] sm:rounded-[18px]"
                             />
 
                             <div className="min-w-0 self-center">
@@ -641,7 +777,7 @@ export function UmkmDiscoveryPanel({
                 ref={desktopMapRef}
                 className="hidden lg:block lg:sticky lg:top-24 lg:self-start"
               >
-                <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-2 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.12)]">
+                <div className="overflow-hidden rounded-[22px] border border-slate-200/80 bg-white p-2 shadow-[0_20px_40px_-30px_rgba(15,23,42,0.12)] dark:border-slate-800 dark:bg-slate-950/82">
                   <div className="flex items-center justify-between px-2 pb-2 pt-1">
                     <div>
                       <p className="text-[13px] font-semibold text-[color:var(--app-text)]">
@@ -653,7 +789,7 @@ export function UmkmDiscoveryPanel({
                     </div>
                   </div>
 
-                  {renderDiscoveryMap('h-[560px] w-full')}
+                  {renderDiscoveryMap('h-[440px] w-full xl:h-[500px]')}
                 </div>
               </aside>
             </div>

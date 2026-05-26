@@ -15,6 +15,7 @@ use uuid::Uuid;
 use crate::config::AppState;
 use crate::routes::verification::{derive_verification_state, public_verification_payload};
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 struct AccessClaims {
     sub: String,

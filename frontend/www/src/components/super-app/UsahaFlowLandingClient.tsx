@@ -184,7 +184,7 @@ function getStoreStatus(
       tone: 'warning',
       label: isId ? 'Pilih channel jualan' : 'Choose a sales channel',
       desc: isId
-        ? 'Aktifkan Food atau Mart supaya alur jualannya jelas.'
+        ? 'Aktifkan Food/Mart biar alur jualan jelas.'
         : 'Enable Food or Mart so the selling flow is ready.',
     };
   }
@@ -656,7 +656,7 @@ export function UsahaFlowLandingClient({
         step: isId ? 'Langkah 1' : 'Step 1',
         title: isId ? 'Rapikan identitas usaha' : 'Tidy the business identity',
         desc: isId
-          ? 'Lengkapi nama, kota, alamat, telepon, dan ringkasan supaya tim tidak bingung.'
+          ? 'Isi nama, kota, alamat, telepon, ringkasan.'
           : 'Complete the name, city, address, phone, and summary so the team has clean context.',
         href: buildUsahaPath('profile', {
           storeId: selectedStore.id,
@@ -958,7 +958,7 @@ export function UsahaFlowLandingClient({
                   </h1>
                   <p className="mt-2 max-w-3xl text-[13px] leading-6 text-[color:var(--app-text-soft)] sm:text-[14px]">
                     {isId
-                      ? 'Halaman ini sekarang jadi hub kerja. Semua tombol utama mengikuti usaha yang dipilih, jadi user tidak lagi loncat tanpa konteks.'
+                      ? 'Semua tombol mengikuti usaha aktif.'
                       : 'This page is now a work hub. Every primary button follows the selected business, so users stop jumping without context.'}
                   </p>
 
@@ -975,7 +975,7 @@ export function UsahaFlowLandingClient({
                         </p>
                         <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
                           {isId
-                            ? 'Setelah login, Anda bisa pilih usaha aktif, cek progress setup, dan langsung masuk ke profil, katalog, order, atau operasional.'
+                            ? 'Login, pilih usaha, lanjut profil, katalog, order, atau operasional.'
                             : 'After signing in, you can choose the active business, review setup progress, and go straight into profile, catalog, orders, or operations.'}
                         </p>
                       </div>
@@ -1000,7 +1000,7 @@ export function UsahaFlowLandingClient({
                       </h2>
                       <p className="mt-2 text-[13px] leading-6 text-[color:var(--app-text-soft)]">
                         {isId
-                          ? 'Urutannya sekarang jelas: buat usaha, rapikan setup, isi katalog, lalu lanjut ke pesanan atau operasional.'
+                          ? 'Buat usaha. Rapikan setup. Isi katalog. Lanjut order.'
                           : 'The sequence is explicit now: create the business, tidy the setup, fill the catalog, then continue into orders or operations.'}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">
@@ -1075,7 +1075,7 @@ export function UsahaFlowLandingClient({
                         <SummaryMetricCard label={isId ? 'Progress flow' : 'Flow progress'} value={`${completedFlowSteps}/${selectedStoreWorkflow.length}`} hint={isId ? 'Langkah utama yang sudah rapi.' : 'Primary steps already tidy.'} />
                         <SummaryMetricCard label={isId ? 'Katalog' : 'Catalog'} value={selectedSnapshotLoading && !selectedSnapshot ? '...' : selectedSnapshot?.productsCount || 0} hint={isId ? 'Jumlah item yang sudah masuk.' : 'Listings already added.'} />
                         <SummaryMetricCard label={isId ? 'Order aktif' : 'Active orders'} value={selectedSnapshotLoading && !selectedSnapshot ? '...' : selectedSnapshot?.ordersActive || 0} hint={isId ? 'Order yang masih perlu ditangani.' : 'Orders still needing attention.'} />
-                        <SummaryMetricCard label={selectedStoreSupportsReservations || selectedStoreSupportsDineIn ? (isId ? 'Operasional' : 'Operations') : isId ? 'Tim' : 'Team'} value={selectedSnapshotLoading && !selectedSnapshot ? '...' : selectedStoreSupportsReservations || selectedStoreSupportsDineIn ? (selectedSnapshot?.reservationsActive || selectedSnapshot?.tablesCount || 0) : selectedSnapshot?.teamTotal || 0} hint={selectedStoreSupportsReservations || selectedStoreSupportsDineIn ? (isId ? 'Reservasi aktif atau meja siap pakai.' : 'Active reservations or ready tables.') : isId ? 'Jumlah anggota yang pegang usaha ini.' : 'Members handling this business.'} />
+                        <SummaryMetricCard label={selectedStoreSupportsReservations || selectedStoreSupportsDineIn ? (isId ? 'Operasional' : 'Operations') : isId ? 'Tim' : 'Team'} value={selectedSnapshotLoading && !selectedSnapshot ? '...' : selectedStoreSupportsReservations || selectedStoreSupportsDineIn ? (selectedSnapshot?.reservationsActive || selectedSnapshot?.tablesCount || 0) : selectedSnapshot?.teamTotal || 0} hint={selectedStoreSupportsReservations || selectedStoreSupportsDineIn ? (isId ? 'Reservasi atau meja.' : 'Active reservations or ready tables.') : isId ? 'Jumlah anggota yang pegang usaha ini.' : 'Members handling this business.'} />
                       </div>
 
                       {snapshotError ? (
@@ -1105,7 +1105,7 @@ export function UsahaFlowLandingClient({
                     </div>
                     {storesNeedingAttention > 0 ? (
                       <div className="mt-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-200">
-                        {isId ? `${storesNeedingAttention} usaha masih perlu dibereskan setup atau channel jualannya.` : `${storesNeedingAttention} businesses still need setup or channel cleanup.`}
+                        {isId ? `${storesNeedingAttention} usaha perlu dicek.` : `${storesNeedingAttention} businesses still need setup or channel cleanup.`}
                       </div>
                     ) : stores.length > 0 ? (
                       <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-200">
@@ -1267,7 +1267,7 @@ export function UsahaFlowLandingClient({
                           {isId ? `Jalankan ${selectedStore.name} tanpa lompat-lompat flow` : `Run ${selectedStore.name} without jumping between flows`}
                         </h2>
                         <p className="mt-1 text-[13px] leading-6 text-[color:var(--app-text-soft)]">
-                          {isId ? 'Urutan ini dibuat supaya user selalu tahu habis ini harus ke mana.' : 'This order keeps the next step obvious for the user.'}
+                          {isId ? 'Urutan dibuat biar langkah berikutnya jelas.' : 'This order keeps the next step obvious for the user.'}
                         </p>
                       </div>
                       <span className={cn('inline-flex min-h-[28px] items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]', toneBadgeClass(completedFlowSteps === selectedStoreWorkflow.length ? 'success' : 'primary'))}>

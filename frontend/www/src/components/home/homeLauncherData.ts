@@ -1,17 +1,22 @@
 import {
+  BadgeCheck,
   Bike,
   Briefcase,
-  CarFront,
   ClipboardList,
-  MapPin,
+  Factory,
+  Globe2,
+  Hammer,
   Package,
   QrCode,
   Search,
   ShieldCheck,
+  Ship,
   Store,
   Truck,
+  Wheat,
   type LucideIcon,
 } from 'lucide-react';
+import { LOCAL_FIRST_HOME_LINKS } from '@/lib/indonesia/localIndustryCatalog';
 import { UMKM_DISCOVERY_PATH, buildUsahaPath } from '@/lib/umkmSurface';
 
 export type ShortcutItem = {
@@ -52,39 +57,39 @@ function createSoftTone(
 
 export function createHomeCopy(isId: boolean) {
   return {
-    eyebrow: isId ? 'Mulai kebutuhan usaha dari sini' : 'Start your business needs here',
+    eyebrow: isId ? 'Bangun rantai pasok Indonesia' : 'Build Indonesia supply chains',
 
     heroTitle: isId
-      ? 'Saat stok seret, lokasi belum pas, atau operasional mulai berat, kamu bisa mulai dari sini.'
-      : 'When stock is tight, the location is not right, or operations start to feel heavy, you can start here.',
+      ? 'Cari bahan lokal, produsen, jasa, dan jalur ekspor yang bikin usaha Indonesia naik kelas.'
+      : 'Find local inputs, producers, services, and export paths that help Indonesian businesses level up.',
 
     heroDesc: isId
-      ? 'Cari supplier, distributor, lokasi jualan, jasa operasional, logistik, sampai toko aktif dalam satu alur yang lebih rapi.'
-      : 'Find suppliers, distributors, selling spots, operations support, logistics, and active storefronts in one cleaner flow.',
+      ? 'Mulai dari supplier, substitusi impor, kemasan, sertifikasi, logistik, sampai storefront aktif dalam satu alur yang rapi.'
+      : 'Start with suppliers, import replacement, packaging, certification, logistics, and active storefronts in one cleaner flow.',
 
-    ctaSearch: isId ? 'Cari kebutuhan usaha' : 'Search business needs',
-    ctaCreate: isId ? 'Buat kebutuhan' : 'Create a need',
+    ctaSearch: isId ? 'Cari pasokan lokal' : 'Search local supply',
+    ctaCreate: isId ? 'Pasang peluang' : 'Post an opportunity',
 
     trustLine: isId
-      ? 'Cek verifikasi mitra, escrow pembayaran, peta toko aktif, QR meja, dan riwayat transaksi sebelum kamu lanjut.'
-      : 'Check partner verification, payment escrow, active storefront maps, table QR, and transaction history before moving forward.',
+      ? 'Cek verifikasi mitra, kapasitas produksi, sertifikasi, escrow pembayaran, dan riwayat transaksi sebelum lanjut.'
+      : 'Check partner verification, production capacity, certification, payment escrow, and transaction history before moving forward.',
 
-    shortcutsTitle: isId ? 'Aksi supply' : 'Supply shortcuts',
+    shortcutsTitle: isId ? 'Aksi lokal' : 'Local-first shortcuts',
     launcherEyebrow: isId ? 'Mulai sekarang' : 'Start now',
     launcherTitle: isId
-      ? 'Pilih kebutuhan yang mau kamu bereskan lebih dulu'
-      : 'Choose the need you want to solve first',
+      ? 'Pilih jalur yang paling cepat bikin produksi jalan'
+      : 'Choose the fastest path to get production moving',
 
     layoutGrid: isId ? 'Grid' : 'Grid',
     layoutList: isId ? 'List' : 'List',
 
-    servicesTitle: isId ? 'Operasional usaha' : 'Business operations',
-    listingsTitle: isId ? 'Pasokan usaha' : 'Business supply',
+    servicesTitle: isId ? 'Operasional & ekspor' : 'Operations and export',
+    listingsTitle: isId ? 'Pasokan lokal' : 'Local supply',
 
-    moreTitle: isId ? 'Eksplor ekosistem' : 'Explore the ecosystem',
+    moreTitle: isId ? 'Eksplor industri Indonesia' : 'Explore Indonesian industries',
     moreHint: isId
-      ? 'Distributor, lokasi jualan, rental, jasa, talent, promo, dan toko aktif'
-      : 'Distributors, selling spots, rentals, services, talent, promos, and active stores',
+      ? 'Pangan, maritim, manufaktur, kreatif, digital, logistik, dan UMKM aktif'
+      : 'Food, maritime, manufacturing, creative, digital, logistics, and active SMEs',
 
     openAll: isId ? 'Lihat semua jalur' : 'See all paths',
     openSearch: isId ? 'Buka pencarian' : 'Open search',
@@ -107,6 +112,10 @@ const shortcutTones = {
   blue: createSoftTone(
     'bg-[linear-gradient(135deg,#bfdbfe_0%,#dbeafe_58%,#eff6ff_100%)]',
     'text-blue-700 dark:bg-blue-900/40 dark:text-blue-200',
+  ),
+  emerald: createSoftTone(
+    'bg-[linear-gradient(135deg,#bbf7d0_0%,#dcfce7_58%,#f0fdf4_100%)]',
+    'text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200',
   ),
 };
 
@@ -159,34 +168,46 @@ const menuTones = {
     'bg-[linear-gradient(135deg,#d9f99d_0%,#ecfccb_50%,#f7fee7_100%)]',
     '',
   ),
+  export: createSoftTone(
+    'bg-[linear-gradient(135deg,#bbf7d0_0%,#dbeafe_50%,#f8fafc_100%)]',
+    '',
+  ),
+  industry: createSoftTone(
+    'bg-[linear-gradient(135deg,#e2e8f0_0%,#f1f5f9_52%,#ffffff_100%)]',
+    '',
+  ),
+  agri: createSoftTone(
+    'bg-[linear-gradient(135deg,#bef264_0%,#dcfce7_52%,#f7fee7_100%)]',
+    '',
+  ),
 };
 
 export const shortcutItems: ShortcutItem[] = [
   {
-    href: '/search?type=product&q=supplier',
-    labelId: 'Cari supplier',
-    labelEn: 'Find suppliers',
-    hintId: 'Distributor & grosir',
-    hintEn: 'Distributors and wholesale',
-    icon: Search,
-    tone: shortcutTones.sky,
+    href: '/search?type=product&q=bahan%20baku%20lokal',
+    labelId: 'Bahan lokal',
+    labelEn: 'Local inputs',
+    hintId: 'Pangan, bahan, kemasan',
+    hintEn: 'Food, inputs, packaging',
+    icon: Wheat,
+    tone: shortcutTones.emerald,
   },
   {
-    href: '/search?type=product&q=reseller',
-    labelId: 'Stok jualan',
-    labelEn: 'Resale stock',
-    hintId: 'Produk siap jual',
-    hintEn: 'Ready-to-resell goods',
-    icon: Package,
+    href: '/search?type=product&q=produk%20siap%20ekspor',
+    labelId: 'Siap ekspor',
+    labelEn: 'Export-ready',
+    hintId: 'Produk & dokumen',
+    hintEn: 'Products and docs',
+    icon: Ship,
     tone: shortcutTones.amber,
   },
   {
-    href: '/search?type=tool_rental',
-    labelId: 'Sewa alat',
-    labelEn: 'Rent tools',
-    hintId: 'Alat usaha',
-    hintEn: 'Business tools',
-    icon: Truck,
+    href: '/search?type=product&q=substitusi%20impor',
+    labelId: 'Substitusi impor',
+    labelEn: 'Import replacement',
+    hintId: 'Alternatif lokal',
+    hintEn: 'Local alternatives',
+    icon: Factory,
     tone: shortcutTones.indigo,
   },
   {
@@ -202,25 +223,43 @@ export const shortcutItems: ShortcutItem[] = [
 
 export const serviceItems: LauncherItem[] = [
   {
-    href: '/super-app/mart',
-    labelId: 'Stok',
-    labelEn: 'Stock',
-    hintId: 'Bahan & kemasan',
-    hintEn: 'Supplies and packaging',
+    href: '/search?type=product&q=bahan%20baku%20kemasan',
+    labelId: 'Bahan',
+    labelEn: 'Inputs',
+    hintId: 'Bahan lokal & kemasan',
+    hintEn: 'Local inputs and packaging',
     icon: Package,
     bgClass: menuTones.mart,
   },
   {
-    href: '/super-app/send',
-    labelId: 'Kirim',
-    labelEn: 'Delivery',
-    hintId: 'Order & dokumen',
-    hintEn: 'Orders and documents',
+    href: '/search?type=product&q=produk%20siap%20ekspor',
+    labelId: 'Ekspor',
+    labelEn: 'Export',
+    hintId: 'Produk siap kirim',
+    hintEn: 'Ready-to-ship goods',
+    icon: Ship,
+    bgClass: menuTones.export,
+  },
+  {
+    href: '/search?type=service&q=sertifikasi%20halal%20bpom%20tkdn',
+    labelId: 'Sertifikasi',
+    labelEn: 'Certify',
+    hintId: 'Halal, BPOM, TKDN',
+    hintEn: 'Halal, BPOM, TKDN',
+    icon: BadgeCheck,
+    bgClass: menuTones.agri,
+  },
+  {
+    href: '/search?type=service&q=jasa%20pengiriman%20usaha',
+    labelId: 'Logistik',
+    labelEn: 'Logistics',
+    hintId: 'Order, gudang, kargo',
+    hintEn: 'Orders, warehouse, cargo',
     icon: Truck,
     bgClass: menuTones.send,
   },
   {
-    href: '/super-app/ride',
+    href: '/search?type=service&q=kurir%20pickup%20usaha',
     labelId: 'Kurir',
     labelEn: 'Courier',
     hintId: 'Pickup cepat',
@@ -229,16 +268,16 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.ride,
   },
   {
-    href: '/super-app/car',
-    labelId: 'Belanja',
-    labelEn: 'Procure',
-    hintId: 'Belanja grosir',
-    hintEn: 'Bulk buying',
-    icon: CarFront,
-    bgClass: menuTones.car,
+    href: '/search?type=service&q=manufaktur%20lokal%20mesin%20umkm',
+    labelId: 'Produksi',
+    labelEn: 'Produce',
+    hintId: 'Mesin & workshop',
+    hintEn: 'Machines and workshops',
+    icon: Hammer,
+    bgClass: menuTones.industry,
   },
   {
-    href: '/super-app/food',
+    href: '/umkm?q=kuliner',
     labelId: 'Kuliner',
     labelEn: 'Food',
     hintId: 'Outlet & menu',
@@ -247,7 +286,7 @@ export const serviceItems: LauncherItem[] = [
     bgClass: menuTones.food,
   },
   {
-    href: '/super-app/services',
+    href: '/search?type=service&q=jasa%20operasional%20umkm',
     labelId: 'Ops',
     labelEn: 'Ops',
     hintId: 'Jasa harian',
@@ -268,11 +307,11 @@ export const serviceItems: LauncherItem[] = [
 
 export const listingItems: LauncherItem[] = [
   {
-    href: '/search?type=product&q=supplier',
-    labelId: 'Supplier',
-    labelEn: 'Suppliers',
-    hintId: 'Cari vendor stok',
-    hintEn: 'Find stock vendors',
+    href: '/search?type=product&q=supplier%20lokal',
+    labelId: 'Supplier lokal',
+    labelEn: 'Local suppliers',
+    hintId: 'Vendor stok Indonesia',
+    hintEn: 'Indonesian stock vendors',
     icon: Search,
     bgClass: menuTones.product,
   },
@@ -286,22 +325,22 @@ export const listingItems: LauncherItem[] = [
     bgClass: menuTones.product,
   },
   {
-    href: '/search?type=property&q=lokasi%20jualan',
-    labelId: 'Lokasi',
-    labelEn: 'Locations',
-    hintId: 'Kios, ruko, booth',
-    hintEn: 'Kiosk, shophouse, booth',
-    icon: MapPin,
-    bgClass: menuTones.property,
+    href: '/search?type=service&q=produsen%20manufaktur%20lokal',
+    labelId: 'Produsen',
+    labelEn: 'Producers',
+    hintId: 'Pabrik kecil & workshop',
+    hintEn: 'Small factories and workshops',
+    icon: Factory,
+    bgClass: menuTones.industry,
   },
   {
-    href: '/search?type=service&q=paket%20jasa',
-    labelId: 'Paket jasa',
-    labelEn: 'Service packs',
-    hintId: 'Support operasional',
-    hintEn: 'Operational support',
-    icon: ClipboardList,
-    bgClass: menuTones.service,
+    href: '/search?type=service&q=jasa%20ekspor%20sertifikasi%20umkm',
+    labelId: 'Jasa ekspor',
+    labelEn: 'Export services',
+    hintId: 'Dokumen & compliance',
+    hintEn: 'Docs and compliance',
+    icon: Globe2,
+    bgClass: menuTones.export,
   },
   {
     href: '/search?type=freelancer&q=umkm',
@@ -325,49 +364,49 @@ export const listingItems: LauncherItem[] = [
 
 export const homePrimaryFocusItems: LauncherItem[] = [
   {
-    href: '/search?type=product&q=supplier',
-    labelId: 'Cari supplier',
-    labelEn: 'Find suppliers',
+    href: '/search?type=product&q=supplier%20lokal',
+    labelId: 'Supplier lokal',
+    labelEn: 'Local suppliers',
     hintId: 'Stok & bahan baku',
     hintEn: 'Stock and raw materials',
     icon: Search,
     bgClass: menuTones.product,
   },
   {
-    href: '/search?type=product&q=distributor',
-    labelId: 'Cari distributor',
-    labelEn: 'Find distributors',
-    hintId: 'Harga partai',
-    hintEn: 'Bulk pricing',
-    icon: ShieldCheck,
-    bgClass: menuTones.product,
+    href: '/search?type=product&q=bahan%20baku%20lokal',
+    labelId: 'Bahan lokal',
+    labelEn: 'Local inputs',
+    hintId: 'Pangan, bahan, kemasan',
+    hintEn: 'Food, inputs, packaging',
+    icon: Wheat,
+    bgClass: menuTones.agri,
   },
   {
-    href: '/search?type=property&q=lokasi%20jualan',
-    labelId: 'Cari lokasi',
-    labelEn: 'Find locations',
-    hintId: 'Ruko, kios, booth',
-    hintEn: 'Shophouse, kiosks, booths',
-    icon: MapPin,
-    bgClass: menuTones.property,
+    href: '/search?type=service&q=produsen%20manufaktur%20lokal',
+    labelId: 'Produsen',
+    labelEn: 'Producers',
+    hintId: 'Workshop & pabrik kecil',
+    hintEn: 'Workshops and small factories',
+    icon: Factory,
+    bgClass: menuTones.industry,
   },
   {
-    href: '/search?type=tool_rental',
-    labelId: 'Sewa alat',
-    labelEn: 'Rent tools',
-    hintId: 'Alat usaha harian',
-    hintEn: 'Daily business tools',
-    icon: Truck,
-    bgClass: menuTones.service,
+    href: '/search?type=product&q=produk%20siap%20ekspor',
+    labelId: 'Siap ekspor',
+    labelEn: 'Export-ready',
+    hintId: 'Produk & dokumen',
+    hintEn: 'Products and docs',
+    icon: Ship,
+    bgClass: menuTones.export,
   },
   {
-    href: '/search?type=service&q=paket%20jasa',
-    labelId: 'Paket jasa',
-    labelEn: 'Service packages',
-    hintId: 'Operasional & branding',
-    hintEn: 'Operations and branding',
-    icon: ClipboardList,
-    bgClass: menuTones.service,
+    href: '/search?type=service&q=sertifikasi%20halal%20bpom%20tkdn',
+    labelId: 'Sertifikasi',
+    labelEn: 'Certification',
+    hintId: 'Halal, BPOM, TKDN',
+    hintEn: 'Halal, BPOM, TKDN',
+    icon: BadgeCheck,
+    bgClass: menuTones.agri,
   },
   {
     href: UMKM_DISCOVERY_PATH,
@@ -381,27 +420,7 @@ export const homePrimaryFocusItems: LauncherItem[] = [
 ];
 
 export const homeSecondaryFocusItems: HomeFocusLinkItem[] = [
-  {
-    href: '/search?type=product&q=bahan%20baku',
-    labelId: 'Bahan baku',
-    labelEn: 'Raw materials',
-    hintId: 'Produksi harian',
-    hintEn: 'Daily production',
-  },
-  {
-    href: '/search?type=product&q=reseller',
-    labelId: 'Produk reseller',
-    labelEn: 'Reseller goods',
-    hintId: 'Jual ulang',
-    hintEn: 'Resell inventory',
-  },
-  {
-    href: '/search?type=service&q=optimasi%20marketplace',
-    labelId: 'Channel online',
-    labelEn: 'Online channels',
-    hintId: 'Shopee, Tokopedia, TikTok',
-    hintEn: 'Shopee, Tokopedia, TikTok',
-  },
+  ...LOCAL_FIRST_HOME_LINKS,
   {
     href: '/search?type=freelancer&q=admin%20marketplace',
     labelId: 'Freelancer ops',

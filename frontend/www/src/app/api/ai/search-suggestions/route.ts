@@ -129,6 +129,30 @@ function buildFallbackSuggestions(query: string): string[] {
     'lajukan marketplace grosir',
   ]);
 
+  addWhenContains(
+    [
+      'ekspor',
+      'export',
+      'impor',
+      'import',
+      'tkdn',
+      'halal',
+      'bpom',
+      'manufaktur',
+      'produsen',
+      'lokal',
+      'briket',
+      'rumput laut',
+    ],
+    [
+      'produk lokal siap ekspor',
+      'substitusi impor produsen lokal',
+      'sertifikasi halal bpom tkdn',
+      'logistik ekspor umkm',
+      'briket kelapa ekspor',
+    ],
+  );
+
   addWhenContains(['property', 'properti', 'rumah', 'apartemen', 'ruko', 'real estate'], [
     'lajukan property rumah apartemen',
     'lajukan sewa ruko strategis',
@@ -143,6 +167,8 @@ function buildFallbackSuggestions(query: string): string[] {
 
   suggestions.push(
     'lajukan jobs freelancer supply property',
+    'lajukan produk lokal siap ekspor',
+    'lajukan substitusi impor indonesia',
     'lajukan sewa ruko dan lapak kios',
     'lajukan marketplace produk dan jasa',
   );

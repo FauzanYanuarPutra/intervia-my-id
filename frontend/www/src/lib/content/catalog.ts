@@ -1,5 +1,3 @@
-import { localContentImageForTopic } from '@/lib/media/localSeedMedia';
-
 export type ContentMetadata = Record<string, unknown>;
 export type ContentOwnerProfile = {
   id?: string;
@@ -64,7 +62,21 @@ export type ContentItem = {
   updated_at?: string;
 };
 
-export const DEFAULT_CONTENT_IMAGE = localContentImageForTopic('listing', 'default');
+const PUBLIC_CONTENT_IMAGES: Record<ContentImageTopic, string> = {
+  listing:
+    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=80',
+  property:
+    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80',
+  job: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80',
+  talent:
+    'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80',
+  service:
+    'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=900&q=80',
+  product:
+    'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=900&q=80',
+};
+
+export const DEFAULT_CONTENT_IMAGE = PUBLIC_CONTENT_IMAGES.listing;
 
 function topicByToken(token: string): ContentImageTopic {
   const normalized = (token || '').trim().toLowerCase();
@@ -104,14 +116,16 @@ export function topicalImageForTopic(
   topic: ContentImageTopic,
   seed?: string,
 ): string {
-  return localContentImageForTopic(topic, seed || '0');
+  void seed;
+  return PUBLIC_CONTENT_IMAGES[topic] || PUBLIC_CONTENT_IMAGES.listing;
 }
 
 export function backupImageForTopic(
   topic: ContentImageTopic,
   seed?: string,
 ): string {
-  return localContentImageForTopic(topic, `${seed || '0'}-backup`);
+  void seed;
+  return PUBLIC_CONTENT_IMAGES[topic] || PUBLIC_CONTENT_IMAGES.listing;
 }
 
 function seededImage(topic: string, itemId?: string): string {
@@ -182,6 +196,7 @@ function isPlaceholderLikeImage(url?: string): boolean {
   if (!value) return true;
   return (
     value.includes('loremflickr.com') ||
+    value.includes('picsum.photos') ||
     value.includes('i.pravatar.cc') ||
     value.includes('api.dicebear.com') ||
     value.includes('placehold.co') ||
@@ -268,7 +283,7 @@ export function matchAnyFilter(item: ContentItem, query: string): boolean {
 function extractImageArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
 
-  return value.flatMap((entry) => {
+  return value.flatMap(entry => {
     const direct = asString(entry);
     if (direct) return [direct];
 

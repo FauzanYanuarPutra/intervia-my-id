@@ -161,9 +161,9 @@ export async function generateMetadata({
 export default async function JobDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   const item = await fetchJobContent(slug);
 
   if (!item) {
@@ -205,7 +205,7 @@ export default async function JobDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <JobDetailClient job={job} />
+      <JobDetailClient job={job} locale={locale} />
     </>
   );
 }

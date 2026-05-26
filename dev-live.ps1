@@ -82,6 +82,7 @@ $coreServices = @(
     "meilisearch",
     "identity_service",
     "marketplace_service",
+    "community_service",
     "mailhog"
 )
 

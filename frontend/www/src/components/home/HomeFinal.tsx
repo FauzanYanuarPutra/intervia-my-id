@@ -33,6 +33,7 @@ import {
   Video,
   XCircle,
 } from "lucide-react";
+import LajuloLogo from "@/components/logo/LajuloLogo";
 
 const IS_AUTHENTICATED = true;
 
@@ -153,31 +154,7 @@ const cx = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
 
 function Logo({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div
-        className={cx(
-          compact ? "h-8 w-8" : "h-9 w-9",
-          "flex items-center justify-center rounded-xl bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[var(--app-shadow-soft)]",
-        )}
-      >
-        <div
-          className={cx(
-            compact ? "h-3 w-3 border-[4px]" : "h-3.5 w-3.5 border-[5px]",
-            "rounded-full border-current",
-          )}
-        />
-      </div>
-      <span
-        className={cx(
-          compact ? "text-lg" : "text-xl",
-          "font-black tracking-tight text-[color:var(--app-text)]",
-        )}
-      >
-        Lajukan
-      </span>
-    </div>
-  );
+  return <LajuloLogo compact={compact} />;
 }
 
 function IconBadge({
@@ -191,7 +168,7 @@ function IconBadge({
 }) {
   const tones: Record<Tone, string> = {
     green: "ui-success-bg ui-success-text ui-success-border",
-    purple: "bg-[color:color-mix(in_srgb,#a855f7_16%,transparent)] text-purple-500 border-purple-500/20",
+    purple: "bg-[color:color-mix(in_srgb,#65a30d_16%,transparent)] text-lime-600 border-lime-500/20",
     orange: "ui-warning-bg ui-warning-text ui-warning-border",
     blue: "ui-info-bg ui-info-text ui-info-border",
     slate: "bg-[color:color-mix(in_srgb,var(--app-text)_8%,transparent)] text-[color:var(--app-text-soft)] border-[color:var(--app-border)]",
@@ -272,7 +249,9 @@ function ProductCard({
   return (
     <article
       className={cx(
-        compact ? "min-w-[150px] sm:min-w-[190px]" : "min-w-[158px] sm:min-w-0",
+        compact
+          ? "w-[150px] min-w-[150px] max-w-[150px] sm:w-[190px] sm:min-w-[190px] sm:max-w-[190px]"
+          : "w-[158px] min-w-[158px] max-w-[158px] sm:w-auto sm:min-w-0 sm:max-w-none",
         "ui-panel ui-card-hover overflow-hidden rounded-2xl transition hover:-translate-y-0.5",
       )}
     >
@@ -331,7 +310,7 @@ function ProductCard({
 
 function ReelCard({ reel }: { reel: (typeof reels)[number] }) {
   return (
-    <article className="relative h-56 min-w-[132px] overflow-hidden rounded-2xl bg-slate-950 shadow-[var(--app-shadow-soft)] sm:min-w-[150px] lg:min-w-0">
+    <article className="relative h-56 w-[132px] min-w-[132px] max-w-[132px] overflow-hidden rounded-2xl bg-slate-950 shadow-[var(--app-shadow-soft)] sm:w-[150px] sm:min-w-[150px] sm:max-w-[150px] lg:w-auto lg:min-w-0 lg:max-w-none">
       <img src={reel.image} alt={reel.title} className="h-full w-full object-cover opacity-70" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
       <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-black text-[color:var(--app-accent)] backdrop-blur">
@@ -543,7 +522,7 @@ function Hero({ isAuthenticated = IS_AUTHENTICATED }: { isAuthenticated?: boolea
             </h1>
             <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-[color:var(--app-text-soft)] sm:text-base">
               {isAuthenticated
-                ? "Temukan peluang terbaik dan perluas jaringan untuk bisnis yang lebih besar."
+                ? "Cari peluang. Perluas jaringan."
                 : "Cari supplier, produk, jasa, lokasi, talent, dan peluang usaha terbaik. Nego langsung, transaksi aman, bisnis makin berkembang."}
             </p>
             <div className="mt-5 hidden max-w-lg md:block">
@@ -579,17 +558,17 @@ function QuickActions({ isAuthenticated = IS_AUTHENTICATED }: { isAuthenticated?
   const actions = isAuthenticated
     ? [
         [Briefcase, "Buat Permintaan", "Cari supplier, jasa, atau produk", "green"],
-        [Store, "Jelajahi", "Temukan peluang terbaik", "purple"],
+        [Store, "Jelajahi", "Peluang aktif", "purple"],
         [ClipboardList, "Lihat Penawaran", "Penawaran baru menunggumu", "orange"],
         [MessageCircle, "Mulai Nego", "Chat & nego dengan supplier", "blue"],
       ]
     : [
-        [Briefcase, "Supplier", "Temukan supplier terpercaya", "green"],
-        [Package, "Produk", "Temukan produk terbaik", "green"],
+        [Briefcase, "Supplier", "Supplier siap", "green"],
+        [Package, "Produk", "Stok siap", "green"],
         [Store, "Jasa", "Berbagai jasa untuk bisnismu", "purple"],
-        [MapPin, "Lokasi", "Temukan lokasi strategis", "orange"],
-        [User, "Talent", "Temukan talent berkualitas", "blue"],
-        [Plus, "Permintaan", "Buat permintaan kebutuhanmu", "green"],
+        [MapPin, "Lokasi", "Lokasi jualan", "orange"],
+        [User, "Talent", "Talent siap", "blue"],
+        [Plus, "Permintaan", "Buat permintaan", "green"],
       ] as const;
 
   return (
@@ -833,7 +812,7 @@ function BottomNav({ isAuthenticated = IS_AUTHENTICATED }: { isAuthenticated?: b
   ] as const;
 
   return (
-    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 rounded-t-[28px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_90%,transparent)] px-3 pb-5 pt-3 shadow-[var(--app-shadow-sheet)] backdrop-blur-xl lg:hidden">
+    <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-[430px] -translate-x-1/2 grid-cols-5 rounded-t-[28px] border-x-0 border-t border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_90%,transparent)] px-3 pb-5 pt-3 shadow-[var(--app-shadow-sheet)] backdrop-blur-xl lg:hidden">
       {navItems.map(([Icon, label, active], index) => (
         <button key={String(label)} className="flex flex-col items-center gap-1 text-[11px] font-bold">
           <span
@@ -866,10 +845,10 @@ function MobileLongSections({ isAuthenticated = IS_AUTHENTICATED }: { isAuthenti
         <SectionHeader title="Cara Kerja Lajukan" />
         <div className="space-y-3">
           {[
-            ["Cari & Temukan", "Supplier, produk, atau jasa terbaik"],
+            ["Cari", "Supplier, produk, jasa"],
             ["Hubungi & Nego", "Chat langsung, negosiasi mudah"],
             ["Transaksi Aman", "Pembayaran aman dan terproteksi"],
-            ["Kembangkan Bisnis", "Tumbuh lebih cepat bersama Lajukan"],
+            ["Kembangkan", "Tumbuh bareng Lajukan"],
           ].map(([title, desc], index) => (
             <div key={title} className="flex items-center gap-4 rounded-2xl bg-[color:var(--app-surface-muted)] p-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-base font-black text-[color:var(--app-accent)]">
@@ -927,7 +906,7 @@ export default function LajukanResponsiveHome() {
       <div className="flex min-h-screen">
         <Sidebar isAuthenticated={isAuthenticated} />
 
-        <div className="min-w-0 flex-1 pb-28 lg:pb-0">
+        <div className="min-w-0 flex-1 pb-6 lg:pb-0">
           <MobileHeader isAuthenticated={isAuthenticated} />
           <TopBar isAuthenticated={isAuthenticated} />
 

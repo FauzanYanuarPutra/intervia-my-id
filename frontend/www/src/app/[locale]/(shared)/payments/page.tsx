@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Image from 'next/image';
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { useAuth } from '@/context/AuthContext';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
 import { Modal } from '@/components/common/Modal';
@@ -105,20 +105,81 @@ type PaymentMethodOption = {
 };
 
 const MIDTRANS_METHOD_OPTIONS: PaymentMethodOption[] = [
-  { value: 'qris', label: 'QRIS', hint: 'Scan pakai mobile banking atau e-wallet apa saja.', image: '/images/payments/qris.svg' },
-  { value: 'bank_transfer', label: 'Transfer Bank', hint: 'Nomor VA akan disiapkan sesuai channel yang tersedia.', image: '/images/payments/bank-transfer.svg' },
-  { value: 'gopay', label: 'GoPay', hint: 'Buka aplikasi GoPay lalu lanjut bayar dari sana.', image: '/images/payments/gopay.svg' },
-  { value: 'bca_va', label: 'BCA Virtual Account', hint: 'Bayar dari BCA mobile, myBCA, internet banking, atau ATM.', image: '/images/payments/bca-va.svg' },
-  { value: 'mandiri_va', label: 'Mandiri Virtual Account', hint: 'Cocok untuk Livin Mandiri dan ATM Mandiri.', image: '/images/payments/bank-transfer.svg' },
-  { value: 'bni_va', label: 'BNI Virtual Account', hint: 'Bayar dari Wondr/BNI Mobile, ATM, atau kanal BNI.', image: '/images/payments/bank-transfer.svg' },
-  { value: 'bri_va', label: 'BRI Virtual Account', hint: 'Praktis lewat BRImo, ATM, atau agen BRI.', image: '/images/payments/bank-transfer.svg' },
-  { value: 'cimb_va', label: 'CIMB Virtual Account', hint: 'Bisa dibayar dari OCTO Mobile dan ATM CIMB.', image: '/images/payments/bank-transfer.svg' },
-  { value: 'permata_va', label: 'Permata Virtual Account', hint: 'Enak kalau mau bayar dari banyak jaringan ATM bank.', image: '/images/payments/bank-transfer.svg' },
-  { value: 'shopeepay', label: 'ShopeePay', hint: 'Bayar langsung dari aplikasi ShopeePay.', image: '/images/payments/qris.svg' },
-  { value: 'credit_card', label: 'Kartu Debit/Kredit', hint: 'Pakai kartu Visa, Mastercard, JCB, atau Amex bila aktif.', image: '/images/payments/bank-transfer.svg' },
+  {
+    value: 'qris',
+    label: 'QRIS',
+    hint: 'Scan pakai mobile banking atau e-wallet apa saja.',
+    image: '/images/payments/qris.svg',
+  },
+  {
+    value: 'bank_transfer',
+    label: 'Transfer Bank',
+    hint: 'Nomor VA akan disiapkan sesuai channel yang tersedia.',
+    image: '/images/payments/bank-transfer.svg',
+  },
+  {
+    value: 'gopay',
+    label: 'GoPay',
+    hint: 'Buka aplikasi GoPay lalu lanjut bayar dari sana.',
+    image: '/images/payments/gopay.svg',
+  },
+  {
+    value: 'bca_va',
+    label: 'BCA Virtual Account',
+    hint: 'Bayar dari BCA mobile, myBCA, internet banking, atau ATM.',
+    image: '/images/payments/bca-va.svg',
+  },
+  {
+    value: 'mandiri_va',
+    label: 'Mandiri Virtual Account',
+    hint: 'Cocok untuk Livin Mandiri dan ATM Mandiri.',
+    image: '/images/payments/bank-transfer.svg',
+  },
+  {
+    value: 'bni_va',
+    label: 'BNI Virtual Account',
+    hint: 'Bayar dari Wondr/BNI Mobile, ATM, atau kanal BNI.',
+    image: '/images/payments/bank-transfer.svg',
+  },
+  {
+    value: 'bri_va',
+    label: 'BRI Virtual Account',
+    hint: 'Praktis lewat BRImo, ATM, atau agen BRI.',
+    image: '/images/payments/bank-transfer.svg',
+  },
+  {
+    value: 'cimb_va',
+    label: 'CIMB Virtual Account',
+    hint: 'Bisa dibayar dari OCTO Mobile dan ATM CIMB.',
+    image: '/images/payments/bank-transfer.svg',
+  },
+  {
+    value: 'permata_va',
+    label: 'Permata Virtual Account',
+    hint: 'Enak kalau mau bayar dari banyak jaringan ATM bank.',
+    image: '/images/payments/bank-transfer.svg',
+  },
+  {
+    value: 'shopeepay',
+    label: 'ShopeePay',
+    hint: 'Bayar langsung dari aplikasi ShopeePay.',
+    image: '/images/payments/qris.svg',
+  },
+  {
+    value: 'credit_card',
+    label: 'Kartu Debit/Kredit',
+    hint: 'Pakai kartu Visa, Mastercard, JCB, atau Amex bila aktif.',
+    image: '/images/payments/bank-transfer.svg',
+  },
 ];
 
 const TOPUP_PRESETS_IDR = [20_000, 50_000, 100_000, 200_000, 500_000] as const;
+const PAYMENT_FIELD_LABEL_CLASS =
+  'text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)]';
+const PAYMENT_AMOUNT_FIELD_CLASS =
+  'mt-1.5 flex min-h-[54px] items-center gap-2 rounded-[16px] border-2 border-slate-300 bg-white px-3.5 py-2.5 shadow-none transition hover:border-slate-400 focus-within:border-[color:var(--app-accent)] focus-within:ring-4 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600 dark:focus-within:border-emerald-400';
+const PAYMENT_AMOUNT_INPUT_CLASS =
+  'w-full min-w-0 bg-transparent text-[1.1rem] font-black tracking-[-0.03em] text-[color:var(--app-text)] outline-none placeholder:text-slate-400 min-[420px]:text-[1.25rem]';
 
 function moneyFromCents(cents: number, currency: string): string {
   const value = Number(cents || 0);
@@ -148,10 +209,14 @@ function dateTimeLabel(value?: string | null): string {
 }
 
 function topupStatusClass(status: WalletTopup['status']): string {
-  if (status === 'paid') return 'bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] text-[color:var(--app-accent)] border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)]';
-  if (status === 'pending') return 'bg-[color:color-mix(in_srgb,_var(--app-warning)_15%,_transparent)] text-[color:var(--app-warning)] border-[color:color-mix(in_srgb,_var(--app-warning-border)_30%,_transparent)]';
-  if (status === 'failed') return 'bg-[color:color-mix(in_srgb,_var(--app-danger)_15%,_transparent)] text-[color:var(--app-danger)] border-[color:color-mix(in_srgb,_var(--app-danger-border)_30%,_transparent)]';
-  if (status === 'cancelled' || status === 'expired') return 'bg-[color:color-mix(in_srgb,_var(--app-surface)_20%,_transparent)] text-[color:var(--app-text-soft)] border-[color:color-mix(in_srgb,_var(--app-border-strong)_30%,_transparent)]';
+  if (status === 'paid')
+    return 'bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] text-[color:var(--app-accent)] border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)]';
+  if (status === 'pending')
+    return 'bg-[color:color-mix(in_srgb,_var(--app-warning)_15%,_transparent)] text-[color:var(--app-warning)] border-[color:color-mix(in_srgb,_var(--app-warning-border)_30%,_transparent)]';
+  if (status === 'failed')
+    return 'bg-[color:color-mix(in_srgb,_var(--app-danger)_15%,_transparent)] text-[color:var(--app-danger)] border-[color:color-mix(in_srgb,_var(--app-danger-border)_30%,_transparent)]';
+  if (status === 'cancelled' || status === 'expired')
+    return 'bg-[color:color-mix(in_srgb,_var(--app-surface)_20%,_transparent)] text-[color:var(--app-text-soft)] border-[color:color-mix(in_srgb,_var(--app-border-strong)_30%,_transparent)]';
   return 'bg-[color:color-mix(in_srgb,_var(--app-surface)_20%,_transparent)] text-[color:var(--app-text-soft)] border-[color:color-mix(in_srgb,_var(--app-border-strong)_30%,_transparent)]';
 }
 
@@ -195,7 +260,11 @@ function paymentMethodDisplayLabel(value?: string | null): string {
 function paymentMethodGroupLabel(value?: string | null): string {
   const source = String(value || '').toLowerCase();
   if (!source) return 'Metode pembayaran';
-  if (source.includes('gopay') || source.includes('shopee') || source.includes('qris')) {
+  if (
+    source.includes('gopay') ||
+    source.includes('shopee') ||
+    source.includes('qris')
+  ) {
     return 'E-wallet';
   }
   if (source.includes('credit') || source.includes('card')) {
@@ -209,7 +278,11 @@ function paymentMethodIcon(method?: string | null, paymentType?: string) {
   if (!source) return Banknote;
   if (source.includes('va') || source.includes('bank')) return Landmark;
   if (source.includes('qris') || source.includes('qr')) return QrCode;
-  if (source.includes('gopay') || source.includes('shopee') || source.includes('ewallet')) {
+  if (
+    source.includes('gopay') ||
+    source.includes('shopee') ||
+    source.includes('ewallet')
+  ) {
     return Smartphone;
   }
   if (source.includes('credit') || source.includes('card')) return CreditCard;
@@ -219,11 +292,14 @@ function paymentMethodIcon(method?: string | null, paymentType?: string) {
 function paymentMethodNextStep(value?: string | null): string {
   const source = String(value || '').toLowerCase();
   if (!source) return 'Instruksi bayar muncul setelah tagihan dibuat.';
-  if (source === 'gopay') return 'Setelah tagihan dibuat, langsung lanjutkan pembayaran di GoPay.';
-  if (source === 'qris') return 'Setelah tagihan dibuat, scan QR dari mobile banking atau e-wallet apa saja.';
-  if (source === 'shopeepay') return 'Setelah tagihan dibuat, lanjutkan pembayaran dari ShopeePay.';
-  if (source.includes('va') || source.includes('bank')) return 'Setelah tagihan dibuat, nomor virtual account langsung muncul untuk disalin.';
-  if (source.includes('credit') || source.includes('card')) return 'Setelah tagihan dibuat, lanjutkan ke halaman pembayaran kartu yang aman.';
+  if (source === 'gopay') return 'Tagihan jadi, lanjut bayar di GoPay.';
+  if (source === 'qris') return 'Tagihan jadi, scan QR.';
+  if (source === 'shopeepay')
+    return 'Setelah tagihan dibuat, lanjutkan pembayaran dari ShopeePay.';
+  if (source.includes('va') || source.includes('bank'))
+    return 'VA muncul setelah tagihan dibuat.';
+  if (source.includes('credit') || source.includes('card'))
+    return 'Tagihan jadi, lanjut bayar kartu.';
   return 'Ikuti instruksi pembayaran yang muncul setelah tagihan dibuat.';
 }
 
@@ -240,15 +316,24 @@ function resolveAutoTopupDescription(
 }
 
 function parseTopupPaymentDueAt(topup: WalletTopup): Date | null {
-  const direct = typeof topup.payment_due_at === 'string' ? topup.payment_due_at.trim() : '';
-  const payload = topup.payment_payload && typeof topup.payment_payload === 'object' ? topup.payment_payload : {};
+  const direct =
+    typeof topup.payment_due_at === 'string' ? topup.payment_due_at.trim() : '';
+  const payload =
+    topup.payment_payload && typeof topup.payment_payload === 'object'
+      ? topup.payment_payload
+      : {};
   const walletFlow =
-    payload && typeof (payload as Record<string, unknown>).wallet_flow === 'object'
-      ? ((payload as Record<string, unknown>).wallet_flow as Record<string, unknown>)
+    payload &&
+    typeof (payload as Record<string, unknown>).wallet_flow === 'object'
+      ? ((payload as Record<string, unknown>).wallet_flow as Record<
+          string,
+          unknown
+        >)
       : null;
-  const fromPayload = walletFlow && typeof walletFlow.payment_due_at === 'string'
-    ? walletFlow.payment_due_at.trim()
-    : '';
+  const fromPayload =
+    walletFlow && typeof walletFlow.payment_due_at === 'string'
+      ? walletFlow.payment_due_at.trim()
+      : '';
   const raw = direct || fromPayload;
   if (!raw) return null;
   const parsed = new Date(raw);
@@ -283,7 +368,9 @@ type PaymentInstructionView = {
 };
 
 function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function asString(value: unknown): string {
@@ -296,14 +383,16 @@ function findActionUrl(actions: unknown, nameCandidates: string[]): string {
     const row = asObject(entry);
     const name = asString(row.name).toLowerCase();
     if (!name) continue;
-    if (!nameCandidates.some((candidate) => name.includes(candidate))) continue;
+    if (!nameCandidates.some(candidate => name.includes(candidate))) continue;
     const url = asString(row.url);
     if (url) return url;
   }
   return '';
 }
 
-function extractPaymentInstructionView(topup: WalletTopup | null): PaymentInstructionView | null {
+function extractPaymentInstructionView(
+  topup: WalletTopup | null,
+): PaymentInstructionView | null {
   if (!topup) return null;
   const payload = asObject(topup.payment_payload);
   const mode = asString(payload.mode).toLowerCase();
@@ -315,24 +404,37 @@ function extractPaymentInstructionView(topup: WalletTopup | null): PaymentInstru
         ? asObject(payload.snap)
         : payload;
   const actions = charge.actions;
-  const paymentType = asString(charge.payment_type || midtrans.payment_type || topup.payment_method).toLowerCase();
-  const vaNumbersRaw = Array.isArray(charge.va_numbers) ? charge.va_numbers : [];
+  const paymentType = asString(
+    charge.payment_type || midtrans.payment_type || topup.payment_method,
+  ).toLowerCase();
+  const vaNumbersRaw = Array.isArray(charge.va_numbers)
+    ? charge.va_numbers
+    : [];
   const vaNumbers = vaNumbersRaw
-    .map((entry) => {
+    .map(entry => {
       const row = asObject(entry);
       return {
         bank: asString(row.bank).toUpperCase(),
         number: asString(row.va_number || row.number),
       };
     })
-    .filter((entry) => entry.number);
+    .filter(entry => entry.number);
 
   return {
     mode: mode || 'unknown',
     paymentType,
     transactionId: asString(charge.transaction_id || midtrans.transaction_id),
-    transactionStatus: asString(charge.transaction_status || midtrans.transaction_status || charge.status_message),
-    expiryTime: asString(charge.expiry_time || charge.expiration_time || charge.settlement_time || midtrans.settlement_time),
+    transactionStatus: asString(
+      charge.transaction_status ||
+        midtrans.transaction_status ||
+        charge.status_message,
+    ),
+    expiryTime: asString(
+      charge.expiry_time ||
+        charge.expiration_time ||
+        charge.settlement_time ||
+        midtrans.settlement_time,
+    ),
     checkoutHint: asString(payload.checkout_hint || topup.checkout_url),
     qrUrl:
       asString(charge.qr_url) ||
@@ -356,13 +458,13 @@ function hasPaymentInstructionData(
   if (!instruction) return false;
   return Boolean(
     instruction.vaNumbers.length ||
-      instruction.permataVa ||
-      instruction.billKey ||
-      instruction.qrUrl ||
-      instruction.qrString ||
-      instruction.deeplinkUrl ||
-      instruction.checkoutHint ||
-      topup.checkout_url,
+    instruction.permataVa ||
+    instruction.billKey ||
+    instruction.qrUrl ||
+    instruction.qrString ||
+    instruction.deeplinkUrl ||
+    instruction.checkoutHint ||
+    topup.checkout_url,
   );
 }
 
@@ -372,7 +474,9 @@ export default function PaymentsPage() {
   const [balances, setBalances] = useState<WalletBalancesResponse | null>(null);
   const [loadingBalances, setLoadingBalances] = useState(true);
   const [balanceError, setBalanceError] = useState<string | null>(null);
-  const [selectedEnvironment, setSelectedEnvironment] = useState<'development' | 'live'>('development');
+  const [selectedEnvironment, setSelectedEnvironment] = useState<
+    'development' | 'live'
+  >('development');
 
   const [topups, setTopups] = useState<WalletTopup[]>([]);
   const [topupsLoading, setTopupsLoading] = useState(false);
@@ -397,20 +501,26 @@ export default function PaymentsPage() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const prefillAppliedRef = useRef(false);
 
-  const copyInstructionValue = useCallback(async (label: string, value: string) => {
-    const content = value.trim();
-    if (!content) return;
-    try {
-      await navigator.clipboard.writeText(content);
-      setSubmitSuccess(`${label} berhasil disalin.`);
-      setSubmitError(null);
-    } catch {
-      setSubmitError(`Gagal menyalin ${label}.`);
-    }
-  }, []);
+  const copyInstructionValue = useCallback(
+    async (label: string, value: string) => {
+      const content = value.trim();
+      if (!content) return;
+      try {
+        await navigator.clipboard.writeText(content);
+        setSubmitSuccess(`${label} berhasil disalin.`);
+        setSubmitError(null);
+      } catch {
+        setSubmitError(`Gagal menyalin ${label}.`);
+      }
+    },
+    [],
+  );
 
   const selectedAccount = useMemo(
-    () => balances?.accounts.find((account) => account.environment === selectedEnvironment) || null,
+    () =>
+      balances?.accounts.find(
+        account => account.environment === selectedEnvironment,
+      ) || null,
     [balances?.accounts, selectedEnvironment],
   );
 
@@ -421,42 +531,73 @@ export default function PaymentsPage() {
   }, [balances?.live_enabled]);
 
   const selectedMethodMeta = useMemo(
-    () => MIDTRANS_METHOD_OPTIONS.find((method) => method.value === paymentMethod) || MIDTRANS_METHOD_OPTIONS[0],
+    () =>
+      MIDTRANS_METHOD_OPTIONS.find(method => method.value === paymentMethod) ||
+      MIDTRANS_METHOD_OPTIONS[0],
     [paymentMethod],
   );
   const amountMajorNumber = Number(amountMajor);
   const normalizedAmountMajor =
-    Number.isFinite(amountMajorNumber) && amountMajorNumber > 0 ? amountMajorNumber : 0;
+    Number.isFinite(amountMajorNumber) && amountMajorNumber > 0
+      ? amountMajorNumber
+      : 0;
   const selectedCurrency = currency.trim().toUpperCase() || 'IDR';
   const estimatedTopupCents = Math.round(normalizedAmountMajor * 100);
   const projectedAvailableBalanceCents =
     (selectedAccount?.available_balance_cents || 0) + estimatedTopupCents;
   const featuredMethods = useMemo(() => {
-    const preferred = ['qris', 'bank_transfer', 'gopay', 'bca_va', 'mandiri_va', 'bri_va', 'bni_va'];
+    const preferred = [
+      'qris',
+      'bank_transfer',
+      'gopay',
+      'bca_va',
+      'mandiri_va',
+      'bri_va',
+      'bni_va',
+    ];
     const preferredSet = new Set(preferred);
     const ordered = [
       ...preferred
-        .map((value) => MIDTRANS_METHOD_OPTIONS.find((item) => item.value === value))
+        .map(value =>
+          MIDTRANS_METHOD_OPTIONS.find(item => item.value === value),
+        )
         .filter(Boolean),
-      ...MIDTRANS_METHOD_OPTIONS.filter((item) => !preferredSet.has(item.value)),
+      ...MIDTRANS_METHOD_OPTIONS.filter(item => !preferredSet.has(item.value)),
     ];
     return ordered as PaymentMethodOption[];
   }, []);
-  const quickMethods = useMemo(() => featuredMethods.slice(0, 3), [featuredMethods]);
-  const secondaryMethods = useMemo(() => featuredMethods.slice(3), [featuredMethods]);
+  const quickMethods = useMemo(
+    () => featuredMethods.slice(0, 3),
+    [featuredMethods],
+  );
+  const secondaryMethods = useMemo(
+    () => featuredMethods.slice(3),
+    [featuredMethods],
+  );
   const mobileMethods = useMemo(
     () =>
       ['qris', 'bank_transfer', 'gopay']
-        .map((value) => MIDTRANS_METHOD_OPTIONS.find((item) => item.value === value))
+        .map(value =>
+          MIDTRANS_METHOD_OPTIONS.find(item => item.value === value),
+        )
         .filter(Boolean) as PaymentMethodOption[],
     [],
   );
-  const selectedMethodNextStep = useMemo(() => paymentMethodNextStep(paymentMethod), [paymentMethod]);
+  const selectedMethodNextStep = useMemo(
+    () => paymentMethodNextStep(paymentMethod),
+    [paymentMethod],
+  );
   const prefillAmountCentsRaw = (searchParams.get('amount_cents') || '').trim();
-  const prefillCurrencyRaw = (searchParams.get('currency') || '').trim().toUpperCase();
-  const prefillTransactionId = (searchParams.get('transaction_id') || '').trim();
+  const prefillCurrencyRaw = (searchParams.get('currency') || '')
+    .trim()
+    .toUpperCase();
+  const prefillTransactionId = (
+    searchParams.get('transaction_id') || ''
+  ).trim();
   const prefillSource = (searchParams.get('source') || '').trim().toLowerCase();
-  const redirectStatusRaw = (searchParams.get('topup_status') || '').trim().toLowerCase();
+  const redirectStatusRaw = (searchParams.get('topup_status') || '')
+    .trim()
+    .toLowerCase();
   const redirectTopupId = (searchParams.get('topup_id') || '').trim();
   const resolvedDescription = useMemo(
     () =>
@@ -468,29 +609,37 @@ export default function PaymentsPage() {
     if (!redirectStatusRaw) return null;
     if (redirectStatusRaw === 'finish') {
       return {
-        className: 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] text-[color:var(--app-accent)]',
-        message: `Pembayaran berhasil diproses${redirectTopupId ? ` (ID ${redirectTopupId}).` : '.'} Saldo akan diperbarui otomatis setelah callback diterima.`,
+        className:
+          'border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] text-[color:var(--app-accent)]',
+        message: `Pembayaran berhasil${redirectTopupId ? ` (ID ${redirectTopupId}).` : '.'} Saldo otomatis update.`,
       };
     }
     if (redirectStatusRaw === 'unfinish' || redirectStatusRaw === 'pending') {
       return {
-        className: 'border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] text-[color:var(--app-warning)]',
-        message: `Pembayaran belum selesai${redirectTopupId ? ` (ID ${redirectTopupId}).` : '.'} Kamu bisa lanjutkan dari tombol "Buka pembayaran" di riwayat isi saldo.`,
+        className:
+          'border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] text-[color:var(--app-warning)]',
+        message: `Pembayaran belum selesai${redirectTopupId ? ` (ID ${redirectTopupId}).` : '.'} Lanjut dari riwayat isi saldo.`,
       };
     }
     if (redirectStatusRaw === 'error' || redirectStatusRaw === 'failed') {
       return {
-        className: 'border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] text-[color:var(--app-danger)]',
+        className:
+          'border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] text-[color:var(--app-danger)]',
         message: `Pembayaran mengembalikan status error${redirectTopupId ? ` (ID ${redirectTopupId}).` : '.'} Cek detail transaksi lalu coba isi saldo lagi.`,
       };
     }
     return {
-      className: 'border-[color:color-mix(in_srgb,_var(--app-border-strong)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface)_10%,_transparent)] text-[color:var(--app-text-soft)]',
+      className:
+        'border-[color:color-mix(in_srgb,_var(--app-border-strong)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface)_10%,_transparent)] text-[color:var(--app-text-soft)]',
       message: `Status pembayaran diterima: ${redirectStatusRaw}${redirectTopupId ? ` (ID ${redirectTopupId})` : ''}.`,
     };
   }, [redirectStatusRaw, redirectTopupId]);
   const actionableTopup = useMemo(
-    () => topups.find((item) => item.status === 'pending') || latestTopup || topups[0] || null,
+    () =>
+      topups.find(item => item.status === 'pending') ||
+      latestTopup ||
+      topups[0] ||
+      null,
     [latestTopup, topups],
   );
   const actionableInstruction = useMemo(
@@ -506,7 +655,9 @@ export default function PaymentsPage() {
     if (actionableInstruction.vaNumbers.length) {
       const firstVa = actionableInstruction.vaNumbers[0];
       return {
-        label: firstVa.bank ? `${firstVa.bank.toUpperCase()} VA` : 'Virtual account',
+        label: firstVa.bank
+          ? `${firstVa.bank.toUpperCase()} VA`
+          : 'Virtual account',
         value: firstVa.number,
       };
     }
@@ -525,20 +676,31 @@ export default function PaymentsPage() {
   );
   const detailAccount = useMemo(() => {
     if (!detailTopup || !balances?.accounts?.length) return null;
-    return balances.accounts.find((account) => account.id === detailTopup.account_id) || null;
+    return (
+      balances.accounts.find(
+        account => account.id === detailTopup.account_id,
+      ) || null
+    );
   }, [balances?.accounts, detailTopup]);
   const expectedAfterPaidCents = useMemo(() => {
     if (!detailTopup || !detailAccount) return null;
-    if (detailTopup.status === 'paid') return detailAccount.available_balance_cents;
+    if (detailTopup.status === 'paid')
+      return detailAccount.available_balance_cents;
     return detailAccount.available_balance_cents + detailTopup.net_amount_cents;
   }, [detailAccount, detailTopup]);
 
   const transactionPrefillBanner = useMemo(() => {
     if (!prefillTransactionId) return null;
-    const sourceLabel = prefillSource === 'chat' ? 'chat' : prefillSource === 'transactions' ? 'transactions' : 'transaction';
+    const sourceLabel =
+      prefillSource === 'chat'
+        ? 'chat'
+        : prefillSource === 'transactions'
+          ? 'transactions'
+          : 'transaction';
     return {
-      className: 'border-[color:color-mix(in_srgb,_var(--app-info-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] text-[color:var(--app-info)]',
-      message: `${sourceLabel}. Nominal isi saldo sudah diisi untuk transaksi ${prefillTransactionId}. Lanjutkan dengan "Lanjut ke pembayaran", lalu klik "Buka pembayaran" untuk bayar.`,
+      className:
+        'border-[color:color-mix(in_srgb,_var(--app-info-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] text-[color:var(--app-info)]',
+      message: `${sourceLabel}. Nominal sudah terisi untuk transaksi ${prefillTransactionId}. Lanjut bayar.`,
     };
   }, [prefillSource, prefillTransactionId]);
 
@@ -570,47 +732,58 @@ export default function PaymentsPage() {
     }
   }, [prefillAmountCentsRaw, prefillCurrencyRaw, prefillTransactionId]);
 
-  const loadBalances = useCallback(async (options?: { silent?: boolean; preserveSelection?: boolean }) => {
-    if (!user?.id) return;
-    if (!options?.silent) {
-      setLoadingBalances(true);
-      setBalanceError(null);
-    }
-    try {
-      const res = await authFetch('/api/wallet/balance', { cache: 'no-store' });
-      const payload = (await res.json().catch(() => ({}))) as
-        | WalletBalancesResponse
-        | { error?: string };
-      if (!res.ok) {
-        throw new Error((payload as { error?: string }).error || 'Gagal memuat saldo.');
+  const loadBalances = useCallback(
+    async (options?: { silent?: boolean; preserveSelection?: boolean }) => {
+      if (!user?.id) return;
+      if (!options?.silent) {
+        setLoadingBalances(true);
+        setBalanceError(null);
       }
+      try {
+        const res = await authFetch('/api/wallet/balance', {
+          cache: 'no-store',
+        });
+        const payload = (await res.json().catch(() => ({}))) as
+          | WalletBalancesResponse
+          | { error?: string };
+        if (!res.ok) {
+          throw new Error(
+            (payload as { error?: string }).error || 'Gagal memuat saldo.',
+          );
+        }
 
-      const normalized = payload as WalletBalancesResponse;
-      setBalances(normalized);
-      if (!options?.preserveSelection) {
-        const availableEnvs: Array<'development' | 'live'> = normalized.live_enabled
-          ? ['development', 'live']
-          : ['development'];
-        if (availableEnvs.includes(normalized.default_environment)) {
-          setSelectedEnvironment(normalized.default_environment);
-        } else {
-          setSelectedEnvironment('development');
+        const normalized = payload as WalletBalancesResponse;
+        setBalances(normalized);
+        if (!options?.preserveSelection) {
+          const availableEnvs: Array<'development' | 'live'> =
+            normalized.live_enabled ? ['development', 'live'] : ['development'];
+          if (availableEnvs.includes(normalized.default_environment)) {
+            setSelectedEnvironment(normalized.default_environment);
+          } else {
+            setSelectedEnvironment('development');
+          }
+        }
+      } catch (error) {
+        if (!options?.silent) {
+          setBalanceError(
+            error instanceof Error ? error.message : 'Gagal memuat saldo.',
+          );
+          setBalances(null);
+        }
+      } finally {
+        if (!options?.silent) {
+          setLoadingBalances(false);
         }
       }
-    } catch (error) {
-      if (!options?.silent) {
-        setBalanceError(error instanceof Error ? error.message : 'Gagal memuat saldo.');
-        setBalances(null);
-      }
-    } finally {
-      if (!options?.silent) {
-        setLoadingBalances(false);
-      }
-    }
-  }, [authFetch, user?.id]);
+    },
+    [authFetch, user?.id],
+  );
 
   const loadTopups = useCallback(
-    async (environment: 'development' | 'live', options?: { silent?: boolean }) => {
+    async (
+      environment: 'development' | 'live',
+      options?: { silent?: boolean },
+    ) => {
       if (!user?.id) return;
       if (!options?.silent) {
         setTopupsLoading(true);
@@ -629,12 +802,23 @@ export default function PaymentsPage() {
           | PaginatedResponse<WalletTopup>
           | { error?: string };
         if (!res.ok) {
-          throw new Error((payload as { error?: string }).error || 'Gagal memuat riwayat isi saldo.');
+          throw new Error(
+            (payload as { error?: string }).error ||
+              'Gagal memuat riwayat isi saldo.',
+          );
         }
-        setTopups(Array.isArray((payload as PaginatedResponse<WalletTopup>).items) ? (payload as PaginatedResponse<WalletTopup>).items : []);
+        setTopups(
+          Array.isArray((payload as PaginatedResponse<WalletTopup>).items)
+            ? (payload as PaginatedResponse<WalletTopup>).items
+            : [],
+        );
       } catch (error) {
         if (!options?.silent) {
-          setTopupsError(error instanceof Error ? error.message : 'Gagal memuat riwayat isi saldo.');
+          setTopupsError(
+            error instanceof Error
+              ? error.message
+              : 'Gagal memuat riwayat isi saldo.',
+          );
           setTopups([]);
         }
       } finally {
@@ -647,7 +831,10 @@ export default function PaymentsPage() {
   );
 
   const loadLedger = useCallback(
-    async (environment: 'development' | 'live', options?: { silent?: boolean }) => {
+    async (
+      environment: 'development' | 'live',
+      options?: { silent?: boolean },
+    ) => {
       if (!user?.id) return;
       if (!options?.silent) {
         setLedgerLoading(true);
@@ -666,12 +853,23 @@ export default function PaymentsPage() {
           | PaginatedResponse<WalletLedgerEntry>
           | { error?: string };
         if (!res.ok) {
-          throw new Error((payload as { error?: string }).error || 'Gagal memuat mutasi saldo.');
+          throw new Error(
+            (payload as { error?: string }).error ||
+              'Gagal memuat mutasi saldo.',
+          );
         }
-        setLedger(Array.isArray((payload as PaginatedResponse<WalletLedgerEntry>).items) ? (payload as PaginatedResponse<WalletLedgerEntry>).items : []);
+        setLedger(
+          Array.isArray((payload as PaginatedResponse<WalletLedgerEntry>).items)
+            ? (payload as PaginatedResponse<WalletLedgerEntry>).items
+            : [],
+        );
       } catch (error) {
         if (!options?.silent) {
-          setLedgerError(error instanceof Error ? error.message : 'Gagal memuat mutasi saldo.');
+          setLedgerError(
+            error instanceof Error
+              ? error.message
+              : 'Gagal memuat mutasi saldo.',
+          );
           setLedger([]);
         }
       } finally {
@@ -684,8 +882,14 @@ export default function PaymentsPage() {
   );
 
   const refreshLists = useCallback(
-    async (environment: 'development' | 'live', options?: { silent?: boolean }) => {
-      await Promise.all([loadTopups(environment, options), loadLedger(environment, options)]);
+    async (
+      environment: 'development' | 'live',
+      options?: { silent?: boolean },
+    ) => {
+      await Promise.all([
+        loadTopups(environment, options),
+        loadLedger(environment, options),
+      ]);
     },
     [loadLedger, loadTopups],
   );
@@ -701,7 +905,9 @@ export default function PaymentsPage() {
   }, [refreshLists, selectedEnvironment, user?.id]);
 
   useEffect(() => {
-    if (!MIDTRANS_METHOD_OPTIONS.some((option) => option.value === paymentMethod)) {
+    if (
+      !MIDTRANS_METHOD_OPTIONS.some(option => option.value === paymentMethod)
+    ) {
       setPaymentMethod('qris');
     }
   }, [paymentMethod]);
@@ -713,7 +919,7 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     if (!detailTopup) return;
-    const refreshed = topups.find((item) => item.id === detailTopup.id);
+    const refreshed = topups.find(item => item.id === detailTopup.id);
     if (refreshed) {
       setDetailTopup(refreshed);
       return;
@@ -723,7 +929,10 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     const onNotification = (event: Event) => {
-      const custom = event as CustomEvent<{ category?: string; event_type?: string }>;
+      const custom = event as CustomEvent<{
+        category?: string;
+        event_type?: string;
+      }>;
       const category = String(custom.detail?.category || '').toLowerCase();
       const eventType = String(custom.detail?.event_type || '').toLowerCase();
       if (
@@ -735,7 +944,10 @@ export default function PaymentsPage() {
       void loadBalances({ silent: true, preserveSelection: true });
       void refreshLists(selectedEnvironment, { silent: true });
     };
-    window.addEventListener('marketplace:notification', onNotification as EventListener);
+    window.addEventListener(
+      'marketplace:notification',
+      onNotification as EventListener,
+    );
     return () =>
       window.removeEventListener(
         'marketplace:notification',
@@ -744,7 +956,7 @@ export default function PaymentsPage() {
   }, [loadBalances, refreshLists, selectedEnvironment]);
 
   useEffect(() => {
-    const hasPending = topups.some((topup) => topup.status === 'pending');
+    const hasPending = topups.some(topup => topup.status === 'pending');
     if (!hasPending) return;
     const timer = window.setInterval(() => {
       void loadBalances({ silent: true, preserveSelection: true });
@@ -757,7 +969,11 @@ export default function PaymentsPage() {
     setSubmitError(null);
     setSubmitSuccess(null);
 
-    const majorRaw = Number(String(amountMajor || '').replace(/,/g, '').trim());
+    const majorRaw = Number(
+      String(amountMajor || '')
+        .replace(/,/g, '')
+        .trim(),
+    );
     if (!Number.isFinite(majorRaw) || majorRaw <= 0) {
       setSubmitError('Nominal isi saldo belum benar.');
       return;
@@ -770,8 +986,7 @@ export default function PaymentsPage() {
 
     setSubmittingTopup(true);
     try {
-      const normalizedMethod =
-        paymentMethod.trim().toLowerCase() || undefined;
+      const normalizedMethod = paymentMethod.trim().toLowerCase() || undefined;
 
       const body = {
         amount_cents: amountCents,
@@ -809,7 +1024,7 @@ export default function PaymentsPage() {
         topup?.status === 'paid'
           ? 'Isi saldo berhasil masuk ke dompet.'
           : topup?.checkout_url
-            ? 'Transaksi isi saldo dibuat. Instruksi bayar muncul di bawah dan status akan diperbarui otomatis.'
+            ? 'Tagihan dibuat. Instruksi bayar ada di bawah.'
             : 'Transaksi isi saldo dibuat dan sedang menunggu pembayaran.';
 
       setSubmitSuccess(nextText);
@@ -820,7 +1035,11 @@ export default function PaymentsPage() {
         refreshLists(selectedEnvironment, { silent: true }),
       ]);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Gagal membuat transaksi isi saldo.');
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : 'Gagal membuat transaksi isi saldo.',
+      );
     } finally {
       setSubmittingTopup(false);
     }
@@ -843,15 +1062,22 @@ export default function PaymentsPage() {
       setSettlingId(topupId);
       setSubmitError(null);
       try {
-        const res = await authFetch(`/api/wallet/topups/${encodeURIComponent(topupId)}/settle-dev`, {
-          method: 'POST',
-          headers: {
-            'X-Idempotency-Key': createIdempotencyKey('wallet-settle'),
+        const res = await authFetch(
+          `/api/wallet/topups/${encodeURIComponent(topupId)}/settle-dev`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Idempotency-Key': createIdempotencyKey('wallet-settle'),
+            },
           },
-        });
-        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        );
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
         if (!res.ok) {
-          throw new Error(payload.error || 'Gagal menyelesaikan transaksi dev.');
+          throw new Error(
+            payload.error || 'Gagal menyelesaikan transaksi dev.',
+          );
         }
         setSubmitSuccess('Transaksi dev berhasil diselesaikan.');
         await Promise.all([
@@ -859,7 +1085,11 @@ export default function PaymentsPage() {
           refreshLists(selectedEnvironment, { silent: true }),
         ]);
       } catch (error) {
-        setSubmitError(error instanceof Error ? error.message : 'Gagal menyelesaikan transaksi dev.');
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : 'Gagal menyelesaikan transaksi dev.',
+        );
       } finally {
         setSettlingId(null);
       }
@@ -873,15 +1103,22 @@ export default function PaymentsPage() {
       setCancellingId(topupId);
       setSubmitError(null);
       try {
-        const res = await authFetch(`/api/wallet/topups/${encodeURIComponent(topupId)}/cancel`, {
-          method: 'POST',
-          headers: {
-            'X-Idempotency-Key': createIdempotencyKey('wallet-topup-cancel'),
+        const res = await authFetch(
+          `/api/wallet/topups/${encodeURIComponent(topupId)}/cancel`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Idempotency-Key': createIdempotencyKey('wallet-topup-cancel'),
+            },
           },
-        });
-        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        );
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
         if (!res.ok) {
-          throw new Error(payload.error || 'Gagal membatalkan transaksi isi saldo.');
+          throw new Error(
+            payload.error || 'Gagal membatalkan transaksi isi saldo.',
+          );
         }
         setSubmitSuccess('Transaksi isi saldo berhasil dibatalkan.');
         await Promise.all([
@@ -889,7 +1126,11 @@ export default function PaymentsPage() {
           refreshLists(selectedEnvironment, { silent: true }),
         ]);
       } catch (error) {
-        setSubmitError(error instanceof Error ? error.message : 'Gagal membatalkan transaksi isi saldo.');
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : 'Gagal membatalkan transaksi isi saldo.',
+        );
       } finally {
         setCancellingId(null);
       }
@@ -903,12 +1144,15 @@ export default function PaymentsPage() {
       setSyncingId(topupId);
       setSubmitError(null);
       try {
-        const res = await authFetch(`/api/wallet/topups/${encodeURIComponent(topupId)}/sync`, {
-          method: 'POST',
-          headers: {
-            'X-Idempotency-Key': createIdempotencyKey('wallet-topup-sync'),
+        const res = await authFetch(
+          `/api/wallet/topups/${encodeURIComponent(topupId)}/sync`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Idempotency-Key': createIdempotencyKey('wallet-topup-sync'),
+            },
           },
-        });
+        );
         const payload = (await res.json().catch(() => ({}))) as {
           error?: string;
           synced?: boolean;
@@ -916,7 +1160,9 @@ export default function PaymentsPage() {
           topup?: WalletTopup;
         };
         if (!res.ok) {
-          throw new Error(payload.error || 'Gagal menyinkronkan status pembayaran.');
+          throw new Error(
+            payload.error || 'Gagal menyinkronkan status pembayaran.',
+          );
         }
         if (payload.topup && typeof payload.topup === 'object') {
           setLatestTopup(payload.topup);
@@ -931,7 +1177,11 @@ export default function PaymentsPage() {
           refreshLists(selectedEnvironment, { silent: true }),
         ]);
       } catch (error) {
-        setSubmitError(error instanceof Error ? error.message : 'Gagal menyinkronkan status pembayaran.');
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : 'Gagal menyinkronkan status pembayaran.',
+        );
       } finally {
         setSyncingId(null);
       }
@@ -947,7 +1197,9 @@ export default function PaymentsPage() {
     return (
       <div className="mx-auto w-full max-w-2xl px-0 py-6 sm:px-6">
         <div className="ui-feed-section rounded-none border border-x-0 border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6 text-center shadow-sm sm:rounded-2xl sm:border-x">
-          <p className="text-sm text-[color:var(--app-text)]">Login diperlukan untuk mengakses dompet dan isi saldo.</p>
+          <p className="text-sm text-[color:var(--app-text)]">
+            Login diperlukan untuk mengakses dompet dan isi saldo.
+          </p>
         </div>
       </div>
     );
@@ -958,10 +1210,16 @@ export default function PaymentsPage() {
       {redirectBanner || transactionPrefillBanner ? (
         <div className="ui-feed-section border-0 bg-transparent p-0">
           {redirectBanner ? (
-            <p className={`ui-feed-row rounded-2xl border px-3 py-2 text-xs ${redirectBanner.className}`}>{redirectBanner.message}</p>
+            <p
+              className={`ui-feed-row rounded-2xl border px-3 py-2 text-xs ${redirectBanner.className}`}
+            >
+              {redirectBanner.message}
+            </p>
           ) : null}
           {transactionPrefillBanner ? (
-            <p className={`ui-feed-row mt-2 rounded-2xl border px-3 py-2 text-xs ${transactionPrefillBanner.className}`}>
+            <p
+              className={`ui-feed-row mt-2 rounded-2xl border px-3 py-2 text-xs ${transactionPrefillBanner.className}`}
+            >
               {transactionPrefillBanner.message}
             </p>
           ) : null}
@@ -969,36 +1227,57 @@ export default function PaymentsPage() {
       ) : null}
 
       <div className="ui-feed-section hidden border-0 bg-transparent p-0 sm:block">
-        <div className="rounded-[1.5rem] bg-[linear-gradient(155deg,#0f172a_0%,#0f3d68_52%,#0d9488_100%)] p-4 text-white shadow-[0_22px_52px_rgba(15,23,42,0.18)]">
+        <div className="rounded-[1.5rem] bg-[linear-gradient(155deg,#0f1f17_0%,#128a45_52%,#0f766e_100%)] p-4 text-white shadow-[0_22px_52px_rgba(15,23,42,0.18)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-100/90">Isi saldo cepat</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100/90">
+                Isi saldo cepat
+              </p>
               <h1 className="mt-2 text-[1.6rem] font-black tracking-[-0.05em] sm:text-[2.25rem]">
                 Pilih nominal, pilih metode, bayar.
               </h1>
-              <p className="mt-2 text-sm text-cyan-50/88">
-                Flow-nya saya ringkas jadi tiga langkah saja. Yang penting kelihatan dulu, sisanya baru dibuka kalau memang perlu.
+              <p className="mt-2 text-sm text-emerald-50/88">
+                Flow-nya saya ringkas jadi tiga langkah saja. Yang penting
+                kelihatan dulu, sisanya baru dibuka kalau memang perlu.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[31rem]">
               <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/80">1. Dompet</p>
-                <p className="mt-1 text-sm font-bold text-white">
-                  {selectedEnvironment === 'live' ? 'Saldo utama' : 'Mode coba dulu'}
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
+                  1. Dompet
                 </p>
-                <p className="mt-1 text-[11px] text-cyan-50/80">Pilih tujuan saldo sebelum bikin tagihan.</p>
+                <p className="mt-1 text-sm font-bold text-white">
+                  {selectedEnvironment === 'live'
+                    ? 'Saldo utama'
+                    : 'Mode coba dulu'}
+                </p>
+                <p className="mt-1 text-[11px] text-emerald-50/80">
+                  Pilih tujuan saldo sebelum bikin tagihan.
+                </p>
               </div>
               <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/80">2. Nominal</p>
-                <p className="mt-1 text-sm font-bold text-white">
-                  {normalizedAmountMajor > 0 ? moneyFromCents(estimatedTopupCents, selectedCurrency) : 'Isi nominal'}
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
+                  2. Nominal
                 </p>
-                <p className="mt-1 text-[11px] text-cyan-50/80">Bisa pilih preset atau ketik sendiri.</p>
+                <p className="mt-1 text-sm font-bold text-white">
+                  {normalizedAmountMajor > 0
+                    ? moneyFromCents(estimatedTopupCents, selectedCurrency)
+                    : 'Isi nominal'}
+                </p>
+                <p className="mt-1 text-[11px] text-emerald-50/80">
+                  Bisa pilih preset atau ketik sendiri.
+                </p>
               </div>
               <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/80">3. Bayar</p>
-                <p className="mt-1 text-sm font-bold text-white">{paymentMethodDisplayLabel(paymentMethod)}</p>
-                <p className="mt-1 text-[11px] text-cyan-50/80">{paymentMethodNextStep(paymentMethod)}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
+                  3. Bayar
+                </p>
+                <p className="mt-1 text-sm font-bold text-white">
+                  {paymentMethodDisplayLabel(paymentMethod)}
+                </p>
+                <p className="mt-1 text-[11px] text-emerald-50/80">
+                  {paymentMethodNextStep(paymentMethod)}
+                </p>
               </div>
             </div>
           </div>
@@ -1006,35 +1285,58 @@ export default function PaymentsPage() {
           {loadingBalances ? (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
-                <div key={index} className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
+                <div
+                  key={index}
+                  className="rounded-[1rem] border border-white/12 bg-white/10 p-3"
+                >
                   <Skeleton className="h-3 w-24 bg-white/20" />
                   <Skeleton className="mt-2 h-7 w-28 bg-white/20" />
                 </div>
               ))}
             </div>
           ) : balanceError ? (
-            <p className="mt-3 rounded-[1rem] border border-white/18 bg-white/10 px-4 py-3 text-sm text-rose-100">{balanceError}</p>
+            <p className="mt-3 rounded-[1rem] border border-white/18 bg-white/10 px-4 py-3 text-sm text-rose-100">
+              {balanceError}
+            </p>
           ) : (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/80">Saldo sekarang</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
+                  Saldo sekarang
+                </p>
                 <p className="mt-1.5 text-lg font-black text-white sm:text-xl">
-                  {moneyFromCents(selectedAccount?.available_balance_cents || 0, selectedAccount?.currency || 'IDR')}
+                  {moneyFromCents(
+                    selectedAccount?.available_balance_cents || 0,
+                    selectedAccount?.currency || 'IDR',
+                  )}
                 </p>
               </div>
               <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/80">Akan masuk ke</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
+                  Akan masuk ke
+                </p>
                 <p className="mt-1.5 text-sm font-bold text-white">
-                  {selectedEnvironment === 'live' ? 'Saldo utama' : 'Saldo simulasi'}
+                  {selectedEnvironment === 'live'
+                    ? 'Saldo utama'
+                    : 'Saldo simulasi'}
                 </p>
-                <p className="mt-1 text-[11px] text-cyan-50/80">
-                  Ditahan {moneyFromCents(selectedAccount?.held_balance_cents || 0, selectedAccount?.currency || 'IDR')}
+                <p className="mt-1 text-[11px] text-emerald-50/80">
+                  Ditahan{' '}
+                  {moneyFromCents(
+                    selectedAccount?.held_balance_cents || 0,
+                    selectedAccount?.currency || 'IDR',
+                  )}
                 </p>
               </div>
               <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/80">Perkiraan setelah isi</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
+                  Perkiraan setelah isi
+                </p>
                 <p className="mt-1.5 text-lg font-black text-white sm:text-xl">
-                  {moneyFromCents(projectedAvailableBalanceCents, selectedAccount?.currency || selectedCurrency)}
+                  {moneyFromCents(
+                    projectedAvailableBalanceCents,
+                    selectedAccount?.currency || selectedCurrency,
+                  )}
                 </p>
               </div>
             </div>
@@ -1043,11 +1345,15 @@ export default function PaymentsPage() {
       </div>
 
       <div className="hidden">
-        <div className="rounded-[1.35rem] bg-[linear-gradient(155deg,#0f172a_0%,#0f3d68_52%,#0d9488_100%)] p-3.5 text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
+        <div className="rounded-[1.35rem] bg-[linear-gradient(155deg,#0f1f17_0%,#128a45_52%,#0f766e_100%)] p-3.5 text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/90">Payments</p>
-              <h1 className="mt-1 text-[1.35rem] font-black tracking-[-0.05em]">Bayar cepat</h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/90">
+                Payments
+              </p>
+              <h1 className="mt-1 text-[1.35rem] font-black tracking-[-0.05em]">
+                Bayar cepat
+              </h1>
             </div>
             <button
               type="button"
@@ -1055,22 +1361,27 @@ export default function PaymentsPage() {
                 void loadBalances();
                 void refreshLists(selectedEnvironment);
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-cyan-50"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-emerald-50"
               aria-label="Muat ulang saldo"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-cyan-50">
-              {selectedEnvironment === 'live' ? 'Saldo utama' : 'Mode coba dulu'}
+            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-emerald-50">
+              {selectedEnvironment === 'live'
+                ? 'Saldo utama'
+                : 'Mode coba dulu'}
             </span>
-            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-cyan-50">
+            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-emerald-50">
               {loadingBalances
                 ? 'Memuat saldo...'
-                : moneyFromCents(selectedAccount?.available_balance_cents || 0, selectedAccount?.currency || 'IDR')}
+                : moneyFromCents(
+                    selectedAccount?.available_balance_cents || 0,
+                    selectedAccount?.currency || 'IDR',
+                  )}
             </span>
-            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-cyan-50">
+            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-emerald-50">
               {paymentMethodDisplayLabel(paymentMethod)}
             </span>
           </div>
@@ -1083,13 +1394,20 @@ export default function PaymentsPage() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-                  {actionableTopup.status === 'pending' ? 'Bayar sekarang' : 'Pembayaran terakhir'}
+                  {actionableTopup.status === 'pending'
+                    ? 'Bayar sekarang'
+                    : 'Pembayaran terakhir'}
                 </p>
                 <p className="mt-1 text-sm font-black text-[color:var(--app-text)]">
-                  {moneyFromCents(actionableTopup.amount_cents, actionableTopup.currency)}
+                  {moneyFromCents(
+                    actionableTopup.amount_cents,
+                    actionableTopup.currency,
+                  )}
                 </p>
               </div>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${topupStatusClass(actionableTopup.status)}`}>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold ${topupStatusClass(actionableTopup.status)}`}
+              >
                 {(() => {
                   const StatusIcon = topupStatusIcon(actionableTopup.status);
                   return <StatusIcon className="h-3 w-3" />;
@@ -1110,12 +1428,21 @@ export default function PaymentsPage() {
             {actionableReference && !actionableTopup.checkout_url ? (
               <div className="mt-2 flex items-center justify-between gap-2 rounded-[0.9rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2.5 py-2">
                 <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">{actionableReference.label}</p>
-                  <p className="truncate font-mono text-[11px] font-semibold text-[color:var(--app-text)]">{actionableReference.value}</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                    {actionableReference.label}
+                  </p>
+                  <p className="truncate font-mono text-[11px] font-semibold text-[color:var(--app-text)]">
+                    {actionableReference.value}
+                  </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => void copyInstructionValue(actionableReference.label, actionableReference.value)}
+                  onClick={() =>
+                    void copyInstructionValue(
+                      actionableReference.label,
+                      actionableReference.value,
+                    )
+                  }
                   className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-2 py-1 text-[9px] font-semibold text-[color:var(--app-info)]"
                 >
                   <Copy className="h-3 w-3" />
@@ -1135,14 +1462,19 @@ export default function PaymentsPage() {
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
               ) : null}
-              {actionableTopup.status === 'pending' && actionableTopup.payment_provider === 'midtrans' ? (
+              {actionableTopup.status === 'pending' &&
+              actionableTopup.payment_provider === 'midtrans' ? (
                 <button
                   type="button"
                   onClick={() => void syncTopupStatus(actionableTopup.id)}
                   disabled={syncingId === actionableTopup.id}
                   className="inline-flex items-center justify-center gap-1 rounded-[0.95rem] bg-[color:var(--app-surface-muted)] px-3 py-2.5 text-[11px] font-semibold text-[color:var(--app-text)] disabled:opacity-50"
                 >
-                  {syncingId === actionableTopup.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                  {syncingId === actionableTopup.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCcw className="h-3.5 w-3.5" />
+                  )}
                   Cek
                 </button>
               ) : (
@@ -1161,18 +1493,23 @@ export default function PaymentsPage() {
         <div className="rounded-[1.05rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-black text-[color:var(--app-text)]">Isi saldo</h2>
+              <h2 className="text-sm font-black text-[color:var(--app-text)]">
+                Isi saldo
+              </h2>
             </div>
             <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
               {loadingBalances
                 ? 'Memuat...'
-                : moneyFromCents(selectedAccount?.available_balance_cents || 0, selectedAccount?.currency || 'IDR')}
+                : moneyFromCents(
+                    selectedAccount?.available_balance_cents || 0,
+                    selectedAccount?.currency || 'IDR',
+                  )}
             </span>
           </div>
 
           {envOptions.length > 1 ? (
             <div className="mt-2 grid grid-cols-2 gap-1">
-              {envOptions.map((env) => (
+              {envOptions.map(env => (
                 <button
                   key={env}
                   type="button"
@@ -1189,29 +1526,34 @@ export default function PaymentsPage() {
             </div>
           ) : null}
 
-          {balances && selectedEnvironment === 'live' && !balances.live_enabled ? (
+          {balances &&
+          selectedEnvironment === 'live' &&
+          !balances.live_enabled ? (
             <p className="mt-2 rounded-[0.9rem] border border-[color:color-mix(in_srgb,_var(--app-warning-border)_30%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] px-2.5 py-2 text-[11px] text-[color:var(--app-warning)]">
               Saldo utama belum aktif.
             </p>
           ) : null}
 
-          <p className="mt-3 text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">Nominal</p>
-          <div className="mt-1.5 flex items-center gap-2 rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-3 py-2.5">
-            <span className="text-sm font-black text-[color:var(--app-accent)]">Rp</span>
+          <p className={`mt-3 ${PAYMENT_FIELD_LABEL_CLASS}`}>Nominal</p>
+          <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
+            <span className="text-sm font-black text-[color:var(--app-accent)]">
+              Rp
+            </span>
             <input
               type="number"
               min={1}
               inputMode="numeric"
               value={amountMajor}
-              onChange={(event) => setAmountMajor(event.target.value)}
-              className="w-full bg-transparent text-[1.15rem] font-black tracking-[-0.03em] text-[color:var(--app-text)] outline-none"
+              onChange={event => setAmountMajor(event.target.value)}
+              className={PAYMENT_AMOUNT_INPUT_CLASS}
               placeholder="50000"
+              aria-label="Nominal top up"
             />
           </div>
 
           {selectedCurrency === 'IDR' ? (
             <div className="mt-2 -mx-0.5 flex gap-1 overflow-x-auto px-0.5 pb-1">
-              {TOPUP_PRESETS_IDR.map((preset) => {
+              {TOPUP_PRESETS_IDR.map(preset => {
                 const active = normalizedAmountMajor === preset;
                 return (
                   <button
@@ -1231,9 +1573,9 @@ export default function PaymentsPage() {
             </div>
           ) : null}
 
-          <p className="mt-3 text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">Metode</p>
+          <p className={`mt-3 ${PAYMENT_FIELD_LABEL_CLASS}`}>Metode</p>
           <div className="mt-1.5 grid grid-cols-3 gap-1">
-            {mobileMethods.map((method) => {
+            {mobileMethods.map(method => {
               const active = paymentMethod === method.value;
               return (
                 <button
@@ -1266,23 +1608,33 @@ export default function PaymentsPage() {
           <button
             type="button"
             onClick={() => void submitTopup()}
-            disabled={submittingTopup || (selectedEnvironment === 'live' && !balances?.live_enabled)}
+            disabled={
+              submittingTopup ||
+              (selectedEnvironment === 'live' && !balances?.live_enabled)
+            }
             className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[0.95rem] bg-[color:var(--app-accent)] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)] disabled:opacity-50"
           >
-            {submittingTopup ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
+            {submittingTopup ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowUpRight className="h-4 w-4" />
+            )}
             {submittingTopup ? 'Menyiapkan...' : 'Bayar sekarang'}
           </button>
         </div>
 
         <DetailAccordion
           title="Riwayat"
-          description="Kalau perlu cek pembayaran lama."
+          description="Cek yang lama."
           className="hidden"
         >
           {topupsLoading ? (
             <div className="mt-3 space-y-2">
               {Array.from({ length: 2 }).map((_, index) => (
-                <div key={index} className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <div
+                  key={index}
+                  className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3"
+                >
                   <Skeleton className="h-4 w-28" />
                   <Skeleton className="mt-2 h-3 w-20" />
                 </div>
@@ -1298,20 +1650,26 @@ export default function PaymentsPage() {
             </p>
           ) : (
             <div className="mt-3 space-y-2">
-              {recentTopups.map((topup) => (
-                <div key={topup.id} className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+              {recentTopups.map(topup => (
+                <div
+                  key={topup.id}
+                  className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-black text-[color:var(--app-accent)]">
                       {moneyFromCents(topup.amount_cents, topup.currency)}
                     </p>
-                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${topupStatusClass(topup.status)}`}>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${topupStatusClass(topup.status)}`}
+                    >
                       {topupStatusLabel(topup.status)}
                     </span>
                   </div>
                   <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
-                    {paymentMethodDisplayLabel(topup.payment_method)} • {dateTimeLabel(topup.created_at)}
+                    {paymentMethodDisplayLabel(topup.payment_method)} •{' '}
+                    {dateTimeLabel(topup.created_at)}
                   </p>
-                  {(topup.checkout_url || topup.status === 'pending') ? (
+                  {topup.checkout_url || topup.status === 'pending' ? (
                     <div className="mt-2 flex gap-2">
                       <button
                         type="button"
@@ -1351,7 +1709,7 @@ export default function PaymentsPage() {
                 Tiga langkah, selesai.
               </h2>
               <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                Fokus ke yang wajib dulu. Riwayat dan pengaturan tambahan saya simpan di panel bawah.
+                Isi yang wajib dulu.
               </p>
             </div>
             <button
@@ -1376,7 +1734,9 @@ export default function PaymentsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-black text-[color:var(--app-text)]">Pilih dompet tujuan</p>
+                      <p className="text-sm font-black text-[color:var(--app-text)]">
+                        Pilih dompet tujuan
+                      </p>
                       <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
                         {selectedEnvironment === 'live'
                           ? 'Saldo ini dipakai untuk transaksi asli.'
@@ -1385,11 +1745,13 @@ export default function PaymentsPage() {
                     </div>
                     <span className="inline-flex items-center rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                       <Wallet className="mr-1.5 h-3.5 w-3.5" />
-                      {selectedEnvironment === 'live' ? 'Saldo utama' : 'Mode coba dulu'}
+                      {selectedEnvironment === 'live'
+                        ? 'Saldo utama'
+                        : 'Mode coba dulu'}
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {envOptions.map((env) => (
+                    {envOptions.map(env => (
                       <button
                         key={env}
                         type="button"
@@ -1411,10 +1773,22 @@ export default function PaymentsPage() {
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
                     <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[color:var(--app-text-soft)]">
-                      Saldo {loadingBalances ? 'memuat...' : moneyFromCents(selectedAccount?.available_balance_cents || 0, selectedAccount?.currency || 'IDR')}
+                      Saldo{' '}
+                      {loadingBalances
+                        ? 'memuat...'
+                        : moneyFromCents(
+                            selectedAccount?.available_balance_cents || 0,
+                            selectedAccount?.currency || 'IDR',
+                          )}
                     </span>
                     <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[color:var(--app-text-soft)]">
-                      Total isi {loadingBalances ? 'memuat...' : moneyFromCents(selectedAccount?.total_topup_cents || 0, selectedAccount?.currency || 'IDR')}
+                      Total isi{' '}
+                      {loadingBalances
+                        ? 'memuat...'
+                        : moneyFromCents(
+                            selectedAccount?.total_topup_cents || 0,
+                            selectedAccount?.currency || 'IDR',
+                          )}
                     </span>
                   </div>
                 </div>
@@ -1427,20 +1801,27 @@ export default function PaymentsPage() {
                   2
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-black text-[color:var(--app-text)]">Tentukan nominal</p>
-                  <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
-                    Pilih nominal populer atau ketik sesuai kebutuhanmu.
+                  <p className="text-sm font-black text-[color:var(--app-text)]">
+                    Tentukan nominal
                   </p>
-                  <div className="mt-3 flex items-center gap-2.5 rounded-[1.1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 py-3">
-                    <span className="text-lg font-black text-[color:var(--app-accent)]">Rp</span>
+                  <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
+                    Pilih nominal atau ketik.
+                  </p>
+                  <div
+                    className={`${PAYMENT_AMOUNT_FIELD_CLASS} sm:min-h-[62px] sm:px-4`}
+                  >
+                    <span className="text-lg font-black text-[color:var(--app-accent)]">
+                      Rp
+                    </span>
                     <input
                       type="number"
                       min={1}
                       inputMode="numeric"
                       value={amountMajor}
-                      onChange={(event) => setAmountMajor(event.target.value)}
-                      className="w-full bg-transparent text-[1.5rem] font-black tracking-[-0.04em] text-[color:var(--app-text)] outline-none placeholder:text-[color:color-mix(in_srgb,var(--app-text-soft)_70%,transparent)] sm:text-[1.9rem]"
+                      onChange={event => setAmountMajor(event.target.value)}
+                      className={`${PAYMENT_AMOUNT_INPUT_CLASS} sm:text-[1.9rem]`}
                       placeholder="100000"
+                      aria-label="Nominal top up"
                     />
                     <span className="inline-flex rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                       {selectedCurrency}
@@ -1448,7 +1829,7 @@ export default function PaymentsPage() {
                   </div>
                   {selectedCurrency === 'IDR' ? (
                     <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
-                      {TOPUP_PRESETS_IDR.map((preset) => {
+                      {TOPUP_PRESETS_IDR.map(preset => {
                         const active = normalizedAmountMajor === preset;
                         return (
                           <button
@@ -1461,7 +1842,9 @@ export default function PaymentsPage() {
                                 : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]'
                             }`}
                           >
-                            <p className="text-[11px] font-black sm:text-sm">Rp {preset.toLocaleString('id-ID')}</p>
+                            <p className="text-[11px] font-black sm:text-sm">
+                              Rp {preset.toLocaleString('id-ID')}
+                            </p>
                           </button>
                         );
                       })}
@@ -1479,9 +1862,11 @@ export default function PaymentsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-black text-[color:var(--app-text)]">Pilih metode bayar</p>
+                      <p className="text-sm font-black text-[color:var(--app-text)]">
+                        Pilih metode bayar
+                      </p>
                       <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
-                        Saya tampilkan yang paling sering dipakai dulu.
+                        Yang sering dipakai dulu.
                       </p>
                     </div>
                     <span className="inline-flex rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1489,8 +1874,11 @@ export default function PaymentsPage() {
                     </span>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-1.5">
-                    {quickMethods.map((method) => {
-                      const MethodChoiceIcon = paymentMethodIcon(method.value, method.value);
+                    {quickMethods.map(method => {
+                      const MethodChoiceIcon = paymentMethodIcon(
+                        method.value,
+                        method.value,
+                      );
                       const active = paymentMethod === method.value;
                       return (
                         <button
@@ -1506,7 +1894,10 @@ export default function PaymentsPage() {
                           <div className="flex items-center gap-2">
                             <div className="relative h-10 w-10 shrink-0">
                               <Image
-                                src={method.image || '/images/payments/bank-transfer.svg'}
+                                src={
+                                  method.image ||
+                                  '/images/payments/bank-transfer.svg'
+                                }
                                 alt={method.label}
                                 width={44}
                                 height={44}
@@ -1533,11 +1924,11 @@ export default function PaymentsPage() {
                   {secondaryMethods.length ? (
                     <DetailAccordion
                       title="Metode lain"
-                      description="Buka kalau metode favoritmu belum ada di atas."
+                      description="Kalau belum ada di atas."
                       className="mt-3 rounded-[1rem] p-2.5"
                     >
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {secondaryMethods.map((method) => {
+                        {secondaryMethods.map(method => {
                           const active = paymentMethod === method.value;
                           return (
                             <button
@@ -1553,7 +1944,9 @@ export default function PaymentsPage() {
                               <p className="text-[12px] font-semibold text-[color:var(--app-text)]">
                                 {paymentMethodDisplayLabel(method.value)}
                               </p>
-                              <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">{method.hint}</p>
+                              <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                                {method.hint}
+                              </p>
                             </button>
                           );
                         })}
@@ -1562,8 +1955,12 @@ export default function PaymentsPage() {
                   ) : null}
 
                   <div className="mt-3 rounded-[1rem] border border-[color:color-mix(in_srgb,_var(--app-info-border)_24%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] px-3 py-2.5 text-sm text-[color:var(--app-info)]">
-                    <p className="font-semibold">{paymentMethodDisplayLabel(paymentMethod)}</p>
-                    <p className="mt-1 text-[12px]">{selectedMethodMeta.hint}</p>
+                    <p className="font-semibold">
+                      {paymentMethodDisplayLabel(paymentMethod)}
+                    </p>
+                    <p className="mt-1 text-[12px]">
+                      {selectedMethodMeta.hint}
+                    </p>
                     <p className="mt-1 text-[12px]">{selectedMethodNextStep}</p>
                   </div>
                 </div>
@@ -1587,21 +1984,34 @@ export default function PaymentsPage() {
 
               <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                 <div className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">Isi saldo</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                    Isi saldo
+                  </p>
                   <p className="mt-1.5 text-base font-black text-[color:var(--app-text)]">
-                    {normalizedAmountMajor > 0 ? moneyFromCents(estimatedTopupCents, selectedCurrency) : 'Isi nominal dulu'}
+                    {normalizedAmountMajor > 0
+                      ? moneyFromCents(estimatedTopupCents, selectedCurrency)
+                      : 'Isi nominal dulu'}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">Masuk ke</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                    Masuk ke
+                  </p>
                   <p className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
-                    {selectedEnvironment === 'live' ? 'Saldo utama' : 'Saldo simulasi'}
+                    {selectedEnvironment === 'live'
+                      ? 'Saldo utama'
+                      : 'Saldo simulasi'}
                   </p>
                 </div>
                 <div className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">Setelah berhasil</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                    Setelah berhasil
+                  </p>
                   <p className="mt-1.5 text-sm font-bold text-[color:var(--app-accent)]">
-                    {moneyFromCents(projectedAvailableBalanceCents, selectedAccount?.currency || selectedCurrency)}
+                    {moneyFromCents(
+                      projectedAvailableBalanceCents,
+                      selectedAccount?.currency || selectedCurrency,
+                    )}
                   </p>
                 </div>
               </div>
@@ -1620,11 +2030,18 @@ export default function PaymentsPage() {
               <button
                 type="button"
                 onClick={() => void submitTopup()}
-                disabled={submittingTopup || (selectedEnvironment === 'live' && !balances?.live_enabled)}
+                disabled={
+                  submittingTopup ||
+                  (selectedEnvironment === 'live' && !balances?.live_enabled)
+                }
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 py-3 text-sm font-semibold text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_color-mix(in_srgb,var(--app-accent)_26%,transparent)] hover:bg-[color:var(--app-accent-strong)] disabled:opacity-50"
               >
-                {submittingTopup ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpRight className="h-4 w-4" />}
-                {submittingTopup ? 'Menyiapkan pembayaran...' : 'Buat tagihan & lanjut bayar'}
+                {submittingTopup ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUpRight className="h-4 w-4" />
+                )}
+                {submittingTopup ? 'Menyiapkan...' : 'Buat tagihan'}
               </button>
             </div>
 
@@ -1633,14 +2050,14 @@ export default function PaymentsPage() {
                 Dibuat otomatis
               </p>
               <p className="mt-2 text-[color:var(--app-text)]">
-                Catatan pembayaran saya isi otomatis dan mata uang tetap {selectedCurrency}.
+                Catatan otomatis. Mata uang {selectedCurrency}.
               </p>
               <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
                 {resolvedDescription}
               </p>
               {selectedEnvironment === 'development' ? (
                 <p className="mt-2 text-[12px] text-[color:var(--app-text-soft)]">
-                  Mode coba dulu tetap mengikuti alur pembayaran, jadi aman dipakai untuk cek flow.
+                  Mode coba aman untuk cek flow.
                 </p>
               ) : null}
             </div>
@@ -1654,17 +2071,23 @@ export default function PaymentsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                      {actionableTopup.status === 'pending' ? 'Lanjutkan pembayaran' : 'Top up terakhir'}
+                      {actionableTopup.status === 'pending'
+                        ? 'Lanjutkan pembayaran'
+                        : 'Top up terakhir'}
                     </p>
                     <h2 className="mt-1.5 text-base font-black tracking-[-0.03em] text-[color:var(--app-text)]">
                       {actionableTopup.status === 'pending'
-                        ? 'Pembayaran aktif selalu saya taruh di depan.'
-                        : 'Status terakhir tetap kelihatan jelas.'}
+                        ? 'Pembayaran aktif ada di atas.'
+                        : 'Status terakhir kelihatan.'}
                     </h2>
                   </div>
-                  <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${topupStatusClass(actionableTopup.status)}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${topupStatusClass(actionableTopup.status)}`}
+                  >
                     {(() => {
-                      const StatusIcon = topupStatusIcon(actionableTopup.status);
+                      const StatusIcon = topupStatusIcon(
+                        actionableTopup.status,
+                      );
                       return <StatusIcon className="h-3.5 w-3.5" />;
                     })()}
                     {topupStatusLabel(actionableTopup.status)}
@@ -1672,21 +2095,33 @@ export default function PaymentsPage() {
                 </div>
 
                 <div className="mt-3 rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">Nominal</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                    Nominal
+                  </p>
                   <p className="mt-1.5 text-lg font-black text-[color:var(--app-text)]">
-                    {moneyFromCents(actionableTopup.amount_cents, actionableTopup.currency)}
+                    {moneyFromCents(
+                      actionableTopup.amount_cents,
+                      actionableTopup.currency,
+                    )}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-[color:var(--app-text-soft)]">
                     <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">
-                      {paymentMethodDisplayLabel(actionableTopup.payment_method)}
+                      {paymentMethodDisplayLabel(
+                        actionableTopup.payment_method,
+                      )}
                     </span>
                     <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">
-                      {actionableTopup.environment === 'live' ? 'Masuk ke saldo utama' : 'Masuk ke saldo simulasi'}
+                      {actionableTopup.environment === 'live'
+                        ? 'Masuk ke saldo utama'
+                        : 'Masuk ke saldo simulasi'}
                     </span>
                   </div>
                   <p className="mt-2 text-[12px] text-[color:var(--app-text-soft)]">
                     {actionableTopup.status === 'pending'
-                      ? paymentMethodNextStep(actionableTopup.payment_method || actionableInstruction?.paymentType)
+                      ? paymentMethodNextStep(
+                          actionableTopup.payment_method ||
+                            actionableInstruction?.paymentType,
+                        )
                       : actionableTopup.status === 'paid'
                         ? `Terbayar ${dateTimeLabel(actionableTopup.paid_at || actionableTopup.updated_at)}`
                         : `Status update ${dateTimeLabel(actionableTopup.updated_at)}`}
@@ -1694,13 +2129,16 @@ export default function PaymentsPage() {
                   {actionableDueAt ? (
                     <p
                       className={`mt-2 text-[12px] ${
-                        actionableTopup.status === 'pending' && actionableDueAt.getTime() <= nowMs
+                        actionableTopup.status === 'pending' &&
+                        actionableDueAt.getTime() <= nowMs
                           ? 'text-[color:var(--app-danger)]'
                           : 'text-[color:var(--app-warning)]'
                       }`}
                     >
                       Batas bayar {dateTimeLabel(actionableDueAt.toISOString())}
-                      {actionableTopup.status === 'pending' ? ` | ${remainingCountdownLabel(actionableDueAt, nowMs)}` : ''}
+                      {actionableTopup.status === 'pending'
+                        ? ` | ${remainingCountdownLabel(actionableDueAt, nowMs)}`
+                        : ''}
                     </p>
                   ) : null}
                 </div>
@@ -1716,7 +2154,12 @@ export default function PaymentsPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => void copyInstructionValue(actionableReference.label, actionableReference.value)}
+                        onClick={() =>
+                          void copyInstructionValue(
+                            actionableReference.label,
+                            actionableReference.value,
+                          )
+                        }
                         className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)]"
                       >
                         <Copy className="h-3 w-3" />
@@ -1728,16 +2171,28 @@ export default function PaymentsPage() {
 
                 <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                   <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">1</p>
-                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">Buka halaman pembayaran atau detail.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      1
+                    </p>
+                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">
+                      Buka pembayaran.
+                    </p>
                   </div>
                   <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">2</p>
-                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">Selesaikan bayar sesuai metode yang dipilih.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      2
+                    </p>
+                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">
+                      Bayar sesuai metode.
+                    </p>
                   </div>
                   <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">3</p>
-                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">Saldo akan diperbarui otomatis setelah sukses.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      3
+                    </p>
+                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">
+                      Saldo masuk otomatis.
+                    </p>
                   </div>
                 </div>
 
@@ -1747,7 +2202,7 @@ export default function PaymentsPage() {
                     onClick={() => setDetailTopup(actionableTopup)}
                     className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)]"
                   >
-                    Lihat detail bayar
+                    Detail bayar
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   </button>
                   {actionableTopup.checkout_url ? (
@@ -1761,15 +2216,26 @@ export default function PaymentsPage() {
                       <ArrowUpRight className="h-3.5 w-3.5" />
                     </a>
                   ) : null}
-                  {actionableTopup.status === 'pending' && actionableTopup.payment_provider === 'midtrans' ? (
+                  {actionableTopup.status === 'pending' &&
+                  actionableTopup.payment_provider === 'midtrans' ? (
                     <button
                       type="button"
                       onClick={() => void syncTopupStatus(actionableTopup.id)}
-                      disabled={syncingId === actionableTopup.id || cancellingId === actionableTopup.id || settlingId === actionableTopup.id}
+                      disabled={
+                        syncingId === actionableTopup.id ||
+                        cancellingId === actionableTopup.id ||
+                        settlingId === actionableTopup.id
+                      }
                       className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)] disabled:opacity-50"
                     >
-                      {syncingId === actionableTopup.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                      {syncingId === actionableTopup.id ? 'Menyinkronkan...' : 'Cek status'}
+                      {syncingId === actionableTopup.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCcw className="h-3.5 w-3.5" />
+                      )}
+                      {syncingId === actionableTopup.id
+                        ? 'Menyinkronkan...'
+                        : 'Cek status'}
                     </button>
                   ) : null}
                 </div>
@@ -1777,23 +2243,35 @@ export default function PaymentsPage() {
             ) : (
               <>
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                  Belum ada pembayaran aktif
+                  Belum ada yang aktif
                 </p>
                 <h2 className="mt-1.5 text-base font-black tracking-[-0.03em] text-[color:var(--app-text)]">
-                  Begitu bikin tagihan, statusnya muncul di sini.
+                  Tagihan baru muncul di sini.
                 </h2>
                 <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                   <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">1</p>
-                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">Pilih nominal dan metode di panel kiri.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      1
+                    </p>
+                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">
+                      Pilih nominal.
+                    </p>
                   </div>
                   <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">2</p>
-                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">Tekan tombol bayar untuk membuat tagihan.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      2
+                    </p>
+                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">
+                      Tekan buat tagihan.
+                    </p>
                   </div>
                   <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">3</p>
-                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">Selesaikan pembayaran, lalu saldo masuk otomatis.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      3
+                    </p>
+                    <p className="mt-1 text-[12px] text-[color:var(--app-text)]">
+                      Bayar. Saldo masuk.
+                    </p>
                   </div>
                 </div>
               </>
@@ -1802,7 +2280,7 @@ export default function PaymentsPage() {
 
           <DetailAccordion
             title="Riwayat isi saldo"
-            description="Buka kalau perlu cek transaksi lama atau lanjutkan pembayaran yang lain."
+            description="Cek top up lama."
             className="rounded-[1.35rem] p-3.5 shadow-[0_14px_38px_rgba(15,23,42,0.08)]"
           >
             {topupsLoading ? (
@@ -1830,25 +2308,33 @@ export default function PaymentsPage() {
               </p>
             ) : (
               <div className="mt-2.5 space-y-1.5 max-h-[23rem] overflow-auto pr-1">
-                {topups.map((topup) => {
+                {topups.map(topup => {
                   const dueAt = parseTopupPaymentDueAt(topup);
                   const isPending = topup.status === 'pending';
                   const isOverdue = Boolean(dueAt && dueAt.getTime() <= nowMs);
                   const instruction = extractPaymentInstructionView(topup);
-                  const hasInstruction = hasPaymentInstructionData(topup, instruction);
+                  const hasInstruction = hasPaymentInstructionData(
+                    topup,
+                    instruction,
+                  );
                   const StatusIcon = topupStatusIcon(topup.status);
                   const MethodIcon = paymentMethodIcon(
                     topup.payment_method,
                     instruction?.paymentType,
                   );
                   return (
-                    <div key={topup.id} className="ui-feed-row rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
+                    <div
+                      key={topup.id}
+                      className="ui-feed-row rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="inline-flex items-center gap-1.5 text-[13px] font-black text-[color:var(--app-accent)] sm:text-sm">
                           <MethodIcon className="h-4 w-4 text-[color:var(--app-info)]" />
                           {moneyFromCents(topup.amount_cents, topup.currency)}
                         </p>
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${topupStatusClass(topup.status)}`}>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${topupStatusClass(topup.status)}`}
+                        >
                           <StatusIcon className="h-3.5 w-3.5" />
                           {topupStatusLabel(topup.status)}
                         </span>
@@ -1857,12 +2343,17 @@ export default function PaymentsPage() {
                       <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-[color:var(--app-text-soft)]">
                         {topup.payment_method ? (
                           <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">
-                            metode: {paymentMethodDisplayLabel(topup.payment_method)}
+                            metode:{' '}
+                            {paymentMethodDisplayLabel(topup.payment_method)}
                           </span>
                         ) : null}
-                        <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">{dateTimeLabel(topup.created_at)}</span>
+                        <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">
+                          {dateTimeLabel(topup.created_at)}
+                        </span>
                         {topup.external_reference ? (
-                          <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">{topup.external_reference}</span>
+                          <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">
+                            {topup.external_reference}
+                          </span>
                         ) : null}
                       </div>
                       <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
@@ -1875,15 +2366,21 @@ export default function PaymentsPage() {
                       {dueAt && (
                         <p
                           className={`mt-1 text-[11px] ${
-                            isPending && isOverdue ? 'text-[color:var(--app-danger)]' : 'text-[color:var(--app-warning)]'
+                            isPending && isOverdue
+                              ? 'text-[color:var(--app-danger)]'
+                              : 'text-[color:var(--app-warning)]'
                           }`}
                         >
                           Batas bayar {dateTimeLabel(dueAt.toISOString())}
-                          {isPending ? ` | ${remainingCountdownLabel(dueAt, nowMs)}` : ''}
+                          {isPending
+                            ? ` | ${remainingCountdownLabel(dueAt, nowMs)}`
+                            : ''}
                         </p>
                       )}
 
-                      {(topup.checkout_url || topup.status === 'pending' || hasInstruction) && (
+                      {(topup.checkout_url ||
+                        topup.status === 'pending' ||
+                        hasInstruction) && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           <button
                             type="button"
@@ -1912,23 +2409,41 @@ export default function PaymentsPage() {
                             <button
                               type="button"
                               onClick={() => void settleDevTopup(topup.id)}
-                              disabled={settlingId === topup.id || cancellingId === topup.id}
+                              disabled={
+                                settlingId === topup.id ||
+                                cancellingId === topup.id
+                              }
                               className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:opacity-50"
                             >
-                              {settlingId === topup.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                              {settlingId === topup.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              )}
                               Selesaikan dev
                             </button>
                           ) : null}
 
-                          {topup.status === 'pending' && topup.payment_provider === 'midtrans' ? (
+                          {topup.status === 'pending' &&
+                          topup.payment_provider === 'midtrans' ? (
                             <button
                               type="button"
                               onClick={() => void syncTopupStatus(topup.id)}
-                              disabled={syncingId === topup.id || cancellingId === topup.id || settlingId === topup.id}
+                              disabled={
+                                syncingId === topup.id ||
+                                cancellingId === topup.id ||
+                                settlingId === topup.id
+                              }
                               className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)] disabled:opacity-50"
                             >
-                              {syncingId === topup.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                              {syncingId === topup.id ? 'Menyinkronkan...' : 'Sinkronkan status'}
+                              {syncingId === topup.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCcw className="h-3.5 w-3.5" />
+                              )}
+                              {syncingId === topup.id
+                                ? 'Menyinkronkan...'
+                                : 'Sinkronkan status'}
                             </button>
                           ) : null}
 
@@ -1936,11 +2451,21 @@ export default function PaymentsPage() {
                             <button
                               type="button"
                               onClick={() => void cancelTopup(topup.id)}
-                              disabled={cancellingId === topup.id || settlingId === topup.id || syncingId === topup.id}
+                              disabled={
+                                cancellingId === topup.id ||
+                                settlingId === topup.id ||
+                                syncingId === topup.id
+                              }
                               className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-danger)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-danger)] hover:bg-[color:color-mix(in_srgb,_var(--app-danger)_30%,_transparent)] disabled:opacity-50"
                             >
-                              {cancellingId === topup.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
-                              {cancellingId === topup.id ? 'Membatalkan...' : 'Batalkan'}
+                              {cancellingId === topup.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <XCircle className="h-3.5 w-3.5" />
+                              )}
+                              {cancellingId === topup.id
+                                ? 'Membatalkan...'
+                                : 'Batalkan'}
                             </button>
                           ) : null}
                         </div>
@@ -1982,10 +2507,15 @@ export default function PaymentsPage() {
               </p>
             ) : (
               <div className="mt-2.5 space-y-1.5 max-h-[20rem] overflow-auto pr-1">
-                {ledger.map((entry) => (
-                  <div key={entry.id} className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
+                {ledger.map(entry => (
+                  <div
+                    key={entry.id}
+                    className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5"
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className={`text-sm font-black ${entry.direction === 'credit' ? 'text-[color:var(--app-accent)]' : 'text-[color:var(--app-danger)]'}`}>
+                      <p
+                        className={`text-sm font-black ${entry.direction === 'credit' ? 'text-[color:var(--app-accent)]' : 'text-[color:var(--app-danger)]'}`}
+                      >
                         {entry.direction === 'credit' ? '+' : '-'}
                         {moneyFromCents(entry.amount_cents, entry.currency)}
                       </p>
@@ -1995,10 +2525,16 @@ export default function PaymentsPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
-                      {entry.entry_type} - saldo setelah transaksi {moneyFromCents(entry.balance_after_cents, entry.currency)}
+                      {entry.entry_type} - saldo setelah transaksi{' '}
+                      {moneyFromCents(
+                        entry.balance_after_cents,
+                        entry.currency,
+                      )}
                     </p>
                     {entry.description ? (
-                      <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">{entry.description}</p>
+                      <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                        {entry.description}
+                      </p>
                     ) : null}
                   </div>
                 ))}
@@ -2017,12 +2553,16 @@ export default function PaymentsPage() {
         {detailTopup ? (
           <div className="space-y-3 text-xs">
             <div className="rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-              <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">Ringkasan</p>
+              <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                Ringkasan
+              </p>
               <p className="mt-1 text-sm font-bold text-[color:var(--app-accent)]">
                 {moneyFromCents(detailTopup.amount_cents, detailTopup.currency)}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${topupStatusClass(detailTopup.status)}`}>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${topupStatusClass(detailTopup.status)}`}
+                >
                   {(() => {
                     const StatusIcon = topupStatusIcon(detailTopup.status);
                     return <StatusIcon className="h-3.5 w-3.5" />;
@@ -2031,7 +2571,8 @@ export default function PaymentsPage() {
                 </span>
                 {detailTopup.payment_method ? (
                   <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                    metode: {paymentMethodDisplayLabel(detailTopup.payment_method)}
+                    metode:{' '}
+                    {paymentMethodDisplayLabel(detailTopup.payment_method)}
                   </span>
                 ) : null}
               </div>
@@ -2041,25 +2582,42 @@ export default function PaymentsPage() {
             </div>
 
             <div className="rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-              <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">Dompet tujuan</p>
-              <p className="mt-1 text-sm font-semibold text-[color:var(--app-info)]">
-                {detailTopup.environment === 'live' ? 'Saldo utama' : 'Saldo simulasi'} ({detailTopup.currency})
+              <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                Dompet tujuan
               </p>
-              <p className="mt-1 break-all text-[color:var(--app-text-soft)]">ID akun: {detailTopup.account_id}</p>
+              <p className="mt-1 text-sm font-semibold text-[color:var(--app-info)]">
+                {detailTopup.environment === 'live'
+                  ? 'Saldo utama'
+                  : 'Saldo simulasi'}{' '}
+                ({detailTopup.currency})
+              </p>
+              <p className="mt-1 break-all text-[color:var(--app-text-soft)]">
+                ID akun: {detailTopup.account_id}
+              </p>
               {detailAccount ? (
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2">
-                    <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">Saldo Sekarang</p>
+                    <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                      Saldo Sekarang
+                    </p>
                     <p className="mt-1 text-sm font-bold text-[color:var(--app-accent)]">
-                      {moneyFromCents(detailAccount.available_balance_cents, detailAccount.currency)}
+                      {moneyFromCents(
+                        detailAccount.available_balance_cents,
+                        detailAccount.currency,
+                      )}
                     </p>
                   </div>
                   <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2">
                     <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                      {detailTopup.status === 'paid' ? 'Saldo setelah berhasil' : 'Estimasi setelah berhasil'}
+                      {detailTopup.status === 'paid'
+                        ? 'Saldo setelah berhasil'
+                        : 'Estimasi setelah berhasil'}
                     </p>
                     <p className="mt-1 text-sm font-bold text-[color:var(--app-info)]">
-                      {moneyFromCents(expectedAfterPaidCents || 0, detailAccount.currency)}
+                      {moneyFromCents(
+                        expectedAfterPaidCents || 0,
+                        detailAccount.currency,
+                      )}
                     </p>
                   </div>
                 </div>
@@ -2067,14 +2625,20 @@ export default function PaymentsPage() {
             </div>
 
             <div className="rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-              <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">Instruksi pembayaran</p>
+              <p className="text-[10px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                Instruksi pembayaran
+              </p>
               {detailInstruction ? (
                 <div className="mt-2 space-y-2 text-[color:var(--app-text-soft)]">
                   {detailInstruction.transactionId ? (
-                    <p className="break-all">ID transaksi: {detailInstruction.transactionId}</p>
+                    <p className="break-all">
+                      ID transaksi: {detailInstruction.transactionId}
+                    </p>
                   ) : null}
                   {detailInstruction.transactionStatus ? (
-                    <p>Status pembayaran: {detailInstruction.transactionStatus}</p>
+                    <p>
+                      Status pembayaran: {detailInstruction.transactionStatus}
+                    </p>
                   ) : null}
                   {detailInstruction.expiryTime ? (
                     <p>Batas dari gateway: {detailInstruction.expiryTime}</p>
@@ -2082,15 +2646,25 @@ export default function PaymentsPage() {
 
                   {detailInstruction.vaNumbers.length ? (
                     <div className="space-y-1.5">
-                      {detailInstruction.vaNumbers.map((va) => (
-                        <div key={`${va.bank}-${va.number}`} className="flex flex-wrap items-center gap-1.5">
+                      {detailInstruction.vaNumbers.map(va => (
+                        <div
+                          key={`${va.bank}-${va.number}`}
+                          className="flex flex-wrap items-center gap-1.5"
+                        >
                           <span className="rounded bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-1.5 py-0.5 font-semibold text-[color:var(--app-info)]">
                             {va.bank || 'VA'}
                           </span>
-                          <span className="break-all font-mono font-semibold">{va.number}</span>
+                          <span className="break-all font-mono font-semibold">
+                            {va.number}
+                          </span>
                           <button
                             type="button"
-                            onClick={() => void copyInstructionValue(`nomor ${va.bank || 'VA'}`, va.number)}
+                            onClick={() =>
+                              void copyInstructionValue(
+                                `nomor ${va.bank || 'VA'}`,
+                                va.number,
+                              )
+                            }
                             className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)]"
                           >
                             <Copy className="h-3 w-3" />
@@ -2102,18 +2676,28 @@ export default function PaymentsPage() {
                   ) : null}
                   {detailInstruction.permataVa ? (
                     <p className="break-all">
-                      Permata VA: <span className="font-mono font-semibold">{detailInstruction.permataVa}</span>
+                      Permata VA:{' '}
+                      <span className="font-mono font-semibold">
+                        {detailInstruction.permataVa}
+                      </span>
                     </p>
                   ) : null}
                   {detailInstruction.billKey ? (
                     <p className="break-all">
-                      Bill Key: <span className="font-mono font-semibold">{detailInstruction.billKey}</span>
-                      {detailInstruction.billerCode ? ` | Kode biller: ${detailInstruction.billerCode}` : ''}
+                      Bill Key:{' '}
+                      <span className="font-mono font-semibold">
+                        {detailInstruction.billKey}
+                      </span>
+                      {detailInstruction.billerCode
+                        ? ` | Kode biller: ${detailInstruction.billerCode}`
+                        : ''}
                     </p>
                   ) : null}
                 </div>
               ) : (
-                <p className="mt-2 text-[color:var(--app-text-soft)]">Instruksi belum tersedia saat ini.</p>
+                <p className="mt-2 text-[color:var(--app-text-soft)]">
+                  Instruksi belum tersedia saat ini.
+                </p>
               )}
             </div>
 
@@ -2151,7 +2735,8 @@ export default function PaymentsPage() {
                   <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>
               ) : null}
-              {detailTopup.status === 'pending' && detailTopup.payment_provider === 'midtrans' ? (
+              {detailTopup.status === 'pending' &&
+              detailTopup.payment_provider === 'midtrans' ? (
                 <button
                   type="button"
                   onClick={() => void syncTopupStatus(detailTopup.id)}

@@ -209,7 +209,7 @@ export function HomeWalletQuickPanel({
           if (!balanceRes.ok) {
             setError(
               balancePayload.error ||
-                (isId ? 'Wallet belum siap.' : 'Wallet is unavailable.'),
+              (isId ? 'Wallet belum siap.' : 'Wallet is unavailable.'),
             );
             setBalances(null);
           } else {
@@ -246,26 +246,24 @@ export function HomeWalletQuickPanel({
     return (
       <section
         className={cn(
-          'ui-page-section ui-home-section-shell px-2 sm:px-3',
+          'ui-page-section ui-home-section-shell',
           className,
         )}
       >
         <article className="ui-home-section-content overflow-hidden rounded-[22px] bg-white px-3 py-2.5 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] dark:bg-slate-950 sm:rounded-[24px] sm:px-3.5 sm:py-3">
-          <div className="animate-pulse">
-            <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-slate-200 dark:bg-slate-800" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="h-3 w-16 rounded-full bg-slate-200 dark:bg-slate-800" />
-                  <div className="h-6 w-32 rounded-full bg-slate-200 dark:bg-slate-800" />
-                  <div className="h-3 w-24 rounded-full bg-slate-200 dark:bg-slate-800" />
-                </div>
+          <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="ui-skeleton ui-skeleton-pulse h-10 w-10 rounded-2xl" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="ui-skeleton ui-skeleton-pulse h-3 w-16 rounded-full" />
+                <div className="ui-skeleton ui-skeleton-pulse h-6 w-32 rounded-full" />
+                <div className="ui-skeleton ui-skeleton-pulse h-3 w-24 rounded-full" />
               </div>
-              <div className="grid grid-cols-3 gap-1.5 md:min-w-[214px]">
-                <div className="h-[58px] rounded-[18px] bg-slate-200 dark:bg-slate-800" />
-                <div className="h-[58px] rounded-[18px] bg-slate-200 dark:bg-slate-800" />
-                <div className="h-[58px] rounded-[18px] bg-slate-200 dark:bg-slate-800" />
-              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 md:min-w-[214px]">
+              <div className="ui-skeleton ui-skeleton-pulse h-[58px] rounded-[18px]" />
+              <div className="ui-skeleton ui-skeleton-pulse h-[58px] rounded-[18px]" />
+              <div className="ui-skeleton ui-skeleton-pulse h-[58px] rounded-[18px]" />
             </div>
           </div>
         </article>
@@ -277,7 +275,7 @@ export function HomeWalletQuickPanel({
     return (
       <section
         className={cn(
-          'ui-page-section ui-home-section-shell px-2 sm:px-3',
+          'ui-page-section ui-home-section-shell',
           className,
         )}
       >
@@ -288,7 +286,7 @@ export function HomeWalletQuickPanel({
                 <Wallet className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-sky-300">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
                   Wallet
                 </p>
                 <p className="mt-0.5 truncate text-[15px] font-black text-[color:var(--app-text)] sm:text-[16px]">
@@ -336,7 +334,7 @@ export function HomeWalletQuickPanel({
 
   return (
     <section
-      className={cn('ui-page-section ui-home-section-shell px-2 sm:px-3', className)}
+      className={cn('ui-page-section ui-home-section-shell', className)}
     >
       <article className="ui-home-section-content overflow-hidden rounded-[22px] bg-white px-3 py-2.5 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] dark:bg-slate-950 sm:rounded-[24px] sm:px-3.5 sm:py-3">
         <div className="grid gap-2.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
@@ -347,7 +345,7 @@ export function HomeWalletQuickPanel({
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-sky-300">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
                   Wallet
                 </p>
                 <span

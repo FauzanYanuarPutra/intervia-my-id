@@ -45,13 +45,45 @@ const SUPPLY_SIGNALS = [
 ] as const;
 
 const DEMAND_ONLY_TYPES = new Set(['job']);
-const DEMAND_ENABLED_TYPES = new Set(['product', 'service', 'property', 'tool_rental', 'job']);
+const DEMAND_ENABLED_TYPES = new Set([
+  'product',
+  'service',
+  'property',
+  'tool_rental',
+  'job',
+]);
 
 const DEMAND_HIDDEN_FIELDS_BY_TYPE: Record<string, string[]> = {
-  product: ['sku', 'gtin', 'mpn', 'availability', 'shipping_method', 'shipping_fee', 'warranty', 'return_policy'],
-  service: ['level', 'rate_type', 'availability', 'revisions_included', 'next_available', 'portfolio_url', 'certifications', 'revision_policy', 'sla'],
+  product: [
+    'sku',
+    'gtin',
+    'mpn',
+    'availability',
+    'shipping_method',
+    'shipping_fee',
+    'warranty',
+    'return_policy',
+  ],
+  service: [
+    'level',
+    'rate_type',
+    'availability',
+    'revisions_included',
+    'next_available',
+    'portfolio_url',
+    'certifications',
+    'revision_policy',
+    'sla',
+  ],
   job: ['company_size', 'application_url', 'benefits'],
-  property: ['availability_status', 'ownership', 'year_built', 'legal_docs', 'inspection_status', 'tour_booking_url'],
+  property: [
+    'availability_status',
+    'ownership',
+    'year_built',
+    'legal_docs',
+    'inspection_status',
+    'tour_booking_url',
+  ],
   tool_rental: [
     'asset_identity_code',
     'condition_notes',
@@ -99,20 +131,58 @@ function normalizeType(value: unknown): string {
   const normalized = normalizeSignal(value);
   if (!normalized) return '';
   if (normalized.includes('job')) return 'job';
-  if (normalized.includes('company') || normalized.includes('organization') || normalized.includes('organisation')) return 'company';
-  if (normalized.includes('freelancer') || normalized.includes('talent') || normalized.includes('profile')) return 'freelancer';
-  if (normalized.includes('tool') || normalized.includes('rental') || normalized.includes('rent') || normalized.includes('sewa')) return 'tool_rental';
-  if (normalized.includes('property') || normalized.includes('real estate') || normalized.includes('realestate')) return 'property';
-  if (normalized.includes('service') || normalized.includes('jasa')) return 'service';
-  if (normalized.includes('product') || normalized.includes('market') || normalized.includes('store')) return 'product';
+  if (
+    normalized.includes('business transfer') ||
+    normalized.includes('business handover') ||
+    normalized.includes('oper usaha') ||
+    normalized.includes('jual usaha') ||
+    normalized.includes('usaha berjalan') ||
+    normalized.includes('handover') ||
+    normalized.includes('takeover')
+  ) {
+    return 'business_transfer';
+  }
+  if (
+    normalized.includes('company') ||
+    normalized.includes('organization') ||
+    normalized.includes('organisation')
+  )
+    return 'company';
+  if (
+    normalized.includes('freelancer') ||
+    normalized.includes('talent') ||
+    normalized.includes('profile')
+  )
+    return 'freelancer';
+  if (
+    normalized.includes('tool') ||
+    normalized.includes('rental') ||
+    normalized.includes('rent') ||
+    normalized.includes('sewa')
+  )
+    return 'tool_rental';
+  if (
+    normalized.includes('property') ||
+    normalized.includes('real estate') ||
+    normalized.includes('realestate')
+  )
+    return 'property';
+  if (normalized.includes('service') || normalized.includes('jasa'))
+    return 'service';
+  if (
+    normalized.includes('product') ||
+    normalized.includes('market') ||
+    normalized.includes('store')
+  )
+    return 'product';
   return normalized;
 }
 
 function detectExplicitSide(value: unknown): ListingSide | null {
   const signal = normalizeSignal(value);
   if (!signal) return null;
-  if (DEMAND_SIGNALS.some((token) => signal.includes(token))) return 'demand';
-  if (SUPPLY_SIGNALS.some((token) => signal.includes(token))) return 'supply';
+  if (DEMAND_SIGNALS.some(token => signal.includes(token))) return 'demand';
+  if (SUPPLY_SIGNALS.some(token => signal.includes(token))) return 'supply';
   return null;
 }
 
@@ -130,7 +200,9 @@ export function supportsDemandListing(type: unknown): boolean {
   return DEMAND_ENABLED_TYPES.has(normalizeType(type));
 }
 
-export function resolveListingSide(input: ResolveListingSideInput): ListingSide {
+export function resolveListingSide(
+  input: ResolveListingSideInput,
+): ListingSide {
   const metadata = asObject(input.metadata);
   const explicitCandidates = [
     input.side,
@@ -150,7 +222,7 @@ export function resolveListingSide(input: ResolveListingSideInput): ListingSide 
 
   const inferredSide = detectExplicitSide(
     [input.title, input.summary, metadata?.headline, metadata?.tagline]
-      .map((value) => asString(value))
+      .map(value => asString(value))
       .filter(Boolean)
       .join(' '),
   );
@@ -169,7 +241,10 @@ export function toMarketSideValue(side: ListingSide): MarketSide {
   return side === 'demand' ? 'seeker' : 'provider';
 }
 
-export function getListingSideLabel(side: ListingSide, locale: LocaleCode): string {
+export function getListingSideLabel(
+  side: ListingSide,
+  locale: LocaleCode,
+): string {
   if (locale === 'id') {
     return side === 'demand' ? 'Pencari' : 'Penyedia';
   }
@@ -185,17 +260,27 @@ export function getListingSideContextLabel(
   if (locale === 'id') {
     if (normalizedType === 'company') return 'Profil Perusahaan';
     if (normalizedType === 'job') return 'Pencari Kandidat';
-    if (normalizedType === 'service') return side === 'demand' ? 'Pencari Jasa' : 'Penyedia Jasa';
-    if (normalizedType === 'property') return side === 'demand' ? 'Pencari Properti' : 'Penyedia Properti';
-    if (normalizedType === 'tool_rental') return side === 'demand' ? 'Pencari Sewa' : 'Penyedia Sewa';
+    if (normalizedType === 'service')
+      return side === 'demand' ? 'Pencari Jasa' : 'Penyedia Jasa';
+    if (normalizedType === 'property')
+      return side === 'demand' ? 'Pencari Properti' : 'Penyedia Properti';
+    if (normalizedType === 'tool_rental')
+      return side === 'demand' ? 'Pencari Sewa' : 'Penyedia Sewa';
+    if (normalizedType === 'business_transfer')
+      return side === 'demand' ? 'Cari Oper Usaha' : 'Oper Usaha';
     return side === 'demand' ? 'Pencari Produk' : 'Penyedia Produk';
   }
 
   if (normalizedType === 'company') return 'Company Profile';
   if (normalizedType === 'job') return 'Hiring';
-  if (normalizedType === 'service') return side === 'demand' ? 'Service Needed' : 'Service Offer';
-  if (normalizedType === 'property') return side === 'demand' ? 'Property Needed' : 'Property Offer';
-  if (normalizedType === 'tool_rental') return side === 'demand' ? 'Rental Needed' : 'Rental Offer';
+  if (normalizedType === 'service')
+    return side === 'demand' ? 'Service Needed' : 'Service Offer';
+  if (normalizedType === 'property')
+    return side === 'demand' ? 'Property Needed' : 'Property Offer';
+  if (normalizedType === 'tool_rental')
+    return side === 'demand' ? 'Rental Needed' : 'Rental Offer';
+  if (normalizedType === 'business_transfer')
+    return side === 'demand' ? 'Business Transfer Needed' : 'Business Transfer';
   return side === 'demand' ? 'Need Request' : 'Product Offer';
 }
 
@@ -206,7 +291,9 @@ export function filterFieldsForListingSide(
 ): SectorField[] {
   if (side !== 'demand') return fields;
   const normalizedType = normalizeType(type);
-  const hiddenKeys = new Set(DEMAND_HIDDEN_FIELDS_BY_TYPE[normalizedType] || []);
+  const hiddenKeys = new Set(
+    DEMAND_HIDDEN_FIELDS_BY_TYPE[normalizedType] || [],
+  );
   if (hiddenKeys.size === 0) return fields;
-  return fields.filter((field) => !hiddenKeys.has(field.key));
+  return fields.filter(field => !hiddenKeys.has(field.key));
 }

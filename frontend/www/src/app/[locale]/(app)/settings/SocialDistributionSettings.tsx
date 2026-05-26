@@ -42,8 +42,9 @@ const CHANNELS: Array<{
       { value: 'professional', id: 'Professional', en: 'Professional' },
       { value: 'creator', id: 'Creator', en: 'Creator' },
     ],
-    helperId: 'Siapkan akun professional agar nanti bisa masuk alur distribusi Meta.',
-    helperEn: 'Prepare a professional account so it can enter the Meta distribution flow later.',
+    helperId: 'Siapkan akun professional untuk distribusi Meta.',
+    helperEn:
+      'Prepare a professional account so it can enter the Meta distribution flow later.',
     loginUrl: 'https://www.instagram.com/',
   },
   {
@@ -54,7 +55,8 @@ const CHANNELS: Array<{
       { value: 'business', id: 'Business', en: 'Business' },
     ],
     helperId: 'Gunakan Page bisnis untuk share link dan distribusi komunitas.',
-    helperEn: 'Use a business Page for link sharing and community distribution.',
+    helperEn:
+      'Use a business Page for link sharing and community distribution.',
     loginUrl: 'https://www.facebook.com/',
   },
   {
@@ -64,8 +66,10 @@ const CHANNELS: Array<{
       { value: 'business', id: 'Business', en: 'Business' },
       { value: 'creator', id: 'Creator', en: 'Creator' },
     ],
-    helperId: 'Siapkan akun creator/business dulu. Publish API bisa disambung setelah audit siap.',
-    helperEn: 'Prepare a creator/business account first. The publish API can be attached once the audit is ready.',
+    helperId:
+      'Siapkan akun creator/business dulu. Publish API bisa disambung setelah audit siap.',
+    helperEn:
+      'Prepare a creator/business account first. The publish API can be attached once the audit is ready.',
     loginUrl: 'https://www.tiktok.com/login',
   },
   {
@@ -93,6 +97,10 @@ function normalizeDraftMap(value: SocialConnectionMap): DraftMap {
   };
 }
 
+const SOCIAL_FIELD_CLASS =
+  'min-h-[46px] w-full rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-sm font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+const SOCIAL_SELECT_CLASS = `${SOCIAL_FIELD_CLASS} appearance-none pr-9`;
+
 export function SocialDistributionSettings({ locale }: Props) {
   const isId = locale === 'id';
   const { user, authFetch, refreshUser } = useAuth();
@@ -103,7 +111,9 @@ export function SocialDistributionSettings({ locale }: Props) {
   const [drafts, setDrafts] = useState<DraftMap>(() =>
     normalizeDraftMap(currentConnections),
   );
-  const [savingChannel, setSavingChannel] = useState<SocialChannelId | null>(null);
+  const [savingChannel, setSavingChannel] = useState<SocialChannelId | null>(
+    null,
+  );
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,11 +128,13 @@ export function SocialDistributionSettings({ locale }: Props) {
       >
         <div className="space-y-1">
           <h2 className="text-base font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            {isId ? 'Distribusi & channel posting' : 'Distribution and posting channels'}
+            {isId
+              ? 'Distribusi & channel posting'
+              : 'Distribution and posting channels'}
           </h2>
           <p className="text-xs text-[color:var(--app-text-soft)]">
             {isId
-              ? 'Masuk dulu supaya target akun dan page bisa disimpan untuk Share Pack.'
+              ? 'Masuk dulu untuk simpan target Share Pack.'
               : 'Sign in first so your account and page targets can be saved for Share Pack.'}
           </p>
         </div>
@@ -170,11 +182,15 @@ export function SocialDistributionSettings({ locale }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ metadata }),
       });
-      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+      };
       if (!res.ok) {
         throw new Error(
           payload.error ||
-            (isId ? 'Gagal menyimpan koneksi channel.' : 'Failed to save the channel connection.'),
+            (isId
+              ? 'Gagal menyimpan koneksi channel.'
+              : 'Failed to save the channel connection.'),
         );
       }
       await refreshUser();
@@ -219,7 +235,9 @@ export function SocialDistributionSettings({ locale }: Props) {
     >
       <div className="space-y-1">
         <h2 className="text-base font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-          {isId ? 'Distribusi & channel posting' : 'Distribution and posting channels'}
+          {isId
+            ? 'Distribusi & channel posting'
+            : 'Distribution and posting channels'}
         </h2>
         <p className="text-xs text-[color:var(--app-text-soft)]">
           {isId
@@ -280,8 +298,15 @@ export function SocialDistributionSettings({ locale }: Props) {
                   onChange={event =>
                     updateDraft(channel.id, { label: event.target.value })
                   }
-                  placeholder={isId ? 'Nama akun / page / brand' : 'Account / page / brand name'}
-                  className="ui-control w-full px-3 text-sm"
+                  placeholder={
+                    isId
+                      ? 'Nama akun / page / brand'
+                      : 'Account / page / brand name'
+                  }
+                  className={SOCIAL_FIELD_CLASS}
+                  aria-label={
+                    isId ? 'Nama akun atau page' : 'Account or page name'
+                  }
                 />
                 <input
                   value={draft.handle || ''}
@@ -289,22 +314,40 @@ export function SocialDistributionSettings({ locale }: Props) {
                     updateDraft(channel.id, { handle: event.target.value })
                   }
                   placeholder={isId ? 'Handle / username' : 'Handle / username'}
-                  className="ui-control w-full px-3 text-sm"
+                  className={SOCIAL_FIELD_CLASS}
+                  aria-label={
+                    isId ? 'Handle atau username' : 'Handle or username'
+                  }
                 />
                 <input
+                  type="url"
                   value={draft.targetUrl || ''}
                   onChange={event =>
                     updateDraft(channel.id, { targetUrl: event.target.value })
                   }
-                  placeholder={isId ? 'URL akun / page target' : 'Target account / page URL'}
-                  className="ui-control w-full px-3 text-sm sm:col-span-2"
+                  placeholder={
+                    isId
+                      ? 'URL akun / page target'
+                      : 'Target account / page URL'
+                  }
+                  className={`${SOCIAL_FIELD_CLASS} sm:col-span-2`}
+                  aria-label={
+                    isId
+                      ? 'URL akun atau page target'
+                      : 'Target account or page URL'
+                  }
                 />
                 <select
-                  value={draft.accountType || channel.accountTypes[0]?.value || 'profile'}
+                  value={
+                    draft.accountType ||
+                    channel.accountTypes[0]?.value ||
+                    'profile'
+                  }
                   onChange={event =>
                     updateDraft(channel.id, { accountType: event.target.value })
                   }
-                  className="ui-control w-full px-3 text-sm"
+                  className={SOCIAL_SELECT_CLASS}
+                  aria-label={isId ? 'Tipe akun' : 'Account type'}
                 >
                   {channel.accountTypes.map(option => (
                     <option key={option.value} value={option.value}>
@@ -317,15 +360,26 @@ export function SocialDistributionSettings({ locale }: Props) {
                   onChange={event =>
                     updateDraft(channel.id, { notes: event.target.value })
                   }
-                  placeholder={isId ? 'Catatan posting / target audience' : 'Posting notes / target audience'}
-                  className="ui-control w-full px-3 text-sm"
+                  placeholder={
+                    isId
+                      ? 'Catatan posting / target audience'
+                      : 'Posting notes / target audience'
+                  }
+                  className={SOCIAL_FIELD_CLASS}
+                  aria-label={
+                    isId
+                      ? 'Catatan posting atau target audience'
+                      : 'Posting notes or target audience'
+                  }
                 />
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => updateDraft(channel.id, { enabled: !draft.enabled })}
+                  onClick={() =>
+                    updateDraft(channel.id, { enabled: !draft.enabled })
+                  }
                   className={`inline-flex h-9 items-center justify-center gap-2 rounded-xl border px-3 text-[11px] font-semibold ${
                     draft.enabled
                       ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
@@ -380,7 +434,9 @@ export function SocialDistributionSettings({ locale }: Props) {
       </div>
 
       {message ? (
-        <p className="mt-3 text-xs text-[color:var(--app-text-soft)]">{message}</p>
+        <p className="mt-3 text-xs text-[color:var(--app-text-soft)]">
+          {message}
+        </p>
       ) : null}
     </div>
   );

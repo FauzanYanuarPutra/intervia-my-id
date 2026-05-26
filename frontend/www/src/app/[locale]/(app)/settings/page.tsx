@@ -1,19 +1,68 @@
 'use client';
 
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useUISettings } from '@/context/UISettingsContext';
+import {
+  MAX_SAVED_ACCOUNTS,
+  formatSavedAccountIdentifier,
+  readSavedAccounts,
+  removeSavedAccount,
+  saveAccountSnapshot,
+  type SavedAccount,
+} from '@/lib/accountVault';
 import { mapCommonAuthError } from '@/lib/authErrors';
 import { validatePasswordStrength } from '@/lib/passwordPolicy';
+import {
+  Laptop,
+  LogOut,
+  Plus,
+  RefreshCcw,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  Users,
+} from 'lucide-react';
 import { SocialDistributionSettings } from './SocialDistributionSettings';
 
 type ActionState = 'idle' | 'loading' | 'success' | 'error';
 
+type UserSession = {
+  id: string;
+  deviceName?: string | null;
+  deviceType?: string | null;
+  location?: string | null;
+  lastActiveAt?: string | number | Date | null;
+  createdAt?: string | number | Date | null;
+  isCurrent?: boolean;
+};
+
 function detectLocale(pathname: string): 'id' | 'en' {
   return pathname.startsWith('/id') ? 'id' : 'en';
+}
+
+function getAccountInitial(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || 'A';
+}
+
+function formatSessionTime(
+  value: UserSession['lastActiveAt'],
+  locale: 'id' | 'en',
+): string {
+  if (!value) return locale === 'id' ? 'Belum tercatat' : 'Not recorded';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return locale === 'id' ? 'Belum tercatat' : 'Not recorded';
+  }
+  return new Intl.DateTimeFormat(locale === 'id' ? 'id-ID' : 'en-US', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function SectionHeader({
@@ -47,7 +96,7 @@ function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="ui-feed-row flex flex-col gap-2 border border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:var(--app-surface-muted)] p-3 sm:flex-row sm:items-center sm:justify-between dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+    <div className="ui-feed-row flex flex-col gap-3 rounded-[18px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.24)] sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-slate-950/72">
       <div className="space-y-1">
         <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {label}
@@ -62,6 +111,11 @@ function SettingRow({
     </div>
   );
 }
+
+const SETTINGS_CONTROL_CLASS =
+  'min-h-[46px] w-full rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-sm font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400 dark:disabled:border-slate-800 dark:disabled:bg-slate-900/70';
+const SETTINGS_SELECT_CLASS = `${SETTINGS_CONTROL_CLASS} appearance-none pr-9`;
+const SETTINGS_TEXTAREA_CLASS = `${SETTINGS_CONTROL_CLASS} min-h-[92px] resize-y py-3 leading-6`;
 
 function Toggle({
   id,
@@ -122,7 +176,7 @@ export default function SettingsPage() {
   const pathname = usePathname();
   const locale = detectLocale(pathname || '');
   const { confirm } = useDialog();
-  const { logout, refreshUser, user } = useAuth();
+  const { authFetch, logout, refreshUser, user } = useAuth();
   const {
     colorScheme,
     themePreset,
@@ -153,44 +207,109 @@ export default function SettingsPage() {
   const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteReason, setDeleteReason] = useState('');
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [sessionsState, setSessionsState] = useState<ActionState>('idle');
+  const [sessionsMessage, setSessionsMessage] = useState<string | null>(null);
+  const [sessionActionId, setSessionActionId] = useState<string | null>(null);
 
   const text = {
     title: locale === 'id' ? 'Pengaturan' : 'Settings',
     subtitle:
       locale === 'id'
-        ? 'Sesuaikan tampilan, aksesibilitas, dan data akun dengan cepat.'
+        ? 'Atur tampilan dan akun.'
         : 'Tune appearance, accessibility, and account data quickly.',
     appearance: locale === 'id' ? 'Tampilan' : 'Appearance',
     appearanceDesc:
       locale === 'id'
-        ? 'Pilih mode terang atau gelap dan preset warna brand yang paling nyaman.'
+        ? 'Mode, warna, kerapatan.'
         : 'Choose light or dark mode and the brand palette that feels best.',
     typography: locale === 'id' ? 'Tipografi' : 'Typography',
     typographyDesc:
       locale === 'id'
-        ? 'Atur ukuran dan jenis font untuk membaca lebih nyaman.'
+        ? 'Ukuran dan jenis font.'
         : 'Adjust font size and family for readability.',
     accessibility: locale === 'id' ? 'Aksesibilitas' : 'Accessibility',
     accessibilityDesc:
       locale === 'id'
-        ? 'Pengaturan untuk mengurangi gerakan dan meningkatkan kontras.'
+        ? 'Kurangi gerakan, tambah kontras.'
         : 'Controls to reduce motion and improve contrast.',
     account: locale === 'id' ? 'Akun & Data' : 'Account & Data',
     accountDesc:
       locale === 'id'
-        ? 'Kelola password, export data, dan penghapusan akun.'
-        : 'Manage password, data export, and account deletion.',
+        ? 'Akun, sesi, password, export.'
+        : 'Manage account switching, device sessions, password, data export, and deletion.',
+    savedAccounts: locale === 'id' ? 'Akun tersimpan' : 'Saved accounts',
+    savedAccountsDesc:
+      locale === 'id'
+        ? 'Simpan shortcut akun di perangkat ini.'
+        : 'Keep up to 8 account shortcuts on this device. Switching signs out first and the next account still requires OTP.',
+    savedAccountsSecure:
+      locale === 'id'
+        ? 'Aman: tidak simpan token/password.'
+        : 'Safe: only name and phone/email are stored, never tokens or passwords.',
+    savedAccountLimit: locale === 'id' ? 'Slot akun' : 'Account slots',
+    currentAccount: locale === 'id' ? 'Aktif sekarang' : 'Current',
+    switchAccount: locale === 'id' ? 'Pakai akun ini' : 'Use this account',
+    removeShortcut: locale === 'id' ? 'Hapus shortcut' : 'Remove shortcut',
+    addAnotherAccount:
+      locale === 'id'
+        ? 'Tambah / login akun lain'
+        : 'Add / sign in another account',
+    noSavedAccounts:
+      locale === 'id'
+        ? 'Akun aktif otomatis muncul di sini.'
+        : 'The active account is added automatically after the profile loads.',
+    sessionsTitle: locale === 'id' ? 'Perangkat & sesi' : 'Devices & sessions',
+    sessionsDesc:
+      locale === 'id'
+        ? 'Cek perangkat. Cabut yang asing.'
+        : 'Review signed-in devices and revoke sessions you do not recognize.',
+    refreshSessions: locale === 'id' ? 'Refresh sesi' : 'Refresh sessions',
+    currentDevice: locale === 'id' ? 'Perangkat ini' : 'This device',
+    revokeSession: locale === 'id' ? 'Cabut' : 'Revoke',
+    revokeOtherDevices:
+      locale === 'id' ? 'Keluar dari perangkat lain' : 'Sign out other devices',
+    sessionsEmpty:
+      locale === 'id'
+        ? 'Belum ada sesi perangkat lain.'
+        : 'No other device sessions yet.',
+    sessionsFailed:
+      locale === 'id'
+        ? 'Gagal mengambil sesi perangkat.'
+        : 'Failed to load device sessions.',
+    sessionRevoked:
+      locale === 'id' ? 'Sesi perangkat dicabut.' : 'Device session revoked.',
+    sessionsUpdated:
+      locale === 'id'
+        ? 'Sesi perangkat diperbarui.'
+        : 'Device sessions updated.',
+    revokeFailed:
+      locale === 'id' ? 'Gagal mencabut sesi.' : 'Failed to revoke session.',
+    switchConfirmTitle: locale === 'id' ? 'Switch akun?' : 'Switch account?',
+    switchConfirmDesc:
+      locale === 'id'
+        ? 'Akun ini keluar dulu. Lanjut login akun pilihan.'
+        : 'This session will sign out first. You will go to login with the selected account.',
+    removeShortcutConfirm:
+      locale === 'id'
+        ? 'Hapus shortcut akun dari perangkat ini?'
+        : 'Remove this account shortcut from this device?',
+    logoutOtherConfirm:
+      locale === 'id'
+        ? 'Keluar dari semua perangkat lain?'
+        : 'Sign out from all other devices?',
     passwordCard: locale === 'id' ? 'Password akun' : 'Account password',
     passwordDesc:
       locale === 'id'
-        ? 'Login utama tetap pakai nomor HP + OTP. Password ini hanya dipakai kalau nanti dibutuhkan dari Settings atau alur lanjutan.'
+        ? 'Login utama tetap nomor HP + OTP.'
         : 'The main login still uses phone + OTP. This password only exists for later Settings or advanced flows.',
     createPassword: locale === 'id' ? 'Buat Password' : 'Create Password',
     changePassword: locale === 'id' ? 'Ganti Password' : 'Change Password',
     currentPassword: locale === 'id' ? 'Password sekarang' : 'Current password',
     currentPasswordHint:
       locale === 'id'
-        ? 'Kosongkan karena akun ini belum punya password.'
+        ? 'Kosongkan kalau belum punya password.'
         : 'Leave this empty because this account does not have a password yet.',
     newPassword: locale === 'id' ? 'Password baru' : 'New password',
     confirmPassword:
@@ -209,7 +328,7 @@ export default function SettingsPage() {
         : 'Failed to save password.',
     deleteSetupFirst:
       locale === 'id'
-        ? 'Buat password dulu di atas sebelum menghapus akun.'
+        ? 'Buat password dulu.'
         : 'Create a password above before deleting the account.',
     themeMode: locale === 'id' ? 'Mode Tema' : 'Theme Mode',
     themeModeDesc:
@@ -219,24 +338,24 @@ export default function SettingsPage() {
     themePreset: locale === 'id' ? 'Preset Tema' : 'Theme Preset',
     themePresetDesc:
       locale === 'id'
-        ? 'Pilih palet utama: Lajukan, mono, ocean, sunset, atau orchid.'
+        ? 'Pilih palet.'
         : 'Pick the primary palette: Lajukan, mono, ocean, sunset, or orchid.',
     colorVision: locale === 'id' ? 'Mode Warna' : 'Color Vision',
     colorVisionDesc:
       locale === 'id'
-        ? 'Optimasi untuk kontras tinggi atau colorblind.'
+        ? 'Kontras tinggi atau colorblind.'
         : 'Optimize for high contrast or colorblind.',
     density: locale === 'id' ? 'Kerapatan' : 'Density',
     densityDesc:
       locale === 'id'
-        ? 'Atur jarak komponen agar ringkas atau lega.'
+        ? 'Ringkas atau lega.'
         : 'Choose compact or comfortable spacing.',
     fontSize: locale === 'id' ? 'Ukuran Font' : 'Font Size',
     fontFamily: locale === 'id' ? 'Keluarga Font' : 'Font Family',
     reduceMotion: locale === 'id' ? 'Kurangi Animasi' : 'Reduce Motion',
     reduceMotionDesc:
       locale === 'id'
-        ? 'Matikan animasi untuk pengalaman lebih stabil.'
+        ? 'Matikan animasi.'
         : 'Disable animations for a steadier feel.',
     exportData: locale === 'id' ? 'Export Data' : 'Export Data',
     exportDesc:
@@ -275,6 +394,148 @@ export default function SettingsPage() {
         ? 'Export belum tersedia. Silakan coba lagi nanti.'
         : 'Export is not available yet. Please try again later.',
     signOut: locale === 'id' ? 'Keluar' : 'Sign out',
+  };
+
+  useEffect(() => {
+    setSavedAccounts(user ? saveAccountSnapshot(user) : readSavedAccounts());
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const refreshSavedAccounts = () => setSavedAccounts(readSavedAccounts());
+    window.addEventListener('lajukan:saved-accounts', refreshSavedAccounts);
+
+    return () => {
+      window.removeEventListener(
+        'lajukan:saved-accounts',
+        refreshSavedAccounts,
+      );
+    };
+  }, []);
+
+  const loadSessions = useCallback(async () => {
+    setSessionsState('loading');
+    setSessionsMessage(null);
+
+    try {
+      const res = await authFetch('/api/user/sessions', { method: 'GET' });
+      const body = await res.json().catch(() => ({}) as { sessions?: unknown });
+      if (!res.ok || !Array.isArray(body.sessions)) {
+        throw new Error(text.sessionsFailed);
+      }
+
+      setSessions(body.sessions as UserSession[]);
+      setSessionsState('success');
+    } catch (error) {
+      setSessionsState('error');
+      setSessionsMessage(
+        error instanceof Error ? error.message : text.sessionsFailed,
+      );
+    }
+  }, [authFetch, text.sessionsFailed]);
+
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
+
+  const handleSwitchAccount = async (account: SavedAccount) => {
+    if (account.id === user?.id) return;
+
+    const approved = await confirm({
+      title: text.switchConfirmTitle,
+      description: text.switchConfirmDesc,
+      confirmLabel: text.switchAccount,
+      cancelLabel: locale === 'id' ? 'Batal' : 'Cancel',
+      tone: 'default',
+    });
+    if (!approved) return;
+
+    await logout({
+      redirectTo: `/${locale}/login?accountId=${encodeURIComponent(account.id)}`,
+    });
+  };
+
+  const handleAddAnotherAccount = async () => {
+    const approved = await confirm({
+      title: locale === 'id' ? 'Login akun lain?' : 'Sign in another account?',
+      description: text.switchConfirmDesc,
+      confirmLabel: text.addAnotherAccount,
+      cancelLabel: locale === 'id' ? 'Batal' : 'Cancel',
+      tone: 'default',
+    });
+    if (!approved) return;
+
+    await logout({ redirectTo: `/${locale}/login?addAccount=1` });
+  };
+
+  const handleRemoveSavedAccount = async (account: SavedAccount) => {
+    const approved = await confirm({
+      title: text.removeShortcut,
+      description: text.removeShortcutConfirm,
+      confirmLabel: text.removeShortcut,
+      cancelLabel: locale === 'id' ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+
+    setSavedAccounts(removeSavedAccount(account.id));
+  };
+
+  const handleRevokeSession = async (sessionId: string) => {
+    setSessionActionId(sessionId);
+    setSessionsMessage(null);
+
+    try {
+      const res = await authFetch(
+        `/api/user/sessions/${encodeURIComponent(sessionId)}`,
+        {
+          method: 'DELETE',
+        },
+      );
+      const body = await res.json().catch(() => ({}) as { error?: string });
+      if (!res.ok) {
+        throw new Error(body?.error || text.revokeFailed);
+      }
+      setSessionsMessage(text.sessionRevoked);
+      await loadSessions();
+    } catch (error) {
+      setSessionsMessage(
+        error instanceof Error ? error.message : text.revokeFailed,
+      );
+    } finally {
+      setSessionActionId(null);
+    }
+  };
+
+  const handleRevokeOtherSessions = async () => {
+    const approved = await confirm({
+      title: text.revokeOtherDevices,
+      description: text.logoutOtherConfirm,
+      confirmLabel: text.revokeOtherDevices,
+      cancelLabel: locale === 'id' ? 'Batal' : 'Cancel',
+      tone: 'danger',
+    });
+    if (!approved) return;
+
+    setSessionActionId('all');
+    setSessionsMessage(null);
+
+    try {
+      const res = await authFetch('/api/user/sessions', { method: 'DELETE' });
+      const body = await res.json().catch(() => ({}) as { error?: string });
+      if (!res.ok) {
+        throw new Error(body?.error || text.revokeFailed);
+      }
+      setSessionsMessage(text.sessionsUpdated);
+      await loadSessions();
+    } catch (error) {
+      setSessionsMessage(
+        error instanceof Error ? error.message : text.revokeFailed,
+      );
+    } finally {
+      setSessionActionId(null);
+    }
   };
 
   const handleExport = async () => {
@@ -410,7 +671,7 @@ export default function SettingsPage() {
       <div className="ui-page-stack page-rhythm">
         <div className="ui-panel ui-feed-section ui-hero-panel rounded-none border-x-0 p-5 sm:rounded-[var(--app-radius)] sm:border-x sm:p-6">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
-            Settings
+            {locale === 'id' ? 'Pengaturan' : 'Settings'}
           </p>
           <h1 className="mt-2 text-2xl font-[1000] tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
             {text.title}
@@ -437,7 +698,7 @@ export default function SettingsPage() {
                     onChange={event =>
                       setColorScheme(event.target.value as typeof colorScheme)
                     }
-                    className="ui-control w-full px-3 text-sm"
+                    className={SETTINGS_SELECT_CLASS}
                   >
                     <option value="system">
                       {locale === 'id' ? 'Otomatis' : 'System'}
@@ -459,7 +720,7 @@ export default function SettingsPage() {
                     onChange={event =>
                       setThemePreset(event.target.value as typeof themePreset)
                     }
-                    className="ui-control w-full px-3 text-sm"
+                    className={SETTINGS_SELECT_CLASS}
                   >
                     <option value="default">Lajukan</option>
                     <option value="mono">
@@ -485,7 +746,7 @@ export default function SettingsPage() {
                     onChange={event =>
                       setColorVision(event.target.value as typeof colorVision)
                     }
-                    className="ui-control w-full px-3 text-sm"
+                    className={SETTINGS_SELECT_CLASS}
                   >
                     <option value="none">
                       {locale === 'id' ? 'Normal' : 'Normal'}
@@ -504,7 +765,7 @@ export default function SettingsPage() {
                     onChange={event =>
                       setDensity(event.target.value as typeof density)
                     }
-                    className="ui-control w-full px-3 text-sm"
+                    className={SETTINGS_SELECT_CLASS}
                   >
                     <option value="compact">
                       {locale === 'id' ? 'Ringkas' : 'Compact'}
@@ -529,7 +790,7 @@ export default function SettingsPage() {
                     onChange={event =>
                       setFontSize(event.target.value as typeof fontSize)
                     }
-                    className="ui-control w-full px-3 text-sm"
+                    className={SETTINGS_SELECT_CLASS}
                   >
                     <option value="sm">
                       {locale === 'id' ? 'Kecil' : 'Small'}
@@ -548,7 +809,7 @@ export default function SettingsPage() {
                     onChange={event =>
                       setFontFamily(event.target.value as typeof fontFamily)
                     }
-                    className="ui-control w-full px-3 text-sm"
+                    className={SETTINGS_SELECT_CLASS}
                   >
                     <option value="inter">Inter</option>
                     <option value="system">
@@ -590,6 +851,203 @@ export default function SettingsPage() {
               />
               <div className="mt-4 grid gap-4">
                 <div className="ui-panel-muted ui-feed-tile p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                      <Users className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          {text.savedAccounts}
+                        </p>
+                        <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-text-soft)]">
+                          {savedAccounts.length}/{MAX_SAVED_ACCOUNTS}{' '}
+                          {text.savedAccountLimit}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {text.savedAccountsDesc}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-[14px] border border-[color:color-mix(in_srgb,_var(--app-accent-border)_45%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_55%,_var(--app-surface))] px-3 py-2 text-xs font-medium text-[color:var(--app-text)]">
+                    <span className="inline-flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                      {text.savedAccountsSecure}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {savedAccounts.length > 0 ? (
+                      savedAccounts.map(account => {
+                        const isCurrent = account.id === user?.id;
+
+                        return (
+                          <div
+                            key={account.id}
+                            className="grid gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-sm font-black text-[color:var(--app-text-inverse)]">
+                                {getAccountInitial(account.displayName)}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
+                                  {account.displayName}
+                                </p>
+                                <p className="truncate text-xs text-[color:var(--app-text-soft)]">
+                                  {formatSavedAccountIdentifier(account)}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                              {isCurrent ? (
+                                <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)]">
+                                  <UserRound className="h-3.5 w-3.5" />
+                                  {text.currentAccount}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwitchAccount(account)}
+                                  className="ui-button-secondary min-h-[34px] px-3 text-xs font-semibold"
+                                >
+                                  {text.switchAccount}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRemoveSavedAccount(account)
+                                }
+                                className="inline-flex min-h-[34px] items-center justify-center rounded-full border border-[color:var(--app-border)] px-3 text-xs font-semibold text-[color:var(--app-danger)] transition hover:bg-[color:var(--app-danger-soft)]"
+                              >
+                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                {text.removeShortcut}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-3 text-xs text-[color:var(--app-text-soft)]">
+                        {text.noSavedAccounts}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddAnotherAccount}
+                    className="ui-button-secondary mt-3 w-full px-4 text-xs font-semibold"
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    {text.addAnotherAccount}
+                  </button>
+                </div>
+
+                <div className="ui-panel-muted ui-feed-tile p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface)] text-[color:var(--app-accent)]">
+                      <Laptop className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {text.sessionsTitle}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {text.sessionsDesc}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void loadSessions()}
+                      disabled={sessionsState === 'loading'}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label={text.refreshSessions}
+                    >
+                      <RefreshCcw
+                        className={`h-4 w-4 ${
+                          sessionsState === 'loading' ? 'animate-spin' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {sessions.length > 0 ? (
+                      sessions.map(session => (
+                        <div
+                          key={session.id}
+                          className="grid gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
+                                {session.deviceName ||
+                                  session.deviceType ||
+                                  (locale === 'id' ? 'Perangkat' : 'Device')}
+                              </p>
+                              {session.isCurrent ? (
+                                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
+                                  {text.currentDevice}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-1 truncate text-xs text-[color:var(--app-text-soft)]">
+                              {session.location || 'Unknown'} -{' '}
+                              {formatSessionTime(
+                                session.lastActiveAt || session.createdAt,
+                                locale,
+                              )}
+                            </p>
+                          </div>
+                          {!session.isCurrent ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleRevokeSession(session.id)
+                              }
+                              disabled={sessionActionId === session.id}
+                              className="ui-button-secondary min-h-[34px] px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {sessionActionId === session.id
+                                ? '...'
+                                : text.revokeSession}
+                            </button>
+                          ) : null}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-3 text-xs text-[color:var(--app-text-soft)]">
+                        {sessionsState === 'loading'
+                          ? `${text.refreshSessions}...`
+                          : text.sessionsEmpty}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleRevokeOtherSessions()}
+                    disabled={sessionActionId === 'all'}
+                    className="ui-button-secondary mt-3 w-full px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <LogOut className="mr-1.5 h-4 w-4" />
+                    {sessionActionId === 'all'
+                      ? '...'
+                      : text.revokeOtherDevices}
+                  </button>
+                  {sessionsMessage ? (
+                    <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
+                      {sessionsMessage}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="ui-panel-muted ui-feed-tile p-4">
                   <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                     {text.passwordCard}
                   </p>
@@ -606,22 +1064,25 @@ export default function SettingsPage() {
                           ? text.currentPassword
                           : text.currentPasswordHint
                       }
-                      className="ui-control w-full px-3 text-sm"
+                      className={SETTINGS_CONTROL_CLASS}
                       disabled={!user?.hasPassword}
+                      aria-label={text.currentPassword}
                     />
                     <input
                       type="password"
                       value={newPassword}
                       onChange={event => setNewPassword(event.target.value)}
                       placeholder={text.newPassword}
-                      className="ui-control w-full px-3 text-sm"
+                      className={SETTINGS_CONTROL_CLASS}
+                      aria-label={text.newPassword}
                     />
                     <input
                       type="password"
                       value={confirmPassword}
                       onChange={event => setConfirmPassword(event.target.value)}
                       placeholder={text.confirmPassword}
-                      className="ui-control w-full px-3 text-sm"
+                      className={SETTINGS_CONTROL_CLASS}
+                      aria-label={text.confirmPassword}
                     />
                   </div>
                   <button
@@ -683,16 +1144,18 @@ export default function SettingsPage() {
                       value={deletePassword}
                       onChange={event => setDeletePassword(event.target.value)}
                       placeholder={text.deletePassword}
-                      className="ui-control w-full px-3 text-sm"
+                      className={SETTINGS_CONTROL_CLASS}
                       disabled={!user?.hasPassword}
+                      aria-label={text.deletePassword}
                     />
                     <textarea
                       value={deleteReason}
                       onChange={event => setDeleteReason(event.target.value)}
                       placeholder={text.deleteReason}
                       rows={3}
-                      className="ui-control w-full px-3 py-2 text-sm"
+                      className={SETTINGS_TEXTAREA_CLASS}
                       disabled={!user?.hasPassword}
+                      aria-label={text.deleteReason}
                     />
                   </div>
                   <button

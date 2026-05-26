@@ -56,7 +56,7 @@ export function Footer() {
           : 'Find suppliers, services, and business opportunities without extra friction.',
       summary:
         locale === 'id'
-          ? 'Sekali buka, langsung tahu mau cari, posting, atau lanjut jalanin usaha.'
+          ? 'Buka, pilih aksi, lanjut jalan.'
           : 'Open once and move straight into search, posting, or daily business work.',
       ctaSearch: locale === 'id' ? 'Buka pencarian' : 'Open search',
       ctaCreate: locale === 'id' ? 'Posting cepat' : 'Post fast',

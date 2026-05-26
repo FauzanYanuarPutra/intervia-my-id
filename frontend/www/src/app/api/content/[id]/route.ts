@@ -134,6 +134,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const resolvedParams = await params;
+  const resolvedContentId = extractContentId(resolvedParams.id);
+
   if (!marketplaceBase) {
     return NextResponse.json(
       { error: 'Marketplace service URL not configured' },
@@ -141,8 +144,6 @@ export async function GET(
     );
   }
 
-  const resolvedParams = await params;
-  const resolvedContentId = extractContentId(resolvedParams.id);
   const includeOwnerProfiles = shouldIncludeOwnerProfiles(
     new URL(req.url).searchParams,
   );

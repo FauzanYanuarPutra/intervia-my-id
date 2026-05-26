@@ -8,6 +8,7 @@ export type CreateRouteTypeId =
   | 'job'
   | 'property'
   | 'tool_rental'
+  | 'business_transfer'
   | 'company';
 
 const CREATE_FLOW_SEGMENTS: Record<
@@ -54,6 +55,19 @@ const CREATE_TYPE_SEGMENTS: Record<
     id: 'sewa-alat',
     en: 'tool-rental',
     aliases: ['sewa-alat', 'tool-rental', 'tool_rental', 'rental'],
+  },
+  business_transfer: {
+    id: 'oper-usaha',
+    en: 'business-transfer',
+    aliases: [
+      'oper-usaha',
+      'business-transfer',
+      'business_transfer',
+      'handover',
+      'takeover',
+      'jual-usaha',
+      'usaha-berjalan',
+    ],
   },
   company: {
     id: 'profil-usaha',
@@ -113,7 +127,9 @@ export function buildCreatePath({
   if (!flow) return '/create';
 
   const flowSegment =
-    locale === 'en' ? CREATE_FLOW_SEGMENTS[flow].en : CREATE_FLOW_SEGMENTS[flow].id;
+    locale === 'en'
+      ? CREATE_FLOW_SEGMENTS[flow].en
+      : CREATE_FLOW_SEGMENTS[flow].id;
   const normalizedType = cleanRouteToken(type);
   if (
     normalizedType &&
@@ -135,7 +151,8 @@ export function resolveMarketplaceCreatePath(
   type: string,
   listingSide: ListingSide = 'demand',
 ): string {
-  const normalizedType = cleanRouteToken(type);
+  const normalizedType =
+    normalizeCreateTypeSegment(type) || cleanRouteToken(type);
   if (
     normalizedType === 'umkm' ||
     normalizedType === 'business' ||
@@ -161,7 +178,8 @@ export function resolveMarketplaceCreatePath(
     normalizedType === 'product' ||
     normalizedType === 'service' ||
     normalizedType === 'property' ||
-    normalizedType === 'tool_rental'
+    normalizedType === 'tool_rental' ||
+    normalizedType === 'business_transfer'
   ) {
     return buildCreatePath({
       locale,

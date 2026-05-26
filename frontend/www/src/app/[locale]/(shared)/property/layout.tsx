@@ -7,7 +7,7 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
   id: {
     title: 'Lajukan Lokasi Usaha | Kios, Ruko, Booth, dan Tempat Jualan',
     description:
-      'Temukan kios, ruko, booth, lapak, dan lokasi jualan yang cocok untuk operasional usaha di Lajukan.',
+      'Cari kios, ruko, booth, lapak, dan lokasi jualan.',
     keywords: [
       'lokasi usaha',
       'sewa kios',

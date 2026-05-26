@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useState, type CSSProperties } from 'react';
+import { LajukanImage } from '@/components/common/LajukanImage';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,7 @@ import {
   BriefcaseBusiness,
   CircleDollarSign,
   Clock3,
+  Handshake,
   House,
   MapPin,
   Package2,
@@ -27,6 +29,7 @@ type DiscoveryCardType =
   | 'property'
   | 'service'
   | 'tool_rental'
+  | 'business_transfer'
   | 'umkm'
   | 'other';
 
@@ -91,14 +94,14 @@ const TYPE_ACCENTS: Record<
     softBg: 'bg-red-50 dark:bg-red-500/10',
   },
   freelancer: {
-    accent: '#7c3aed',
-    softText: 'text-violet-700 dark:text-violet-300',
-    softBg: 'bg-violet-50 dark:bg-violet-500/10',
+    accent: '#65a30d',
+    softText: 'text-lime-800 dark:text-lime-300',
+    softBg: 'bg-lime-50 dark:bg-lime-500/10',
   },
   product: {
-    accent: '#0284c7',
-    softText: 'text-sky-700 dark:text-sky-300',
-    softBg: 'bg-sky-50 dark:bg-sky-500/10',
+    accent: '#128a45',
+    softText: 'text-emerald-700 dark:text-emerald-300',
+    softBg: 'bg-emerald-50 dark:bg-emerald-500/10',
   },
   property: {
     accent: '#d97706',
@@ -114,6 +117,11 @@ const TYPE_ACCENTS: Record<
     accent: '#ea580c',
     softText: 'text-orange-700 dark:text-orange-300',
     softBg: 'bg-orange-50 dark:bg-orange-500/10',
+  },
+  business_transfer: {
+    accent: '#047857',
+    softText: 'text-emerald-700 dark:text-emerald-300',
+    softBg: 'bg-emerald-50 dark:bg-emerald-500/10',
   },
   umkm: {
     accent: '#0d9488',
@@ -134,20 +142,19 @@ const TYPE_ICONS: Record<DiscoveryCardType, LucideIcon> = {
   property: House,
   service: Wrench,
   tool_rental: Wrench,
+  business_transfer: Handshake,
   umkm: Store,
   other: Package2,
 };
 
-const CATEGORY_LABELS: Record<
-  DiscoveryCardType,
-  { id: string; en: string }
-> = {
+const CATEGORY_LABELS: Record<DiscoveryCardType, { id: string; en: string }> = {
   job: { id: 'Lowongan', en: 'Jobs' },
   freelancer: { id: 'Freelancer', en: 'Talent' },
   product: { id: 'Produk', en: 'Product' },
   property: { id: 'Properti', en: 'Property' },
   service: { id: 'Jasa', en: 'Service' },
   tool_rental: { id: 'Sewa', en: 'Rental' },
+  business_transfer: { id: 'Oper Usaha', en: 'Transfer' },
   umkm: { id: 'UMKM', en: 'Business' },
   other: { id: 'Info', en: 'Info' },
 };
@@ -217,6 +224,7 @@ function isLikelyPlaceholderImage(src?: string): boolean {
   return (
     value.startsWith('data:image/svg+xml') ||
     value.includes('loremflickr.com') ||
+    value.includes('picsum.photos') ||
     value.includes('i.pravatar.cc') ||
     value.includes('api.dicebear.com') ||
     value.includes('placeholder') ||
@@ -349,7 +357,7 @@ function useCardActions(
         : 'Apply'
       : profileIsPrimary
         ? locale === 'id'
-          ? 'Lihat profil'
+          ? 'Profil'
           : 'Profile'
         : locale === 'id'
           ? 'Buka'
@@ -422,13 +430,15 @@ function MediaThumb({
     >
       {image ? (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <LajukanImage
             src={image}
             alt={item.title}
-            className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.02]"
+            fill
+            sizes={
+              variant === 'avatar' ? '96px' : '(max-width: 640px) 75vw, 320px'
+            }
+            className="object-cover transition duration-500 ease-out group-hover:scale-[1.02]"
             loading="lazy"
-            decoding="async"
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.08)_46%,rgba(15,23,42,0.3))]" />
         </>
@@ -712,13 +722,9 @@ export function MarketplaceDiscoveryCard({
         </Link>
 
         {simple ? (
-          <div className="mt-2.5">
-            {renderAction(primary)}
-          </div>
+          <div className="mt-2.5">{renderAction(primary)}</div>
         ) : shouldCollapseActionsInRail ? (
-          <div className="mt-2.5">
-            {renderAction(primary)}
-          </div>
+          <div className="mt-2.5">{renderAction(primary)}</div>
         ) : (
           <div
             className={cn(

@@ -1228,8 +1228,7 @@ export default function EditProfilePage() {
                 URL profil publik
               </p>
               <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                Pakai huruf kecil, angka, dan tanda minus supaya link mudah
-                diingat dan gampang dibagikan.
+                Pakai huruf kecil, angka, dan tanda minus.
               </p>
               <div className="mt-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm font-semibold text-[color:var(--app-text)] break-all dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]">
                 {publicProfileDisplayUrl}
@@ -1546,8 +1545,7 @@ export default function EditProfilePage() {
                   Experience
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  Isi pengalaman kerja atau proyek penting supaya buyer paham
-                  track record Anda.
+                  Isi pengalaman atau proyek penting.
                 </p>
               </div>
               <button
@@ -1626,8 +1624,7 @@ export default function EditProfilePage() {
                   Links & Portfolio
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  Pakai untuk LinkedIn, website, GitHub, atau portfolio agar
-                  orang bisa verifikasi karya Anda.
+                  Tambah LinkedIn, website, GitHub, atau portfolio.
                 </p>
               </div>
               <button
@@ -1738,8 +1735,7 @@ export default function EditProfilePage() {
               Buyer Preferences
             </h2>
             <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-              Berguna untuk matching kebutuhan, budget, dan rekomendasi vendor
-              yang masuk akal buat Anda.
+              Bantu matching kebutuhan, budget, dan vendor.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <input
@@ -2017,8 +2013,7 @@ export default function EditProfilePage() {
         }
       >
         <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
-          Isi hanya yang penting supaya profile tetap enak dibaca. Satu card
-          education biasanya cukup singkat.
+          Isi yang penting saja. Satu card cukup singkat.
         </p>
         <div className="grid gap-3">
           <input

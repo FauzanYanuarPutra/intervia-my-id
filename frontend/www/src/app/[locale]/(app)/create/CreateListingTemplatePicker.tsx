@@ -55,7 +55,7 @@ export function CreateListingTemplatePicker({
             key={template.id}
             type="button"
             onClick={() => onApplyTemplate(template.id)}
-            className="group relative overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-left shadow-[0_12px_22px_-18px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50/85 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/68 dark:hover:border-sky-800 dark:hover:bg-sky-950/20"
+            className="group relative overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-left shadow-[0_12px_22px_-18px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:border-teal-200 hover:bg-teal-50/85 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/68 dark:hover:border-teal-800 dark:hover:bg-teal-950/20"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">

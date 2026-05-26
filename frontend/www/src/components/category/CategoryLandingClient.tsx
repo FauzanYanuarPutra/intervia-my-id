@@ -22,6 +22,12 @@ import {
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotificationInbox } from '@/context/NotificationInboxContext';
+import { Header } from '@/components/layout/Header';
+import {
+  localContentImageForTopic,
+  localHomeVisual,
+  localProductImageForCategory,
+} from '@/lib/media/localSeedMedia';
 import { cn } from '@/lib/utils';
 
 type Copy = {
@@ -30,7 +36,12 @@ type Copy = {
 };
 
 type Tone = 'emerald' | 'rose' | 'sky' | 'violet' | 'amber';
-type LeafCategoryId = 'supplier' | 'location' | 'service' | 'product' | 'talent';
+type LeafCategoryId =
+  | 'supplier'
+  | 'location'
+  | 'service'
+  | 'product'
+  | 'talent';
 type CategoryId = 'all' | LeafCategoryId;
 
 type CategoryDefinition = {
@@ -83,22 +94,22 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
     icon: ShoppingBag,
     label: { id: 'Supplier', en: 'Suppliers' },
     summary: {
-      id: 'Temukan supplier terpercaya untuk kebutuhan usahamu',
+      id: 'Supplier siap buat usahamu',
       en: 'Find trusted suppliers for your business needs',
     },
     description: {
-      id: 'Temukan supplier terpercaya untuk kebutuhan usahamu',
+      id: 'Supplier stok, bahan baku, grosir.',
       en: 'Discover reliable suppliers for daily stock, raw materials, and wholesale sourcing.',
     },
     heroTitle: {
-      id: 'Cari supplier terbaik untuk kebutuhan usahamu',
+      id: 'Cari supplier cepat',
       en: 'Find the best suppliers for your business needs',
     },
     heroDescription: {
       id: 'Terpercaya, berkualitas, dan harga bersaing',
       en: 'Trusted quality with competitive pricing',
     },
-    illustration: '/images/umkm/banner-supplier.svg',
+    illustration: localHomeVisual('supplier'),
     browseHref: '/search?q=supplier%20bahan%20baku',
     searchQuery: 'supplier bahan baku',
   },
@@ -108,22 +119,22 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
     icon: MapPin,
     label: { id: 'Lokasi Usaha', en: 'Business Locations' },
     summary: {
-      id: 'Temukan lokasi strategis untuk bisnismu',
+      id: 'Lokasi usaha siap cek',
       en: 'Find strategic places for your business',
     },
     description: {
-      id: 'Temukan lokasi strategis untuk bisnismu',
+      id: 'Kios, booth, ruko, dapur.',
       en: 'Compare kiosks, booths, cloud kitchens, and other spaces that match your budget.',
     },
     heroTitle: {
-      id: 'Temukan lokasi usaha yang paling cocok',
+      id: 'Cari lokasi usaha',
       en: 'Find the business location that fits you best',
     },
     heroDescription: {
-      id: 'Bandingkan area, traffic, dan budget dengan cepat',
+      id: 'Cek area, traffic, budget.',
       en: 'Compare area, traffic, and budget faster',
     },
-    illustration: '/images/umkm/banner-location.svg',
+    illustration: localHomeVisual('location'),
     browseHref: '/property',
     searchQuery: 'lokasi usaha',
   },
@@ -133,22 +144,22 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
     icon: BriefcaseBusiness,
     label: { id: 'Jasa', en: 'Services' },
     summary: {
-      id: 'Pilih jasa yang bantu operasional tetap jalan',
+      id: 'Jasa biar operasional jalan',
       en: 'Pick services that keep operations moving',
     },
     description: {
-      id: 'Pilih jasa yang bantu operasional tetap jalan',
+      id: 'Desain, admin, legal, foto.',
       en: 'Find design, admin, legal, photography, and execution support in one place.',
     },
     heroTitle: {
-      id: 'Pilih jasa pendukung operasional usaha',
+      id: 'Pilih jasa operasional',
       en: 'Choose service partners for your operations',
     },
     heroDescription: {
       id: 'Dari desain, admin, hingga eksekusi lapangan',
       en: 'From design and admin to hands-on execution',
     },
-    illustration: '/images/umkm/content-service.svg',
+    illustration: localContentImageForTopic('service', 'category-service'),
     browseHref: '/search?q=jasa%20usaha',
     searchQuery: 'jasa usaha',
   },
@@ -158,22 +169,22 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
     icon: Package,
     label: { id: 'Produk', en: 'Products' },
     summary: {
-      id: 'Cari stok siap jual yang cepat diputar',
+      id: 'Stok siap jual',
       en: 'Find ready-to-sell products with faster turnover',
     },
     description: {
-      id: 'Cari stok siap jual yang cepat diputar',
+      id: 'Produk, frozen food, grosir.',
       en: 'Explore products, frozen food, retail stock, and wholesale-ready items for resale.',
     },
     heroTitle: {
-      id: 'Temukan stok produk siap jual untuk tokomu',
+      id: 'Cari stok toko',
       en: 'Find ready-to-sell stock for your store',
     },
     heroDescription: {
-      id: 'Cepat putar, margin aman, dan supplier rapi',
+      id: 'Cepat putar, margin aman.',
       en: 'Fast-moving items, safer margins, cleaner sourcing',
     },
-    illustration: '/images/umkm/content-product.svg',
+    illustration: localContentImageForTopic('product', 'category-product'),
     browseHref: '/marketplace',
     searchQuery: 'produk reseller',
   },
@@ -183,29 +194,29 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
     icon: UserRound,
     label: { id: 'Talent', en: 'Talent' },
     summary: {
-      id: 'Temukan talent andal untuk bantu tim usahamu',
+      id: 'Talent siap bantu',
       en: 'Find dependable talent to support your business team',
     },
     description: {
-      id: 'Temukan talent andal untuk bantu tim usahamu',
+      id: 'Admin, konten, sales, operator.',
       en: 'Search for creators, admin staff, sales support, and other business-ready talent.',
     },
     heroTitle: {
-      id: 'Cari talent yang siap bantu bisnis tumbuh',
+      id: 'Cari talent cepat',
       en: 'Find talent that helps your business grow',
     },
     heroDescription: {
       id: 'Freelancer, admin, sales, dan partner kreatif',
       en: 'Freelancers, admins, sales support, and creative partners',
     },
-    illustration: '/images/umkm/content-talent.svg',
+    illustration: localContentImageForTopic('talent', 'category-talent'),
     browseHref: '/freelancers',
     searchQuery: 'talent usaha',
   },
 ];
 
 const CATEGORY_BY_ID = Object.fromEntries(
-  CATEGORY_DEFINITIONS.map((item) => [item.id, item]),
+  CATEGORY_DEFINITIONS.map(item => [item.id, item]),
 ) as Record<LeafCategoryId, CategoryDefinition>;
 
 const ALL_CATEGORY_TILE_LABEL: Copy = {
@@ -223,13 +234,13 @@ const BENEFITS: BenefitItem[] = [
   {
     id: 'offers',
     title: { id: 'Banyak Penawaran', en: 'More Offers' },
-    description: { id: 'Dapatkan pilihan terbaik', en: 'Get better comparisons' },
+    description: { id: 'Pilihan terbaik', en: 'Get better comparisons' },
     icon: ShoppingBag,
   },
   {
     id: 'verified',
     title: { id: 'Terverifikasi', en: 'Verified' },
-    description: { id: 'Dari supplier terpercaya', en: 'From trusted partners' },
+    description: { id: 'Supplier tepercaya', en: 'From trusted partners' },
     icon: ShieldCheck,
   },
 ];
@@ -299,44 +310,194 @@ const ALL_CATEGORY_TOPICS: TopicChip[] = [
 
 const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
   supplier: [
-    { id: 'chicken', emoji: '🐔', label: { id: 'Ayam', en: 'Chicken' }, href: '/search?q=supplier%20ayam' },
-    { id: 'meat', emoji: '🥩', label: { id: 'Daging', en: 'Meat' }, href: '/search?q=supplier%20daging' },
-    { id: 'seafood', emoji: '🐟', label: { id: 'Ikan & Seafood', en: 'Seafood' }, href: '/search?q=supplier%20seafood' },
-    { id: 'vegetables', emoji: '🥬', label: { id: 'Sayuran', en: 'Vegetables' }, href: '/search?q=supplier%20sayuran' },
-    { id: 'fruit', emoji: '🍊', label: { id: 'Buah', en: 'Fruit' }, href: '/search?q=supplier%20buah' },
-    { id: 'dry', emoji: '📦', label: { id: 'Bahan Kering', en: 'Dry Goods' }, href: '/search?q=bahan%20kering' },
+    {
+      id: 'chicken',
+      emoji: '🐔',
+      label: { id: 'Ayam', en: 'Chicken' },
+      href: '/search?q=supplier%20ayam',
+    },
+    {
+      id: 'meat',
+      emoji: '🥩',
+      label: { id: 'Daging', en: 'Meat' },
+      href: '/search?q=supplier%20daging',
+    },
+    {
+      id: 'seafood',
+      emoji: '🐟',
+      label: { id: 'Ikan & Seafood', en: 'Seafood' },
+      href: '/search?q=supplier%20seafood',
+    },
+    {
+      id: 'vegetables',
+      emoji: '🥬',
+      label: { id: 'Sayuran', en: 'Vegetables' },
+      href: '/search?q=supplier%20sayuran',
+    },
+    {
+      id: 'fruit',
+      emoji: '🍊',
+      label: { id: 'Buah', en: 'Fruit' },
+      href: '/search?q=supplier%20buah',
+    },
+    {
+      id: 'dry',
+      emoji: '📦',
+      label: { id: 'Bahan Kering', en: 'Dry Goods' },
+      href: '/search?q=bahan%20kering',
+    },
   ],
   location: [
-    { id: 'ruko', emoji: '🏬', label: { id: 'Ruko', en: 'Shophouse' }, href: '/property?q=ruko' },
-    { id: 'kios', emoji: '🛍️', label: { id: 'Kios', en: 'Kiosk' }, href: '/property?q=kios' },
-    { id: 'booth', emoji: '🧺', label: { id: 'Booth', en: 'Booth' }, href: '/property?q=booth' },
-    { id: 'cloud', emoji: '🍽️', label: { id: 'Cloud Kitchen', en: 'Cloud Kitchen' }, href: '/property?q=cloud%20kitchen' },
-    { id: 'warehouse', emoji: '🏭', label: { id: 'Gudang Kecil', en: 'Small Warehouse' }, href: '/property?q=gudang' },
-    { id: 'mall', emoji: '🏢', label: { id: 'Mall Area', en: 'Mall Area' }, href: '/property?q=mall' },
+    {
+      id: 'ruko',
+      emoji: '🏬',
+      label: { id: 'Ruko', en: 'Shophouse' },
+      href: '/property?q=ruko',
+    },
+    {
+      id: 'kios',
+      emoji: '🛍️',
+      label: { id: 'Kios', en: 'Kiosk' },
+      href: '/property?q=kios',
+    },
+    {
+      id: 'booth',
+      emoji: '🧺',
+      label: { id: 'Booth', en: 'Booth' },
+      href: '/property?q=booth',
+    },
+    {
+      id: 'cloud',
+      emoji: '🍽️',
+      label: { id: 'Cloud Kitchen', en: 'Cloud Kitchen' },
+      href: '/property?q=cloud%20kitchen',
+    },
+    {
+      id: 'warehouse',
+      emoji: '🏭',
+      label: { id: 'Gudang Kecil', en: 'Small Warehouse' },
+      href: '/property?q=gudang',
+    },
+    {
+      id: 'mall',
+      emoji: '🏢',
+      label: { id: 'Mall Area', en: 'Mall Area' },
+      href: '/property?q=mall',
+    },
   ],
   service: [
-    { id: 'design', emoji: '🎨', label: { id: 'Desain', en: 'Design' }, href: '/search?q=jasa%20desain' },
-    { id: 'photo', emoji: '📷', label: { id: 'Foto Produk', en: 'Product Photo' }, href: '/search?q=foto%20produk' },
-    { id: 'admin', emoji: '🧾', label: { id: 'Admin', en: 'Admin' }, href: '/search?q=jasa%20admin' },
-    { id: 'legal', emoji: '⚖️', label: { id: 'Legal', en: 'Legal' }, href: '/search?q=jasa%20legal' },
-    { id: 'marketing', emoji: '📣', label: { id: 'Marketing', en: 'Marketing' }, href: '/search?q=jasa%20marketing' },
-    { id: 'delivery', emoji: '🛵', label: { id: 'Kurir', en: 'Courier' }, href: '/search?q=jasa%20kurir' },
+    {
+      id: 'design',
+      emoji: '🎨',
+      label: { id: 'Desain', en: 'Design' },
+      href: '/search?q=jasa%20desain',
+    },
+    {
+      id: 'photo',
+      emoji: '📷',
+      label: { id: 'Foto Produk', en: 'Product Photo' },
+      href: '/search?q=foto%20produk',
+    },
+    {
+      id: 'admin',
+      emoji: '🧾',
+      label: { id: 'Admin', en: 'Admin' },
+      href: '/search?q=jasa%20admin',
+    },
+    {
+      id: 'legal',
+      emoji: '⚖️',
+      label: { id: 'Legal', en: 'Legal' },
+      href: '/search?q=jasa%20legal',
+    },
+    {
+      id: 'marketing',
+      emoji: '📣',
+      label: { id: 'Marketing', en: 'Marketing' },
+      href: '/search?q=jasa%20marketing',
+    },
+    {
+      id: 'delivery',
+      emoji: '🛵',
+      label: { id: 'Kurir', en: 'Courier' },
+      href: '/search?q=jasa%20kurir',
+    },
   ],
   product: [
-    { id: 'frozen', emoji: '🧊', label: { id: 'Frozen Food', en: 'Frozen Food' }, href: '/marketplace?category=Frozen%20Food' },
-    { id: 'drinks', emoji: '🥤', label: { id: 'Minuman', en: 'Drinks' }, href: '/marketplace?category=Minuman' },
-    { id: 'snacks', emoji: '🍪', label: { id: 'Snack', en: 'Snacks' }, href: '/marketplace?category=Snack' },
-    { id: 'staples', emoji: '🛒', label: { id: 'Sembako', en: 'Staples' }, href: '/marketplace?category=Sembako' },
-    { id: 'packaging', emoji: '📦', label: { id: 'Kemasan', en: 'Packaging' }, href: '/marketplace?category=Kemasan' },
-    { id: 'tools', emoji: '🍳', label: { id: 'Peralatan', en: 'Tools' }, href: '/marketplace?category=Peralatan' },
+    {
+      id: 'frozen',
+      emoji: '🧊',
+      label: { id: 'Frozen Food', en: 'Frozen Food' },
+      href: '/marketplace?category=Frozen%20Food',
+    },
+    {
+      id: 'drinks',
+      emoji: '🥤',
+      label: { id: 'Minuman', en: 'Drinks' },
+      href: '/marketplace?category=Minuman',
+    },
+    {
+      id: 'snacks',
+      emoji: '🍪',
+      label: { id: 'Snack', en: 'Snacks' },
+      href: '/marketplace?category=Snack',
+    },
+    {
+      id: 'staples',
+      emoji: '🛒',
+      label: { id: 'Sembako', en: 'Staples' },
+      href: '/marketplace?category=Sembako',
+    },
+    {
+      id: 'packaging',
+      emoji: '📦',
+      label: { id: 'Kemasan', en: 'Packaging' },
+      href: '/marketplace?category=Kemasan',
+    },
+    {
+      id: 'tools',
+      emoji: '🍳',
+      label: { id: 'Peralatan', en: 'Tools' },
+      href: '/marketplace?category=Peralatan',
+    },
   ],
   talent: [
-    { id: 'cashier', emoji: '💳', label: { id: 'Kasir', en: 'Cashier' }, href: '/freelancers?q=kasir' },
-    { id: 'admin', emoji: '🧾', label: { id: 'Admin Toko', en: 'Store Admin' }, href: '/freelancers?q=admin%20toko' },
-    { id: 'creator', emoji: '🎥', label: { id: 'Konten Kreator', en: 'Content Creator' }, href: '/freelancers?q=konten%20kreator' },
-    { id: 'sales', emoji: '🤝', label: { id: 'Sales', en: 'Sales' }, href: '/freelancers?q=sales' },
-    { id: 'ops', emoji: '📋', label: { id: 'Operasional', en: 'Operations' }, href: '/freelancers?q=operasional' },
-    { id: 'design', emoji: '✏️', label: { id: 'Desainer', en: 'Designer' }, href: '/freelancers?q=desainer' },
+    {
+      id: 'cashier',
+      emoji: '💳',
+      label: { id: 'Kasir', en: 'Cashier' },
+      href: '/freelancers?q=kasir',
+    },
+    {
+      id: 'admin',
+      emoji: '🧾',
+      label: { id: 'Admin Toko', en: 'Store Admin' },
+      href: '/freelancers?q=admin%20toko',
+    },
+    {
+      id: 'creator',
+      emoji: '🎥',
+      label: { id: 'Konten Kreator', en: 'Content Creator' },
+      href: '/freelancers?q=konten%20kreator',
+    },
+    {
+      id: 'sales',
+      emoji: '🤝',
+      label: { id: 'Sales', en: 'Sales' },
+      href: '/freelancers?q=sales',
+    },
+    {
+      id: 'ops',
+      emoji: '📋',
+      label: { id: 'Operasional', en: 'Operations' },
+      href: '/freelancers?q=operasional',
+    },
+    {
+      id: 'design',
+      emoji: '✏️',
+      label: { id: 'Desainer', en: 'Designer' },
+      href: '/freelancers?q=desainer',
+    },
   ],
 };
 
@@ -350,7 +511,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '128',
     price: 'Rp 28.000',
     unit: '/kg',
-    image: 'https://picsum.photos/seed/lajukan-kategori-ayam/720/540',
+    image: localProductImageForCategory('ayam', 'kategori-ayam'),
     href: '/search?q=supplier%20ayam%20segar',
     description: {
       id: 'Potongan ayam segar dengan pasokan rutin untuk kebutuhan outlet harian.',
@@ -367,7 +528,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '52',
     price: 'Rp 120.000',
     unit: '/kg',
-    image: 'https://picsum.photos/seed/lajukan-kategori-daging/720/540',
+    image: localProductImageForCategory('daging', 'kategori-daging'),
     href: '/search?q=supplier%20daging',
     description: {
       id: 'Supplier daging sapi dan kambing segar, halal, dan higienis.',
@@ -384,7 +545,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '76',
     price: 'Rp 5.000.000',
     unit: '/bulan',
-    image: 'https://picsum.photos/seed/lajukan-kategori-kantor/720/540',
+    image: localContentImageForTopic('property', 'kategori-kantor'),
     href: '/property?q=kantor%20strategis',
     description: {
       id: 'Lokasi kantor dan showroom dekat akses utama dengan fasilitas siap pakai.',
@@ -401,7 +562,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '54',
     price: 'Rp 250.000',
     unit: '',
-    image: 'https://picsum.photos/seed/lajukan-kategori-logo/720/540',
+    image: localContentImageForTopic('service', 'kategori-logo'),
     href: '/search?q=jasa%20desain%20logo',
     description: {
       id: 'Desain logo dan identitas visual untuk produk, outlet, dan campaign baru.',
@@ -418,7 +579,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '62',
     price: 'Rp 500.000',
     unit: '',
-    image: 'https://picsum.photos/seed/lajukan-kategori-fotografer/720/540',
+    image: localContentImageForTopic('talent', 'kategori-fotografer'),
     href: '/freelancers?q=fotografer%20produk',
     description: {
       id: 'Fotografer berpengalaman untuk katalog, menu, dan konten marketplace.',
@@ -435,7 +596,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '64',
     price: 'Rp 24.000',
     unit: '/kg',
-    image: 'https://picsum.photos/seed/lajukan-kategori-telur/720/540',
+    image: localProductImageForCategory('telur', 'kategori-telur'),
     href: '/search?q=supplier%20telur',
     description: {
       id: 'Menyediakan telur segar berkualitas dengan harga terjangkau.',
@@ -452,7 +613,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '38',
     price: 'Rp 35.000',
     unit: '/kg',
-    image: 'https://picsum.photos/seed/lajukan-kategori-seafood/720/540',
+    image: localProductImageForCategory('seafood', 'kategori-seafood'),
     href: '/search?q=supplier%20seafood',
     description: {
       id: 'Berbagai pilihan seafood segar langsung dari nelayan.',
@@ -469,7 +630,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '41',
     price: 'Rp 3.200.000',
     unit: '/bulan',
-    image: 'https://picsum.photos/seed/lajukan-kategori-kios/720/540',
+    image: localContentImageForTopic('property', 'kategori-kios'),
     href: '/property?q=kios%20pasar',
     description: {
       id: 'Kios dengan traffic tinggi cocok untuk F&B dan retail cepat putar.',
@@ -486,7 +647,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '48',
     price: 'Rp 1.800.000',
     unit: '/bulan',
-    image: 'https://picsum.photos/seed/lajukan-kategori-marketplace/720/540',
+    image: localContentImageForTopic('service', 'kategori-marketplace'),
     href: '/search?q=jasa%20kelola%20marketplace',
     description: {
       id: 'Optimasi listing, balas chat, dan rutinitas operasional marketplace.',
@@ -503,7 +664,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '71',
     price: 'Rp 18.000',
     unit: '/pack',
-    image: 'https://picsum.photos/seed/lajukan-kategori-frozen/720/540',
+    image: localProductImageForCategory('frozen', 'kategori-frozen'),
     href: '/marketplace?category=Frozen%20Food',
     description: {
       id: 'Produk frozen food dengan margin aman dan stok siap kirim.',
@@ -520,7 +681,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '33',
     price: 'Rp 22.000',
     unit: '/botol',
-    image: 'https://picsum.photos/seed/lajukan-kategori-minuman/720/540',
+    image: localProductImageForCategory('minuman', 'kategori-minuman'),
     href: '/marketplace?category=Minuman',
     description: {
       id: 'Minuman siap jual untuk reseller, booth, dan penjualan event.',
@@ -537,7 +698,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '29',
     price: 'Rp 2.800.000',
     unit: '/bulan',
-    image: 'https://picsum.photos/seed/lajukan-kategori-admin/720/540',
+    image: localContentImageForTopic('talent', 'kategori-admin'),
     href: '/freelancers?q=admin%20operasional',
     description: {
       id: 'Bisa bantu order entry, follow up supplier, dan administrasi harian.',
@@ -554,7 +715,7 @@ const SHOWCASE_ITEMS: ShowcaseItem[] = [
     reviews: '35',
     price: 'Rp 1.200.000',
     unit: '/project',
-    image: 'https://picsum.photos/seed/lajukan-kategori-kreator/720/540',
+    image: localContentImageForTopic('talent', 'kategori-kreator'),
     href: '/freelancers?q=konten%20kreator',
     description: {
       id: 'Bikin konten promosi, reels, dan materi upload marketplace.',
@@ -582,24 +743,24 @@ function toneStyles(tone: Tone) {
   }
   if (tone === 'sky') {
     return {
-      active: 'border-sky-500 bg-sky-50 text-sky-700',
-      idle: 'border-slate-200 bg-white text-slate-700 hover:border-sky-200 hover:bg-sky-50/70',
-      icon: 'bg-sky-100 text-sky-600',
-      badge: 'bg-sky-50 text-sky-700',
-      hero: 'from-white via-sky-50 to-cyan-50',
-      shadow: 'shadow-[0_24px_40px_-30px_rgba(14,165,233,0.35)]',
-      accentText: 'text-sky-600',
+      active: 'border-teal-500 bg-teal-50 text-teal-700',
+      idle: 'border-slate-200 bg-white text-slate-700 hover:border-teal-200 hover:bg-teal-50/70',
+      icon: 'bg-teal-100 text-teal-700',
+      badge: 'bg-teal-50 text-teal-700',
+      hero: 'from-white via-teal-50 to-emerald-50',
+      shadow: 'shadow-[0_24px_40px_-30px_rgba(13,148,136,0.35)]',
+      accentText: 'text-teal-700',
     };
   }
   if (tone === 'violet') {
     return {
-      active: 'border-violet-500 bg-violet-50 text-violet-700',
-      idle: 'border-slate-200 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50/70',
-      icon: 'bg-violet-100 text-violet-600',
-      badge: 'bg-violet-50 text-violet-700',
-      hero: 'from-white via-violet-50 to-fuchsia-50',
-      shadow: 'shadow-[0_24px_40px_-30px_rgba(139,92,246,0.35)]',
-      accentText: 'text-violet-600',
+      active: 'border-lime-500 bg-lime-50 text-lime-800',
+      idle: 'border-slate-200 bg-white text-slate-700 hover:border-lime-200 hover:bg-lime-50/70',
+      icon: 'bg-lime-100 text-lime-800',
+      badge: 'bg-lime-50 text-lime-800',
+      hero: 'from-white via-lime-50 to-emerald-50',
+      shadow: 'shadow-[0_24px_40px_-30px_rgba(101,163,13,0.35)]',
+      accentText: 'text-lime-700',
     };
   }
   if (tone === 'amber') {
@@ -657,7 +818,7 @@ function getShowcaseItems(category: CategoryId): ShowcaseItem[] {
   if (category === 'all') {
     return SHOWCASE_ITEMS.slice(0, 5);
   }
-  const filtered = SHOWCASE_ITEMS.filter((item) => item.category === category);
+  const filtered = SHOWCASE_ITEMS.filter(item => item.category === category);
   return filtered.length ? filtered : SHOWCASE_ITEMS.slice(0, 5);
 }
 
@@ -680,13 +841,15 @@ export function CategoryLandingClient({
   const { unreadCount } = useNotificationInbox();
   const [searchValue, setSearchValue] = useState(initialQuery);
   const [desktopCategory, setDesktopCategory] = useState<CategoryId>('all');
-  const [mobileCategory, setMobileCategory] = useState<LeafCategoryId>('supplier');
+  const [mobileCategory, setMobileCategory] =
+    useState<LeafCategoryId>('supplier');
 
   const requestHref = isAuthenticated ? '/create' : '/register';
 
   const desktopCategoryConfig =
     desktopCategory === 'all' ? null : CATEGORY_BY_ID[desktopCategory];
-  const resolvedDesktopConfig = desktopCategoryConfig ?? CATEGORY_DEFINITIONS[0];
+  const resolvedDesktopConfig =
+    desktopCategoryConfig ?? CATEGORY_DEFINITIONS[0];
   const desktopTone = toneStyles(desktopCategoryConfig?.tone || 'emerald');
   const mobileCategoryConfig = CATEGORY_BY_ID[mobileCategory];
   const mobileTone = toneStyles(mobileCategoryConfig.tone);
@@ -700,7 +863,10 @@ export function CategoryLandingClient({
     [mobileCategory],
   );
   const desktopTopics = useMemo(
-    () => (desktopCategory === 'all' ? ALL_CATEGORY_TOPICS : CATEGORY_TOPICS[desktopCategory]),
+    () =>
+      desktopCategory === 'all'
+        ? ALL_CATEGORY_TOPICS
+        : CATEGORY_TOPICS[desktopCategory],
     [desktopCategory],
   );
   const mobileTopics = CATEGORY_TOPICS[mobileCategory];
@@ -717,7 +883,9 @@ export function CategoryLandingClient({
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = searchValue.trim();
-    router.push(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : '/search');
+    router.push(
+      trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : '/search',
+    );
   };
 
   const desktopBannerTitle =
@@ -729,62 +897,66 @@ export function CategoryLandingClient({
   const desktopBannerDescription =
     desktopCategory === 'all'
       ? isId
-        ? 'Buat permintaan spesifik dan dapatkan penawaran terbaik dari banyak supplier terpercaya.'
+        ? 'Tulis kebutuhan. Supplier bisa masuk.'
         : 'Post a specific request and get offers from trusted business partners.'
       : pick(isId, resolvedDesktopConfig.heroDescription);
   const desktopBannerIllustration =
     desktopCategory === 'all'
-      ? '/images/umkm/banner-support.svg'
+      ? localHomeVisual('support')
       : resolvedDesktopConfig.illustration;
 
   return (
-    <main className="page-shell overflow-x-hidden pb-8 pt-3 sm:pt-5">
+    <main className="lajukan-market-page lajukan-market-category page-shell max-lg:!px-0 overflow-x-hidden pb-5 pt-2 sm:pt-4 lg:pb-8">
+      <div className="hidden lg:block">
+        <Header />
+      </div>
+      <div aria-hidden="true" className="hidden h-[4.625rem] lg:block" />
       <div className="mx-auto w-full max-w-[1500px] px-2 sm:px-4 lg:px-6">
-        <section
-          className="lg:hidden"
-          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
-        >
-          <div className="space-y-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h1 className="text-[2rem] font-black tracking-[-0.05em] text-slate-950">
-                  {isId ? 'Kategori' : 'Categories'}
-                </h1>
-              </div>
+        <div className="lg:hidden">
+          <section
+            className="ui-layer-local-topbar fixed inset-x-0 top-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)] backdrop-blur-xl sm:px-3"
+            style={{ paddingTop: 'max(env(safe-area-inset-top), 0.3rem)' }}
+          >
+            <div className="mx-auto flex max-w-[720px] items-center gap-2">
+              <form
+                onSubmit={handleSearchSubmit}
+                className="ui-navbar-search-field flex-1"
+              >
+                <Search className="ui-navbar-search-icon" />
+                <input
+                  type="search"
+                  value={searchValue}
+                  onChange={event => setSearchValue(event.target.value)}
+                  placeholder={
+                    isId
+                      ? 'Cari supplier, jasa, lokasi...'
+                      : 'Search suppliers, locations, services, products, talent...'
+                  }
+                  className="ui-navbar-search-input"
+                />
+              </form>
               <Link
                 href="/notifications"
-                className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_18px_30px_-24px_rgba(15,23,42,0.28)]"
+                className="relative inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.24)]"
                 aria-label={isId ? 'Buka notifikasi' : 'Open notifications'}
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-4.5 w-4.5" />
                 {unreadCount > 0 ? (
-                  <span className="absolute right-1 top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+                  <span className="absolute right-0.5 top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 py-0.5 text-[9px] font-black text-white">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 ) : null}
               </Link>
             </div>
+          </section>
+          <div
+            aria-hidden="true"
+            className="h-[calc(3.55rem+env(safe-area-inset-top))]"
+          />
 
-            <form
-              onSubmit={handleSearchSubmit}
-              className="flex items-center gap-3 rounded-[24px] border border-slate-200 bg-white px-4 py-3 shadow-[0_20px_36px_-30px_rgba(15,23,42,0.2)]"
-            >
-              <Search className="h-5 w-5 text-slate-400" />
-              <input
-                type="search"
-                value={searchValue}
-                onChange={(event) => setSearchValue(event.target.value)}
-                placeholder={
-                  isId
-                    ? 'Cari supplier, lokasi, jasa, produk, talent...'
-                    : 'Search suppliers, locations, services, products, talent...'
-                }
-                className="w-full min-w-0 border-0 bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              />
-            </form>
-
-            <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {CATEGORY_DEFINITIONS.map((item) => {
+          <div className="space-y-3">
+            <div className="-mx-2 flex gap-2 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {CATEGORY_DEFINITIONS.map(item => {
                 const Icon = item.icon;
                 const tone = toneStyles(item.tone);
                 const active = mobileCategory === item.id;
@@ -795,17 +967,17 @@ export function CategoryLandingClient({
                     type="button"
                     onClick={() => setMobileCategory(item.id)}
                     className={cn(
-                      'inline-flex shrink-0 items-center gap-3 rounded-[22px] border px-4 py-3 text-left text-sm font-semibold transition',
+                      'inline-flex shrink-0 items-center gap-2 rounded-[15px] border px-2.5 py-1.5 text-left text-xs font-semibold transition',
                       active ? tone.active : tone.idle,
                     )}
                   >
                     <span
                       className={cn(
-                        'inline-flex h-10 w-10 items-center justify-center rounded-2xl',
+                        'inline-flex h-7 w-7 items-center justify-center rounded-[10px]',
                         tone.icon,
                       )}
                     >
-                      <Icon className="h-4.5 w-4.5" />
+                      <Icon className="h-3.5 w-3.5" />
                     </span>
                     <span>{pick(isId, item.label)}</span>
                   </button>
@@ -815,47 +987,51 @@ export function CategoryLandingClient({
 
             <article
               className={cn(
-                'relative overflow-hidden rounded-[30px] border border-slate-200 bg-gradient-to-br p-6',
+                'relative min-h-[148px] overflow-hidden rounded-[22px] border border-slate-200 bg-gradient-to-br p-4',
                 mobileTone.hero,
                 mobileTone.shadow,
               )}
             >
-              <div className="max-w-[58%] space-y-3">
-                <h2 className="text-[2rem] font-black leading-[1.02] tracking-[-0.06em] text-slate-950">
+              <div className="max-w-[68%] space-y-2">
+                <h2 className="text-[1.45rem] font-black leading-[1.04] tracking-[-0.04em] text-slate-950">
                   {pick(isId, mobileCategoryConfig.heroTitle)}
                 </h2>
-                <p className="text-sm leading-6 text-slate-600">
+                <p className="line-clamp-2 text-xs leading-5 text-slate-600">
                   {pick(isId, mobileCategoryConfig.heroDescription)}
                 </p>
                 <Link
                   href={mobileAction.href}
-                  className="inline-flex min-h-[52px] items-center justify-center rounded-[18px] bg-emerald-600 px-5 text-sm font-semibold text-white shadow-[0_18px_30px_-22px_rgba(22,163,74,0.58)]"
+                  className="inline-flex min-h-[38px] items-center justify-center rounded-[14px] bg-emerald-600 px-4 text-xs font-semibold text-white shadow-[0_14px_26px_-20px_rgba(22,163,74,0.55)]"
                 >
                   {mobileAction.label}
                 </Link>
               </div>
 
-              <div className="pointer-events-none absolute bottom-0 right-0 flex w-[44%] items-end justify-end">
+              <div className="pointer-events-none absolute bottom-0 right-0 flex w-[38%] items-end justify-end">
                 <Image
                   src={mobileCategoryConfig.illustration}
                   alt={pick(isId, mobileCategoryConfig.label)}
                   width={240}
                   height={200}
-                  className="h-auto w-full max-w-[220px] object-contain"
+                  className="h-auto w-full max-w-[170px] object-contain"
                   priority={mobileCategory === 'supplier'}
                 />
               </div>
             </article>
 
             <SectionHeader
-              title={isId ? `${pick(true, mobileCategoryConfig.label)} Populer` : `Popular ${pick(false, mobileCategoryConfig.label)}`}
+              title={
+                isId
+                  ? `${pick(true, mobileCategoryConfig.label)} Populer`
+                  : `Popular ${pick(false, mobileCategoryConfig.label)}`
+              }
               actionHref={mobileCategoryConfig.browseHref}
               actionLabel={isId ? 'Lihat Semua' : 'View All'}
               mobile
             />
 
-            <div className="flex gap-4 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {mobileShowcase.map((item) => (
+            <div className="-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {mobileShowcase.map(item => (
                 <MobileShowcaseCard key={item.id} item={item} isId={isId} />
               ))}
             </div>
@@ -867,17 +1043,17 @@ export function CategoryLandingClient({
               mobile
             />
 
-            <div className="grid grid-cols-3 gap-3">
-              {mobileTopics.map((topic) => (
+            <div className="grid grid-cols-3 gap-2">
+              {mobileTopics.map(topic => (
                 <Link
                   key={topic.id}
                   href={topic.href}
-                  className="rounded-[22px] border border-slate-200 bg-white px-3 py-4 text-center shadow-[0_16px_30px_-28px_rgba(15,23,42,0.2)]"
+                  className="rounded-[16px] border border-slate-200 bg-white px-2 py-2.5 text-center shadow-[0_14px_26px_-24px_rgba(15,23,42,0.18)]"
                 >
-                  <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-2xl">
+                  <span className="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-slate-50 text-xl">
                     {topic.emoji}
                   </span>
-                  <span className="mt-3 block text-sm font-semibold text-slate-900">
+                  <span className="mt-2 block truncate text-xs font-semibold text-slate-900">
                     {pick(isId, topic.label)}
                   </span>
                 </Link>
@@ -891,13 +1067,17 @@ export function CategoryLandingClient({
               mobile
             />
 
-            <div className="space-y-4">
-              {mobileShowcase.slice(0, 3).map((item) => (
-                <MobileRecommendationRow key={`${item.id}-row`} item={item} isId={isId} />
+            <div className="space-y-2">
+              {mobileShowcase.slice(0, 3).map(item => (
+                <MobileRecommendationRow
+                  key={`${item.id}-row`}
+                  item={item}
+                  isId={isId}
+                />
               ))}
             </div>
           </div>
-        </section>
+        </div>
 
         <section className="hidden lg:block">
           <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
@@ -911,7 +1091,7 @@ export function CategoryLandingClient({
                     tone="emerald"
                     onClick={() => setDesktopCategory('all')}
                   />
-                  {CATEGORY_DEFINITIONS.map((item) => (
+                  {CATEGORY_DEFINITIONS.map(item => (
                     <SidebarCategoryButton
                       key={item.id}
                       active={desktopCategory === item.id}
@@ -964,7 +1144,7 @@ export function CategoryLandingClient({
                     </h1>
                     <p className="mt-3 text-base leading-7 text-slate-600">
                       {isId
-                        ? 'Temukan semua yang kamu butuhkan untuk mengembangkan usahamu.'
+                        ? 'Cari yang dibutuhkan. Lanjut chat.'
                         : 'Find the business categories you need to keep your operation moving.'}
                     </p>
                   </div>
@@ -977,10 +1157,10 @@ export function CategoryLandingClient({
                     <input
                       type="search"
                       value={searchValue}
-                      onChange={(event) => setSearchValue(event.target.value)}
+                      onChange={event => setSearchValue(event.target.value)}
                       placeholder={
                         isId
-                          ? 'Cari supplier, lokasi, jasa, produk, talent...'
+                          ? 'Cari supplier, jasa, lokasi...'
                           : 'Search suppliers, locations, services, products, talent...'
                       }
                       className="w-full min-w-0 border-0 bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400"
@@ -995,7 +1175,7 @@ export function CategoryLandingClient({
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-5">
-                  {CATEGORY_DEFINITIONS.map((item) => (
+                  {CATEGORY_DEFINITIONS.map(item => (
                     <DesktopCategoryCard
                       key={item.id}
                       category={item}
@@ -1010,7 +1190,9 @@ export function CategoryLandingClient({
               <article
                 className={cn(
                   'grid gap-6 overflow-hidden rounded-[36px] border border-slate-200 bg-gradient-to-r p-6 shadow-[0_24px_44px_-34px_rgba(15,23,42,0.2)] xl:grid-cols-[minmax(0,1fr)_260px_minmax(0,0.95fr)] xl:items-center xl:p-7',
-                  desktopCategoryConfig ? desktopTone.hero : 'from-white via-emerald-50 to-sky-50',
+                  desktopCategoryConfig
+                    ? desktopTone.hero
+                    : 'from-white via-emerald-50 to-teal-50',
                 )}
               >
                 <div>
@@ -1031,7 +1213,11 @@ export function CategoryLandingClient({
                 <div className="mx-auto flex w-full max-w-[240px] justify-center">
                   <Image
                     src={desktopBannerIllustration}
-                    alt={desktopCategoryConfig ? pick(isId, desktopCategoryConfig.label) : 'Support illustration'}
+                    alt={
+                      desktopCategoryConfig
+                        ? pick(isId, desktopCategoryConfig.label)
+                        : 'Support illustration'
+                    }
                     width={260}
                     height={220}
                     className="h-auto w-full object-contain"
@@ -1039,7 +1225,7 @@ export function CategoryLandingClient({
                 </div>
 
                 <div className="grid gap-4">
-                  {BENEFITS.map((item) => {
+                  {BENEFITS.map(item => {
                     const Icon = item.icon;
                     return (
                       <div
@@ -1081,7 +1267,7 @@ export function CategoryLandingClient({
                 />
 
                 <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
-                  {desktopTopics.map((topic) => (
+                  {desktopTopics.map(topic => (
                     <Link
                       key={topic.id}
                       href={topic.href}
@@ -1100,7 +1286,9 @@ export function CategoryLandingClient({
 
               <div className="space-y-4">
                 <SectionHeader
-                  title={isId ? 'Rekomendasi Untukmu' : 'Recommendations For You'}
+                  title={
+                    isId ? 'Rekomendasi Untukmu' : 'Recommendations For You'
+                  }
                   actionHref={
                     desktopCategory === 'all'
                       ? '/search'
@@ -1110,8 +1298,12 @@ export function CategoryLandingClient({
                 />
 
                 <div className="grid gap-5 xl:grid-cols-5">
-                  {desktopShowcase.map((item) => (
-                    <DesktopShowcaseCard key={item.id} item={item} isId={isId} />
+                  {desktopShowcase.map(item => (
+                    <DesktopShowcaseCard
+                      key={item.id}
+                      item={item}
+                      isId={isId}
+                    />
                   ))}
                 </div>
               </div>
@@ -1139,7 +1331,7 @@ function SectionHeader({
       <h2
         className={cn(
           'font-black tracking-[-0.04em] text-slate-950',
-          mobile ? 'text-[1.8rem]' : 'text-[2rem]',
+          mobile ? 'text-[1.2rem]' : 'text-[2rem]',
         )}
       >
         {title}
@@ -1148,7 +1340,7 @@ function SectionHeader({
         href={actionHref}
         className={cn(
           'shrink-0 font-semibold text-emerald-600 transition hover:text-emerald-700',
-          mobile ? 'text-sm' : 'text-sm',
+          mobile ? 'rounded-full bg-emerald-50 px-2.5 py-1 text-xs' : 'text-sm',
         )}
       >
         {actionLabel}
@@ -1231,7 +1423,12 @@ function DesktopCategoryCard({
       <p className="mt-2 max-w-[15rem] text-sm leading-6 text-slate-600">
         {pick(isId, category.summary)}
       </p>
-      <span className={cn('mt-5 inline-flex items-center gap-2 text-sm font-semibold', palette.accentText)}>
+      <span
+        className={cn(
+          'mt-5 inline-flex items-center gap-2 text-sm font-semibold',
+          palette.accentText,
+        )}
+      >
         {isId ? 'Jelajahi' : 'Explore'}
         <ArrowRight className="h-4 w-4" />
       </span>
@@ -1320,43 +1517,43 @@ function MobileShowcaseCard({
   isId: boolean;
 }) {
   return (
-    <article className="w-[255px] shrink-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_18px_32px_-28px_rgba(15,23,42,0.22)]">
-      <div className="relative aspect-[1.02/0.82] overflow-hidden">
+    <article className="w-[calc(50vw-0.875rem)] min-w-[166px] max-w-[214px] shrink-0 overflow-hidden rounded-[18px] border border-slate-200 bg-white shadow-[0_16px_28px_-26px_rgba(15,23,42,0.22)]">
+      <div className="relative aspect-[1.08/0.82] overflow-hidden">
         <Image
           src={item.image}
           alt={item.title}
           fill
           className="object-cover"
-          sizes="255px"
+          sizes="(max-width: 640px) 50vw, 214px"
         />
         {item.verified ? (
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-emerald-700 shadow-sm">
-            <ShieldCheck className="h-3.5 w-3.5" />
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/92 px-2 py-0.5 text-[9.5px] font-bold text-emerald-700 shadow-sm">
+            <ShieldCheck className="h-3 w-3" />
             Verified
           </span>
         ) : null}
-        <span className="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-slate-600 shadow-sm">
-          <Bookmark className="h-4.5 w-4.5" />
+        <span className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-slate-600 shadow-sm">
+          <Bookmark className="h-4 w-4" />
         </span>
       </div>
-      <div className="space-y-2.5 p-4">
-        <h3 className="text-[1.15rem] font-black leading-[1.2] tracking-[-0.04em] text-slate-950">
+      <div className="space-y-1.5 p-2.5">
+        <h3 className="line-clamp-2 text-sm font-black leading-[1.2] tracking-[-0.03em] text-slate-950">
           {item.title}
         </h3>
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <MapPin className="h-4 w-4" />
-          <span>{item.location}</span>
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <MapPin className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{item.location}</span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
           <span className="font-semibold text-slate-700">{item.rating}</span>
-          <span>
+          <span className="truncate">
             {isId ? `(${item.reviews} ulasan)` : `(${item.reviews} reviews)`}
           </span>
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="truncate text-[11px] text-slate-500">
           {isId ? 'Mulai dari ' : 'Starting at '}
-          <span className="text-[1.1rem] font-black tracking-[-0.03em] text-emerald-600">
+          <span className="text-sm font-black tracking-[-0.02em] text-emerald-600">
             {item.price}
           </span>
           <span>{item.unit}</span>
@@ -1374,38 +1571,44 @@ function MobileRecommendationRow({
   isId: boolean;
 }) {
   return (
-    <article className="flex gap-4 rounded-[28px] border border-slate-200 bg-white p-3 shadow-[0_18px_32px_-28px_rgba(15,23,42,0.22)]">
-      <div className="relative h-[112px] w-[112px] shrink-0 overflow-hidden rounded-[22px]">
-        <Image src={item.image} alt={item.title} fill className="object-cover" sizes="112px" />
+    <article className="flex gap-2.5 rounded-[18px] border border-slate-200 bg-white p-2 shadow-[0_16px_28px_-26px_rgba(15,23,42,0.2)]">
+      <div className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[15px]">
+        <Image
+          src={item.image}
+          alt={item.title}
+          fill
+          className="object-cover"
+          sizes="92px"
+        />
         {item.verified ? (
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/92 px-2 py-1 text-[10px] font-bold text-emerald-700 shadow-sm">
+          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-white/92 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700 shadow-sm">
             <ShieldCheck className="h-3 w-3" />
             Verified
           </span>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="truncate text-[1.2rem] font-black tracking-[-0.04em] text-slate-950">
+          <h3 className="truncate text-sm font-black tracking-[-0.03em] text-slate-950">
             {item.title}
           </h3>
-          <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-            <MapPin className="h-4 w-4 shrink-0" />
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{item.location}</span>
           </div>
-          <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-            <Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-400" />
+          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+            <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
             <span className="font-semibold text-slate-700">{item.rating}</span>
-            <span>
+            <span className="truncate">
               {isId ? `(${item.reviews} ulasan)` : `(${item.reviews} reviews)`}
             </span>
           </div>
-          <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
+          <p className="mt-1 line-clamp-1 text-[11px] leading-4 text-slate-600">
             {pick(isId, item.description)}
           </p>
-          <p className="mt-3 text-sm text-slate-500">
+          <p className="mt-1.5 text-[11px] text-slate-500">
             {isId ? 'Mulai dari ' : 'Starting at '}
-            <span className="text-[1.1rem] font-black tracking-[-0.03em] text-emerald-600">
+            <span className="text-sm font-black tracking-[-0.02em] text-emerald-600">
               {item.price}
             </span>
             <span>{item.unit}</span>
@@ -1413,10 +1616,10 @@ function MobileRecommendationRow({
         </div>
         <Link
           href={item.href}
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600"
           aria-label={isId ? 'Simpan rekomendasi' : 'Save recommendation'}
         >
-          <Bookmark className="h-4.5 w-4.5" />
+          <Bookmark className="h-4 w-4" />
         </Link>
       </div>
     </article>

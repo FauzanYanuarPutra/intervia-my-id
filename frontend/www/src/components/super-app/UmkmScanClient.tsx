@@ -51,7 +51,7 @@ function getCameraEnvironmentError(isId: boolean): string | null {
   }
   if (!window.isSecureContext) {
     return isId
-      ? 'Buka halaman ini lewat HTTPS atau localhost supaya kamera bisa dipakai.'
+      ? 'Buka lewat HTTPS atau localhost untuk pakai kamera.'
       : 'Camera access requires HTTPS or localhost.';
   }
   if (!navigator.mediaDevices?.getUserMedia) {

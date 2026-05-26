@@ -59,14 +59,14 @@ export function buildPrimaryNavItems(
   locale: 'id' | 'en',
 ): PrimaryNavItem[] {
   const createHref = isAuthenticated ? '/create' : '/register';
-  const categoryHref = '/kategori';
+  const categoryHref = '/search';
   const requestHref = isAuthenticated ? '/my-projects' : '/login';
   const accountHref = isAuthenticated ? '/profile' : '/login';
   const text = {
     home: locale === 'id' ? 'Beranda' : 'Home',
-    search: locale === 'id' ? 'Kategori' : 'Categories',
+    search: locale === 'id' ? 'Cari' : 'Search',
     create: locale === 'id' ? 'Buat' : 'Create',
-    umkm: locale === 'id' ? 'Permintaan' : 'Requests',
+    umkm: locale === 'id' ? 'Proyek' : 'Projects',
     account: locale === 'id' ? 'Akun' : 'Account',
   };
 
@@ -92,6 +92,9 @@ export function buildPrimaryNavItems(
         '/marketplace',
         '/property',
         '/microgigs',
+        '/super-app',
+        '/usaha',
+        '/toko',
       ],
     },
     {

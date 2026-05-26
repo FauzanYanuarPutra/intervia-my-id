@@ -114,12 +114,14 @@ pub struct DeleteMeRequest {
 #[derive(Debug, Deserialize, Clone)]
 struct AccessClaims {
     pub sub: String,
+    #[allow(dead_code)]
     pub exp: usize,
     #[serde(default)]
     pub roles: Vec<String>,
     #[serde(default)]
     pub perms: Vec<String>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub username: String,
 }
 

@@ -28,9 +28,9 @@ export function SuperAppLoginGate({
 }: SuperAppLoginGateProps) {
   const highlights = isId
     ? [
-        'Simpan Rumah, Kerja, dan perjalanan terakhir',
-        'Tracking driver real-time setelah order dibuat',
-        'Pembayaran lebih cepat dengan saldo dan voucher',
+        'Simpan alamat favorit',
+        'Tracking driver real-time',
+        'Bayar cepat pakai saldo/voucher',
       ]
     : [
         'Save Home, Work, and recent destinations',
@@ -48,18 +48,18 @@ export function SuperAppLoginGate({
           </p>
           <h3 className="mt-3 text-xl font-[1000] leading-tight tracking-tight text-[color:var(--app-text)]">
             {isId
-              ? 'Masuk dulu untuk konfirmasi order tanpa kehilangan detail perjalanan'
+              ? 'Masuk dulu untuk konfirmasi order'
               : 'Sign in to confirm the order without losing trip details'}
           </h3>
           <p className="mt-2 max-w-[38rem] text-sm text-[color:var(--app-text-soft)]">
             {isId
-              ? 'Pickup, tujuan, estimasi harga, dan opsi kendaraan sudah siap. Tinggal login untuk kirim order ke sistem dispatch.'
+              ? 'Detail sudah siap. Login untuk kirim order.'
               : 'Pickup, destination, estimated fare, and vehicle choice are ready. Sign in to send the order into dispatch.'}
           </p>
         </div>
         <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-success)]">
           <ShieldCheck className="h-3.5 w-3.5" />
-          {isId ? 'Aman, cepat, dan tersimpan' : 'Secure, fast, and saved'}
+          {isId ? 'Aman & tersimpan' : 'Secure, fast, and saved'}
         </span>
       </div>
 

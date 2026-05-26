@@ -15,7 +15,7 @@ export default async function CookiePolicyPage({ params }: PageProps) {
   const isId = locale === 'id';
 
   return (
-    <main className="page-shell page-rhythm pb-24 pt-6 lg:pb-10">
+    <main className="page-shell page-rhythm pb-6 pt-6 lg:pb-10">
       <SummaryCard
         title={isId ? 'Cookie Policy' : 'Cookie Policy'}
         description={

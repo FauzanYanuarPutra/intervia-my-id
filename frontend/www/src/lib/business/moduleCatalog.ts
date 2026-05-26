@@ -170,7 +170,7 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     status: 'live',
     summary: 'Persistent internal knowledge base and team know-how.',
     valueStatement: 'Keep operational knowledge discoverable and reusable.',
-    primaryPath: '/forum',
+    primaryPath: '/community',
     integrations: ['LMS', 'PMS', 'Support'],
     securityFocus: ['Granular read/write permission', 'Versioned knowledge records'],
     kpis: ['Knowledge reuse rate', 'Resolution time', 'Duplicate question ratio'],

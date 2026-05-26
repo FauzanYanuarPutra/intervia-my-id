@@ -2,9 +2,10 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductCard } from '@/components/ui-kit';
+import { Header } from '@/components/layout/Header';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   ChevronLeft,
   Filter,
@@ -139,9 +140,9 @@ export default function MarketplaceClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const lastScrollYRef = useRef(0);
   const autoLoadTargetRef = useRef<HTMLDivElement>(null);
   const autoLoadLockRef = useRef(false);
+  const fallbackHomePath = pathname.startsWith('/en') ? '/en/home' : '/id/home';
 
   const initialFilters = useMemo<Filters>(
     () => ({
@@ -160,7 +161,6 @@ export default function MarketplaceClient() {
     }),
     [searchParams],
   );
-
   const [draftFilters, setDraftFilters] = useState(initialFilters);
   const [filters, setFilters] = useState(initialFilters);
 
@@ -170,20 +170,8 @@ export default function MarketplaceClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
-  const [isVisible, setIsVisible] = useState(true);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const y = window.scrollY;
-      const delta = y - lastScrollYRef.current;
-      if (y <= 10) setIsVisible(true);
-      else if (delta > 15) setIsVisible(false);
-      else if (delta < -10) setIsVisible(true);
-      lastScrollYRef.current = y;
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const handleBack = useAppBack(router, fallbackHomePath);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -381,22 +369,22 @@ export default function MarketplaceClient() {
   }, [items]);
 
   return (
-    <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <header
-        className={clsx(
-          'fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] backdrop-blur-xl transition-transform duration-300 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)]',
-          isVisible ? 'translate-y-0' : '-translate-y-full',
-        )}
-      >
-        <div className="mx-auto max-w-7xl space-y-4 px-4 py-4">
-          <div className="flex flex-col gap-3 md:flex-row">
+    <div className="lajukan-market-page lajukan-market-marketplace min-h-screen bg-[color:var(--app-surface-muted)] pb-6 dark:bg-[color:var(--app-surface-strong)] lg:pb-0">
+      <div className="hidden lg:block">
+        <Header />
+      </div>
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
+        <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
+          <div className="flex flex-col gap-2 md:flex-row">
             <div className="flex flex-grow items-center gap-2">
               <button
+                type="button"
                 title="Back"
-                onClick={() => router.back()}
-                className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 transition-all active:scale-95 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                aria-label="Back"
+                onClick={handleBack}
+                className="inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition-all active:scale-95 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               >
-                <ChevronLeft className="h-5 w-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
+                <ChevronLeft className="h-4.5 w-4.5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
               </button>
 
               <div className="relative flex-grow">
@@ -404,7 +392,7 @@ export default function MarketplaceClient() {
                 <input
                   type="text"
                   placeholder="Search products and services"
-                  className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-3 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                  className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={draftFilters.search}
                   onChange={(event) =>
                     setDraftFilters((prev) => ({ ...prev, search: event.target.value }))
@@ -414,13 +402,13 @@ export default function MarketplaceClient() {
               </div>
             </div>
 
-            <div className="grid flex-1 gap-2 md:max-w-xl md:grid-cols-2">
+            <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] md:max-w-xl md:grid md:grid-cols-2 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
               <select
                 value={draftFilters.category}
                 onChange={(event) =>
                   setDraftFilters((prev) => ({ ...prev, category: event.target.value }))
                 }
-                className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               >
                 <option value="">All categories</option>
                 {categoryOptions.map((category) => (
@@ -437,12 +425,12 @@ export default function MarketplaceClient() {
                   setDraftFilters((prev) => ({ ...prev, location: event.target.value }))
                 }
                 onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
-                className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-5 [&::-webkit-scrollbar]:hidden">
             <input
               type="number"
               min={0}
@@ -451,7 +439,7 @@ export default function MarketplaceClient() {
               onChange={(event) =>
                 setDraftFilters((prev) => ({ ...prev, minPrice: event.target.value }))
               }
-              className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+              className="min-w-[132px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             />
             <input
               type="number"
@@ -461,14 +449,14 @@ export default function MarketplaceClient() {
               onChange={(event) =>
                 setDraftFilters((prev) => ({ ...prev, maxPrice: event.target.value }))
               }
-              className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+              className="min-w-[132px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             />
             <select
               value={draftFilters.condition}
               onChange={(event) =>
                 setDraftFilters((prev) => ({ ...prev, condition: event.target.value }))
               }
-              className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+              className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             >
               <option value="">Any condition</option>
               <option value="new">New</option>
@@ -485,13 +473,13 @@ export default function MarketplaceClient() {
                   sortBy: event.target.value as Filters['sortBy'],
                 }))
               }
-              className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+              className="min-w-[170px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             >
               <option value="latest">Sort: Latest</option>
               <option value="price_low">Sort: Price Low to High</option>
               <option value="price_high">Sort: Price High to Low</option>
             </select>
-            <label className="inline-flex items-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2.5 text-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
+            <label className="inline-flex min-w-[136px] items-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
               <input
                 type="checkbox"
                 checked={draftFilters.inStockOnly}
@@ -517,7 +505,7 @@ export default function MarketplaceClient() {
               <div className="flex flex-wrap items-center gap-2">
                 {filters.search ? (
                   <span className="rounded-lg border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--app-accent)]">
-                    "{filters.search}"
+                    &quot;{filters.search}&quot;
                   </span>
                 ) : null}
                 {filters.category ? (
@@ -560,13 +548,13 @@ export default function MarketplaceClient() {
             )}
           </div>
 
-          <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">Auto-apply filter aktif</p>
+          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">Auto-apply filter aktif</p>
         </div>
       </header>
 
-      <div className="h-[180px] md:h-[150px]" />
+      <div className="h-[160px] md:h-[128px] lg:h-[calc(128px+3.5rem+env(safe-area-inset-top))]" />
 
-      <main className="mx-auto max-w-7xl px-4 pb-24">
+      <main className="mx-auto max-w-[1500px] px-2 pb-5 sm:px-3">
         <section className="mb-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
             <p className="font-semibold text-[color:var(--app-text)]">Loaded Items</p>
@@ -606,7 +594,7 @@ export default function MarketplaceClient() {
             {Array.from({ length: 10 }).map((_, index) => (
               <div
                 key={index}
-                className="h-56 animate-pulse rounded-2xl bg-[color:var(--app-surface)] dark:bg-[color:var(--app-surface-strong)]"
+                className="ui-skeleton ui-skeleton-pulse h-56 rounded-2xl"
               />
             ))}
           </div>
@@ -663,7 +651,7 @@ export default function MarketplaceClient() {
 
             <div
               ref={autoLoadTargetRef}
-              className="flex min-h-[120px] w-full flex-col items-center justify-center py-12"
+              className="flex min-h-[72px] w-full flex-col items-center justify-center py-5"
             >
               {loadingMore ? (
                 <div className="inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--app-text)]">
@@ -678,15 +666,15 @@ export default function MarketplaceClient() {
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center py-24 text-center">
-            <ShoppingBag className="mb-4 h-16 w-16 text-[color:var(--app-text-soft)]" />
+          <div className="flex flex-col items-center py-8 text-center">
+            <ShoppingBag className="mb-3 h-12 w-12 text-[color:var(--app-text-soft)]" />
             <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">No marketplace items found</h2>
             <p className="mt-2 text-sm text-[color:var(--app-text)]">
               Try different keywords or category filters.
             </p>
             <button
               onClick={resetFilters}
-              className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-8 py-3 font-bold text-[color:var(--app-text-inverse)] shadow-lg hover:bg-[color:var(--app-accent-strong)]"
+              className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-5 py-2.5 font-bold text-[color:var(--app-text-inverse)] shadow-lg hover:bg-[color:var(--app-accent-strong)]"
             >
               <RefreshCcw className="h-4 w-4" />
               Reset filters

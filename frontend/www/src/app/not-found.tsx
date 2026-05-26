@@ -5,7 +5,7 @@ import { Z_INDEX } from '@/components/constants/z-index';
 export default function NotFoundPage() {
   return (
     <div
-      className="fixed top-0 bottom-0 left-0 right-0 z-[999999] flex flex-col items-center justify-center min-h-screen text-center px-4 bg-[color:var(--app-surface-strong)]"
+      className="ui-layer-not-found fixed top-0 bottom-0 left-0 right-0 flex flex-col items-center justify-center min-h-screen text-center px-4 bg-[color:var(--app-surface-strong)]"
       style={{ zIndex: Z_INDEX.notFound }}
     >
       <Icon

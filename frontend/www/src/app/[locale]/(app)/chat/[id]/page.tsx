@@ -15,6 +15,8 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Loader2,
   MoreVertical,
@@ -34,6 +36,7 @@ import {
 import { Link, useRouter } from '@/i18n/navigation';
 import { joinRoom, onMessage, sendMessageViaSocket } from '@/lib/chat';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 import { buildAiChatPayload } from '@/lib/aiChat';
 import {
   buildAiRoomCardPayload,
@@ -102,6 +105,14 @@ type DraftAttachment = {
 };
 
 const MAX_COMPOSER_ATTACHMENTS = 10;
+const CHAT_FIELD_LABEL_CLASS =
+  'block text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)]';
+const CHAT_CONTROL_CLASS =
+  'mt-1.5 min-h-[46px] w-full rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+const CHAT_TEXTAREA_CLASS =
+  'mt-1.5 min-h-[116px] w-full resize-y rounded-[14px] border-2 border-slate-300 bg-white px-3.5 py-3 text-[14px] font-medium leading-6 text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+const CHAT_COMPOSER_SHELL_CLASS =
+  'flex min-w-0 flex-1 items-end gap-1 rounded-[24px] border-2 border-slate-300 bg-white px-2 py-1.5 shadow-none transition focus-within:border-[#25d366] focus-within:ring-4 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366]';
 
 const QUICK_EMOJIS = [
   '\u{1F600}',
@@ -172,7 +183,7 @@ const AI_TEMPLATES = [
   {
     id: 'clarify',
     label: 'Minta detail',
-    prompt: 'Tanyakan 2-3 detail agar pekerjaan/penawaran jelas.',
+    prompt: 'Tanyakan 2-3 detail inti.',
   },
   {
     id: 'decline',
@@ -232,8 +243,7 @@ const AI_STRUCTURED_PROMPT_EXAMPLES: Record<
       id: 'supplier',
       labelId: 'Listing supplier',
       labelEn: 'Supplier listing',
-      promptId:
-        'Buat listing supplier bahan baku lokal yang jelas, ringkas, dan cepat dipercaya buyer.',
+      promptId: 'Buat listing supplier yang jelas dan cepat dipercaya.',
       promptEn:
         'Create a local raw-material supplier listing that is clear, concise, and easy for buyers to trust.',
     },
@@ -241,8 +251,7 @@ const AI_STRUCTURED_PROMPT_EXAMPLES: Record<
       id: 'service',
       labelId: 'Listing jasa',
       labelEn: 'Service listing',
-      promptId:
-        'Buat listing jasa operasional usaha dengan scope kerja, hasil, dan ekspektasi timeline yang jelas.',
+      promptId: 'Buat listing jasa dengan scope dan timeline jelas.',
       promptEn:
         'Create an operational service listing with a clear scope, deliverables, and realistic timeline expectations.',
     },
@@ -250,8 +259,7 @@ const AI_STRUCTURED_PROMPT_EXAMPLES: Record<
       id: 'job',
       labelId: 'Lowongan cepat',
       labelEn: 'Quick job post',
-      promptId:
-        'Buat draft lowongan yang singkat tapi tetap jelas soal peran, requirement, dan lokasi kerja.',
+      promptId: 'Buat lowongan singkat: peran, syarat, lokasi.',
       promptEn:
         'Create a short but clear job draft covering the role, requirements, and work location.',
     },
@@ -261,8 +269,7 @@ const AI_STRUCTURED_PROMPT_EXAMPLES: Record<
       id: 'storefront',
       labelId: 'Profil brand',
       labelEn: 'Brand profile',
-      promptId:
-        'Buat profil usaha yang bikin supplier, partner, dan calon buyer cepat paham posisi brand ini.',
+      promptId: 'Buat profil usaha yang cepat dipahami.',
       promptEn:
         'Create a business profile that helps suppliers, partners, and buyers quickly understand the brand position.',
     },
@@ -270,8 +277,7 @@ const AI_STRUCTURED_PROMPT_EXAMPLES: Record<
       id: 'maker',
       labelId: 'Usaha produksi',
       labelEn: 'Production business',
-      promptId:
-        'Buat profil usaha produksi lokal dengan fokus kapasitas, kualitas, dan reliability kerja.',
+      promptId: 'Buat profil produksi: kapasitas, kualitas, reliabilitas.',
       promptEn:
         'Create a local production-business profile focused on capacity, quality, and operational reliability.',
     },
@@ -279,8 +285,7 @@ const AI_STRUCTURED_PROMPT_EXAMPLES: Record<
       id: 'agency',
       labelId: 'Profil agency',
       labelEn: 'Agency profile',
-      promptId:
-        'Buat profil usaha jasa kreatif yang menonjolkan layanan utama, cara kerja, dan nilai bisnis.',
+      promptId: 'Buat profil jasa: layanan, cara kerja, nilai bisnis.',
       promptEn:
         'Create a creative-service business profile that highlights the core services, working style, and business value.',
     },
@@ -461,20 +466,20 @@ type ListingActionDraft = {
   currency: string;
   contentUrl?: string;
   dealKind:
-    | 'job'
-    | 'service'
-    | 'product'
-    | 'property'
-    | 'tool_rental'
-    | 'profile'
-    | 'other';
+  | 'job'
+  | 'service'
+  | 'product'
+  | 'property'
+  | 'tool_rental'
+  | 'profile'
+  | 'other';
   fulfillmentMode:
-    | 'standard'
-    | 'shipping'
-    | 'pickup'
-    | 'remote'
-    | 'onsite'
-    | 'instant';
+  | 'standard'
+  | 'shipping'
+  | 'pickup'
+  | 'remote'
+  | 'onsite'
+  | 'instant';
   pricingMode: 'fixed' | 'request';
 };
 
@@ -570,19 +575,19 @@ function getListingActionDefaults(
       mode === 'direct'
         ? isRental
           ? locale === 'id'
-            ? 'Halo kak, saya mau lanjut sewa. Mohon info jadwal ready, deposit, dan cara ambilnya.'
+            ? 'Halo kak, saya mau sewa. Jadwal dan depositnya gimana?'
             : 'Hi, I want to proceed with the rental. Please share the schedule, deposit, and pickup details.'
           : isProperty
             ? locale === 'id'
-              ? 'Halo kak, saya mau lanjut untuk lokasi ini. Mohon info survey dan syarat deal utamanya.'
+              ? 'Halo kak, saya tertarik lokasi ini. Bisa survey kapan?'
               : 'Hi, I want to proceed with this location. Please share the viewing and key deal terms.'
             : isService
               ? locale === 'id'
-                ? 'Halo kak, saya mau lanjut deal jasa ini. Tolong kirim langkah mulai, timeline, dan catatan kerjanya.'
+                ? 'Halo kak, saya mau lanjut jasa ini. Mulainya gimana?'
                 : 'Hi, I want to proceed with this service. Please share the start steps, timeline, and work notes.'
               : isProduct
                 ? locale === 'id'
-                  ? 'Halo kak, saya mau lanjut order sesuai harga listing. Mohon konfirmasi stok, ongkir, dan langkah bayarnya.'
+                  ? 'Halo kak, saya mau order. Stok dan ongkirnya ada?'
                   : 'Hi, I want to proceed at the listed price. Please confirm stock, delivery, and payment steps.'
                 : locale === 'id'
                   ? 'Saya lanjut sesuai detail listing. Mohon kirim langkah berikutnya.'
@@ -590,49 +595,49 @@ function getListingActionDefaults(
         : draft.listingSide === 'demand'
           ? isJob
             ? locale === 'id'
-              ? 'Halo kak, saya tertarik apply. Saya kirim profil singkat, pengalaman, dan kesiapan saya di sini.'
+              ? 'Halo kak, saya tertarik apply. Ini profil singkat saya.'
               : 'Hi, I want to apply. I am sharing my short profile, experience, and availability here.'
             : isProperty
               ? locale === 'id'
-                ? 'Halo kak, saya punya lokasi yang mungkin cocok. Saya kirim harga, detail, dan catatan utamanya di sini.'
+                ? 'Halo kak, saya punya lokasi cocok. Ini detailnya.'
                 : 'Hi, I may have a suitable location. I am sending the price, details, and key notes here.'
               : isRental
                 ? locale === 'id'
-                  ? 'Halo kak, saya bisa bantu alat yang dibutuhkan. Saya kirim durasi, biaya, dan catatan utamanya di sini.'
+                  ? 'Halo kak, saya bisa bantu alatnya. Ini durasi dan biaya.'
                   : 'Hi, I can support the equipment needed. I am sending duration, pricing, and key notes here.'
                 : locale === 'id'
-                  ? 'Halo kak, saya bisa bantu kebutuhan ini. Saya kirim nominal, scope, dan catatan singkat supaya cepat dicek.'
+                  ? 'Halo kak, saya bisa bantu. Ini nominal dan scope singkat.'
                   : 'Hi, I can help with this need. I am sending the amount, scope, and a short note for quick review.'
           : draft.pricingMode === 'request'
             ? isRental
               ? locale === 'id'
-                ? 'Halo kak, saya tertarik sewa ini. Boleh info jadwal ready, deposit, dan harga akhirnya?'
+                ? 'Halo kak, saya tertarik sewa. Jadwal dan depositnya?'
                 : 'Hi, I am interested in this rental. Could you share the ready schedule, deposit, and final price?'
               : isProperty
                 ? locale === 'id'
-                  ? 'Halo kak, saya tertarik lokasi ini. Boleh info harga deal, survey, dan syarat utamanya?'
+                  ? 'Halo kak, saya tertarik lokasi ini. Harga dan surveynya?'
                   : 'Hi, I am interested in this location. Could you share the deal price, viewing plan, and key terms?'
                 : isService
                   ? locale === 'id'
-                    ? 'Halo kak, saya tertarik jasa ini. Boleh info scope final, timeline, dan harga kerjanya?'
+                    ? 'Halo kak, saya tertarik jasa ini. Scope dan harganya?'
                     : 'Hi, I am interested in this service. Could you share the final scope, timeline, and price?'
                   : isProduct
                     ? locale === 'id'
-                      ? 'Halo kak, saya tertarik produk ini. Boleh info stok ready, harga, dan ongkirnya?'
+                      ? 'Halo kak, produk ini ready? Harga dan ongkirnya?'
                       : 'Hi, I am interested in this product. Could you share stock, price, and delivery cost?'
                     : locale === 'id'
                       ? 'Halo kak, saya tertarik. Boleh kirim detail harga dan ketentuan utamanya?'
                       : 'I am interested. Could you share the price details and key terms?'
             : isRental
               ? locale === 'id'
-                ? 'Halo kak, saya tertarik sewa ini. Saya kirim request durasi, jadwal, dan penawaran awal saya.'
+                ? 'Halo kak, saya tertarik sewa. Ini request awal saya.'
                 : 'Hi, I am interested in this rental. I am sending the duration, schedule, and my initial offer.'
               : isProperty
                 ? locale === 'id'
-                  ? 'Halo kak, saya tertarik lokasi ini. Saya kirim penawaran awal dan catatan singkat saya.'
+                  ? 'Halo kak, saya tertarik lokasi ini. Ini penawaran awal saya.'
                   : 'Hi, I am interested in this location. I am sending my initial offer and a short note.'
                 : locale === 'id'
-                  ? 'Halo kak, saya tertarik. Saya kirim penawaran awal supaya cepat dibahas.'
+                  ? 'Halo kak, saya tertarik. Saya kirim penawaran awal.'
                   : 'Hi, I am interested. Here is my initial offer so we can discuss it quickly.',
   };
 }
@@ -1264,6 +1269,8 @@ export default function ChatRoomPage() {
     refetch: refetchInbox,
   } = useChatInbox();
 
+  const handleBack = useAppBack(router, '/chat');
+
   // Allowed rooms based on inbox (anti URL injection)
   const allowedRoomIds = useMemo(() => {
     const set = new Set<string>();
@@ -1324,7 +1331,7 @@ export default function ChatRoomPage() {
                   : 'Support Room',
               member_ids: [user.id],
             }),
-          }).catch(() => {});
+          }).catch(() => { });
         }
         await refetchInbox();
       } finally {
@@ -1399,7 +1406,7 @@ export default function ChatRoomPage() {
               (typeof payload.username === 'string' && payload.username.trim()
                 ? `@${payload.username.trim()}`
                 : typeof payload.full_name === 'string' &&
-                    payload.full_name.trim()
+                  payload.full_name.trim()
                   ? payload.full_name.trim()
                   : null) || null;
             return label ? { id, label } : null;
@@ -1482,6 +1489,7 @@ export default function ChatRoomPage() {
   const [listingActionMessage, setListingActionMessage] = useState('');
   const [listingActionSubmitting, setListingActionSubmitting] = useState(false);
   const [showTransactionsDrawer, setShowTransactionsDrawer] = useState(false);
+  const [roomSummaryExpanded, setRoomSummaryExpanded] = useState(false);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(
     null,
@@ -1926,7 +1934,7 @@ export default function ChatRoomPage() {
       if (!structured) {
         throw new Error(
           chatLocale === 'id'
-            ? 'Format jawaban AI belum rapi. Coba generate ulang atau rapikan brief-nya.'
+            ? 'Jawaban AI belum rapi. Coba ulang.'
             : 'The AI response format is invalid. Try again or tighten the brief.',
         );
       }
@@ -1959,7 +1967,7 @@ export default function ChatRoomPage() {
     if (!canonicalRoomId) return;
     authFetch(`/api/chat/rooms/${encodeURIComponent(canonicalRoomId)}/read`, {
       method: 'POST',
-    }).catch(() => {});
+    }).catch(() => { });
     try {
       channelRef.current?.push('read', {});
     } catch {
@@ -2135,7 +2143,7 @@ export default function ChatRoomPage() {
           if (channelRef.current && channelRef.current !== channel) {
             try {
               channelRef.current.leave();
-            } catch {}
+            } catch { }
           }
 
           channelRef.current = channel;
@@ -2194,7 +2202,7 @@ export default function ChatRoomPage() {
               setMessages(prev =>
                 prev.map(m =>
                   normId(m.sender_id) === normId(user.id) &&
-                  (m.status === 'sent' || m.status === 'sending')
+                    (m.status === 'sent' || m.status === 'sending')
                     ? { ...m, status: 'read' as MessageStatus }
                     : m,
                 ),
@@ -2274,11 +2282,11 @@ export default function ChatRoomPage() {
                 return prev.map(m =>
                   m.id === payload.client_ref
                     ? {
-                        ...m,
-                        id: msgId,
-                        status: 'sent' as MessageStatus,
-                        created_at: payload.sent_at ?? m.created_at,
-                      }
+                      ...m,
+                      id: msgId,
+                      status: 'sent' as MessageStatus,
+                      created_at: payload.sent_at ?? m.created_at,
+                    }
                     : m,
                 );
               }
@@ -2290,8 +2298,8 @@ export default function ChatRoomPage() {
                 message_type: payload.message_type ?? 'text',
                 attachments: Array.isArray(payload.attachments)
                   ? payload.attachments
-                      .map(normalizeAttachmentUrl)
-                      .filter(Boolean)
+                    .map(normalizeAttachmentUrl)
+                    .filter(Boolean)
                   : [],
                 created_at: payload.sent_at ?? new Date().toISOString(),
                 status: 'sent',
@@ -2313,15 +2321,15 @@ export default function ChatRoomPage() {
               channel.off('call_incoming', incomingCallRef);
               channel.off('call_rejected', callRejectedRef);
               channel.off('call_ended', callEndedRef);
-            } catch {}
+            } catch { }
 
             try {
               messageHandlerDispose?.();
-            } catch {}
+            } catch { }
 
             try {
               channel.leave();
-            } catch {}
+            } catch { }
 
             if (channelRef.current === channel) channelRef.current = null;
             setChannelReady(false);
@@ -2345,7 +2353,7 @@ export default function ChatRoomPage() {
       if (channelRef.current) {
         try {
           channelRef.current.leave();
-        } catch {}
+        } catch { }
         channelRef.current = null;
       }
       setChannelReady(false);
@@ -2471,7 +2479,7 @@ export default function ChatRoomPage() {
         try {
           channelRef.current.push('typing', { is_typing: true });
           lastTypingSentRef.current = now;
-        } catch {}
+        } catch { }
       }
 
       if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
@@ -2484,7 +2492,7 @@ export default function ChatRoomPage() {
               channelRef.current.push('typing', { is_typing: false });
               lastTypingSentRef.current = 0;
             }
-          } catch {}
+          } catch { }
           typingStopTimerRef.current = null;
         }, TYPING_STOP_MS);
         typingDebounceRef.current = null;
@@ -2538,11 +2546,11 @@ export default function ChatRoomPage() {
           prev.map(att =>
             att.id === attachmentId
               ? {
-                  ...att,
-                  serverUrl: fileUrl,
-                  status: 'uploaded',
-                  type: uploadType,
-                }
+                ...att,
+                serverUrl: fileUrl,
+                status: 'uploaded',
+                type: uploadType,
+              }
               : att,
           ),
         );
@@ -2683,7 +2691,7 @@ export default function ChatRoomPage() {
         throw new Error((createData as any)?.error || 'Failed to create chat');
       }
       targetRoomId = newRoomId;
-      await refetchInbox().catch(() => {});
+      await refetchInbox().catch(() => { });
       router.replace(`/chat/${encodeURIComponent(newRoomId)}`);
       return targetRoomId;
     };
@@ -2701,21 +2709,21 @@ export default function ChatRoomPage() {
         const serverMsg = (data as any).message ?? (data as any).data;
         const resolved: Message = serverMsg
           ? {
-              id: serverMsg.id ?? serverMsg.sent_at ?? clientRef,
-              content: serverMsg.content ?? content,
-              sender_id: serverMsg.sender_id ?? user?.id ?? '',
-              message_type: serverMsg.message_type ?? messageType,
-              attachments: Array.isArray(serverMsg.attachments)
-                ? serverMsg.attachments
-                    .map(normalizeAttachmentUrl)
-                    .filter(Boolean)
-                : attachments.map(normalizeAttachmentUrl).filter(Boolean),
-              created_at:
-                serverMsg.created_at ??
-                serverMsg.sent_at ??
-                tempMessage.created_at,
-              status: 'sent',
-            }
+            id: serverMsg.id ?? serverMsg.sent_at ?? clientRef,
+            content: serverMsg.content ?? content,
+            sender_id: serverMsg.sender_id ?? user?.id ?? '',
+            message_type: serverMsg.message_type ?? messageType,
+            attachments: Array.isArray(serverMsg.attachments)
+              ? serverMsg.attachments
+                .map(normalizeAttachmentUrl)
+                .filter(Boolean)
+              : attachments.map(normalizeAttachmentUrl).filter(Boolean),
+            created_at:
+              serverMsg.created_at ??
+              serverMsg.sent_at ??
+              tempMessage.created_at,
+            status: 'sent',
+          }
           : { ...tempMessage, status: 'sent' as MessageStatus };
         setMessages(prev => prev.map(m => (m.id === clientRef ? resolved : m)));
       } else {
@@ -2744,16 +2752,16 @@ export default function ChatRoomPage() {
             prev.map(m =>
               m.id === clientRef
                 ? {
-                    id: result.message_id,
-                    content: result.content ?? content,
-                    sender_id: user?.id ?? '',
-                    message_type: result.message_type ?? messageType,
-                    attachments: (result.attachments ?? attachments)
-                      .map(normalizeAttachmentUrl)
-                      .filter(Boolean),
-                    created_at: result.sent_at,
-                    status: 'sent',
-                  }
+                  id: result.message_id,
+                  content: result.content ?? content,
+                  sender_id: user?.id ?? '',
+                  message_type: result.message_type ?? messageType,
+                  attachments: (result.attachments ?? attachments)
+                    .map(normalizeAttachmentUrl)
+                    .filter(Boolean),
+                  created_at: result.sent_at,
+                  status: 'sent',
+                }
                 : m,
             ),
           );
@@ -2852,9 +2860,9 @@ export default function ChatRoomPage() {
           Array.isArray(data.issues) && data.issues.length > 0
             ? formatValidationIssues(data.issues, chatLocale)
             : data.error ||
-                (chatLocale === 'id'
-                  ? 'Gagal membuat draft listing.'
-                  : 'Failed to create the draft.'),
+            (chatLocale === 'id'
+              ? 'Gagal membuat draft listing.'
+              : 'Failed to create the draft.'),
         );
       }
 
@@ -2947,9 +2955,9 @@ export default function ChatRoomPage() {
             Array.isArray(data.issues) && data.issues.length > 0
               ? formatValidationIssues(data.issues, chatLocale)
               : data.error ||
-                  (chatLocale === 'id'
-                    ? 'Draft belum bisa dipublish.'
-                    : 'The draft cannot be published yet.'),
+              (chatLocale === 'id'
+                ? 'Draft belum bisa dipublish.'
+                : 'The draft cannot be published yet.'),
           );
         }
 
@@ -2966,7 +2974,7 @@ export default function ChatRoomPage() {
             typeof data.title === 'string' && data.title.trim()
               ? data.title
               : typeof meta?.content_title === 'string' &&
-                  meta.content_title.trim()
+                meta.content_title.trim()
                 ? meta.content_title
                 : 'Listing',
             typeof data.slug === 'string' && data.slug.trim()
@@ -3042,7 +3050,7 @@ export default function ChatRoomPage() {
         : '',
       lastIncoming
         ? `Pesan terakhir lawan bicara: "${lastIncoming}"`
-        : 'Belum ada pesan. Buat pesan pembuka singkat dan ramah.',
+        : 'Belum ada pesan. Tulis singkat.',
       'Balasan harus natural, siap dikirim, dan tidak kaku.',
     ].filter(Boolean);
 
@@ -3162,7 +3170,7 @@ export default function ChatRoomPage() {
       try {
         channelRef.current.push('typing', { is_typing: false });
         lastTypingSentRef.current = 0;
-      } catch {}
+      } catch { }
     }
 
     const attachmentUrls = hasAttachments
@@ -3286,10 +3294,10 @@ export default function ChatRoomPage() {
           typeof meta.content_url === 'string' && meta.content_url.trim()
             ? meta.content_url
             : buildContentHref(
-                contentId,
-                String(meta.content_title || 'Listing'),
-                typeof meta.slug === 'string' ? meta.slug : '',
-              ),
+              contentId,
+              String(meta.content_title || 'Listing'),
+              typeof meta.slug === 'string' ? meta.slug : '',
+            ),
         dealKind: mapDealKind(meta.deal_kind ?? meta.content_type),
         fulfillmentMode: mapFulfillmentMode(
           meta.deal_kind ?? meta.content_type,
@@ -3663,7 +3671,7 @@ export default function ChatRoomPage() {
       if (action === 'dispute') {
         const reason = await prompt({
           title: 'Ajukan dispute',
-          description: 'Jelaskan alasan dispute.',
+          description: 'Tulis alasan dispute.',
           placeholder: 'Alasan dispute (wajib)',
           confirmLabel: 'Lanjut',
           cancelLabel: 'Batal',
@@ -3858,11 +3866,11 @@ export default function ChatRoomPage() {
         Object.keys(asObject(txn.safety_checklist)).length > 0
           ? asObject(txn.safety_checklist)
           : {
-              identity_confirmed: true,
-              platform_payment_confirmed: true,
-              item_detail_confirmed: true,
-              anti_scam_acknowledged: true,
-            };
+            identity_confirmed: true,
+            platform_payment_confirmed: true,
+            item_detail_confirmed: true,
+            anti_scam_acknowledged: true,
+          };
       const riskFlags = detectFraudSignals(message).map(signal =>
         signal.severity === 'high'
           ? 'off_platform_or_otp_risk'
@@ -3924,14 +3932,14 @@ export default function ChatRoomPage() {
               ? latest.snapshot_listing.content_url
               : latest.content_id
                 ? buildContentHref(
-                    latest.content_id,
-                    typeof latest.snapshot_listing?.title === 'string'
-                      ? latest.snapshot_listing.title
-                      : 'Listing',
-                    typeof latest.snapshot_listing?.slug === 'string'
-                      ? latest.snapshot_listing.slug
-                      : '',
-                  )
+                  latest.content_id,
+                  typeof latest.snapshot_listing?.title === 'string'
+                    ? latest.snapshot_listing.title
+                    : 'Listing',
+                  typeof latest.snapshot_listing?.slug === 'string'
+                    ? latest.snapshot_listing.slug
+                    : '',
+                )
                 : undefined,
           amount_cents: latest.amount_cents,
           currency: latest.currency,
@@ -4109,9 +4117,13 @@ export default function ChatRoomPage() {
     });
     return activeTxn || roomTransactions[0] || null;
   }, [roomTransactions, selectedTransaction]);
+  const roomSummaryTransactionId = roomSummaryTransaction?.id || '';
+  useEffect(() => {
+    setRoomSummaryExpanded(false);
+  }, [roomSummaryTransactionId]);
   const roomSummaryTxnStatus = normalizeTransactionStatus(
     roomSummaryTransaction?.status ||
-      roomSummaryTransaction?.transaction_status,
+    roomSummaryTransaction?.transaction_status,
   );
   const roomSummaryTxnPaymentStatus = resolveTransactionPaymentStatus(
     roomSummaryTransaction,
@@ -4126,10 +4138,10 @@ export default function ChatRoomPage() {
   );
   const roomSummaryTxnTitle =
     typeof roomSummaryTransaction?.snapshot_listing?.title === 'string' &&
-    roomSummaryTransaction.snapshot_listing.title.trim()
+      roomSummaryTransaction.snapshot_listing.title.trim()
       ? roomSummaryTransaction.snapshot_listing.title
       : typeof roomSummaryTransaction?.content_id === 'string' &&
-          roomSummaryTransaction.content_id.trim()
+        roomSummaryTransaction.content_id.trim()
         ? roomSummaryTransaction.content_id
         : chatLocale === 'id'
           ? 'Transaksi aktif'
@@ -4229,17 +4241,17 @@ export default function ChatRoomPage() {
   );
   const selectedTxnSide = selectedTransaction
     ? resolveListingSide({
-        type:
-          selectedTransaction.deal_kind ??
-          selectedTransaction.snapshot_listing?.content_type,
-        metadata: selectedTxnMeta,
-        title: selectedTransaction.snapshot_listing?.title,
-      })
+      type:
+        selectedTransaction.deal_kind ??
+        selectedTransaction.snapshot_listing?.content_type,
+      metadata: selectedTxnMeta,
+      title: selectedTransaction.snapshot_listing?.title,
+    })
     : 'supply';
   const selectedTxnSideLabel = getListingSideContextLabel(
     selectedTxnSide,
     selectedTransaction?.deal_kind ??
-      selectedTransaction?.snapshot_listing?.content_type,
+    selectedTransaction?.snapshot_listing?.content_type,
     chatLocale,
   );
   const canListingActionDirect = Boolean(
@@ -4275,10 +4287,10 @@ export default function ChatRoomPage() {
     ? ''
     : chatLocale === 'id'
       ? listingActionDraft.listingSide === 'demand'
-        ? 'Balasan ini akan dikirim sebagai tiket terstruktur agar nominal, scope, dan tindak lanjut terbaca jelas.'
+        ? 'Balasan dikirim sebagai tiket rapi.'
         : canListingActionDirect
-          ? 'Satu modal untuk pilih lanjut langsung atau negosiasi dulu. Detailnya tetap dikirim ke chat sebagai tiket.'
-          : 'Harga belum fix. Pakai modal ini untuk kirim budget atau mulai tanya detail lewat chat.'
+          ? 'Pilih lanjut langsung atau nego dulu.'
+          : 'Harga belum fix. Kirim budget atau tanya detail.'
       : listingActionDraft.listingSide === 'demand'
         ? 'This reply will be sent as a structured ticket so amount, scope, and next steps stay clear.'
         : canListingActionDirect
@@ -4311,15 +4323,15 @@ export default function ChatRoomPage() {
     : null;
   const structuredDraftPublishValidation = structuredDraftPayload
     ? validateListingPayload(
-        {
-          ...structuredDraftPayload,
-          content_status: 'active',
-        },
-        {
-          mode: 'create',
-          strictActiveValidation: true,
-        },
-      )
+      {
+        ...structuredDraftPayload,
+        content_status: 'active',
+      },
+      {
+        mode: 'create',
+        strictActiveValidation: true,
+      },
+    )
     : null;
   const structuredDraftPublishIssues =
     structuredDraftPublishValidation && !structuredDraftPublishValidation.ok
@@ -4344,19 +4356,15 @@ export default function ChatRoomPage() {
   }
 
   const composerOffset = isMobileViewport ? keyboardOffset : 0;
-  const messageListPadding =
-    isMobileViewport && composerHeight > 0
-      ? `calc(${composerHeight}px + ${composerOffset}px + env(safe-area-inset-bottom))`
-      : undefined;
   const messageListSpacerHeight =
     isMobileViewport && composerHeight > 0
       ? `calc(${composerHeight}px + ${composerOffset}px + env(safe-area-inset-bottom))`
       : undefined;
   const composerStyle = isMobileViewport
     ? {
-        transform: `translateY(-${composerOffset}px)`,
-        paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
-      }
+      transform: `translateY(-${composerOffset}px)`,
+      paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
+    }
     : undefined;
 
   if (!canonicalRoomId) {
@@ -4411,228 +4419,292 @@ export default function ChatRoomPage() {
 
   return (
     <div
-      className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]"
+      className="flex h-full max-h-full min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]"
       style={{
-        paddingBottom: 'env(safe-area-inset-bottom)',
         backgroundColor: 'transparent',
       }}
     >
-      <header className="sticky top-0 z-40 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
-        <div className="flex min-w-0 items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3">
-          {/* Mobile back */}
-          <button
-            onClick={() => router.push('/chat')}
-            className="rounded-full p-2 text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5 lg:hidden"
-            aria-label={
-              chatLocale === 'id' ? 'Kembali ke chat' : 'Back to chats'
-            }
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
+      <header className="z-40 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
+        <div className="min-w-0 px-2.5 py-2 sm:px-4 sm:py-2.5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <button
+              onClick={handleBack}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#54656f] shadow-sm transition hover:bg-black/5 dark:border-white/10 dark:bg-[#111b21] dark:text-[#aebac1] dark:hover:bg-white/5 lg:hidden"
+              aria-label={
+                chatLocale === 'id' ? 'Kembali ke chat' : 'Back to chats'
+              }
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
 
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dfe5e7] text-sm font-semibold text-[#54656f] dark:bg-[#2a3942] dark:text-[#d1d7db] sm:h-11 sm:w-11">
-            {roomInitial}
-          </div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dfe5e7] text-sm font-semibold text-[#54656f] dark:bg-[#2a3942] dark:text-[#d1d7db] sm:h-11 sm:w-11">
+              {roomInitial}
+            </div>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-[15px] font-medium text-[#111b21] dark:text-[#e9edef] sm:text-base">
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-[15px] font-semibold leading-5 text-[#111b21] dark:text-[#e9edef] sm:text-base">
                 {roomName}
               </h1>
-              {roomKind !== 'direct' ? (
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    roomKind === 'group'
-                      ? 'bg-[#dfe5e7] text-[#54656f] dark:bg-[#2a3942] dark:text-[#aebac1]'
-                      : 'bg-[#fff3cd] text-[#8a6d1d] dark:bg-[#3b2f12] dark:text-[#f6d87a]'
-                  }`}
-                >
-                  {roomKind === 'group'
-                    ? chatLocale === 'id'
-                      ? 'Grup'
-                      : 'Group'
-                    : chatLocale === 'id'
-                      ? 'Bantuan'
-                      : 'Support'}
-                </span>
-              ) : null}
             </div>
-            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-[#667781] dark:text-[#8696a0] sm:text-xs">
-              <span className={`h-2 w-2 rounded-full ${statusInfo.dotClass}`} />
-              <span className="truncate">
+
+            <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+              <button
+                onClick={() => void startOutgoingCall('video')}
+                className="hidden h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 min-[360px]:inline-flex dark:text-[#aebac1] dark:hover:bg-white/5"
+                aria-label="Start video call"
+                disabled={
+                  !channelReady ||
+                  !channelRef.current ||
+                  showVideoCall ||
+                  showVoiceCall ||
+                  !!incomingCall
+                }
+                title={
+                  !channelReady
+                    ? chatLocale === 'id'
+                      ? 'Menghubungkan...'
+                      : 'Connecting...'
+                    : chatLocale === 'id'
+                      ? 'Panggilan video'
+                      : 'Video call'
+                }
+              >
+                <Video className="h-5 w-5" />
+              </button>
+
+              <button
+                onClick={() => void startOutgoingCall('voice')}
+                className="hidden h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 min-[360px]:inline-flex dark:text-[#aebac1] dark:hover:bg-white/5"
+                aria-label="Start voice call"
+                disabled={
+                  !channelReady ||
+                  !channelRef.current ||
+                  showVideoCall ||
+                  showVoiceCall ||
+                  !!incomingCall
+                }
+                title={
+                  !channelReady
+                    ? chatLocale === 'id'
+                      ? 'Menghubungkan...'
+                      : 'Connecting...'
+                    : chatLocale === 'id'
+                      ? 'Panggilan suara'
+                      : 'Voice call'
+                }
+              >
+                <Phone className="h-5 w-5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowChatSettings(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5"
+                aria-label={
+                  chatLocale === 'id' ? 'Pengaturan chat' : 'Chat settings'
+                }
+                title={
+                  chatLocale === 'id' ? 'Pengaturan chat' : 'Chat settings'
+                }
+              >
+                <MoreVertical className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="inline-flex min-h-[28px] min-w-0 max-w-full items-center gap-1.5 rounded-full bg-white/70 px-2.5 text-[11px] font-medium text-[#667781] dark:bg-[#111b21]/50 dark:text-[#aebac1] sm:text-xs">
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${statusInfo.dotClass}`}
+              />
+              <span className="min-w-0 truncate">
                 {typingUser
                   ? chatLocale === 'id'
                     ? `${typingUser} sedang mengetik...`
                     : `${typingUser} is typing...`
                   : statusInfo.subtext}
               </span>
-            </div>
-          </div>
+            </span>
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            {roomKind !== 'direct' ? (
+              <span
+                className={`inline-flex min-h-[28px] shrink-0 items-center rounded-full px-2.5 text-[10px] font-semibold ${roomKind === 'group'
+                  ? 'bg-[#dfe5e7] text-[#54656f] dark:bg-[#2a3942] dark:text-[#aebac1]'
+                  : 'bg-[#fff3cd] text-[#8a6d1d] dark:bg-[#3b2f12] dark:text-[#f6d87a]'
+                  }`}
+              >
+                {roomKind === 'group'
+                  ? chatLocale === 'id'
+                    ? 'Grup'
+                    : 'Group'
+                  : chatLocale === 'id'
+                    ? 'Bantuan'
+                    : 'Support'}
+              </span>
+            ) : null}
+
             <button
               onClick={() => setShowTransactionsDrawer(prev => !prev)}
-              className="inline-flex h-10 min-w-10 items-center justify-center gap-1 rounded-full px-2.5 text-[11px] font-medium text-[#54656f] transition hover:bg-black/5 max-[340px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5 sm:px-3"
+              className="inline-flex min-h-[28px] shrink-0 items-center gap-1.5 rounded-full bg-white/70 px-2.5 text-[11px] font-semibold text-[#54656f] transition hover:bg-white dark:bg-[#111b21]/50 dark:text-[#aebac1] dark:hover:bg-[#111b21]"
               aria-label={
                 chatLocale === 'id' ? 'Buka transaksi' : 'Open transactions'
               }
               title={chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
             >
-              <ReceiptText className="h-4 w-4" />
-              <span className="hidden xl:inline">
-                {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
-              </span>
-            </button>
-
-            <button
-              onClick={() => void startOutgoingCall('video')}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 max-[340px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5"
-              aria-label="Start video call"
-              disabled={
-                !channelReady ||
-                !channelRef.current ||
-                showVideoCall ||
-                showVoiceCall ||
-                !!incomingCall
-              }
-              title={
-                !channelReady
-                  ? chatLocale === 'id'
-                    ? 'Menghubungkan...'
-                    : 'Connecting...'
-                  : chatLocale === 'id'
-                    ? 'Panggilan video'
-                    : 'Video call'
-              }
-            >
-              <Video className="h-5 w-5" />
-            </button>
-
-            <button
-              onClick={() => void startOutgoingCall('voice')}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50 max-[340px]:hidden dark:text-[#aebac1] dark:hover:bg-white/5"
-              aria-label="Start voice call"
-              disabled={
-                !channelReady ||
-                !channelRef.current ||
-                showVideoCall ||
-                showVoiceCall ||
-                !!incomingCall
-              }
-              title={
-                !channelReady
-                  ? chatLocale === 'id'
-                    ? 'Menghubungkan...'
-                    : 'Connecting...'
-                  : chatLocale === 'id'
-                    ? 'Panggilan suara'
-                    : 'Voice call'
-              }
-            >
-              <Phone className="h-5 w-5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowChatSettings(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5"
-              aria-label={
-                chatLocale === 'id' ? 'Pengaturan chat' : 'Chat settings'
-              }
-              title={chatLocale === 'id' ? 'Pengaturan chat' : 'Chat settings'}
-            >
-              <MoreVertical className="h-5 w-5" />
+              <ReceiptText className="h-3.5 w-3.5" />
+              {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
             </button>
           </div>
         </div>
       </header>
 
       {roomSummaryTransaction ? (
-        <div className="border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-2.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
+        <div className="border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
           <div className="mx-auto w-full max-w-[920px]">
-            <div className="rounded-[20px] border border-black/5 bg-white/85 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)] backdrop-blur dark:border-white/8 dark:bg-[#202c33]/88">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#25d366]">
+            <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)] backdrop-blur dark:border-white/8 dark:bg-[#202c33]/90">
+              <button
+                type="button"
+                onClick={() => setRoomSummaryExpanded(prev => !prev)}
+                aria-expanded={roomSummaryExpanded}
+                className="flex w-full min-w-0 items-center gap-3 text-left"
+              >
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e7f8ef] text-[#128c7e] dark:bg-[#123d32] dark:text-[#25d366]">
+                  <ReceiptText className="h-4.5 w-4.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[10px] font-black uppercase tracking-[0.14em] text-[#128c7e] dark:text-[#25d366]">
                     {chatLocale === 'id'
-                      ? 'Ringkasan transaksi'
-                      : 'Transaction summary'}
-                  </p>
-                  <h2 className="mt-1 truncate text-sm font-semibold text-[#111b21] dark:text-[#e9edef] sm:text-base">
+                      ? 'Transaksi aktif'
+                      : 'Active transaction'}
+                  </span>
+                  <span className="mt-0.5 block truncate text-sm font-black text-[#111b21] dark:text-[#e9edef]">
                     {roomSummaryTxnTitle}
-                  </h2>
-                  <p className="mt-1 text-xs text-[#667781] dark:text-[#8696a0]">
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs font-semibold text-[#667781] dark:text-[#8696a0]">
                     {roomSummaryTxnWaitingParty}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowTransactionsDrawer(true);
-                      setSelectedTransaction(roomSummaryTransaction);
-                    }}
-                    className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-[#f0f2f5] px-4 text-sm font-medium text-[#111b21] transition hover:bg-[#e9edef] dark:bg-[#111b21] dark:text-[#dfe7ea] dark:hover:bg-[#1a252c]"
-                  >
-                    {chatLocale === 'id'
-                      ? 'Lihat transaksi'
-                      : 'Open transaction'}
-                  </button>
-                  {roomSummaryTxnShouldPay ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openPaymentForTransaction({
-                          id: roomSummaryTransaction.id,
-                          amount_cents: roomSummaryTransaction.amount_cents,
-                          currency: roomSummaryTransaction.currency,
-                        })
-                      }
-                      className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-semibold text-[#111b21] shadow-[0_18px_32px_-24px_rgba(37,211,102,0.55)] transition hover:bg-[#22c55e]"
-                    >
-                      <Wallet className="h-4 w-4" />
-                      {chatLocale === 'id' ? 'Bayar sekarang' : 'Pay now'}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
-                    {chatLocale === 'id' ? 'Nominal' : 'Amount'}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[#128c7e] dark:text-[#25d366]">
+                  </span>
+                </span>
+                <span className="hidden shrink-0 text-right sm:block">
+                  <span className="block text-sm font-black text-[#128c7e] dark:text-[#25d366]">
                     {formatMoney(
                       roomSummaryTransaction.amount_cents,
                       roomSummaryTransaction.currency,
                     )}
-                  </p>
-                </div>
-                <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
-                    {chatLocale === 'id' ? 'Status' : 'Status'}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
-                    {humanizeStatus(roomSummaryTxnStatus)}
-                  </p>
-                </div>
-                <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
-                    {chatLocale === 'id' ? 'Pembayaran' : 'Payment'}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
-                    {humanizeStatus(roomSummaryTxnPaymentStatus)}
-                  </p>
-                </div>
-                <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
-                    {chatLocale === 'id' ? 'Progress' : 'Progress'}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
+                  </span>
+                  <span className="text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
                     {roomSummaryTxnProgress}%
-                  </p>
+                  </span>
+                </span>
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0f2f5] text-[#54656f] dark:bg-[#111b21] dark:text-[#aebac1]">
+                  {roomSummaryExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </span>
+              </button>
+
+              <div className="mt-2 flex items-center gap-2 sm:hidden">
+                <span className="shrink-0 text-xs font-black text-[#128c7e] dark:text-[#25d366]">
+                  {formatMoney(
+                    roomSummaryTransaction.amount_cents,
+                    roomSummaryTransaction.currency,
+                  )}
+                </span>
+                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e9edef] dark:bg-[#111b21]">
+                  <div
+                    className="h-full rounded-full bg-[#25d366]"
+                    style={{ width: `${roomSummaryTxnProgress}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-[11px] font-bold text-[#667781] dark:text-[#8696a0]">
+                  {roomSummaryTxnProgress}%
+                </span>
+              </div>
+
+              <div
+                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${roomSummaryExpanded
+                  ? 'mt-3 grid-rows-[1fr] opacity-100'
+                  : 'mt-0 grid-rows-[0fr] opacity-0'
+                  }`}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div className="flex flex-wrap gap-2 border-t border-black/5 pt-3 dark:border-white/8">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTransactionsDrawer(true);
+                        setSelectedTransaction(roomSummaryTransaction);
+                      }}
+                      className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-[#f0f2f5] px-4 text-sm font-medium text-[#111b21] transition hover:bg-[#e9edef] dark:bg-[#111b21] dark:text-[#dfe7ea] dark:hover:bg-[#1a252c]"
+                    >
+                      {chatLocale === 'id'
+                        ? 'Lihat transaksi'
+                        : 'Open transaction'}
+                    </button>
+                    {roomSummaryTxnShouldPay ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openPaymentForTransaction({
+                            id: roomSummaryTransaction.id,
+                            amount_cents: roomSummaryTransaction.amount_cents,
+                            currency: roomSummaryTransaction.currency,
+                          })
+                        }
+                        className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-full bg-[#25d366] px-4 text-sm font-semibold text-[#111b21] shadow-[0_18px_32px_-24px_rgba(37,211,102,0.55)] transition hover:bg-[#22c55e]"
+                      >
+                        <Wallet className="h-4 w-4" />
+                        {chatLocale === 'id' ? 'Bayar sekarang' : 'Pay now'}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                    <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
+                        {chatLocale === 'id' ? 'Nominal' : 'Amount'}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[#128c7e] dark:text-[#25d366]">
+                        {formatMoney(
+                          roomSummaryTransaction.amount_cents,
+                          roomSummaryTransaction.currency,
+                        )}
+                      </p>
+                    </div>
+                    <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
+                        {chatLocale === 'id' ? 'Status' : 'Status'}
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
+                        {humanizeStatus(roomSummaryTxnStatus)}
+                      </p>
+                    </div>
+                    <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
+                        {chatLocale === 'id' ? 'Pembayaran' : 'Payment'}
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
+                        {humanizeStatus(roomSummaryTxnPaymentStatus)}
+                      </p>
+                    </div>
+                    <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
+                        {chatLocale === 'id' ? 'Progress' : 'Progress'}
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e9edef] dark:bg-[#202c33]">
+                          <div
+                            className="h-full rounded-full bg-[#25d366]"
+                            style={{ width: `${roomSummaryTxnProgress}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
+                          {roomSummaryTxnProgress}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4641,7 +4713,7 @@ export default function ChatRoomPage() {
       ) : null}
 
       {/* Messages */}
-      <main className="flex-1 min-w-0 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+      <main className="min-h-0 flex-1 min-w-0 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
         <div className="relative h-full">
           <div
             className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-35"
@@ -4654,11 +4726,7 @@ export default function ChatRoomPage() {
           />
           <div
             className="relative h-full min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-2 py-3 sm:px-5 sm:py-4"
-            style={
-              messageListPadding
-                ? { paddingBottom: messageListPadding }
-                : undefined
-            }
+            data-auto-scrollbar
           >
             <div className="mx-auto flex w-full max-w-[920px] flex-col space-y-1.5">
               {loading ? (
@@ -4687,7 +4755,7 @@ export default function ChatRoomPage() {
                   </p>
                   <p className="text-sm text-[#667781] dark:text-[#8696a0]">
                     {chatLocale === 'id'
-                      ? 'Mulai saja dengan pesan singkat seperti di WhatsApp.'
+                      ? 'Tulis singkat seperti WhatsApp.'
                       : 'Start the conversation with a friendly hello.'}
                   </p>
                 </div>
@@ -4699,7 +4767,7 @@ export default function ChatRoomPage() {
                         key={item.id}
                         className="sticky top-2 z-10 flex justify-center py-1"
                       >
-                        <span className="rounded-full border border-black/5 bg-[#e9edef]/92 px-3 py-1 text-[10px] font-medium text-[#54656f] shadow-sm backdrop-blur dark:border-white/8 dark:bg-[#202c33]/92 dark:text-[#aebac1]">
+                        <span className="rounded-full border border-black/5 bg-[#e9edef]/92 px-3 py-1 text-[10px] font-medium text-[#54656f] shadow-sm dark:border-white/8 dark:bg-[#202c33]/92 dark:text-[#aebac1]">
                           {item.label}
                         </span>
                       </div>
@@ -4729,30 +4797,30 @@ export default function ChatRoomPage() {
                   const structuredSideContext = getListingSideContextLabel(
                     structuredSide,
                     meta?.content_type ??
-                      meta?.deal_kind ??
-                      listingSnapshot.content_type,
+                    meta?.deal_kind ??
+                    listingSnapshot.content_type,
                     chatLocale,
                   );
                   const structuredContentUrl =
                     typeof meta?.content_url === 'string' &&
-                    meta.content_url.trim()
+                      meta.content_url.trim()
                       ? meta.content_url
                       : typeof listingSnapshot.content_url === 'string' &&
-                          listingSnapshot.content_url.trim()
+                        listingSnapshot.content_url.trim()
                         ? String(listingSnapshot.content_url)
                         : typeof meta?.content_id === 'string' &&
-                            meta.content_id.trim()
+                          meta.content_id.trim()
                           ? buildContentHref(
-                              String(meta.content_id),
-                              String(
-                                meta?.content_title ||
-                                  listingSnapshot.title ||
-                                  'Listing',
-                              ),
-                              typeof listingSnapshot.slug === 'string'
-                                ? listingSnapshot.slug
-                                : '',
-                            )
+                            String(meta.content_id),
+                            String(
+                              meta?.content_title ||
+                              listingSnapshot.title ||
+                              'Listing',
+                            ),
+                            typeof listingSnapshot.slug === 'string'
+                              ? listingSnapshot.slug
+                              : '',
+                          )
                           : '';
                   const isAiRoomDraftCard =
                     msg.message_type === 'listing' &&
@@ -4762,109 +4830,109 @@ export default function ChatRoomPage() {
                     typeof meta?.draft_id === 'string' && meta.draft_id.trim()
                       ? meta.draft_id.trim()
                       : typeof meta?.content_id === 'string' &&
-                          meta.content_id.trim()
+                        meta.content_id.trim()
                         ? meta.content_id.trim()
                         : '';
                   const structuredDraftStatus =
                     typeof meta?.content_status === 'string' &&
-                    meta.content_status.trim()
+                      meta.content_status.trim()
                       ? meta.content_status.trim().toLowerCase()
                       : 'draft';
                   const structuredDraftPublishIssues = Array.isArray(
                     meta?.publish_issues,
                   )
                     ? meta.publish_issues
-                        .map(item => String(item).trim())
-                        .filter(Boolean)
+                      .map(item => String(item).trim())
+                      .filter(Boolean)
                     : [];
                   const structuredDraftReviewNotes = Array.isArray(
                     meta?.review_notes,
                   )
                     ? meta.review_notes
-                        .map(item => String(item).trim())
-                        .filter(Boolean)
+                      .map(item => String(item).trim())
+                      .filter(Boolean)
                     : [];
                   const structuredDraftAssumptions = Array.isArray(
                     meta?.assumptions,
                   )
                     ? meta.assumptions
-                        .map(item => String(item).trim())
-                        .filter(Boolean)
+                      .map(item => String(item).trim())
+                      .filter(Boolean)
                     : [];
                   const structuredDraftFollowUpQuestions = Array.isArray(
                     meta?.follow_up_questions,
                   )
                     ? meta.follow_up_questions
-                        .map(item => String(item).trim())
-                        .filter(Boolean)
+                      .map(item => String(item).trim())
+                      .filter(Boolean)
                     : [];
                   const structuredDraftEditHref = structuredDraftId
                     ? `${buildCreatePath({
-                        locale: chatLocale,
-                        side: structuredSide,
-                        type:
-                          typeof meta?.content_type === 'string'
-                            ? meta.content_type
-                            : 'service',
-                      })}?draft=${encodeURIComponent(structuredDraftId)}`
+                      locale: chatLocale,
+                      side: structuredSide,
+                      type:
+                        typeof meta?.content_type === 'string'
+                          ? meta.content_type
+                          : 'service',
+                    })}?draft=${encodeURIComponent(structuredDraftId)}`
                     : '';
                   const transactionCardTxn =
                     msg.message_type === 'transaction'
                       ? (() => {
-                          const fallback =
-                            toRoomTransactionFromStructuredPayload(meta);
-                          if (!fallback) return null;
-                          return (
-                            roomTransactionsById.get(fallback.id) || fallback
-                          );
-                        })()
+                        const fallback =
+                          toRoomTransactionFromStructuredPayload(meta);
+                        if (!fallback) return null;
+                        return (
+                          roomTransactionsById.get(fallback.id) || fallback
+                        );
+                      })()
                       : null;
                   const transactionCardMeta =
                     msg.message_type === 'transaction' && transactionCardTxn
                       ? ({
-                          ...meta,
-                          ...transactionCardTxn,
-                          transaction_id: transactionCardTxn.id,
-                          status:
-                            transactionCardTxn.status ||
-                            transactionCardTxn.transaction_status ||
-                            meta?.status,
-                          transaction_status:
-                            transactionCardTxn.transaction_status ||
-                            transactionCardTxn.status ||
-                            meta?.transaction_status,
-                          protection_status:
-                            transactionCardTxn.protection_status ||
-                            meta?.protection_status,
-                          snapshot_listing:
-                            transactionCardTxn.snapshot_listing ||
-                            meta?.snapshot_listing,
-                          transaction_meta:
-                            transactionCardTxn.transaction_meta ||
-                            meta?.transaction_meta,
-                          response_message:
-                            transactionCardTxn.response_message ||
-                            meta?.response_message,
-                          offer_message:
-                            transactionCardTxn.offer_message ||
-                            meta?.offer_message,
-                          buyer_id:
-                            transactionCardTxn.buyer_id || meta?.buyer_id,
-                          seller_id:
-                            transactionCardTxn.seller_id || meta?.seller_id,
-                          content_id:
-                            transactionCardTxn.content_id || meta?.content_id,
-                          amount_cents:
-                            transactionCardTxn.amount_cents ??
-                            meta?.amount_cents,
-                          currency:
-                            transactionCardTxn.currency || meta?.currency,
-                          deal_kind:
-                            transactionCardTxn.deal_kind || meta?.deal_kind,
-                          fulfillment_mode:
-                            transactionCardTxn.fulfillment_mode ||
-                            meta?.fulfillment_mode,
-                        } as StructuredChatPayload)
+                        ...meta,
+                        ...transactionCardTxn,
+                        transaction_id: transactionCardTxn.id,
+                        status:
+                          transactionCardTxn.status ||
+                          transactionCardTxn.transaction_status ||
+                          meta?.status,
+                        transaction_status:
+                          transactionCardTxn.transaction_status ||
+                          transactionCardTxn.status ||
+                          meta?.transaction_status,
+                        protection_status:
+                          transactionCardTxn.protection_status ||
+                          meta?.protection_status,
+                        snapshot_listing:
+                          transactionCardTxn.snapshot_listing ||
+                          meta?.snapshot_listing,
+                        transaction_meta:
+                          transactionCardTxn.transaction_meta ||
+                          meta?.transaction_meta,
+                        response_message:
+                          transactionCardTxn.response_message ||
+                          meta?.response_message,
+                        offer_message:
+                          transactionCardTxn.offer_message ||
+                          meta?.offer_message,
+                        buyer_id:
+                          transactionCardTxn.buyer_id || meta?.buyer_id,
+                        seller_id:
+                          transactionCardTxn.seller_id || meta?.seller_id,
+                        content_id:
+                          transactionCardTxn.content_id || meta?.content_id,
+                        amount_cents:
+                          transactionCardTxn.amount_cents ??
+                          meta?.amount_cents,
+                        currency:
+                          transactionCardTxn.currency || meta?.currency,
+                        deal_kind:
+                          transactionCardTxn.deal_kind || meta?.deal_kind,
+                        fulfillment_mode:
+                          transactionCardTxn.fulfillment_mode ||
+                          meta?.fulfillment_mode,
+                      } as StructuredChatPayload)
                       : meta;
                   const transactionCardId =
                     transactionCardTxn?.id ||
@@ -4873,12 +4941,12 @@ export default function ChatRoomPage() {
                       : '');
                   const transactionCardStatus = transactionCardTxn
                     ? normalizeTransactionStatus(
-                        transactionCardTxn.status ||
-                          transactionCardTxn.transaction_status,
-                      )
+                      transactionCardTxn.status ||
+                      transactionCardTxn.transaction_status,
+                    )
                     : normalizeTransactionStatus(
-                        meta?.status || meta?.transaction_status,
-                      );
+                      meta?.status || meta?.transaction_status,
+                    );
                   const transactionCardPaymentStatus =
                     resolveTransactionPaymentStatus(transactionCardTxn);
                   const transactionCardListingSnapshot = asObject(
@@ -4889,16 +4957,16 @@ export default function ChatRoomPage() {
                   );
                   const transactionCardTitle =
                     typeof transactionCardListingSnapshot.title === 'string' &&
-                    transactionCardListingSnapshot.title.trim()
+                      transactionCardListingSnapshot.title.trim()
                       ? String(transactionCardListingSnapshot.title)
                       : typeof transactionCardMeta?.content_title ===
-                            'string' && transactionCardMeta.content_title.trim()
+                        'string' && transactionCardMeta.content_title.trim()
                         ? transactionCardMeta.content_title
                         : 'Item';
                   const transactionCardNextStep = transactionCardTxn
                     ? getTransactionWaitingParty(transactionCardTxn, user?.id)
                     : typeof ticketMeta.next_step === 'string' &&
-                        ticketMeta.next_step.trim()
+                      ticketMeta.next_step.trim()
                       ? String(ticketMeta.next_step)
                       : '';
                   const transactionCardProgress =
@@ -4919,16 +4987,14 @@ export default function ChatRoomPage() {
                     msg.message_type === 'transaction' ||
                     msg.message_type === 'job_update';
 
-                  const bubbleClass = `relative max-w-[86%] overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:max-w-[72%] sm:px-3 sm:py-2.5 sm:text-sm ${
-                    isOwn
-                      ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
-                      : 'rounded-bl-[6px] bg-white text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#202c33] dark:text-[#e9edef]'
-                  }`;
-                  const bubbleTailClass = `absolute bottom-1 h-3 w-3 rotate-45 ${
-                    isOwn
-                      ? 'right-[-4px] rounded-bl-[2px] bg-[#d9fdd3] dark:bg-[#005c4b]'
-                      : 'left-[-4px] rounded-br-[2px] bg-white dark:bg-[#202c33]'
-                  }`;
+                  const bubbleClass = `relative max-w-[86%] overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:max-w-[72%] sm:px-3 sm:py-2.5 sm:text-sm ${isOwn
+                    ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
+                    : 'rounded-bl-[6px] bg-white text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#202c33] dark:text-[#e9edef]'
+                    }`;
+                  const bubbleTailClass = `absolute bottom-1 h-3 w-3 rotate-45 ${isOwn
+                    ? 'right-[-4px] rounded-bl-[2px] bg-[#d9fdd3] dark:bg-[#005c4b]'
+                    : 'left-[-4px] rounded-br-[2px] bg-white dark:bg-[#202c33]'
+                    }`;
                   const bubbleMetaClass = isOwn
                     ? 'text-[#667781] dark:text-[#d1f4cc]'
                     : 'text-[#667781] dark:text-[#8696a0]';
@@ -4943,803 +5009,809 @@ export default function ChatRoomPage() {
                       <div className={bubbleClass}>
                         <span aria-hidden="true" className={bubbleTailClass} />
                         <div className="relative z-10">
-                        {/* Structured business messages */}
-                        {isStructured ? (
-                          <div className="space-y-2">
-                            <div
-                              className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${isOwn ? 'bg-[color:color-mix(in_srgb,_var(--app-overlay)_25%,_transparent)] text-[color:var(--app-accent)]' : 'bg-[color:var(--app-surface)] text-[color:var(--app-accent)]'}`}
-                            >
-                              {msg.message_type === 'offer' &&
-                                (chatLocale === 'id' ? 'Offer' : 'Offer')}
-                              {msg.message_type === 'application' &&
-                                (chatLocale === 'id'
-                                  ? 'Lamaran'
-                                  : 'Application')}
-                              {msg.message_type === 'listing' &&
-                                (isAiRoomDraftCard
-                                  ? chatLocale === 'id'
-                                    ? 'Draft AI'
-                                    : 'AI Draft'
-                                  : chatLocale === 'id'
-                                    ? 'Listing dibagikan'
-                                    : 'Listing Shared')}
-                              {msg.message_type === 'transaction' &&
-                                (chatLocale === 'id'
-                                  ? 'Update transaksi'
-                                  : 'Transaction Update')}
-                              {msg.message_type === 'job_update' &&
-                                (chatLocale === 'id'
-                                  ? 'Update kerja'
-                                  : 'Job Update')}
-                            </div>
-
-                            {msg.message_type === 'offer' && (
+                          {/* Structured business messages */}
+                          {isStructured ? (
+                            <div className="space-y-2">
                               <div
-                                className={`rounded-xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
+                                className={`inline-flex rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${isOwn ? 'bg-[color:color-mix(in_srgb,_var(--app-overlay)_25%,_transparent)] text-[color:var(--app-accent)]' : 'bg-[color:var(--app-surface)] text-[color:var(--app-accent)]'}`}
                               >
-                                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
-                                  {chatLocale === 'id'
-                                    ? 'Ringkasan offer'
-                                    : 'Offer Summary'}
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
-                                  {typeof ticketMeta.reference === 'string' &&
-                                    ticketMeta.reference.trim() && (
-                                      <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                        {ticketMeta.reference}
-                                      </span>
-                                    )}
-                                  <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                    {structuredSideContext}
-                                  </span>
-                                </div>
-                                <p className="mt-1 text-xs font-semibold">
-                                  {String(
-                                    meta?.content_title ||
+                                {msg.message_type === 'offer' &&
+                                  (chatLocale === 'id' ? 'Offer' : 'Offer')}
+                                {msg.message_type === 'application' &&
+                                  (chatLocale === 'id'
+                                    ? 'Lamaran'
+                                    : 'Application')}
+                                {msg.message_type === 'listing' &&
+                                  (isAiRoomDraftCard
+                                    ? chatLocale === 'id'
+                                      ? 'Draft AI'
+                                      : 'AI Draft'
+                                    : chatLocale === 'id'
+                                      ? 'Listing dibagikan'
+                                      : 'Listing Shared')}
+                                {msg.message_type === 'transaction' &&
+                                  (chatLocale === 'id'
+                                    ? 'Update transaksi'
+                                    : 'Transaction Update')}
+                                {msg.message_type === 'job_update' &&
+                                  (chatLocale === 'id'
+                                    ? 'Update kerja'
+                                    : 'Job Update')}
+                              </div>
+
+                              {msg.message_type === 'offer' && (
+                                <div
+                                  className={`rounded-xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
+                                >
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
+                                    {chatLocale === 'id'
+                                      ? 'Ringkasan offer'
+                                      : 'Offer Summary'}
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
+                                    {typeof ticketMeta.reference === 'string' &&
+                                      ticketMeta.reference.trim() && (
+                                        <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                          {ticketMeta.reference}
+                                        </span>
+                                      )}
+                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                      {structuredSideContext}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-xs font-semibold">
+                                    {String(
+                                      meta?.content_title ||
                                       (chatLocale === 'id'
                                         ? 'Offer baru'
                                         : 'New offer'),
-                                  )}
-                                </p>
-                                <p className="mt-1 text-base font-black text-[color:var(--app-accent)]">
-                                  {formatMoney(
-                                    transactionCardMeta?.amount_cents,
-                                    transactionCardMeta?.currency,
-                                  )}
-                                </p>
-                                <p className="mt-1 text-[11px] opacity-80">
-                                  {humanizeStatus(meta?.status)} •{' '}
-                                  {String(meta?.deal_kind || 'deal')}
-                                </p>
-                                {typeof meta?.offer_message === 'string' &&
-                                  meta.offer_message.trim() && (
-                                    <p className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)] px-2 py-1.5 text-xs opacity-90">
-                                      {meta.offer_message}
-                                    </p>
-                                  )}
-                                {typeof ticketMeta.next_step === 'string' &&
-                                  ticketMeta.next_step.trim() && (
-                                    <p className="mt-2 text-[11px] opacity-80">
-                                      {String(ticketMeta.next_step)}
-                                    </p>
-                                  )}
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  {typeof meta?.transaction_id === 'string' &&
-                                    meta.transaction_id.trim() && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setShowTransactionsDrawer(true);
-                                          void (async () => {
-                                            const list =
-                                              await loadRoomTransactions();
-                                            const found = list.find(
-                                              txn =>
-                                                txn.id === meta.transaction_id,
-                                            );
-                                            if (found)
-                                              setSelectedTransaction(found);
-                                          })();
-                                        }}
-                                        className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
-                                      >
-                                        {chatLocale === 'id'
-                                          ? 'Buka transaksi'
-                                          : 'Open Ticket'}
-                                      </button>
                                     )}
-                                  {structuredContentUrl && (
-                                    <Link
-                                      href={structuredContentUrl}
-                                      className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
-                                    >
-                                      {chatLocale === 'id'
-                                        ? 'Buka listing'
-                                        : 'Open Listing'}
-                                    </Link>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {msg.message_type === 'application' && (
-                              <div
-                                className={`rounded-xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
-                              >
-                                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
-                                  {chatLocale === 'id'
-                                    ? 'Profil pelamar'
-                                    : 'Applicant Profile'}
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
-                                  {typeof ticketMeta.reference === 'string' &&
-                                    ticketMeta.reference.trim() && (
-                                      <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                        {ticketMeta.reference}
-                                      </span>
-                                    )}
-                                  <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                    {structuredSideContext}
-                                  </span>
-                                </div>
-                                <p className="mt-1 text-xs font-semibold">
-                                  {String(
-                                    meta?.content_title ||
-                                      (chatLocale === 'id'
-                                        ? 'Lamaran kerja'
-                                        : 'Job application'),
-                                  )}
-                                </p>
-                                <p className="mt-1 text-xs opacity-95">
-                                  {String(
-                                    (applicantMeta.full_name as string) ||
-                                      (applicantMeta.email as string) ||
-                                      'Applicant submitted',
-                                  )}
-                                </p>
-                                {typeof applicantMeta.headline === 'string' && (
-                                  <p className="mt-1 text-[11px] opacity-80">
-                                    {String(applicantMeta.headline)}
                                   </p>
-                                )}
-                                <div className="mt-2 grid gap-2 text-[11px] opacity-90 sm:grid-cols-2">
-                                  {typeof applicantMeta.location === 'string' &&
-                                    applicantMeta.location.trim() && (
-                                      <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
-                                        <p className="font-semibold opacity-75">
-                                          Location
-                                        </p>
-                                        <p>{String(applicantMeta.location)}</p>
-                                      </div>
-                                    )}
-                                  {typeof applicantMeta.years_exp ===
-                                    'string' &&
-                                    applicantMeta.years_exp.trim() && (
-                                      <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
-                                        <p className="font-semibold opacity-75">
-                                          Experience
-                                        </p>
-                                        <p>
-                                          {String(applicantMeta.years_exp)}{' '}
-                                          years
-                                        </p>
-                                      </div>
-                                    )}
-                                  {(typeof applicantMeta.expected_salary_cents ===
-                                    'number' ||
-                                    typeof applicantMeta.expected_salary_cents ===
-                                      'string') && (
-                                    <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
-                                      <p className="font-semibold opacity-75">
-                                        Expectation
-                                      </p>
-                                      <p>
-                                        {formatMoney(
-                                          applicantMeta.expected_salary_cents,
-                                          meta?.currency || 'IDR',
-                                        )}
-                                      </p>
-                                    </div>
-                                  )}
-                                  {typeof applicantMeta.phone === 'string' &&
-                                    applicantMeta.phone.trim() && (
-                                      <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
-                                        <p className="font-semibold opacity-75">
-                                          Phone
-                                        </p>
-                                        <p>{String(applicantMeta.phone)}</p>
-                                      </div>
-                                    )}
-                                </div>
-                                {typeof applicantMeta.message === 'string' &&
-                                  applicantMeta.message.trim() && (
-                                    <p className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)] px-2 py-1.5 text-xs opacity-90">
-                                      {String(applicantMeta.message)}
-                                    </p>
-                                  )}
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  {typeof applicantMeta.resume_url ===
-                                    'string' &&
-                                    applicantMeta.resume_url.trim() && (
-                                      <a
-                                        href={normalizeAttachmentUrl(
-                                          String(applicantMeta.resume_url),
-                                        )}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
-                                      >
-                                        {chatLocale === 'id'
-                                          ? 'Lihat CV'
-                                          : 'View Resume'}
-                                      </a>
-                                    )}
-                                  {structuredContentUrl && (
-                                    <Link
-                                      href={structuredContentUrl}
-                                      className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
-                                    >
-                                      {chatLocale === 'id'
-                                        ? 'Buka listing'
-                                        : 'Open Listing'}
-                                    </Link>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {msg.message_type === 'listing' && (
-                              <div
-                                className={`rounded-xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
-                              >
-                                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
-                                  {isAiRoomDraftCard
-                                    ? chatLocale === 'id'
-                                      ? 'Review draft AI'
-                                      : 'AI Draft Review'
-                                    : chatLocale === 'id'
-                                      ? 'Listing dibagikan'
-                                      : 'Shared Listing'}
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
-                                  <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                    {structuredSideLabel}
-                                  </span>
-                                  <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                    {structuredSideContext}
-                                  </span>
-                                  {isAiRoomDraftCard && (
-                                    <span
-                                      className={`rounded-full border px-2 py-0.5 ${
-                                        structuredDraftStatus === 'active'
-                                          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_18%,_transparent)] text-[color:var(--app-accent)]'
-                                          : structuredDraftPublishIssues.length ===
-                                              0
-                                            ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_14%,_transparent)] text-[color:var(--app-info)]'
-                                            : 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
-                                      }`}
-                                    >
-                                      {structuredDraftStatus === 'active'
-                                        ? chatLocale === 'id'
-                                          ? 'Sudah aktif'
-                                          : 'Published'
-                                        : structuredDraftPublishIssues.length ===
-                                            0
-                                          ? chatLocale === 'id'
-                                            ? 'Siap publish'
-                                            : 'Ready to publish'
-                                          : chatLocale === 'id'
-                                            ? 'Perlu review'
-                                            : 'Needs review'}
-                                    </span>
-                                  )}
-                                </div>
-                                {typeof meta?.cover_image === 'string' &&
-                                  meta.cover_image.trim() && (
-                                    <img
-                                      src={normalizeAttachmentUrl(
-                                        meta.cover_image,
-                                      )}
-                                      alt={String(
-                                        meta?.content_title || 'Listing',
-                                      )}
-                                      className="mt-2 h-28 w-full rounded-lg object-cover"
-                                      loading="lazy"
-                                    />
-                                  )}
-                                <p className="mt-2 text-xs font-semibold">
-                                  {String(meta?.content_title || 'Listing')}
-                                </p>
-                                <p className="mt-1 text-[11px] opacity-80">
-                                  {String(meta?.content_type || 'content')}{' '}
-                                  {meta?.location
-                                    ? `• ${String(meta.location)}`
-                                    : ''}
-                                </p>
-                                <div className="mt-1 flex items-end gap-1.5">
-                                  <p className="text-base font-black text-[color:var(--app-accent)]">
-                                    {inferPricingMode(meta || {}) === 'request'
-                                      ? 'Price on request'
-                                      : formatMoney(
-                                          meta?.price_cents,
-                                          meta?.currency,
-                                        )}
-                                  </p>
-                                  {inferPricingMode(meta || {}) === 'fixed' &&
-                                    parseMoneyCents(
-                                      meta?.original_price_cents,
-                                    ) > parseMoneyCents(meta?.price_cents) && (
-                                      <span className="text-[11px] line-through opacity-70">
-                                        {formatMoney(
-                                          meta?.original_price_cents,
-                                          meta?.currency,
-                                        )}
-                                      </span>
-                                    )}
-                                </div>
-                                <div className="mt-1 flex flex-wrap gap-1.5">
-                                  {typeof meta?.promo_label === 'string' &&
-                                    meta.promo_label.trim() && (
-                                      <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-danger)_20%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-danger)]">
-                                        {meta.promo_label}
-                                      </span>
-                                    )}
-                                  <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-accent)]">
-                                    <BadgeCheck className="mr-1 inline h-3 w-3" />
-                                    {getTrustBadge(meta || {})}
-                                  </span>
-                                </div>
-                                {isAiRoomDraftCard &&
-                                  structuredDraftReviewNotes.length > 0 && (
-                                    <div className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_18%,_transparent)] px-3 py-2 text-[11px] opacity-90">
-                                      <p className="font-semibold">
-                                        {chatLocale === 'id'
-                                          ? 'Yang wajib dicek'
-                                          : 'Review before posting'}
-                                      </p>
-                                      <ul className="mt-1 space-y-1">
-                                        {structuredDraftReviewNotes
-                                          .slice(0, 3)
-                                          .map(note => (
-                                            <li key={`${msg.id}-${note}`}>
-                                              - {note}
-                                            </li>
-                                          ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                {isAiRoomDraftCard &&
-                                  structuredDraftAssumptions.length > 0 && (
-                                    <div className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_14%,_transparent)] px-3 py-2 text-[11px] opacity-85">
-                                      <p className="font-semibold">
-                                        {chatLocale === 'id'
-                                          ? 'Asumsi AI'
-                                          : 'AI assumptions'}
-                                      </p>
-                                      <p className="mt-1">
-                                        {structuredDraftAssumptions
-                                          .slice(0, 2)
-                                          .join(' | ')}
-                                      </p>
-                                    </div>
-                                  )}
-                                {isAiRoomDraftCard &&
-                                  structuredDraftFollowUpQuestions.length >
-                                    0 && (
-                                    <div className="mt-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-info-border)_38%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] px-3 py-2 text-[11px] text-[color:var(--app-text)]">
-                                      <p className="font-semibold">
-                                        {chatLocale === 'id'
-                                          ? 'AI masih butuh detail ini'
-                                          : 'The AI still needs these details'}
-                                      </p>
-                                      <ul className="mt-1 space-y-1">
-                                        {structuredDraftFollowUpQuestions
-                                          .slice(0, 3)
-                                          .map(question => (
-                                            <li key={`${msg.id}-${question}`}>
-                                              - {question}
-                                            </li>
-                                          ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                {isAiRoomDraftCard &&
-                                  structuredDraftPublishIssues.length > 0 && (
-                                    <div className="mt-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-warning-border)_42%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] px-3 py-2 text-[11px] text-[color:var(--app-warning)]">
-                                      <p className="font-semibold">
-                                        {chatLocale === 'id'
-                                          ? 'Masih perlu dirapikan'
-                                          : 'Still needs work'}
-                                      </p>
-                                      <p className="mt-1">
-                                        {formatValidationIssues(
-                                          structuredDraftPublishIssues,
-                                          chatLocale,
-                                        )}
-                                      </p>
-                                    </div>
-                                  )}
-                                {isOwn && isAiRoomDraftCard && (
-                                  <div className="mt-2 flex flex-wrap gap-1.5">
-                                    {structuredDraftEditHref && (
-                                      <Link
-                                        href={structuredDraftEditHref}
-                                        className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
-                                      >
-                                        {chatLocale === 'id'
-                                          ? 'Edit draft'
-                                          : 'Edit draft'}
-                                      </Link>
-                                    )}
-                                    {structuredDraftId &&
-                                      structuredDraftStatus !== 'active' && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            void handlePublishStructuredDraft(
-                                              msg.id,
-                                              meta,
-                                            )
-                                          }
-                                          disabled={
-                                            publishingDraftId ===
-                                            structuredDraftId
-                                          }
-                                          className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:opacity-60"
-                                        >
-                                          {publishingDraftId ===
-                                          structuredDraftId ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                          ) : null}
-                                          {chatLocale === 'id'
-                                            ? 'Publish sekarang'
-                                            : 'Publish now'}
-                                        </button>
-                                      )}
-                                    {(structuredDraftStatus === 'active'
-                                      ? structuredContentUrl
-                                      : structuredDraftEditHref) && (
-                                      <Link
-                                        href={
-                                          structuredDraftStatus === 'active'
-                                            ? structuredContentUrl
-                                            : structuredDraftEditHref
-                                        }
-                                        className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_18%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_28%,_transparent)]"
-                                      >
-                                        {structuredDraftStatus === 'active'
-                                          ? chatLocale === 'id'
-                                            ? 'Buka listing'
-                                            : 'Open listing'
-                                          : chatLocale === 'id'
-                                            ? 'Lihat draft'
-                                            : 'Open draft'}
-                                      </Link>
-                                    )}
-                                  </div>
-                                )}
-                                {!isOwn &&
-                                  typeof meta?.content_id === 'string' &&
-                                  meta.content_id.trim() && (
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          openListingActionModal(
-                                            meta,
-                                            structuredSide === 'supply' &&
-                                              inferPricingMode(meta || {}) ===
-                                                'fixed'
-                                              ? 'direct'
-                                              : 'offer',
-                                          )
-                                        }
-                                        className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
-                                      >
-                                        {chatLocale === 'id'
-                                          ? structuredSide === 'demand'
-                                            ? 'Tanggapi Listing'
-                                            : 'Pilih Respons'
-                                          : structuredSide === 'demand'
-                                            ? 'Respond'
-                                            : 'Choose Action'}
-                                      </button>
-                                      {structuredContentUrl && (
-                                        <Link
-                                          href={structuredContentUrl}
-                                          className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
-                                        >
-                                          {chatLocale === 'id'
-                                            ? 'Buka listing'
-                                            : 'Open Listing'}
-                                        </Link>
-                                      )}
-                                    </div>
-                                  )}
-                              </div>
-                            )}
-
-                            {msg.message_type === 'transaction' && (
-                              <div
-                                className={`rounded-2xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
-                              >
-                                <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
-                                  {chatLocale === 'id'
-                                    ? 'Transaksi'
-                                    : 'Transaction'}
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
-                                  {typeof ticketMeta.reference === 'string' &&
-                                    ticketMeta.reference.trim() && (
-                                      <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                        {ticketMeta.reference}
-                                      </span>
-                                    )}
-                                  <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                    {structuredSideContext}
-                                  </span>
-                                  <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                    {transactionCardWalletLabel}
-                                  </span>
-                                </div>
-                                {transactionCardCoverImage && (
-                                  <img
-                                    src={transactionCardCoverImage}
-                                    alt={transactionCardTitle}
-                                    className="mt-2 h-20 w-full rounded-xl object-cover"
-                                    loading="lazy"
-                                  />
-                                )}
-                                <div className="mt-2 flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <p className="truncate text-xs font-semibold">
-                                      {transactionCardTitle}
-                                    </p>
-                                    <p className="mt-1 text-[11px] opacity-80">
-                                      {transactionCardShortId}
-                                    </p>
-                                  </div>
-                                  <p className="shrink-0 text-base font-black text-[color:var(--app-accent)]">
+                                  <p className="mt-1 text-base font-black text-[color:var(--app-accent)]">
                                     {formatMoney(
                                       transactionCardMeta?.amount_cents,
                                       transactionCardMeta?.currency,
                                     )}
                                   </p>
-                                </div>
-                                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold">
-                                  <span
-                                    className={`rounded-full border px-2 py-0.5 ${statusTone(transactionCardStatus)}`}
-                                  >
-                                    {humanizeStatus(transactionCardStatus)}
-                                  </span>
-                                  <span
-                                    className={`rounded-full border px-2 py-0.5 ${protectionTone(
-                                      transactionCardMeta?.protection_status ||
-                                        'awaiting_funding',
-                                    )}`}
-                                  >
-                                    {humanizeStatus(
-                                      transactionCardMeta?.protection_status ||
-                                        'awaiting_funding',
+                                  <p className="mt-1 text-[11px] opacity-80">
+                                    {humanizeStatus(meta?.status)} •{' '}
+                                    {String(meta?.deal_kind || 'deal')}
+                                  </p>
+                                  {typeof meta?.offer_message === 'string' &&
+                                    meta.offer_message.trim() && (
+                                      <p className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)] px-2 py-1.5 text-xs opacity-90">
+                                        {meta.offer_message}
+                                      </p>
                                     )}
-                                  </span>
-                                  <span
-                                    className={`rounded-full border px-2 py-0.5 ${paymentTone(transactionCardPaymentStatus)}`}
-                                  >
-                                    {humanizeStatus(
-                                      transactionCardPaymentStatus,
+                                  {typeof ticketMeta.next_step === 'string' &&
+                                    ticketMeta.next_step.trim() && (
+                                      <p className="mt-2 text-[11px] opacity-80">
+                                        {String(ticketMeta.next_step)}
+                                      </p>
                                     )}
-                                  </span>
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {typeof meta?.transaction_id === 'string' &&
+                                      meta.transaction_id.trim() && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowTransactionsDrawer(true);
+                                            void (async () => {
+                                              const list =
+                                                await loadRoomTransactions();
+                                              const found = list.find(
+                                                txn =>
+                                                  txn.id ===
+                                                  meta.transaction_id,
+                                              );
+                                              if (found)
+                                                setSelectedTransaction(found);
+                                            })();
+                                          }}
+                                          className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
+                                        >
+                                          {chatLocale === 'id'
+                                            ? 'Buka transaksi'
+                                            : 'Open Ticket'}
+                                        </button>
+                                      )}
+                                    {structuredContentUrl && (
+                                      <Link
+                                        href={structuredContentUrl}
+                                        className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
+                                      >
+                                        {chatLocale === 'id'
+                                          ? 'Buka listing'
+                                          : 'Open Listing'}
+                                      </Link>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_18%,_transparent)] px-3 py-2">
-                                  <div className="flex items-center justify-between gap-2 text-[11px]">
-                                    <p className="font-semibold opacity-90">
-                                      {transactionCardNextStep ||
-                                        (chatLocale === 'id'
-                                          ? 'Menunggu pembaruan transaksi'
-                                          : 'Waiting for transaction update')}
-                                    </p>
-                                    <span className="font-bold text-[color:var(--app-accent)]">
-                                      {transactionCardProgress}%
+                              )}
+
+                              {msg.message_type === 'application' && (
+                                <div
+                                  className={`rounded-xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
+                                >
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
+                                    {chatLocale === 'id'
+                                      ? 'Profil pelamar'
+                                      : 'Applicant Profile'}
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
+                                    {typeof ticketMeta.reference === 'string' &&
+                                      ticketMeta.reference.trim() && (
+                                        <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                          {ticketMeta.reference}
+                                        </span>
+                                      )}
+                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                      {structuredSideContext}
                                     </span>
                                   </div>
-                                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface)_45%,_transparent)]">
-                                    <div
-                                      className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)]"
-                                      style={{
-                                        width: `${transactionCardProgress}%`,
-                                      }}
-                                    />
-                                  </div>
-                                  <p className="mt-2 text-[11px] opacity-80">
-                                    {humanizeStatus(
-                                      transactionCardMeta?.deal_kind || 'deal',
-                                    )}{' '}
-                                    |{' '}
-                                    {humanizeStatus(
-                                      transactionCardMeta?.fulfillment_mode ||
-                                        'standard',
+                                  <p className="mt-1 text-xs font-semibold">
+                                    {String(
+                                      meta?.content_title ||
+                                      (chatLocale === 'id'
+                                        ? 'Lamaran kerja'
+                                        : 'Job application'),
                                     )}
                                   </p>
+                                  <p className="mt-1 text-xs opacity-95">
+                                    {String(
+                                      (applicantMeta.full_name as string) ||
+                                      (applicantMeta.email as string) ||
+                                      'Applicant submitted',
+                                    )}
+                                  </p>
+                                  {typeof applicantMeta.headline ===
+                                    'string' && (
+                                      <p className="mt-1 text-[11px] opacity-80">
+                                        {String(applicantMeta.headline)}
+                                      </p>
+                                    )}
+                                  <div className="mt-2 grid gap-2 text-[11px] opacity-90 sm:grid-cols-2">
+                                    {typeof applicantMeta.location ===
+                                      'string' &&
+                                      applicantMeta.location.trim() && (
+                                        <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
+                                          <p className="font-semibold opacity-75">
+                                            Location
+                                          </p>
+                                          <p>
+                                            {String(applicantMeta.location)}
+                                          </p>
+                                        </div>
+                                      )}
+                                    {typeof applicantMeta.years_exp ===
+                                      'string' &&
+                                      applicantMeta.years_exp.trim() && (
+                                        <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
+                                          <p className="font-semibold opacity-75">
+                                            Experience
+                                          </p>
+                                          <p>
+                                            {String(applicantMeta.years_exp)}{' '}
+                                            years
+                                          </p>
+                                        </div>
+                                      )}
+                                    {(typeof applicantMeta.expected_salary_cents ===
+                                      'number' ||
+                                      typeof applicantMeta.expected_salary_cents ===
+                                      'string') && (
+                                        <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
+                                          <p className="font-semibold opacity-75">
+                                            Expectation
+                                          </p>
+                                          <p>
+                                            {formatMoney(
+                                              applicantMeta.expected_salary_cents,
+                                              meta?.currency || 'IDR',
+                                            )}
+                                          </p>
+                                        </div>
+                                      )}
+                                    {typeof applicantMeta.phone === 'string' &&
+                                      applicantMeta.phone.trim() && (
+                                        <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
+                                          <p className="font-semibold opacity-75">
+                                            Phone
+                                          </p>
+                                          <p>{String(applicantMeta.phone)}</p>
+                                        </div>
+                                      )}
+                                  </div>
+                                  {typeof applicantMeta.message === 'string' &&
+                                    applicantMeta.message.trim() && (
+                                      <p className="mt-2 rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)] px-2 py-1.5 text-xs opacity-90">
+                                        {String(applicantMeta.message)}
+                                      </p>
+                                    )}
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {typeof applicantMeta.resume_url ===
+                                      'string' &&
+                                      applicantMeta.resume_url.trim() && (
+                                        <a
+                                          href={normalizeAttachmentUrl(
+                                            String(applicantMeta.resume_url),
+                                          )}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
+                                        >
+                                          {chatLocale === 'id'
+                                            ? 'Lihat CV'
+                                            : 'View Resume'}
+                                        </a>
+                                      )}
+                                    {structuredContentUrl && (
+                                      <Link
+                                        href={structuredContentUrl}
+                                        className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
+                                      >
+                                        {chatLocale === 'id'
+                                          ? 'Buka listing'
+                                          : 'Open Listing'}
+                                      </Link>
+                                    )}
+                                  </div>
                                 </div>
-                                {typeof transactionCardMeta?.response_message ===
-                                  'string' &&
-                                  transactionCardMeta.response_message.trim() && (
-                                    <p className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)] px-3 py-2 text-xs opacity-90">
-                                      {transactionCardMeta.response_message}
+                              )}
+
+                              {msg.message_type === 'listing' && (
+                                <div
+                                  className={`rounded-xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
+                                >
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
+                                    {isAiRoomDraftCard
+                                      ? chatLocale === 'id'
+                                        ? 'Review draft AI'
+                                        : 'AI Draft Review'
+                                      : chatLocale === 'id'
+                                        ? 'Listing dibagikan'
+                                        : 'Shared Listing'}
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
+                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                      {structuredSideLabel}
+                                    </span>
+                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                      {structuredSideContext}
+                                    </span>
+                                    {isAiRoomDraftCard && (
+                                      <span
+                                        className={`rounded-full border px-2 py-0.5 ${structuredDraftStatus === 'active'
+                                          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_18%,_transparent)] text-[color:var(--app-accent)]'
+                                          : structuredDraftPublishIssues.length ===
+                                            0
+                                            ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_14%,_transparent)] text-[color:var(--app-info)]'
+                                            : 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
+                                          }`}
+                                      >
+                                        {structuredDraftStatus === 'active'
+                                          ? chatLocale === 'id'
+                                            ? 'Sudah aktif'
+                                            : 'Published'
+                                          : structuredDraftPublishIssues.length ===
+                                            0
+                                            ? chatLocale === 'id'
+                                              ? 'Siap publish'
+                                              : 'Ready to publish'
+                                            : chatLocale === 'id'
+                                              ? 'Perlu review'
+                                              : 'Needs review'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {typeof meta?.cover_image === 'string' &&
+                                    meta.cover_image.trim() && (
+                                      <img
+                                        src={normalizeAttachmentUrl(
+                                          meta.cover_image,
+                                        )}
+                                        alt={String(
+                                          meta?.content_title || 'Listing',
+                                        )}
+                                        className="mt-2 h-28 w-full rounded-lg object-cover"
+                                        loading="lazy"
+                                      />
+                                    )}
+                                  <p className="mt-2 text-xs font-semibold">
+                                    {String(meta?.content_title || 'Listing')}
+                                  </p>
+                                  <p className="mt-1 text-[11px] opacity-80">
+                                    {String(meta?.content_type || 'content')}{' '}
+                                    {meta?.location
+                                      ? `• ${String(meta.location)}`
+                                      : ''}
+                                  </p>
+                                  <div className="mt-1 flex items-end gap-1.5">
+                                    <p className="text-base font-black text-[color:var(--app-accent)]">
+                                      {inferPricingMode(meta || {}) ===
+                                        'request'
+                                        ? 'Price on request'
+                                        : formatMoney(
+                                          meta?.price_cents,
+                                          meta?.currency,
+                                        )}
                                     </p>
+                                    {inferPricingMode(meta || {}) === 'fixed' &&
+                                      parseMoneyCents(
+                                        meta?.original_price_cents,
+                                      ) >
+                                      parseMoneyCents(meta?.price_cents) && (
+                                        <span className="text-[11px] line-through opacity-70">
+                                          {formatMoney(
+                                            meta?.original_price_cents,
+                                            meta?.currency,
+                                          )}
+                                        </span>
+                                      )}
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-1.5">
+                                    {typeof meta?.promo_label === 'string' &&
+                                      meta.promo_label.trim() && (
+                                        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-danger)_20%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-danger)]">
+                                          {meta.promo_label}
+                                        </span>
+                                      )}
+                                    <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-accent)]">
+                                      <BadgeCheck className="mr-1 inline h-3 w-3" />
+                                      {getTrustBadge(meta || {})}
+                                    </span>
+                                  </div>
+                                  {isAiRoomDraftCard &&
+                                    structuredDraftReviewNotes.length > 0 && (
+                                      <div className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_18%,_transparent)] px-3 py-2 text-[11px] opacity-90">
+                                        <p className="font-semibold">
+                                          {chatLocale === 'id'
+                                            ? 'Yang wajib dicek'
+                                            : 'Review before posting'}
+                                        </p>
+                                        <ul className="mt-1 space-y-1">
+                                          {structuredDraftReviewNotes
+                                            .slice(0, 3)
+                                            .map(note => (
+                                              <li key={`${msg.id}-${note}`}>
+                                                - {note}
+                                              </li>
+                                            ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  {isAiRoomDraftCard &&
+                                    structuredDraftAssumptions.length > 0 && (
+                                      <div className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_14%,_transparent)] px-3 py-2 text-[11px] opacity-85">
+                                        <p className="font-semibold">
+                                          {chatLocale === 'id'
+                                            ? 'Asumsi AI'
+                                            : 'AI assumptions'}
+                                        </p>
+                                        <p className="mt-1">
+                                          {structuredDraftAssumptions
+                                            .slice(0, 2)
+                                            .join(' | ')}
+                                        </p>
+                                      </div>
+                                    )}
+                                  {isAiRoomDraftCard &&
+                                    structuredDraftFollowUpQuestions.length >
+                                    0 && (
+                                      <div className="mt-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-info-border)_38%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] px-3 py-2 text-[11px] text-[color:var(--app-text)]">
+                                        <p className="font-semibold">
+                                          {chatLocale === 'id'
+                                            ? 'AI masih butuh detail ini'
+                                            : 'The AI still needs these details'}
+                                        </p>
+                                        <ul className="mt-1 space-y-1">
+                                          {structuredDraftFollowUpQuestions
+                                            .slice(0, 3)
+                                            .map(question => (
+                                              <li key={`${msg.id}-${question}`}>
+                                                - {question}
+                                              </li>
+                                            ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  {isAiRoomDraftCard &&
+                                    structuredDraftPublishIssues.length > 0 && (
+                                      <div className="mt-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-warning-border)_42%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] px-3 py-2 text-[11px] text-[color:var(--app-warning)]">
+                                        <p className="font-semibold">
+                                          {chatLocale === 'id'
+                                            ? 'Masih perlu dirapikan'
+                                            : 'Still needs work'}
+                                        </p>
+                                        <p className="mt-1">
+                                          {formatValidationIssues(
+                                            structuredDraftPublishIssues,
+                                            chatLocale,
+                                          )}
+                                        </p>
+                                      </div>
+                                    )}
+                                  {isOwn && isAiRoomDraftCard && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {structuredDraftEditHref && (
+                                        <Link
+                                          href={structuredDraftEditHref}
+                                          className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
+                                        >
+                                          {chatLocale === 'id'
+                                            ? 'Edit draft'
+                                            : 'Edit draft'}
+                                        </Link>
+                                      )}
+                                      {structuredDraftId &&
+                                        structuredDraftStatus !== 'active' && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              void handlePublishStructuredDraft(
+                                                msg.id,
+                                                meta,
+                                              )
+                                            }
+                                            disabled={
+                                              publishingDraftId ===
+                                              structuredDraftId
+                                            }
+                                            className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:opacity-60"
+                                          >
+                                            {publishingDraftId ===
+                                              structuredDraftId ? (
+                                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : null}
+                                            {chatLocale === 'id'
+                                              ? 'Publish sekarang'
+                                              : 'Publish now'}
+                                          </button>
+                                        )}
+                                      {(structuredDraftStatus === 'active'
+                                        ? structuredContentUrl
+                                        : structuredDraftEditHref) && (
+                                          <Link
+                                            href={
+                                              structuredDraftStatus === 'active'
+                                                ? structuredContentUrl
+                                                : structuredDraftEditHref
+                                            }
+                                            className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_18%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_28%,_transparent)]"
+                                          >
+                                            {structuredDraftStatus === 'active'
+                                              ? chatLocale === 'id'
+                                                ? 'Buka listing'
+                                                : 'Open listing'
+                                              : chatLocale === 'id'
+                                                ? 'Lihat draft'
+                                                : 'Open draft'}
+                                          </Link>
+                                        )}
+                                    </div>
                                   )}
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setShowTransactionsDrawer(true);
-                                      void (async () => {
-                                        const list =
-                                          await loadRoomTransactions();
-                                        if (!transactionCardId) return;
-                                        const found = list.find(
-                                          txn => txn.id === transactionCardId,
-                                        );
-                                        if (found)
-                                          setSelectedTransaction(found);
-                                      })();
-                                    }}
-                                    className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
-                                  >
+                                  {!isOwn &&
+                                    typeof meta?.content_id === 'string' &&
+                                    meta.content_id.trim() && (
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            openListingActionModal(
+                                              meta,
+                                              structuredSide === 'supply' &&
+                                                inferPricingMode(meta || {}) ===
+                                                'fixed'
+                                                ? 'direct'
+                                                : 'offer',
+                                            )
+                                          }
+                                          className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
+                                        >
+                                          {chatLocale === 'id'
+                                            ? structuredSide === 'demand'
+                                              ? 'Tanggapi Listing'
+                                              : 'Pilih Respons'
+                                            : structuredSide === 'demand'
+                                              ? 'Respond'
+                                              : 'Choose Action'}
+                                        </button>
+                                        {structuredContentUrl && (
+                                          <Link
+                                            href={structuredContentUrl}
+                                            className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
+                                          >
+                                            {chatLocale === 'id'
+                                              ? 'Buka listing'
+                                              : 'Open Listing'}
+                                          </Link>
+                                        )}
+                                      </div>
+                                    )}
+                                </div>
+                              )}
+
+                              {msg.message_type === 'transaction' && (
+                                <div
+                                  className={`rounded-2xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
+                                >
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
                                     {chatLocale === 'id'
-                                      ? 'Buka transaksi'
-                                      : 'Open transaction'}
-                                  </button>
-                                  {transactionShouldShowPay ? (
+                                      ? 'Transaksi'
+                                      : 'Transaction'}
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
+                                    {typeof ticketMeta.reference === 'string' &&
+                                      ticketMeta.reference.trim() && (
+                                        <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                          {ticketMeta.reference}
+                                        </span>
+                                      )}
+                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                      {structuredSideContext}
+                                    </span>
+                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
+                                      {transactionCardWalletLabel}
+                                    </span>
+                                  </div>
+                                  {transactionCardCoverImage && (
+                                    <img
+                                      src={transactionCardCoverImage}
+                                      alt={transactionCardTitle}
+                                      className="mt-2 h-20 w-full rounded-xl object-cover"
+                                      loading="lazy"
+                                    />
+                                  )}
+                                  <div className="mt-2 flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-xs font-semibold">
+                                        {transactionCardTitle}
+                                      </p>
+                                      <p className="mt-1 text-[11px] opacity-80">
+                                        {transactionCardShortId}
+                                      </p>
+                                    </div>
+                                    <p className="shrink-0 text-base font-black text-[color:var(--app-accent)]">
+                                      {formatMoney(
+                                        transactionCardMeta?.amount_cents,
+                                        transactionCardMeta?.currency,
+                                      )}
+                                    </p>
+                                  </div>
+                                  <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold">
+                                    <span
+                                      className={`rounded-full border px-2 py-0.5 ${statusTone(transactionCardStatus)}`}
+                                    >
+                                      {humanizeStatus(transactionCardStatus)}
+                                    </span>
+                                    <span
+                                      className={`rounded-full border px-2 py-0.5 ${protectionTone(
+                                        transactionCardMeta?.protection_status ||
+                                        'awaiting_funding',
+                                      )}`}
+                                    >
+                                      {humanizeStatus(
+                                        transactionCardMeta?.protection_status ||
+                                        'awaiting_funding',
+                                      )}
+                                    </span>
+                                    <span
+                                      className={`rounded-full border px-2 py-0.5 ${paymentTone(transactionCardPaymentStatus)}`}
+                                    >
+                                      {humanizeStatus(
+                                        transactionCardPaymentStatus,
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_18%,_transparent)] px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                                      <p className="font-semibold opacity-90">
+                                        {transactionCardNextStep ||
+                                          (chatLocale === 'id'
+                                            ? 'Menunggu pembaruan transaksi'
+                                            : 'Waiting for transaction update')}
+                                      </p>
+                                      <span className="font-bold text-[color:var(--app-accent)]">
+                                        {transactionCardProgress}%
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface)_45%,_transparent)]">
+                                      <div
+                                        className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)]"
+                                        style={{
+                                          width: `${transactionCardProgress}%`,
+                                        }}
+                                      />
+                                    </div>
+                                    <p className="mt-2 text-[11px] opacity-80">
+                                      {humanizeStatus(
+                                        transactionCardMeta?.deal_kind ||
+                                        'deal',
+                                      )}{' '}
+                                      |{' '}
+                                      {humanizeStatus(
+                                        transactionCardMeta?.fulfillment_mode ||
+                                        'standard',
+                                      )}
+                                    </p>
+                                  </div>
+                                  {typeof transactionCardMeta?.response_message ===
+                                    'string' &&
+                                    transactionCardMeta.response_message.trim() && (
+                                      <p className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)] px-3 py-2 text-xs opacity-90">
+                                        {transactionCardMeta.response_message}
+                                      </p>
+                                    )}
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        openPaymentForTransaction({
-                                          transaction_id: transactionCardId,
-                                          amount_cents:
-                                            transactionCardMeta?.amount_cents,
-                                          currency:
-                                            transactionCardMeta?.currency,
-                                        })
-                                      }
-                                      className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)]"
+                                      onClick={() => {
+                                        setShowTransactionsDrawer(true);
+                                        void (async () => {
+                                          const list =
+                                            await loadRoomTransactions();
+                                          if (!transactionCardId) return;
+                                          const found = list.find(
+                                            txn => txn.id === transactionCardId,
+                                          );
+                                          if (found)
+                                            setSelectedTransaction(found);
+                                        })();
+                                      }}
+                                      className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
                                     >
-                                      <Wallet className="h-3.5 w-3.5" />
                                       {chatLocale === 'id'
-                                        ? 'Bayar sekarang'
-                                        : 'Pay now'}
+                                        ? 'Buka transaksi'
+                                        : 'Open transaction'}
                                     </button>
-                                  ) : null}
+                                    {transactionShouldShowPay ? (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openPaymentForTransaction({
+                                            transaction_id: transactionCardId,
+                                            amount_cents:
+                                              transactionCardMeta?.amount_cents,
+                                            currency:
+                                              transactionCardMeta?.currency,
+                                          })
+                                        }
+                                        className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)]"
+                                      >
+                                        <Wallet className="h-3.5 w-3.5" />
+                                        {chatLocale === 'id'
+                                          ? 'Bayar sekarang'
+                                          : 'Pay now'}
+                                      </button>
+                                    ) : null}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
-                            {msg.message_type === 'job_update' && (
-                              <div
-                                className={`rounded-xl border p-2.5 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
-                              >
-                                <p className="text-xs font-semibold">
-                                  {String(meta?.title || 'Job updated')}
+                              {msg.message_type === 'job_update' && (
+                                <div
+                                  className={`rounded-xl border p-2.5 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
+                                >
+                                  <p className="text-xs font-semibold">
+                                    {String(meta?.title || 'Job updated')}
+                                  </p>
+                                </div>
+                              )}
+
+                              {msg.content && (
+                                <p className="text-xs opacity-90">
+                                  {msg.content}
                                 </p>
-                              </div>
-                            )}
-
-                            {msg.content && (
-                              <p className="text-xs opacity-90">
-                                {msg.content}
-                              </p>
-                            )}
-                          </div>
-                        ) : msg.message_type === 'image' &&
-                          msg.attachments?.[0] ? (
-                          <div className="space-y-2">
-                            {msg.attachments.map((rawUrl, index) => {
-                              const imageUrl = normalizeAttachmentUrl(rawUrl);
-                              if (!imageUrl) return null;
-                              return (
-                                <img
-                                  key={`${msg.id}-img-${index}`}
-                                  src={imageUrl}
-                                  alt={
-                                    (msg.attachments?.length ?? 0) > 1
-                                      ? `Image ${index + 1}`
-                                      : 'Image'
-                                  }
-                                  className="max-w-full rounded-lg border border-[color:color-mix(in_srgb,_var(--app-border-strong)_5%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)]"
-                                  loading="lazy"
-                                />
-                              );
-                            })}
-                            {msg.content && (
-                              <span className="block">{msg.content}</span>
-                            )}
-                          </div>
-                        ) : msg.message_type === 'video' &&
-                          msg.attachments?.[0] ? (
-                          <div className="space-y-2">
-                            <video
-                              src={normalizeAttachmentUrl(msg.attachments[0])}
-                              controls
-                              className="max-w-full rounded-lg"
-                            />
-                            {msg.content && (
-                              <span className="block">{msg.content}</span>
-                            )}
-                          </div>
-                        ) : msg.message_type === 'audio' &&
-                          msg.attachments?.[0] ? (
-                          <div className="space-y-2">
-                            <audio
-                              src={normalizeAttachmentUrl(msg.attachments[0])}
-                              controls
-                              className="max-w-full"
-                            />
-                            {msg.content && (
-                              <span className="block">{msg.content}</span>
-                            )}
-                          </div>
-                        ) : msg.message_type === 'sticker' &&
-                          msg.attachments?.[0] ? (
-                          <div className="space-y-2">
-                            <img
-                              src={normalizeAttachmentUrl(msg.attachments[0])}
-                              alt="Sticker"
-                              className="mx-auto h-24 w-24 object-contain"
-                              loading="lazy"
-                            />
-                            {msg.content && (
-                              <span className="block">{msg.content}</span>
-                            )}
-                          </div>
-                        ) : msg.message_type === 'file' &&
-                          msg.attachments?.[0] ? (
-                          <a
-                            href={normalizeAttachmentUrl(msg.attachments[0])}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`break-words underline ${isOwn ? 'text-[color:color-mix(in_srgb,_var(--app-text-inverse)_90%,_transparent)]' : 'text-[color:var(--app-accent)]'}`}
-                          >
-                            {msg.content || 'Download file'}
-                          </a>
-                        ) : (
-                          <span>{msg.content}</span>
-                        )}
-
-                        <div
-                          className="mt-1.5 flex items-center justify-end gap-1 pl-8"
-                        >
-                          <span
-                            className={`text-[10px] ${bubbleMetaClass}`}
-                          >
-                            {formatMessageTime(msg.created_at)}
-                          </span>
-                          {isOwn && (
-                            <span className="ml-0.5 inline-flex items-center opacity-90">
-                              {status === 'sending' && (
-                                <Clock
-                                  className="w-3 h-3 animate-pulse"
-                                  aria-label="Sending"
-                                />
                               )}
-                              {status === 'sent' && (
-                                <Check className="w-3 h-3" aria-label="Sent" />
+                            </div>
+                          ) : msg.message_type === 'image' &&
+                            msg.attachments?.[0] ? (
+                            <div className="space-y-2">
+                              {msg.attachments.map((rawUrl, index) => {
+                                const imageUrl = normalizeAttachmentUrl(rawUrl);
+                                if (!imageUrl) return null;
+                                return (
+                                  <img
+                                    key={`${msg.id}-img-${index}`}
+                                    src={imageUrl}
+                                    alt={
+                                      (msg.attachments?.length ?? 0) > 1
+                                        ? `Image ${index + 1}`
+                                        : 'Image'
+                                    }
+                                    className="max-w-full rounded-lg border border-[color:color-mix(in_srgb,_var(--app-border-strong)_5%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)]"
+                                    loading="lazy"
+                                  />
+                                );
+                              })}
+                              {msg.content && (
+                                <span className="block">{msg.content}</span>
                               )}
-                              {status === 'read' && (
-                                <CheckCheck
-                                  className="w-3 h-3 text-[#53bdeb]"
-                                  aria-label="Read"
-                                />
+                            </div>
+                          ) : msg.message_type === 'video' &&
+                            msg.attachments?.[0] ? (
+                            <div className="space-y-2">
+                              <video
+                                src={normalizeAttachmentUrl(msg.attachments[0])}
+                                controls
+                                className="max-w-full rounded-lg"
+                              />
+                              {msg.content && (
+                                <span className="block">{msg.content}</span>
                               )}
-                              {status === 'failed' && (
-                                <AlertCircle
-                                  className="w-3 h-3 text-[#ff6b6b]"
-                                  aria-label="Failed"
-                                />
+                            </div>
+                          ) : msg.message_type === 'audio' &&
+                            msg.attachments?.[0] ? (
+                            <div className="space-y-2">
+                              <audio
+                                src={normalizeAttachmentUrl(msg.attachments[0])}
+                                controls
+                                className="max-w-full"
+                              />
+                              {msg.content && (
+                                <span className="block">{msg.content}</span>
                               )}
-                            </span>
+                            </div>
+                          ) : msg.message_type === 'sticker' &&
+                            msg.attachments?.[0] ? (
+                            <div className="space-y-2">
+                              <img
+                                src={normalizeAttachmentUrl(msg.attachments[0])}
+                                alt="Sticker"
+                                className="mx-auto h-24 w-24 object-contain"
+                                loading="lazy"
+                              />
+                              {msg.content && (
+                                <span className="block">{msg.content}</span>
+                              )}
+                            </div>
+                          ) : msg.message_type === 'file' &&
+                            msg.attachments?.[0] ? (
+                            <a
+                              href={normalizeAttachmentUrl(msg.attachments[0])}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`break-words underline ${isOwn ? 'text-[color:color-mix(in_srgb,_var(--app-text-inverse)_90%,_transparent)]' : 'text-[color:var(--app-accent)]'}`}
+                            >
+                              {msg.content || 'Download file'}
+                            </a>
+                          ) : (
+                            <span>{msg.content}</span>
                           )}
-                        </div>
+
+                          <div className="mt-1.5 flex items-center justify-end gap-1 pl-8">
+                            <span className={`text-[10px] ${bubbleMetaClass}`}>
+                              {formatMessageTime(msg.created_at)}
+                            </span>
+                            {isOwn && (
+                              <span className="ml-0.5 inline-flex items-center opacity-90">
+                                {status === 'sending' && (
+                                  <Clock
+                                    className="w-3 h-3 animate-pulse"
+                                    aria-label="Sending"
+                                  />
+                                )}
+                                {status === 'sent' && (
+                                  <Check
+                                    className="w-3 h-3"
+                                    aria-label="Sent"
+                                  />
+                                )}
+                                {status === 'read' && (
+                                  <CheckCheck
+                                    className="w-3 h-3 text-[#53bdeb]"
+                                    aria-label="Read"
+                                  />
+                                )}
+                                {status === 'failed' && (
+                                  <AlertCircle
+                                    className="w-3 h-3 text-[#ff6b6b]"
+                                    aria-label="Failed"
+                                  />
+                                )}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -5759,9 +5831,8 @@ export default function ChatRoomPage() {
       {/* Composer */}
       <div
         ref={composerRef}
-        className={`border-t border-black/5 bg-[#f0f2f5]/95 px-2 py-2 backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95 ${
-          isMobileViewport ? 'fixed inset-x-0 bottom-0 z-40' : ''
-        }`}
+        className={`border-t border-black/5 bg-[#f0f2f5]/95 px-2 py-2 backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95 ${isMobileViewport ? 'fixed inset-x-0 bottom-0 z-40' : ''
+          }`}
         style={composerStyle}
       >
         <div className="mx-auto w-full max-w-[920px] space-y-2">
@@ -5845,11 +5916,10 @@ export default function ChatRoomPage() {
 
           {activeFraudSignal && (
             <div
-              className={`flex items-start gap-2 rounded-[18px] border bg-white/84 px-3 py-2 text-xs shadow-sm dark:bg-[#111b21]/84 ${
-                activeFraudSignal.severity === 'high'
-                  ? 'border-[#ffb4a2] text-[#c65b3d] dark:border-[#6b4f3b] dark:text-[#ffb199]'
-                  : 'border-[#f7d794] text-[#b07c00] dark:border-[#6b5a2e] dark:text-[#f6d87a]'
-              }`}
+              className={`flex items-start gap-2 rounded-[18px] border bg-white/84 px-3 py-2 text-xs shadow-sm dark:bg-[#111b21]/84 ${activeFraudSignal.severity === 'high'
+                ? 'border-[#ffb4a2] text-[#c65b3d] dark:border-[#6b4f3b] dark:text-[#ffb199]'
+                : 'border-[#f7d794] text-[#b07c00] dark:border-[#6b5a2e] dark:text-[#f6d87a]'
+                }`}
             >
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
               <p>{activeFraudSignal.message}</p>
@@ -5857,7 +5927,7 @@ export default function ChatRoomPage() {
           )}
 
           <div className="flex items-end gap-2">
-            <div className="flex min-w-0 flex-1 items-end gap-1 rounded-[28px] bg-white px-2 py-1.5 shadow-[0_1px_2px_rgba(17,27,33,0.14)] dark:bg-[#2a3942]">
+            <div className={CHAT_COMPOSER_SHELL_CLASS}>
               <div className="flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
@@ -5942,7 +6012,7 @@ export default function ChatRoomPage() {
                     placeholder={
                       chatLocale === 'id' ? 'Ketik pesan' : 'Type a message'
                     }
-                    className="h-10 w-full border-0 bg-transparent px-2 text-[14px] text-[#111b21] placeholder:text-[#667781] focus:outline-none dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
+                    className="h-10 w-full rounded-[18px] border border-transparent bg-transparent px-2 text-[14px] font-semibold text-[#111b21] placeholder:text-[#667781] outline-none transition focus:border-[#25d366]/35 focus:bg-[#f7fff8] dark:text-[#e9edef] dark:placeholder:text-[#8696a0] dark:focus:bg-[#202c33]"
                   />
 
                   {showEmojiPicker && (
@@ -6052,11 +6122,10 @@ export default function ChatRoomPage() {
                     }
                     openAiWorkspace(workspace.id);
                   }}
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                    aiWorkspaceMode === workspace.id
-                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                  }`}
+                  className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiWorkspaceMode === workspace.id
+                    ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                    : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                    }`}
                 >
                   {chatLocale === 'id' ? workspace.labelId : workspace.labelEn}
                 </button>
@@ -6071,11 +6140,10 @@ export default function ChatRoomPage() {
                       key={template.id}
                       type="button"
                       onClick={() => setAiTemplateId(template.id)}
-                      className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                        aiTemplateId === template.id
-                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                      }`}
+                      className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiTemplateId === template.id
+                        ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                        }`}
                     >
                       {template.label}
                     </button>
@@ -6182,7 +6250,7 @@ export default function ChatRoomPage() {
                   </p>
                   <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
                     {chatLocale === 'id'
-                      ? 'Isi brief awalnya. Nanti AI susun jadi card review di room chat, lalu kamu edit atau publish.'
+                      ? 'Isi brief. AI buat card review.'
                       : 'Start from a short brief. The AI will turn it into a review card in the room chat, then you can edit or publish it.'}
                   </p>
                 </div>
@@ -6210,7 +6278,7 @@ export default function ChatRoomPage() {
                   )}
                 </div>
 
-                <label className="mt-3 block text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                <label className={`mt-3 ${CHAT_FIELD_LABEL_CLASS}`}>
                   {chatLocale === 'id' ? 'Brief default' : 'Default brief'}
                   <textarea
                     value={aiStructuredPrompt}
@@ -6218,7 +6286,7 @@ export default function ChatRoomPage() {
                       setAiStructuredPrompt(event.target.value)
                     }
                     rows={9}
-                    className="mt-1 w-full rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-3 py-3 text-xs text-[color:var(--app-text)] outline-none transition focus:border-[color:var(--app-accent)]"
+                    className={CHAT_TEXTAREA_CLASS}
                     placeholder={
                       chatLocale === 'id'
                         ? 'Tulis dulu inti listing atau profil usaha yang ingin dibantu AI.'
@@ -6281,11 +6349,10 @@ export default function ChatRoomPage() {
                         {aiStructuredDraft.listingSide}
                       </span>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          structuredDraftPublishIssues.length === 0
-                            ? 'bg-[color:color-mix(in_srgb,_var(--app-accent)_16%,_transparent)] text-[color:var(--app-accent)]'
-                            : 'bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${structuredDraftPublishIssues.length === 0
+                          ? 'bg-[color:color-mix(in_srgb,_var(--app-accent)_16%,_transparent)] text-[color:var(--app-accent)]'
+                          : 'bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
+                          }`}
                       >
                         {structuredDraftPublishIssues.length === 0
                           ? chatLocale === 'id'
@@ -6387,7 +6454,7 @@ export default function ChatRoomPage() {
                             ? 'Menyimpan draft...'
                             : 'Saving draft...'
                           : chatLocale === 'id'
-                            ? 'Buat draft dan kirim ke room'
+                            ? 'Kirim draft'
                             : 'Create draft and send to room'}
                       </button>
                       <button
@@ -6405,7 +6472,7 @@ export default function ChatRoomPage() {
 
             <div className="mt-3 rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3 text-[11px] text-[color:var(--app-text-soft)]">
               {chatLocale === 'id'
-                ? 'Nada AI, instruksi tambahan, dan auto-send masih bisa diatur dari Chat Settings.'
+                ? 'Nada AI dan auto-send ada di Chat Settings.'
                 : 'The AI tone, extra instruction, and auto-send are still managed from Chat Settings.'}
               <button
                 type="button"
@@ -6482,11 +6549,10 @@ export default function ChatRoomPage() {
                     type="button"
                     onClick={() => setAiUseContext(prev => !prev)}
                     aria-pressed={aiUseContext}
-                    className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                      aiUseContext
-                        ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                    }`}
+                    className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiUseContext
+                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                      }`}
                   >
                     Konteks
                   </button>
@@ -6494,28 +6560,27 @@ export default function ChatRoomPage() {
                     type="button"
                     onClick={() => setAiAutoSend(prev => !prev)}
                     aria-pressed={aiAutoSend}
-                    className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                      aiAutoSend
-                        ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                    }`}
+                    className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiAutoSend
+                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                      }`}
                   >
                     {aiAutoSend ? 'Auto send' : 'Manual'}
                   </button>
                 </div>
 
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <label className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  <label className={CHAT_FIELD_LABEL_CLASS}>
                     Nama AI
                     <input
                       type="text"
                       value={aiProfileName}
                       onChange={event => setAiProfileName(event.target.value)}
-                      className="mt-1 w-full rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs text-[color:var(--app-text)] focus:border-[color:var(--app-accent)] focus:outline-none"
+                      className={CHAT_CONTROL_CLASS}
                       placeholder="AI Pribadi"
                     />
                   </label>
-                  <label className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  <label className={CHAT_FIELD_LABEL_CLASS}>
                     Nada
                     <select
                       value={aiToneId}
@@ -6523,7 +6588,7 @@ export default function ChatRoomPage() {
                         const next = event.target.value;
                         if (isAiToneId(next)) setAiToneId(next);
                       }}
-                      className="mt-1 w-full rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs text-[color:var(--app-text)] focus:border-[color:var(--app-accent)] focus:outline-none"
+                      className={CHAT_CONTROL_CLASS}
                     >
                       {AI_TONES.map(tone => (
                         <option key={tone.id} value={tone.id}>
@@ -6535,7 +6600,7 @@ export default function ChatRoomPage() {
                 </div>
 
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <label className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  <label className={CHAT_FIELD_LABEL_CLASS}>
                     Panjang
                     <select
                       value={aiLengthId}
@@ -6543,7 +6608,7 @@ export default function ChatRoomPage() {
                         const next = event.target.value;
                         if (isAiLengthId(next)) setAiLengthId(next);
                       }}
-                      className="mt-1 w-full rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs text-[color:var(--app-text)] focus:border-[color:var(--app-accent)] focus:outline-none"
+                      className={CHAT_CONTROL_CLASS}
                     >
                       {AI_LENGTHS.map(length => (
                         <option key={length.id} value={length.id}>
@@ -6552,13 +6617,13 @@ export default function ChatRoomPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  <label className={CHAT_FIELD_LABEL_CLASS}>
                     Instruksi tambahan
                     <input
                       type="text"
                       value={aiInstruction}
                       onChange={event => setAiInstruction(event.target.value)}
-                      className="mt-1 w-full rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs text-[color:var(--app-text)] focus:border-[color:var(--app-accent)] focus:outline-none"
+                      className={CHAT_CONTROL_CLASS}
                       placeholder="Contoh: fokus ke harga dan deadline"
                     />
                   </label>
@@ -6574,11 +6639,10 @@ export default function ChatRoomPage() {
                         key={template.id}
                         type="button"
                         onClick={() => setAiTemplateId(template.id)}
-                        className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                          aiTemplateId === template.id
-                            ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                        }`}
+                        className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiTemplateId === template.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                          }`}
                       >
                         {template.label}
                       </button>
@@ -6638,7 +6702,7 @@ export default function ChatRoomPage() {
                 <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
                   {listingActionDraft.pricingMode === 'request'
                     ? chatLocale === 'id'
-                      ? 'Harga belum ditampilkan. Anda bisa mulai dari budget atau tanya detail dulu.'
+                      ? 'Harga belum tampil. Mulai dari budget atau tanya detail.'
                       : 'Price is still by request. You can start with a budget or ask for details first.'
                     : listingActionDraft.listingSide === 'demand'
                       ? `${chatLocale === 'id' ? 'Budget acuan' : 'Reference budget'}: ${formatMoney(listingActionDraft.amountCents, listingActionDraft.currency)}`
@@ -6667,11 +6731,10 @@ export default function ChatRoomPage() {
                   onClick={() =>
                     applyListingActionMode(listingActionDraft, 'direct')
                   }
-                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
-                    listingActionMode === 'direct'
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)]'
-                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
-                  }`}
+                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${listingActionMode === 'direct'
+                    ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)]'
+                    : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
+                    }`}
                 >
                   <p className="text-[11px] font-semibold text-[color:var(--app-accent)]">
                     {chatLocale === 'id'
@@ -6689,18 +6752,17 @@ export default function ChatRoomPage() {
                   onClick={() =>
                     applyListingActionMode(listingActionDraft, 'offer')
                   }
-                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
-                    listingActionMode === 'offer'
-                      ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_12%,_transparent)]'
-                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
-                  }`}
+                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${listingActionMode === 'offer'
+                    ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_12%,_transparent)]'
+                    : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
+                    }`}
                 >
                   <p className="text-[11px] font-semibold text-[color:var(--app-info)]">
                     {chatLocale === 'id' ? 'Nego dulu' : 'Negotiate first'}
                   </p>
                   <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
                     {chatLocale === 'id'
-                      ? 'Kirim nominal awal, scope, dan catatan untuk buka negosiasi.'
+                      ? 'Kirim nominal, scope, catatan.'
                       : 'Send a starting amount, scope, and note to open negotiation.'}
                   </p>
                 </button>
@@ -6725,10 +6787,9 @@ export default function ChatRoomPage() {
                     setShowListingActionModal(false);
                     setNewMessage(
                       prev =>
-                        `${prev}${prev ? ' ' : ''}${
-                          chatLocale === 'id'
-                            ? 'Halo, boleh kirim detail harga dan ketentuan utamanya?'
-                            : 'Could you share the price details and key terms?'
+                        `${prev}${prev ? ' ' : ''}${chatLocale === 'id'
+                          ? 'Halo, boleh kirim detail harga dan ketentuan utamanya?'
+                          : 'Could you share the price details and key terms?'
                         }`,
                     );
                   }}
@@ -6741,7 +6802,7 @@ export default function ChatRoomPage() {
               </div>
             )}
 
-            <label className="block text-xs font-semibold text-[color:var(--app-text-soft)]">
+            <label className={CHAT_FIELD_LABEL_CLASS}>
               {listingActionAmountLabel}
             </label>
             <input
@@ -6750,17 +6811,16 @@ export default function ChatRoomPage() {
               value={listingActionAmount}
               onChange={e => setListingActionAmount(e.target.value)}
               readOnly={isListingActionAmountLocked}
-              className={`mt-1 w-full rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-sm text-[color:var(--app-text-soft)] outline-none focus:border-[color:var(--app-accent)] ${
-                isListingActionAmountLocked
-                  ? 'cursor-not-allowed opacity-80'
-                  : ''
-              }`}
+              className={`${CHAT_CONTROL_CLASS} ${isListingActionAmountLocked
+                ? 'cursor-not-allowed opacity-80'
+                : ''
+                }`}
               placeholder={listingActionAmountPlaceholder}
             />
             <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
               {listingActionMode === 'direct'
                 ? chatLocale === 'id'
-                  ? 'Nominal mengikuti harga listing agar transaksi langsung terbentuk rapi.'
+                  ? 'Nominal ikut harga listing.'
                   : 'The amount follows the listing price so the transaction can be created immediately.'
                 : listingActionDraft.listingSide === 'demand'
                   ? chatLocale === 'id'
@@ -6771,7 +6831,7 @@ export default function ChatRoomPage() {
                     : 'Use this as the starting point for a clearer negotiation.'}
             </p>
 
-            <label className="mt-3 block text-xs font-semibold text-[color:var(--app-text-soft)]">
+            <label className={`mt-3 ${CHAT_FIELD_LABEL_CLASS}`}>
               {chatLocale === 'id'
                 ? 'Pesan detail (opsional)'
                 : 'Detailed note (optional)'}
@@ -6780,24 +6840,24 @@ export default function ChatRoomPage() {
               rows={4}
               value={listingActionMessage}
               onChange={e => setListingActionMessage(e.target.value)}
-              className="mt-1 w-full resize-none rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-sm text-[color:var(--app-text-soft)] outline-none focus:border-[color:var(--app-accent)]"
+              className={CHAT_TEXTAREA_CLASS}
               placeholder={
                 listingActionMode === 'direct'
                   ? chatLocale === 'id'
-                    ? 'Contoh: saya lanjut hari ini, mohon kirim detail pembayaran dan pengiriman.'
+                    ? 'Contoh: saya lanjut hari ini.'
                     : 'Example: I am ready to proceed today, please share payment and delivery details.'
                   : listingActionDraft.listingSide === 'demand'
                     ? chatLocale === 'id'
-                      ? 'Contoh: kami bisa kerjakan 3 hari, scope-nya mencakup A, B, C, dengan revisi 2 kali.'
+                      ? 'Contoh: 3 hari, scope A-B-C, revisi 2 kali.'
                       : 'Example: we can deliver in 3 days, covering scope A, B, and C with 2 revisions.'
                     : chatLocale === 'id'
-                      ? 'Contoh: saya ajukan nominal ini dengan catatan timeline dan scope berikut.'
+                      ? 'Contoh: saya ajukan nominal ini.'
                       : 'Example: I am sending this amount with the following scope and timeline.'
               }
             />
             <p className="mt-2 text-[11px] text-[color:var(--app-text-soft)]">
               {chatLocale === 'id'
-                ? 'Setelah dikirim, chat akan menerima kartu tiket lengkap dengan referensi, status, dan langkah berikutnya.'
+                ? 'Setelah dikirim, tiket muncul di chat.'
                 : 'After submission, chat receives a structured ticket card with reference, status, and next steps.'}
             </p>
 
@@ -6822,7 +6882,7 @@ export default function ChatRoomPage() {
                     : 'Processing...'
                   : listingActionMode === 'direct'
                     ? chatLocale === 'id'
-                      ? 'Buat Tiket Deal'
+                      ? 'Buat Deal'
                       : 'Create Deal Ticket'
                     : listingActionDraft.listingSide === 'demand'
                       ? chatLocale === 'id'
@@ -6942,11 +7002,10 @@ export default function ChatRoomPage() {
                         key={txn.id}
                         type="button"
                         onClick={() => setSelectedTransaction(txn)}
-                        className={`ui-feed-row w-full rounded-2xl border p-3 text-left transition ${
-                          isSelected
-                            ? 'border-[color:color-mix(in_srgb,_var(--app-accent)_70%,_transparent)] bg-[color:var(--app-accent-soft)]'
-                            : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] hover:bg-[color:var(--app-surface-muted)]'
-                        }`}
+                        className={`ui-feed-row w-full rounded-2xl border p-3 text-left transition ${isSelected
+                          ? 'border-[color:color-mix(in_srgb,_var(--app-accent)_70%,_transparent)] bg-[color:var(--app-accent-soft)]'
+                          : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] hover:bg-[color:var(--app-surface-muted)]'
+                          }`}
                       >
                         <div className="flex items-start gap-3">
                           {txnCoverImage ? (
@@ -7025,7 +7084,7 @@ export default function ChatRoomPage() {
       )}
 
       {selectedTransaction && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] p-3 sm:items-center">
+        <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] p-3 sm:items-center">
           <div className="ui-feed-section max-h-[80svh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl sm:p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -7035,8 +7094,8 @@ export default function ChatRoomPage() {
                 <h3 className="mt-1 truncate text-sm font-semibold text-[color:var(--app-text-soft)] sm:text-base">
                   {String(
                     selectedTransaction.snapshot_listing?.title ||
-                      selectedTransaction.content_id ||
-                      'Transaction',
+                    selectedTransaction.content_id ||
+                    'Transaction',
                   )}
                 </h3>
                 <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
@@ -7089,18 +7148,18 @@ export default function ChatRoomPage() {
             </div>
             {(Object.keys(selectedTxnTicket).length > 0 ||
               selectedTxnSideLabel) && (
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-                {typeof selectedTxnTicket.reference === 'string' &&
-                  selectedTxnTicket.reference.trim() && (
-                    <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                      Ref: {selectedTxnTicket.reference}
-                    </span>
-                  )}
-                <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                  {selectedTxnSideLabel}
-                </span>
-              </div>
-            )}
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  {typeof selectedTxnTicket.reference === 'string' &&
+                    selectedTxnTicket.reference.trim() && (
+                      <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
+                        Ref: {selectedTxnTicket.reference}
+                      </span>
+                    )}
+                  <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
+                    {selectedTxnSideLabel}
+                  </span>
+                </div>
+              )}
 
             <div className="mb-3 rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -7126,13 +7185,12 @@ export default function ChatRoomPage() {
                 {selectedTxnSteps.map((step, index) => (
                   <div
                     key={`${selectedTransaction.id}-step-${step.key}`}
-                    className={`rounded-lg border px-2 py-1.5 text-[11px] ${
-                      step.done
-                        ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] text-[color:var(--app-accent)]'
-                        : step.active
-                          ? 'border-[color:color-mix(in_srgb,_var(--app-info-border)_50%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] text-[color:var(--app-info)]'
-                          : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]'
-                    }`}
+                    className={`rounded-lg border px-2 py-1.5 text-[11px] ${step.done
+                      ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] text-[color:var(--app-accent)]'
+                      : step.active
+                        ? 'border-[color:color-mix(in_srgb,_var(--app-info-border)_50%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] text-[color:var(--app-info)]'
+                        : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]'
+                      }`}
                   >
                     <p className="font-semibold">
                       {index + 1}. {step.label}
@@ -7191,7 +7249,7 @@ export default function ChatRoomPage() {
                 <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
                   {formatDateTimeLabel(
                     selectedTransaction.updated_at ||
-                      selectedTransaction.created_at,
+                    selectedTransaction.created_at,
                   )}
                 </p>
               </div>
@@ -7227,7 +7285,7 @@ export default function ChatRoomPage() {
                         ? 'Diterima'
                         : 'Accepted'
                       : selectedTxnLatestDelivery.reviewStatus ===
-                          'revision_requested'
+                        'revision_requested'
                         ? chatLocale === 'id'
                           ? 'Perlu revisi'
                           : 'Revision requested'
@@ -7309,8 +7367,8 @@ export default function ChatRoomPage() {
                         {humanizeStatus(item.status || item.event || 'updated')}
                       </p>
                       {'description' in item &&
-                      typeof item.description === 'string' &&
-                      item.description.trim() ? (
+                        typeof item.description === 'string' &&
+                        item.description.trim() ? (
                         <p className="text-[11px] text-[color:color-mix(in_srgb,_var(--app-text-soft)_90%,_transparent)]">
                           {item.description}
                         </p>
@@ -7326,37 +7384,37 @@ export default function ChatRoomPage() {
 
             {(selectedTransaction.offer_message ||
               selectedTransaction.response_message) && (
-              <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  Catatan Negosiasi
-                </summary>
-                <div className="mt-2 space-y-2">
-                  {selectedTransaction.offer_message ? (
-                    <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                      <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                        Catatan Buyer
-                      </p>
-                      <p>{selectedTransaction.offer_message}</p>
-                    </div>
-                  ) : null}
-                  {selectedTransaction.response_message ? (
-                    <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                      <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                        Catatan Seller
-                      </p>
-                      <p>{selectedTransaction.response_message}</p>
-                    </div>
-                  ) : null}
-                </div>
-              </details>
-            )}
+                <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
+                  <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                    Catatan Negosiasi
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {selectedTransaction.offer_message ? (
+                      <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
+                        <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                          Catatan Buyer
+                        </p>
+                        <p>{selectedTransaction.offer_message}</p>
+                      </div>
+                    ) : null}
+                    {selectedTransaction.response_message ? (
+                      <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
+                        <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                          Catatan Seller
+                        </p>
+                        <p>{selectedTransaction.response_message}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
+              )}
 
             <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
               <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
                 {chatLocale === 'id' ? 'Keamanan & risiko' : 'Safety & risk'}
               </summary>
               {Array.isArray(selectedTransaction.risk_flags) &&
-              selectedTransaction.risk_flags.length > 0 ? (
+                selectedTransaction.risk_flags.length > 0 ? (
                 <div className="mt-2 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] p-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-warning)]">
                     Risk Flags
@@ -7393,11 +7451,10 @@ export default function ChatRoomPage() {
                         className="flex items-center gap-2 text-xs text-[color:var(--app-text-soft)]"
                       >
                         <span
-                          className={`inline-block h-2 w-2 rounded-full ${
-                            Boolean(value)
-                              ? 'bg-[color:var(--app-accent)]'
-                              : 'bg-[color:var(--app-surface)]'
-                          }`}
+                          className={`inline-block h-2 w-2 rounded-full ${Boolean(value)
+                            ? 'bg-[color:var(--app-accent)]'
+                            : 'bg-[color:var(--app-surface)]'
+                            }`}
                         />
                         <span>{humanizeStatus(key)}</span>
                       </div>
@@ -7633,7 +7690,7 @@ export default function ChatRoomPage() {
               channelRef.current?.push('call_reject', {
                 call_id: incomingCall.callId,
               });
-            } catch {}
+            } catch { }
             setIncomingCall(null);
           }}
         />

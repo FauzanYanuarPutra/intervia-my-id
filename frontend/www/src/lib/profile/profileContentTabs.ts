@@ -5,6 +5,7 @@ export type ProfileContentTab =
   | 'product'
   | 'service'
   | 'tool_rental'
+  | 'business_transfer'
   | 'property'
   | 'umkm';
 
@@ -116,6 +117,21 @@ export const PROFILE_CONTENT_TABS: ProfileContentTabDefinition[] = [
     browseHref: '/search?type=tool_rental',
   },
   {
+    key: 'business_transfer',
+    labelId: 'Oper Usaha',
+    labelEn: 'Business Transfer',
+    emptyTitleId: 'Belum ada oper usaha',
+    emptyTitleEn: 'No business transfer yet',
+    emptyDescriptionId:
+      'Tampilkan usaha berjalan yang bisa dialihkan lengkap dengan aset, rating, biaya, dan risiko.',
+    emptyDescriptionEn:
+      'Show running businesses for transfer with assets, ratings, costs, and risks.',
+    addLabelId: 'Tambah oper usaha',
+    addLabelEn: 'Add business transfer',
+    createHref: '/create/jual/oper-usaha',
+    browseHref: '/search?type=business_transfer',
+  },
+  {
     key: 'property',
     labelId: 'Properti',
     labelEn: 'Property',
@@ -172,9 +188,7 @@ function collectMetadataTokens(
   return rawValues.flatMap(value => {
     if (typeof value === 'string') return [normalizeToken(value)];
     if (Array.isArray(value)) {
-      return value
-        .map(entry => normalizeToken(entry))
-        .filter(Boolean);
+      return value.map(entry => normalizeToken(entry)).filter(Boolean);
     }
     return [];
   });
@@ -194,6 +208,12 @@ export function normalizeProfileContentTab(input: {
 
   if (/(freelancer|talent|creator|profile)/.test(joined)) return 'freelancer';
   if (/(job|career|hiring|recruit|loker|vacancy)/.test(joined)) return 'job';
+  if (
+    /(business_transfer|business-transfer|business transfer|oper usaha|jual usaha|usaha berjalan|handover|takeover)/.test(
+      joined,
+    )
+  )
+    return 'business_transfer';
   if (/(tool_rental|tool-rental|rental|rent|sewa|pinjam|meminjam)/.test(joined))
     return 'tool_rental';
   if (/(property|real estate|apartment|house|ruko|kios|lapak)/.test(joined))
@@ -209,7 +229,8 @@ export function getProfileContentTabDefinition(
   key: ProfileContentTab,
 ): ProfileContentTabDefinition {
   return (
-    PROFILE_CONTENT_TABS.find(item => item.key === key) || PROFILE_CONTENT_TABS[0]
+    PROFILE_CONTENT_TABS.find(item => item.key === key) ||
+    PROFILE_CONTENT_TABS[0]
   );
 }
 

@@ -11,6 +11,60 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+$RuntimeDir = Join-Path $PSScriptRoot ".runtime"
+$StartupStateFile = Join-Path $RuntimeDir "stack-startup.json"
+
+function Write-StartupState {
+    param(
+        [Parameter(Mandatory = $true)]
+        [bool]$Active,
+        [Parameter(Mandatory = $true)]
+        [string]$Status,
+        [Parameter(Mandatory = $true)]
+        [string]$Phase,
+        [string]$Message = "",
+        [string[]]$ServiceNames = @()
+    )
+
+    if (-not (Test-Path $RuntimeDir)) {
+        New-Item -ItemType Directory -Path $RuntimeDir -Force *> $null
+    }
+
+    $now = (Get-Date).ToString("o")
+    $startedAt = $now
+    if (Test-Path $StartupStateFile) {
+        try {
+            $existing = Get-Content $StartupStateFile -Raw | ConvertFrom-Json
+            if ($existing.startedAt) {
+                $startedAt = [string]$existing.startedAt
+            }
+        } catch {
+            $startedAt = $now
+        }
+    }
+
+    $state = @{
+        active    = $Active
+        status    = $Status
+        phase     = $Phase
+        message   = $Message
+        script    = "up-super-fast.ps1"
+        mode      = $Mode
+        services  = @($ServiceNames)
+        startedAt = $startedAt
+        updatedAt = $now
+    }
+
+    $state | ConvertTo-Json -Depth 5 | Set-Content -Path $StartupStateFile -Encoding UTF8
+}
+
+trap {
+    Write-StartupState -Active $false -Status "failed" -Phase "failed" -Message "$($_.Exception.Message)" -ServiceNames $selectedServices
+    break
+}
+
+Write-StartupState -Active $true -Status "starting" -Phase "initializing" -Message "Preparing Docker startup." -ServiceNames $Services
+
 $env:DOCKER_BUILDKIT = "1"
 $env:COMPOSE_DOCKER_CLI_BUILD = "1"
 $env:COMPOSE_PARALLEL_LIMIT = "3"
@@ -137,8 +191,18 @@ function Test-LocalImage {
         [Parameter(Mandatory = $true)]
         [string]$ImageName
     )
-    & docker image inspect $ImageName *> $null
-    return ($LASTEXITCODE -eq 0)
+    try {
+        $output = & docker image inspect $ImageName 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+
+        Write-Host "Local image check failed for ${ImageName}; treating it as missing so it can be rebuilt." -ForegroundColor Yellow
+        return $false
+    } catch {
+        Write-Host "Local image check threw for ${ImageName}; treating it as missing so it can be rebuilt." -ForegroundColor Yellow
+        return $false
+    }
 }
 
 function Get-ComposeServiceContainerIds {
@@ -325,11 +389,13 @@ if (Test-Path $stateFile) {
 $serviceInputs = @{
     identity_service    = @("backend/rust_apps", "docker-compose.yml")
     marketplace_service = @("backend/rust_apps", "docker-compose.yml")
+    community_service   = @("backend/rust_apps", "docker-compose.yml")
     ai_service          = @("backend/rust_apps", "docker-compose.yml")
     chat_service        = @("backend/chat_service", "docker-compose.yml")
     ocr_service         = @("ai/ocr_paddle", "docker-compose.yml")
     liveness_service    = @("ai/liveness", "docker-compose.yml")
     www                 = @("frontend/www", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
+    usaha               = @("frontend/usaha", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
     cms                 = @("frontend/cms", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
     crm                 = @("frontend/crm", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
 }
@@ -343,11 +409,13 @@ $composeProjectName = if ($env:COMPOSE_PROJECT_NAME) {
 $serviceImages = @{
     identity_service    = "$composeProjectName-identity_service"
     marketplace_service = "$composeProjectName-marketplace_service"
+    community_service   = "$composeProjectName-community_service"
     ai_service          = "$composeProjectName-ai_service"
     chat_service        = "$composeProjectName-chat_service"
     ocr_service         = "$composeProjectName-ocr_service"
     liveness_service    = "$composeProjectName-liveness_service"
     www                 = "$composeProjectName-www"
+    usaha               = "$composeProjectName-usaha"
     cms                 = "$composeProjectName-cms"
     crm                 = "$composeProjectName-crm"
 }
@@ -355,11 +423,13 @@ $serviceImages = @{
 $serviceBaseImages = @{
     identity_service    = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
     marketplace_service = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
+    community_service   = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
     ai_service          = @("rustlang/rust:nightly-bookworm", "debian:bookworm-slim")
     chat_service        = @("docker/dockerfile:1.7", "elixir:1.15-slim", "erlang:26-slim")
     ocr_service         = @("python:3.9-slim")
     liveness_service    = @("python:3.11-slim")
     www                 = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
+    usaha               = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
     cms                 = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
     crm                 = @("docker/dockerfile:1.7", "node:20-bullseye-slim")
 }
@@ -371,6 +441,7 @@ $defaultDevServices = @(
     "meilisearch",
     "identity_service",
     "marketplace_service",
+    "community_service",
     "www",
     "cms",
     "crm",
@@ -388,11 +459,16 @@ if ($Mode -eq "prod") {
     Write-Host "Starting production services without build..."
     Invoke-Compose ($prodArgs + @("up", "-d", "--no-build", "--no-recreate", "--remove-orphans"))
     Invoke-Compose ($prodArgs + @("ps"))
+    Write-StartupState -Active $false -Status "ready" -Phase "ready" -Message "Production services are ready." -ServiceNames $Services
     exit 0
 }
 
 if (-not (Test-Path $EnvFile)) {
-    throw "Env file not found: $EnvFile"
+    if ($EnvFile -eq ".env.development" -and (Test-Path ".env")) {
+        $EnvFile = ".env"
+    } else {
+        throw "Env file not found: $EnvFile"
+    }
 }
 
 $availableServices = @{}
@@ -438,6 +514,8 @@ $selectedServices = if ($requestedServices.Count -gt 0) {
 } else {
     $defaultDevServices
 }
+
+Write-StartupState -Active $true -Status "starting" -Phase "checking_images" -Message "Checking images and service inputs." -ServiceNames $selectedServices
 
 $startupServices = @($selectedServices | Where-Object {
     $availableServices.Count -eq 0 -or $availableServices.ContainsKey($_)
@@ -494,13 +572,14 @@ if (-not $NoBuild) {
 }
 
 if ($servicesToBuild.Count -gt 0) {
+    Write-StartupState -Active $true -Status "building" -Phase "building" -Message "Building changed services." -ServiceNames $servicesToBuild
     Warm-BaseImagesForServices -ServiceNames $servicesToBuild
 
     $buildOrder = @(
-        @("identity_service", "marketplace_service", "ai_service"),
+        @("identity_service", "marketplace_service", "community_service", "ai_service"),
         @("chat_service"),
         @("ocr_service", "liveness_service"),
-        @("www", "cms", "crm")
+        @("www", "usaha", "cms", "crm")
     )
 
     foreach ($group in $buildOrder) {
@@ -535,6 +614,7 @@ if ($servicesToBuild.Count -gt 0) {
 }
 
 Write-Host "Starting services..."
+Write-StartupState -Active $true -Status "starting_services" -Phase "starting_services" -Message "Starting Docker services." -ServiceNames $startupServices
 if ($servicesToBuild.Count -gt 0) {
     Remove-LegacyComposeContainers -ProjectName $composeProjectName -Services $servicesToBuild
     Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build") + $servicesToBuild)
@@ -585,3 +665,4 @@ if ($servicesToBuild.Count -gt 0) {
     }
 }
 Invoke-Compose @("--env-file", $EnvFile, "ps")
+Write-StartupState -Active $false -Status "ready" -Phase "ready" -Message "All requested services are ready." -ServiceNames $startupServices

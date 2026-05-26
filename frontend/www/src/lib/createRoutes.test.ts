@@ -12,6 +12,23 @@ describe('createRoutes', () => {
     expect(normalizeCreateTypeSegment('tool-rental')).toBe('tool_rental');
   });
 
+  it('normalizes business transfer route segments', () => {
+    expect(normalizeCreateTypeSegment('oper-usaha')).toBe('business_transfer');
+    expect(normalizeCreateTypeSegment('business-transfer')).toBe(
+      'business_transfer',
+    );
+    expect(
+      buildCreatePath({
+        locale: 'id',
+        side: 'supply',
+        type: 'business_transfer',
+      }),
+    ).toBe('/create/jual/oper-usaha');
+    expect(
+      resolveMarketplaceCreatePath('en', 'business_transfer', 'supply'),
+    ).toBe('/create/sell/business-transfer');
+  });
+
   it('always routes jobs to the demand flow', () => {
     expect(resolveMarketplaceCreatePath('id', 'job', 'supply')).toBe(
       '/create/butuh/lowongan',
@@ -31,9 +48,9 @@ describe('createRoutes', () => {
   });
 
   it('keeps legacy business-profile paths but routes new business setup to owner onboarding', () => {
-    expect(buildCreatePath({ locale: 'id', side: 'supply', type: 'company' })).toBe(
-      '/create/jual/profil-usaha',
-    );
+    expect(
+      buildCreatePath({ locale: 'id', side: 'supply', type: 'company' }),
+    ).toBe('/create/jual/profil-usaha');
     expect(resolveMarketplaceCreatePath('id', 'company', 'supply')).toBe(
       buildUsahaPath('onboarding'),
     );

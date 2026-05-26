@@ -53,6 +53,8 @@ export type LajukanRequestCard = {
   created_label: string;
   offers_label: string;
   offer_count: number;
+  cover_image?: string | null;
+  image_urls?: string[];
   status: string;
   status_key: 'active' | 'waiting' | 'completed' | string;
   detail: LajukanRequestDetail;

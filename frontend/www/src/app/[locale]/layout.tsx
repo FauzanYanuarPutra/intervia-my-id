@@ -3,19 +3,26 @@ import { notFound } from 'next/navigation';
 import { ReactNode } from 'react';
 import ClientLayoutWrapper from '@/components/layout/ClientLayoutWrapper';
 import type { Metadata } from 'next';
+import { readStackStartupState } from '@/lib/system/startupState';
+
+export const dynamic = 'force-dynamic';
 
 const SITE_URL = 'https://www.lajukan.com';
 const OG_IMAGE = `${SITE_URL}/og-image-home.png`;
 
 const METADATA_BY_LOCALE: Record<string, Metadata> = {
   id: {
-    title: 'Lajukan UMKM | Cari Supplier, Jasa, dan Peluang Usaha',
+    title: 'Lajukan UMKM | Pasokan Lokal, Substitusi Impor, dan Ekspor',
     description:
-      'Lajukan bantu UMKM cari supplier, jasa, lokasi jualan, dan peluang usaha dengan cepat.',
+      'Lajukan bantu UMKM cari supplier lokal, bahan baku Indonesia, jasa operasional, sertifikasi, dan jalur ekspor yang lebih rapi.',
     keywords: [
       'lajukan indonesia',
       'supplier indonesia',
       'distributor indonesia',
+      'produk lokal indonesia',
+      'substitusi impor',
+      'produk siap ekspor',
+      'sertifikasi halal bpom tkdn',
       'barang reseller',
       'bahan baku usaha',
       'sourcing umkm',
@@ -24,9 +31,9 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
       'freelancer umkm',
     ],
     openGraph: {
-      title: 'Lajukan UMKM | Cari Supplier, Jasa, dan Peluang Usaha',
+      title: 'Lajukan UMKM | Pasokan Lokal, Substitusi Impor, dan Ekspor',
       description:
-        'Lajukan bantu UMKM cari supplier, jasa, lokasi jualan, dan peluang usaha dengan cepat.',
+        'Cari supplier lokal, bahan baku Indonesia, jasa operasional, sertifikasi, dan jalur ekspor di Lajukan.',
       url: `${SITE_URL}/id/home`,
       siteName: 'Lajukan',
       type: 'website',
@@ -42,19 +49,23 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
     },
     twitter: {
       card: 'summary_large_image',
-      title: 'Lajukan UMKM | Cari Supplier, Jasa, dan Peluang Usaha',
+      title: 'Lajukan UMKM | Pasokan Lokal, Substitusi Impor, dan Ekspor',
       description:
-        'Cari supplier, jasa, lokasi jualan, dan peluang usaha dengan cepat di Lajukan.',
+        'Cari supplier lokal, bahan baku Indonesia, jasa operasional, sertifikasi, dan jalur ekspor di Lajukan.',
       images: [OG_IMAGE],
     },
   },
   en: {
-    title: 'Lajukan Global | Supply, Sourcing, and Business Operations',
+    title: 'Lajukan Global | Local Supply, Import Replacement, and Export',
     description:
-      'Lajukan helps businesses find suppliers, distributors, resale goods, raw materials, business tool rentals, operational services, and business-ready freelancers.',
+      'Lajukan helps businesses find Indonesian suppliers, local inputs, import-replacement options, operational services, certification support, and export paths.',
     keywords: [
       'lajukan',
       'supplier marketplace',
+      'indonesia local supply',
+      'import replacement',
+      'export ready products',
+      'halal bpom tkdn certification',
       'business sourcing',
       'distributor marketplace',
       'resale goods',
@@ -64,9 +75,9 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
       'umkm freelancer',
     ],
     openGraph: {
-      title: 'Lajukan Global | Supply, Sourcing, and Business Operations',
+      title: 'Lajukan Global | Local Supply, Import Replacement, and Export',
       description:
-        'Find suppliers, distributors, resale goods, business tool rentals, operational services, and business freelancers on Lajukan.',
+        'Find Indonesian suppliers, local inputs, import-replacement options, operational services, and export paths on Lajukan.',
       url: `${SITE_URL}/en/home`,
       siteName: 'Lajukan',
       type: 'website',
@@ -82,9 +93,9 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
     },
     twitter: {
       card: 'summary_large_image',
-      title: 'Lajukan Global | Supply, Sourcing, and Business Operations',
+      title: 'Lajukan Global | Local Supply, Import Replacement, and Export',
       description:
-        'Search suppliers, distributors, rentals, operational services, and business talent on Lajukan.',
+        'Search Indonesian suppliers, local inputs, certification support, export services, and business talent on Lajukan.',
       images: [OG_IMAGE],
     },
   },
@@ -116,10 +127,16 @@ export default async function LocaleLayout({
 }) {
   const { locale } = await params;
   const messages = await getCommonMessages(locale);
+  const startupState = readStackStartupState();
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <ClientLayoutWrapper locale={locale}>{children}</ClientLayoutWrapper>
+      <ClientLayoutWrapper
+        initialMaintenanceState={startupState}
+        locale={locale}
+      >
+        {children}
+      </ClientLayoutWrapper>
     </NextIntlClientProvider>
   );
 }

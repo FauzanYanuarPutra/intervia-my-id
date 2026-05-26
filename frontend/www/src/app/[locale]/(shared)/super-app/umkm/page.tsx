@@ -1,4 +1,5 @@
-import { UmkmDiscoveryClient } from '@/components/super-app/UmkmDiscoveryClient';
+import { redirect } from 'next/navigation';
+import { buildUmkmDiscoveryPath } from '@/lib/umkmSurface';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -9,16 +10,15 @@ type PageProps = {
   }>;
 };
 
-export default async function UmkmHubPage({ params, searchParams }: PageProps) {
+export default async function LegacySuperAppUmkmPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
   const resolvedSearchParams = await searchParams;
-  return (
-    <UmkmDiscoveryClient
-      locale={locale}
-      isId={locale === 'id'}
-      initialQuery={resolvedSearchParams.q || ''}
-      initialCity={resolvedSearchParams.city || ''}
-      initialStoreSlug={resolvedSearchParams.store || ''}
-    />
+
+  redirect(
+    `/${locale}${buildUmkmDiscoveryPath({
+      q: resolvedSearchParams.q,
+      city: resolvedSearchParams.city,
+      store: resolvedSearchParams.store,
+    })}`,
   );
 }

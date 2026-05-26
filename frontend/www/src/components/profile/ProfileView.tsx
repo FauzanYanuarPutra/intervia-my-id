@@ -24,14 +24,16 @@ import {
   CheckCircle,
   ArrowRight,
 } from 'lucide-react';
-import Image from 'next/image';
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { useRouter } from '@/i18n/navigation';
 import { Link } from '@/i18n/navigation';
 
 export default function ProfileView() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'overview' | 'listings' | 'reviews'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'listings' | 'reviews'
+  >('overview');
 
   const handleLogout = async () => {
     await logout();
@@ -43,7 +45,9 @@ export default function ProfileView() {
       <div className="min-h-screen flex items-center justify-center p-3">
         <div className="text-center">
           <User className="w-12 h-12 mx-auto text-[color:var(--app-text-soft)] mb-3" />
-          <p className="text-[color:var(--app-text)] text-sm mb-4">Please login to view your profile</p>
+          <p className="text-[color:var(--app-text)] text-sm mb-4">
+            Please login to view your profile
+          </p>
           <Link
             href="/login"
             className="inline-block h-10 px-5 bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] rounded-xl text-sm font-semibold active:scale-95 transition-transform"
@@ -114,18 +118,32 @@ export default function ProfileView() {
               {/* Quick Stats */}
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <div className="text-center">
-                  <div className="text-base sm:text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">0</div>
-                  <div className="text-[10px] text-[color:var(--app-text)] mt-0.5">Jobs Posted</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-base sm:text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">0</div>
-                  <div className="text-[10px] text-[color:var(--app-text)] mt-0.5">Applications</div>
+                  <div className="text-base sm:text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    0
+                  </div>
+                  <div className="text-[10px] text-[color:var(--app-text)] mt-0.5">
+                    Jobs Posted
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-base sm:text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {user.emailVerified ? <CheckCircle className="w-5 h-5 text-[color:var(--app-accent)] mx-auto" /> : '0'}
+                    0
                   </div>
-                  <div className="text-[10px] text-[color:var(--app-text)] mt-0.5">Verified</div>
+                  <div className="text-[10px] text-[color:var(--app-text)] mt-0.5">
+                    Applications
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-base sm:text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {user.emailVerified ? (
+                      <CheckCircle className="w-5 h-5 text-[color:var(--app-accent)] mx-auto" />
+                    ) : (
+                      '0'
+                    )}
+                  </div>
+                  <div className="text-[10px] text-[color:var(--app-text)] mt-0.5">
+                    Verified
+                  </div>
                 </div>
               </div>
             </div>
@@ -139,7 +157,9 @@ export default function ProfileView() {
                   <Briefcase className="w-4 h-4 text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Offer Your Services</h3>
+                  <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    Offer Your Services
+                  </h3>
                   <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mt-0">
                     Get hired as a freelancer and earn money
                   </p>
@@ -159,14 +179,16 @@ export default function ProfileView() {
         {/* Tabs */}
         <div className="mt-4 bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] rounded-xl shadow-lg overflow-hidden">
           <div className="flex border-b border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)]">
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'listings', label: 'My Listings' },
-              { id: 'reviews', label: 'Reviews' },
-            ].map((tab) => (
+            {(
+              [
+                { id: 'overview', label: 'Overview' },
+                { id: 'listings', label: 'My Listings' },
+                { id: 'reviews', label: 'Reviews' },
+              ] as Array<{ id: typeof activeTab; label: string }>
+            ).map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
                   activeTab === tab.id
                     ? 'text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]'
@@ -252,7 +274,9 @@ export default function ProfileView() {
                         <Mail className="w-4 h-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
                       </div>
                       <div className="flex-1">
-                        <div className="text-xs text-[color:var(--app-text)]">Email</div>
+                        <div className="text-xs text-[color:var(--app-text)]">
+                          Email
+                        </div>
                         <div className="text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {user.email}
                         </div>
@@ -266,7 +290,9 @@ export default function ProfileView() {
                         <Phone className="w-4 h-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
                       </div>
                       <div className="flex-1">
-                        <div className="text-xs text-[color:var(--app-text)]">Phone</div>
+                        <div className="text-xs text-[color:var(--app-text)]">
+                          Phone
+                        </div>
                         <div className="text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {user.phone || 'Not added'}
                         </div>
@@ -282,7 +308,9 @@ export default function ProfileView() {
                         <MapPin className="w-4 h-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
                       </div>
                       <div className="flex-1">
-                        <div className="text-xs text-[color:var(--app-text)]">Location</div>
+                        <div className="text-xs text-[color:var(--app-text)]">
+                          Location
+                        </div>
                         <div className="text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {user.location || 'Not set'}
                         </div>

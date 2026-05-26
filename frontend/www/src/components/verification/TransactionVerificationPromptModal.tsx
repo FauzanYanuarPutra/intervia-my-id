@@ -48,14 +48,14 @@ export function TransactionVerificationPromptModal({
             onClick={onOpenProfile}
             className="inline-flex flex-1 items-center justify-center rounded-full border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
           >
-            {isId ? 'Buka profile' : 'Open profile'}
+            {isId ? 'Profile' : 'Open profile'}
           </button>
         </div>
       }
     >
       <p>
         {isId
-          ? 'Sebelum lanjut transaksi, akun minimal perlu nomor HP yang aktif dan terverifikasi OTP.'
+          ? 'Verifikasi nomor HP dulu.'
           : 'Before continuing the transaction, the account needs an active phone number verified with OTP.'}
       </p>
       <div className="mt-3 space-y-2">
@@ -95,14 +95,14 @@ export function TransactionVerificationPromptModal({
       <p className="mt-3 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
         {!prompt?.hasPhone
           ? isId
-            ? 'Tambahkan nomor telepon dulu di profile agar transaksi bisa berjalan dengan alur yang lebih aman dan rapi.'
+            ? 'Tambahkan nomor HP di profile.'
             : 'Add a phone number in your profile first so transactions can continue in a safer and cleaner flow.'
           : needsPhoneOtp
             ? isId
-              ? 'Nomor telepon sudah tersimpan, tetapi belum diverifikasi OTP. Kami arahkan ke profile agar verifikasi nomor selesai dari satu alur yang jelas.'
+              ? 'Nomor sudah ada. Verifikasi OTP di profile.'
               : 'Your phone number is already saved, but OTP verification is still required. We will redirect you to profile so phone verification is completed in one clear flow.'
           : isId
-            ? 'Setelah nomor aman, verifikasi identitas lanjutan tetap bisa dikerjakan belakangan dari profile saat limit atau trust perlu ditingkatkan.'
+            ? 'Verifikasi identitas bisa nanti.'
             : 'Once the phone is secure, advanced identity verification can still be completed later from the profile when higher limits or trust are needed.'}
       </p>
     </Modal>

@@ -1,0 +1,145 @@
+CREATE TABLE IF NOT EXISTS lajukan_reels (
+  id text PRIMARY KEY,
+  creator_user_id text NULL,
+  creator text NOT NULL,
+  title text NOT NULL,
+  caption text NOT NULL,
+  tag text NOT NULL,
+  product_name text NULL,
+  product_price text NULL,
+  product_href text NULL,
+  video_src text NOT NULL,
+  source_url text NOT NULL,
+  likes_count bigint NOT NULL DEFAULT 0,
+  comments_count bigint NOT NULL DEFAULT 0,
+  shares_count bigint NOT NULL DEFAULT 0,
+  tone text NOT NULL DEFAULT 'emerald',
+  icon_key text NOT NULL DEFAULT 'supplier',
+  media_url text NOT NULL,
+  media_type text NOT NULL DEFAULT 'video' CHECK (media_type IN ('video', 'image')),
+  hook text NOT NULL DEFAULT '',
+  store_id text NOT NULL DEFAULT '',
+  store_slug text NOT NULL DEFAULT '',
+  store_name text NOT NULL DEFAULT '',
+  store_city text NOT NULL DEFAULT '',
+  store_phone text NULL,
+  storefront_path text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived', 'blocked')),
+  published_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS lajukan_reels_feed_idx
+  ON lajukan_reels (status, published_at DESC, id);
+
+CREATE INDEX IF NOT EXISTS lajukan_reels_store_idx
+  ON lajukan_reels (store_slug, store_city, status);
+
+CREATE INDEX IF NOT EXISTS lajukan_reels_search_idx
+  ON lajukan_reels
+  USING gin (
+    to_tsvector(
+      'simple',
+      coalesce(title, '') || ' ' ||
+      coalesce(caption, '') || ' ' ||
+      coalesce(creator, '') || ' ' ||
+      coalesce(tag, '') || ' ' ||
+      coalesce(product_name, '') || ' ' ||
+      coalesce(store_name, '') || ' ' ||
+      coalesce(store_city, '')
+    )
+  );
+
+CREATE TABLE IF NOT EXISTS lajukan_reel_events (
+  id text PRIMARY KEY,
+  reel_id text NOT NULL REFERENCES lajukan_reels(id) ON DELETE CASCADE,
+  actor_user_id text NULL,
+  anon_key_hash text NULL,
+  event_type text NOT NULL CHECK (event_type IN ('view', 'watch', 'like', 'share', 'comment', 'open_store', 'open_product')),
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS lajukan_reel_events_reel_idx
+  ON lajukan_reel_events (reel_id, event_type, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS lajukan_reel_events_actor_idx
+  ON lajukan_reel_events (actor_user_id, created_at DESC);
+
+INSERT INTO lajukan_reels
+  (
+    id, creator_user_id, creator, title, caption, tag,
+    product_name, product_price, product_href,
+    video_src, source_url, likes_count, comments_count, shares_count,
+    tone, icon_key, media_url, media_type, hook,
+    store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+    status, published_at, created_at, updated_at
+  )
+VALUES
+  (
+    'supplier-terpercaya', '00000000-0000-0000-0000-000000000001', 'Lajukan Business',
+    'Cara cari supplier terpercaya buat UMKM',
+    'Jangan cuma lihat harga. Cek rating, respon chat, lokasi, minimal order, dan riwayat transaksi supplier.',
+    'Supplier', 'Supplier Ayam Frozen', 'Mulai Rp 28.000/kg', '/home?product=ayam-frozen',
+    'https://www.pexels.com/download/video/4434069/',
+    'https://www.pexels.com/video/business-meeting-4434069/',
+    12400, 328, 1200, 'emerald', 'supplier',
+    'https://www.pexels.com/download/video/4434069/', 'video',
+    'Cek supplier dari rating, lokasi, minimal order, dan bukti transaksi.',
+    'store-supplier-ayam-frozen', 'supplier-ayam-frozen', 'Supplier Ayam Frozen', 'Bekasi', NULL, '/toko/supplier-ayam-frozen',
+    'published', now() - interval '2 hours', now(), now()
+  ),
+  (
+    'packaging-naik-kelas', '00000000-0000-0000-0000-000000000002', 'Packindo',
+    'Packaging murah tapi kelihatan premium',
+    'Kemasan sederhana bisa terlihat mahal kalau label, warna, ukuran, dan finishing-nya konsisten.',
+    'Packaging', 'Kemasan Box Custom', 'Mulai Rp 2.500/pcs', '/home?product=kemasan-box',
+    'https://www.pexels.com/download/video/7205557/',
+    'https://www.pexels.com/video/a-person-packing-a-box-7205557/',
+    10200, 276, 1100, 'orange', 'packaging',
+    'https://www.pexels.com/download/video/7205557/', 'video',
+    'Tampilkan proses packing supaya pembeli paham kualitas dan finishing.',
+    'store-packindo', 'packindo', 'Packindo', 'Tangerang', NULL, '/toko/packindo',
+    'published', now() - interval '5 hours', now(), now()
+  ),
+  (
+    'kopi-laris', '00000000-0000-0000-0000-000000000003', 'Kopi Nusantara',
+    'Bikin menu kopi terlihat lebih mahal',
+    'Ambil close-up proses, pakai lighting hangat, dan tampilkan harga paket agar pelanggan cepat paham.',
+    'Coffee Shop', 'Kopi Arabica Premium', 'Mulai Rp 150.000/250gr', '/home?product=kopi-arabica',
+    'https://www.pexels.com/download/video/17422066/',
+    'https://www.pexels.com/video/coffee-17422066/',
+    8900, 211, 920, 'amber', 'marketing',
+    'https://www.pexels.com/download/video/17422066/', 'video',
+    'Close-up proses seduh membuat produk terasa lebih premium.',
+    'store-kopi-nusantara', 'kopi-nusantara', 'Kopi Nusantara', 'Bandung', NULL, '/toko/kopi-nusantara',
+    'published', now() - interval '8 hours', now(), now()
+  ),
+  (
+    'keuangan-umkm', '00000000-0000-0000-0000-000000000004', 'Keuangan UMKM',
+    'Cashflow usaha kecil jangan dicampur',
+    'Pisahkan uang pribadi dan uang usaha. Catat stok, margin, piutang, dan biaya harian biar bisnis sehat.',
+    'Keuangan', 'Template Keuangan UMKM', 'Gratis untuk pengguna', '/home?product=template-keuangan',
+    'https://www.pexels.com/download/video/6774772/',
+    'https://www.pexels.com/video/a-group-of-people-in-a-business-meeting-6774772/',
+    7100, 185, 740, 'blue', 'finance',
+    'https://www.pexels.com/download/video/6774772/', 'video',
+    'Buat konten singkat tentang pemisahan kas, stok, margin, dan piutang.',
+    'store-keuangan-umkm', 'keuangan-umkm', 'Keuangan UMKM', 'Jakarta', NULL, '/toko/keuangan-umkm',
+    'published', now() - interval '12 hours', now(), now()
+  ),
+  (
+    'packing-online-shop', '00000000-0000-0000-0000-000000000002', 'Seller Academy',
+    'Packing rapi bikin pembeli repeat order',
+    'Gunakan pelindung, kartu ucapan, label jelas, dan foto proses packing untuk tingkatkan trust.',
+    'Online Shop', 'Paket Packaging UMKM', 'Mulai Rp 99.000', '/home?product=paket-packaging',
+    'https://www.pexels.com/download/video/7308170/',
+    'https://www.pexels.com/video/a-person-packing-a-box-for-shipment-7308170/',
+    9600, 244, 980, 'rose', 'frozen',
+    'https://www.pexels.com/download/video/7308170/', 'video',
+    'Rekam detail packing dan label supaya pembeli percaya sebelum order.',
+    'store-seller-academy', 'seller-academy', 'Seller Academy', 'Surabaya', NULL, '/toko/seller-academy',
+    'published', now() - interval '1 day', now(), now()
+  )
+ON CONFLICT (id) DO NOTHING;

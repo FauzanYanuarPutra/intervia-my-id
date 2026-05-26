@@ -127,7 +127,7 @@ export function CameraCaptureModal({ open, onClose, onCapture }: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_90%,_transparent)]">
+    <div className="ui-layer-modal fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_90%,_transparent)]">
       <div className="relative mx-4 max-h-[80svh] w-full max-w-lg overflow-hidden rounded-2xl bg-[color:var(--app-overlay)]">
         <button
           type="button"

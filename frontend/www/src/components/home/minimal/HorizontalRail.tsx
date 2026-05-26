@@ -168,12 +168,12 @@ export function HorizontalRail({
                 minimal
                   ? 'basis-auto'
                   : [
-                      'w-[82vw]',
-                      'xs:w-[74vw]',
-                      'sm:w-[320px]',
-                      'md:w-[340px]',
-                      'lg:w-[360px]',
-                      'xl:w-[380px]',
+                      'w-[82vw] min-w-[82vw] max-w-[82vw]',
+                      'xs:w-[74vw] xs:min-w-[74vw] xs:max-w-[74vw]',
+                      'sm:w-[320px] sm:min-w-[320px] sm:max-w-[320px]',
+                      'md:w-[340px] md:min-w-[340px] md:max-w-[340px]',
+                      'lg:w-[360px] lg:min-w-[360px] lg:max-w-[360px]',
+                      'xl:w-[380px] xl:min-w-[380px] xl:max-w-[380px]',
                     ].join(' '),
               ].join(' ')}
             >

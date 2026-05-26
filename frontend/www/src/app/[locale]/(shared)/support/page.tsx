@@ -26,10 +26,8 @@ const supportRoutes = [
 
 export default function SupportPage() {
   return (
-    <main className="page-shell py-4 sm:py-6">
-      <div className="ui-page-stack">
-        <section className="ui-section-shell">
-          <div className="ui-section-shell-content bg-[color:var(--app-surface-strong)] px-4 py-4 shadow-none sm:rounded-3xl sm:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_97%,white_3%),color-mix(in_srgb,var(--app-surface)_92%,transparent))] sm:p-5 sm:shadow-[0_20px_44px_-34px_rgba(15,23,42,0.24)]">
+    <main className="page-shell page-rhythm pb-6 pt-4 lg:pb-8">
+      <section className="ui-panel ui-hero-panel p-4">
           <p className="ui-page-eyebrow">Pusat bantuan</p>
           <h1 className="ui-page-title mt-2">Pilih jalur bantuan.</h1>
           <p className="ui-page-copy mt-2">
@@ -68,11 +66,9 @@ export default function SupportPage() {
               </LocalizedLink>
             ))}
           </div>
-          </div>
-        </section>
+      </section>
 
-        <section className="ui-section-shell">
-          <div className="ui-section-shell-content bg-[color:var(--app-surface-strong)] px-4 py-4 shadow-none sm:rounded-3xl sm:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_97%,white_3%),color-mix(in_srgb,var(--app-surface)_92%,transparent))] sm:p-5 sm:shadow-[0_20px_44px_-34px_rgba(15,23,42,0.24)]">
+      <section className="ui-panel p-4">
           <p className="ui-page-eyebrow">Kirim tiket</p>
           <h2 className="mt-2 text-lg font-black text-[color:var(--app-text)]">
             Masih belum ketemu?
@@ -83,9 +79,7 @@ export default function SupportPage() {
           <div className="mt-4">
             <SupportTicketForm />
           </div>
-          </div>
-        </section>
-      </div>
+      </section>
     </main>
   );
 }

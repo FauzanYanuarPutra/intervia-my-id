@@ -31,7 +31,7 @@ export default async function TrustTopicPage({ params }: PageProps) {
   const audience = pickText(locale, entry.audience);
 
   return (
-    <main className="page-shell page-rhythm pb-24 pt-6 lg:pb-10">
+    <main className="page-shell page-rhythm pb-6 pt-6 lg:pb-10">
       <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text-soft)]">
         <Link href="/trust" className="inline-flex items-center gap-1 bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
           <ArrowLeft className="h-3.5 w-3.5" />

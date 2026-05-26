@@ -37,7 +37,7 @@ export async function generateMetadata({
         ? 'Buat Brief Kebutuhan Usaha | Lajukan'
         : 'Create a Business Need Brief | Lajukan',
       description: isId
-        ? 'Pilih jalur brief untuk supplier, lokasi jualan, jasa operasional, alat sewa, atau hiring talent agar kebutuhan usaha Anda lebih cepat nyambung.'
+        ? 'Pilih kebutuhan: supplier, lokasi, jasa, sewa, atau talent.'
         : 'Choose a brief path for suppliers, selling locations, operations services, rental tools, or hiring talent so your business needs can align faster.',
       alternates: { canonical },
       robots: { index: true, follow: true },
@@ -46,7 +46,7 @@ export async function generateMetadata({
           ? 'Buat Brief Kebutuhan Usaha | Lajukan'
           : 'Create a Business Need Brief | Lajukan',
         description: isId
-          ? 'Masuk ke jalur kebutuhan usaha dan pilih form supplier, talent, lokasi, jasa, atau alat sewa yang paling tepat.'
+          ? 'Pilih form yang paling pas.'
           : 'Enter the business-needs flow and choose the most relevant supplier, talent, property, service, or rental brief form.',
         url: canonical,
         type: 'website',
@@ -62,7 +62,7 @@ export async function generateMetadata({
       ? 'Buat Listing Jualan Usaha | Lajukan'
       : 'Create a Business Listing | Lajukan',
     description: isId
-      ? 'Pilih tipe listing untuk produk, jasa, properti, atau alat sewa yang ingin Anda tawarkan di Lajukan. Untuk hiring, gunakan brief talent.'
+      ? 'Pilih listing: produk, jasa, properti, atau rental.'
       : 'Choose the listing type for products, services, property, or rentals you want to offer on Lajukan. For hiring, use the talent brief.',
     alternates: { canonical },
     robots: { index: true, follow: true },
@@ -71,7 +71,7 @@ export async function generateMetadata({
         ? 'Buat Listing Jualan Usaha | Lajukan'
         : 'Create a Business Listing | Lajukan',
       description: isId
-        ? 'Masuk ke jalur jual dan pilih form listing produk, jasa, properti, atau rental yang paling sesuai.'
+        ? 'Pilih form jual yang paling pas.'
         : 'Enter the sell flow and choose the most relevant product, service, property, or rental listing form.',
       url: canonical,
       type: 'website',

@@ -46,6 +46,7 @@ export type ListingTypeId =
   | 'job'
   | 'property'
   | 'tool_rental'
+  | 'business_transfer'
   | 'company';
 
 export type CreateFlowIntent = 'demand' | 'supply';
@@ -183,6 +184,27 @@ export function formatListingIssueForUi(issue: string, locale: string): string {
       ? 'Profil usaha nggak pakai mode harga tetap.'
       : 'Company listings cannot use fixed pricing.';
   }
+  if (
+    normalized ===
+    'business_transfer listing requires fixed price_cents as asking price'
+  ) {
+    return isId
+      ? 'Isi harga oper usaha dulu. Boleh tulis nego di detail.'
+      : 'Add the business transfer asking price first. You can mention negotiation in the details.';
+  }
+  if (normalized === 'business_transfer listing cannot use request pricing_mode') {
+    return isId
+      ? 'Oper usaha perlu harga acuan, bukan mode minta harga.'
+      : 'Business transfers need a reference asking price, not request pricing.';
+  }
+  if (
+    normalized.startsWith('metadata.') &&
+    normalized.endsWith(' is required for business_transfer listing')
+  ) {
+    return isId
+      ? 'Detail oper usaha masih ada yang wajib diisi biar aman dicek.'
+      : 'Some required business transfer details are still missing.';
+  }
   if (normalized === 'active simple listing requires at least one image') {
     return isId
       ? 'Masukin minimal 1 foto dulu sebelum tayang.'
@@ -276,6 +298,19 @@ const CREATE_TYPE_SEGMENTS: Record<
     id: 'sewa-alat',
     en: 'tool-rental',
     aliases: ['sewa-alat', 'tool-rental', 'tool_rental', 'rental'],
+  },
+  business_transfer: {
+    id: 'oper-usaha',
+    en: 'business-transfer',
+    aliases: [
+      'oper-usaha',
+      'business-transfer',
+      'business_transfer',
+      'handover',
+      'takeover',
+      'jual-usaha',
+      'usaha-berjalan',
+    ],
   },
   company: {
     id: 'profil-usaha',

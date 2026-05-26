@@ -26,10 +26,12 @@ import {
   Plus,
   QrCode,
   Share2,
+  Search,
   ShoppingBag,
   Sparkles,
   Star,
   Table2,
+  Truck,
   Users,
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
@@ -206,6 +208,22 @@ type OrderCreateResponse = {
   error?: string;
 };
 
+type OrderPaymentResponse = {
+  data?: {
+    payment?: {
+      topup?: {
+        id: string;
+        status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'expired';
+        payment_provider?: string | null;
+        payment_method?: string | null;
+        checkout_url?: string | null;
+      } | null;
+      requires_action?: boolean;
+    };
+  };
+  error?: string;
+};
+
 type ShippingQuoteOption = {
   id: string;
   label: string;
@@ -247,6 +265,22 @@ type ShippingQuoteResponse = {
       notice: string | null;
     };
   };
+  error?: string;
+};
+
+type ShippingDestination = {
+  id: string;
+  label: string;
+  province: string | null;
+  city: string | null;
+  district: string | null;
+  subdistrict: string | null;
+  postal_code: string | null;
+};
+
+type ShippingDestinationResponse = {
+  data?: ShippingDestination[];
+  notice?: string;
   error?: string;
 };
 
@@ -404,8 +438,12 @@ function formatFulfillmentMode(
 }
 
 function formatShippingProvider(provider: string): string {
+  if (provider.toLowerCase().startsWith('rajaongkir:')) {
+    const courier = provider.split(':')[1]?.trim().toUpperCase();
+    return courier ? `RajaOngkir ${courier}` : 'RajaOngkir';
+  }
   return provider
-    .split(/[_\s-]+/)
+    .split(/[:_\s-]+/)
     .filter(Boolean)
     .map(token => token.charAt(0).toUpperCase() + token.slice(1))
     .join(' ');
@@ -857,6 +895,20 @@ export function UmkmStorefrontClient({
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryDestinationQuery, setDeliveryDestinationQuery] = useState('');
+  const [deliveryDestinationId, setDeliveryDestinationId] = useState('');
+  const [deliveryDestinationLabel, setDeliveryDestinationLabel] = useState('');
+  const [deliveryDestinationOptions, setDeliveryDestinationOptions] = useState<
+    ShippingDestination[]
+  >([]);
+  const [deliveryDestinationLoading, setDeliveryDestinationLoading] =
+    useState(false);
+  const [deliveryDestinationNotice, setDeliveryDestinationNotice] = useState<
+    string | null
+  >(null);
+  const [deliveryDestinationError, setDeliveryDestinationError] = useState<
+    string | null
+  >(null);
   const [addressConfirmed, setAddressConfirmed] = useState(false);
   const [fulfillmentMode, setFulfillmentMode] = useState<
     'courier' | 'pickup' | 'digital'
@@ -868,6 +920,9 @@ export function UmkmStorefrontClient({
   const [shippingProfile, setShippingProfile] = useState<
     NonNullable<ShippingQuoteResponse['data']>['profile'] | null
   >(null);
+  const [shippingIntegration, setShippingIntegration] = useState<
+    NonNullable<ShippingQuoteResponse['data']>['integration'] | null
+  >(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -876,6 +931,13 @@ export function UmkmStorefrontClient({
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderResult, setOrderResult] = useState<
     OrderCreateResponse['data'] | null
+  >(null);
+  const [orderPaymentLoading, setOrderPaymentLoading] = useState(false);
+  const [orderPaymentError, setOrderPaymentError] = useState<string | null>(
+    null,
+  );
+  const [orderPaymentCheckoutUrl, setOrderPaymentCheckoutUrl] = useState<
+    string | null
   >(null);
 
   const [guestCount, setGuestCount] = useState('2');
@@ -934,6 +996,31 @@ export function UmkmStorefrontClient({
         if (message) return message;
       }
       return fallback;
+    },
+    [],
+  );
+
+  const handleDeliveryDestinationQueryChange = useCallback(
+    (value: string) => {
+      setDeliveryDestinationQuery(value);
+      if (value.trim() !== deliveryDestinationLabel) {
+        setDeliveryDestinationId('');
+        setDeliveryDestinationLabel('');
+        setAddressConfirmed(false);
+      }
+    },
+    [deliveryDestinationLabel],
+  );
+
+  const chooseDeliveryDestination = useCallback(
+    (destination: ShippingDestination) => {
+      setDeliveryDestinationId(destination.id);
+      setDeliveryDestinationLabel(destination.label);
+      setDeliveryDestinationQuery(destination.label);
+      setDeliveryDestinationOptions([]);
+      setDeliveryDestinationError(null);
+      setDeliveryDestinationNotice(null);
+      setAddressConfirmed(false);
     },
     [],
   );
@@ -1591,10 +1678,97 @@ export function UmkmStorefrontClient({
   }, [currentCartItems, hydratedCartStoreId, mode, sharedCart?.storeId, store]);
 
   useEffect(() => {
+    if (!isOnline || fulfillmentMode !== 'courier') {
+      setDeliveryDestinationOptions([]);
+      setDeliveryDestinationLoading(false);
+      setDeliveryDestinationError(null);
+      setDeliveryDestinationNotice(null);
+      return;
+    }
+
+    const query = normalizeSingleLineInput(deliveryDestinationQuery);
+    if (deliveryDestinationId && query === deliveryDestinationLabel) {
+      setDeliveryDestinationOptions([]);
+      setDeliveryDestinationLoading(false);
+      setDeliveryDestinationError(null);
+      return;
+    }
+    if (query.length < 3) {
+      setDeliveryDestinationOptions([]);
+      setDeliveryDestinationLoading(false);
+      setDeliveryDestinationError(null);
+      setDeliveryDestinationNotice(
+        query.length > 0
+          ? isId
+            ? 'Ketik minimal 3 huruf kecamatan/kota.'
+            : 'Type at least 3 characters.'
+          : null,
+      );
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setDeliveryDestinationLoading(true);
+      setDeliveryDestinationError(null);
+
+      try {
+        const params = new URLSearchParams({ search: query, limit: '8' });
+        const res = await fetch(
+          `/api/super-app/umkm/shipping/destinations?${params.toString()}`,
+          {
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        );
+        const payload = (await res
+          .json()
+          .catch(() => ({}))) as ShippingDestinationResponse;
+        if (!res.ok) {
+          throw new Error(
+            payload.error ||
+              (isId
+                ? 'Gagal mencari tujuan ongkir.'
+                : 'Failed to search shipping destination.'),
+          );
+        }
+
+        setDeliveryDestinationOptions(Array.isArray(payload.data) ? payload.data : []);
+        setDeliveryDestinationNotice(payload.notice || null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setDeliveryDestinationOptions([]);
+        setDeliveryDestinationError(
+          err instanceof Error
+            ? err.message
+            : isId
+              ? 'Gagal mencari tujuan ongkir.'
+              : 'Failed to search shipping destination.',
+        );
+      } finally {
+        setDeliveryDestinationLoading(false);
+      }
+    }, 280);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [
+    deliveryDestinationId,
+    deliveryDestinationLabel,
+    deliveryDestinationQuery,
+    fulfillmentMode,
+    isId,
+    isOnline,
+  ]);
+
+  useEffect(() => {
     if (!isOnline || items.length === 0) {
       setShippingOptions([]);
       setSelectedShippingOptionId('');
       setShippingProfile(null);
+      setShippingIntegration(null);
       setShippingError(null);
       if (
         !localComposition.contains_physical &&
@@ -1614,6 +1788,7 @@ export function UmkmStorefrontClient({
       setShippingOptions([]);
       setSelectedShippingOptionId('');
       setShippingProfile(null);
+      setShippingIntegration(null);
       setShippingError(
         isId
           ? 'Item di keranjang terlalu banyak. Maksimal 120 item.'
@@ -1625,6 +1800,7 @@ export function UmkmStorefrontClient({
       setShippingOptions([]);
       setSelectedShippingOptionId('');
       setShippingProfile(null);
+      setShippingIntegration(null);
       setShippingError(
         isId
           ? 'Alamat kirim terlalu panjang. Maksimal 500 karakter.'
@@ -1647,6 +1823,7 @@ export function UmkmStorefrontClient({
           body: JSON.stringify({
             store_id: store.id,
             delivery_address: normalizedDeliveryAddress || undefined,
+            delivery_destination_id: deliveryDestinationId || undefined,
             preferred_mode: fulfillmentMode,
             items: items.map(item => ({
               product_id: item.product_id,
@@ -1663,6 +1840,7 @@ export function UmkmStorefrontClient({
         }
 
         setShippingProfile(data.profile);
+        setShippingIntegration(data.integration);
         setShippingOptions(data.options);
 
         const nextMode = data.options.some(
@@ -1702,6 +1880,7 @@ export function UmkmStorefrontClient({
         setShippingOptions([]);
         setSelectedShippingOptionId('');
         setShippingProfile(null);
+        setShippingIntegration(null);
         setShippingError(
           err instanceof Error
             ? simplifyCheckoutErrorMessage(err.message, isId)
@@ -1720,6 +1899,7 @@ export function UmkmStorefrontClient({
     };
   }, [
     deliveryAddress,
+    deliveryDestinationId,
     fulfillmentMode,
     isId,
     isOnline,
@@ -1836,7 +2016,8 @@ export function UmkmStorefrontClient({
         Math.max(0, (current[productId] || 0) + delta),
       );
       if (next <= 0) {
-        const { [productId]: _removed, ...rest } = current;
+        const rest = { ...current };
+        delete rest[productId];
         return rest;
       }
       return {
@@ -2145,6 +2326,8 @@ export function UmkmStorefrontClient({
     setOrderSubmitting(true);
     setOrderError(null);
     setOrderResult(null);
+    setOrderPaymentError(null);
+    setOrderPaymentCheckoutUrl(null);
 
     try {
       const res = await fetch('/api/super-app/umkm/orders', {
@@ -2173,6 +2356,10 @@ export function UmkmStorefrontClient({
             isOnline && activeShippingOption?.mode === 'courier'
               ? deliveryAddressValue || undefined
               : undefined,
+          delivery_destination_id:
+            isOnline && activeShippingOption?.mode === 'courier'
+              ? deliveryDestinationId || undefined
+              : undefined,
           address_confirmed:
             isOnline && activeShippingOption?.mode === 'courier'
               ? addressConfirmed
@@ -2198,6 +2385,10 @@ export function UmkmStorefrontClient({
       setNotes('');
       if (isOnline) {
         setAddressConfirmed(false);
+        setDeliveryDestinationId('');
+        setDeliveryDestinationLabel('');
+        setDeliveryDestinationQuery('');
+        setDeliveryDestinationOptions([]);
         if (shippingProfile?.default_mode) {
           setFulfillmentMode(shippingProfile.default_mode);
         }
@@ -2228,6 +2419,73 @@ export function UmkmStorefrontClient({
       );
     } finally {
       setOrderSubmitting(false);
+    }
+  };
+
+  const startOrderPayment = async (orderId: string) => {
+    if (!orderId || orderPaymentLoading) return;
+    if (!user && !authLoading) {
+      router.push(loginHref);
+      return;
+    }
+    if (!user) return;
+
+    setOrderPaymentLoading(true);
+    setOrderPaymentError(null);
+    try {
+      const res = await authFetch(
+        `/api/super-app/umkm/orders/${encodeURIComponent(orderId)}/payment`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payment_provider: 'midtrans',
+            payment_method: 'qris',
+          }),
+        },
+      );
+      const payload = (await res
+        .json()
+        .catch(() => ({}))) as OrderPaymentResponse;
+      const topup = payload.data?.payment?.topup || null;
+      if (!res.ok || !payload.data) {
+        throw new Error(payload.error || 'Failed to create payment session');
+      }
+
+      const checkoutUrl = topup?.checkout_url || null;
+      setOrderPaymentCheckoutUrl(checkoutUrl);
+      if (checkoutUrl) {
+        window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      showStorefrontToast(
+        topup?.status === 'paid' ? 'success' : 'info',
+        topup?.status === 'paid'
+          ? isId
+            ? 'Pembayaran sudah terkonfirmasi'
+            : 'Payment already confirmed'
+          : isId
+            ? 'Pembayaran disiapkan'
+            : 'Payment prepared',
+        isId
+          ? 'Cek halaman pembayaran kalau instruksinya belum muncul.'
+          : 'Open the payments page if the instruction is not visible yet.',
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? simplifyCheckoutErrorMessage(err.message, isId)
+          : isId
+            ? 'Gagal menyiapkan pembayaran.'
+            : 'Failed to prepare payment.';
+      setOrderPaymentError(message);
+      showStorefrontToast(
+        'error',
+        isId ? 'Bayar belum bisa lanjut' : 'Payment cannot continue yet',
+        message,
+      );
+    } finally {
+      setOrderPaymentLoading(false);
     }
   };
 
@@ -2406,17 +2664,17 @@ export function UmkmStorefrontClient({
             : 'Add to bill';
   const PlaceTypeIcon = placeHeader ? getPlaceIcon(placeHeader.kind) : null;
   const utilityActionClass =
-    'ui-pressable ui-pressable-card inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[16px] bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-700 shadow-[0_12px_22px_-20px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-800/80 sm:text-[11px]';
+    'ui-pressable ui-pressable-card inline-flex min-h-[34px] min-w-0 items-center justify-center gap-1.5 rounded-[16px] bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-700 shadow-[0_12px_22px_-20px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-800/80 sm:text-[11px]';
   const detailActionClass =
-    'ui-pressable ui-pressable-card inline-flex min-h-[36px] items-center justify-center gap-2 rounded-[14px] bg-white px-3 text-[11px] font-semibold text-slate-700 shadow-[0_12px_22px_-20px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-800/80 sm:text-[12px]';
+    'ui-pressable ui-pressable-card inline-flex min-h-[36px] min-w-0 items-center justify-center gap-2 rounded-[14px] bg-white px-3 text-[11px] font-semibold text-slate-700 shadow-[0_12px_22px_-20px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-800/80 sm:text-[12px]';
   const heroShellClass =
-    'overflow-hidden rounded-[20px] bg-white p-1.5 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[24px] sm:p-2';
+    'min-w-0 overflow-hidden rounded-[18px] bg-white p-1.5 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[24px] sm:p-2';
   const heroContentCardClass =
-    'rounded-[18px] bg-white px-3 py-3 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:px-3.5 sm:py-3.5';
+    'min-w-0 rounded-[18px] bg-white px-3 py-3 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:px-3.5 sm:py-3.5';
   const heroStatCardClass =
-    'rounded-[14px] bg-slate-50/92 px-2.5 py-2 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80';
+    'min-w-0 rounded-[14px] bg-slate-50/92 px-2.5 py-2 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80';
   const sectionCardClass =
-    'rounded-[20px] bg-white px-3.5 py-3.5 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px]';
+    'min-w-0 rounded-[18px] bg-white px-3 py-3 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px] sm:px-3.5 sm:py-3.5';
   const cycleMapTheme = useCallback(() => {
     setMapTheme(current => getNextUmkmMapTheme(current));
   }, []);
@@ -2502,7 +2760,7 @@ export function UmkmStorefrontClient({
     const params = new URLSearchParams();
     if (store?.name) params.set('q', store.name);
     if (store?.slug) params.set('store', store.slug);
-    return `/forum${params.toString() ? `?${params.toString()}` : ''}`;
+    return `/community${params.toString() ? `?${params.toString()}` : ''}`;
   }, [store]);
   const reelsPath = useMemo(() => {
     const params = new URLSearchParams();
@@ -2597,7 +2855,7 @@ export function UmkmStorefrontClient({
         id: 'ops',
         title: isId ? 'Flow operasional biar order rapi' : 'Operational flow to keep orders tidy',
         prompt: isId
-          ? `Teman-teman, flow paling rapi buat handle order ${store.name} itu lebih enak pakai SOP seperti apa supaya chat, packing, dan follow-up tidak berantakan?`
+          ? `SOP apa yang paling rapi buat handle order ${store.name}?`
           : `What operating SOP works best for ${store.name} so chat, packing, and follow-up stay clean?`,
         tag: 'marketplace',
         categoryHint: 'marketplace-projects',
@@ -2615,6 +2873,13 @@ export function UmkmStorefrontClient({
   }, [isId, placeHeader, publicProfile?.businessFocus, publicProfile?.featuredProducts, store]);
   const forumTabEnabled = storeForumTopics.length > 0;
   const tabs: { key: StorefrontTab; label: string; visible: boolean }[] = [
+    { key: 'menu', label: isId ? 'Menu' : 'Menu', visible: true },
+    { key: 'overview', label: isId ? 'Info' : 'Info', visible: true },
+    {
+      key: 'reviews',
+      label: isId ? 'Ulasan' : 'Reviews',
+      visible: true,
+    },
     {
       key: 'gallery',
       label: isId ? 'Galeri' : 'Gallery',
@@ -2624,13 +2889,6 @@ export function UmkmStorefrontClient({
       key: 'reels',
       label: isId ? 'Reels' : 'Reels',
       visible: reelsTabEnabled,
-    },
-    { key: 'menu', label: isId ? 'Menu' : 'Menu', visible: true },
-    { key: 'overview', label: isId ? 'Info' : 'Info', visible: true },
-    {
-      key: 'reviews',
-      label: isId ? 'Cerita pembeli' : 'Reviews',
-      visible: true,
     },
     {
       key: 'forum',
@@ -2655,17 +2913,17 @@ export function UmkmStorefrontClient({
     (placeHeader?.serviceBadges.length || 0) - visibleServiceBadges.length,
   );
   const tabPanelClass =
-    'overflow-hidden rounded-[20px] bg-white p-2 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px] sm:p-2.5';
+    'min-w-0 overflow-hidden rounded-[18px] bg-white p-2 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px] sm:p-2.5';
   const mobileSectionClass =
-    'overflow-hidden rounded-[18px] bg-white p-2.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:p-3';
+    'min-w-0 overflow-hidden rounded-[18px] bg-white p-2.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:p-3';
   const infoCardClass =
-    'rounded-[14px] bg-slate-50/92 px-3 py-2.5 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80';
+    'min-w-0 rounded-[14px] bg-slate-50/92 px-3 py-2.5 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80';
   const subtleActionClass =
     'ui-pressable ui-pressable-card inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-xs font-semibold text-[color:var(--app-text)] shadow-[0_14px_24px_-22px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:ring-slate-800/80';
   const categoryShellClass =
-    'rounded-[20px] bg-white p-3 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80';
+    'min-w-0 rounded-[18px] bg-white p-2.5 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:p-3';
   const menuItemCardClass =
-    'rounded-[18px] bg-slate-50/92 p-3 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80';
+    'min-w-0 rounded-[16px] bg-slate-50/92 p-2.5 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80 sm:rounded-[18px] sm:p-3';
 
   useEffect(() => {
     if (
@@ -2706,11 +2964,11 @@ export function UmkmStorefrontClient({
 
   return (
     <main className="page-shell overflow-x-hidden py-0 pb-10 sm:pb-0 sm:py-3">
-      <div className="flex w-full flex-col gap-2.5 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-3">
+      <div className="flex w-full min-w-0 flex-col gap-2.5 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-3">
         <section>
           <div className={heroShellClass}>
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.04fr)_minmax(340px,0.96fr)]">
-              <div className="space-y-3">
+            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.04fr)_minmax(300px,0.96fr)] xl:grid-cols-[minmax(0,1.04fr)_minmax(340px,0.96fr)]">
+              <div className="min-w-0 space-y-3">
                 {store ? (
                   <>
                     <div className="min-w-0 overflow-hidden rounded-[22px] border border-[color:var(--app-accent-border)] bg-white shadow-[0_24px_48px_-34px_rgba(15,23,42,0.28)] dark:bg-slate-950 sm:rounded-[24px]">
@@ -2747,13 +3005,13 @@ export function UmkmStorefrontClient({
                           onRouteResolved={setRouteSummary}
                           focusMode={mapFocusMode}
                           focusNonce={mapFocusNonce}
-                          className="h-[240px] w-full sm:h-[300px] xl:h-[360px]"
+                          className="h-[220px] w-full sm:h-[300px] xl:h-[360px]"
                         />
 
                         {placeHeader ? (
                           <>
                             <div className="pointer-events-none absolute left-3 top-3 z-[1050] inline-flex items-center gap-1.5 rounded-[16px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(239,246,255,0.88))] px-3 py-1.5 text-[11px] font-semibold text-slate-800 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur-sm">
-                              <MapPin className="h-3.5 w-3.5 text-blue-700" />
+                              <MapPin className="h-3.5 w-3.5 text-emerald-700" />
                               {store.city}
                             </div>
                             <LocalizedAnchor
@@ -2763,11 +3021,11 @@ export function UmkmStorefrontClient({
                               {isId ? 'Lihat peta penuh' : 'Full map'}
                               <ArrowRight className="h-3.5 w-3.5" />
                             </LocalizedAnchor>
-                            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[900] bg-[linear-gradient(180deg,rgba(15,23,42,0.02)_0%,rgba(15,23,42,0.76)_100%)] p-4 pl-[7rem] sm:pl-[8rem]">
+                            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[900] bg-[linear-gradient(180deg,rgba(15,23,42,0.02)_0%,rgba(15,23,42,0.76)_100%)] p-3 pl-[6.25rem] sm:p-4 sm:pl-[8rem]">
                               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/76">
                                 {placeHeader.categoryLabel}
                               </p>
-                              <p className="mt-1 text-lg font-bold text-white">
+                              <p className="mt-1 line-clamp-1 text-base font-bold text-white sm:text-lg">
                                 {store.name}
                               </p>
                               <p className="mt-1 line-clamp-1 text-[12px] text-white/76">
@@ -2953,55 +3211,23 @@ export function UmkmStorefrontClient({
                     ) : null}
                   </div>
 
-                  {orderTabEnabled ? (
+                  {orderTabEnabled && hasForeignActiveCart ? (
                     <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_12%,white)] px-3 py-2.5 text-[11px] leading-5 text-[color:var(--app-text)]">
-                      {hasForeignActiveCart
-                        ? isId
-                          ? `Keranjang aktif masih di ${activeSharedCartStoreName}. Kalau pesan di sini, keranjang lama akan direset setelah konfirmasi.`
-                          : `Your active cart is still in ${activeSharedCartStoreName}. Ordering here will reset the old cart after confirmation.`
-                        : isId
-                          ? 'Satu keranjang hanya untuk satu usaha, jadi checkout-nya tetap cepat dan rapi.'
-                          : 'One cart only covers one business so checkout stays fast and tidy.'}
+                      {isId
+                        ? `Keranjang aktif masih di ${activeSharedCartStoreName}. Kalau pesan di sini, keranjang lama akan direset setelah konfirmasi.`
+                        : `Your active cart is still in ${activeSharedCartStoreName}. Ordering here will reset the old cart after confirmation.`}
                     </div>
                   ) : null}
 
                   <div className="mt-2 grid gap-2 min-[420px]:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => handleTabChange('menu')}
-                      className={detailActionClass}
-                    >
-                      <ShoppingBag className="h-4 w-4" />
-                      {isId ? 'Lihat menu' : 'Open menu'}
-                    </button>
-                    {galleryTabEnabled ? (
+                    {!orderTabEnabled ? (
                       <button
                         type="button"
-                        onClick={() => handleTabChange('gallery')}
+                        onClick={() => handleTabChange('menu')}
                         className={detailActionClass}
                       >
-                        <ImageIcon className="h-4 w-4" />
-                        {isId ? 'Galeri' : 'Gallery'}
-                      </button>
-                    ) : null}
-                    {reelsTabEnabled ? (
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('reels')}
-                        className={detailActionClass}
-                      >
-                        <Clapperboard className="h-4 w-4" />
-                        {isId ? 'Reels usaha' : 'Reels'}
-                      </button>
-                    ) : null}
-                    {forumTabEnabled ? (
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('forum')}
-                        className={detailActionClass}
-                      >
-                        <MessagesSquare className="h-4 w-4" />
-                        {isId ? 'Forum bisnis' : 'Forum'}
+                        <ShoppingBag className="h-4 w-4" />
+                        {isId ? 'Lihat menu' : 'Open menu'}
                       </button>
                     ) : null}
                     {placeHeader?.whatsappHref ? (
@@ -3096,8 +3322,8 @@ export function UmkmStorefrontClient({
           </div>
         </section>
 
-        <nav className="sticky top-2 z-20 rounded-[22px] bg-white/94 p-1.5 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-950/94 dark:ring-slate-800/80 sm:top-4">
-          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+        <nav className="sticky top-2 z-20 rounded-[20px] bg-white/94 p-1.5 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-950/94 dark:ring-slate-800/80 sm:top-4 sm:rounded-[22px]">
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto" data-auto-scrollbar>
             {visibleTabs.map(tab => {
               const isActive = activeTab === tab.key;
               return (
@@ -3106,7 +3332,7 @@ export function UmkmStorefrontClient({
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
                   className={cn(
-                    'ui-pressable ui-pressable-card inline-flex min-h-[42px] shrink-0 items-center justify-center rounded-[18px] px-4 text-[11px] font-bold transition',
+                    'ui-pressable ui-pressable-card inline-flex min-h-[38px] shrink-0 items-center justify-center rounded-[16px] px-3 text-[11px] font-bold transition sm:min-h-[42px] sm:rounded-[18px] sm:px-4',
                     isActive
                       ? 'bg-[color:var(--app-accent)] text-white shadow-[0_18px_30px_-24px_color-mix(in_srgb,var(--app-accent)_36%,transparent)]'
                       : 'bg-slate-50 text-[color:var(--app-text-soft)] ring-1 ring-slate-200/80 hover:bg-white hover:text-[color:var(--app-text)] dark:bg-slate-900/70 dark:text-slate-300 dark:ring-slate-800/80',
@@ -3122,8 +3348,8 @@ export function UmkmStorefrontClient({
 
         {!loading && store && tabHighlights ? (
           <section ref={tabContentRef} className={tabPanelClass}>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl">
+            <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 max-w-3xl">
                 <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
                   {tabHighlights.eyebrow}
                 </p>
@@ -3183,7 +3409,7 @@ export function UmkmStorefrontClient({
                 ) : null}
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 lg:w-[320px]">
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:w-[300px] xl:w-[320px]">
                 {activeTab === 'menu' ? (
                   <div className={infoCardClass}>
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
@@ -3225,7 +3451,7 @@ export function UmkmStorefrontClient({
                           ? `Keranjang lama kamu masih di ${activeSharedCartStoreName}. Tambah item di sini akan minta konfirmasi dulu.`
                           : `Your previous cart is still in ${activeSharedCartStoreName}. Adding items here will ask for confirmation first.`
                         : isId
-                          ? 'Tambah item, cek total, lalu langsung lanjut checkout.'
+                          ? 'Tambah item. Cek total. Checkout.'
                           : 'Add items, check the total, then continue to checkout.'}
                     </p>
                   </div>
@@ -3327,7 +3553,7 @@ export function UmkmStorefrontClient({
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
                         {isId
-                          ? 'Forum ini bukan timeline random, tapi ruang diskusi bisnis yang langsung bisa dipakai.'
+                          ? 'Diskusi bisnis yang siap dipakai.'
                           : 'This is not a random timeline. It is a business discussion room with practical value.'}
                       </p>
                     </div>
@@ -3581,7 +3807,7 @@ export function UmkmStorefrontClient({
 
                 <p className="mt-3 text-[12px] leading-6 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Galeri ini dibuat supaya pembeli Indonesia cepat paham toko ini jual apa, suasananya seperti apa, dan kualitas visualnya seperti apa.'
+                    ? 'Cek jualan, suasana, dan visual toko.'
                     : 'This gallery helps buyers quickly understand what the business sells, what the place looks like, and how the offer is presented.'}
                 </p>
 
@@ -3783,7 +4009,7 @@ export function UmkmStorefrontClient({
                     params.set('content', topic.prompt);
                     params.set('category', topic.categoryHint);
                     params.set('tag', topic.tag);
-                    const composeHref = `/forum?${params.toString()}`;
+                    const composeHref = `/community?${params.toString()}`;
 
                     return (
                       <article
@@ -3972,12 +4198,15 @@ export function UmkmStorefrontClient({
                               key={product.id}
                               className={menuItemCardClass}
                             >
-                              <div className="flex gap-3">
-                                <ProductThumbnail product={product} />
+                              <div className="flex min-w-0 gap-2.5 sm:gap-3">
+                                <ProductThumbnail
+                                  product={product}
+                                  className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[color:var(--app-accent-border)] sm:h-16 sm:w-16"
+                                />
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
+                                    <div className="min-w-0">
+                                      <p className="line-clamp-2 text-[11px] font-semibold text-[color:var(--app-text)]">
                                         {product.name}
                                       </p>
                                       <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
@@ -3987,17 +4216,17 @@ export function UmkmStorefrontClient({
                                             : 'Ready to order.')}
                                       </p>
                                     </div>
-                                    <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80">
+                                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:px-2.5 sm:text-[11px]">
                                       {formatIdr(product.price_cents)}
                                     </span>
                                   </div>
-                                  <div className="mt-2 flex items-center justify-between gap-3">
+                                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
                                     <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                                       {isId
                                         ? `Stok ${product.stock_qty}`
                                         : `Stock ${product.stock_qty}`}
                                     </p>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -4698,6 +4927,24 @@ export function UmkmStorefrontClient({
                     </p>
                   ) : null}
 
+                  {shippingIntegration ? (
+                    <div className="flex items-center gap-2 rounded-2xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[11px] font-semibold text-[color:var(--app-text)]">
+                      <Truck className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {shippingIntegration.quote_source === 'provider_api'
+                          ? isId
+                            ? `Ongkir ${shippingIntegration.provider_label}`
+                            : `${shippingIntegration.provider_label} rates`
+                          : isId
+                            ? 'Ongkir estimasi'
+                            : 'Estimated delivery fee'}
+                      </span>
+                      <span className="rounded-full bg-[color:var(--app-surface-strong)] px-2 py-1 text-[10px]">
+                        {isId ? 'Bayar via Lajukan' : 'Pay via Lajukan'}
+                      </span>
+                    </div>
+                  ) : null}
+
                   {visibleShippingOptions.length > 0 ? (
                     visibleShippingOptions.length === 1 &&
                     activeShippingOption ? (
@@ -4783,10 +5030,89 @@ export function UmkmStorefrontClient({
                   )}
 
                   {requiresOnlineAddress ? (
-                    <div>
-                      <label className="text-xs font-semibold text-[color:var(--app-text)]">
-                        {isId ? 'Alamat kirim' : 'Delivery address'}
-                      </label>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-semibold text-[color:var(--app-text)]">
+                          {isId
+                            ? 'Kecamatan/kota tujuan'
+                            : 'Destination district/city'}
+                        </label>
+                        <div className="relative mt-1">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
+                          <input
+                            type="search"
+                            autoComplete="address-level3"
+                            value={deliveryDestinationQuery}
+                            onChange={event =>
+                              handleDeliveryDestinationQueryChange(
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-2xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-9 pr-3 text-sm text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent)]"
+                            placeholder={
+                              isId
+                                ? 'Contoh: Cikarang, Tebet, Ubud'
+                                : 'Example: Cikarang, Tebet, Ubud'
+                            }
+                          />
+                        </div>
+                        {deliveryDestinationId ? (
+                          <div className="mt-2 flex items-center gap-2 rounded-2xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] font-semibold text-[color:var(--app-text)]">
+                            <span className="min-w-0 flex-1 truncate">
+                              {deliveryDestinationLabel}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeliveryDestinationId('');
+                                setDeliveryDestinationLabel('');
+                                setDeliveryDestinationOptions([]);
+                              }}
+                              className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2 py-1 text-[10px]"
+                            >
+                              {isId ? 'Ganti' : 'Change'}
+                            </button>
+                          </div>
+                        ) : deliveryDestinationOptions.length > 0 ? (
+                          <div className="mt-2 max-h-48 overflow-y-auto rounded-2xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] p-1 shadow-lg">
+                            {deliveryDestinationOptions.map(destination => (
+                              <button
+                                key={destination.id}
+                                type="button"
+                                onClick={() =>
+                                  chooseDeliveryDestination(destination)
+                                }
+                                className="block w-full rounded-xl px-3 py-2 text-left text-xs text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)]"
+                              >
+                                <span className="block font-semibold">
+                                  {destination.subdistrict ||
+                                    destination.district ||
+                                    destination.city ||
+                                    destination.label}
+                                </span>
+                                <span className="mt-0.5 block line-clamp-1 text-[11px] text-[color:var(--app-text-soft)]">
+                                  {destination.label}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        <p className="mt-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+                          {deliveryDestinationLoading
+                            ? isId
+                              ? 'Mencari tujuan...'
+                              : 'Searching destination...'
+                            : deliveryDestinationError ||
+                              deliveryDestinationNotice ||
+                              (isId
+                                ? 'Dipakai buat hitung ongkir. Kalau belum dipilih, sistem pakai estimasi.'
+                                : 'Used for shipping rates. Without it, checkout uses an estimate.')}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-[color:var(--app-text)]">
+                          {isId ? 'Alamat lengkap' : 'Full delivery address'}
+                        </label>
                       <textarea
                         autoComplete="street-address"
                         maxLength={CHECKOUT_LIMITS.deliveryAddress}
@@ -4802,6 +5128,7 @@ export function UmkmStorefrontClient({
                             : 'Enter the full address'
                         }
                       />
+                      </div>
                       <label className="mt-2 flex items-start gap-2 text-xs text-[color:var(--app-text)]">
                         <input
                           type="checkbox"
@@ -4879,6 +5206,39 @@ export function UmkmStorefrontClient({
                       ? 'Usaha sudah menerima order kamu.'
                       : 'The business has received your order.'}
                 </p>
+                {isOnline ? (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={() => void startOrderPayment(orderResult.order.id)}
+                      disabled={orderPaymentLoading}
+                      className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {orderPaymentLoading
+                        ? isId
+                          ? 'Menyiapkan...'
+                          : 'Preparing...'
+                        : isId
+                          ? 'Bayar QRIS'
+                          : 'Pay with QRIS'}
+                    </button>
+                    {orderPaymentCheckoutUrl ? (
+                      <a
+                        href={orderPaymentCheckoutUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-[color:var(--app-accent-border)] px-4 text-xs font-bold text-[color:var(--app-text)]"
+                      >
+                        {isId ? 'Buka instruksi bayar' : 'Open payment'}
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+                {orderPaymentError ? (
+                  <p className="mt-2 text-xs font-semibold text-[color:var(--app-text)]">
+                    {orderPaymentError}
+                  </p>
+                ) : null}
               </div>
             ) : null}
           </div>

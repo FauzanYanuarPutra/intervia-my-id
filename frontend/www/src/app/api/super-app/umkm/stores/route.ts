@@ -77,6 +77,9 @@ export async function GET(req: NextRequest) {
     const query = (url.searchParams.get('q') || '').trim();
     const city = (url.searchParams.get('city') || '').trim();
     const slug = (url.searchParams.get('slug') || '').trim();
+    const backendOnly =
+      url.searchParams.get('backend_only') === '1' ||
+      url.searchParams.get('backend_only') === 'true';
     const requestedLimit = Number.parseInt(url.searchParams.get('limit') || '80', 10) || 80;
     const limit = Math.max(1, Math.min(500, requestedLimit));
     const viewerLat = parseCoord(url.searchParams.get('viewer_lat'));
@@ -97,6 +100,7 @@ export async function GET(req: NextRequest) {
           query: query || undefined,
           city: city || undefined,
           slug: slug || undefined,
+          backendOnly,
           activeOnly: true,
           limit: 500,
         });

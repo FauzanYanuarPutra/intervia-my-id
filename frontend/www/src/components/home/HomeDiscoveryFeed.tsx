@@ -30,6 +30,7 @@ import {
   ArrowRight,
   UserRound,
   Store,
+  Handshake,
 } from 'lucide-react';
 
 type DiscoverySort = 'newest' | 'top';
@@ -38,6 +39,7 @@ type DiscoveryFilter =
   | 'product'
   | 'property'
   | 'tool_rental'
+  | 'business_transfer'
   | 'service'
   | 'freelancer'
   | 'umkm';
@@ -49,6 +51,7 @@ type DiscoveryCardType =
   | 'property'
   | 'service'
   | 'tool_rental'
+  | 'business_transfer'
   | 'umkm'
   | 'other';
 
@@ -107,14 +110,19 @@ const FILTER_OPTIONS: Array<{
   labelId: string;
   labelEn: string;
 }> = [
-  { value: 'all', labelId: 'Semua', labelEn: 'All' },
-  { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
-  { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
-  { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
-  { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
-  { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
-  { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
-];
+    { value: 'all', labelId: 'Semua', labelEn: 'All' },
+    { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
+    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
+    { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
+    { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
+    {
+      value: 'business_transfer',
+      labelId: 'Oper Usaha',
+      labelEn: 'Business Transfer',
+    },
+    { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
+    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
+  ];
 
 function isDiscoveryFilter(value: string | null): value is DiscoveryFilter {
   return [
@@ -122,6 +130,7 @@ function isDiscoveryFilter(value: string | null): value is DiscoveryFilter {
     'product',
     'property',
     'tool_rental',
+    'business_transfer',
     'service',
     'freelancer',
     'umkm',
@@ -154,10 +163,7 @@ function formatShortDate(value: number, locale: 'id' | 'en'): string | null {
   });
 }
 
-function formatRatingLabel(
-  value: number,
-  locale: 'id' | 'en',
-): string | null {
+function formatRatingLabel(value: number, locale: 'id' | 'en'): string | null {
   if (!Number.isFinite(value) || value <= 0) return null;
   return value.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US', {
     minimumFractionDigits: 1,
@@ -170,6 +176,13 @@ function resolveCardType(value: string): DiscoveryCardType {
   if (/(job|career|loker|job_listing|job_posting)/.test(normalized))
     return 'job';
   if (/(freelancer|talent|profile)/.test(normalized)) return 'freelancer';
+  if (
+    /(business_transfer|business-transfer|oper usaha|oper-usaha|jual usaha|usaha berjalan|handover|takeover)/.test(
+      normalized,
+    )
+  ) {
+    return 'business_transfer';
+  }
   if (/(product|market|shop|store)/.test(normalized)) return 'product';
   if (
     /(tool_rental|tool-rental|rental|rent|sewa|pinjam|meminjam)/.test(
@@ -195,7 +208,12 @@ function groupForType(typeKey: DiscoveryCardType): GroupKey {
   if (typeKey === 'freelancer') return 'talent';
   if (typeKey === 'property') return 'property';
   if (typeKey === 'tool_rental') return 'rental';
-  if (typeKey === 'product' || typeKey === 'service') return 'supply';
+  if (
+    typeKey === 'product' ||
+    typeKey === 'service' ||
+    typeKey === 'business_transfer'
+  )
+    return 'supply';
   if (typeKey === 'umkm') return 'umkm';
   return 'other';
 }
@@ -210,6 +228,9 @@ function displayTypeLabel(
   }
   if (typeKey === 'tool_rental') {
     return locale === 'id' ? 'Sewa Alat' : 'Tool Rental';
+  }
+  if (typeKey === 'business_transfer') {
+    return locale === 'id' ? 'Oper Usaha' : 'Business Transfer';
   }
   if (typeKey === 'freelancer') return 'Freelancer';
   if (typeKey === 'service') {
@@ -239,6 +260,12 @@ function resolveSideContextLabel(
 
   if (typeKey === 'tool_rental') {
     return locale === 'id' ? 'Sewa alat usaha' : 'Business tool rental';
+  }
+
+  if (typeKey === 'business_transfer') {
+    return locale === 'id'
+      ? 'Usaha berjalan siap dialihkan'
+      : 'Running business for transfer';
   }
 
   if (typeKey === 'property') {
@@ -555,7 +582,7 @@ function DiscoveryCardRail({
           compact
           layoutContext="rail"
           presentation={simple ? 'simple' : 'default'}
-          className="w-[74vw] min-w-[74vw] max-w-[232px] self-stretch snap-start sm:w-[204px] sm:min-w-[204px] sm:max-w-none"
+          className="w-[74vw] min-w-[74vw] max-w-[232px] self-stretch snap-start sm:w-[204px] sm:min-w-[204px] sm:max-w-[204px]"
           item={{
             id: item.id,
             href: item.href,
@@ -594,7 +621,7 @@ function RailSkeleton({ locale }: { locale: 'id' | 'en' }) {
       {Array.from({ length: 3 }).map((_, index) => (
         <div
           key={index}
-          className="h-[284px] w-[82vw] min-w-[82vw] max-w-[256px] animate-pulse self-stretch rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_90%,white_10%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_94%,transparent))] shadow-[0_18px_32px_-30px_rgba(15,23,42,0.12)] sm:h-[292px] sm:w-[228px] sm:min-w-[228px] sm:max-w-none sm:rounded-[24px] lg:h-[300px] lg:rounded-[26px] dark:border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] dark:shadow-[0_20px_34px_-28px_rgba(2,6,23,0.44)]"
+          className="ui-skeleton ui-skeleton-pulse h-[284px] w-[82vw] min-w-[82vw] max-w-[256px] self-stretch rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_90%,white_10%)] shadow-[0_18px_32px_-30px_rgba(15,23,42,0.12)] sm:h-[292px] sm:w-[228px] sm:min-w-[228px] sm:max-w-[228px] sm:rounded-[24px] lg:h-[300px] lg:rounded-[26px] dark:border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] dark:shadow-[0_20px_34px_-28px_rgba(2,6,23,0.44)]"
         />
       ))}
     </HorizontalRail>
@@ -620,7 +647,9 @@ function FeedStateCard({
           {children}
         </div>
       </div>
-      {action ? <div className="w-full shrink-0 sm:w-auto">{action}</div> : null}
+      {action ? (
+        <div className="w-full shrink-0 sm:w-auto">{action}</div>
+      ) : null}
     </div>
   );
 }
@@ -726,9 +755,9 @@ export function HomeDiscoveryFeed({
       if (!response.ok) {
         throw new Error(
           (payload as { error?: string }).error ||
-            (isId
-              ? 'Konten belum bisa dimuat.'
-              : 'Content is unavailable right now.'),
+          (isId
+            ? 'Konten belum bisa dimuat.'
+            : 'Content is unavailable right now.'),
         );
       }
 
@@ -745,6 +774,7 @@ export function HomeDiscoveryFeed({
         productResult,
         propertyResult,
         rentalResult,
+        businessTransferResult,
         serviceResult,
         freelancerResult,
       ] = await Promise.allSettled([
@@ -756,6 +786,9 @@ export function HomeDiscoveryFeed({
         ),
         fetchContentCards(
           '/api/content?type=tool_rental&include_owner=1&limit=16&offset=0',
+        ),
+        fetchContentCards(
+          '/api/content?type=business_transfer&include_owner=1&limit=16&offset=0',
         ),
         fetchContentCards(
           '/api/content?type=service&include_owner=1&limit=16&offset=0',
@@ -773,6 +806,10 @@ export function HomeDiscoveryFeed({
         propertyResult.status === 'fulfilled' ? propertyResult.value : [];
       const rentalCards =
         rentalResult.status === 'fulfilled' ? rentalResult.value : [];
+      const businessTransferCards =
+        businessTransferResult.status === 'fulfilled'
+          ? businessTransferResult.value
+          : [];
       const serviceCards =
         serviceResult.status === 'fulfilled' ? serviceResult.value : [];
       const freelancerCards =
@@ -782,6 +819,7 @@ export function HomeDiscoveryFeed({
         ...productCards,
         ...propertyCards,
         ...rentalCards,
+        ...businessTransferCards,
         ...serviceCards,
         ...freelancerCards,
       ]);
@@ -791,6 +829,7 @@ export function HomeDiscoveryFeed({
         product: dedupeCards(productCards),
         property: dedupeCards(propertyCards),
         tool_rental: dedupeCards(rentalCards),
+        business_transfer: dedupeCards(businessTransferCards),
         freelancer: dedupeCards(freelancerCards),
         service: dedupeCards(serviceCards),
       });
@@ -800,6 +839,7 @@ export function HomeDiscoveryFeed({
         !productCards.length &&
         !propertyCards.length &&
         !rentalCards.length &&
+        !businessTransferCards.length &&
         !freelancerCards.length &&
         !serviceCards.length
       ) {
@@ -849,6 +889,15 @@ export function HomeDiscoveryFeed({
     [cardsByFilter.service, cardsByFilter.tool_rental],
   );
 
+  const topBusinessTransfers = useMemo(
+    () =>
+      sortCards(
+        dedupeCards(cardsByFilter.business_transfer || []),
+        'top',
+      ).slice(0, 8),
+    [cardsByFilter.business_transfer],
+  );
+
   const topFreelancers = useMemo(
     () =>
       sortCards(dedupeCards(cardsByFilter.freelancer || []), 'top').slice(0, 8),
@@ -869,9 +918,9 @@ export function HomeDiscoveryFeed({
         ? allCards
         : filter === 'service'
           ? dedupeCards([
-              ...(cardsByFilter.service || []),
-              ...(cardsByFilter.tool_rental || []),
-            ])
+            ...(cardsByFilter.service || []),
+            ...(cardsByFilter.tool_rental || []),
+          ])
           : dedupeCards(cardsByFilter[filter] || fallback);
 
     return sortCards(source, 'top').slice(0, 12);
@@ -890,7 +939,7 @@ export function HomeDiscoveryFeed({
         ? 'Stok, operasional, lokasi, atau talent.'
         : 'Stock, operations, locations, or talent.'
       : isId
-        ? 'User tidak perlu lihat semuanya dulu. Pilih jalur, lalu lanjut ke listing yang siap dihubungi.'
+        ? 'Pilih jalur. Hubungi yang siap.'
         : 'Users do not need to see everything first. Pick a lane, then continue to listings that are ready to contact.',
     seeAll: isId ? 'Lihat semua' : 'See all',
     refresh: isId ? 'Coba lagi' : 'Retry',
@@ -907,6 +956,10 @@ export function HomeDiscoveryFeed({
     operationsDescription: isId
       ? 'Jasa harian, operasional, dan alat.'
       : 'Daily services, operations support, and tools.',
+    businessTransfers: isId ? 'Oper usaha' : 'Business transfers',
+    businessTransfersDescription: isId
+      ? 'Usaha berjalan yang bisa dicek aset, rating, dan risikonya.'
+      : 'Running businesses with assets, ratings, and risks to review.',
     freelancers: isId ? 'Talent' : 'Talent',
     freelancersDescription: isId
       ? 'Eksekutor cepat untuk admin, konten, dan support.'
@@ -914,6 +967,9 @@ export function HomeDiscoveryFeed({
     productsEmpty: isId ? 'Supplier belum tampil.' : 'No suppliers yet.',
     propertiesEmpty: isId ? 'Lokasi belum tampil.' : 'No locations yet.',
     operationsEmpty: isId ? 'Jasa belum tampil.' : 'No services yet.',
+    businessTransfersEmpty: isId
+      ? 'Oper usaha belum tampil.'
+      : 'No business transfers yet.',
     freelancersEmpty: isId ? 'Talent belum tampil.' : 'No talent yet.',
     discoverLabel: isId ? 'Pilihan cepat' : 'Quick picks',
     growthBadge: isId ? 'Pilih yang siap jalan' : 'Pick what is ready',
@@ -924,20 +980,20 @@ export function HomeDiscoveryFeed({
 
   const growthLinks = isId
     ? [
-        { href: '/community', label: 'Komunitas' },
-        { href: '/learn', label: 'Harga sehat' },
-        { href: '/search?type=product&q=distributor', label: 'Distributor' },
-      ]
+      { href: '/community', label: 'Komunitas' },
+      { href: '/learn', label: 'Harga sehat' },
+      { href: '/search?type=product&q=distributor', label: 'Distributor' },
+    ]
     : [
-        { href: '/community', label: 'Community' },
-        { href: '/learn', label: 'Healthy pricing' },
-        { href: '/search?type=product&q=distributor', label: 'Distributors' },
-      ];
+      { href: '/community', label: 'Community' },
+      { href: '/learn', label: 'Healthy pricing' },
+      { href: '/search?type=product&q=distributor', label: 'Distributors' },
+    ];
 
   const browseHref = resolveBrowseHref(filter, 'newest');
   const activeLoading = loading;
   return (
-    <section className="ui-page-section ui-home-section-shell px-2 sm:px-3">
+    <section className="ui-page-section ui-home-section-shell">
       <div className="ui-home-section-content grid w-full min-w-0 max-w-full gap-2 sm:gap-2.5">
         <section
           className={cn(
@@ -950,7 +1006,7 @@ export function HomeDiscoveryFeed({
           {compact ? null : (
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-sky-200">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]">
                   <Sparkles className="h-3 w-3" />
                   {text.discoverLabel}
                 </div>
@@ -974,7 +1030,9 @@ export function HomeDiscoveryFeed({
           <div
             className={cn(
               'flex gap-1.5',
-              compact ? 'mt-0 overflow-x-auto rounded-[18px] bg-slate-100/90 p-0.5 pb-0.5 no-scrollbar dark:bg-slate-900/80' : 'mt-2 flex-wrap',
+              compact
+                ? 'mt-0 overflow-x-auto rounded-[18px] bg-slate-100/90 p-0.5 pb-0.5 no-scrollbar dark:bg-slate-900/80'
+                : 'mt-2 flex-wrap',
             )}
           >
             {FILTER_OPTIONS.map(option => (
@@ -988,10 +1046,10 @@ export function HomeDiscoveryFeed({
                   compact
                     ? filter === option.value
                       ? 'border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_44%,transparent)]'
-                      : 'border border-transparent bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:bg-slate-950/86 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-sky-200'
+                      : 'border border-transparent bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:bg-slate-950/86 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-[color:var(--app-accent)]'
                     : filter === option.value
-                      ? 'border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] text-[color:var(--app-accent-strong)] shadow-[0_12px_28px_-24px_color-mix(in_srgb,var(--app-accent)_28%,transparent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-sky-200'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-sky-200',
+                      ? 'border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] text-[color:var(--app-accent-strong)] shadow-[0_12px_28px_-24px_color-mix(in_srgb,var(--app-accent)_28%,transparent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]'
+                      : 'border border-slate-200 bg-white text-slate-600 hover:border-[color:var(--app-accent-border)] hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-[color:var(--app-accent-border)] dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:hover:text-[color:var(--app-accent)]',
                 )}
               >
                 {isId ? option.labelId : option.labelEn}
@@ -1001,7 +1059,7 @@ export function HomeDiscoveryFeed({
 
           {compact ? null : (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,white)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:text-sky-200">
+              <span className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,white)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]">
                 {text.growthBadge}
               </span>
               <span className="text-[11px] font-medium text-[color:var(--app-text-soft)]">
@@ -1043,10 +1101,7 @@ export function HomeDiscoveryFeed({
                 {text.empty}
               </FeedStateCard>
             ) : (
-              <DiscoveryCardRail
-                items={activeCards}
-                locale={localeCode}
-              />
+              <DiscoveryCardRail items={activeCards} locale={localeCode} />
             )}
           </div>
         </section>
@@ -1084,6 +1139,17 @@ export function HomeDiscoveryFeed({
               loading={loading}
               emptyLabel={text.operationsEmpty}
               icon={<Sparkles className="h-4 w-4" />}
+            />
+
+            <RailSection
+              title={text.businessTransfers}
+              description={text.businessTransfersDescription}
+              href="/search?type=business_transfer"
+              items={topBusinessTransfers}
+              locale={localeCode}
+              loading={loading}
+              emptyLabel={text.businessTransfersEmpty}
+              icon={<Handshake className="h-4 w-4" />}
             />
 
             <RailSection

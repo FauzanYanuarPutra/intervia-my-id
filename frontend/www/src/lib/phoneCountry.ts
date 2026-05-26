@@ -114,7 +114,7 @@ export const AUTH_PHONE_COUNTRIES: PhoneCountry[] = [
 ];
 
 const PHONE_COUNTRY_BY_CODE = new Map(
-  AUTH_PHONE_COUNTRIES.map((country) => [country.code, country]),
+  AUTH_PHONE_COUNTRIES.map(country => [country.code, country]),
 );
 
 const COUNTRIES_BY_DIAL_LENGTH = [...AUTH_PHONE_COUNTRIES].sort(
@@ -137,6 +137,16 @@ export function getPhoneCountry(
   );
 }
 
+export function getPhoneCountryFlagEmoji(
+  code: PhoneCountryCode | string | null | undefined,
+): string {
+  const normalized = String(code || '').toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return '';
+  return String.fromCodePoint(
+    ...normalized.split('').map(letter => 0x1f1e6 + letter.charCodeAt(0) - 65),
+  );
+}
+
 function getDialDigits(country: PhoneCountry): string {
   return country.dialCode.replace(/\D/g, '');
 }
@@ -155,7 +165,7 @@ export function detectPhoneCountryFromValue(
   const digits = trimInternationalPrefix(trimmed).replace(/\D/g, '');
   if (!digits) return null;
 
-  const matched = COUNTRIES_BY_DIAL_LENGTH.find((country) =>
+  const matched = COUNTRIES_BY_DIAL_LENGTH.find(country =>
     digits.startsWith(getDialDigits(country)),
   );
 

@@ -7,25 +7,39 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
+import { useId } from 'react';
 import { CheckCircle2, ChevronRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 
+const controlBaseClass =
+  'min-h-[50px] w-full touch-manipulation rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400 dark:disabled:border-slate-800 dark:disabled:bg-slate-900/70';
+
 export function FieldLabel({
   children,
   className,
+  htmlFor,
+  required,
 }: {
   children: ReactNode;
   className?: string;
+  htmlFor?: string;
+  required?: boolean;
 }) {
   return (
     <label
+      htmlFor={htmlFor}
       className={cn(
-        'text-[10px] font-semibold tracking-[0.01em] text-[color:var(--app-text-soft)]',
+        'flex items-center gap-1 text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)]',
         className,
       )}
     >
-      {children}
+      <span>{children}</span>
+      {required ? (
+        <span aria-hidden="true" className="text-red-500">
+          *
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -36,17 +50,34 @@ export function TextInput(
     compact?: boolean;
   },
 ) {
-  const { label, className, compact = false, ...rest } = props;
+  const {
+    label,
+    className,
+    compact = false,
+    id,
+    required,
+    disabled,
+    ...rest
+  } = props;
+  const generatedId = useId();
+  const inputId = id || generatedId;
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
-      <FieldLabel className={compact ? 'text-[9px]' : undefined}>
+      <FieldLabel
+        htmlFor={inputId}
+        required={required}
+        className={compact ? 'text-[11px]' : undefined}
+      >
         {label}
       </FieldLabel>
       <input
+        id={inputId}
+        required={required}
+        disabled={disabled}
         {...rest}
         className={cn(
-          'min-h-[48px] w-full touch-manipulation rounded-[16px] border-0 bg-white px-3.5 text-[13px] text-[color:var(--app-text)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-[color:var(--app-accent-border)] dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-slate-800/80',
-          compact && 'min-h-[44px] rounded-[14px] px-3 text-[12px]',
+          controlBaseClass,
+          compact && 'min-h-[44px] rounded-[13px] px-3 text-[13px]',
           className,
         )}
       />
@@ -60,17 +91,35 @@ export function TextArea(
     compact?: boolean;
   },
 ) {
-  const { label, className, compact = false, ...rest } = props;
+  const {
+    label,
+    className,
+    compact = false,
+    id,
+    required,
+    disabled,
+    ...rest
+  } = props;
+  const generatedId = useId();
+  const textareaId = id || generatedId;
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
-      <FieldLabel className={compact ? 'text-[9px]' : undefined}>
+      <FieldLabel
+        htmlFor={textareaId}
+        required={required}
+        className={compact ? 'text-[11px]' : undefined}
+      >
         {label}
       </FieldLabel>
       <textarea
+        id={textareaId}
+        required={required}
+        disabled={disabled}
         {...rest}
         className={cn(
-          'min-h-[112px] w-full touch-manipulation rounded-[16px] border-0 bg-white px-3.5 py-3 text-[13px] text-[color:var(--app-text)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-[color:var(--app-accent-border)] dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:ring-slate-800/80',
-          compact && 'min-h-[88px] rounded-[14px] px-3 py-2.5 text-[12px]',
+          controlBaseClass,
+          'min-h-[116px] resize-y py-3 font-medium leading-6',
+          compact && 'min-h-[88px] rounded-[13px] px-3 py-2.5 text-[13px]',
           className,
         )}
       />
@@ -85,17 +134,36 @@ export function SelectInput(
     compact?: boolean;
   },
 ) {
-  const { label, className, children, compact = false, ...rest } = props;
+  const {
+    label,
+    className,
+    children,
+    compact = false,
+    id,
+    required,
+    disabled,
+    ...rest
+  } = props;
+  const generatedId = useId();
+  const selectId = id || generatedId;
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
-      <FieldLabel className={compact ? 'text-[9px]' : undefined}>
+      <FieldLabel
+        htmlFor={selectId}
+        required={required}
+        className={compact ? 'text-[11px]' : undefined}
+      >
         {label}
       </FieldLabel>
       <select
+        id={selectId}
+        required={required}
+        disabled={disabled}
         {...rest}
         className={cn(
-          'min-h-[48px] w-full touch-manipulation rounded-[16px] border-0 bg-white px-3.5 text-[13px] text-[color:var(--app-text)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 outline-none transition focus:ring-2 focus:ring-[color:var(--app-accent-border)] dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-800/80',
-          compact && 'min-h-[44px] rounded-[14px] px-3 text-[12px]',
+          controlBaseClass,
+          'pr-9',
+          compact && 'min-h-[44px] rounded-[13px] px-3 text-[13px]',
           className,
         )}
       >
@@ -127,9 +195,9 @@ export function Toggle({
       }}
       disabled={disabled}
       className={cn(
-        'ui-pressable ui-pressable-card flex min-h-[56px] w-full items-start justify-between gap-3 rounded-[18px] bg-white px-3 py-3 text-left shadow-[0_10px_20px_-18px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 dark:bg-slate-950 dark:ring-slate-800/80',
+        'ui-pressable ui-pressable-card flex min-h-[56px] w-full items-start justify-between gap-3 rounded-[16px] border-2 border-slate-300 bg-white px-3 py-3 text-left shadow-none transition hover:-translate-y-0.5 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600',
         checked
-          ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_34%,white)] text-[color:var(--app-accent)] ring-[color:var(--app-accent-border)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))]'
+          ? 'border-[color:var(--app-accent)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_34%,white)] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))]'
           : 'text-[color:var(--app-text)]',
         disabled ? 'cursor-not-allowed opacity-60' : '',
       )}

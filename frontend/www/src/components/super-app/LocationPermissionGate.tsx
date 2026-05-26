@@ -222,7 +222,7 @@ export function LocationPermissionGate({
   const benefits = [
     {
       icon: Navigation,
-      title: isId ? 'Matching lebih cepat' : 'Faster matching',
+      title: isId ? 'Matching cepat' : 'Faster matching',
       text: isId
         ? 'Driver terdekat bisa langsung diprioritaskan.'
         : 'The nearest driver can be prioritized immediately.',
@@ -244,7 +244,7 @@ export function LocationPermissionGate({
   ];
 
   return (
-    <div className="fixed inset-0 z-[190] flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_56%,_transparent)] p-3 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_56%,_transparent)] p-3 backdrop-blur-sm sm:items-center sm:p-4">
       <section
         role="dialog"
         aria-modal="true"

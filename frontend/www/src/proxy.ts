@@ -19,12 +19,14 @@ const JWT_SECRET = process.env.JWT_SECRET
 const IS_DEV = (process.env.NODE_ENV || 'development') !== 'production';
 const DEBUG = process.env.MIDDLEWARE_DEBUG === 'true' && IS_DEV;
 const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const PUBLIC_HTTPS_HOSTS = new Set(['lajukan.com', 'www.lajukan.com']);
 const BASE_ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
   'https://www.lajukan.com',
   'https://lajukan.com',
+  'https://usaha.lajukan.com',
 ];
 const CORS_ALLOWED_ORIGINS = new Set([
   ...BASE_ALLOWED_ORIGINS,
@@ -33,6 +35,42 @@ const CORS_ALLOWED_ORIGINS = new Set([
     .map(v => v.trim())
     .filter(Boolean),
 ]);
+const scriptSrc = IS_DEV
+  ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:"
+  : "script-src 'self' 'unsafe-inline' blob:";
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "frame-ancestors 'none'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: https:",
+  "media-src 'self' data: blob: https:",
+  scriptSrc,
+  [
+    'connect-src',
+    "'self'",
+    'https:',
+    'ws:',
+    'wss:',
+    'stun:',
+    'turn:',
+    'turns:',
+    'http://auth.localhost',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+    'http://localhost:8081',
+    'http://127.0.0.1:8081',
+    'ws://localhost:3000',
+    'ws://127.0.0.1:3000',
+    'ws://localhost:4000',
+    'ws://127.0.0.1:4000',
+    'https://lajukan.com',
+    'https://auth.lajukan.com',
+    'wss://lajukan.com',
+    'wss://www.lajukan.com',
+    'wss://chat.lajukan.com',
+  ].join(' '),
+].join('; ');
 
 type Locale = (typeof LOCALES)[number];
 
@@ -130,11 +168,12 @@ function syncAuthPresenceCookie(
 }
 
 function applySecurityHeaders(res: NextResponse) {
+  res.headers.set('Content-Security-Policy', CONTENT_SECURITY_POLICY);
   res.headers.set('X-DNS-Prefetch-Control', 'on');
-  res.headers.set('X-Frame-Options', 'SAMEORIGIN');
+  res.headers.set('X-Frame-Options', 'DENY');
   res.headers.set('X-Content-Type-Options', 'nosniff');
   res.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
-  res.headers.set('Referrer-Policy', 'origin-when-cross-origin');
+  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.headers.set(
     'Permissions-Policy',
     'camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()',
@@ -143,9 +182,31 @@ function applySecurityHeaders(res: NextResponse) {
   res.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
   res.headers.set(
     'Strict-Transport-Security',
-    'max-age=31536000; includeSubDomains',
+    'max-age=31536000; includeSubDomains; preload',
   );
   return res;
+}
+
+function firstForwardedValue(value: string | null) {
+  return value?.split(',')[0]?.trim().toLowerCase() || '';
+}
+
+function httpsRedirectResponse(req: NextRequest) {
+  if (IS_DEV) return null;
+
+  const forwardedProto = firstForwardedValue(
+    req.headers.get('x-forwarded-proto'),
+  );
+  const forwardedHost = firstForwardedValue(req.headers.get('x-forwarded-host'));
+  const host = forwardedHost || req.nextUrl.host.toLowerCase();
+
+  if (forwardedProto !== 'http' || !PUBLIC_HTTPS_HOSTS.has(host)) return null;
+
+  const url = req.nextUrl.clone();
+  url.protocol = 'https:';
+  url.hostname = host === 'lajukan.com' ? 'www.lajukan.com' : host;
+  url.port = '';
+  return applySecurityHeaders(NextResponse.redirect(url, 308));
 }
 
 function getRequestOrigin(req: NextRequest): string {
@@ -317,6 +378,8 @@ async function getUserRole(
 /* ---------------- MAIN MIDDLEWARE ---------------- */
 export async function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
+  const httpsRedirect = httpsRedirectResponse(req);
+  if (httpsRedirect) return httpsRedirect;
 
   // Forward marketplace notification websocket endpoint to marketplace service.
   // This keeps /v1/notifications/stream working even when public traffic hits
@@ -389,6 +452,10 @@ export async function proxy(req: NextRequest) {
     return applySecurityHeaders(response);
   }
 
+  if (pathname === '/security.txt' || pathname === '/.well-known/security.txt') {
+    return applySecurityHeaders(NextResponse.next());
+  }
+
   // 2. Static assets
   if (pathname.startsWith('/_next') || pathname.match(/\.(.*)$/)) {
     return NextResponse.next();
@@ -430,6 +497,18 @@ export async function proxy(req: NextRequest) {
 
   // 4. Route auth checks
   const routePath = '/' + segments.slice(2).join('/');
+  const legacyCommunityGroup = searchParams.get('group')?.trim();
+  if (routePath === '/community' && legacyCommunityGroup) {
+    const url = req.nextUrl.clone();
+    url.pathname = `/${locale}/community/groups/${encodeURIComponent(legacyCommunityGroup)}`;
+    url.searchParams.delete('group');
+    url.searchParams.delete('category');
+    return applyLocaleCookies(
+      applySecurityHeaders(NextResponse.redirect(url, 307)),
+      locale,
+    );
+  }
+
   const route = findRouteConfig(routePath, routes);
   const auth = await getUserRole(req);
   const hasSessionMarker = auth.valid || auth.recoverable;

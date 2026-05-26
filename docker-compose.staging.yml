@@ -12,6 +12,15 @@ services:
       ENV: staging
       APP_ENV: staging
 
+  community_service:
+    image: ${DOCKERHUB_NAMESPACE}/lajukan-community:${IMAGE_TAG:-staging}
+    environment:
+      ENV: staging
+      APP_ENV: staging
+      APP_PORT: "8082"
+      COMMUNITY_UPLOAD_DIR: /app/uploads/forum
+      COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
+
   ai_service:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-ai:${IMAGE_TAG:-staging}
     environment:
@@ -37,6 +46,8 @@ services:
       APP_ENV: staging
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: staging
+      INTERNAL_COMMUNITY_URL: http://community_service:8082
+      COMMUNITY_SERVICE_URL: http://community_service:8082
 
   usaha:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-usaha:${IMAGE_TAG:-staging}
@@ -45,6 +56,8 @@ services:
       APP_ENV: staging
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: staging
+      INTERNAL_COMMUNITY_URL: http://community_service:8082
+      COMMUNITY_SERVICE_URL: http://community_service:8082
 
   cms:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-cms:${IMAGE_TAG:-staging}

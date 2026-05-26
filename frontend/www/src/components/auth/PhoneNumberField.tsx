@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -7,6 +8,7 @@ import {
   detectPhoneCountryFromValue,
   formatPhonePreview,
   getPhoneCountry,
+  getPhoneCountryFlagEmoji,
   normalizePhoneInput,
   stripCountryDialCode,
   type PhoneCountryCode,
@@ -37,84 +39,91 @@ export default function PhoneNumberField({
   id,
   disabled = false,
 }: PhoneNumberFieldProps) {
+  const generatedId = useId();
+  const inputId = id || generatedId;
   const selectedCountry = getPhoneCountry(countryCode);
   const countryLabel = locale === 'id' ? 'Pilih negara' : 'Choose country';
   const phoneLabel =
     locale === 'id' ? 'Nomor HP / WhatsApp' : 'Phone / WhatsApp number';
+  const selectedFlag = getPhoneCountryFlagEmoji(selectedCountry.code);
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
-        <label className="space-y-1.5">
-          <span className="block text-xs font-medium text-[color:var(--app-text-soft)]">
-            {countryLabel}
-          </span>
-          <span className="relative block">
+    <div className="space-y-2">
+      <div className="space-y-1.5">
+        <label
+          htmlFor={inputId}
+          className="block text-[11px] font-semibold text-[color:var(--app-text-soft)]"
+        >
+          {phoneLabel}
+        </label>
+
+        <div
+          className={cn(
+            'flex min-h-[50px] min-w-0 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-2.5 py-1.5 transition-[border-color,background-color,box-shadow] focus-within:border-[color:var(--app-accent-border)] focus-within:bg-[color:var(--app-surface)] focus-within:ring-4 focus-within:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] dark:bg-[color:var(--app-surface-strong)]',
+            disabled &&
+              'cursor-not-allowed bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+          )}
+        >
+          <span className="relative shrink-0">
             <select
+              aria-label={countryLabel}
+              title={`${selectedCountry.label} ${selectedCountry.dialCode}`}
               value={countryCode}
-              onChange={(event) =>
+              onChange={event =>
                 onCountryCodeChange(event.target.value as PhoneCountryCode)
               }
               disabled={disabled}
               className={cn(
-                'min-h-[56px] w-full appearance-none rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 pr-10 text-[15px] font-medium text-[color:var(--app-text)] outline-none transition-[border-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] sm:text-sm',
+                'absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed',
                 selectClassName,
               )}
             >
-              {AUTH_PHONE_COUNTRIES.map((country) => (
+              {AUTH_PHONE_COUNTRIES.map(country => (
                 <option key={country.code} value={country.code}>
-                  {`${country.flag} ${country.dialCode} ${country.label}`}
+                  {`${getPhoneCountryFlagEmoji(country.code)} ${country.dialCode} ${country.label}`}
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
-          </span>
-        </label>
-
-        <label className="space-y-1.5">
-          <span className="block text-xs font-medium text-[color:var(--app-text-soft)]">
-            {phoneLabel}
-          </span>
-          <div className="relative min-w-0">
-            <span className="pointer-events-none absolute left-3 top-1/2 inline-flex -translate-y-1/2 items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]">
-              {selectedCountry.dialCode}
+            <span className="inline-flex min-h-[38px] items-center gap-1.5 rounded-[12px] bg-[color:var(--app-surface-muted)] px-2.5 text-[13px] font-black text-[color:var(--app-text)]">
+              <span className="text-base leading-none">{selectedFlag}</span>
+              <span>{selectedCountry.dialCode}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-[color:var(--app-text-soft)]" />
             </span>
-            <input
-              id={id}
-              type="tel"
-              inputMode="tel"
-              enterKeyHint="next"
-              value={value}
-              onChange={(event) => {
-                const nextRaw = normalizePhoneInput(event.target.value);
-                const detectedCountry = detectPhoneCountryFromValue(nextRaw);
+          </span>
 
-                if (detectedCountry && detectedCountry !== countryCode) {
-                  onCountryCodeChange(detectedCountry);
-                  onValueChange(stripCountryDialCode(nextRaw, detectedCountry));
-                  return;
-                }
+          <input
+            id={inputId}
+            type="tel"
+            inputMode="tel"
+            enterKeyHint="next"
+            value={value}
+            onChange={event => {
+              const nextRaw = normalizePhoneInput(event.target.value);
+              const detectedCountry = detectPhoneCountryFromValue(nextRaw);
 
-                onValueChange(nextRaw);
-              }}
-              placeholder={selectedCountry.placeholder}
-              autoComplete={autoComplete}
-              disabled={disabled}
-              className={cn(
-                inputClassName,
-                'min-h-[56px] w-full min-w-0 pl-[5.4rem] sm:pl-[5.7rem]',
-              )}
-            />
-          </div>
-        </label>
+              if (detectedCountry && detectedCountry !== countryCode) {
+                onCountryCodeChange(detectedCountry);
+                onValueChange(stripCountryDialCode(nextRaw, detectedCountry));
+                return;
+              }
+
+              onValueChange(nextRaw);
+            }}
+            placeholder={selectedCountry.placeholder}
+            autoComplete={autoComplete}
+            disabled={disabled}
+            className={cn(
+              inputClassName,
+              'min-h-[38px] min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 py-0 text-[15px] shadow-none outline-none focus:border-0 focus:bg-transparent focus:ring-0 disabled:bg-transparent sm:text-sm dark:bg-transparent',
+            )}
+          />
+        </div>
       </div>
 
-      <p className="text-xs leading-5 text-[color:var(--app-text-soft)]">
-        {locale === 'id'
-          ? 'Kode akan dikirim ke nomor ini:'
-          : 'We will send the code to:'}{' '}
+      <p className="text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+        {locale === 'id' ? 'Kode ke:' : 'Code to:'}{' '}
         <span className="inline-flex max-w-full flex-wrap items-center gap-1 break-words font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-          {selectedCountry.flag} {formatPhonePreview(value, countryCode)}
+          {selectedFlag} {formatPhonePreview(value, countryCode)}
         </span>
       </p>
     </div>

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { buildLoginPath, isProtectedRoutePath } from '@/lib/authRoutes';
+import { saveAccountSnapshot } from '@/lib/accountVault';
 import { getLocaleFromPathname, isSupportedLocale } from '@/lib/locale';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -60,7 +61,7 @@ type AuthCtx = {
     options?: { silent?: boolean; redirectTo?: string; phoneOtpToken?: string },
   ) => Promise<void>;
   register: (data: any) => Promise<Record<string, unknown>>;
-  logout: () => Promise<void>;
+  logout: (options?: { redirectTo?: string }) => Promise<void>;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   refreshUser: () => Promise<void>;
 };
@@ -222,7 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
 
         if (res.ok) {
-          setUser(normalizeUserPayload(data));
+          const normalizedUser = normalizeUserPayload(data);
+          saveAccountSnapshot(normalizedUser);
+          setUser(normalizedUser);
         } else {
           if (data.shouldClearLocalAuth) hardResetAuth();
           if (res.status === 401 || res.status === 403) {
@@ -483,13 +486,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data as Record<string, unknown>;
   };
 
-  const logout = async () => {
+  const logout = async (options?: { redirectTo?: string }) => {
     setLoading(true);
     try {
       const res = await fetch('/api/auth/logout', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (data.shouldClearLocalAuth || IS_DEV) {
+      if ((data as any).shouldClearLocalAuth || IS_DEV) {
         hardResetAuth();
       }
     } catch {
@@ -497,7 +500,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       hardResetAuth();
       if (typeof window !== 'undefined') {
-        window.location.replace(`/${getLocale()}/login`);
+        window.location.replace(options?.redirectTo || `/${getLocale()}/login`);
       }
     }
   };

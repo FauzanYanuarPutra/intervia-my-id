@@ -5,9 +5,7 @@ defmodule ChatServiceWeb.Endpoint do
     "https://lajukan.com",
     "https://www.lajukan.com",
     "https://chat.lajukan.com",
-    "http://lajukan.com",
-    "http://www.lajukan.com",
-    "http://chat.lajukan.com",
+    "https://usaha.lajukan.com",
     "http://127.0.0.1",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
@@ -22,6 +20,7 @@ defmodule ChatServiceWeb.Endpoint do
     "//lajukan.com",
     "//www.lajukan.com",
     "//chat.lajukan.com",
+    "//usaha.lajukan.com",
     "//127.0.0.1",
     "//127.0.0.1:3000",
     "//127.0.0.1:3001",
@@ -45,6 +44,7 @@ defmodule ChatServiceWeb.Endpoint do
       check_origin: @socket_allowed_origins
     ]
 
+  plug ChatServiceWeb.Plugs.SecurityHeaders
   plug :health_check
 
   defp health_check(%{path_info: ["api", "health"]} = conn, _opts) do

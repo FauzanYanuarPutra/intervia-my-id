@@ -57,7 +57,7 @@ const ROLE_OPTIONS: Choice[] = [
     icon: BadgeCheck,
     label: { id: 'Tawarkan skill pribadi', en: 'Offer personal skills' },
     hint: {
-      id: 'Kalau kamu jual jasa personal, freelance, atau skill khusus.',
+      id: 'Jasa personal, freelance, skill khusus.',
       en: 'Freelance, admin, operator, specialist.',
     },
   },

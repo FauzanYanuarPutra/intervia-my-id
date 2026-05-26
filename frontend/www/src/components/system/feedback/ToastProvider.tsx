@@ -74,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-bottom-nav-height,0px)+0.75rem)] z-[120] mx-auto flex w-[min(420px,calc(100vw-1.5rem))] flex-col gap-2 px-3 sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-3 sm:mx-0 sm:px-0">
+      <div className="ui-layer-local-topbar pointer-events-none fixed inset-x-0 bottom-[calc(var(--app-bottom-nav-height,0px)+0.75rem)] mx-auto flex w-[min(420px,calc(100vw-1.5rem))] flex-col gap-2 px-3 sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-3 sm:mx-0 sm:px-0">
         {toasts.map((toast) => (
           <div
             key={toast.id}

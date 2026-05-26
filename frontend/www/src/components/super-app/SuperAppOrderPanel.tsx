@@ -630,7 +630,7 @@ function buildDynamicTripOptions(input: {
               detail: input.isId
                 ? 'Diprioritaskan untuk order yang butuh pickup lebih gesit.'
                 : 'Prioritized for trips that need a faster pickup response.',
-              footnote: input.isId ? 'Driver lebih cepat dipanggil' : 'Faster matching queue',
+              footnote: input.isId ? 'Driver cepat dipanggil' : 'Faster matching queue',
               icon: 'bike',
               multiplier: 1.08,
               extraCents: 300_000,
@@ -1395,7 +1395,7 @@ export function SuperAppOrderPanel({
       if (isMapService && routePreview.provider === 'none') {
         setError(
           isId
-            ? 'Pilih pickup dan tujuan dari map dulu supaya sistem bisa menghitung rute.'
+            ? 'Pilih pickup dan tujuan dulu.'
             : 'Pick pickup and destination from the map first so the system can calculate the route.',
         );
         return;
@@ -2487,7 +2487,7 @@ export function SuperAppOrderPanel({
                   {needsDropoffSelection ? (
                     <p className="mt-3 rounded-[18px] border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3 py-2 text-[11px] text-[color:var(--app-warning)]">
                       {isId
-                        ? 'Pilih titik tujuan dari saran map supaya ETA dan harga mengikuti rute asli.'
+                        ? 'Pilih tujuan dari saran map.'
                         : 'Pick a destination from the map suggestions so ETA and fare follow the real route.'}
                     </p>
                   ) : null}
@@ -3110,7 +3110,7 @@ export function SuperAppOrderPanel({
                 <div className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2.5 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
                   {routeExceedsDistanceLimit
                     ? isId
-                      ? 'Layanan ini dibatasi supaya ETA, supply driver, dan pengalaman booking tetap realistis.'
+                      ? 'Layanan dibatasi biar ETA tetap realistis.'
                       : 'This service is limited so ETA, driver supply, and booking experience stay realistic.'
                     : activeTripOption?.note ||
                       (isId
@@ -3138,13 +3138,13 @@ export function SuperAppOrderPanel({
               {!routePricingReady ? (
                 <p className="rounded-[18px] border border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] px-3 py-2 text-[12px] leading-5 text-[color:var(--app-info)]">
                   {isId
-                    ? 'Pilih pickup dan tujuan dari saran map dulu. Setelah rute kebaca, ETA dan biaya baru muncul.'
+                    ? 'Pilih pickup dan tujuan dulu.'
                     : 'Pick pickup and destination from the map suggestions first. ETA and fare appear once the route is resolved.'}
                 </p>
               ) : routeExceedsDistanceLimit ? (
                 <p className="rounded-[18px] border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3 py-2 text-[12px] leading-5 text-[color:var(--app-warning)]">
                   {isId
-                    ? `Rute ${routeSummaryLabel} melewati batas ${distanceLimitLabel}. Ubah tujuan agar opsi armada bisa muncul.`
+                    ? `Rute ${routeSummaryLabel} lewat batas ${distanceLimitLabel}. Ubah tujuan.`
                     : `The ${routeSummaryLabel} route is over the ${distanceLimitLabel} limit. Change the destination to unlock vehicle options.`}
                 </p>
               ) : (

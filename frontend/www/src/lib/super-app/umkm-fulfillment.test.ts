@@ -20,6 +20,11 @@ afterEach(() => {
   delete process.env.UMKM_SHIPPING_PROVIDER;
   delete process.env.UMKM_SHIPPING_QUOTE_API_URL;
   delete process.env.UMKM_SHIPPING_ENABLE_PROVIDER_API;
+  delete process.env.UMKM_SHIPPING_API_KEY;
+  delete process.env.RAJAONGKIR_API_KEY;
+  delete process.env.RAJAONGKIR_BASE_URL;
+  delete process.env.RAJAONGKIR_DEFAULT_ORIGIN_ID;
+  delete process.env.RAJAONGKIR_DEFAULT_COURIERS;
   vi.restoreAllMocks();
 });
 
@@ -181,5 +186,70 @@ describe('umkm fulfillment', () => {
     expect(quote.integration.quote_source).toBe('provider_api');
     expect(quote.integration.uses_live_rates).toBe(true);
     expect(quote.options.some((option) => option.id === 'biteship-reg')).toBe(true);
+  });
+
+  it('uses RajaOngkir domestic-cost rates when configured', async () => {
+    process.env.UMKM_SHIPPING_ENV = 'live';
+    process.env.UMKM_SHIPPING_PROVIDER = 'rajaongkir';
+    process.env.UMKM_SHIPPING_ENABLE_PROVIDER_API = 'true';
+    process.env.RAJAONGKIR_API_KEY = 'test-raja-key';
+    process.env.RAJAONGKIR_BASE_URL = 'https://rajaongkir.example.test/api/v1';
+    process.env.RAJAONGKIR_DEFAULT_ORIGIN_ID = '501';
+    process.env.RAJAONGKIR_DEFAULT_COURIERS = 'jne,sicepat';
+
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          meta: { code: 200, status: 'success' },
+          data: [
+            {
+              name: 'Jalur Nugraha Ekakurir (JNE)',
+              code: 'jne',
+              service: 'REG',
+              description: 'Layanan reguler',
+              cost: 18000,
+              etd: '1-2',
+            },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+
+    const quote = await buildUmkmShippingQuote({
+      store: baseStore,
+      selectedProducts: [
+        {
+          id: 'p1',
+          name: 'Bakpia Box',
+          price_cents: 390_000,
+          metadata: {
+            item_kind: 'physical',
+            weight_grams: 900,
+            allow_pickup: true,
+            allow_courier_shipping: true,
+          },
+          quantity: 2,
+        },
+      ],
+      deliveryAddress: 'Jl. Sudirman No. 1, Jakarta',
+      deliveryDestinationId: '114',
+      preferredMode: 'courier',
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0];
+    expect(String(url)).toBe('https://rajaongkir.example.test/api/v1/calculate/domestic-cost');
+    expect((init?.headers as Record<string, string>).key).toBe('test-raja-key');
+    expect(String(init?.body)).toContain('origin=501');
+    expect(String(init?.body)).toContain('destination=114');
+    expect(String(init?.body)).toContain('courier=jne%3Asicepat');
+    expect(quote.integration.provider).toBe('rajaongkir');
+    expect(quote.integration.quote_source).toBe('provider_api');
+    expect(quote.options.some((option) => option.id.startsWith('rajaongkir-jne-reg'))).toBe(true);
+    expect(quote.options.find((option) => option.provider === 'rajaongkir:jne')?.fee_cents).toBe(1_800_000);
   });
 });

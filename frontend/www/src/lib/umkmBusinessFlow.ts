@@ -1,12 +1,16 @@
 import {
   BriefcaseBusiness,
+  Handshake,
   MapPin,
   Store,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import type { ListingSide } from '@/lib/content/listingSide';
-import { buildCreatePath, resolveMarketplaceCreatePath } from '@/lib/createRoutes';
+import {
+  buildCreatePath,
+  resolveMarketplaceCreatePath,
+} from '@/lib/createRoutes';
 import { buildUsahaPath } from '@/lib/umkmSurface';
 
 export type UmkmJourneyTypeId =
@@ -14,7 +18,8 @@ export type UmkmJourneyTypeId =
   | 'service'
   | 'job'
   | 'property'
-  | 'tool_rental';
+  | 'tool_rental'
+  | 'business_transfer';
 
 export type UmkmJourneyStep = {
   id: string;
@@ -99,6 +104,24 @@ export const UMKM_JOURNEY_STEPS: UmkmJourneyStep[] = [
     icon: Wrench,
     accentClass:
       'from-sky-400/18 via-cyan-300/10 to-transparent dark:from-sky-400/20 dark:via-cyan-400/12 dark:to-transparent',
+  },
+  {
+    id: 'business-transfer',
+    typeId: 'business_transfer',
+    listingSide: 'supply',
+    titleId: 'Oper usaha',
+    titleEn: 'Transfer a running business',
+    bodyId: 'Aset, rating, biaya, risiko.',
+    bodyEn: 'Assets, ratings, costs, and risks.',
+    searchHref: '/search?type=business_transfer&q=oper%20usaha',
+    createHref: '/create/jual/oper-usaha',
+    searchLabelId: 'Lihat oper usaha',
+    searchLabelEn: 'Browse transfers',
+    createLabelId: 'Jual usaha',
+    createLabelEn: 'List transfer',
+    icon: Handshake,
+    accentClass:
+      'from-emerald-400/18 via-green-300/10 to-transparent dark:from-emerald-400/20 dark:via-green-400/12 dark:to-transparent',
   },
   {
     id: 'talent',
@@ -212,6 +235,9 @@ export function resolveOppositeMarketplaceCreateHref(
   if (type === 'company') {
     return buildUsahaPath('onboarding');
   }
+  if (type === 'business_transfer') {
+    return resolveMarketplaceCreatePath(locale, type, 'supply');
+  }
 
   return resolveMarketplaceCreateHref(
     locale,
@@ -220,7 +246,10 @@ export function resolveOppositeMarketplaceCreateHref(
   );
 }
 
-export function resolveUmkmCreateHrefForType(locale: string, type: string): string {
+export function resolveUmkmCreateHrefForType(
+  locale: string,
+  type: string,
+): string {
   if (type === 'company') {
     return buildUsahaPath('onboarding');
   }

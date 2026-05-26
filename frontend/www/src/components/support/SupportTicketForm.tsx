@@ -437,7 +437,7 @@ export default function SupportTicketForm() {
       setSubject('');
       setMessage('');
       setCaptchaToken('');
-      setSuccess('Ticket berhasil dibuat. Tim support akan merespons secepatnya.');
+      setSuccess('Ticket dibuat. Tim support akan balas.');
       await loadMyTickets();
     } catch {
       if (isAuthenticated) {
@@ -552,7 +552,7 @@ export default function SupportTicketForm() {
           <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-accent-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_70%,_transparent)] p-3 text-xs text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]">
             <p className="font-semibold">1. Buat ticket</p>
             <p className="mt-1 text-[11px] text-[color:color-mix(in_srgb,_var(--app-accent)_80%,_transparent)] dark:text-[color:color-mix(in_srgb,_var(--app-accent)_70%,_transparent)]">
-              Isi masalah singkat + detail transaksi jika ada.
+              Tulis masalah + ID transaksi.
             </p>
           </div>
           <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-3 text-xs text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
@@ -574,7 +574,7 @@ export default function SupportTicketForm() {
       <div className="lg:col-span-3 rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
         <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Buat Ticket Bantuan</h3>
         <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-          Jelaskan kendala akun, transaksi, atau masalah teknis agar tim support bisa membantu lebih cepat.
+          Tulis kendala singkat. Tambahkan ID jika ada.
         </p>
 
         <form className="mt-4 space-y-3" onSubmit={submitTicket}>
@@ -633,7 +633,7 @@ export default function SupportTicketForm() {
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Jelaskan kendala Anda dengan detail."
+            placeholder="Tulis kendala singkat."
             rows={5}
             className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2.5 text-sm shadow-sm shadow-[var(--app-shadow)]"
             required
@@ -726,7 +726,7 @@ export default function SupportTicketForm() {
           </div>
           <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
             {isAuthenticated
-              ? 'Balas langsung ke agent support dari sini.'
+              ? 'Balas agent dari sini.'
               : 'Login dulu untuk melihat percakapan ticket.'}
           </p>
 
@@ -734,7 +734,7 @@ export default function SupportTicketForm() {
             {!isAuthenticated ? (
               <p className="text-xs text-[color:var(--app-text)]">Belum login.</p>
             ) : !selectedTicketId ? (
-              <p className="text-xs text-[color:var(--app-text)]">Pilih ticket untuk melihat detail.</p>
+              <p className="text-xs text-[color:var(--app-text)]">Pilih ticket.</p>
             ) : detailLoading ? (
               <p className="text-xs text-[color:var(--app-text)]">Memuat detail...</p>
             ) : detailError ? (
@@ -820,7 +820,7 @@ export default function SupportTicketForm() {
             {isId ? 'Bantuan live: chat & AI' : 'Live tools: Chat & AI'}
           </summary>
           <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-            Aktifkan chat realtime atau AI hanya saat dibutuhkan agar alur tetap ringan.
+            Buka chat/AI kalau perlu.
           </p>
 
           <div className="mt-4 space-y-4">
@@ -897,7 +897,7 @@ export default function SupportTicketForm() {
                 {isId ? 'Asisten bantuan AI' : 'AI Support Assistant'}
               </h4>
               <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                Tanyakan dulu ke AI untuk solusi cepat sebelum diteruskan ke agent.
+                Tanya AI dulu.
               </p>
 
               <div className="mt-3 max-h-56 space-y-2 overflow-auto pr-1">
@@ -948,11 +948,11 @@ export default function SupportTicketForm() {
         </details>
 
         <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
-          <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Tips agar cepat ditangani</h4>
+          <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Biar cepat</h4>
           <ul className="mt-3 space-y-2 text-xs text-[color:var(--app-text)]">
             <li>Gunakan subjek singkat yang jelas (contoh: "OTP tidak masuk").</li>
-            <li>Tuliskan kronologi + langkah yang sudah dicoba.</li>
-            <li>Tambahkan detail transaksi atau ID terkait jika ada.</li>
+            <li>Tulis kronologi singkat.</li>
+            <li>Tambahkan ID transaksi jika ada.</li>
           </ul>
         </div>
 

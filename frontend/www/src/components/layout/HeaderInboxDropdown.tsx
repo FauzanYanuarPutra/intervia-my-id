@@ -1,0 +1,526 @@
+'use client';
+
+import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  Bell,
+  CheckCheck,
+  ChevronRight,
+  Loader2,
+  MessageCircle,
+  RefreshCcw,
+} from 'lucide-react';
+import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
+import { useChatInbox, type InboxRoom } from '@/context/ChatInboxContext';
+import {
+  useNotificationInbox,
+  type InboxNotification,
+} from '@/context/NotificationInboxContext';
+import { resolveLocaleFromPathname } from '@/lib/locale';
+import { cn } from '@/lib/utils';
+
+type HeaderInboxDropdownKind = 'chat' | 'notifications';
+
+type HeaderInboxDropdownProps = {
+  kind: HeaderInboxDropdownKind;
+  isId?: boolean;
+  className?: string;
+  iconClassName?: string;
+  menuClassName?: string;
+  active?: boolean;
+};
+
+function compactCount(value: number): string {
+  if (value <= 0) return '';
+  return value > 99 ? '99+' : String(value);
+}
+
+function toText(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number') return String(value);
+  return fallback;
+}
+
+function formatRelativeTime(value: string | undefined, isId: boolean): string {
+  if (!value) return isId ? 'Baru saja' : 'Just now';
+  const parsed = new Date(value).getTime();
+  if (!Number.isFinite(parsed)) return isId ? 'Baru saja' : 'Just now';
+
+  const diffSeconds = Math.round((parsed - Date.now()) / 1000);
+  const abs = Math.abs(diffSeconds);
+  const locale = isId ? 'id-ID' : 'en-US';
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+
+  if (abs < 60) return rtf.format(diffSeconds, 'second');
+  const diffMinutes = Math.round(diffSeconds / 60);
+  if (Math.abs(diffMinutes) < 60) return rtf.format(diffMinutes, 'minute');
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) return rtf.format(diffHours, 'hour');
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 7) return rtf.format(diffDays, 'day');
+
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+  }).format(parsed);
+}
+
+function roomId(room: InboxRoom): string {
+  return toText(room.room_id ?? room.id);
+}
+
+function roomName(room: InboxRoom, isId: boolean): string {
+  return toText(
+    room.room_name ?? room.name,
+    isId ? 'Percakapan' : 'Conversation',
+  );
+}
+
+function roomMessage(room: InboxRoom, isId: boolean): string {
+  return toText(
+    room.last_message ?? room.lastMsg,
+    isId ? 'Belum ada pesan terbaru.' : 'No recent message yet.',
+  );
+}
+
+function roomAvatar(room: InboxRoom): string {
+  return toText(room.room_avatar ?? room.avatar);
+}
+
+function roomUnread(room: InboxRoom): number {
+  const value = Number(room.unread_count ?? 0);
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function initials(value: string): string {
+  const clean = value.trim();
+  if (!clean) return 'L';
+  const words = clean.split(/\s+/).slice(0, 2);
+  return words.map(word => word.charAt(0).toUpperCase()).join('');
+}
+
+function notificationHref(item: InboxNotification): string {
+  const data = item.data || {};
+  const directHref =
+    toText(data.href) ||
+    toText(data.url) ||
+    toText(data.action_url) ||
+    toText(data.actionHref);
+  if (directHref.startsWith('/')) return directHref;
+
+  const transactionId =
+    toText(data.transaction_id) || toText(data.order_id) || toText(data.txn_id);
+  if (transactionId)
+    return `/transactions/${encodeURIComponent(transactionId)}`;
+
+  const topupId = toText(data.topup_id);
+  if (topupId || item.category === 'wallet') return '/payments';
+  if (item.category === 'transaction') return '/transactions';
+  if (item.category === 'security') return '/settings';
+  return '/notifications';
+}
+
+function categoryTone(category: string): string {
+  const key = category.toLowerCase();
+  if (key === 'wallet') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_45%,_transparent)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]';
+  }
+  if (key === 'transaction') {
+    return 'border-teal-200 bg-teal-50 text-teal-700';
+  }
+  if (key === 'security') {
+    return 'border-rose-200 bg-rose-50 text-rose-700';
+  }
+  return 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]';
+}
+
+function EmptyState({
+  icon,
+  title,
+  body,
+}: {
+  icon: ReactNode;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-5 text-center">
+      <div className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]">
+        {icon}
+      </div>
+      <p className="mt-3 text-sm font-black text-[color:var(--app-text)]">
+        {title}
+      </p>
+      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+        {body}
+      </p>
+    </div>
+  );
+}
+
+function LoadingRows() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className="flex items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
+        >
+          <div className="ui-skeleton ui-skeleton-pulse h-10 w-10 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="ui-skeleton ui-skeleton-pulse h-3 w-28 rounded-full" />
+            <div className="ui-skeleton ui-skeleton-pulse h-2.5 w-full rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function HeaderInboxDropdown({
+  kind,
+  isId,
+  className,
+  iconClassName,
+  menuClassName,
+  active,
+}: HeaderInboxDropdownProps) {
+  const pathname = usePathname();
+  const locale = resolveLocaleFromPathname(pathname);
+  const idLocale = isId ?? locale === 'id';
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
+  const chatInbox = useChatInbox();
+  const notificationInbox = useNotificationInbox();
+
+  const isChat = kind === 'chat';
+  const count = isChat ? chatInbox.totalUnread : notificationInbox.unreadCount;
+  const badge = compactCount(count);
+  const title = isChat
+    ? idLocale
+      ? 'Chat terbaru'
+      : 'Recent chats'
+    : idLocale
+      ? 'Notifikasi'
+      : 'Notifications';
+  const label = isChat ? 'Chat' : idLocale ? 'Notifikasi' : 'Notifications';
+  const fullHref = isChat ? '/chat' : '/notifications';
+
+  const sortedRooms = useMemo(
+    () =>
+      [...chatInbox.rooms]
+        .sort(
+          (a, b) =>
+            new Date(toText(b.last_message_at)).getTime() -
+            new Date(toText(a.last_message_at)).getTime(),
+        )
+        .slice(0, 5),
+    [chatInbox.rooms],
+  );
+  const sortedNotifications = useMemo(
+    () =>
+      [...notificationInbox.items]
+        .sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )
+        .slice(0, 6),
+    [notificationInbox.items],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (rootRef.current && !rootRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const refresh = () => {
+    if (isChat) {
+      void chatInbox.refetch();
+      return;
+    }
+    void notificationInbox.refetch();
+  };
+
+  return (
+    <div ref={rootRef} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(prev => !prev);
+          if (!open) refresh();
+        }}
+        className={cn(
+          'ui-pressable relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition',
+          active || open
+            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
+          className,
+        )}
+        aria-label={label}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        {isChat ? (
+          <MessageCircle className={cn('h-4 w-4', iconClassName)} />
+        ) : (
+          <Bell className={cn('h-4 w-4', iconClassName)} />
+        )}
+        {badge ? (
+          <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+            {badge}
+          </span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <div
+          role="dialog"
+          aria-label={title}
+          className={cn(
+            'ui-layer-drawer absolute right-0 top-[calc(100%+12px)] z-[90] w-[min(360px,calc(100vw-2rem))] overflow-visible rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,var(--app-text-soft)_18%)] bg-white p-2 text-[color:var(--app-text)] shadow-[0_28px_76px_-34px_rgba(15,23,42,0.5)] ring-1 ring-black/[0.04] dark:border-slate-700/80 dark:bg-slate-950 dark:ring-white/10',
+            menuClassName,
+          )}
+        >
+          <span className="pointer-events-none absolute right-4 top-[-7px] h-3.5 w-3.5 rotate-45 border-l border-t border-[color:color-mix(in_srgb,var(--app-border)_82%,var(--app-text-soft)_18%)] bg-white shadow-[-4px_-4px_10px_-8px_rgba(15,23,42,0.45)] dark:border-slate-700/80 dark:bg-slate-950" />
+          <div className="flex items-center justify-between gap-3 px-2 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+                {title}
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium text-[color:var(--app-text-soft)]">
+                {isChat
+                  ? idLocale
+                    ? `${count} pesan belum dibaca`
+                    : `${count} unread messages`
+                  : idLocale
+                    ? `${count} belum dibaca`
+                    : `${count} unread`}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {!isChat && notificationInbox.unreadCount > 0 ? (
+                <button
+                  type="button"
+                  disabled={markingAll}
+                  onClick={async () => {
+                    setMarkingAll(true);
+                    try {
+                      await notificationInbox.markAllRead();
+                    } finally {
+                      setMarkingAll(false);
+                    }
+                  }}
+                  className="ui-pressable inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60"
+                  aria-label={
+                    idLocale ? 'Tandai semua dibaca' : 'Mark all read'
+                  }
+                >
+                  {markingAll ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCheck className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={refresh}
+                className="ui-pressable inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
+                aria-label={idLocale ? 'Muat ulang' : 'Refresh'}
+              >
+                <RefreshCcw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[min(440px,calc(100vh-150px))] space-y-1 overflow-y-auto px-1 pb-1">
+            {isChat ? (
+              chatInbox.loading ? (
+                <LoadingRows />
+              ) : sortedRooms.length === 0 ? (
+                <EmptyState
+                  icon={<MessageCircle className="h-4 w-4" />}
+                  title={idLocale ? 'Belum ada chat' : 'No chats yet'}
+                  body={
+                    idLocale
+                      ? 'Percakapan dari transaksi, reels, dan profil usaha akan muncul di sini.'
+                      : 'Conversations from transactions, reels, and business profiles will appear here.'
+                  }
+                />
+              ) : (
+                sortedRooms.map(room => {
+                  const id = roomId(room);
+                  const name = roomName(room, idLocale);
+                  const avatar = roomAvatar(room);
+                  const unread = roomUnread(room);
+                  const href = id ? `/chat/${encodeURIComponent(id)}` : '/chat';
+
+                  return (
+                    <Link
+                      key={id || name}
+                      href={href}
+                      onClick={() => setOpen(false)}
+                      className="group flex min-h-[66px] items-center gap-3 rounded-[18px] px-2.5 py-2.5 transition hover:bg-[color:var(--app-surface-muted)]"
+                    >
+                      <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-xs font-black text-[color:var(--app-accent)]">
+                        {avatar.startsWith('/') ? (
+                          <Image
+                            src={avatar}
+                            alt=""
+                            width={44}
+                            height={44}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          initials(name)
+                        )}
+                        {unread > 0 ? (
+                          <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-red-500" />
+                        ) : null}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-black text-[color:var(--app-text)]">
+                            {name}
+                          </span>
+                          <span className="shrink-0 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                            {formatRelativeTime(
+                              toText(room.last_message_at),
+                              idLocale,
+                            )}
+                          </span>
+                        </span>
+                        <span className="mt-1 flex items-center gap-2">
+                          <span
+                            className={cn(
+                              'min-w-0 flex-1 truncate text-xs leading-5',
+                              unread > 0
+                                ? 'font-bold text-[color:var(--app-text)]'
+                                : 'text-[color:var(--app-text-soft)]',
+                            )}
+                          >
+                            {roomMessage(room, idLocale)}
+                          </span>
+                          {unread > 0 ? (
+                            <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+                              {compactCount(unread)}
+                            </span>
+                          ) : null}
+                        </span>
+                      </span>
+                    </Link>
+                  );
+                })
+              )
+            ) : notificationInbox.loading ? (
+              <LoadingRows />
+            ) : sortedNotifications.length === 0 ? (
+              <EmptyState
+                icon={<Bell className="h-4 w-4" />}
+                title={
+                  idLocale ? 'Belum ada notifikasi' : 'No notifications yet'
+                }
+                body={
+                  idLocale
+                    ? 'Update pembayaran, keamanan, dan transaksi penting akan tampil di sini.'
+                    : 'Payment, security, and transaction updates will appear here.'
+                }
+              />
+            ) : (
+              sortedNotifications.map(item => {
+                const href = notificationHref(item);
+
+                return (
+                  <Link
+                    key={item.id}
+                    href={href}
+                    onClick={() => {
+                      setOpen(false);
+                      if (!item.is_read)
+                        void notificationInbox.markRead(item.id);
+                    }}
+                    className={cn(
+                      'group relative flex min-h-[72px] gap-3 rounded-[18px] px-2.5 py-2.5 text-left transition hover:bg-[color:var(--app-surface-muted)]',
+                      !item.is_read && 'bg-[color:var(--app-accent-soft)]/70',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border',
+                        categoryTone(item.category),
+                      )}
+                    >
+                      <Bell className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-black text-[color:var(--app-text)]">
+                          {item.title ||
+                            (idLocale ? 'Notifikasi baru' : 'New notification')}
+                        </span>
+                        {!item.is_read ? (
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-[color:var(--app-accent)]" />
+                        ) : null}
+                      </span>
+                      <span className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                        {item.message}
+                      </span>
+                      <span className="mt-1.5 flex items-center justify-between gap-2">
+                        <span
+                          className={cn(
+                            'truncate rounded-full border px-2 py-0.5 text-[10px] font-bold',
+                            categoryTone(item.category),
+                          )}
+                        >
+                          {item.category || item.event_type || 'update'}
+                        </span>
+                        <span className="shrink-0 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                          {formatRelativeTime(item.created_at, idLocale)}
+                        </span>
+                      </span>
+                    </span>
+                  </Link>
+                );
+              })
+            )}
+          </div>
+
+          <div className="mt-1 border-t border-[color:var(--app-border)] px-1 pt-2">
+            <Link
+              href={fullHref}
+              onClick={() => setOpen(false)}
+              className="ui-pressable flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
+            >
+              {isChat
+                ? idLocale
+                  ? 'Lihat semua chat'
+                  : 'View all chats'
+                : idLocale
+                  ? 'Lihat semua notifikasi'
+                  : 'View all notifications'}
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

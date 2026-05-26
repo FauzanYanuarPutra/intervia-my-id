@@ -41,6 +41,7 @@ const CreateOrderSchema = z.object({
   delivery_address: z.string().max(500).optional(),
   delivery_lat: z.number().min(-90).max(90).optional(),
   delivery_lng: z.number().min(-180).max(180).optional(),
+  delivery_destination_id: z.string().max(80).optional(),
   address_confirmed: z.boolean().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
@@ -259,6 +260,7 @@ export async function POST(req: NextRequest) {
         deliveryAddress: payload.delivery_address,
         deliveryLat: payload.delivery_lat,
         deliveryLng: payload.delivery_lng,
+        deliveryDestinationId: payload.delivery_destination_id,
         preferredMode: payload.fulfillment_mode,
       });
       const recommendedOptionId = shippingQuote.recommended_option_id;
@@ -309,6 +311,9 @@ export async function POST(req: NextRequest) {
       ...(payload.delivery_address ? { delivery_address: payload.delivery_address } : {}),
       ...(payload.delivery_lat !== undefined && payload.delivery_lng !== undefined
         ? { delivery_lat: payload.delivery_lat, delivery_lng: payload.delivery_lng }
+        : {}),
+      ...(payload.delivery_destination_id
+        ? { delivery_destination_id: payload.delivery_destination_id }
         : {}),
       ...(payload.address_confirmed
         ? { address_confirmed: true, address_confirmed_at: new Date().toISOString() }

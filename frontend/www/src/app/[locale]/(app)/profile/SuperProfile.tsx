@@ -1284,7 +1284,7 @@ export default function SuperProfile() {
 
                   <p className="mt-2 max-w-2xl text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                     {professionalData.headline ||
-                      'Lengkapi profil Anda agar tampil lebih meyakinkan untuk marketplace, jobs, dan chat.'}
+                      'Lengkapi profil biar lebih meyakinkan.'}
                   </p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1405,7 +1405,7 @@ export default function SuperProfile() {
                     <p className="mt-2 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] line-clamp-4 sm:line-clamp-none">
                       {professionalData.summary ||
                         bioInput ||
-                        'Belum ada ringkasan profil. Tambahkan bio singkat, pengalaman utama, dan value yang Anda tawarkan agar profil terasa lebih profesional.'}
+                        'Belum ada ringkasan. Tambah bio, pengalaman, dan value.'}
                     </p>
                   </div>
 

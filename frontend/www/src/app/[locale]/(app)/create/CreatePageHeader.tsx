@@ -52,7 +52,6 @@ export function CreatePageHeader({
   activeTypeIcon: ActiveTypeIcon,
   selectedTypeLabel,
   typePicked,
-  typeThemeBadgeClass,
   listingSideContextLabel,
   typeSummaryDescription,
   requiredDone,
@@ -81,105 +80,102 @@ export function CreatePageHeader({
   const readinessLabel =
     publishBlockersCount > 0
       ? isId
-        ? `${publishBlockersCount} yang perlu dicek`
+        ? `${publishBlockersCount} perlu dicek`
         : `${publishBlockersCount} blockers`
       : isId
         ? 'Siap lanjut'
         : 'Ready';
   const compactSummary = typePicked
-    ? `${selectedTypeLabel} • ${listingSideContextLabel}`
+    ? `${selectedTypeLabel} / ${listingSideContextLabel}`
     : typeSummaryDescription;
+  const statusLabel =
+    contentStatus === 'active' ? (isId ? 'Sudah tayang' : 'Live') : 'Draft';
+  const progressText = isId
+    ? `${requiredDone}/${Math.max(requiredTotal, 1)} info utama`
+    : `${requiredDone}/${Math.max(requiredTotal, 1)} core fields`;
+  const mediaText = isId
+    ? `${imagesCount} foto, ${documentsCount} dokumen`
+    : `${imagesCount} photos, ${documentsCount} documents`;
+  const promoText = promotionEnabled
+    ? `${promotionRequiredDone}/${Math.max(promotionRequiredTotal, 1)} promo`
+    : isId
+      ? 'Promo dilewati'
+      : 'Promo skipped';
+  const activeStepLabel =
+    stepLabels[currentStep - 1] || (isId ? 'Langkah aktif' : 'Active step');
+  const statusToneClass =
+    contentStatus === 'active'
+      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+      : 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]';
 
   return (
     <div
       data-section-shell-hero="true"
-      className="ui-feed-section ui-section-shell relative min-w-0 overflow-hidden rounded-none border-x-0 border-y border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-3 shadow-none dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[22px] sm:border sm:px-4 sm:py-3.5 sm:shadow-[0_18px_34px_-32px_rgba(15,23,42,0.14)]"
+      className="min-w-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_18px_38px_-36px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:p-4"
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[-2rem] top-[-2rem] h-24 w-24 rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.1),transparent_72%)] blur-3xl" />
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {typePicked ? (
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+              <ActiveTypeIcon className="h-4 w-4" />
+            </span>
+          ) : null}
+          <div className="min-w-0">
+            <p className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+              {typePicked ? compactSummary : formEyebrow}
+            </p>
+            <h1 className="mt-0.5 truncate text-[1.08rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.32rem]">
+              {formTitle}
+            </h1>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span
+            className={`inline-flex min-h-[30px] items-center rounded-full border px-2.5 text-[10px] font-black ${statusToneClass}`}
+          >
+            {statusLabel}
+          </span>
+          <span
+            className={`inline-flex min-h-[30px] items-center gap-1 rounded-full border px-2.5 text-[10px] font-black ${
+              publishBlockersCount > 0
+                ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
+                : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+            }`}
+          >
+            {publishBlockersCount > 0 ? (
+              <AlertTriangle className="h-3.5 w-3.5" />
+            ) : (
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            )}
+            {publishBlockersCount > 0
+              ? isId
+                ? `${publishBlockersCount} cek`
+                : `${publishBlockersCount} check`
+              : readinessLabel}
+          </span>
+        </div>
       </div>
 
-      <div className="relative">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="max-w-2xl">
-            <p className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-              {formEyebrow}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h1 className="text-[1.12rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.28rem]">
-                {formTitle}
-              </h1>
-              <span
-                className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
-                  contentStatus === 'active'
-                    ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                    : 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
-                }`}
-              >
-                {contentStatus === 'active'
-                  ? isId
-                    ? 'Udah tayang'
-                    : 'Live'
-                  : isId
-                    ? 'Draft'
-                    : 'Draft'}
-              </span>
-            </div>
-            <p className="mt-1.5 max-w-xl text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
-              {formSubtitle}
-            </p>
-            {compactSummary ? (
-              <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                {compactSummary}
-              </p>
-            ) : null}
-          </div>
+      <p className="mt-2 line-clamp-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
+        {isQuickMode
+          ? isId
+            ? 'Mode cepat: isi inti dulu, detail bisa diedit nanti.'
+            : 'Quick mode: fill the essentials first, edit details later.'
+          : formSubtitle}
+      </p>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {typePicked ? (
-              <span className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-1 text-[10px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55 dark:text-[color:var(--app-text-inverse)]">
-                <ActiveTypeIcon className="h-3.5 w-3.5" />
-                {selectedTypeLabel}
-              </span>
-            ) : null}
-
-            {typePicked ? (
-              <span
-                className={`inline-flex min-h-[32px] items-center rounded-full border px-3 py-1 text-[10px] font-semibold ${typeThemeBadgeClass}`}
-              >
-                {listingSideContextLabel}
-              </span>
-            ) : null}
-
-            <span className="inline-flex min-h-[32px] items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-              {isId
-                ? `Langkah ${currentStep} dari ${totalSteps}`
-                : `Step ${currentStep} of ${totalSteps}`}{' '}
-              | {stepProgress}%
-            </span>
-
-            {publishBlockersCount > 0 ? (
-              <span className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3 py-1 text-[10px] font-semibold text-[color:var(--app-warning)]">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {readinessLabel}
-              </span>
-            ) : (
-              <span className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-[10px] font-semibold text-[color:var(--app-accent)]">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {readinessLabel}
-              </span>
-            )}
-          </div>
+      <div className="mt-3 rounded-[14px] bg-[color:var(--app-surface-muted)] p-2 dark:bg-slate-950/45">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <p className="min-w-0 truncate text-[12px] font-black text-[color:var(--app-text)]">
+            {currentStep}/{totalSteps} {activeStepLabel}
+          </p>
+          <span className="shrink-0 text-[10px] font-bold text-[color:var(--app-text-soft)]">
+            {stepProgress}%
+          </span>
         </div>
 
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-slate-900/70">
-          <div
-            className="h-full rounded-full bg-[linear-gradient(90deg,var(--app-accent),var(--app-accent-strong))] transition-[width] duration-300"
-            style={{ width: `${stepProgress}%` }}
-          />
-        </div>
-
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <div className="mt-2 grid grid-cols-4 gap-1.5">
           {Array.from({ length: totalSteps }).map((_, idx) => {
             const step = idx + 1;
             const active = currentStep === step;
@@ -191,86 +187,103 @@ export function CreatePageHeader({
               <button
                 key={step}
                 type="button"
+                aria-label={label}
                 disabled={!clickable && !active}
                 onClick={() => {
                   if (clickable) onStepSelect(step);
                 }}
-                className={`inline-flex min-h-[34px] shrink-0 items-center gap-2 rounded-full border px-3 text-[10px] font-semibold transition ${
+                className={`min-w-0 rounded-full border px-2 py-1.5 text-center text-[10px] font-black transition ${
                   active
-                    ? 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]'
+                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
                     : done
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'border-slate-200 bg-white text-[color:var(--app-text-soft)] dark:border-slate-800 dark:bg-slate-950/60'
-                } ${clickable ? 'hover:-translate-y-0.5' : 'cursor-default'}`}
+                      ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] dark:bg-slate-950/70'
+                      : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] dark:bg-slate-950/55'
+                } ${clickable ? 'hover:border-[color:var(--app-accent)]' : 'cursor-default'}`}
               >
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current/10 bg-white/80 text-[10px] font-bold dark:bg-slate-950/60">
+                <span className="inline-flex items-center justify-center gap-1">
                   {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : step}
+                  <span className="hidden truncate min-[420px]:inline">
+                    {label}
+                  </span>
                 </span>
-                <span>{label}</span>
               </button>
             );
           })}
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {showModeSwitch ? (
-              <div className="inline-flex rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
-                <button
-                  type="button"
-                  onClick={() => onListingModeChange('simple')}
-                  className={`rounded-[10px] px-3 py-1.5 text-[10px] font-semibold transition ${
-                    listingMode === 'simple'
-                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'text-[color:var(--app-text)]'
-                  }`}
-                >
-                  {isId ? 'Cepat' : 'Quick'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onListingModeChange('detail')}
-                  className={`rounded-[10px] px-3 py-1.5 text-[10px] font-semibold transition ${
-                    listingMode === 'detail'
-                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'text-[color:var(--app-text)]'
-                  }`}
-                >
-                  {isId ? 'Lengkap' : 'Detail'}
-                </button>
-              </div>
-            ) : null}
-
-            {canChangeTypeBeforeDraft ? (
-              <button
-                type="button"
-                onClick={onChangeType}
-                className="inline-flex items-center rounded-full border border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] px-3 py-1.5 text-[10px] font-semibold text-[color:var(--app-info)]"
-              >
-                {isId ? 'Ganti tipe' : 'Change category'}
-              </button>
-            ) : null}
-          </div>
-
-          {typeSelectionLocked ? (
-            <p className="text-[11px] text-[color:var(--app-warning)]">
-              {isId
-                ? 'Kalau udah tayang, tipenya nggak bisa diganti.'
-                : 'Category locks after publish.'}
-            </p>
-          ) : !isCompact ? (
-            <p className="text-[11px] text-[color:var(--app-text-soft)]">
-              {isQuickMode
-                ? isId
-                  ? 'Mulai dari inti dulu. Detail bisa ditambah nanti.'
-                  : 'Start from the core. Details can follow later.'
-                : isId
-                  ? `${requiredDone}/${Math.max(requiredTotal, 1)} info utama sudah terisi.`
-                  : `${requiredDone}/${Math.max(requiredTotal, 1)} core fields filled.`}
-            </p>
-          ) : null}
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white dark:bg-slate-900">
+          <div
+            className="h-full rounded-full bg-[color:var(--app-accent)] transition-[width] duration-300"
+            style={{ width: `${stepProgress}%` }}
+          />
         </div>
       </div>
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {showModeSwitch ? (
+            <div className="inline-flex rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-0.5 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+              <button
+                type="button"
+                onClick={() => onListingModeChange('simple')}
+                className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${
+                  listingMode === 'simple'
+                    ? 'bg-[color:var(--app-accent)] text-white'
+                    : 'text-[color:var(--app-text)]'
+                }`}
+              >
+                {isId ? 'Cepat' : 'Quick'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onListingModeChange('detail')}
+                className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${
+                  listingMode === 'detail'
+                    ? 'bg-[color:var(--app-accent)] text-white'
+                    : 'text-[color:var(--app-text)]'
+                }`}
+              >
+                {isId ? 'Detail' : 'Detail'}
+              </button>
+            </div>
+          ) : null}
+
+          {canChangeTypeBeforeDraft ? (
+            <button
+              type="button"
+              onClick={onChangeType}
+              className="inline-flex min-h-[32px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-3 text-[10px] font-black text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
+            >
+              {isId ? 'Ganti tipe' : 'Change category'}
+            </button>
+          ) : null}
+        </div>
+
+        <details className="group relative">
+          <summary className="inline-flex min-h-[32px] cursor-pointer list-none items-center rounded-full bg-[color:var(--app-surface-muted)] px-3 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)] [&::-webkit-details-marker]:hidden">
+            {isId ? 'Detail status' : 'Status details'}
+          </summary>
+          <div className="absolute right-0 z-30 mt-2 w-[min(88vw,280px)] rounded-[16px] border border-[color:var(--app-border)] bg-white p-3 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">
+            <div className="grid gap-2">
+              <span>{progressText}</span>
+              <span>{mediaText}</span>
+              {!isCompact ? <span>{promoText}</span> : null}
+              <span>
+                {publishReadyCount}/{Math.max(publishReadinessTotal, 1)}{' '}
+                {isId ? 'siap' : 'ready'}
+              </span>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {typeSelectionLocked ? (
+        <p className="mt-2 text-[11px] text-[color:var(--app-warning)]">
+          {isId
+            ? 'Kalau sudah tayang, tipenya tidak bisa diganti.'
+            : 'Category locks after publish.'}
+        </p>
+      ) : null}
     </div>
   );
 }

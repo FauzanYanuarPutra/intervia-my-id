@@ -1,44 +1,113 @@
-import React from 'react';
+import { cn } from '@/lib/utils';
 
-const LajukanLogo = () => {
+type LajukanLogoProps = {
+  compact?: boolean;
+  markOnly?: boolean;
+  className?: string;
+  markClassName?: string;
+  textClassName?: string;
+};
+
+export function LajukanLogoMark({ className }: { className?: string }) {
   return (
-    <div className=" font-poppins group cursor-pointer select-none">
-      <div className="flex items-baseline gap-0">
-        {/* "Laju" - Bold & Solid */}
-        <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] transition-colors duration-300 group-hover:text-[color:var(--app-text)]">
-          Laju
-        </h1>
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center text-[color:var(--app-accent)] drop-shadow-[0_12px_24px_rgba(7,148,85,0.22)]',
+        className,
+      )}
+      aria-hidden="true"
+    >
+      <svg
+        viewBox="0 0 64 64"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-full w-full"
+      >
+        <rect x="5" y="5" width="54" height="54" rx="17" fill="currentColor" />
+        <path
+          d="M12 19.5C17.1 11.7 25.5 8.4 36.4 9.1c7.8.5 14 3.8 18.5 9.7v-3.6C54.9 9.6 50.4 5 44.8 5H22.3C16.7 5 12 9.7 12 15.3v4.2Z"
+          fill="white"
+          opacity="0.16"
+        />
+        <path
+          d="M8 43.5c9.2 8.7 20.3 12.7 34.5 11.8C52.4 54.7 59 49.2 59 40.5V49c0 5.5-4.5 10-10 10H15c-5.5 0-10-4.5-10-10v-8.1c.9.9 1.9 1.8 3 2.6Z"
+          fill="#052E1A"
+          opacity="0.15"
+        />
+        <path
+          d="M21 19.5V44h19.4"
+          stroke="white"
+          strokeWidth="7.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M36.2 32.4 47.4 43.6 36.2 54.8"
+          stroke="white"
+          strokeWidth="7.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M21 19.5V44h19.4"
+          stroke="#DFFDEA"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.72"
+        />
+        <path
+          d="M36.2 32.4 47.4 43.6 36.2 54.8"
+          stroke="#DFFDEA"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.72"
+        />
+        <path
+          d="M19 51.5h10"
+          stroke="#DFFDEA"
+          strokeWidth="3"
+          strokeLinecap="round"
+          opacity="0.55"
+        />
+        <circle cx="46.8" cy="18.6" r="3.4" fill="white" opacity="0.28" />
+      </svg>
+    </span>
+  );
+}
 
-        {/* "lo" dengan Ikon Terintegrasi */}
-        <div className="relative flex items-center">
-          <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-[color:var(--app-accent)] transition-transform duration-500 group-hover:scale-105">
-            Kan
-          </h1>
-
-          {/* Aksesoris Ikon Melingkar di atas huruf 'l' */}
-          <div className="absolute -top-1 -right-3 md:-top-2 md:-right-3 opacity-80 group-hover:opacity-100 transition-opacity">
-            <svg
-              className="w-4 h-4 md:w-5 md:h-5 text-[color:var(--app-accent)] animate-[spin_8s_linear_infinite]"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M12 2V5M12 19V22M4.93 4.93L7.05 7.05M16.95 16.95L19.07 19.07M2 12H5M19 12H22M4.93 19.07L7.05 16.95M16.95 7.05L19.07 4.93"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-              <circle cx="12" cy="12" r="3" className="fill-current" />
-            </svg>
-          </div>
-        </div>
-
-        {/* Dot Com - Discreet but clean */}
-        <span className="text-[8px] md:text-md font-semibold text-[color:var(--app-text-soft)] ml-1 transition-colors group-hover:text-[color:var(--app-accent)]">
-          .com
+const LajukanLogo = ({
+  compact = false,
+  markOnly = false,
+  className,
+  markClassName,
+  textClassName,
+}: LajukanLogoProps) => {
+  return (
+    <div
+      className={cn(
+        'group inline-flex select-none items-center gap-2.5 whitespace-nowrap',
+        className,
+      )}
+    >
+      <LajukanLogoMark
+        className={cn(
+          compact ? 'h-8 w-8' : 'h-8 w-8 sm:h-9 sm:w-9',
+          markClassName,
+        )}
+      />
+      {markOnly ? null : (
+        <span
+          className={cn(
+            compact ? 'text-lg' : 'text-xl sm:text-[1.35rem]',
+            'font-black leading-none tracking-[-0.035em] text-[color:var(--app-text)] transition-colors group-hover:text-[color:var(--app-accent)]',
+            textClassName,
+          )}
+        >
+          Lajukan
         </span>
-      </div>
+      )}
     </div>
   );
 };

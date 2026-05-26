@@ -10,9 +10,9 @@ export const AUTH_ROUTE_PATHS = [
 export const PROTECTED_ROUTE_PREFIXES = [
   '/dashboard',
   '/create',
-  '/profile',
   '/chat',
   '/transactions',
+  '/payments',
   '/notifications',
   '/settings',
   '/my-projects',
@@ -21,6 +21,9 @@ export const PROTECTED_ROUTE_PREFIXES = [
   '/collaboration',
   '/spatial',
   '/onboarding',
+  '/jobs/create',
+  '/property/create',
+  '/company/create',
 ] as const;
 
 function stripQueryAndHash(pathname: string): string {
@@ -49,13 +52,23 @@ export function normalizeAuthRoutePath(
 
 export function isAuthRoutePath(pathname: string | null | undefined): boolean {
   const routePath = normalizeAuthRoutePath(pathname);
-  return AUTH_ROUTE_PATHS.includes(routePath as (typeof AUTH_ROUTE_PATHS)[number]);
+  return AUTH_ROUTE_PATHS.includes(
+    routePath as (typeof AUTH_ROUTE_PATHS)[number],
+  );
 }
 
 export function isProtectedRoutePath(
   pathname: string | null | undefined,
 ): boolean {
   const routePath = normalizeAuthRoutePath(pathname);
+  if (
+    routePath === '/profile' ||
+    routePath.startsWith('/profile/edit') ||
+    routePath.startsWith('/profile/freelancer/create')
+  ) {
+    return true;
+  }
+  if (/^\/content\/[^/]+\/edit$/.test(routePath)) return true;
   return PROTECTED_ROUTE_PREFIXES.some(
     prefix => routePath === prefix || routePath.startsWith(`${prefix}/`),
   );

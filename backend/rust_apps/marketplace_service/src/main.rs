@@ -9,7 +9,7 @@ use axum::{
     Json, Router,
 };
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use lapin::{
     options::{BasicPublishOptions, ExchangeDeclareOptions},
@@ -96,7 +96,6 @@ struct OutboxEventRow {
     id: Uuid,
     routing_key: String,
     payload: Value,
-    retry_count: i32,
 }
 
 fn parse_cors_origins() -> Vec<HeaderValue> {
@@ -115,10 +114,12 @@ fn parse_cors_origins() -> Vec<HeaderValue> {
 #[derive(Debug, Deserialize)]
 struct AccessClaims {
     sub: String,
+    #[allow(dead_code)]
     exp: usize,
     #[serde(default)]
     roles: Vec<String>,
     #[serde(default)]
+    #[allow(dead_code)]
     perms: Vec<String>,
 }
 
@@ -139,7 +140,6 @@ struct ListContentQuery {
 
 #[derive(Debug, Deserialize, Default)]
 struct UpsertContentRequest {
-    owner_id: Option<Uuid>,
     content_type: Option<String>,
     #[serde(rename = "type")]
     type_alias: Option<String>,
@@ -284,6 +284,16 @@ struct ContentResponse {
 
 impl ContentResponse {
     fn from_row(value: ContentRow, seller_stats: Option<SellerStats>) -> Self {
+        let image_urls = response_image_urls_for_content(
+            &value.content_type,
+            value.category.as_deref(),
+            &value.metadata,
+            value.cover_image.as_deref(),
+        );
+        let cover_image = clean_response_image_url(value.cover_image.clone())
+            .or_else(|| image_urls.first().cloned());
+        let metadata = attach_response_image_urls(value.metadata, &image_urls);
+
         Self {
             id: value.id,
             owner_id: value.owner_id,
@@ -296,7 +306,7 @@ impl ContentResponse {
             price_cents: value.price_cents,
             currency: value.currency,
             tags: value.tags,
-            cover_image: value.cover_image,
+            cover_image,
             category: value.category,
             status: value.content_status.clone(),
             content_status: value.content_status,
@@ -308,7 +318,7 @@ impl ContentResponse {
             rating: value.rating,
             review_count: value.review_count,
             seller_stats,
-            metadata: value.metadata,
+            metadata,
             created_at: value.created_at,
             updated_at: value.updated_at,
         }
@@ -496,10 +506,9 @@ struct LajukanRequestRow {
     content_type: String,
     category: Option<String>,
     price_cents: Option<i64>,
-    currency: Option<String>,
+    cover_image: Option<String>,
     metadata: Value,
     created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
     offer_count: i64,
 }
 
@@ -508,7 +517,6 @@ struct LajukanRequestOfferRow {
     id: Uuid,
     content_id: Option<Uuid>,
     amount_cents: i64,
-    currency: String,
     transaction_status: String,
     offer_message: Option<String>,
     response_message: Option<String>,
@@ -553,6 +561,8 @@ struct LajukanRequestCard {
     created_label: String,
     offers_label: String,
     offer_count: i64,
+    cover_image: Option<String>,
+    image_urls: Vec<String>,
     status: String,
     status_key: String,
     detail: LajukanRequestDetail,
@@ -2013,9 +2023,6 @@ fn build_midtrans_direct_charge_request(
                 "transaction_details": {
                     "order_id": external_reference,
                     "gross_amount": gross_amount
-                },
-                "qris": {
-                    "acquirer": "gopay"
                 }
             }),
         ));
@@ -2099,6 +2106,43 @@ fn midtrans_checkout_hint_from_charge(payload: &Value) -> Option<String> {
     })
 }
 
+fn midtrans_provider_message(payload: &Value) -> Option<String> {
+    for key in ["status_message", "message", "error_message", "error"] {
+        if let Some(message) = payload
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return Some(message.to_string());
+        }
+    }
+
+    for key in ["validation_messages", "error_messages"] {
+        if let Some(messages) = payload.get(key).and_then(Value::as_array) {
+            let joined = messages
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .collect::<Vec<_>>()
+                .join("; ");
+            if !joined.is_empty() {
+                return Some(joined);
+            }
+        }
+    }
+
+    None
+}
+
+fn midtrans_rejection_summary(status: u16, payload: &Value) -> String {
+    match midtrans_provider_message(payload) {
+        Some(message) => format!("status {} message={}", status, message),
+        None => format!("status {}", status),
+    }
+}
+
 fn midtrans_signature(
     order_id: &str,
     status_code: &str,
@@ -2162,6 +2206,9 @@ fn canonical_content_type(value: &str) -> String {
         "tool-rental" | "rental" | "rentals" | "equipment_rental" | "sewa_alat" | "alat_sewa" => {
             "tool_rental".to_string()
         }
+        "business-transfer" | "business_transfer" | "business_handover" | "oper-usaha"
+        | "oper_usaha" | "jual-usaha" | "jual_usaha" | "usaha-berjalan" | "usaha_berjalan"
+        | "handover" | "takeover" => "business_transfer".to_string(),
         _ => value.to_string(),
     }
 }
@@ -2216,6 +2263,7 @@ fn is_valid_content_type(value: &str) -> bool {
             | "project"
             | "material"
             | "tool_rental"
+            | "business_transfer"
             | "talent"
             | "profile"
             | "freelancer"
@@ -2230,7 +2278,7 @@ fn is_valid_content_type(value: &str) -> bool {
 fn content_type_requires_primary_image(value: &str) -> bool {
     matches!(
         value,
-        "product" | "property" | "material" | "tool_rental" | "image"
+        "product" | "property" | "material" | "tool_rental" | "business_transfer" | "image"
     )
 }
 
@@ -2301,11 +2349,209 @@ fn collect_metadata_image_urls(metadata: &Value) -> Vec<String> {
     urls
 }
 
+fn is_frontend_static_image_url(value: &str) -> bool {
+    let lowered = value.trim().to_lowercase();
+    lowered.starts_with("/images/")
+        || lowered.starts_with("/default-avatar")
+        || lowered.contains("/images/umkm/")
+        || lowered.contains("placeholder")
+        || lowered.contains("no-image")
+        || lowered.contains("noimage")
+}
+
+fn clean_response_image_url(value: Option<String>) -> Option<String> {
+    let cleaned = clean_text(value)?;
+    if !is_likely_image_url(&cleaned) || is_frontend_static_image_url(&cleaned) {
+        return None;
+    }
+    Some(cleaned)
+}
+
+fn public_market_image_for_content(
+    content_type: &str,
+    category: Option<&str>,
+    metadata: &Value,
+) -> String {
+    let mut tokens = vec![content_type.to_lowercase()];
+    if let Some(category) = category {
+        tokens.push(category.to_lowercase());
+    }
+    for path in [
+        ["sector"].as_slice(),
+        ["sub_sector"].as_slice(),
+        ["business_category"].as_slice(),
+        ["property_type"].as_slice(),
+    ] {
+        if let Some(value) = json_text_at(metadata, path) {
+            tokens.push(value.to_lowercase());
+        }
+    }
+    let token_text = tokens.join(" ");
+
+    let photo_id = if token_text.contains("coffee") || token_text.contains("kopi") {
+        "1495474472287-4d71bcdd2085"
+    } else if token_text.contains("food")
+        || token_text.contains("kuliner")
+        || token_text.contains("restaurant")
+        || token_text.contains("business_transfer")
+    {
+        "1555396273-367ea4eb4db5"
+    } else if token_text.contains("property")
+        || token_text.contains("realestate")
+        || token_text.contains("location")
+    {
+        "1486406146926-c627a92ad1ab"
+    } else if token_text.contains("tool")
+        || token_text.contains("rental")
+        || token_text.contains("machine")
+        || token_text.contains("mesin")
+    {
+        "1581091226825-a6a2a5aee158"
+    } else if token_text.contains("service")
+        || token_text.contains("creative")
+        || token_text.contains("consulting")
+    {
+        "1556761175-b413da4baf72"
+    } else if token_text.contains("talent")
+        || token_text.contains("freelancer")
+        || token_text.contains("job")
+    {
+        "1521737604893-d14cc237f11d"
+    } else if token_text.contains("product") || token_text.contains("retail") {
+        "1542838132-92c53300491e"
+    } else {
+        "1556742049-0cfed4f6a45d"
+    };
+
+    format!("https://images.unsplash.com/photo-{photo_id}?auto=format&fit=crop&w=900&q=80")
+}
+
+fn response_image_urls_for_content(
+    content_type: &str,
+    category: Option<&str>,
+    metadata: &Value,
+    cover_image: Option<&str>,
+) -> Vec<String> {
+    let mut urls = Vec::new();
+    let mut seen = HashSet::new();
+    let mut push = |candidate: Option<String>| {
+        let Some(cleaned) = clean_response_image_url(candidate) else {
+            return;
+        };
+        let key = cleaned.to_lowercase();
+        if seen.insert(key) {
+            urls.push(cleaned);
+        }
+    };
+
+    push(cover_image.map(|value| value.to_string()));
+    for url in collect_metadata_image_urls(metadata) {
+        push(Some(url));
+    }
+
+    if urls.is_empty() {
+        urls.push(public_market_image_for_content(
+            content_type,
+            category,
+            metadata,
+        ));
+    }
+
+    urls
+}
+
+fn attach_response_image_urls(metadata: Value, image_urls: &[String]) -> Value {
+    let mut map = match metadata {
+        Value::Object(map) => map,
+        _ => serde_json::Map::new(),
+    };
+    map.insert(
+        "image_urls".to_string(),
+        Value::Array(image_urls.iter().cloned().map(Value::String).collect()),
+    );
+    if let Some(first) = image_urls.first() {
+        map.insert("cover_image".to_string(), Value::String(first.clone()));
+    }
+    Value::Object(map)
+}
+
 fn clean_json_string(value: Option<&Value>) -> Option<String> {
     value
         .and_then(Value::as_str)
         .map(|raw| raw.trim().to_lowercase())
         .filter(|raw| !raw.is_empty())
+}
+
+fn json_has_value_at(value: &Value, path: &[&str]) -> bool {
+    match json_lookup(value, path) {
+        Some(Value::String(text)) => !text.trim().is_empty(),
+        Some(Value::Number(number)) => {
+            number.as_i64().is_some_and(|raw| raw > 0)
+                || number.as_f64().is_some_and(|raw| raw > 0.0)
+        }
+        Some(Value::Bool(value)) => *value,
+        Some(Value::Array(items)) => !items.is_empty(),
+        Some(Value::Object(map)) => !map.is_empty(),
+        _ => false,
+    }
+}
+
+fn validate_business_transfer_requirements(
+    content_status: &str,
+    pricing_mode: &str,
+    price_cents: Option<i64>,
+    metadata: &Value,
+) -> Result<(), &'static str> {
+    if content_status != "active" {
+        return Ok(());
+    }
+
+    if pricing_mode == "request" || price_cents.unwrap_or(0) <= 0 {
+        return Err("business_transfer listing requires fixed price_cents as asking price");
+    }
+
+    for field in [
+        "business_name",
+        "business_category",
+        "included_assets",
+        "handover_items",
+        "lease_contract_status",
+        "liabilities_note",
+        "reason_for_sale",
+        "handover_timeline",
+        "ownership_proof",
+        "legal_transfer_note",
+        "handover_risks",
+    ] {
+        if !json_has_value_at(metadata, &[field]) {
+            return Err("business_transfer listing is missing required handover metadata");
+        }
+    }
+
+    for field in [
+        "business_age_months",
+        "average_monthly_revenue_cents",
+        "monthly_operational_cost_cents",
+    ] {
+        if json_i64_at(metadata, &[field]).unwrap_or(0) <= 0 {
+            return Err("business_transfer listing financial fields must be positive");
+        }
+    }
+
+    let rating_policy = clean_json_string(json_lookup(metadata, &["rating_transfer_policy"]));
+    match rating_policy.as_deref() {
+        Some("included_verified") | Some("included_needs_platform_approval") => {
+            if !json_has_value_at(metadata, &["transferable_channels"]) {
+                return Err(
+                    "business_transfer listing requires transferable_channels when ratings/accounts are included",
+                );
+            }
+        }
+        Some("not_included") => {}
+        _ => return Err("business_transfer listing requires a valid rating_transfer_policy"),
+    }
+
+    Ok(())
 }
 
 fn validate_tool_rental_review_gate(
@@ -3353,6 +3599,7 @@ fn request_need_type_label(content_type: &str) -> String {
         "property" => "Lokasi Usaha".to_string(),
         "freelancer" => "Talent".to_string(),
         "tool_rental" => "Sewa Alat".to_string(),
+        "business_transfer" => "Oper Usaha".to_string(),
         "job" => "Rekrutmen".to_string(),
         _ => "Kebutuhan Usaha".to_string(),
     }
@@ -3620,10 +3867,9 @@ async fn list_lajukan_requests(
           c.content_type,
           c.category,
           c.price_cents,
-          c.currency,
+          c.cover_image,
           c.metadata,
           c.created_at,
-          c.updated_at,
           COUNT(t.id)::BIGINT AS offer_count
         FROM content_items c
         LEFT JOIN transactions t ON t.content_id = c.id
@@ -3631,7 +3877,7 @@ async fn list_lajukan_requests(
           AND c.pricing_mode = 'request'
         GROUP BY
           c.id, c.slug, c.title, c.summary, c.body, c.content_type, c.category,
-          c.price_cents, c.currency, c.metadata, c.created_at, c.updated_at
+          c.price_cents, c.cover_image, c.metadata, c.created_at, c.updated_at
         ORDER BY c.updated_at DESC
         LIMIT $1
         "#,
@@ -3654,7 +3900,6 @@ async fn list_lajukan_requests(
                       id,
                       content_id,
                       amount_cents,
-                      currency,
                       transaction_status,
                       offer_message,
                       response_message,
@@ -3693,6 +3938,14 @@ async fn list_lajukan_requests(
                             .or_else(|| json_text_at(&row.metadata, &["location"]))
                             .unwrap_or_else(|| "Indonesia".to_string());
                         let offers = offers_map.remove(&row.id).unwrap_or_default();
+                        let image_urls = response_image_urls_for_content(
+                            &row.content_type,
+                            row.category.as_deref(),
+                            &row.metadata,
+                            row.cover_image.as_deref(),
+                        );
+                        let cover_image = clean_response_image_url(row.cover_image.clone())
+                            .or_else(|| image_urls.first().cloned());
                         let card = LajukanRequestCard {
                             id: row.id.to_string(),
                             slug: row.slug.clone(),
@@ -3702,6 +3955,8 @@ async fn list_lajukan_requests(
                             created_label: format_relative_time_id(row.created_at),
                             offers_label: format!("{} penawaran", row.offer_count),
                             offer_count: row.offer_count,
+                            cover_image,
+                            image_urls,
                             status,
                             status_key: status_key.clone(),
                             detail: build_lajukan_request_detail(&row),
@@ -3789,11 +4044,22 @@ async fn list_umkm_stores(
             name ILIKE ('%' || $4 || '%') OR
             COALESCE(description, '') ILIKE ('%' || $4 || '%') OR
             city ILIKE ('%' || $4 || '%') OR
-            address ILIKE ('%' || $4 || '%')
+            address ILIKE ('%' || $4 || '%') OR
+            COALESCE(metadata->>'search_text', '') ILIKE ('%' || $4 || '%') OR
+            COALESCE(metadata->>'segment', '') ILIKE ('%' || $4 || '%') OR
+            COALESCE(metadata->>'keywords', '') ILIKE ('%' || $4 || '%')
           )
           AND ($5::text IS NULL OR city ILIKE ('%' || $5 || '%'))
           AND (NOT $6::bool OR is_active = TRUE)
-        ORDER BY updated_at DESC
+        ORDER BY
+          CASE WHEN $4::text IS NULL THEN 0 ELSE
+            (CASE WHEN name ILIKE ($4 || '%') THEN 64 ELSE 0 END) +
+            (CASE WHEN name ILIKE ('%' || $4 || '%') THEN 36 ELSE 0 END) +
+            (CASE WHEN city ILIKE ('%' || $4 || '%') THEN 18 ELSE 0 END) +
+            (CASE WHEN COALESCE(metadata->>'segment', '') ILIKE ('%' || $4 || '%') THEN 16 ELSE 0 END) +
+            (CASE WHEN COALESCE(metadata->>'search_text', '') ILIKE ('%' || $4 || '%') THEN 10 ELSE 0 END)
+          END DESC,
+          updated_at DESC
         LIMIT $7
         "#,
     )
@@ -4217,7 +4483,23 @@ async fn list_content(
               title ILIKE ('%' || $2 || '%') OR
               coalesce(summary, '') ILIKE ('%' || $2 || '%') OR
               body ILIKE ('%' || $2 || '%') OR
-              coalesce(slug, '') ILIKE ('%' || $2 || '%')
+              coalesce(slug, '') ILIKE ('%' || $2 || '%') OR
+              coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'location', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'address', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'brand', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'company', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'company_name', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'seller_type', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'service_scope', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'skills', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'profession', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'property_type', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'work_mode', '') ILIKE ('%' || $2 || '%')
           )
           AND (
               $3::text IS NULL OR
@@ -4248,7 +4530,19 @@ async fn list_content(
           AND (
               $8::uuid IS NULL OR owner_id = $8
           )
-        ORDER BY created_at DESC
+        ORDER BY
+          CASE WHEN $2::text IS NULL THEN 0 ELSE
+            (CASE WHEN title ILIKE ($2 || '%') THEN 80 ELSE 0 END) +
+            (CASE WHEN title ILIKE ('%' || $2 || '%') THEN 48 ELSE 0 END) +
+            (CASE WHEN coalesce(array_to_string(tags, ' '), '') ILIKE ('%' || $2 || '%') THEN 26 ELSE 0 END) +
+            (CASE WHEN coalesce(summary, '') ILIKE ('%' || $2 || '%') THEN 18 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'city', '') ILIKE ('%' || $2 || '%') THEN 14 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'sector', '') ILIKE ('%' || $2 || '%') THEN 12 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $2 || '%') THEN 12 ELSE 0 END) +
+            (CASE WHEN coalesce(metadata->>'search_text', '') ILIKE ('%' || $2 || '%') THEN 10 ELSE 0 END)
+          END DESC,
+          updated_at DESC,
+          created_at DESC
         LIMIT $9 OFFSET $10
         "#,
     )
@@ -4476,6 +4770,16 @@ async fn create_content(
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
     let cover_image = clean_text(payload.cover_image);
+    if content_type == "business_transfer" {
+        if let Err(message) = validate_business_transfer_requirements(
+            &content_status,
+            &pricing_mode,
+            price_cents,
+            &metadata,
+        ) {
+            return err(StatusCode::BAD_REQUEST, message).into_response();
+        }
+    }
     if let Err(message) = validate_content_media_requirements(
         &content_type,
         &content_status,
@@ -4723,6 +5027,16 @@ async fn update_content(
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
     let cover_image = clean_text(payload.cover_image).or(existing.cover_image.clone());
+    if content_type == "business_transfer" {
+        if let Err(message) = validate_business_transfer_requirements(
+            &content_status,
+            &pricing_mode,
+            price_cents,
+            &metadata,
+        ) {
+            return err(StatusCode::BAD_REQUEST, message).into_response();
+        }
+    }
     if let Err(message) = validate_content_media_requirements(
         &content_type,
         &content_status,
@@ -5893,8 +6207,6 @@ async fn get_transaction(
 struct UpdateTransactionRequest {
     response_message: Option<String>,
     reason_code: Option<String>,
-    evidence_note: Option<String>,
-    evidence_attachments: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -10335,10 +10647,7 @@ async fn build_provider_checkout(
         let normalized_method = payment_method
             .map(|value| value.trim().to_lowercase())
             .filter(|value| !value.is_empty());
-        let is_explicit_method = normalized_method
-            .as_deref()
-            .map(|method| method != "auto" && method != "all" && method != "any")
-            .unwrap_or(false);
+        let mut direct_charge_fallback: Option<Value> = None;
 
         if let Some((direct_method, direct_request_body)) = build_midtrans_direct_charge_request(
             &external_reference,
@@ -10373,50 +10682,46 @@ async fn build_provider_checkout(
                             });
                         }
                         Ok(payload) => {
-                            if is_explicit_method {
-                                return Err(format!(
-                                    "midtrans direct charge rejected for method={} status={} payload={}",
-                                    direct_method,
-                                    status.as_u16(),
-                                    payload
-                                ));
-                            }
                             tracing::warn!(
                                 "midtrans direct charge rejected, fallback to snap; status={} method={} payload={}",
                                 status.as_u16(),
                                 direct_method,
                                 payload
                             );
+                            direct_charge_fallback = Some(json!({
+                                "method": direct_method,
+                                "status": status.as_u16(),
+                                "message": midtrans_provider_message(&payload),
+                                "payload": payload
+                            }));
                         }
                         Err(error) => {
-                            if is_explicit_method {
+                            if status.is_success() {
                                 return Err(format!(
                                     "midtrans direct charge parse failed for method={}: {}",
                                     direct_method, error
                                 ));
                             }
                             tracing::warn!(
-                                "midtrans direct charge parse failed, fallback to snap; method={} error={}",
+                                "midtrans direct charge rejected with unreadable body, fallback to snap; status={} method={} error={}",
+                                status.as_u16(),
                                 direct_method,
                                 error
                             );
+                            direct_charge_fallback = Some(json!({
+                                "method": direct_method,
+                                "status": status.as_u16(),
+                                "error": error.to_string()
+                            }));
                         }
                     }
                 }
                 Err(error) => {
-                    if is_explicit_method {
-                        return Err(format!(
-                            "midtrans direct charge failed for method={}: {}",
-                            direct_method,
-                            describe_reqwest_error(&error)
-                        ));
-                    }
-                    tracing::warn!(
-                        "midtrans direct charge failed, fallback to snap; method={} endpoint={} error={}",
+                    return Err(format!(
+                        "midtrans direct charge failed for method={}: {}",
                         direct_method,
-                        endpoint,
                         describe_reqwest_error(&error)
-                    );
+                    ));
                 }
             }
         }
@@ -10436,8 +10741,7 @@ async fn build_provider_checkout(
             "enabled_payments": enabled_payments,
             "custom_field1": topup_id.to_string(),
             "custom_field2": description.unwrap_or("wallet_topup"),
-            "custom_field3": user_id.to_string(),
-            "custom_field4": payment_method.unwrap_or("auto")
+            "custom_field3": user_id.to_string()
         });
         if let Some(due_at) = payment_due_at {
             let start_at = Utc::now();
@@ -10471,7 +10775,6 @@ async fn build_provider_checkout(
                 }
             ]);
         }
-
         let endpoint = format!(
             "{}/snap/v1/transactions",
             midtrans_snap_base_url(environment)
@@ -10498,8 +10801,8 @@ async fn build_provider_checkout(
 
         if !status.is_success() {
             return Err(format!(
-                "midtrans rejected payment link creation: status {}",
-                status.as_u16()
+                "midtrans rejected payment link creation: {}",
+                midtrans_rejection_summary(status.as_u16(), &payload)
             ));
         }
 
@@ -10516,6 +10819,7 @@ async fn build_provider_checkout(
                 "environment": environment,
                 "mode": "snap_redirect",
                 "requested_method": normalized_method,
+                "direct_charge_fallback": direct_charge_fallback,
                 "snap": payload
             }),
         });
@@ -14013,7 +14317,7 @@ async fn publish_outbox_batch(
 ) -> anyhow::Result<usize> {
     let events = sqlx::query_as::<_, OutboxEventRow>(
         r#"
-        SELECT id, routing_key, payload, retry_count
+        SELECT id, routing_key, payload
         FROM event_outbox
         WHERE status = 'pending' AND available_at <= NOW()
         ORDER BY created_at ASC
@@ -14187,24 +14491,6 @@ async fn resolve_content_id(db: &PgPool, id_or_slug: &str) -> Result<Option<Uuid
     .await
 }
 
-async fn find_transaction(db: &PgPool, id: Uuid) -> Result<Option<TransactionRow>, sqlx::Error> {
-    sqlx::query_as::<_, TransactionRow>(
-        r#"
-        SELECT
-            id, content_id, buyer_id, seller_id, amount_cents, currency,
-            transaction_status AS status, protection_status, deal_kind, fulfillment_mode,
-            snapshot_listing, safety_checklist, risk_flags, transaction_meta,
-            offer_message, response_message, created_at, updated_at
-        FROM transactions
-        WHERE id = $1
-        LIMIT 1
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(db)
-    .await
-}
-
 async fn find_transaction_for_user(
     db: &PgPool,
     id: Uuid,
@@ -14239,6 +14525,11 @@ mod tests {
         assert_eq!(canonical_content_type("products"), "product");
         assert_eq!(canonical_content_type("service"), "service");
         assert_eq!(canonical_content_type("rental"), "tool_rental");
+        assert_eq!(canonical_content_type("oper-usaha"), "business_transfer");
+        assert_eq!(
+            canonical_content_type("business-transfer"),
+            "business_transfer"
+        );
     }
 
     #[test]
@@ -14275,6 +14566,42 @@ mod tests {
         .expect("request should deserialize with both aliases present");
         assert_eq!(parsed.type_alias.as_deref(), Some("property"));
         assert_eq!(parsed.content_type.as_deref(), Some("property"));
+    }
+
+    #[test]
+    fn midtrans_qris_direct_charge_payload_stays_minimal() {
+        let (method, payload) =
+            build_midtrans_direct_charge_request("TOPUP-DEV-TEST", 10_000, Some("qris"))
+                .expect("qris direct charge payload should be generated");
+
+        assert_eq!(method, "qris");
+        assert_eq!(
+            payload.get("payment_type").and_then(Value::as_str),
+            Some("qris")
+        );
+        assert_eq!(
+            payload
+                .pointer("/transaction_details/order_id")
+                .and_then(Value::as_str),
+            Some("TOPUP-DEV-TEST")
+        );
+        assert!(
+            payload.get("qris").is_none(),
+            "QRIS direct charge should avoid provider-specific acquirer payload"
+        );
+    }
+
+    #[test]
+    fn midtrans_rejection_summary_keeps_provider_message() {
+        let payload = json!({
+            "status_code": "401",
+            "status_message": "Operation is not allowed due to unauthorized payload."
+        });
+
+        assert_eq!(
+            midtrans_rejection_summary(401, &payload),
+            "status 401 message=Operation is not allowed due to unauthorized payload."
+        );
     }
 
     #[test]

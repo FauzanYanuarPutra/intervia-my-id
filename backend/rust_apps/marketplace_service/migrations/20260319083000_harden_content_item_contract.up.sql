@@ -19,6 +19,7 @@ BEGIN
         'project',
         'material',
         'tool_rental',
+        'business_transfer',
         'talent',
         'profile',
         'freelancer',

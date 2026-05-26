@@ -50,6 +50,7 @@ import {
   extractUploadedContentImageUrls,
 } from '@/lib/content/uploadMedia';
 import { validateListingPayload } from '@/lib/content/listingFlowRules';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 import { DetailAccordion } from '@/components/ui/DetailAccordion';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { CreatePageSkeleton } from '@/components/system/feedback/RouteSkeletons';
@@ -101,6 +102,7 @@ import {
   FolderKanban,
   Globe2,
   Gift,
+  Handshake,
   ImageIcon,
   Info,
   Loader2,
@@ -164,6 +166,14 @@ const FIELD_ICON_BY_KEY: Record<string, LucideIcon> = {
   promo_tax_percent: BadgePercent,
   promo_opex_percent: BadgePercent,
   legal_docs: ShieldCheck,
+  business_name: Store,
+  included_assets: Package,
+  handover_items: ClipboardList,
+  rating_summary: Trophy,
+  rating_transfer_policy: ShieldCheck,
+  liabilities_note: ShieldCheck,
+  reason_for_sale: Info,
+  ownership_proof: ShieldCheck,
   cover_image: ImageIcon,
   images: ImageIcon,
 };
@@ -276,17 +286,21 @@ const SIMPLE_MODE_ALLOWED_TYPES = new Set<ListingTypeId>([
   'job',
   'property',
   'tool_rental',
+  'business_transfer',
   'company',
 ]);
 const PRIMARY_IMAGE_REQUIRED_TYPES = new Set<ListingTypeId>([
   'product',
   'property',
   'tool_rental',
+  'business_transfer',
 ]);
 const CORE_DEMAND_CREATE_TYPE_IDS = new Set<ListingTypeId>([
   'product',
   'service',
   'job',
+  'property',
+  'tool_rental',
 ]);
 
 function supportsSimpleListingMode(type: string): boolean {
@@ -304,6 +318,8 @@ function getSimpleModePinnedFieldKeys(
       return listingSide === 'demand'
         ? ['title', 'price_cents', 'location']
         : ['title', 'price_cents', 'location'];
+    case 'business_transfer':
+      return ['title', 'price_cents', 'location'];
     case 'service':
       return listingSide === 'demand'
         ? ['title', 'summary', 'price_cents', 'location']
@@ -393,15 +409,57 @@ function buildSimpleModeFallbackCopy({
   };
 }
 
-function CreateCanvas({ children }: { children: ReactNode }) {
+type CreateEntryAction = {
+  key: string;
+  href: string;
+  title: string;
+  description: string;
+  chips: string[];
+  Icon: LucideIcon;
+  tone: string;
+};
+
+function CreateEntryActionCard({ item }: { item: CreateEntryAction }) {
+  const Icon = item.Icon;
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#f8fafc_100%)] dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)]">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute left-[-4rem] top-[-4rem] h-48 w-48 rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.12),transparent_72%)] blur-3xl" />
-        <div className="absolute right-[-3rem] top-10 h-56 w-56 rounded-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent_74%)] blur-3xl" />
-      </div>
-      <div className="relative">{children}</div>
-    </div>
+    <Link
+      href={item.href}
+      data-testid="create-entry-action-card"
+      className="group flex min-h-[178px] flex-col justify-between rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_34px_-30px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/70"
+    >
+      <span
+        className={cn(
+          'mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full',
+          item.tone,
+        )}
+      >
+        <Icon className="h-7 w-7" />
+      </span>
+      <span className="mt-3 block text-center">
+        <span className="block text-[14px] font-black leading-tight text-[color:var(--app-text)]">
+          {item.title}
+        </span>
+        <span className="mt-1.5 block line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+          {item.description}
+        </span>
+      </span>
+      <span className="mt-3 flex items-center justify-between gap-2">
+        <span className="flex min-w-0 flex-wrap gap-1">
+          {item.chips.slice(0, 2).map(chip => (
+            <span
+              key={chip}
+              className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]"
+            >
+              {chip}
+            </span>
+          ))}
+        </span>
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+        </span>
+      </span>
+    </Link>
   );
 }
 
@@ -416,13 +474,10 @@ function CreateHeroShell({
     <div
       data-section-shell-hero="true"
       className={cn(
-        'ui-feed-section ui-section-shell relative overflow-hidden rounded-none bg-[color:var(--app-surface-strong)]/92 px-3.5 py-4 shadow-none dark:bg-[color:var(--app-surface-strong)] sm:rounded-[22px] sm:px-4 sm:py-4 sm:shadow-[0_16px_34px_-30px_rgba(15,23,42,0.1)] sm:ring-1 sm:ring-slate-200/80',
+        'ui-feed-section ui-section-shell relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white px-4 py-5 shadow-[0_18px_38px_-36px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:px-5 sm:py-5',
         className,
       )}
     >
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute left-0 top-0 h-24 w-24 rounded-full bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.08),transparent_72%)] blur-2xl" />
-      </div>
       <div className="relative">{children}</div>
     </div>
   );
@@ -446,25 +501,25 @@ function CreateFormSectionCard({
   return (
     <section
       className={cn(
-        'ui-section-shell relative overflow-hidden rounded-none bg-[color:var(--app-surface-strong)]/92 px-3 py-3.5 shadow-none dark:bg-[color:var(--app-surface-strong)] sm:rounded-[22px] sm:px-4 sm:py-4 sm:shadow-[0_16px_34px_-30px_rgba(15,23,42,0.1)] sm:ring-1 sm:ring-slate-200/80',
+        'ui-section-shell relative overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-white px-4 py-4 shadow-[0_18px_38px_-38px_rgba(15,23,42,0.16)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[20px] sm:px-5 sm:py-5',
         className,
       )}
     >
-      <div className="relative flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 pb-2.5 dark:border-slate-800/70">
+      <div className="relative flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-800/70">
         <div className="min-w-0">
-          <p className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
             {eyebrow}
           </p>
-          <h2 className="mt-2 text-[15px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h2 className="mt-1.5 text-[16px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {title}
           </h2>
-          <p className="mt-1 max-w-2xl text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
             {description}
           </p>
         </div>
         {aside ? <div className="shrink-0">{aside}</div> : null}
       </div>
-      <div className="relative mt-3 space-y-2.5">{children}</div>
+      <div className="relative mt-4 space-y-3">{children}</div>
     </section>
   );
 }
@@ -498,23 +553,23 @@ function CreateChoiceCard({
       disabled={disabled}
       onClick={onClick}
       aria-label={`${title}. ${actionLabel}`}
-      className={`group relative flex min-h-[76px] w-full items-start gap-3 overflow-hidden rounded-[16px] px-3 py-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`group relative flex min-h-[164px] w-full flex-col items-center justify-between overflow-hidden rounded-[16px] px-4 py-4 text-center transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
         selected
           ? `${theme.cardSelected} shadow-[0_12px_24px_-22px_rgba(15,23,42,0.18)] ring-1 ring-current/12`
           : `bg-white/96 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.16)] ring-1 ring-slate-200/80 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)] dark:bg-slate-950/85 dark:ring-slate-800/80`
       }`}
     >
       <span
-        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] ${
+        className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${
           selected
             ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]'
             : theme.cardIcon
         }`}
       >
-        <Icon className="h-4 w-4" />
+        <Icon className="h-7 w-7" />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+      <span className="mt-3 min-w-0">
+        <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
           {badge}
         </span>
         <span className="mt-1 block text-[14px] font-black leading-tight text-[color:var(--app-text)]">
@@ -524,14 +579,21 @@ function CreateChoiceCard({
           {description}
         </span>
         {highlights?.length ? (
-          <span className="mt-1.5 block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-            {highlights.slice(0, 2).join(' • ')}
+          <span className="mt-2 flex flex-wrap justify-center gap-1">
+            {highlights.slice(0, 2).map(item => (
+              <span
+                key={item}
+                className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]"
+              >
+                {item}
+              </span>
+            ))}
           </span>
         ) : null}
       </span>
       <span
         className={cn(
-          'inline-flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-full transition',
+          'mt-3 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition',
           selected
             ? 'bg-[color:var(--app-accent)] text-white'
             : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] dark:bg-slate-900/80',
@@ -646,6 +708,20 @@ function getQuickCreateExamples(
           ];
   }
 
+  if (type === 'business_transfer') {
+    return isId
+      ? [
+          'Judul: Oper usaha laundry berjalan area Bekasi',
+          'Harga: Rp 185.000.000 nego',
+          'Lokasi: Bekasi, omzet 6 bulan siap dicek',
+        ]
+      : [
+          'Title: Running laundry business transfer in Bekasi',
+          'Price: IDR 185,000,000 negotiable',
+          'Location: Bekasi, six-month revenue can be reviewed',
+        ];
+  }
+
   if (type === 'company') {
     return isId
       ? [
@@ -698,6 +774,11 @@ function getFieldExample(
     return getQuickCreateExamples(type, locale, listingSide)[0] || null;
   }
   if (key.includes('summary')) {
+    if (type === 'business_transfer') {
+      return isId
+        ? 'Usaha berjalan, omzet stabil, aset siap dicek, alasan jual jelas.'
+        : 'Running business with stable revenue, verifiable assets, and a clear reason for sale.';
+    }
     if (listingSide === 'demand' && type === 'product') {
       return isId
         ? 'Cari supplier sembako dengan MOQ fleksibel, harga grosir, dan kirim rutin ke toko.'
@@ -715,14 +796,19 @@ function getFieldExample(
     }
     if (listingSide === 'demand' && type === 'job') {
       return isId
-        ? 'Cari talent yang bisa langsung bantu closing, konten, atau operasional harian.'
+        ? 'Cari talent untuk closing, konten, operasional.'
         : 'Need talent who can immediately support sales, content, or day-to-day operations.';
     }
     return isId
-      ? 'Singkat, jelas, dan langsung ke benefit utamanya.'
+      ? 'Singkat. Jelas. Benefit utama.'
       : 'Keep it short, clear, and focused on the main benefit.';
   }
   if (key === 'body' || key.includes('description')) {
+    if (type === 'business_transfer') {
+      return isId
+        ? 'Tulis alasan jual, omzet rata-rata, biaya operasional, aset yang ikut, rating/review, akun yang bisa dipindahkan, hutang/kontrak, dan skema handover.'
+        : 'Describe the reason for sale, average revenue, operational costs, included assets, ratings/reviews, transferable accounts, liabilities/contracts, and handover flow.';
+    }
     if (listingSide === 'demand' && type === 'product') {
       return isId
         ? 'Tulis barang yang dicari, volume, merek wajib, area kirim, target datang, dan syarat supplier.'
@@ -730,17 +816,17 @@ function getFieldExample(
     }
     if (listingSide === 'demand' && type === 'service') {
       return isId
-        ? 'Ceritain channel usaha, target launch, partner yang dicari, output, revisi, dan deadline eksekusinya.'
+        ? 'Tulis channel, target launch, partner, output, deadline.'
         : 'Explain the business channel, launch target, partner profile needed, output, revision expectation, and execution deadline.';
     }
     if (listingSide === 'demand' && type === 'property') {
       return isId
-        ? 'Ceritain area incarannya, traffic yang dibutuhin, ukuran minimum, akses parkir, dan target mulai pakainya.'
+        ? 'Tulis area, traffic, ukuran, parkir, target mulai.'
         : 'Describe the target area, traffic needed, minimum size, parking access, and target start date.';
     }
     if (listingSide === 'demand' && type === 'job') {
       return isId
-        ? 'Ceritain target role-nya, shift kerja, tools yang dipakai, KPI, dan kapan orang ini harus mulai bantu.'
+        ? 'Tulis role, shift, tools, KPI, tanggal mulai.'
         : 'Describe the role target, work shift, tools used, KPI, and when the person needs to start.';
     }
     return isId
@@ -761,6 +847,7 @@ function getFieldExample(
       return listingSide === 'demand' ? '1000000' : '950000';
     if (type === 'tool_rental')
       return listingSide === 'demand' ? '700000' : '450000';
+    if (type === 'business_transfer') return '185000000';
     return listingSide === 'demand' ? '8000000' : '185000';
   }
   if (
@@ -780,7 +867,97 @@ function getFieldExample(
     }
     if (type === 'job') return isId ? 'Jakarta Barat' : 'West Jakarta';
     if (type === 'tool_rental') return isId ? 'Depok' : 'Depok';
+    if (type === 'business_transfer') return isId ? 'Bekasi' : 'Bekasi';
     return isId ? 'Tangerang Selatan' : 'South Tangerang';
+  }
+  if (key === 'business_name') {
+    return isId ? 'Laundry Kilat Bekasi' : 'Laundry Kilat Bekasi';
+  }
+  if (key === 'business_category') {
+    return 'service';
+  }
+  if (key === 'business_age_months') {
+    return '18';
+  }
+  if (key === 'average_monthly_revenue_cents') {
+    return '42000000';
+  }
+  if (key === 'average_monthly_profit_cents') {
+    return '11000000';
+  }
+  if (key === 'monthly_operational_cost_cents') {
+    return '26000000';
+  }
+  if (key === 'included_assets') {
+    return isId
+      ? 'Mesin cuci 4 unit, dryer 2 unit, stok deterjen, rak, meja kasir, banner, dan perlengkapan outlet.'
+      : 'Four washing machines, two dryers, detergent stock, racks, cashier desk, banner, and outlet equipment.';
+  }
+  if (key === 'handover_items') {
+    return isId
+      ? 'SOP operasional, kontak supplier, template promosi, file harga, training owner 7 hari, dan daftar pelanggan yang boleh dialihkan.'
+      : 'Operational SOP, supplier contacts, promo templates, price files, seven-day owner training, and transferable customer list.';
+  }
+  if (key === 'rating_summary') {
+    return isId
+      ? 'Google Maps 4,8 dari 320 review'
+      : 'Google Maps 4.8 from 320 reviews';
+  }
+  if (key === 'rating_transfer_policy') {
+    return 'included_needs_platform_approval';
+  }
+  if (key === 'transferable_channels') {
+    return isId
+      ? 'Google Maps, marketplace, nomor outlet, website, dan katalog pelanggan jika disetujui platform/pihak terkait.'
+      : 'Google Maps, marketplace, outlet number, website, and customer catalog if approved by each platform or party.';
+  }
+  if (key === 'lease_contract_status') {
+    return 'lease_needs_approval';
+  }
+  if (key === 'liabilities_note') {
+    return isId
+      ? 'Tidak ada hutang supplier. Sewa outlet perlu approval pemilik. Pajak dan utilitas berjalan dibuka saat due diligence.'
+      : 'No supplier debt. Outlet lease needs owner approval. Current tax and utility records can be reviewed during due diligence.';
+  }
+  if (key === 'optional_extra_costs') {
+    return isId
+      ? 'Opsional: deposit sewa lanjutan, notaris, biaya ganti nama akun bila disetujui platform.'
+      : 'Optional: continued lease deposit, notary, account name-change fees if approved by platforms.';
+  }
+  if (key === 'reason_for_sale') {
+    return isId
+      ? 'Owner pindah domisili dan ingin fokus ke usaha lain.'
+      : 'Owner is relocating and wants to focus on another business.';
+  }
+  if (key === 'handover_timeline') {
+    return isId
+      ? '14 hari setelah tanda jadi dan verifikasi dokumen'
+      : '14 days after deposit and document verification';
+  }
+  if (key === 'training_support') {
+    return isId
+      ? 'Training owner 7 hari + pendampingan chat 30 hari'
+      : 'Seven-day owner training plus 30-day chat support';
+  }
+  if (key === 'staff_transfer_note') {
+    return isId
+      ? '2 staf operasional bersedia lanjut jika cocok dengan owner baru.'
+      : 'Two operational staff are open to continue if aligned with the new owner.';
+  }
+  if (key === 'ownership_proof') {
+    return isId
+      ? 'Invoice aset, kontrak sewa, NIB, dan akses dashboard siap dicek saat due diligence.'
+      : 'Asset invoices, lease contract, business registration, and dashboard access can be reviewed during due diligence.';
+  }
+  if (key === 'legal_transfer_note') {
+    return isId
+      ? 'Alih kelola mengikuti persetujuan pemilik lokasi dan aturan platform. Akun yang tidak boleh dipindah tidak termasuk transaksi.'
+      : 'Transfer follows location-owner approval and platform rules. Accounts that cannot be transferred are excluded from the deal.';
+  }
+  if (key === 'handover_risks') {
+    return isId
+      ? 'Omzet turun saat musim libur panjang, lokasi bergantung traffic kos/kampus, dan sewa perlu approval pemilik.'
+      : 'Revenue drops during long holidays, location depends on boarding-house/campus traffic, and lease transfer needs owner approval.';
   }
   if (key.includes('company')) {
     return isId ? 'CV Dapur Tumbuh Jaya' : 'CV Dapur Tumbuh Jaya';
@@ -812,6 +989,11 @@ function getFieldExample(
       return isId
         ? 'freezer, vacuum sealer, kamera konten'
         : 'freezer, vacuum sealer, content camera';
+    }
+    if (type === 'business_transfer') {
+      return isId
+        ? 'oper usaha, usaha berjalan, laundry, handover'
+        : 'business transfer, running business, laundry, handover';
     }
     return isId
       ? 'supplier, sembako, MOQ, area kirim'
@@ -926,6 +1108,23 @@ function getSimpleModeVisibleFieldKeys(
     ].forEach(key => keys.add(key));
   }
 
+  if (type === 'business_transfer') {
+    [
+      'business_name',
+      'business_age_months',
+      'average_monthly_revenue_cents',
+      'monthly_operational_cost_cents',
+      'included_assets',
+      'handover_items',
+      'rating_transfer_policy',
+      'liabilities_note',
+      'reason_for_sale',
+      'handover_timeline',
+      'ownership_proof',
+      'legal_transfer_note',
+    ].forEach(key => keys.add(key));
+  }
+
   return keys;
 }
 const TYPE_SWITCH_SAFE_KEYS = new Set([
@@ -954,7 +1153,7 @@ const PROMOTION_BASE_FIELDS: SectorField[] = [
     inDetail: true,
     options: [
       { value: 'awareness', labelEn: 'Awareness', labelId: 'Awareness' },
-      { value: 'lead', labelEn: 'Lead generation', labelId: 'Dapatkan lead' },
+      { value: 'lead', labelEn: 'Lead generation', labelId: 'Lead masuk' },
       { value: 'sale', labelEn: 'Direct sales', labelId: 'Penjualan langsung' },
     ],
   },
@@ -1298,6 +1497,41 @@ const PROMOTION_TYPE_FIELDS: Record<ListingTypeId, SectorField[]> = {
       inDetail: true,
     },
   ],
+  business_transfer: [
+    {
+      key: 'promo_fast_sale_angle',
+      kind: 'text',
+      labelEn: 'Fast-sale angle',
+      labelId: 'Angle cepat laku',
+      placeholderEn: 'e.g. Verified revenue and owner training included',
+      placeholderId: 'mis. Omzet bisa dicek dan training owner ikut',
+      inCreate: true,
+      inCard: false,
+      inDetail: true,
+    },
+    {
+      key: 'promo_due_diligence_slot',
+      kind: 'text',
+      labelEn: 'Due diligence slot',
+      labelId: 'Slot cek usaha',
+      placeholderEn: 'e.g. Saturday 10:00-12:00',
+      placeholderId: 'mis. Sabtu 10.00-12.00',
+      inCreate: true,
+      inCard: false,
+      inDetail: true,
+    },
+    {
+      key: 'promo_included_bonus',
+      kind: 'text',
+      labelEn: 'Included bonus',
+      labelId: 'Bonus yang ikut',
+      placeholderEn: 'e.g. 30 days transition support',
+      placeholderId: 'mis. support transisi 30 hari',
+      inCreate: true,
+      inCard: false,
+      inDetail: true,
+    },
+  ],
   company: [
     {
       key: 'promo_featured_story_angle',
@@ -1563,12 +1797,11 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
   product: {
     headlineId: 'Supplier / stok usaha',
     headlineEn: 'Supplier / Stock Listing',
-    descId:
-      'Pasang supplier, distributor, bahan baku, atau stok usaha yang siap jalan.',
+    descId: 'Pasang supplier, bahan baku, atau stok.',
     descEn:
       'Publish suppliers, distributors, raw materials, or business stock that is ready to offer.',
-    stepsId: ['Produk', 'Spesifikasi', 'Media', 'Promosi'],
-    stepsEn: ['Product', 'Specs', 'Media', 'Promotion'],
+    stepsId: ['Informasi Produk', 'Harga & Stok', 'Foto Produk', 'Selesai'],
+    stepsEn: ['Product Info', 'Price & Stock', 'Product Photos', 'Finish'],
     step1Keys: [
       'title',
       'summary',
@@ -1587,12 +1820,11 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
   service: {
     headlineId: 'Jasa operasional',
     headlineEn: 'Operations Service Listing',
-    descId:
-      'Pasang jasa admin marketplace, konten, kemasan, desain, legal, atau kebutuhan operasional lain buat usaha.',
+    descId: 'Pasang jasa admin, konten, desain, legal.',
     descEn:
       'Offer marketplace admin, content, packaging, design, legal, or other operational services for businesses.',
-    stepsId: ['Layanan', 'Detail', 'Media', 'Promosi'],
-    stepsEn: ['Service', 'Details', 'Media', 'Promotion'],
+    stepsId: ['Informasi Jasa', 'Paket & Area', 'Portfolio', 'Selesai'],
+    stepsEn: ['Service Info', 'Package & Area', 'Portfolio', 'Finish'],
     step1Keys: [
       'title',
       'summary',
@@ -1606,20 +1838,18 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'area_served',
       'delivery_time',
     ],
-    step2HintId:
-      'Tambahin scope kerja, output, revisi, dan kebutuhan kliennya ya.',
+    step2HintId: 'Tambah scope, output, revisi.',
     step2HintEn:
       'Complete service scope, deliverables, revisions, and client requirements.',
   },
   job: {
     headlineId: 'Brief Talent',
     headlineEn: 'Talent Brief',
-    descId:
-      'Ceritain kebutuhan admin toko, live host, kreator, sales, atau talent operasional lain dengan target yang jelas.',
+    descId: 'Tulis kebutuhan admin, host, kreator, sales.',
     descEn:
       'Describe the admin, live host, creator, sales, or other operational talent you need with clear targets.',
-    stepsId: ['Posisi', 'Detail', 'Media', 'Promosi'],
-    stepsEn: ['Role', 'Details', 'Media', 'Promotion'],
+    stepsId: ['Informasi Talent', 'Kriteria', 'Lampiran', 'Selesai'],
+    stepsEn: ['Talent Info', 'Criteria', 'Attachments', 'Finish'],
     step1Keys: [
       'title',
       'summary',
@@ -1642,12 +1872,21 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
   property: {
     headlineId: 'Lokasi jualan',
     headlineEn: 'Selling Location Listing',
-    descId:
-      'Pasang ruko, kios, booth, lapak bazaar, atau titik distribusi yang siap dipakai usaha.',
+    descId: 'Pasang ruko, kios, booth, lapak.',
     descEn:
       'List shophouses, kiosks, booths, bazaar spots, or distribution points ready for business use.',
-    stepsId: ['Properti', 'Detail', 'Media', 'Promosi'],
-    stepsEn: ['Property', 'Details', 'Media', 'Promotion'],
+    stepsId: [
+      'Informasi Lokasi',
+      'Kontak & Alamat',
+      'Foto & Dokumen',
+      'Selesai',
+    ],
+    stepsEn: [
+      'Location Info',
+      'Contact & Address',
+      'Photos & Documents',
+      'Finish',
+    ],
     step1Keys: [
       'title',
       'summary',
@@ -1669,12 +1908,11 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
   tool_rental: {
     headlineId: 'Sewa alat usaha',
     headlineEn: 'Business Tool Rental Listing',
-    descId:
-      'Pasang alat usaha yang siap disewa: freezer, vacuum sealer, kamera konten, lighting, dan alat operasional lain.',
+    descId: 'Pasang alat sewa: freezer, kamera, lighting.',
     descEn:
       'Publish business tools ready for rent: freezers, vacuum sealers, content cameras, lighting, and other operational gear.',
-    stepsId: ['Aset', 'Aturan Sewa', 'Media', 'Promosi'],
-    stepsEn: ['Asset', 'Rental Rules', 'Media', 'Promotion'],
+    stepsId: ['Informasi Aset', 'Aturan Sewa', 'Foto Aset', 'Selesai'],
+    stepsEn: ['Asset Info', 'Rental Rules', 'Asset Photos', 'Finish'],
     step1Keys: [
       'title',
       'summary',
@@ -1696,6 +1934,34 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
     step2HintEn:
       'Complete defects, included items, usage restrictions, ownership proof, and complaint rules.',
   },
+  business_transfer: {
+    headlineId: 'Oper usaha berjalan',
+    headlineEn: 'Running Business Transfer',
+    descId:
+      'Jual usaha aktif lengkap dengan aset, angka, rating, dan catatan handover yang jelas.',
+    descEn:
+      'Sell an active business with clear assets, numbers, ratings, and handover notes.',
+    stepsId: ['Profil Usaha', 'Aset & Risiko', 'Bukti', 'Selesai'],
+    stepsEn: ['Business Profile', 'Assets & Risk', 'Proof', 'Finish'],
+    step1Keys: [
+      'title',
+      'summary',
+      'body',
+      'price_cents',
+      'location',
+      'business_name',
+      'business_category',
+      'business_age_months',
+      'average_monthly_revenue_cents',
+      'average_monthly_profit_cents',
+      'monthly_operational_cost_cents',
+      'reason_for_sale',
+    ],
+    step2HintId:
+      'Lengkapin aset yang ikut, rating/akun yang bisa dialihkan, biaya tambahan opsional, hutang/kontrak, dan proses handover.',
+    step2HintEn:
+      'Complete included assets, transferable ratings/accounts, optional extra costs, liabilities/contracts, and handover process.',
+  },
   company: {
     headlineId: 'Profil usaha',
     headlineEn: 'Business Profile',
@@ -1703,8 +1969,8 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'Bikin halaman usaha publik yang identitasnya jelas biar supplier, partner, dan calon talent cepat nangkep bisnis kamu.',
     descEn:
       'Create a clear public business page so suppliers, partners, and future talent quickly understand your business.',
-    stepsId: ['Perusahaan', 'Profil', 'Media', 'Promosi'],
-    stepsEn: ['Company', 'Profile', 'Media', 'Promotion'],
+    stepsId: ['Informasi Usaha', 'Kontak & Lokasi', 'Verifikasi', 'Selesai'],
+    stepsEn: ['Business Info', 'Contact & Location', 'Verification', 'Finish'],
     step1Keys: [
       'title',
       'summary',
@@ -1744,9 +2010,9 @@ const TYPE_THEMES: Record<ListingTypeId, TypeThemeMeta> = {
     cardSelected:
       'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)] dark:border-[color:color-mix(in_srgb,_var(--app-info-border)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)] dark:text-[color:var(--app-info)]',
     cardBase:
-      'border-sky-200 bg-[linear-gradient(135deg,rgba(125,211,252,0.18)_0%,rgba(255,255,255,0.97)_70%)] text-[color:var(--app-text)] dark:border-sky-900/70 dark:bg-[linear-gradient(135deg,rgba(14,165,233,0.24)_0%,rgba(15,23,42,0.92)_72%)]',
+      'border-teal-200 bg-[linear-gradient(135deg,rgba(94,234,212,0.18)_0%,rgba(255,255,255,0.97)_70%)] text-[color:var(--app-text)] dark:border-teal-900/70 dark:bg-[linear-gradient(135deg,rgba(20,184,166,0.24)_0%,rgba(10,10,10,0.92)_72%)]',
     cardIcon:
-      'border-sky-200/80 bg-sky-50 text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/50 dark:text-sky-200',
+      'border-teal-200/80 bg-teal-50 text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/50 dark:text-teal-200',
     buttonPrimary: 'from-[color:var(--app-info)] to-[color:var(--app-info)]',
     badge:
       'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)] dark:border-[color:color-mix(in_srgb,_var(--app-info-border)_60%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)] dark:text-[color:var(--app-info)]',
@@ -1792,6 +2058,20 @@ const TYPE_THEMES: Record<ListingTypeId, TypeThemeMeta> = {
       'from-[color:var(--app-warning)] to-[color:var(--app-warning)]',
     badge:
       'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] dark:border-[color:color-mix(in_srgb,_var(--app-warning-border)_60%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-warning)_30%,_transparent)] dark:text-[color:var(--app-warning)]',
+  },
+  business_transfer: {
+    stepActive:
+      'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_30%,_transparent)] dark:text-[color:var(--app-accent)]',
+    cardSelected:
+      'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_30%,_transparent)] dark:text-[color:var(--app-accent)]',
+    cardBase:
+      'border-emerald-200 bg-[linear-gradient(135deg,rgba(52,211,153,0.18)_0%,rgba(255,255,255,0.97)_70%)] text-[color:var(--app-text)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,rgba(16,185,129,0.24)_0%,rgba(15,23,42,0.92)_72%)]',
+    cardIcon:
+      'border-emerald-200/80 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/50 dark:text-emerald-200',
+    buttonPrimary:
+      'from-[color:var(--app-accent)] to-[color:var(--app-accent)]',
+    badge:
+      'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_60%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_30%,_transparent)] dark:text-[color:var(--app-accent)]',
   },
   company: {
     stepActive:
@@ -1888,6 +2168,66 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       hintEn: 'Example: 24 hours after pickup.',
     },
   },
+  business_transfer: {
+    title: {
+      labelId: 'Judul oper usaha',
+      labelEn: 'Business transfer title',
+      placeholderId: 'mis. Oper usaha laundry berjalan area Bekasi',
+      placeholderEn: 'e.g. Running laundry business transfer in Bekasi',
+    },
+    price_cents: {
+      labelId: 'Harga oper usaha (IDR)',
+      labelEn: 'Business transfer price (IDR)',
+      placeholderId: 'mis. 185000000',
+      placeholderEn: 'e.g. 185000000',
+      hintId: 'Isi harga acuan. Kalau nego, tulis di ringkasan/detail.',
+      hintEn:
+        'Add the reference asking price. Mention negotiation in the summary or details.',
+    },
+    business_name: {
+      hintId: 'Pakai nama usaha yang dikenal pelanggan.',
+      hintEn: 'Use the business name customers recognize.',
+    },
+    average_monthly_revenue_cents: {
+      hintId:
+        'Wajib bisa dibuktikan saat due diligence. Jangan tulis angka asal.',
+      hintEn: 'Must be provable during due diligence. Do not invent numbers.',
+    },
+    average_monthly_profit_cents: {
+      hintId:
+        'Opsional, tapi bagus kalau bisa dibuktikan dari laporan sederhana.',
+      hintEn: 'Optional, but useful if it can be supported by simple records.',
+    },
+    included_assets: {
+      hintId:
+        'Tulis aset yang ikut dan yang tidak ikut supaya tidak salah paham.',
+      hintEn: 'List included and excluded assets to avoid misunderstanding.',
+    },
+    handover_items: {
+      hintId:
+        'Akun/rating hanya boleh ikut kalau aturan platform atau kontrak mengizinkan.',
+      hintEn:
+        'Accounts/ratings may only be included when platform or contract rules allow transfer.',
+    },
+    liabilities_note: {
+      hintId:
+        'Jujur soal hutang, pajak, kontrak, deposit, sewa, dan kewajiban karyawan.',
+      hintEn:
+        'Disclose debt, tax, contracts, deposits, leases, and staff obligations.',
+    },
+    optional_extra_costs: {
+      hintId:
+        'Boleh kosong. Isi kalau ada biaya tambahan supaya calon pembeli bisa hitung cepat.',
+      hintEn:
+        'Optional. Fill this if extra costs exist so buyers can calculate quickly.',
+    },
+    legal_transfer_note: {
+      hintId:
+        'Tulis apa yang bisa dialihkan langsung dan apa yang butuh approval pihak ketiga.',
+      hintEn:
+        'State what can transfer directly and what needs third-party approval.',
+    },
+  },
   company: {
     title: {
       labelId: 'Judul halaman perusahaan',
@@ -1925,8 +2265,7 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       labelEn: 'Public / hiring email',
     },
     about_company: {
-      hintId:
-        'Ceritain bisnisnya, produk utamanya, cara jalaninnya, dan siapa yang dilayani.',
+      hintId: 'Tulis bisnis, produk utama, dan target pembeli.',
       hintEn:
         'Describe the business, core products, operating model, and who it serves.',
     },
@@ -1948,7 +2287,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       placeholderEn: 'e.g. Grocery supplier for stores in Tangerang',
     },
     summary: {
-      labelId: 'Singkatnya kebutuhan',
+      labelId: 'Kebutuhan singkat',
       labelEn: 'Need summary',
       placeholderId:
         'Singkat aja: barangnya apa, volumenya berapa, kirim ke mana, dan target bisnisnya.',
@@ -1956,10 +2295,9 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
         'Summarize the item, volume, delivery area, and business target.',
     },
     body: {
-      labelId: 'Detail kebutuhan',
+      labelId: 'Detail',
       labelEn: 'Need details',
-      hintId:
-        'Ceritain barangnya, qty, MOQ yang masih oke, area kirim, deadline, dan syarat suppliernya.',
+      hintId: 'Tulis barang, qty, MOQ, area kirim, deadline.',
       hintEn:
         'Clarify the item, quantity, workable MOQ, delivery area, deadline, and supplier requirements.',
     },
@@ -2006,8 +2344,10 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
     title: {
       labelId: 'Jasa apa yang dicari?',
       labelEn: 'What service do you need?',
-      placeholderId: 'mis. Cari host live dan admin marketplace untuk launching',
-      placeholderEn: 'e.g. Need live hosts and a marketplace admin for a launch',
+      placeholderId:
+        'mis. Cari host live dan admin marketplace untuk launching',
+      placeholderEn:
+        'e.g. Need live hosts and a marketplace admin for a launch',
     },
     summary: {
       labelId: 'Butuh apa secara singkat?',
@@ -2068,16 +2408,15 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       placeholderEn: 'e.g. Bazaar booth for a snack brand in BSD',
     },
     summary: {
-      labelId: 'Singkatnya kebutuhan',
+      labelId: 'Kebutuhan singkat',
       labelEn: 'Need summary',
       placeholderId: 'Singkat aja: jenis lokasi, area, traffic, dan budgetnya.',
       placeholderEn: 'Summarize the location type, area, traffic, and budget.',
     },
     body: {
-      labelId: 'Detail kebutuhan lokasi',
+      labelId: 'Detail lokasi',
       labelEn: 'Location requirement details',
-      hintId:
-        'Ceritain area incarannya, traffic, akses, luas minimum, fasilitas, dan mau mulai kapan.',
+      hintId: 'Tulis area, traffic, akses, luas, fasilitas, mulai kapan.',
       hintEn:
         'Explain the target area, traffic, access, minimum size, facilities, and usage timeline.',
     },
@@ -2120,7 +2459,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       placeholderEn: 'e.g. TikTok live admin for an F&B brand in Jakarta',
     },
     summary: {
-      labelId: 'Singkatnya kebutuhan',
+      labelId: 'Kebutuhan singkat',
       labelEn: 'Need summary',
       placeholderId:
         'Singkat aja: role, shift, target closing, dan tools yang dipakai.',
@@ -2130,8 +2469,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
     body: {
       labelId: 'Konteks bisnis & tugas utamanya',
       labelEn: 'Business context and main responsibilities',
-      hintId:
-        'Ceritain kenapa role ini dibutuhin, target kerjanya, channel jualan, KPI, dan konteks operasionalnya.',
+      hintId: 'Tulis alasan role, target kerja, channel, KPI.',
       hintEn:
         'Explain why the role is needed, work targets, sales channel, KPI, and operating context.',
     },
@@ -2210,7 +2548,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       placeholderEn: 'e.g. Large-capacity freezer rental for a 3-day event',
     },
     summary: {
-      labelId: 'Singkatnya kebutuhan',
+      labelId: 'Kebutuhan singkat',
       labelEn: 'Need summary',
       placeholderId:
         'Singkat aja: alatnya apa, durasinya berapa lama, dan dipakai di mana.',
@@ -2219,8 +2557,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
     body: {
       labelId: 'Konteks pakainya',
       labelEn: 'Usage context',
-      hintId:
-        'Ceritain alatnya dipakai buat apa, durasinya, akses lokasi, dan batasan utamanya.',
+      hintId: 'Tulis fungsi alat, durasi, lokasi, batasan.',
       hintEn:
         'Explain the use case, duration, site access, and key constraints.',
     },
@@ -2286,7 +2623,7 @@ const TYPE_COMPLIANCE_GUIDANCE: Record<ListingTypeId, TypeChecklistMeta> = {
     itemsId: [
       'Barang, kondisi, stok, estimasi kirim, dan kebijakan retur harus konsisten.',
       'Jangan cantumkan klaim palsu, stok fiktif, atau bonus yang tidak bisa dipenuhi.',
-      'Kalau ada GTIN/MPN resmi, cantumkan supaya identitas produk tidak abu-abu.',
+      'Isi GTIN/MPN kalau ada.',
     ],
     itemsEn: [
       'Item identity, condition, stock, delivery estimate, and return policy must stay consistent.',
@@ -2349,6 +2686,24 @@ const TYPE_COMPLIANCE_GUIDANCE: Record<ListingTypeId, TypeChecklistMeta> = {
       'Condition, included items, defects, and usage restrictions must reflect the real asset state.',
       'Higher-risk rentals need ownership/authority proof and a strong handover trail.',
     ],
+  },
+  business_transfer: {
+    titleId: 'Yang wajib jelas untuk oper usaha',
+    titleEn: 'What must be clear for business transfers',
+    itemsId: [
+      'Omzet, biaya, aset, rating, dan alasan jual harus bisa dibuktikan saat due diligence.',
+      'Akun, rating, lokasi, kontrak, dan database pelanggan hanya boleh dialihkan kalau aturan pihak terkait mengizinkan.',
+      'Hutang, pajak, deposit sewa, kewajiban karyawan, dan risiko usaha wajib ditulis jujur dari awal.',
+    ],
+    itemsEn: [
+      'Revenue, costs, assets, ratings, and reason for sale must be provable during due diligence.',
+      'Accounts, ratings, locations, contracts, and customer databases may transfer only when relevant rules allow it.',
+      'Debts, tax, lease deposits, staff obligations, and business risks must be disclosed from the start.',
+    ],
+    noteId:
+      'Jangan bayar penuh sebelum verifikasi dokumen, cek lokasi/aset, dan kesepakatan handover tertulis.',
+    noteEn:
+      'Do not pay in full before document verification, asset/location checks, and written handover terms.',
   },
   company: {
     titleId: 'Yang wajib jelas untuk profil perusahaan',
@@ -2433,6 +2788,18 @@ const TYPE_COMPLIANCE_VISUALS: Record<ListingTypeId, TypeVisualChecklistMeta> =
         'Rate and deposit are clear',
         'Asset condition must be honest',
         'Handover proof is required',
+      ],
+    },
+    business_transfer: {
+      itemsId: [
+        'Angka usaha bisa dicek',
+        'Aset dan akun jelas',
+        'Risiko ditulis jujur',
+      ],
+      itemsEn: [
+        'Business numbers can be checked',
+        'Assets and accounts are clear',
+        'Risks are disclosed honestly',
       ],
     },
     company: {
@@ -2520,6 +2887,20 @@ const TYPE_MEDIA_GUIDANCE: Record<ListingTypeId, TypeChecklistMeta> = {
       'Ownership / authorization proof when available.',
     ],
   },
+  business_transfer: {
+    titleId: 'Bukti yang disarankan',
+    titleEn: 'Recommended proof',
+    itemsId: [
+      'Foto outlet, aset, stok, dan kondisi operasional terbaru.',
+      'Ringkasan omzet/biaya dengan data sensitif disamarkan.',
+      'Dokumen aman: NIB/izin, invoice aset, kontrak sewa, SOP, dan checklist handover.',
+    ],
+    itemsEn: [
+      'Recent photos of the outlet, assets, inventory, and operating condition.',
+      'Revenue/cost summary with sensitive data masked.',
+      'Safe documents: registration/permits, asset invoices, lease, SOP, and handover checklist.',
+    ],
+  },
   company: {
     titleId: 'Media yang disarankan',
     titleEn: 'Recommended media',
@@ -2576,6 +2957,10 @@ const TYPE_MEDIA_VISUALS: Record<ListingTypeId, TypeVisualChecklistMeta> = {
       'Authority proof',
     ],
   },
+  business_transfer: {
+    itemsId: ['Foto outlet/aset', 'Ringkasan angka', 'Checklist handover'],
+    itemsEn: ['Outlet/asset photos', 'Numbers summary', 'Handover checklist'],
+  },
   company: {
     itemsId: [
       'Logo dan foto tim',
@@ -2614,7 +2999,7 @@ const DEMAND_FORM_GUIDANCE: Partial<Record<ListingTypeId, TypeChecklistMeta>> =
       titleId: 'Agar vendor cepat paham',
       titleEn: 'So providers understand faster',
       itemsId: [
-        'Ceritain target bisnis, scope, dan output utamanya.',
+        'Tulis target bisnis, scope, output.',
         'Sebut timeline, area kerja, dan mode eksekusi.',
         'Tulis budget acuan atau range yang realistis.',
       ],
@@ -2632,7 +3017,7 @@ const DEMAND_FORM_GUIDANCE: Partial<Record<ListingTypeId, TypeChecklistMeta>> =
       titleId: 'Agar talent tepat yang masuk',
       titleEn: 'So the right talent responds',
       itemsId: [
-        'Ceritain role, jumlah orang, dan tugas utamanya.',
+        'Tulis role, jumlah orang, tugas utama.',
         'Sebut sistem kerja, shift, lokasi, dan target mulai.',
         'Tulis skill wajib dan range budget atau gaji.',
       ],
@@ -2668,7 +3053,7 @@ const DEMAND_FORM_GUIDANCE: Partial<Record<ListingTypeId, TypeChecklistMeta>> =
       titleId: 'Agar vendor alat cepat cocok',
       titleEn: 'So rental vendors can match faster',
       itemsId: [
-        'Ceritain alatnya, kapasitasnya, dan durasi sewanya.',
+        'Tulis alat, kapasitas, durasi sewa.',
         'Sebut lokasi pakai, operator, dan target tanggal.',
         'Tulis budget atau batas deposit bila ada.',
       ],
@@ -2791,6 +3176,10 @@ const TYPE_PICKER_META: Record<ListingTypeId, TypePickerMeta> = {
     helperId: 'Sewa alat',
     helperEn: 'Business tool rental',
   },
+  business_transfer: {
+    helperId: 'Oper usaha / aset + rating',
+    helperEn: 'Business handover / assets + ratings',
+  },
   company: {
     helperId: 'Profil usaha',
     helperEn: 'Business profile',
@@ -2827,6 +3216,7 @@ export function CreatePostingClient({
   forcedListingSide = null,
 }: CreatePostingPageProps) {
   const router = useRouter();
+  const handlePageBack = useAppBack(router, '/home');
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const locale = useLocale() || 'id';
@@ -2868,7 +3258,7 @@ export function CreatePostingClient({
   const [sector, setSector] = useState<string>('');
   const [subSector, setSubSector] = useState<string>('');
   const [isSectorPickerOpen, setIsSectorPickerOpen] = useState(false);
-  const [showOtherSupplyPaths, setShowOtherSupplyPaths] = useState(false);
+  const [showOtherSupplyPaths, setShowOtherSupplyPaths] = useState(true);
   const [sectorQuery, setSectorQuery] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ImageFile[]>([]);
@@ -2988,13 +3378,18 @@ export function CreatePostingClient({
     : locale === 'id'
       ? DEFAULT_STEP_LABELS_ID
       : DEFAULT_STEP_LABELS_EN;
-  const stepLabels = baseStepLabels.map((label, index) =>
-    index === TOTAL_STEPS - 1
-      ? locale === 'id'
-        ? `${label} opsional`
-        : `${label} optional`
-      : label,
-  );
+  const stepLabels = baseStepLabels.map((label, index) => {
+    if (index !== TOTAL_STEPS - 1) return label;
+    const normalized = label.toLowerCase();
+    if (
+      normalized.includes('selesai') ||
+      normalized.includes('finish') ||
+      normalized.includes('review')
+    ) {
+      return label;
+    }
+    return locale === 'id' ? `${label} opsional` : `${label} optional`;
+  });
   const fields = useMemo(
     () => (typePicked ? getFieldsForCreate(activeType, effectiveSector) : []),
     [activeType, effectiveSector, typePicked],
@@ -3417,7 +3812,7 @@ export function CreatePostingClient({
             : 'Foreign-brand signal detected',
         description:
           locale === 'id'
-            ? `Di Lajukan, fokusnya brand dan usaha lokal Indonesia. Hapus referensi seperti ${foreignBrandSignalSummary} dulu sebelum tayang.`
+            ? `Hapus referensi brand luar: ${foreignBrandSignalSummary}.`
             : `Lajukan prioritizes local Indonesian brands and businesses. Remove references such as ${foreignBrandSignalSummary} before publishing.`,
       });
     }
@@ -3578,7 +3973,7 @@ export function CreatePostingClient({
       ? `${pathname}?${searchParams.toString()}`
       : pathname;
     if (nextHref === currentHref) return;
-    router.replace(nextHref);
+    router.replace(nextHref, { scroll: false });
   };
   const goToStep = (
     step: number,
@@ -3654,15 +4049,10 @@ export function CreatePostingClient({
       setSubSector('');
     }
     setPromotionEnabled(false);
-    setFieldValues(prev =>
-      sanitizeFieldValuesForType(
-        {
-          ...sanitizeFieldValuesForType(prev, template.typeId),
-          ...template.fields,
-        },
-        template.typeId,
-      ),
-    );
+    setFieldValues(prev => ({
+      ...sanitizeFieldValuesForType(prev, template.typeId),
+      ...template.fields,
+    }));
     setInfoMessage(
       locale === 'id'
         ? 'Template diterapkan. Tinggal edit seperlunya.'
@@ -3698,7 +4088,7 @@ export function CreatePostingClient({
     setFieldValues(prev => sanitizeFieldValuesForType(prev, 'product'));
     setInfoMessage('');
     setErrorMessage('');
-    router.replace(nextBasePath);
+    router.replace(nextBasePath, { scroll: false });
   };
   const applyJourneyIntent = (step: (typeof journeyIntents)[number]) => {
     handleTypeSelection(step.typeId, { listingSide: step.listingSide });
@@ -3706,16 +4096,16 @@ export function CreatePostingClient({
   const specialCreateThemes = {
     profile: {
       stepActive:
-        'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200',
+        'border-lime-300 bg-lime-50 text-lime-800 dark:border-lime-800 dark:bg-lime-950/40 dark:text-lime-200',
       cardSelected:
-        'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200',
+        'border-lime-300 bg-lime-50 text-lime-800 dark:border-lime-800 dark:bg-lime-950/40 dark:text-lime-200',
       cardBase:
-        'border-violet-200 bg-[linear-gradient(135deg,rgba(196,181,253,0.18)_0%,rgba(255,255,255,0.97)_70%)] text-[color:var(--app-text)] dark:border-violet-900/70 dark:bg-[linear-gradient(135deg,rgba(139,92,246,0.22)_0%,rgba(15,23,42,0.92)_72%)]',
+        'border-lime-200 bg-[linear-gradient(135deg,rgba(217,249,157,0.2)_0%,rgba(255,255,255,0.97)_70%)] text-[color:var(--app-text)] dark:border-lime-900/70 dark:bg-[linear-gradient(135deg,rgba(132,204,22,0.2)_0%,rgba(10,10,10,0.92)_72%)]',
       cardIcon:
-        'border-violet-200/80 bg-violet-50 text-violet-700 dark:border-violet-900/70 dark:bg-violet-950/50 dark:text-violet-200',
-      buttonPrimary: 'from-violet-500 to-violet-600',
+        'border-lime-200/80 bg-lime-50 text-lime-800 dark:border-lime-900/70 dark:bg-lime-950/50 dark:text-lime-200',
+      buttonPrimary: 'from-lime-500 to-emerald-600',
       badge:
-        'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200',
+        'border-lime-300 bg-lime-50 text-lime-800 dark:border-lime-800 dark:bg-lime-950/40 dark:text-lime-200',
     },
     umkm: {
       stepActive:
@@ -3799,6 +4189,22 @@ export function CreatePostingClient({
           : ['Tools', 'Duration', 'Pickup'],
     },
     {
+      key: 'business_transfer',
+      href: resolveMarketplaceCreatePath(locale, 'business_transfer', 'supply'),
+      badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
+      title: locale === 'id' ? 'Oper usaha' : 'Business transfer',
+      description:
+        locale === 'id'
+          ? 'Jual usaha berjalan, aset, rating, dan handover.'
+          : 'Sell a running business, assets, ratings, and handover.',
+      Icon: Handshake,
+      theme: TYPE_THEMES.business_transfer,
+      highlights:
+        locale === 'id'
+          ? ['Omzet', 'Aset', 'Handover']
+          : ['Revenue', 'Assets', 'Handover'],
+    },
+    {
       key: 'profile',
       href: '/profile/edit?focus=talent',
       badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
@@ -3844,16 +4250,36 @@ export function CreatePostingClient({
     </div>
   );
   const supplySupportQuickLinks = (
-    <div className="mt-2 flex flex-wrap gap-2">
+    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {supplySupportCards.map(card => (
         <button
           key={card.key}
           type="button"
           onClick={() => router.push(card.href)}
-          className="inline-flex min-h-[38px] items-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] shadow-[0_12px_22px_-22px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50/85 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/60 dark:hover:border-sky-800 dark:hover:bg-sky-950/20"
+          className="group flex min-h-[122px] flex-col items-start justify-between rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 text-left shadow-[0_12px_24px_-24px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:bg-white dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/60"
         >
-          <card.Icon className="h-4 w-4" />
-          <span>{card.title}</span>
+          <span
+            className={cn(
+              'inline-flex h-9 w-9 items-center justify-center rounded-[12px]',
+              card.theme.cardIcon,
+            )}
+          >
+            <card.Icon className="h-4 w-4" />
+          </span>
+          <span className="mt-2 block">
+            <span className="block text-[12px] font-black text-[color:var(--app-text)]">
+              {card.title}
+            </span>
+            <span className="mt-1 block line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+              {card.description}
+            </span>
+          </span>
+          <span className="mt-2 flex w-full items-center justify-between gap-2">
+            <span className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+              {card.highlights.slice(0, 2).join(' / ')}
+            </span>
+            <ChevronRight className="h-4 w-4 text-[color:var(--app-accent)] transition group-hover:translate-x-0.5" />
+          </span>
         </button>
       ))}
     </div>
@@ -3879,6 +4305,131 @@ export function CreatePostingClient({
     locale,
     sideId: 'supply',
   });
+  const createEntryTabs: Array<{
+    key: CreateFlowIntent;
+    href: string;
+    label: string;
+    helper: string;
+  }> = [
+    {
+      key: 'supply',
+      href: supplyEntryHref,
+      label: locale === 'id' ? 'Menawarkan (Listing)' : 'Offer listing',
+      helper:
+        locale === 'id' ? 'Produk, jasa, lokasi' : 'Products, services, spaces',
+    },
+    {
+      key: 'demand',
+      href: demandEntryHref,
+      label: locale === 'id' ? 'Membuat Permintaan' : 'Create request',
+      helper:
+        locale === 'id' ? 'Cari barang atau vendor' : 'Find goods or vendors',
+    },
+  ];
+  const renderCreateEntrySurface = ({
+    activeIntent,
+    eyebrow,
+    title,
+    description,
+    children,
+    aside,
+  }: {
+    activeIntent: CreateFlowIntent;
+    eyebrow: string;
+    title: string;
+    description: string;
+    children: ReactNode;
+    aside?: ReactNode;
+  }) => {
+    return (
+      <div className="mx-auto w-full max-w-none px-0 py-0">
+        <CreateHeroShell className="p-4 sm:p-5 lg:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePageBack}
+                aria-label={locale === 'id' ? 'Kembali' : 'Back'}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] transition hover:bg-white dark:bg-slate-950/60 dark:ring-[color:var(--app-border-strong)]"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                  {locale === 'id' ? 'Buat Baru' : 'Create'}
+                </p>
+                <h1 className="truncate text-[1.1rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.3rem]">
+                  {activeIntent === 'supply'
+                    ? locale === 'id'
+                      ? 'Listing'
+                      : 'Listing'
+                    : locale === 'id'
+                      ? 'Permintaan'
+                      : 'Request'}
+                </h1>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push('/my-listings')}
+              className="inline-flex min-h-[36px] items-center justify-center gap-2 rounded-full bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] transition hover:bg-white dark:bg-slate-950/60 dark:ring-[color:var(--app-border-strong)]"
+            >
+              <FolderKanban className="h-4 w-4" />
+              {locale === 'id' ? 'Draft' : 'Drafts'}
+            </button>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px] 2xl:grid-cols-[minmax(0,1fr)_300px]">
+            <section className="min-w-0">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="inline-flex rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                    {eyebrow}
+                  </p>
+                  <h2 className="mt-2 text-[1.45rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.8rem]">
+                    {title}
+                  </h2>
+                  <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]">
+                    {description}
+                  </p>
+                </div>
+              </div>
+
+              <nav className="mt-4 grid max-w-[520px] grid-cols-2 gap-1 rounded-[12px] bg-[color:var(--app-surface-muted)] p-1 text-[11px] font-semibold dark:bg-slate-950/55">
+                {createEntryTabs.map(tab => {
+                  const isActive = tab.key === activeIntent;
+                  return (
+                    <Link
+                      key={tab.key}
+                      href={tab.href}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cn(
+                        'min-h-[38px] rounded-[10px] px-3 py-2 text-center transition',
+                        isActive
+                          ? 'bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-22px_rgba(22,163,74,0.45)]'
+                          : 'text-[color:var(--app-text-soft)] hover:bg-white hover:text-[color:var(--app-text)] dark:hover:bg-slate-900/80',
+                      )}
+                    >
+                      <span className="block truncate font-black">
+                        {tab.label}
+                      </span>
+                      <span className="sr-only">{tab.helper}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="mt-3">{children}</div>
+            </section>
+
+            {aside ? (
+              <aside className="grid content-start gap-2">{aside}</aside>
+            ) : null}
+          </div>
+        </CreateHeroShell>
+      </div>
+    );
+  };
   const canChangeTypeBeforeDraft =
     typePicked && !typeSelectionLocked && !workingId;
   const publishReadyCount = publishReadiness.filter(item => item.done).length;
@@ -3892,16 +4443,11 @@ export function CreatePostingClient({
     (!isSimpleModeActive ||
       currentStep === TOTAL_STEPS ||
       contentStatus === 'active');
-  const showDesktopAssistRail =
-    typePicked &&
-    (!isSimpleModeActive ||
-      currentStep === TOTAL_STEPS ||
-      topPublishBlockers.length > 0 ||
-      publishReadyCount < publishReadiness.length);
+  const showDesktopAssistRail = typePicked;
   const industryPickerLayer =
     showSectorPicker && isSectorPickerOpen ? (
       <div
-        className="fixed inset-0 z-[80] bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:p-6"
+        className="ui-layer-modal fixed inset-0 bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:p-6"
         onClick={() => setIsSectorPickerOpen(false)}
       >
         <div className="flex h-full items-end justify-center sm:items-center">
@@ -3911,7 +4457,7 @@ export function CreatePostingClient({
           >
             <div className="flex items-start justify-between gap-3 border-b border-slate-200/75 px-3.5 py-3.5 dark:border-slate-800/70">
               <div className="min-w-0">
-                <p className="inline-flex rounded-full border border-sky-200/70 bg-white/85 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-sky-700 shadow-[0_16px_24px_-20px_rgba(14,165,233,0.34)] dark:border-sky-900/70 dark:bg-sky-950/20 dark:text-sky-200">
+                <p className="inline-flex rounded-full border border-teal-200/70 bg-white/85 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-teal-700 shadow-[0_16px_24px_-20px_rgba(20,184,166,0.34)] dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
                   {locale === 'id'
                     ? 'Spesialisasi industri'
                     : 'Industry specialization'}
@@ -4104,7 +4650,7 @@ export function CreatePostingClient({
               <button
                 type="button"
                 onClick={() => setIsSectorPickerOpen(false)}
-                className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-sky-200 bg-sky-50 px-3.5 text-xs font-semibold text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200"
+                className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-teal-200 bg-teal-50 px-3.5 text-xs font-semibold text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-200"
               >
                 {locale === 'id' ? 'Selesai' : 'Done'}
               </button>
@@ -4113,50 +4659,112 @@ export function CreatePostingClient({
         </div>
       </div>
     ) : null;
-  const initialCreateLanes = [
+  const rootCreateActions: CreateEntryAction[] = [
     {
-      key: 'need',
-      Icon: Target,
-      eyebrow: locale === 'id' ? 'Lagi cari sesuatu' : 'Post a need',
-      title:
+      key: 'company',
+      href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
+      title: locale === 'id' ? 'Tambah Usaha' : 'Add Business',
+      description:
         locale === 'id'
-          ? 'Lagi cari supplier, jasa, atau talent?'
-          : 'Need suppliers, services, or talent?',
-      body:
-        locale === 'id'
-          ? 'Tulis singkat aja. Orang harus bisa sekali lihat langsung paham.'
-          : 'Keep it short. People should scan it fast and understand it right away.',
-      href: demandEntryHref,
-      action: locale === 'id' ? 'Bikin kebutuhan' : 'Post a need',
+          ? 'Buat profil usaha atau perusahaan untuk mulai berjualan.'
+          : 'Create a business profile before selling.',
       chips:
         locale === 'id'
-          ? ['Supplier', 'Jasa', 'Talent']
-          : ['Suppliers', 'Services', 'Talent'],
-      tone: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)]/78 text-[color:var(--app-text)]',
-      buttonTone:
-        'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
+          ? ['Profil', 'Alamat', 'Kontak']
+          : ['Profile', 'Address', 'Contact'],
+      Icon: Store,
+      tone: 'bg-emerald-100 text-emerald-700',
     },
     {
-      key: 'sell',
-      Icon: Sparkles,
-      eyebrow: locale === 'id' ? 'Mau nawarin sesuatu' : 'Post an offer',
-      title:
+      key: 'product',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'supply',
+        typeId: 'product',
+      }),
+      title: locale === 'id' ? 'Tambah Produk' : 'Add Product',
+      description:
         locale === 'id'
-          ? 'Mau nawarin produk, jasa, atau profil usaha?'
-          : 'Want to offer products, services, or your business profile?',
-      body:
-        locale === 'id'
-          ? 'Tulis yang penting dulu. Detail lain nyusul juga aman.'
-          : 'Start with the core offer. The rest can follow later.',
-      href: supplyEntryHref,
-      action: locale === 'id' ? 'Bikin penawaran' : 'Post an offer',
+          ? 'Posting produk, stok, atau bahan baku yang tersedia.'
+          : 'Post products, stock, or raw materials.',
       chips:
         locale === 'id'
-          ? ['Produk', 'Jasa', 'Profil']
-          : ['Products', 'Services', 'Profile'],
-      tone: 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)]/78 text-[color:var(--app-text)]',
-      buttonTone:
-        'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
+          ? ['Harga', 'Stok', 'Foto']
+          : ['Price', 'Stock', 'Photos'],
+      Icon: Package,
+      tone: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      key: 'service',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'supply',
+        typeId: 'service',
+      }),
+      title: locale === 'id' ? 'Tambah Jasa' : 'Add Service',
+      description:
+        locale === 'id'
+          ? 'Tawarkan layanan, paket kerja, atau portfolio jasa.'
+          : 'Offer services, packages, or service portfolios.',
+      chips:
+        locale === 'id'
+          ? ['Paket', 'Portfolio', 'Harga']
+          : ['Package', 'Portfolio', 'Price'],
+      Icon: BriefcaseBusiness,
+      tone: 'bg-orange-100 text-orange-700',
+    },
+    {
+      key: 'property',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'supply',
+        typeId: 'property',
+      }),
+      title: locale === 'id' ? 'Tambah Lokasi' : 'Add Space',
+      description:
+        locale === 'id'
+          ? 'Sewakan atau promosikan lokasi usaha yang tersedia.'
+          : 'Offer business locations, booths, or spaces.',
+      chips:
+        locale === 'id'
+          ? ['Harga sewa', 'Fasilitas', 'Maps']
+          : ['Rent', 'Facilities', 'Maps'],
+      Icon: MapPin,
+      tone: 'bg-rose-100 text-rose-700',
+    },
+    {
+      key: 'talent',
+      href: resolveMarketplaceCreatePath(locale, 'talent', 'supply'),
+      title: locale === 'id' ? 'Tambah Talent' : 'Add Talent',
+      description:
+        locale === 'id'
+          ? 'Rapikan profil talent, kandidat, atau skill pribadi.'
+          : 'Complete a talent, candidate, or personal skill profile.',
+      chips:
+        locale === 'id'
+          ? ['Skill', 'Pengalaman', 'Gaji']
+          : ['Skill', 'Experience', 'Rate'],
+      Icon: Users,
+      tone: 'bg-lime-100 text-lime-800',
+    },
+    {
+      key: 'supplier',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'supply',
+        typeId: 'product',
+      }),
+      title: locale === 'id' ? 'Tambah Supplier' : 'Add Supplier',
+      description:
+        locale === 'id'
+          ? 'Daftarkan diri sebagai supplier untuk menerima permintaan.'
+          : 'Register as a supplier so you can receive requests.',
+      chips:
+        locale === 'id'
+          ? ['Kategori', 'Produk', 'MOQ']
+          : ['Category', 'Product', 'MOQ'],
+      Icon: Building2,
+      tone: 'bg-teal-100 text-teal-700',
     },
   ];
   const journeyIntents = UMKM_JOURNEY_STEPS.filter(step =>
@@ -4217,51 +4825,55 @@ export function CreatePostingClient({
   const demandFormTitle =
     activeType === 'product'
       ? locale === 'id'
-        ? 'Cari supplier atau barang'
-        : 'Find suppliers or products'
+        ? 'Buat Permintaan Produk'
+        : 'Create Product Request'
       : activeType === 'property'
         ? locale === 'id'
-          ? 'Cari properti atau lokasi'
-          : 'Find property or a space'
+          ? 'Buat Permintaan Lokasi'
+          : 'Create Location Request'
         : activeType === 'service'
           ? locale === 'id'
-            ? 'Cari jasa yang dibutuhkan'
-            : 'Find the right service'
+            ? 'Buat Permintaan Jasa'
+            : 'Create Service Request'
           : activeType === 'job'
             ? locale === 'id'
-              ? 'Cari talent untuk usaha kamu'
-              : 'Find talent for your business'
+              ? 'Buat Permintaan Talent'
+              : 'Create Talent Request'
             : activeType === 'tool_rental'
               ? locale === 'id'
-                ? 'Cari sewa alat usaha'
-                : 'Find business tool rentals'
+                ? 'Buat Permintaan Sewa Alat'
+                : 'Create Tool Rental Request'
               : locale === 'id'
-                ? 'Cari kebutuhan usaha'
-                : 'Find a business need';
+                ? 'Buat Permintaan Baru'
+                : 'Create New Request';
   const supplyFormTitle =
     activeType === 'product'
       ? locale === 'id'
-        ? 'Jual barang atau stok kamu'
-        : 'Sell your products or stock'
+        ? 'Tambah Produk Baru'
+        : 'Add New Product'
       : activeType === 'property'
         ? locale === 'id'
-          ? 'Jual properti kamu'
-          : 'Sell your property'
+          ? 'Tambah Properti Baru'
+          : 'Add New Space'
         : activeType === 'service'
           ? locale === 'id'
-            ? 'Tawarkan jasa kamu'
-            : 'Offer your service'
+            ? 'Tambah Jasa Baru'
+            : 'Add New Service'
           : activeType === 'tool_rental'
             ? locale === 'id'
-              ? 'Sewakan alat kamu'
-              : 'Rent out your tools'
-            : activeType === 'company'
+              ? 'Tambah Sewa Alat Baru'
+              : 'Add New Tool Rental'
+            : activeType === 'business_transfer'
               ? locale === 'id'
-                ? 'Perkenalkan usaha kamu'
-                : 'Introduce your business'
-              : locale === 'id'
-                ? 'Buat posting kamu'
-                : 'Create your post';
+                ? 'Tambah Oper Usaha'
+                : 'Add Business Transfer'
+              : activeType === 'company'
+                ? locale === 'id'
+                  ? 'Tambah Usaha Baru'
+                  : 'Add New Business'
+                : locale === 'id'
+                  ? 'Tambah Listing Baru'
+                  : 'Add New Listing';
   const formTitle = workingId
     ? locale === 'id'
       ? 'Edit postingan'
@@ -4272,18 +4884,24 @@ export function CreatePostingClient({
   const formSubtitle =
     typePicked && listingSide === 'demand'
       ? locale === 'id'
-        ? 'Isi kebutuhan utamanya dulu. Nanti kami bantu tampilkan ke orang yang relevan.'
+        ? 'Isi inti kebutuhan dulu.'
         : 'Start with the essentials. We will help show it to the right people.'
       : typePicked
         ? locale === 'id'
           ? activeType === 'company'
-            ? 'Isi data usaha berikut. Nanti orang bisa lebih cepat kenal bisnismu.'
-            : 'Isi data utamanya dulu. Nanti kami bantu tampilkan ke orang yang tepat.'
+            ? 'Lengkapi profil usaha agar lebih dipercaya dan mudah ditemukan.'
+            : activeType === 'product'
+              ? 'Isi nama, harga, stok, dan foto supaya mudah ditemukan.'
+              : activeType === 'service'
+                ? 'Isi layanan, paket, area, dan portfolio supaya cepat dipahami.'
+                : activeType === 'property'
+                  ? 'Isi lokasi, alamat, fasilitas, dan foto supaya mudah dicek.'
+                  : 'Isi data utama dulu, detail bisa menyusul.'
           : activeType === 'company'
             ? 'Fill the business basics first so people can understand your company quickly.'
             : 'Fill the essentials first. We will help show it to the right people.'
         : locale === 'id'
-          ? 'Pilih yang paling sesuai, lalu isi satu per satu.'
+          ? 'Pilih yang paling pas.'
           : 'Pick the closest option, then fill it step by step.';
   const effectiveFormEyebrow = isNeedServiceJourney
     ? locale === 'id'
@@ -4297,83 +4915,216 @@ export function CreatePostingClient({
     : formTitle;
   const effectiveFormSubtitle = isNeedServiceJourney
     ? locale === 'id'
-      ? 'Isi yang paling penting dulu biar penyedia yang relevan cepat paham dan bisa langsung masuk.'
+      ? 'Isi inti dulu biar penyedia cepat paham.'
       : 'Start with the essentials so relevant providers can understand it fast and respond sooner.'
     : formSubtitle;
-  const simpleModeCallout =
-    isNeedServiceJourney
-      ? locale === 'id'
-        ? 'Mulai dari inti kebutuhannya dulu. Detail lain bisa nyusul.'
-        : 'Start with the core need first. The rest can follow.'
-      : locale === 'id'
-        ? 'Mode cepat aktif. Isi yang paling penting dulu.'
-        : 'Quick mode is active. Focus on the essentials first.';
-  const simpleModeCalloutChips =
-    isNeedServiceJourney
-      ? locale === 'id'
-        ? ['Jasa yang dicari', 'Ringkasan singkat', 'Budget', 'Kota utama']
-        : ['Needed service', 'Short summary', 'Budget', 'Primary city']
-      : locale === 'id'
-        ? ['Judul jelas', 'Harga atau budget', 'Lokasi utama']
-        : ['Clear title', 'Price or budget', 'Main location'];
+  const simpleModeCallout = isNeedServiceJourney
+    ? locale === 'id'
+      ? 'Mulai dari inti. Detail nanti.'
+      : 'Start with the core need first. The rest can follow.'
+    : locale === 'id'
+      ? 'Mode satset aktif. Isi yang penting.'
+      : 'Quick mode is active. Focus on the essentials first.';
+  const simpleModeCalloutChips = isNeedServiceJourney
+    ? locale === 'id'
+      ? ['Jasa yang dicari', 'Ringkasan singkat', 'Budget', 'Kota utama']
+      : ['Needed service', 'Short summary', 'Budget', 'Primary city']
+    : locale === 'id'
+      ? ['Judul jelas', 'Harga atau budget', 'Lokasi utama']
+      : ['Clear title', 'Price or budget', 'Main location'];
+  const stepCopyByType: Record<
+    ListingTypeId,
+    {
+      step1Title: string;
+      step1Description: string;
+      step2Title: string;
+      step2Description: string;
+      step3Title: string;
+      step3Description: string;
+    }
+  > =
+    locale === 'id'
+      ? {
+          product: {
+            step1Title: 'Produk',
+            step1Description: 'Nama, harga, stok, lokasi.',
+            step2Title: 'Spesifikasi',
+            step2Description: 'Varian, kirim, garansi, aturan order.',
+            step3Title: 'Media',
+            step3Description: 'Foto, video, dokumen.',
+          },
+          service: {
+            step1Title: 'Jasa',
+            step1Description: 'Layanan, harga, lokasi, ringkasan.',
+            step2Title: 'Scope',
+            step2Description: 'Output, revisi, kebutuhan klien.',
+            step3Title: 'Portofolio',
+            step3Description: 'Contoh kerja, sertifikat, dokumen.',
+          },
+          job: {
+            step1Title: 'Talent',
+            step1Description: 'Posisi, lokasi, kompensasi, tipe kerja.',
+            step2Title: 'Kriteria',
+            step2Description: 'Skill, tugas, benefit, jadwal.',
+            step3Title: 'Lampiran',
+            step3Description: 'Dokumen atau visual pendukung.',
+          },
+          property: {
+            step1Title: 'Lokasi',
+            step1Description: 'Nama, harga, alamat, tipe.',
+            step2Title: 'Fasilitas',
+            step2Description: 'Ukuran, akses, legalitas, aturan.',
+            step3Title: 'Foto & Maps',
+            step3Description: 'Foto lokasi dan dokumen.',
+          },
+          tool_rental: {
+            step1Title: 'Aset',
+            step1Description: 'Nama alat, tarif, kondisi, pickup.',
+            step2Title: 'Aturan Sewa',
+            step2Description: 'Deposit, durasi, batas pakai.',
+            step3Title: 'Foto Aset',
+            step3Description: 'Foto kondisi dan bukti.',
+          },
+          business_transfer: {
+            step1Title: 'Usaha',
+            step1Description: 'Nama, harga, omzet, alasan jual.',
+            step2Title: 'Handover',
+            step2Description: 'Aset, akun/rating, biaya, risiko.',
+            step3Title: 'Bukti',
+            step3Description: 'Foto, dokumen, dan checklist.',
+          },
+          company: {
+            step1Title: 'Usaha',
+            step1Description: 'Nama, kategori, logo, sampul.',
+            step2Title: 'Kontak',
+            step2Description: 'Telepon, email, alamat, titik lokasi.',
+            step3Title: 'Verifikasi',
+            step3Description: 'Dokumen legalitas dan foto usaha.',
+          },
+        }
+      : {
+          product: {
+            step1Title: 'Product Information',
+            step1Description:
+              'Add product name, summary, price, stock, and location.',
+            step2Title: 'Product Specs',
+            step2Description:
+              'Add variants, delivery, warranty, and order rules.',
+            step3Title: 'Photos, Video, and Documents',
+            step3Description: 'Upload product visuals and supporting files.',
+          },
+          service: {
+            step1Title: 'Service Information',
+            step1Description:
+              'Add service name, starting price, location, and summary.',
+            step2Title: 'Service Details',
+            step2Description:
+              'Complete scope, deliverables, revisions, and client needs.',
+            step3Title: 'Portfolio and Attachments',
+            step3Description:
+              'Add work samples, certificates, or supporting documents.',
+          },
+          job: {
+            step1Title: 'Talent Information',
+            step1Description:
+              'Add role, company, location, compensation, and work type.',
+            step2Title: 'Criteria and Responsibilities',
+            step2Description:
+              'Complete required skills, duties, benefits, and schedule.',
+            step3Title: 'Supporting Attachments',
+            step3Description:
+              'Add documents or visuals that help candidates understand the role.',
+          },
+          property: {
+            step1Title: 'Location Information',
+            step1Description:
+              'Add location name, rent, address, and property type.',
+            step2Title: 'Facilities and Location Details',
+            step2Description:
+              'Complete size, facilities, access, legality, and usage rules.',
+            step3Title: 'Photos and Map',
+            step3Description:
+              'Upload space photos and supporting documents if needed.',
+          },
+          tool_rental: {
+            step1Title: 'Asset Information',
+            step1Description:
+              'Add tool name, rental rate, condition, and pickup location.',
+            step2Title: 'Rental Rules',
+            step2Description:
+              'Complete deposit, duration, usage limits, and complaint rules.',
+            step3Title: 'Asset Photos and Documents',
+            step3Description: 'Add condition photos and supporting proof.',
+          },
+          business_transfer: {
+            step1Title: 'Business Information',
+            step1Description:
+              'Add business name, price, revenue, and reason for sale.',
+            step2Title: 'Handover Details',
+            step2Description:
+              'Complete assets, accounts/ratings, costs, and risks.',
+            step3Title: 'Proof and Documents',
+            step3Description: 'Add photos, documents, and handover checklist.',
+          },
+          company: {
+            step1Title: 'Business Information',
+            step1Description:
+              'Complete business name, category, description, logo, and cover photo.',
+            step2Title: 'Contact and Location',
+            step2Description: 'Add phone, email, full address, and map point.',
+            step3Title: 'Business Verification',
+            step3Description:
+              'Upload legal documents and business photos to increase trust.',
+          },
+        };
+  const stepCopy =
+    stepCopyByType[activeType as ListingTypeId] || stepCopyByType.product;
   const stepOneMainTitle = isNeedServiceJourney
     ? locale === 'id'
       ? 'Apa jasa yang lagi kamu butuhkan?'
       : 'What service are you looking for?'
-    : locale === 'id'
-      ? isSimpleModeActive
+    : isSimpleModeActive
+      ? locale === 'id'
         ? 'Info utama postingan'
-        : 'Info dasar postingan'
-      : isSimpleModeActive
-        ? 'Main information'
-        : 'Basic listing information';
+        : 'Main information'
+      : stepCopy.step1Title;
   const stepOneMainDescription = isNeedServiceJourney
     ? locale === 'id'
       ? 'Tulis inti kebutuhannya dulu. Biar orang cepat paham tanpa baca terlalu banyak.'
       : 'Write the core need first so people can understand it quickly.'
-    : locale === 'id'
-      ? isSimpleModeActive
+    : isSimpleModeActive
+      ? locale === 'id'
         ? 'Mulai dari judul, harga, dan lokasi.'
-        : 'Mulai dari info yang paling cepat dipahami orang.'
-      : isSimpleModeActive
-        ? 'Start with title, price, and location.'
-        : 'Start with the information people can understand fastest.';
+        : 'Start with title, price, and location.'
+      : stepCopy.step1Description;
   const stepTwoMainTitle = isNeedServiceJourney
     ? locale === 'id'
       ? 'Tambahkan detail kerja kalau perlu'
       : 'Add work details if needed'
-    : locale === 'id'
-      ? isSimpleModeActive
+    : isSimpleModeActive
+      ? locale === 'id'
         ? 'Kalau mau tambah detail'
-        : 'Detail listing'
-      : isSimpleModeActive
-        ? 'Add detail if you want'
-        : 'Listing details';
+        : 'Add detail if you want'
+      : stepCopy.step2Title;
   const stepTwoMainDescription = isNeedServiceJourney
     ? locale === 'id'
-      ? 'Isi kalau mau penyedia yang masuk lebih nyambung sama kebutuhanmu.'
+      ? 'Isi kalau mau vendor lebih nyambung.'
       : 'Add more detail if you want more relevant providers.'
-    : locale === 'id'
-      ? isSimpleModeActive
+    : isSimpleModeActive
+      ? locale === 'id'
         ? 'Skip aja kalau belum perlu.'
-        : 'Tambah yang emang penting aja.'
-      : isSimpleModeActive
-        ? 'Skip if not needed.'
-        : 'Add only the important details.';
+        : 'Skip if not needed.'
+      : stepCopy.step2Description;
   const stepThreeMainTitle = isNeedServiceJourney
     ? locale === 'id'
       ? 'Lampiran pendukung'
       : 'Supporting attachments'
-    : locale === 'id'
-      ? 'Foto, dokumen, dan tag'
-      : 'Media, documents, and tags';
+    : stepCopy.step3Title;
   const stepThreeMainDescription = isNeedServiceJourney
     ? locale === 'id'
-      ? 'Tambah foto, brief, atau tag kalau memang bantu orang lebih cepat paham.'
+      ? 'Tambah foto, brief, atau tag kalau perlu.'
       : 'Add photos, a brief, or tags only if they help people understand faster.'
-    : locale === 'id'
-      ? 'Foto, file, sama tag.'
-      : 'Photos, files, tags.';
+    : stepCopy.step3Description;
   const demandActionTitle =
     activeType === 'property'
       ? locale === 'id'
@@ -4414,19 +5165,28 @@ export function CreatePostingClient({
             : locale === 'id'
               ? 'Jual barang atau stok'
               : 'Sell products or stock';
-  const demandActionBody =
-    locale === 'id'
-      ? 'Kalau kamu sedang mencari.'
-      : 'Use this when you need something.';
-  const supplyActionBody =
-    locale === 'id'
-      ? 'Kalau kamu mau menawarkan.'
-      : 'Use this when you want to offer something.';
   const selectedTypeLabel = selectedType
     ? getContentTypeName(selectedType, locale)
     : locale === 'id'
       ? 'Listing'
       : 'Listing';
+  const sideRailTitle =
+    cleanText(fieldValues.title) ||
+    selectedTypeLabel ||
+    (locale === 'id' ? 'Posting baru' : 'New post');
+  const sideRailLocation =
+    cleanText(fieldValues.location) ||
+    cleanText(fieldValues.address) ||
+    (locale === 'id' ? 'Lokasi belum diisi' : 'Location not set');
+  const sideRailPriceLabel = parsedPriceCents
+    ? new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US', {
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 0,
+      }).format(parsedPriceCents / 100)
+    : locale === 'id'
+      ? 'Harga belum diisi'
+      : 'Price not set';
   const typeSummaryDescription = useMemo(() => {
     if (!typePicked) {
       return locale === 'id'
@@ -4544,7 +5304,7 @@ export function CreatePostingClient({
         : '';
     if (scope === 'publish') {
       return locale === 'id'
-        ? `Belum bisa tayang. Lengkapin dulu field wajibnya: ${topFields}${extraLabel}.`
+        ? `Belum bisa tayang. Lengkapi: ${topFields}${extraLabel}.`
         : `Unable to publish yet. Complete required fields: ${topFields}${extraLabel}.`;
     }
     return locale === 'id'
@@ -4826,7 +5586,7 @@ export function CreatePostingClient({
         ? `${pathname}?${searchParams.toString()}`
         : pathname;
       if (nextHref !== currentHref) {
-        router.replace(nextHref);
+        router.replace(nextHref, { scroll: false });
       }
       return;
     }
@@ -4840,6 +5600,7 @@ export function CreatePostingClient({
     requestedStep,
     requestedSide,
     requestedType,
+    pathname,
     searchParams,
     typePicked,
   ]);
@@ -5085,7 +5846,7 @@ export function CreatePostingClient({
           ? `${pathname}?${searchParams.toString()}`
           : pathname;
         if (nextHref !== currentHref) {
-          router.replace(nextHref);
+          router.replace(nextHref, { scroll: false });
         }
         setContentStatus(
           cleanText(data.content_status || data.status).toLowerCase() ===
@@ -5125,6 +5886,7 @@ export function CreatePostingClient({
     authLoading,
     draftParam,
     locale,
+    pathname,
     requestedStep,
     router,
     searchParams,
@@ -5420,7 +6182,7 @@ export function CreatePostingClient({
         goToStep(1, { draftId: workingId, typeId: activeType });
         setErrorMessage(
           locale === 'id'
-            ? `Listing ini kebaca ngarah ke brand luar seperti ${foreignBrandSignalSummary}. Di Lajukan, fokusnya brand dan usaha lokal Indonesia, jadi revisi dulu sebelum tayang.`
+            ? `Listing mengarah ke brand luar: ${foreignBrandSignalSummary}. Revisi dulu.`
             : `This listing points to foreign brands such as ${foreignBrandSignalSummary}. Lajukan is prioritized for local Indonesian brands and businesses, so revise it before publishing.`,
         );
         return null;
@@ -6052,18 +6814,26 @@ export function CreatePostingClient({
       listingSide,
     );
     const inputPlaceholder = placeholder || example || '';
-    const baseInput =
-      'w-full min-w-0 h-11 rounded-[16px] border border-slate-200/85 bg-white/90 px-3.5 text-[13px] shadow-[0_18px_34px_-26px_rgba(15,23,42,0.26)] backdrop-blur-sm transition placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100/90 dark:border-slate-700/80 dark:bg-slate-950/78 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-700 dark:focus:bg-slate-950 dark:focus:ring-sky-900/30 min-[360px]:text-sm';
+    const fieldIsFilled = cleanText(value).length > 0;
+    const baseInput = cn(
+      'ui-data-control h-12 px-3.5 text-[14px] font-semibold min-[360px]:text-[15px]',
+      'placeholder:text-[color:var(--app-text-soft)]',
+    );
+    const textAreaInput = cn(
+      'ui-data-control ui-data-textarea min-h-[116px] px-3.5 py-3 text-[14px] font-medium leading-6 min-[360px]:text-[15px]',
+      'placeholder:text-[color:var(--app-text-soft)]',
+    );
 
     if (f.kind === 'multiline') {
       return (
         <textarea
           key={f.key}
+          data-filled={fieldIsFilled ? 'true' : 'false'}
           value={value}
           onChange={e => updateField(f.key, e.target.value)}
           placeholder={inputPlaceholder}
           rows={3}
-          className="w-full min-w-0 rounded-[18px] border border-slate-200/85 bg-white/90 px-3.5 py-3 text-[13px] shadow-[0_18px_34px_-26px_rgba(15,23,42,0.26)] backdrop-blur-sm transition placeholder:text-slate-400 focus:border-sky-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100/90 dark:border-slate-700/80 dark:bg-slate-950/78 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-sky-700 dark:focus:bg-slate-950 dark:focus:ring-sky-900/30 min-[360px]:text-sm"
+          className={textAreaInput}
         />
       );
     }
@@ -6072,6 +6842,7 @@ export function CreatePostingClient({
       return (
         <select
           key={f.key}
+          data-filled={fieldIsFilled ? 'true' : 'false'}
           value={value}
           onChange={e => updateField(f.key, e.target.value)}
           className={baseInput}
@@ -6091,6 +6862,7 @@ export function CreatePostingClient({
         <input
           key={f.key}
           type="number"
+          data-filled={fieldIsFilled ? 'true' : 'false'}
           value={value}
           onChange={e => updateField(f.key, e.target.value)}
           placeholder={inputPlaceholder}
@@ -6104,6 +6876,7 @@ export function CreatePostingClient({
         <input
           key={f.key}
           type="text"
+          data-filled={fieldIsFilled ? 'true' : 'false'}
           value={value}
           onChange={e => updateField(f.key, e.target.value)}
           placeholder={inputPlaceholder || 'e.g. 5000000'}
@@ -6119,6 +6892,7 @@ export function CreatePostingClient({
         <input
           key={f.key}
           type="date"
+          data-filled={fieldIsFilled ? 'true' : 'false'}
           value={dateValue}
           onChange={e => updateField(f.key, e.target.value)}
           className={baseInput}
@@ -6131,6 +6905,7 @@ export function CreatePostingClient({
         <input
           key={f.key}
           type="url"
+          data-filled={fieldIsFilled ? 'true' : 'false'}
           value={value}
           onChange={e => updateField(f.key, e.target.value)}
           placeholder={inputPlaceholder}
@@ -6143,6 +6918,7 @@ export function CreatePostingClient({
       <input
         key={f.key}
         type="text"
+        data-filled={fieldIsFilled ? 'true' : 'false'}
         value={value}
         onChange={e => updateField(f.key, e.target.value)}
         placeholder={inputPlaceholder}
@@ -6159,6 +6935,8 @@ export function CreatePostingClient({
     const value = String(fieldValues[f.key] ?? '');
     const quickActions = buildQuickFieldActions(f, value);
     const lowerKey = f.key.toLowerCase();
+    const isRequired = isFieldRequired(f);
+    const isFilled = cleanText(value).length > 0;
     const showHint =
       Boolean(meta.hint) &&
       !cleanText(value) &&
@@ -6177,18 +6955,33 @@ export function CreatePostingClient({
     return (
       <div
         key={f.key}
-        className={cn('space-y-1.5', isWide ? 'lg:col-span-2' : undefined)}
+        className={cn('space-y-2', isWide ? 'lg:col-span-2' : undefined)}
       >
-        <label className="block text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-          <span className="inline-flex flex-wrap items-center gap-1.5">
-            <FieldIcon className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
-            <span>
-              {meta.label}
-              {isFieldRequired(f) && ' *'}
+        <label className="block text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+          <span className="inline-flex w-full min-w-0 flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] border',
+                isFilled
+                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                  : 'border-slate-200 bg-slate-50 text-[color:var(--app-text-soft)] dark:border-slate-700 dark:bg-slate-900',
+              )}
+            >
+              <FieldIcon className="h-3.5 w-3.5" />
             </span>
-            {isSimpleModeActive && !isFieldRequired(f) ? (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                {locale === 'id' ? 'boleh kosong' : 'optional'}
+            <span className="min-w-0 flex-1 truncate">
+              {meta.label}
+              {isRequired ? (
+                <span className="ml-1 text-[color:var(--app-danger)]">*</span>
+              ) : null}
+            </span>
+            {isFilled ? (
+              <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-accent)]">
+                {locale === 'id' ? 'terisi' : 'filled'}
+              </span>
+            ) : isSimpleModeActive && !isRequired ? (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                {locale === 'id' ? 'opsional' : 'optional'}
               </span>
             ) : null}
           </span>
@@ -6216,7 +7009,7 @@ export function CreatePostingClient({
           </div>
         ) : null}
         {showHint && (
-          <p className="line-clamp-1 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
+          <p className="line-clamp-1 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] dark:bg-slate-900">
             {meta.hint}
           </p>
         )}
@@ -6229,1475 +7022,1557 @@ export function CreatePostingClient({
   }
 
   if (showRootIntentPicker) {
-    return (
-      <CreateCanvas>
-        <div className="ui-page-stack mx-auto w-full max-w-5xl px-0 py-2 sm:px-4 sm:py-3">
-          <CreateHeroShell>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="inline-flex rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700 shadow-[0_16px_26px_-22px_rgba(14,165,233,0.45)] dark:border-sky-900/70 dark:bg-sky-950/20 dark:text-sky-200">
-                  {locale === 'id' ? 'Mulai cepat' : 'Quick start'}
-                </p>
-                <h1 className="mt-3 text-[1.65rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[2rem]">
-                  {locale === 'id'
-                    ? 'Kamu mau apa?'
-                    : 'What do you want to post?'}
-                </h1>
-                <p className="mt-2 max-w-md text-[11px] leading-5 text-[color:var(--app-text-soft)] sm:text-[12px]">
-                  {locale === 'id'
-                    ? 'Pilih jalurnya dulu, nanti kami tuntun step by step.'
-                    : 'Pick a path first, then continue step by step.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => router.push('/my-listings')}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
-              >
-                <FolderKanban className="h-4 w-4" />
-                {locale === 'id' ? 'Lihat draft' : 'View drafts'}
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-2">
-              {initialCreateLanes.map(lane => (
-                <Link
-                  key={lane.key}
-                  href={lane.href}
-                  className="group flex items-start gap-3 rounded-[18px] bg-white/96 px-3.5 py-3 text-left shadow-[0_10px_22px_-22px_rgba(15,23,42,0.16)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)] dark:bg-slate-950/85 dark:ring-slate-800/80"
+    return renderCreateEntrySurface({
+      activeIntent: 'supply',
+      eyebrow: locale === 'id' ? 'Mulai cepat' : 'Quick start',
+      title:
+        locale === 'id'
+          ? 'Mau buat apa hari ini?'
+          : 'What do you want to create today?',
+      description:
+        locale === 'id'
+          ? 'Pilih jenis postingan. Isi yang penting dulu, detail bisa menyusul.'
+          : 'Choose a post type. Start with the essentials, details can follow.',
+      children: (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {rootCreateActions.map(item => (
+              <CreateEntryActionCard key={item.key} item={item} />
+            ))}
+          </div>
+          <p className="mt-3 flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]">
+            <ShieldCheck className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+            {locale === 'id'
+              ? 'Belum yakin? Bisa buat lagi nanti.'
+              : 'Not sure? You can create more than one later.'}
+          </p>
+        </>
+      ),
+      aside: (
+        <>
+          <div className="rounded-[14px] bg-[color:var(--app-surface-muted)] p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)]">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/55 dark:text-emerald-200">
+              <ClipboardList className="h-4 w-4" />
+            </span>
+            <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+              {locale === 'id' ? 'Butuh sesuatu?' : 'Need something?'}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+              {locale === 'id'
+                ? 'Cari supplier, jasa, lokasi, produk, atau talent.'
+                : 'Find suppliers, services, locations, products, or talent.'}
+            </p>
+            <Link
+              href={demandEntryHref}
+              className="mt-3 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[12px] font-semibold text-[color:var(--app-text-inverse)]"
+            >
+              {locale === 'id' ? 'Buat Permintaan' : 'Create Request'}
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
+            <p className="text-[13px] font-black text-[color:var(--app-text)]">
+              {locale === 'id'
+                ? 'Proses cepat & aman'
+                : 'Fast and safe process'}
+            </p>
+            <div className="mt-2 grid gap-1.5">
+              {(locale === 'id'
+                ? ['Data aman', 'Bisa edit', 'Tayang setelah cek']
+                : ['Safe draft', 'Editable', 'Checked before publish']
+              ).map(item => (
+                <span
+                  key={item}
+                  className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]"
                 >
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] dark:bg-slate-900/80">
-                    <lane.Icon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
-                      {lane.eyebrow}
-                    </span>
-                    <span className="mt-1 block text-[15px] font-black leading-tight text-[color:var(--app-text)]">
-                      {lane.title}
-                    </span>
-                    <span className="mt-1 block text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                      {lane.body}
-                    </span>
-                    <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--app-accent)]">
-                      {lane.action}
-                    </span>
-                  </span>
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] dark:bg-slate-900/80">
-                    <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                  </span>
-                </Link>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                  {item}
+                </span>
               ))}
             </div>
-          </CreateHeroShell>
-        </div>
-      </CreateCanvas>
-    );
+          </div>
+        </>
+      ),
+    });
   }
 
   if (showDemandIntentPicker) {
-    return (
-      <CreateCanvas>
-        <div className="ui-page-stack mx-auto w-full max-w-5xl px-0 py-2 sm:px-4 sm:py-3">
-          <CreateHeroShell>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="inline-flex rounded-full border border-amber-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 shadow-[0_16px_26px_-22px_rgba(245,158,11,0.35)] dark:border-amber-900/70 dark:bg-amber-950/20 dark:text-amber-200">
-                  {locale === 'id' ? 'Lagi cari sesuatu' : 'Post a need'}
-                </p>
-                <h1 className="mt-3 text-[1.65rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[2rem]">
-                  {locale === 'id'
-                    ? 'Kamu lagi cari apa?'
-                    : 'What need are you posting?'}
-                </h1>
-                <p className="mt-2 max-w-md text-[11px] leading-5 text-[color:var(--app-text-soft)] sm:text-[12px]">
-                  {locale === 'id'
-                    ? 'Pilih yang paling deket aja.'
-                    : 'Pick the closest one.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => router.push('/create')}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                {locale === 'id' ? 'Ganti arah' : 'Change path'}
-              </button>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {journeyIntents.map(step => (
-                <CreateChoiceCard
-                  key={step.id}
-                  disabled={typeSelectionLocked}
-                  onClick={() => applyJourneyIntent(step)}
-                  Icon={step.icon}
-                  theme={
-                    TYPE_THEMES[step.typeId as keyof typeof TYPE_THEMES] ||
-                    TYPE_THEMES.product
-                  }
-                  selected={type === step.typeId}
-                  badge={
-                    locale === 'id'
-                      ? (CONTENT_TYPES.find(ct => ct.id === step.typeId)
-                          ?.shortId ?? 'Brief')
-                      : (CONTENT_TYPES.find(ct => ct.id === step.typeId)
-                          ?.shortEn ?? 'Brief')
-                  }
-                  title={locale === 'id' ? step.titleId : step.titleEn}
-                  description={locale === 'id' ? step.bodyId : step.bodyEn}
-                  highlights={
-                    step.typeId === 'product'
+    return renderCreateEntrySurface({
+      activeIntent: 'demand',
+      eyebrow: locale === 'id' ? 'Lagi cari sesuatu' : 'Post a need',
+      title: locale === 'id' ? 'Kamu butuh apa?' : 'What do you need?',
+      description:
+        locale === 'id'
+          ? 'Pilih kategori yang paling dekat. Nanti tinggal isi detail singkat.'
+          : 'Choose the closest category. Then add a short brief.',
+      children: (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {journeyIntents.map(step => (
+            <CreateChoiceCard
+              key={step.id}
+              disabled={typeSelectionLocked}
+              onClick={() => applyJourneyIntent(step)}
+              Icon={step.icon}
+              theme={
+                TYPE_THEMES[step.typeId as keyof typeof TYPE_THEMES] ||
+                TYPE_THEMES.product
+              }
+              selected={type === step.typeId}
+              badge={
+                locale === 'id'
+                  ? (CONTENT_TYPES.find(ct => ct.id === step.typeId)?.shortId ??
+                    'Brief')
+                  : (CONTENT_TYPES.find(ct => ct.id === step.typeId)?.shortEn ??
+                    'Brief')
+              }
+              title={locale === 'id' ? step.titleId : step.titleEn}
+              description={locale === 'id' ? step.bodyId : step.bodyEn}
+              highlights={
+                step.typeId === 'product'
+                  ? locale === 'id'
+                    ? ['Supplier', 'MOQ', 'Kirim']
+                    : ['Suppliers', 'MOQ', 'Delivery']
+                  : step.typeId === 'service'
+                    ? locale === 'id'
+                      ? ['Scope', 'Output', 'Deadline']
+                      : ['Scope', 'Output', 'Deadline']
+                    : step.typeId === 'job'
                       ? locale === 'id'
-                        ? ['Supplier', 'MOQ', 'Kirim']
-                        : ['Suppliers', 'MOQ', 'Delivery']
-                      : step.typeId === 'service'
+                        ? ['Role', 'Shift', 'KPI']
+                        : ['Role', 'Shift', 'KPI']
+                      : step.typeId === 'tool_rental'
                         ? locale === 'id'
-                          ? ['Scope', 'Output', 'Deadline']
-                          : ['Scope', 'Output', 'Deadline']
-                        : step.typeId === 'job'
-                          ? locale === 'id'
-                            ? ['Role', 'Shift', 'KPI']
-                            : ['Role', 'Shift', 'KPI']
-                          : step.typeId === 'tool_rental'
-                            ? locale === 'id'
-                              ? ['Alat', 'Durasi', 'Lokasi']
-                              : ['Tool', 'Duration', 'Location']
-                            : locale === 'id'
-                              ? ['Lokasi', 'Traffic', 'Budget']
-                              : ['Location', 'Traffic', 'Budget']
-                  }
-                  actionLabel={locale === 'id' ? 'Pilih ini' : 'Use this'}
-                />
+                          ? ['Alat', 'Durasi', 'Lokasi']
+                          : ['Tool', 'Duration', 'Location']
+                        : locale === 'id'
+                          ? ['Lokasi', 'Traffic', 'Budget']
+                          : ['Location', 'Traffic', 'Budget']
+              }
+              actionLabel={locale === 'id' ? 'Pilih ini' : 'Use this'}
+            />
+          ))}
+        </div>
+      ),
+      aside: (
+        <>
+          <div className="rounded-[14px] bg-[color:var(--app-surface-muted)] p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)]">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/55 dark:text-emerald-200">
+              <Store className="h-4 w-4" />
+            </span>
+            <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+              {locale === 'id' ? 'Mau jualan?' : 'Want to offer?'}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+              {locale === 'id'
+                ? 'Kalau mau posting produk, jasa, lokasi, atau talent, pindah ke tab Tawarkan.'
+                : 'If you want to post products, services, spaces, or talent, switch to Offer.'}
+            </p>
+            <Link
+              href={supplyEntryHref}
+              className="mt-3 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-full bg-[color:var(--app-surface-strong)] px-4 text-[12px] font-semibold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]"
+            >
+              {locale === 'id' ? 'Pindah ke Tawarkan' : 'Switch to Offer'}
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
+            <p className="text-[13px] font-black text-[color:var(--app-text)]">
+              {locale === 'id' ? 'Biar cepat dibalas' : 'Get faster replies'}
+            </p>
+            <div className="mt-2 grid gap-1.5">
+              {(locale === 'id'
+                ? [
+                    'Tulis kebutuhan jelas',
+                    'Cantumkan area',
+                    'Kasih kisaran budget',
+                  ]
+                : ['Write a clear need', 'Add location', 'Add budget range']
+              ).map(item => (
+                <span
+                  key={item}
+                  className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                  {item}
+                </span>
               ))}
             </div>
-          </CreateHeroShell>
-        </div>
-      </CreateCanvas>
-    );
+          </div>
+        </>
+      ),
+    });
   }
 
   if (showSupplyIntentPicker) {
-    return (
-      <CreateCanvas>
-        <div className="ui-page-stack mx-auto w-full max-w-5xl px-0 py-2 sm:px-4 sm:py-3">
-          <CreateHeroShell>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="inline-flex rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700 shadow-[0_16px_26px_-22px_rgba(14,165,233,0.42)] dark:border-sky-900/70 dark:bg-sky-950/20 dark:text-sky-200">
-                  {locale === 'id' ? 'Mulai cepat' : 'Quick start'}
-                </p>
-                <h1 className="mt-3 text-[1.65rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[2rem]">
-                  {locale === 'id'
-                    ? 'Kamu mau jual atau tawarkan apa?'
-                    : 'What are you offering?'}
-                </h1>
-                <p className="mt-2 max-w-md text-[11px] leading-5 text-[color:var(--app-text-soft)] sm:text-[12px]">
-                  {locale === 'id'
-                    ? 'Pilih yang paling mirip dulu. Detailnya menyusul.'
-                    : 'Pick the closest type first. Details can follow.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => router.push('/create')}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                {locale === 'id' ? 'Kembali' : 'Back'}
-              </button>
+    return renderCreateEntrySurface({
+      activeIntent: 'supply',
+      eyebrow: locale === 'id' ? 'Kategori jual' : 'Offer category',
+      title:
+        locale === 'id' ? 'Kamu mau tawarkan apa?' : 'What are you offering?',
+      description:
+        locale === 'id'
+          ? 'Pilih kategori jual dulu. Setelah itu isi form yang pendek dan jelas.'
+          : 'Choose an offer category first. Then fill a short, clear form.',
+      children: (
+        <>
+          {errorMessage && (
+            <div className="mb-2 rounded-[14px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)]/92 px-3 py-2.5 text-[11px] text-[color:var(--app-danger)]">
+              {errorMessage}
             </div>
-
-            {errorMessage && (
-              <div className="mt-3 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)]/92 px-3 py-2.5 text-[11px] text-[color:var(--app-danger)]">
-                {errorMessage}
+          )}
+          {typeSelectorGrid}
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => setShowOtherSupplyPaths(current => !current)}
+              className="inline-flex min-h-[36px] items-center rounded-full bg-[color:var(--app-surface-muted)] px-3.5 text-[11px] font-semibold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] transition hover:bg-white dark:bg-slate-950/55"
+            >
+              {showOtherSupplyPaths
+                ? locale === 'id'
+                  ? 'Tutup lainnya'
+                  : 'Hide other paths'
+                : locale === 'id'
+                  ? 'Lihat lainnya'
+                  : 'See other paths'}
+            </button>
+            {showOtherSupplyPaths ? (
+              <div className="mt-2 rounded-[14px] bg-[color:var(--app-surface-muted)] p-2.5 dark:bg-slate-950/45">
+                <p className="text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Buka ini kalau bukan produk, jasa, atau profil usaha.'
+                    : 'Open these if you need something other than products, services, or a business profile.'}
+                </p>
+                {supplySupportQuickLinks}
               </div>
-            )}
-
-            <div className="mt-4">{typeSelectorGrid}</div>
-            <div className="mt-3">
-              <button
-                type="button"
-                onClick={() => setShowOtherSupplyPaths(current => !current)}
-                className="inline-flex min-h-[38px] items-center rounded-full bg-[color:var(--app-surface-muted)] px-3.5 text-[11px] font-semibold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] transition hover:bg-white"
-              >
-                {showOtherSupplyPaths
-                  ? locale === 'id'
-                    ? 'Tutup yang lain'
-                    : 'Hide other paths'
-                  : locale === 'id'
-                    ? 'Lihat yang lain'
-                    : 'See other paths'}
-              </button>
-              {showOtherSupplyPaths ? (
-                <div className="mt-2 rounded-[18px] bg-[color:var(--app-surface-muted)] p-3 dark:bg-slate-950/45">
-                  <p className="text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                    {locale === 'id'
-                      ? 'Buka ini kalau yang kamu cari bukan produk, jasa, atau profil usaha.'
-                      : 'Open these if you need something other than products, services, or a business profile.'}
-                  </p>
-                  {supplySupportQuickLinks}
-                </div>
-              ) : null}
+            ) : null}
+          </div>
+        </>
+      ),
+      aside: (
+        <>
+          <div className="rounded-[14px] bg-[color:var(--app-surface-muted)] p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)]">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/55 dark:text-emerald-200">
+              <ClipboardList className="h-4 w-4" />
+            </span>
+            <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+              {locale === 'id' ? 'Yang dicari orang' : 'What buyers need'}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+              {locale === 'id'
+                ? 'Produk, jasa, supplier, lokasi, dan talent paling mudah ditemukan kalau judulnya jelas.'
+                : 'Products, services, suppliers, spaces, and talent are easier to find with a clear title.'}
+            </p>
+          </div>
+          <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
+            <p className="text-[13px] font-black text-[color:var(--app-text)]">
+              {locale === 'id' ? 'Tips singkat' : 'Quick tips'}
+            </p>
+            <div className="mt-2 grid gap-1.5">
+              {(locale === 'id'
+                ? [
+                    'Judul langsung jelas',
+                    'Harga atau range ada',
+                    'Foto utama siap',
+                  ]
+                : ['Clear title', 'Price or range added', 'Cover photo ready']
+              ).map(item => (
+                <span
+                  key={item}
+                  className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                  {item}
+                </span>
+              ))}
             </div>
-          </CreateHeroShell>
-        </div>
-      </CreateCanvas>
-    );
+          </div>
+        </>
+      ),
+    });
   }
 
+  const primaryActionWillAdvance =
+    currentStep < TOTAL_STEPS &&
+    !(
+      isSimpleModeActive &&
+      !promotionEnabled &&
+      (!requiresPrimaryImageForType(activeType) || currentStep >= 3)
+    );
+  const nextStepLabel =
+    stepLabels[Math.min(currentStep, TOTAL_STEPS - 1)] ||
+    (locale === 'id' ? 'Berikutnya' : 'Next');
+  const primaryActionLabel = uploadingImages
+    ? locale === 'id'
+      ? 'Lagi upload foto...'
+      : 'Uploading images...'
+    : uploadingDocs
+      ? locale === 'id'
+        ? 'Lagi upload dokumen...'
+        : 'Uploading files...'
+      : loading
+        ? locale === 'id'
+          ? 'Lagi nyimpen...'
+          : 'Saving...'
+        : primaryActionWillAdvance
+          ? locale === 'id'
+            ? `Lanjut: ${nextStepLabel}`
+            : `Next: ${nextStepLabel}`
+          : contentStatus === 'active'
+            ? locale === 'id'
+              ? 'Simpan perubahan'
+              : 'Save changes'
+            : locale === 'id'
+              ? 'Selesai & Publikasikan'
+              : 'Finish & Publish';
+
   return (
-    <CreateCanvas>
-      <div className="ui-page-stack mx-auto w-full max-w-5xl px-0 py-2 sm:px-4 sm:py-4">
-        <CreatePageHeader
-          locale={locale}
-          formEyebrow={effectiveFormEyebrow}
-          formTitle={effectiveFormTitle}
-          formSubtitle={effectiveFormSubtitle}
-          uiVariant={isNeedServiceJourney ? 'compact' : 'default'}
-          contentStatus={contentStatus}
-          currentStep={currentStep}
-          totalSteps={TOTAL_STEPS}
-          stepLabels={stepLabels}
-          onStepSelect={step =>
-            goToStep(step, {
-              draftId: workingId,
-              typeId: activeType,
-            })
-          }
-          activeTypeIcon={ActiveTypeIcon}
-          selectedTypeLabel={selectedTypeLabel}
-          typePicked={typePicked}
-          typeThemeBadgeClass={typeTheme.badge}
-          listingSideContextLabel={listingSideContextLabel}
-          typeSummaryDescription={typeSummaryDescription}
-          requiredDone={requiredDone}
-          requiredTotal={requiredFields.length}
-          imagesCount={images.length}
-          documentsCount={documents.length}
-          promotionEnabled={promotionEnabled}
-          promotionRequiredDone={promotionRequiredDone}
-          promotionRequiredTotal={promotionRequiredFields.length}
-          publishBlockersCount={publishBlockers.length}
-          publishReadyCount={publishReadyCount}
-          publishReadinessTotal={publishReadiness.length}
-          supportsSimpleMode={supportsSimpleMode}
-          listingMode={listingMode}
-          onListingModeChange={setListingMode}
-          hideModeSwitch={isNeedServiceJourney}
-          canChangeTypeBeforeDraft={canChangeTypeBeforeDraft}
-          onChangeType={openTypePicker}
-          typeSelectionLocked={typeSelectionLocked}
-        />
+    <div className="ui-page-stack mx-auto w-full max-w-none px-0 py-0">
+      <CreatePageHeader
+        locale={locale}
+        formEyebrow={effectiveFormEyebrow}
+        formTitle={effectiveFormTitle}
+        formSubtitle={effectiveFormSubtitle}
+        uiVariant={isNeedServiceJourney ? 'compact' : 'default'}
+        contentStatus={contentStatus}
+        currentStep={currentStep}
+        totalSteps={TOTAL_STEPS}
+        stepLabels={stepLabels}
+        onStepSelect={step =>
+          goToStep(step, {
+            draftId: workingId,
+            typeId: activeType,
+          })
+        }
+        activeTypeIcon={ActiveTypeIcon}
+        selectedTypeLabel={selectedTypeLabel}
+        typePicked={typePicked}
+        typeThemeBadgeClass={typeTheme.badge}
+        listingSideContextLabel={listingSideContextLabel}
+        typeSummaryDescription={typeSummaryDescription}
+        requiredDone={requiredDone}
+        requiredTotal={requiredFields.length}
+        imagesCount={images.length}
+        documentsCount={documents.length}
+        promotionEnabled={promotionEnabled}
+        promotionRequiredDone={promotionRequiredDone}
+        promotionRequiredTotal={promotionRequiredFields.length}
+        publishBlockersCount={publishBlockers.length}
+        publishReadyCount={publishReadyCount}
+        publishReadinessTotal={publishReadiness.length}
+        supportsSimpleMode={supportsSimpleMode}
+        listingMode={listingMode}
+        onListingModeChange={setListingMode}
+        hideModeSwitch={isNeedServiceJourney}
+        canChangeTypeBeforeDraft={canChangeTypeBeforeDraft}
+        onChangeType={openTypePicker}
+        typeSelectionLocked={typeSelectionLocked}
+      />
 
-        {infoMessage && (
-          <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/92 px-3 py-2.5 text-xs text-[color:var(--app-accent)]">
-            {infoMessage}
-          </div>
-        )}
-        {errorMessage && (
-          <div className="mt-3 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)]/92 px-3 py-2.5 text-xs text-[color:var(--app-danger)]">
-            {errorMessage}
-            {errorDetails.length > 1 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {errorDetails.slice(0, 6).map(detail => (
-                  <span
-                    key={detail}
-                    className="rounded-full border border-[color:var(--app-danger-border)] bg-[color:var(--app-surface-strong)]/88 px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-danger)] backdrop-blur-sm"
-                  >
-                    {detail}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {hasForeignBrandSignalForSupply ? (
-          <div className="mt-3 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)]/92 px-3 py-2.5 text-[11px] text-[color:var(--app-danger)]">
-            <p className="font-semibold">
-              {locale === 'id'
-                ? 'Ada sinyal brand luar di listing ini.'
-                : 'Foreign-brand signals were found in this listing.'}
-            </p>
-            <p className="mt-1 leading-5">
-              {locale === 'id'
-                ? `Hapus referensi seperti ${foreignBrandSignalSummary} dulu sebelum tayang.`
-                : `Remove references such as ${foreignBrandSignalSummary} before publishing.`}
-            </p>
-          </div>
-        ) : null}
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-3 xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:gap-3"
-        >
-          <div className="space-y-2.5">
-            {showStepOneSetupCard && (
-              <>
-                <CreateFormSectionCard
-                  eyebrow={locale === 'id' ? 'Bagian 1' : 'Section 1'}
-                  title={
-                    locale === 'id' ? 'Mulai dari sini' : 'Start here'
-                  }
-                  description={
-                    locale === 'id'
-                      ? 'Pilih tujuan posting dan kategori utamanya.'
-                      : 'Pick the posting direction and main category.'
-                  }
+      {infoMessage && (
+        <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/92 px-3 py-2.5 text-xs text-[color:var(--app-accent)]">
+          {infoMessage}
+        </div>
+      )}
+      {errorMessage && (
+        <div className="mt-3 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)]/92 px-3 py-2.5 text-xs text-[color:var(--app-danger)]">
+          {errorMessage}
+          {errorDetails.length > 1 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {errorDetails.slice(0, 6).map(detail => (
+                <span
+                  key={detail}
+                  className="rounded-full border border-[color:var(--app-danger-border)] bg-[color:var(--app-surface-strong)]/88 px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-danger)] backdrop-blur-sm"
                 >
-                  {typePicked && supportsDemandListing(activeType) && (
-                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {locale === 'id'
-                              ? 'Kamu mau apa?'
-                              : 'What do you want to do?'}
-                          </label>
-                          <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                            {locale === 'id'
-                              ? 'Pilih yang paling sesuai dulu.'
-                              : 'Pick the closest path first.'}
-                          </p>
-                        </div>
-                        <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text)]">
-                          {listingSideContextLabel}
-                        </span>
-                      </div>
-                      <div className="mt-3 grid grid-cols-1 min-[420px]:grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          disabled={!canSwitchListingSide}
-                          onClick={() => {
-                            setListingSide('demand');
-                            syncCreateRoute({ sideId: 'demand' });
-                          }}
-                          className={`rounded-lg border px-2.5 py-2 text-left text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                            listingSide === 'demand'
-                              ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
-                              : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
-                          }`}
-                        >
-                          <span className="mb-1 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-current/15 bg-[color:var(--app-surface-strong)]">
-                            <Target className="h-4 w-4" />
-                          </span>
-                          {demandActionTitle}
-                          <span className="mt-1 block text-[11px] font-normal text-[color:var(--app-text-soft)]">
-                            {demandActionBody}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canSwitchListingSide}
-                          onClick={() => {
-                            setListingSide('supply');
-                            syncCreateRoute({ sideId: 'supply' });
-                          }}
-                          className={`rounded-lg border px-2.5 py-2 text-left text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                            listingSide === 'supply'
-                              ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                              : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
-                          }`}
-                        >
-                          <span className="mb-1 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-current/15 bg-[color:var(--app-surface-strong)]">
-                            <Sparkles className="h-4 w-4" />
-                          </span>
-                          {supplyActionTitle}
-                          <span className="mt-1 block text-[11px] font-normal text-[color:var(--app-text-soft)]">
-                            {supplyActionBody}
-                          </span>
-                        </button>
-                      </div>
-                      {!canSwitchListingSide && (
-                        <p className="mt-2 text-[11px] text-[color:var(--app-text-soft)]">
-                          {locale === 'id'
-                            ? 'Arah ini udah dikunci.'
-                            : 'Direction is locked.'}
+                  {detail}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasForeignBrandSignalForSupply ? (
+        <div className="mt-3 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)]/92 px-3 py-2.5 text-[11px] text-[color:var(--app-danger)]">
+          <p className="font-semibold">
+            {locale === 'id'
+              ? 'Ada sinyal brand luar di listing ini.'
+              : 'Foreign-brand signals were found in this listing.'}
+          </p>
+          <p className="mt-1 leading-5">
+            {locale === 'id'
+              ? `Hapus referensi seperti ${foreignBrandSignalSummary} dulu sebelum tayang.`
+              : `Remove references such as ${foreignBrandSignalSummary} before publishing.`}
+          </p>
+        </div>
+      ) : null}
+
+      <form
+        onSubmit={handleSubmit}
+        data-testid="create-listing-form"
+        className="mt-4 xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]"
+      >
+        <div className="space-y-3">
+          {showStepOneSetupCard && (
+            <div className="space-y-2">
+                {typePicked && supportsDemandListing(activeType) && (
+                  <section className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] dark:border-[color:var(--app-border-strong)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                          {locale === 'id' ? 'Arah posting' : 'Post direction'}
                         </p>
-                      )}
-                    </div>
-                  )}
-
-                  {typePicked && activeTypeIsProperty && (
-                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                      <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
-                        {locale === 'id' ? 'Sektor listing' : 'Listing sector'}
-                      </label>
-                      <p className="text-[11px] text-[color:var(--app-text)]">
-                        {locale === 'id'
-                          ? 'Untuk properti, sektornya otomatis Real Estate.'
-                          : 'Property is mapped to Real Estate.'}
-                      </p>
-                    </div>
-                  )}
-
-                  {showSectorPicker && !isSimpleModeActive && (
-                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {locale === 'id'
-                              ? 'Kategori usaha (opsional)'
-                              : 'Industry specialization (optional)'}
-                          </label>
-                          <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                            {locale === 'id'
-                              ? 'Boleh kosong. Pakai kalau butuh field yang lebih spesifik.'
-                              : 'Optional. Use it for more specific fields.'}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSectorQuery('');
-                            setIsSectorPickerOpen(true);
-                          }}
-                          className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-info-border)] hover:text-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)]"
-                        >
-                          {selectedSectorView
-                            ? locale === 'id'
-                              ? 'Ganti kategori'
-                              : 'Change category'
-                            : locale === 'id'
-                              ? 'Pilih kategori'
-                              : 'Choose category'}
-                        </button>
-                      </div>
-
-                      {selectedSectorView ? (
-                        <div className="mt-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              style={selectedSectorView.colorStyle}
-                              className={cn(
-                                'inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm',
-                                selectedSectorView.colorClass,
-                              )}
-                            >
-                              <selectedSectorView.icon className="h-3.5 w-3.5" />
-                              {getSectorLabel(selectedSectorView, locale)}
-                            </span>
-                            {selectedSubSectorView ? (
-                              <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]">
-                                {getSubSectorName(
-                                  selectedSubSectorView,
-                                  locale,
-                                )}
-                              </span>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSector('');
-                                setSubSector('');
-                                setSectorQuery('');
-                              }}
-                              className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-danger)] dark:border-[color:var(--app-border-strong)]"
-                            >
-                              {locale === 'id' ? 'Hapus' : 'Clear'}
-                            </button>
-                          </div>
-                          {getSectorDescription(selectedSectorView, locale) ? (
-                            <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                              {getSectorDescription(selectedSectorView, locale)}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <p className="mt-3 rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                        <p className="truncate text-xs font-medium text-[color:var(--app-text)]">
                           {locale === 'id'
-                            ? 'Belum dipilih, tapi tetap bisa lanjut.'
-                            : 'Nothing selected. You can continue.'}
+                            ? 'Pilih cepat, detail bisa diedit nanti.'
+                            : 'Pick quickly. Details can be edited later.'}
                         </p>
-                      )}
-                    </div>
-                  )}
-                  {typePicked && !isSimpleModeActive ? (
-                    <CreateListingTemplatePicker
-                      locale={localeCode}
-                      listingSide={listingSide}
-                      activeType={activeType as ListingTypeId}
-                      onApplyTemplate={applyListingTemplate}
-                    />
-                  ) : null}
-                </CreateFormSectionCard>
-              </>
-            )}
-
-            {/* Step 1 fields */}
-            {currentStep === 1 && (
-              <>
-                <CreateFormSectionCard
-                  eyebrow={
-                    locale === 'id'
-                      ? `Bagian ${isNeedServiceJourney ? 1 : 2}`
-                      : `Section ${isNeedServiceJourney ? 1 : 2}`
-                  }
-                  title={stepOneMainTitle}
-                  description={stepOneMainDescription}
-                  aside={
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                      {locale === 'id'
-                        ? `${requiredDone}/${requiredFields.length} wajib diisi`
-                        : `${requiredDone}/${requiredFields.length} required`}
-                    </span>
-                  }
-                >
-                  {!typePicked && (
-                    <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-                      {locale === 'id'
-                        ? 'Setelah pilih tipe, isi bagian penting listing di sini.'
-                        : 'After picking the type, fill the core listing info here.'}
-                    </div>
-                  )}
-                  {typePicked && (
-                    <>
-                      {isSimpleModeActive && (
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3 py-3 dark:border-emerald-900 dark:bg-emerald-950/20">
-                          <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
-                            {simpleModeCallout}
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {simpleModeCalloutChips.map(chip => (
-                              <span
-                                key={chip}
-                                className="rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-slate-950/70 dark:text-emerald-200"
-                              >
-                                {chip}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-                        {step1PrimaryFields.map(renderFieldBlock)}
                       </div>
-                      {step1SecondaryFields.length > 0 && (
-                        <DetailAccordion
-                          title={
-                            locale === 'id'
-                              ? isSimpleModeActive
-                                ? 'Kalau mau bikin makin jelas'
-                                : 'Detail tambahan (opsional)'
-                              : isSimpleModeActive
-                                ? 'Add more if you want clarity'
-                                : 'Optional details'
-                          }
-                          description={
-                            locale === 'id'
-                              ? isSimpleModeActive
-                                ? 'Boleh kosong.'
-                                : 'Isi kalau memang kepake.'
-                              : isSimpleModeActive
-                                ? 'Optional.'
-                                : 'Fill if relevant.'
-                          }
-                          className="bg-[color:var(--app-surface-muted)]"
-                        >
-                          <div className="grid grid-cols-1 gap-2.5 text-[color:var(--app-text)] lg:grid-cols-2">
-                            {step1SecondaryFields.map(renderFieldBlock)}
-                          </div>
-                        </DetailAccordion>
-                      )}
-                    </>
-                  )}
-                </CreateFormSectionCard>
-              </>
-            )}
-
-            {/* Step 2 fields */}
-            {currentStep === 2 && (
-              <>
-                <CreateFormSectionCard
-                  eyebrow={
-                    locale === 'id'
-                      ? `Bagian ${isNeedServiceJourney ? 2 : 3}`
-                      : `Section ${isNeedServiceJourney ? 2 : 3}`
-                  }
-                  title={stepTwoMainTitle}
-                  description={stepTwoMainDescription}
-                  aside={
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                      {isSimpleModeActive
-                        ? locale === 'id'
-                          ? 'boleh kosong semua'
-                          : 'all optional'
-                        : locale === 'id'
-                          ? `${step2RequiredFields.length} field utama`
-                          : `${step2RequiredFields.length} main fields`}
-                    </span>
-                  }
-                >
-                  {!typePicked && (
-                    <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-                      {locale === 'id'
-                        ? 'Pilih tipe dulu di step 1 ya.'
-                        : 'Pick the type in step 1 first.'}
-                    </div>
-                  )}
-                  {typePicked && (
-                    <>
-                      <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-                        {isSimpleModeActive
-                          ? locale === 'id'
-                            ? 'Tambah detail kalau emang perlu.'
-                            : 'Add detail only if needed.'
-                          : locale === 'id'
-                            ? demandTypeMeta?.step2HintId ||
-                              typeConfig.step2HintId
-                            : demandTypeMeta?.step2HintEn ||
-                              typeConfig.step2HintEn}
-                      </div>
-                      {step2Fields.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-                          {isSimpleModeActive
-                            ? locale === 'id'
-                              ? 'Kalau pakai mode sat set, di step ini nggak ada detail tambahan yang wajib diisi.'
-                              : 'There are no extra detail fields you must fill in during this quick step.'
-                            : locale === 'id'
-                              ? 'Belum ada field detail tambahan buat kombinasi ini.'
-                              : 'No additional detail fields for this combination yet.'}
-                        </div>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
-                            {step2RequiredFields.map(renderFieldBlock)}
-                          </div>
-                          {step2OptionalFields.length > 0 && (
-                            <DetailAccordion
-                              title={
-                                locale === 'id'
-                                  ? isSimpleModeActive
-                                    ? 'Tambah lagi kalau perlu'
-                                    : 'Detail tambahan (opsional)'
-                                  : isSimpleModeActive
-                                    ? 'Add more if needed'
-                                    : 'Optional details'
-                              }
-                              description={
-                                locale === 'id'
-                                  ? isSimpleModeActive
-                                    ? 'Boleh kosong semua.'
-                                    : 'Tambah kalau bikin lebih jelas.'
-                                  : isSimpleModeActive
-                                    ? 'Everything here is optional.'
-                                    : 'Add if it helps clarity.'
-                              }
-                              className="bg-[color:var(--app-surface-muted)]"
-                            >
-                              <div className="grid grid-cols-1 gap-2.5 text-[color:var(--app-text)] lg:grid-cols-2">
-                                {step2OptionalFields.map(renderFieldBlock)}
-                              </div>
-                            </DetailAccordion>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
-                </CreateFormSectionCard>
-              </>
-            )}
-
-            {/* Step 3: media + docs + tags */}
-            {currentStep === 3 && (
-              <>
-                <CreateFormSectionCard
-                  eyebrow={
-                    locale === 'id'
-                      ? `Bagian ${isNeedServiceJourney ? 3 : 4}`
-                      : `Section ${isNeedServiceJourney ? 3 : 4}`
-                  }
-                  title={stepThreeMainTitle}
-                  description={stepThreeMainDescription}
-                  aside={
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                      {images.length + documents.length}{' '}
-                      {locale === 'id' ? 'aset' : 'assets'}
-                    </span>
-                  }
-                >
-                  {typePicked && (
-                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                      <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? mediaGuide.titleId
-                          : mediaGuide.titleEn}
-                      </p>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                        {mediaVisualItems.map((item, index) => {
-                          const GuideIcon =
-                            [ImageIcon, FileText, Upload][index] || ImageIcon;
-                          return (
-                            <div
-                              key={item}
-                              title={mediaItems[index] || item}
-                              className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text)]"
-                            >
-                              <GuideIcon className="mb-2 h-4 w-4 text-[color:var(--app-info)]" />
-                              <span className="font-semibold">{item}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {showImages && (
-                    <div>
-                      <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
-                        <span className="inline-flex items-center gap-1.5">
-                          <ImageIcon className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
-                          <span>
-                            {locale === 'id' ? 'Foto' : 'Images'}{' '}
-                            {images.length > 0 && `(${images.length})`}
-                          </span>
-                        </span>
-                      </label>
-                      <ImageUpload
-                        images={images}
-                        onChange={setImages}
-                        onAddFiles={handleAddImages}
-                        maxImages={10}
-                        maxSizeMB={15}
-                        locale={locale}
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
-                        <span>
-                          {locale === 'id'
-                            ? 'Dokumen tambahan'
-                            : 'Supporting documents'}
-                        </span>
+                      <span className="inline-flex max-w-[54vw] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                        <span className="truncate">{selectedTypeLabel}</span>
                       </span>
-                    </label>
-                    <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                      <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[color:var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent)]">
-                        <Upload className="w-3.5 h-3.5" />
-                        {locale === 'id' ? 'Tambah dokumen' : 'Add documents'}
-                        <input
-                          type="file"
-                          accept={DOC_ACCEPT}
-                          multiple
-                          className="hidden"
-                          onChange={e => {
-                            void handleAddDocuments(e.target.files);
-                            e.currentTarget.value = '';
-                          }}
-                        />
-                      </label>
-                      <p className="mt-2 text-[11px] text-[color:var(--app-text)]">
-                        {locale === 'id'
-                          ? 'PDF, DOC, XLS, CSV, PPT, ZIP. Maksimal 20MB per file.'
-                          : 'PDF, DOC, XLS, CSV, PPT, ZIP. Max 20MB/file.'}
-                      </p>
-                      {documents.length > 0 && (
-                        <div className="mt-2 space-y-2">
-                          {documents.map((doc, idx) => (
-                            <div
-                              key={`${doc.name}-${idx}`}
-                              className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1.5 text-xs"
-                            >
-                              <div className="min-w-0">
-                                <div className="truncate font-medium text-[color:var(--app-text)]">
-                                  {doc.name}
-                                </div>
-                                <div className="text-[color:var(--app-text)]">
-                                  {formatFileSize(doc.size)}
-                                  {doc.url
-                                    ? ` - ${locale === 'id' ? 'Udah masuk' : 'Saved'}`
-                                    : ''}
-                                  {doc.uploading ? ` - Uploading` : ''}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                {doc.url && (
-                                  <a
-                                    href={doc.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 rounded-md border border-[color:var(--app-border)] px-2 py-1 text-[color:var(--app-text)]"
-                                  >
-                                    <FileText className="w-3.5 h-3.5" />
-                                    {locale === 'id' ? 'Buka' : 'View'}
-                                  </a>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setDocuments(prev =>
-                                      prev.filter((_, i) => i !== idx),
-                                    )
-                                  }
-                                  className="inline-flex items-center justify-center rounded-md border border-[color:var(--app-danger-border)] px-2 py-1 text-[color:var(--app-danger)]"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
-                        <span>{locale === 'id' ? 'Tag' : 'Tags'}</span>
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      value={fieldValues.tags || ''}
-                      onChange={e => updateField('tags', e.target.value)}
-                      placeholder={
-                        locale === 'id'
-                          ? 'Pisahin pakai koma'
-                          : 'Comma-separated'
-                      }
-                      className="w-full h-11 rounded-[16px] border border-slate-200/85 bg-white/90 px-3.5 text-sm shadow-[0_18px_34px_-26px_rgba(15,23,42,0.26)] backdrop-blur-sm transition focus:border-sky-300 focus:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100/90 dark:border-slate-700/80 dark:bg-slate-950/78 dark:text-slate-100 dark:focus:border-sky-700 dark:focus:bg-slate-950 dark:focus:ring-sky-900/30"
-                    />
-                  </div>
-                </CreateFormSectionCard>
-              </>
-            )}
-
-            {/* Step 4: promotion setup */}
-            {currentStep === 4 && (
-              <>
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                  <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {locale === 'id'
-                      ? 'Promo listing, kalau mau'
-                      : 'Optional Listing Promotion'}
-                  </p>
-                  <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                    {locale === 'id'
-                      ? 'Boleh dilewatin. Pakai kalau mau dorong listingnya lebih kenceng.'
-                      : 'Optional. Use it when you want extra push.'}
-                  </p>
-                  <div className="mt-3 grid grid-cols-1 gap-2 min-[460px]:grid-cols-3">
-                    {[
-                      locale === 'id'
-                        ? 'Tanpa promo pun listing tetap bisa tayang normal.'
-                        : 'You can still publish normally without promotion.',
-                      locale === 'id'
-                        ? 'Promo cocok buat diskon, voucher, atau boost listing.'
-                        : 'Promotion is useful for discounts, vouchers, or boosting a listing.',
-                      locale === 'id'
-                        ? 'Kalau masih bingung, skip dulu juga aman.'
-                        : 'If unsure, skip promotion for now.',
-                    ].map(item => (
-                      <div
-                        key={item}
-                        className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        aria-pressed={listingSide === 'demand'}
+                        disabled={!canSwitchListingSide}
+                        onClick={() => {
+                          if (listingSide === 'demand') return;
+                          setListingSide('demand');
+                          syncCreateRoute({ sideId: 'demand' });
+                        }}
+                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                          listingSide === 'demand'
+                            ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-warning-border)_70%,transparent)]'
+                            : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
+                        }`}
                       >
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-3 inline-flex rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-1 text-[11px] font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPromotionEnabled(true);
-                        setErrorMessage('');
-                      }}
-                      className={`px-3 py-1 rounded-md transition ${
-                        promotionEnabled
-                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                          : 'text-[color:var(--app-text)]'
-                      }`}
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5" />
-                        {locale === 'id' ? 'Pakai promo' : 'Use Promotion'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPromotionEnabled(false);
-                        setErrorMessage('');
-                      }}
-                      className={`px-3 py-1 rounded-md transition ${
-                        !promotionEnabled
-                          ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
-                          : 'text-[color:var(--app-text)]'
-                      }`}
-                    >
-                      <span className="inline-flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        {locale === 'id' ? 'Skip step ini' : 'Skip This Step'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
+                          {listingSide === 'demand' ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <Target className="h-4 w-4" />
+                          )}
+                        </span>
+                        <span className="min-w-0 text-[13px] font-black leading-4">
+                          <span className="line-clamp-2">{demandActionTitle}</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={listingSide === 'supply'}
+                        disabled={!canSwitchListingSide}
+                        onClick={() => {
+                          if (listingSide === 'supply') return;
+                          setListingSide('supply');
+                          syncCreateRoute({ sideId: 'supply' });
+                        }}
+                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                          listingSide === 'supply'
+                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-accent-border)_70%,transparent)]'
+                            : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
+                        }`}
+                      >
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
+                          {listingSide === 'supply' ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <Sparkles className="h-4 w-4" />
+                          )}
+                        </span>
+                        <span className="min-w-0 text-[13px] font-black leading-4">
+                          <span className="line-clamp-2">{supplyActionTitle}</span>
+                        </span>
+                      </button>
+                    </div>
+                    {!canSwitchListingSide && (
+                      <p className="px-1 pt-2 text-[11px] text-[color:var(--app-text-soft)]">
+                        {locale === 'id'
+                          ? 'Arah ini udah dikunci.'
+                          : 'Direction is locked.'}
+                      </p>
+                    )}
+                  </section>
+                )}
 
-                {!promotionEnabled && (
-                  <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-                    {locale === 'id'
-                      ? 'Tanpa promo pun listing tetap bisa langsung tayang. Nanti kalau butuh diskon atau campaign, tinggal aktifin pas edit listing.'
-                      : 'The listing can still be published without promotion. If you need discounts or a campaign later, enable it while editing.'}
+                {typePicked && activeTypeIsProperty && (
+                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                    <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
+                      {locale === 'id' ? 'Sektor listing' : 'Listing sector'}
+                    </label>
+                    <p className="text-[11px] text-[color:var(--app-text)]">
+                      {locale === 'id'
+                        ? 'Untuk properti, sektornya otomatis Real Estate.'
+                        : 'Property is mapped to Real Estate.'}
+                    </p>
                   </div>
                 )}
 
-                {promotionEnabled && (
-                  <>
-                    <div className="rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] text-[color:var(--app-accent)]">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span>
+                {showSectorPicker && !isSimpleModeActive && (
+                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                           {locale === 'id'
-                            ? `Lengkapin ${promotionRequiredDone}/${promotionRequiredFields.length} field promo yang wajib dulu.`
-                            : `Complete ${promotionRequiredDone}/${promotionRequiredFields.length} required promotion fields.`}
-                        </span>
-                        {selectedPromotionOfferType && (
-                          <span className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-accent)]">
-                            {getPromotionOfferLabel(selectedPromotionOfferType)}
-                          </span>
-                        )}
+                            ? 'Kategori usaha (opsional)'
+                            : 'Industry specialization (optional)'}
+                        </label>
+                        <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
+                          {locale === 'id'
+                            ? 'Boleh kosong. Pakai kalau butuh field yang lebih spesifik.'
+                            : 'Optional. Use it for more specific fields.'}
+                        </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSectorQuery('');
+                          setIsSectorPickerOpen(true);
+                        }}
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-info-border)] hover:text-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)]"
+                      >
+                        {selectedSectorView
+                          ? locale === 'id'
+                            ? 'Ganti kategori'
+                            : 'Change category'
+                          : locale === 'id'
+                            ? 'Pilih kategori'
+                            : 'Choose category'}
+                      </button>
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                      <div>
-                        <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {locale === 'id'
-                            ? 'Benefit utama'
-                            : 'Primary benefit programs'}
-                        </p>
-                        <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {locale === 'id'
-                            ? 'Pilih benefit yang paling kerasa buat user. Sistem nanti cek apakah fee, PPN, dan opex-nya masih aman.'
-                            : 'Pick the benefit users will feel most. The system will then check if fees, tax, and opex are still covered.'}
-                        </p>
+                    {selectedSectorView ? (
+                      <div className="mt-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            style={selectedSectorView.colorStyle}
+                            className={cn(
+                              'inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm',
+                              selectedSectorView.colorClass,
+                            )}
+                          >
+                            <selectedSectorView.icon className="h-3.5 w-3.5" />
+                            {getSectorLabel(selectedSectorView, locale)}
+                          </span>
+                          {selectedSubSectorView ? (
+                            <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]">
+                              {getSubSectorName(selectedSubSectorView, locale)}
+                            </span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSector('');
+                              setSubSector('');
+                              setSectorQuery('');
+                            }}
+                            className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-danger)] dark:border-[color:var(--app-border-strong)]"
+                          >
+                            {locale === 'id' ? 'Hapus' : 'Clear'}
+                          </button>
+                        </div>
+                        {getSectorDescription(selectedSectorView, locale) ? (
+                          <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                            {getSectorDescription(selectedSectorView, locale)}
+                          </p>
+                        ) : null}
                       </div>
-                      <div className="grid gap-3 md:grid-cols-3">
-                        {PROMOTION_PRIMARY_CARDS.map(card => {
+                    ) : (
+                      <p className="mt-3 rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                        {locale === 'id'
+                          ? 'Belum dipilih, tapi tetap bisa lanjut.'
+                          : 'Nothing selected. You can continue.'}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {typePicked && !isSimpleModeActive ? (
+                  <CreateListingTemplatePicker
+                    locale={localeCode}
+                    listingSide={listingSide}
+                    activeType={activeType as ListingTypeId}
+                    onApplyTemplate={applyListingTemplate}
+                  />
+                ) : null}
+            </div>
+          )}
+
+          {/* Step 1 fields */}
+          {currentStep === 1 && (
+            <>
+              <CreateFormSectionCard
+                eyebrow={locale === 'id' ? 'Isi utama' : 'Main info'}
+                title={stepOneMainTitle}
+                description={stepOneMainDescription}
+                aside={
+                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    {locale === 'id'
+                      ? `${requiredDone}/${requiredFields.length} wajib diisi`
+                      : `${requiredDone}/${requiredFields.length} required`}
+                  </span>
+                }
+              >
+                {!typePicked && (
+                  <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                    {locale === 'id'
+                      ? 'Pilih tipe dulu, lalu isi inti.'
+                      : 'After picking the type, fill the core listing info here.'}
+                  </div>
+                )}
+                {typePicked && (
+                  <>
+                    {isSimpleModeActive && (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3 py-3 dark:border-emerald-900 dark:bg-emerald-950/20">
+                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                          {simpleModeCallout}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {simpleModeCalloutChips.map(chip => (
+                            <span
+                              key={chip}
+                              className="rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-slate-950/70 dark:text-emerald-200"
+                            >
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+                      {step1PrimaryFields.map(renderFieldBlock)}
+                    </div>
+                    {step1SecondaryFields.length > 0 && (
+                      <DetailAccordion
+                        title={
+                          locale === 'id'
+                            ? isSimpleModeActive
+                              ? 'Tambah kalau perlu'
+                              : 'Detail tambahan (opsional)'
+                            : isSimpleModeActive
+                              ? 'Add more if you want clarity'
+                              : 'Optional details'
+                        }
+                        description={
+                          locale === 'id'
+                            ? isSimpleModeActive
+                              ? 'Boleh kosong.'
+                              : 'Isi kalau memang kepake.'
+                            : isSimpleModeActive
+                              ? 'Optional.'
+                              : 'Fill if relevant.'
+                        }
+                        className="bg-[color:var(--app-surface-muted)]"
+                      >
+                        <div className="grid grid-cols-1 gap-2.5 text-[color:var(--app-text)] lg:grid-cols-2">
+                          {step1SecondaryFields.map(renderFieldBlock)}
+                        </div>
+                      </DetailAccordion>
+                    )}
+                  </>
+                )}
+              </CreateFormSectionCard>
+            </>
+          )}
+
+          {/* Step 2 fields */}
+          {currentStep === 2 && (
+            <>
+              <CreateFormSectionCard
+                eyebrow={locale === 'id' ? 'Detail opsional' : 'Optional detail'}
+                title={stepTwoMainTitle}
+                description={stepTwoMainDescription}
+                aside={
+                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    {isSimpleModeActive
+                      ? locale === 'id'
+                        ? 'boleh kosong semua'
+                        : 'all optional'
+                      : locale === 'id'
+                        ? `${step2RequiredFields.length} field utama`
+                        : `${step2RequiredFields.length} main fields`}
+                  </span>
+                }
+              >
+                {!typePicked && (
+                  <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                    {locale === 'id'
+                      ? 'Pilih tipe dulu di step 1 ya.'
+                      : 'Pick the type in step 1 first.'}
+                  </div>
+                )}
+                {typePicked && (
+                  <>
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                      {isSimpleModeActive
+                        ? locale === 'id'
+                          ? 'Tambah kalau perlu.'
+                          : 'Add detail only if needed.'
+                        : locale === 'id'
+                          ? demandTypeMeta?.step2HintId ||
+                            typeConfig.step2HintId
+                          : demandTypeMeta?.step2HintEn ||
+                            typeConfig.step2HintEn}
+                    </div>
+                    {step2Fields.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                        {isSimpleModeActive
+                          ? locale === 'id'
+                            ? 'Mode satset: tidak ada detail wajib.'
+                            : 'There are no extra detail fields you must fill in during this quick step.'
+                          : locale === 'id'
+                            ? 'Belum ada detail tambahan.'
+                            : 'No additional detail fields for this combination yet.'}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+                          {step2RequiredFields.map(renderFieldBlock)}
+                        </div>
+                        {step2OptionalFields.length > 0 && (
+                          <DetailAccordion
+                            title={
+                              locale === 'id'
+                                ? isSimpleModeActive
+                                  ? 'Tambah lagi kalau perlu'
+                                  : 'Detail tambahan (opsional)'
+                                : isSimpleModeActive
+                                  ? 'Add more if needed'
+                                  : 'Optional details'
+                            }
+                            description={
+                              locale === 'id'
+                                ? isSimpleModeActive
+                                  ? 'Boleh kosong semua.'
+                                  : 'Tambah kalau bikin lebih jelas.'
+                                : isSimpleModeActive
+                                  ? 'Everything here is optional.'
+                                  : 'Add if it helps clarity.'
+                            }
+                            className="bg-[color:var(--app-surface-muted)]"
+                          >
+                            <div className="grid grid-cols-1 gap-2.5 text-[color:var(--app-text)] lg:grid-cols-2">
+                              {step2OptionalFields.map(renderFieldBlock)}
+                            </div>
+                          </DetailAccordion>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </CreateFormSectionCard>
+            </>
+          )}
+
+          {/* Step 3: media + docs + tags */}
+          {currentStep === 3 && (
+            <>
+              <CreateFormSectionCard
+                eyebrow={locale === 'id' ? 'Foto & dokumen' : 'Photos & docs'}
+                title={stepThreeMainTitle}
+                description={stepThreeMainDescription}
+                aside={
+                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                    {images.length + documents.length}{' '}
+                    {locale === 'id' ? 'aset' : 'assets'}
+                  </span>
+                }
+              >
+                {typePicked && (
+                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                    <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      {locale === 'id'
+                        ? mediaGuide.titleId
+                        : mediaGuide.titleEn}
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      {mediaVisualItems.map((item, index) => {
+                        const GuideIcon =
+                          [ImageIcon, FileText, Upload][index] || ImageIcon;
+                        return (
+                          <div
+                            key={item}
+                            title={mediaItems[index] || item}
+                            className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text)]"
+                          >
+                            <GuideIcon className="mb-2 h-4 w-4 text-[color:var(--app-info)]" />
+                            <span className="font-semibold">{item}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {showImages && (
+                  <div>
+                    <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
+                        <span>
+                          {locale === 'id' ? 'Foto' : 'Images'}{' '}
+                          {images.length > 0 && `(${images.length})`}
+                        </span>
+                      </span>
+                    </label>
+                    <ImageUpload
+                      images={images}
+                      onChange={setImages}
+                      onAddFiles={handleAddImages}
+                      maxImages={10}
+                      maxSizeMB={15}
+                      locale={locale}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
+                      <span>
+                        {locale === 'id'
+                          ? 'Dokumen tambahan'
+                          : 'Supporting documents'}
+                      </span>
+                    </span>
+                  </label>
+                  <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[color:var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent)]">
+                      <Upload className="w-3.5 h-3.5" />
+                      {locale === 'id' ? 'Tambah dokumen' : 'Add documents'}
+                      <input
+                        type="file"
+                        accept={DOC_ACCEPT}
+                        multiple
+                        className="hidden"
+                        onChange={e => {
+                          void handleAddDocuments(e.target.files);
+                          e.currentTarget.value = '';
+                        }}
+                      />
+                    </label>
+                    <p className="mt-2 text-[11px] text-[color:var(--app-text)]">
+                      {locale === 'id'
+                        ? 'PDF, DOC, XLS, CSV, PPT, ZIP. Maksimal 20MB per file.'
+                        : 'PDF, DOC, XLS, CSV, PPT, ZIP. Max 20MB/file.'}
+                    </p>
+                    {documents.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        {documents.map((doc, idx) => (
+                          <div
+                            key={`${doc.name}-${idx}`}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1.5 text-xs"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate font-medium text-[color:var(--app-text)]">
+                                {doc.name}
+                              </div>
+                              <div className="text-[color:var(--app-text)]">
+                                {formatFileSize(doc.size)}
+                                {doc.url
+                                  ? ` - ${locale === 'id' ? 'Udah masuk' : 'Saved'}`
+                                  : ''}
+                                {doc.uploading ? ` - Uploading` : ''}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {doc.url && (
+                                <a
+                                  href={doc.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-md border border-[color:var(--app-border)] px-2 py-1 text-[color:var(--app-text)]"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  {locale === 'id' ? 'Buka' : 'View'}
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDocuments(prev =>
+                                    prev.filter((_, i) => i !== idx),
+                                  )
+                                }
+                                className="inline-flex items-center justify-center rounded-md border border-[color:var(--app-danger-border)] px-2 py-1 text-[color:var(--app-danger)]"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
+                      <span>{locale === 'id' ? 'Tag' : 'Tags'}</span>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fieldValues.tags || ''}
+                    onChange={e => updateField('tags', e.target.value)}
+                    placeholder={
+                      locale === 'id' ? 'Pisahin pakai koma' : 'Comma-separated'
+                    }
+                    className="h-12 w-full min-w-0 rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-[15px] font-medium text-[color:var(--app-text)] shadow-[0_1px_0_rgba(15,23,42,0.04)] transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-[color:var(--app-accent)]"
+                  />
+                </div>
+              </CreateFormSectionCard>
+            </>
+          )}
+
+          {/* Step 4: promotion setup */}
+          {currentStep === 4 && (
+            <>
+              <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Promo, opsional'
+                    : 'Optional Listing Promotion'}
+                </p>
+                <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Boleh skip. Pakai kalau mau dorong listing.'
+                    : 'Optional. Use it when you want extra push.'}
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-2 min-[460px]:grid-cols-3">
+                  {[
+                    locale === 'id'
+                      ? 'Tanpa promo tetap bisa tayang.'
+                      : 'You can still publish normally without promotion.',
+                    locale === 'id'
+                      ? 'Cocok buat diskon, voucher, boost.'
+                      : 'Promotion is useful for discounts, vouchers, or boosting a listing.',
+                    locale === 'id'
+                      ? 'Kalau masih bingung, skip dulu juga aman.'
+                      : 'If unsure, skip promotion for now.',
+                  ].map(item => (
+                    <div
+                      key={item}
+                      className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 inline-flex rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-1 text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromotionEnabled(true);
+                      setErrorMessage('');
+                    }}
+                    className={`px-3 py-1 rounded-md transition ${
+                      promotionEnabled
+                        ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                        : 'text-[color:var(--app-text)]'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {locale === 'id' ? 'Pakai promo' : 'Use Promotion'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromotionEnabled(false);
+                      setErrorMessage('');
+                    }}
+                    className={`px-3 py-1 rounded-md transition ${
+                      !promotionEnabled
+                        ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
+                        : 'text-[color:var(--app-text)]'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      {locale === 'id' ? 'Skip step ini' : 'Skip This Step'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {!promotionEnabled && (
+                <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Tanpa promo tetap bisa tayang. Aktifkan nanti saat edit.'
+                    : 'The listing can still be published without promotion. If you need discounts or a campaign later, enable it while editing.'}
+                </div>
+              )}
+
+              {promotionEnabled && (
+                <>
+                  <div className="rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] text-[color:var(--app-accent)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        {locale === 'id'
+                          ? `Isi promo wajib: ${promotionRequiredDone}/${promotionRequiredFields.length}.`
+                          : `Complete ${promotionRequiredDone}/${promotionRequiredFields.length} required promotion fields.`}
+                      </span>
+                      {selectedPromotionOfferType && (
+                        <span className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-accent)]">
+                          {getPromotionOfferLabel(selectedPromotionOfferType)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                    <div>
+                      <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                        {locale === 'id'
+                          ? 'Benefit utama'
+                          : 'Primary benefit programs'}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                        {locale === 'id'
+                          ? 'Pilih benefit. Sistem cek batas aman.'
+                          : 'Pick the benefit users will feel most. The system will then check if fees, tax, and opex are still covered.'}
+                      </p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {PROMOTION_PRIMARY_CARDS.map(card => {
+                        const selected =
+                          selectedPromotionOfferType === card.offerType;
+                        const CardIcon = card.icon;
+                        return (
+                          <button
+                            key={card.offerType}
+                            type="button"
+                            onClick={() => {
+                              setFieldValues(prev => {
+                                const next: Record<string, string> = {
+                                  ...prev,
+                                  promo_offer_type: card.offerType,
+                                };
+                                if (
+                                  card.offerType === 'discount' &&
+                                  !cleanText(next.promo_discount_kind)
+                                ) {
+                                  next.promo_discount_kind = 'percent';
+                                }
+                                if (
+                                  card.offerType === 'loyalty_card' &&
+                                  !cleanText(next.promo_loyalty_reward_type)
+                                ) {
+                                  next.promo_loyalty_reward_type = 'discount';
+                                }
+                                if (
+                                  card.offerType === 'raffle' &&
+                                  !cleanText(next.promo_raffle_max_winners)
+                                ) {
+                                  next.promo_raffle_max_winners = '1';
+                                }
+                                return next;
+                              });
+                              setErrorMessage('');
+                            }}
+                            className={`rounded-2xl border p-3 text-left transition-all ${
+                              selected
+                                ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] shadow-sm'
+                                : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)]'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${
+                                    selected
+                                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
+                                  }`}
+                                >
+                                  <CardIcon className="h-4 w-4" />
+                                </span>
+                                <div>
+                                  <p className="text-sm font-semibold text-[color:var(--app-text)]">
+                                    {locale === 'id'
+                                      ? card.titleId
+                                      : card.titleEn}
+                                  </p>
+                                  <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                                    {locale === 'id'
+                                      ? card.benefitId
+                                      : card.benefitEn}
+                                  </p>
+                                </div>
+                              </div>
+                              {selected && (
+                                <CheckCircle2 className="h-4 w-4 text-[color:var(--app-accent)]" />
+                              )}
+                            </div>
+                            <p className="mt-3 text-[11px] leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                              {locale === 'id' ? card.descId : card.descEn}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Opsi lain' : 'Other offer types'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateField('promo_offer_type', 'none');
+                            setErrorMessage('');
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+                            !selectedPromotionOfferType &&
+                            cleanText(fieldValues.promo_offer_type) === 'none'
+                              ? 'border-[color:var(--app-text)] bg-[color:var(--app-text)] text-[color:var(--app-text-inverse)]'
+                              : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
+                          }`}
+                        >
+                          {getPromotionOfferLabel('none')}
+                        </button>
+                        {PROMOTION_SECONDARY_OFFER_TYPES.map(offerType => {
                           const selected =
-                            selectedPromotionOfferType === card.offerType;
-                          const CardIcon = card.icon;
+                            selectedPromotionOfferType === offerType;
                           return (
                             <button
-                              key={card.offerType}
+                              key={offerType}
                               type="button"
                               onClick={() => {
-                                setFieldValues(prev => {
-                                  const next: Record<string, string> = {
-                                    ...prev,
-                                    promo_offer_type: card.offerType,
-                                  };
-                                  if (
-                                    card.offerType === 'discount' &&
-                                    !cleanText(next.promo_discount_kind)
-                                  ) {
-                                    next.promo_discount_kind = 'percent';
-                                  }
-                                  if (
-                                    card.offerType === 'loyalty_card' &&
-                                    !cleanText(next.promo_loyalty_reward_type)
-                                  ) {
-                                    next.promo_loyalty_reward_type = 'discount';
-                                  }
-                                  if (
-                                    card.offerType === 'raffle' &&
-                                    !cleanText(next.promo_raffle_max_winners)
-                                  ) {
-                                    next.promo_raffle_max_winners = '1';
-                                  }
-                                  return next;
-                                });
+                                updateField('promo_offer_type', offerType);
                                 setErrorMessage('');
                               }}
-                              className={`rounded-2xl border p-3 text-left transition-all ${
+                              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
                                 selected
-                                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] shadow-sm'
-                                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)]'
+                                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                                  : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
                               }`}
                             >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${
-                                      selected
-                                        ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                                    }`}
-                                  >
-                                    <CardIcon className="h-4 w-4" />
-                                  </span>
-                                  <div>
-                                    <p className="text-sm font-semibold text-[color:var(--app-text)]">
-                                      {locale === 'id'
-                                        ? card.titleId
-                                        : card.titleEn}
-                                    </p>
-                                    <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                                      {locale === 'id'
-                                        ? card.benefitId
-                                        : card.benefitEn}
-                                    </p>
-                                  </div>
-                                </div>
-                                {selected && (
-                                  <CheckCircle2 className="h-4 w-4 text-[color:var(--app-accent)]" />
-                                )}
-                              </div>
-                              <p className="mt-3 text-[11px] leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                {locale === 'id' ? card.descId : card.descEn}
-                              </p>
+                              {getPromotionOfferLabel(offerType)}
                             </button>
                           );
                         })}
                       </div>
-
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                          {locale === 'id' ? 'Opsi lain' : 'Other offer types'}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateField('promo_offer_type', 'none');
-                              setErrorMessage('');
-                            }}
-                            className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
-                              !selectedPromotionOfferType &&
-                              cleanText(fieldValues.promo_offer_type) === 'none'
-                                ? 'border-[color:var(--app-text)] bg-[color:var(--app-text)] text-[color:var(--app-text-inverse)]'
-                                : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
-                            }`}
-                          >
-                            {getPromotionOfferLabel('none')}
-                          </button>
-                          {PROMOTION_SECONDARY_OFFER_TYPES.map(offerType => {
-                            const selected =
-                              selectedPromotionOfferType === offerType;
-                            return (
-                              <button
-                                key={offerType}
-                                type="button"
-                                onClick={() => {
-                                  updateField('promo_offer_type', offerType);
-                                  setErrorMessage('');
-                                }}
-                                className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
-                                  selected
-                                    ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                                    : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
-                                }`}
-                              >
-                                {getPromotionOfferLabel(offerType)}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
+                  </div>
 
-                    {selectedPromotionOfferType && (
-                      <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-semibold text-[color:var(--app-text)]">
-                              {locale === 'id'
-                                ? 'Simulasi benefit & batas aman'
-                                : 'Benefit simulation and guardrail'}
-                            </p>
-                            <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {promotionSnapshot?.offerTagline ||
-                                (locale === 'id'
-                                  ? 'Isi benefitnya dulu biar sistem bisa hitung masih aman atau nggak.'
-                                  : 'Configure the benefit first so the system can estimate it.')}
-                            </p>
-                          </div>
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
-                              promotionSnapshot?.status === 'safe'
-                                ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                                : promotionSnapshot?.status === 'watch'
-                                  ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
-                                  : promotionSnapshot?.status === 'unsafe'
-                                    ? 'border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
-                                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
-                            }`}
-                          >
-                            {promotionSnapshot?.status === 'safe'
-                              ? locale === 'id'
-                                ? 'Aman'
-                                : 'Safe'
+                  {selectedPromotionOfferType && (
+                    <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-[color:var(--app-text)]">
+                            {locale === 'id'
+                              ? 'Simulasi benefit & batas aman'
+                              : 'Benefit simulation and guardrail'}
+                          </p>
+                          <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {promotionSnapshot?.offerTagline ||
+                              (locale === 'id'
+                                ? 'Isi benefitnya dulu biar sistem bisa hitung masih aman atau nggak.'
+                                : 'Configure the benefit first so the system can estimate it.')}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+                            promotionSnapshot?.status === 'safe'
+                              ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                               : promotionSnapshot?.status === 'watch'
-                                ? locale === 'id'
-                                  ? 'Waspada'
-                                  : 'Watch'
+                                ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
                                 : promotionSnapshot?.status === 'unsafe'
-                                  ? locale === 'id'
-                                    ? 'Ketinggian'
-                                    : 'Too aggressive'
-                                  : locale === 'id'
-                                    ? 'Data belum cukup'
-                                    : 'Needs data'}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                          <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                              {locale === 'id'
-                                ? 'Benefit yang kerasa'
-                                : 'Customer-facing benefit'}
-                            </div>
-                            <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                              {promotionSnapshot?.benefitLabel ||
-                                (locale === 'id'
-                                  ? 'Pilih benefitnya lalu isi detailnya'
-                                  : 'Pick a benefit and fill the details')}
-                            </div>
-                          </div>
-                          <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                              {locale === 'id'
-                                ? 'Perkiraan biaya / order'
-                                : 'Estimated cost / order'}
-                            </div>
-                            <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                              {promotionSnapshot?.estimatedBenefitCents
-                                ? new Intl.NumberFormat(
-                                    locale === 'id' ? 'id-ID' : 'en-US',
-                                    {
-                                      style: 'currency',
-                                      currency: 'IDR',
-                                      maximumFractionDigits: 0,
-                                    },
-                                  ).format(
-                                    promotionSnapshot.estimatedBenefitCents /
-                                      100,
-                                  )
+                                  ? 'border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
+                                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
+                          }`}
+                        >
+                          {promotionSnapshot?.status === 'safe'
+                            ? locale === 'id'
+                              ? 'Aman'
+                              : 'Safe'
+                            : promotionSnapshot?.status === 'watch'
+                              ? locale === 'id'
+                                ? 'Waspada'
+                                : 'Watch'
+                              : promotionSnapshot?.status === 'unsafe'
+                                ? locale === 'id'
+                                  ? 'Ketinggian'
+                                  : 'Too aggressive'
                                 : locale === 'id'
-                                  ? 'Datanya belum cukup'
-                                  : 'Not enough data'}
-                            </div>
-                          </div>
-                          <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2">
-                            <div className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                              {locale === 'id'
-                                ? 'Batas aman / order'
-                                : 'Safe buffer / order'}
-                            </div>
-                            <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                              {promotionSnapshot?.safeCapCents
-                                ? new Intl.NumberFormat(
-                                    locale === 'id' ? 'id-ID' : 'en-US',
-                                    {
-                                      style: 'currency',
-                                      currency: 'IDR',
-                                      maximumFractionDigits: 0,
-                                    },
-                                  ).format(promotionSnapshot.safeCapCents / 100)
-                                : locale === 'id'
-                                  ? 'Isi harga + margin dulu'
-                                  : 'Add price + margin'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="mt-3 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {promotionSnapshot?.financialMessage ||
-                            (locale === 'id'
-                              ? 'Sistem bakal ngitung benefitnya setelah cadangan fee platform, PPN, dan opex dipotong dari margin.'
-                              : 'The system evaluates the benefit after reserving platform fee, tax, and opex from margin.')}
-                        </p>
+                                  ? 'Data belum cukup'
+                                  : 'Needs data'}
+                        </span>
                       </div>
-                    )}
 
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                      {promotionCoreFields.map(renderFieldBlock)}
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                            {locale === 'id'
+                              ? 'Benefit yang kerasa'
+                              : 'Customer-facing benefit'}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
+                            {promotionSnapshot?.benefitLabel ||
+                              (locale === 'id'
+                                ? 'Pilih benefitnya lalu isi detailnya'
+                                : 'Pick a benefit and fill the details')}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                            {locale === 'id'
+                              ? 'Perkiraan biaya / order'
+                              : 'Estimated cost / order'}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
+                            {promotionSnapshot?.estimatedBenefitCents
+                              ? new Intl.NumberFormat(
+                                  locale === 'id' ? 'id-ID' : 'en-US',
+                                  {
+                                    style: 'currency',
+                                    currency: 'IDR',
+                                    maximumFractionDigits: 0,
+                                  },
+                                ).format(
+                                  promotionSnapshot.estimatedBenefitCents / 100,
+                                )
+                              : locale === 'id'
+                                ? 'Datanya belum cukup'
+                                : 'Not enough data'}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                            {locale === 'id'
+                              ? 'Batas aman / order'
+                              : 'Safe buffer / order'}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
+                            {promotionSnapshot?.safeCapCents
+                              ? new Intl.NumberFormat(
+                                  locale === 'id' ? 'id-ID' : 'en-US',
+                                  {
+                                    style: 'currency',
+                                    currency: 'IDR',
+                                    maximumFractionDigits: 0,
+                                  },
+                                ).format(promotionSnapshot.safeCapCents / 100)
+                              : locale === 'id'
+                                ? 'Isi harga + margin dulu'
+                                : 'Add price + margin'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="mt-3 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                        {promotionSnapshot?.financialMessage ||
+                          (locale === 'id'
+                            ? 'Sistem bakal ngitung benefitnya setelah cadangan fee platform, PPN, dan opex dipotong dari margin.'
+                            : 'The system evaluates the benefit after reserving platform fee, tax, and opex from margin.')}
+                      </p>
                     </div>
+                  )}
 
-                    {promotionTypeFields.length > 0 && (
-                      <DetailAccordion
-                        title={
-                          locale === 'id'
-                            ? 'Tambahan sesuai tipe listing'
-                            : 'Type-specific promotion extras'
-                        }
-                        description={
-                          locale === 'id'
-                            ? 'Tambahan yang relevan buat tipe listing ini.'
-                            : 'Extra promotion fields relevant to this listing type.'
-                        }
-                      >
-                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                          {promotionTypeFields.map(renderFieldBlock)}
-                        </div>
-                      </DetailAccordion>
-                    )}
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {promotionCoreFields.map(renderFieldBlock)}
+                  </div>
 
-                    {selectedPromotionOfferType &&
-                      visiblePromotionBenefitFields.length > 0 && (
-                        <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                          <div>
-                            <p className="text-xs font-semibold text-[color:var(--app-text)]">
-                              {locale === 'id'
-                                ? 'Detail benefit'
-                                : 'Benefit details'}
-                            </p>
-                            <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {promotionSnapshot?.supportLabel ||
-                                (locale === 'id'
-                                  ? 'Isi detail benefit yang nanti beneran dilihat user.'
-                                  : 'Fill the benefit parameters users will actually see.')}
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            {visiblePromotionBenefitFields.map(
-                              renderFieldBlock,
-                            )}
-                          </div>
-                        </div>
-                      )}
+                  {promotionTypeFields.length > 0 && (
+                    <DetailAccordion
+                      title={
+                        locale === 'id'
+                          ? 'Tambahan sesuai tipe listing'
+                          : 'Type-specific promotion extras'
+                      }
+                      description={
+                        locale === 'id'
+                          ? 'Tambahan yang relevan buat tipe listing ini.'
+                          : 'Extra promotion fields relevant to this listing type.'
+                      }
+                    >
+                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        {promotionTypeFields.map(renderFieldBlock)}
+                      </div>
+                    </DetailAccordion>
+                  )}
 
-                    {promotionAdvancedFields.length > 0 && (
+                  {selectedPromotionOfferType &&
+                    visiblePromotionBenefitFields.length > 0 && (
                       <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
                         <div>
                           <p className="text-xs font-semibold text-[color:var(--app-text)]">
                             {locale === 'id'
-                              ? 'Detail promo tambahan'
-                              : 'Additional offer detail'}
+                              ? 'Detail benefit'
+                              : 'Benefit details'}
                           </p>
                           <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {locale === 'id'
-                              ? 'Dipakai buat bundle, referral, bonus, atau format promo non-utama.'
-                              : 'Used for bundles, referrals, bonuses, or non-primary offer formats.'}
+                            {promotionSnapshot?.supportLabel ||
+                              (locale === 'id'
+                                ? 'Isi detail benefit yang nanti beneran dilihat user.'
+                                : 'Fill the benefit parameters users will actually see.')}
                           </p>
                         </div>
                         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                          {promotionAdvancedFields.map(renderFieldBlock)}
+                          {visiblePromotionBenefitFields.map(renderFieldBlock)}
                         </div>
                       </div>
                     )}
 
-                    {selectedPromotionOfferType &&
-                      selectedPromotionOfferType !== 'bundle' && (
-                        <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                          <div>
-                            <p className="text-xs font-semibold text-[color:var(--app-text)]">
-                              {locale === 'id'
-                                ? 'Batas aman biaya'
-                                : 'Cost guardrail'}
-                            </p>
-                            <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {locale === 'id'
-                                ? 'Angka ini bantu jaga biaya Lajukan, pajak, dan operasional tetap ketutup, tapi user masih ngerasa dapat benefit yang jelas.'
-                                : 'These numbers help keep platform, tax, and operating costs covered while users still feel a real benefit.'}
-                            </p>
-                          </div>
-                          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            {PROMOTION_FINANCE_FIELDS.map(renderFieldBlock)}
-                          </div>
+                  {promotionAdvancedFields.length > 0 && (
+                    <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                      <div>
+                        <p className="text-xs font-semibold text-[color:var(--app-text)]">
+                          {locale === 'id'
+                            ? 'Detail promo tambahan'
+                            : 'Additional offer detail'}
+                        </p>
+                        <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                          {locale === 'id'
+                            ? 'Dipakai buat bundle, referral, bonus, atau format promo non-utama.'
+                            : 'Used for bundles, referrals, bonuses, or non-primary offer formats.'}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        {promotionAdvancedFields.map(renderFieldBlock)}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPromotionOfferType &&
+                    selectedPromotionOfferType !== 'bundle' && (
+                      <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                        <div>
+                          <p className="text-xs font-semibold text-[color:var(--app-text)]">
+                            {locale === 'id'
+                              ? 'Batas aman biaya'
+                              : 'Cost guardrail'}
+                          </p>
+                          <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {locale === 'id'
+                              ? 'Angka ini bantu jaga biaya Lajukan, pajak, dan operasional tetap ketutup, tapi user masih ngerasa dapat benefit yang jelas.'
+                              : 'These numbers help keep platform, tax, and operating costs covered while users still feel a real benefit.'}
+                          </p>
                         </div>
-                      )}
-                  </>
-                )}
-              </>
-            )}
-
-            {showSharePackPanel ? (
-              <div className="xl:hidden">
-                <CreateSharePackPanel
-                  locale={localeCode}
-                  input={sharePackInput}
-                  compact
-                />
-              </div>
-            ) : null}
-
-            <div className="sticky bottom-1.5 z-10 grid grid-cols-2 gap-2 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_14px_26px_-20px_rgba(15,23,42,0.16)] backdrop-blur-xl lg:grid-cols-3 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/88">
-              <button
-                type="submit"
-                disabled={
-                  loading ||
-                  uploadingImages ||
-                  uploadingDocs ||
-                  !typePicked ||
-                  !fieldValues.title?.trim()
-                }
-                className={`order-1 col-span-2 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${typeTheme.buttonPrimary} px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_18px_28px_-20px_rgba(15,23,42,0.28)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50`}
-              >
-                {currentStep < TOTAL_STEPS &&
-                !(
-                  isSimpleModeActive &&
-                  !promotionEnabled &&
-                  (!requiresPrimaryImageForType(activeType) || currentStep >= 3)
-                ) ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                {uploadingImages
-                  ? locale === 'id'
-                    ? 'Lagi upload foto...'
-                    : 'Uploading images...'
-                  : uploadingDocs
-                    ? locale === 'id'
-                      ? 'Lagi upload dokumen...'
-                      : 'Uploading files...'
-                    : loading
-                      ? locale === 'id'
-                        ? 'Lagi nyimpen...'
-                        : 'Saving...'
-                      : currentStep < TOTAL_STEPS
-                        ? isSimpleModeActive
-                          ? !promotionEnabled &&
-                            (!requiresPrimaryImageForType(activeType) ||
-                              currentStep >= 3)
-                            ? locale === 'id'
-                              ? 'Tayangkan'
-                              : 'Publish now'
-                            : locale === 'id'
-                              ? 'Lanjut'
-                              : 'Continue'
-                          : locale === 'id'
-                            ? 'Lanjut'
-                            : 'Continue'
-                        : contentStatus === 'active'
-                          ? locale === 'id'
-                            ? 'Simpan perubahan'
-                            : 'Save changes'
-                          : locale === 'id'
-                            ? 'Tayangkan'
-                            : 'Publish now'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  saveListing('draft', { persistStep: currentStep })
-                }
-                disabled={
-                  loading || uploadingImages || uploadingDocs || !typePicked
-                }
-                  className="order-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-4 text-xs font-semibold text-[color:var(--app-warning)] shadow-[0_16px_24px_-22px_rgba(245,158,11,0.28)] disabled:opacity-50"
-              >
-                <FileText className="h-4 w-4" />
-                {loading && contentStatus === 'draft'
-                  ? locale === 'id'
-                    ? 'Lagi nyimpen draft...'
-                    : 'Saving draft...'
-                  : locale === 'id'
-                    ? 'Simpan sebagai draft'
-                    : 'Save for later'}
-              </button>
-
-              {currentStep > 1 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    goToStep(Math.max(1, currentStep - 1), {
-                      draftId: workingId,
-                      typeId: activeType,
-                    })
-                  }
-                  className="order-3 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-white/70 bg-white/82 px-4 text-xs font-semibold text-[color:var(--app-text)] shadow-[0_16px_24px_-22px_rgba(15,23,42,0.2)] backdrop-blur-sm dark:border-slate-800/70 dark:bg-slate-950/68"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  {locale === 'id' ? 'Kembali' : 'Back'}
-                </button>
+                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                          {PROMOTION_FINANCE_FIELDS.map(renderFieldBlock)}
+                        </div>
+                      </div>
+                    )}
+                </>
               )}
-            </div>
+            </>
+          )}
 
-            {(uploadingImages || uploadingDocs) && (
-              <div className="text-[11px] text-[color:var(--app-text)] flex items-center gap-1.5">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-[color:var(--app-accent)]" />
-                {uploadingImages
-                  ? locale === 'id'
-                    ? 'Foto lagi di-upload...'
-                    : 'Uploading images...'
-                  : locale === 'id'
-                    ? 'Dokumen lagi di-upload...'
-                    : 'Uploading files...'}
-              </div>
-            )}
+          {showSharePackPanel ? (
+            <div className="xl:hidden">
+              <CreateSharePackPanel
+                locale={localeCode}
+                input={sharePackInput}
+                compact
+              />
+            </div>
+          ) : null}
+
+          <div className="sticky bottom-2 z-20 grid grid-cols-[0.82fr_1.18fr] gap-2 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_18px_34px_-24px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:grid-cols-[0.9fr_auto_1.25fr] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/88">
+            <button
+              type="button"
+              onClick={() => {
+                if (currentStep > 1) {
+                  goToStep(Math.max(1, currentStep - 1), {
+                    draftId: workingId,
+                    typeId: activeType,
+                  });
+                  return;
+                }
+                router.push('/create');
+              }}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)] shadow-[0_16px_24px_-22px_rgba(15,23,42,0.2)] backdrop-blur-sm transition hover:bg-[color:var(--app-surface-muted)] dark:border-slate-800/70 dark:bg-slate-950/68"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {currentStep > 1
+                ? locale === 'id'
+                  ? 'Kembali'
+                  : 'Back'
+                : locale === 'id'
+                  ? 'Batal'
+                  : 'Cancel'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => saveListing('draft', { persistStep: currentStep })}
+              disabled={
+                loading || uploadingImages || uploadingDocs || !typePicked
+              }
+              className="hidden h-11 min-w-[128px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 text-xs font-semibold text-[color:var(--app-text-soft)] disabled:opacity-50 sm:flex"
+            >
+              <FileText className="h-4 w-4" />
+              {loading && contentStatus === 'draft'
+                ? locale === 'id'
+                  ? 'Nyimpan...'
+                  : 'Saving...'
+                : locale === 'id'
+                  ? 'Simpan draft'
+                  : 'Save draft'}
+            </button>
+
+            <button
+              type="submit"
+              disabled={
+                loading ||
+                uploadingImages ||
+                uploadingDocs ||
+                !typePicked ||
+                !fieldValues.title?.trim()
+              }
+              className={`flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-r ${typeTheme.buttonPrimary} px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_18px_28px_-20px_rgba(15,23,42,0.28)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50`}
+            >
+              {primaryActionWillAdvance ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              {primaryActionLabel}
+            </button>
           </div>
 
-          {showDesktopAssistRail ? (
+          {(uploadingImages || uploadingDocs) && (
+            <div className="text-[11px] text-[color:var(--app-text)] flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[color:var(--app-accent)]" />
+              {uploadingImages
+                ? locale === 'id'
+                  ? 'Foto lagi di-upload...'
+                  : 'Uploading images...'
+                : locale === 'id'
+                  ? 'Dokumen lagi di-upload...'
+                  : 'Uploading files...'}
+            </div>
+          )}
+        </div>
+
+        {showDesktopAssistRail ? (
           <aside className="mt-3 hidden xl:block xl:mt-0">
-            <div className="sticky top-20 space-y-3">
-              <div className="rounded-[24px] border border-white/70 bg-[color:var(--app-surface-strong)] p-3.5 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-slate-800/75 dark:bg-[color:var(--app-surface-strong)]">
-                <p className="inline-flex rounded-full border border-slate-200/80 bg-white/85 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 dark:border-slate-800 dark:bg-slate-950/55 dark:text-slate-400">
-                  {locale === 'id'
-                    ? 'Agar cepat dilihat orang'
-                    : 'To help people notice it faster'}
+            <div className="sticky top-3 space-y-3">
+              <div className="rounded-[14px] border border-emerald-100 bg-emerald-50/70 p-4 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.18)] dark:border-emerald-900/70 dark:bg-emerald-950/20">
+                <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                  {locale === 'id' ? 'Tips' : 'Tips'}
                 </p>
                 <div className="mt-3 space-y-2">
-                  {publishReadiness.map(item => (
-                    <div
+                  {publishReadiness.slice(0, 4).map((item, index) => (
+                    <button
                       key={item.key}
-                      className={cn(
-                        'flex items-start gap-2 rounded-2xl border px-3 py-2',
-                        item.done
-                          ? 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/20'
-                          : 'border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-900/60',
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
-                          item.done
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-                        )}
-                      >
-                        {item.done ? 'OK' : '!'}
-                      </span>
-                      <span className="text-[11px] leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {locale === 'id' ? item.labelId : item.labelEn}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {topPublishBlockers.length > 0 ? (
-                  <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-900 dark:bg-amber-950/20">
-                    <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-200">
-                      {locale === 'id'
-                        ? 'Prioritas sekarang'
-                        : 'Priority right now'}
-                    </p>
-                    <div className="mt-2 space-y-2">
-                      {topPublishBlockers.map(blocker => (
-                        <button
-                          key={blocker.key}
-                          type="button"
-                          onClick={() =>
-                            goToStep(blocker.step, {
+                      type="button"
+                      onClick={() =>
+                        !item.done
+                          ? goToStep(Math.min(index + 1, TOTAL_STEPS), {
                               draftId: workingId,
                               typeId: activeType,
                             })
-                          }
-                          className="w-full rounded-xl border border-amber-200 bg-white/90 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-white dark:border-amber-900 dark:bg-slate-950/70 dark:hover:border-amber-800"
-                        >
-                          <p className="text-[11px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {blocker.title}
-                          </p>
-                          <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                            {blocker.description}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                          : undefined
+                      }
+                      className="flex w-full items-start gap-2 rounded-[10px] px-1 py-1 text-left"
+                    >
+                      <CheckCircle2
+                        className={cn(
+                          'mt-0.5 h-4 w-4 shrink-0',
+                          item.done
+                            ? 'text-[color:var(--app-accent)]'
+                            : 'text-slate-400',
+                        )}
+                      />
+                      <span className="text-[11px] leading-5 text-[color:var(--app-text)]">
+                        {locale === 'id' ? item.labelId : item.labelEn}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              <div className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.18)] dark:border-slate-800/75 dark:bg-[color:var(--app-surface-strong)]">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                    {locale === 'id' ? 'Ringkasan' : 'Summary'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      goToStep(1, { draftId: workingId, typeId: activeType })
+                    }
+                    className="text-[10px] font-bold text-[color:var(--app-accent)]"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                    <ActiveTypeIcon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-black text-[color:var(--app-text)]">
+                      {sideRailTitle}
+                    </p>
+                    <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-accent)]">
+                      {listingSideContextLabel}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 text-[11px] text-[color:var(--app-text-soft)]">
+                  <span className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{sideRailLocation}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <BadgeDollarSign className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{sideRailPriceLabel}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      {contentStatus === 'active'
+                        ? locale === 'id'
+                          ? 'Sudah tayang'
+                          : 'Live'
+                        : locale === 'id'
+                          ? 'Draft tersimpan'
+                          : 'Draft saved'}
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {topPublishBlockers.length > 0 ? (
+                <div className="rounded-[14px] border border-amber-200 bg-amber-50/80 p-4 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.18)] dark:border-amber-900 dark:bg-amber-950/20">
+                  <p className="text-[13px] font-black text-amber-800 dark:text-amber-200">
+                    {locale === 'id'
+                      ? 'Prioritas sekarang'
+                      : 'Priority right now'}
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {topPublishBlockers.map(blocker => (
+                      <button
+                        key={blocker.key}
+                        type="button"
+                        onClick={() =>
+                          goToStep(blocker.step, {
+                            draftId: workingId,
+                            typeId: activeType,
+                          })
+                        }
+                        className="w-full rounded-[10px] border border-amber-200 bg-white/90 px-3 py-2 text-left transition hover:border-amber-300 hover:bg-white dark:border-amber-900 dark:bg-slate-950/70 dark:hover:border-amber-800"
+                      >
+                        <p className="text-[11px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          {blocker.title}
+                        </p>
+                        <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                          {blocker.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               {showSharePackPanel ? (
                 <CreateSharePackPanel
@@ -7708,11 +8583,10 @@ export function CreatePostingClient({
               ) : null}
             </div>
           </aside>
-          ) : null}
-        </form>
-        {industryPickerLayer}
-      </div>
-    </CreateCanvas>
+        ) : null}
+      </form>
+      {industryPickerLayer}
+    </div>
   );
 }
 

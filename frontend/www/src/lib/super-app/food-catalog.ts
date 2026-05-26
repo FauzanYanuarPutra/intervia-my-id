@@ -1,5 +1,4 @@
 import { getPostgresPool } from '@/lib/postgres';
-import { localProductImageForCategory } from '@/lib/media/localSeedMedia';
 
 export type FoodMerchant = {
   id: string;
@@ -61,166 +60,6 @@ export type FoodOrderQuote = {
 
 const DEFAULT_FOOD_DELIVERY_FEE_CENTS = 120_000;
 
-const FALLBACK_MERCHANTS: FoodMerchant[] = [
-  {
-    id: '10000000-0000-0000-0000-000000000001',
-    provider_user_id: '00000000-0000-0000-0000-000000000101',
-    name: 'Warung Nusantara',
-    slug: 'warung-nusantara',
-    city: 'Jakarta',
-    address: 'Jl. Sudirman No. 21, Jakarta Pusat',
-    lat: -6.2087,
-    lng: 106.845,
-    rating_avg: 4.8,
-    rating_count: 1420,
-    eta_min_minutes: 22,
-    is_active: true,
-    metadata: {
-      segment: 'local_favorites',
-      halal_certified: true,
-      promo: {
-        label: 'Diskon Rp8.000',
-        type: 'flat_discount',
-        value_cents: 800_000,
-        min_order_cents: 250_000,
-      },
-    },
-  },
-  {
-    id: '10000000-0000-0000-0000-000000000002',
-    provider_user_id: '00000000-0000-0000-0000-000000000102',
-    name: 'Kopi Senja & Bites',
-    slug: 'kopi-senja-bites',
-    city: 'Jakarta',
-    address: 'Jl. Gatot Subroto No. 99, Jakarta Selatan',
-    lat: -6.2291,
-    lng: 106.8219,
-    rating_avg: 4.75,
-    rating_count: 980,
-    eta_min_minutes: 18,
-    is_active: true,
-    metadata: {
-      segment: 'coffee_snacks',
-      promo: {
-        label: 'Potong Ongkir Rp5.000',
-        type: 'delivery_discount',
-        value_cents: 500_000,
-        min_order_cents: 200_000,
-      },
-    },
-  },
-  {
-    id: '10000000-0000-0000-0000-000000000003',
-    provider_user_id: '00000000-0000-0000-0000-000000000103',
-    name: 'Dapur Sehat Harian',
-    slug: 'dapur-sehat-harian',
-    city: 'Jakarta',
-    address: 'Jl. Rasuna Said No. 13, Jakarta Selatan',
-    lat: -6.2256,
-    lng: 106.8321,
-    rating_avg: 4.86,
-    rating_count: 1250,
-    eta_min_minutes: 20,
-    is_active: true,
-    metadata: {
-      segment: 'healthy_food',
-      promo: {
-        label: 'Diskon Rp10.000',
-        type: 'flat_discount',
-        value_cents: 1_000_000,
-        min_order_cents: 320_000,
-      },
-    },
-  },
-];
-
-const FALLBACK_MENU_ITEMS: FoodMenuItem[] = [
-  {
-    id: '20000000-0000-0000-0000-000000000001',
-    merchant_id: '10000000-0000-0000-0000-000000000001',
-    name: 'Nasi Goreng Kampung',
-    description: 'Nasi goreng tradisional dengan ayam suwir dan telur.',
-    category: 'main_course',
-    price_cents: 320_000,
-    prep_minutes: 15,
-    is_available: true,
-    image_url: localProductImageForCategory('main_course', 'food-1'),
-    metadata: {},
-  },
-  {
-    id: '20000000-0000-0000-0000-000000000002',
-    merchant_id: '10000000-0000-0000-0000-000000000001',
-    name: 'Ayam Bakar Madu',
-    description: 'Ayam bakar bumbu madu dengan sambal dan lalapan.',
-    category: 'main_course',
-    price_cents: 420_000,
-    prep_minutes: 18,
-    is_available: true,
-    image_url: localProductImageForCategory('main_course', 'food-2'),
-    metadata: {},
-  },
-  {
-    id: '20000000-0000-0000-0000-000000000003',
-    merchant_id: '10000000-0000-0000-0000-000000000001',
-    name: 'Es Teh Manis Jumbo',
-    description: 'Teh melati dingin ukuran jumbo.',
-    category: 'beverage',
-    price_cents: 90_000,
-    prep_minutes: 4,
-    is_available: true,
-    image_url: localProductImageForCategory('beverage', 'food-3'),
-    metadata: {},
-  },
-  {
-    id: '20000000-0000-0000-0000-000000000005',
-    merchant_id: '10000000-0000-0000-0000-000000000002',
-    name: 'Latte Gula Aren',
-    description: 'Kopi susu gula aren signature.',
-    category: 'beverage',
-    price_cents: 280_000,
-    prep_minutes: 7,
-    is_available: true,
-    image_url: localProductImageForCategory('coffee', 'food-5'),
-    metadata: {},
-  },
-  {
-    id: '20000000-0000-0000-0000-000000000008',
-    merchant_id: '10000000-0000-0000-0000-000000000002',
-    name: 'Chicken Sandwich',
-    description: 'Sandwich ayam panggang dan sayur segar.',
-    category: 'main_course',
-    price_cents: 360_000,
-    prep_minutes: 14,
-    is_available: true,
-    image_url: localProductImageForCategory('main_course', 'food-8'),
-    metadata: {},
-  },
-  {
-    id: '20000000-0000-0000-0000-000000000009',
-    merchant_id: '10000000-0000-0000-0000-000000000003',
-    name: 'Chicken Breast Bowl',
-    description: 'Nasi merah, ayam panggang, brokoli, telur rebus.',
-    category: 'main_course',
-    price_cents: 440_000,
-    prep_minutes: 16,
-    is_available: true,
-    image_url: localProductImageForCategory('main_course', 'food-9'),
-    metadata: {},
-  },
-  {
-    id: '20000000-0000-0000-0000-000000000011',
-    merchant_id: '10000000-0000-0000-0000-000000000003',
-    name: 'Jus Detox Green',
-    description: 'Cold-pressed apple, spinach, cucumber.',
-    category: 'beverage',
-    price_cents: 250_000,
-    prep_minutes: 8,
-    is_available: true,
-    image_url: localProductImageForCategory('beverage', 'food-11'),
-    metadata: {},
-  },
-];
-
 function normalizeMoney(value: unknown): number {
   const parsed = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(parsed)) return 0;
@@ -234,15 +73,24 @@ function normalizeInt(value: unknown): number {
 }
 
 function normalizeJson(value: unknown): Record<string, unknown> {
-  if (typeof value === 'object' && value) return value as Record<string, unknown>;
+  if (typeof value === 'object' && value)
+    return value as Record<string, unknown>;
   return {};
 }
 
 function parsePromo(raw: unknown): FoodPromo | null {
   if (!raw || typeof raw !== 'object') return null;
   const src = raw as Record<string, unknown>;
-  const label = typeof src.label === 'string' && src.label.trim().length > 0 ? src.label.trim() : '';
-  const type = src.type === 'delivery_discount' ? 'delivery_discount' : src.type === 'flat_discount' ? 'flat_discount' : null;
+  const label =
+    typeof src.label === 'string' && src.label.trim().length > 0
+      ? src.label.trim()
+      : '';
+  const type =
+    src.type === 'delivery_discount'
+      ? 'delivery_discount'
+      : src.type === 'flat_discount'
+        ? 'flat_discount'
+        : null;
   const value = normalizeMoney(src.value_cents);
   const minOrder = normalizeMoney(src.min_order_cents);
   if (!label || !type || value <= 0) return null;
@@ -254,18 +102,19 @@ function parsePromo(raw: unknown): FoodPromo | null {
   };
 }
 
-export function getFoodPromoFromMetadata(metadata: Record<string, unknown>): FoodPromo | null {
+export function getFoodPromoFromMetadata(
+  metadata: Record<string, unknown>,
+): FoodPromo | null {
   return parsePromo(metadata.promo);
 }
 
 function fallbackMerchants(): FoodMerchant[] {
-  return FALLBACK_MERCHANTS.filter((item) => item.is_active).map((item) => ({ ...item }));
+  return [];
 }
 
 function fallbackMenu(merchantId: string): FoodMenuItem[] {
-  return FALLBACK_MENU_ITEMS.filter(
-    (item) => item.merchant_id === merchantId && item.is_available,
-  ).map((item) => ({ ...item }));
+  void merchantId;
+  return [];
 }
 
 export async function listFoodMerchants(): Promise<FoodMerchant[]> {
@@ -298,7 +147,7 @@ export async function listFoodMerchants(): Promise<FoodMerchant[]> {
       LIMIT 100
       `,
     );
-    return result.rows.map((row) => ({
+    return result.rows.map(row => ({
       id: row.id,
       provider_user_id: row.provider_user_id,
       name: row.name,
@@ -318,7 +167,9 @@ export async function listFoodMerchants(): Promise<FoodMerchant[]> {
   }
 }
 
-export async function listFoodMenuItems(merchantId: string): Promise<FoodMenuItem[]> {
+export async function listFoodMenuItems(
+  merchantId: string,
+): Promise<FoodMenuItem[]> {
   const pool = getPostgresPool();
   if (!pool) return fallbackMenu(merchantId);
 
@@ -347,7 +198,7 @@ export async function listFoodMenuItems(merchantId: string): Promise<FoodMenuIte
       `,
       [merchantId],
     );
-    return result.rows.map((row) => ({
+    return result.rows.map(row => ({
       id: row.id,
       merchant_id: row.merchant_id,
       name: row.name,
@@ -364,9 +215,11 @@ export async function listFoodMenuItems(merchantId: string): Promise<FoodMenuIte
   }
 }
 
-export async function getFoodMerchantById(merchantId: string): Promise<FoodMerchant | null> {
+export async function getFoodMerchantById(
+  merchantId: string,
+): Promise<FoodMerchant | null> {
   const merchants = await listFoodMerchants();
-  return merchants.find((merchant) => merchant.id === merchantId) || null;
+  return merchants.find(merchant => merchant.id === merchantId) || null;
 }
 
 export async function buildFoodOrderQuote(input: {
@@ -380,15 +233,20 @@ export async function buildFoodOrderQuote(input: {
   }
 
   const menu = await listFoodMenuItems(input.merchantId);
-  const menuMap = new Map(menu.map((item) => [item.id, item]));
+  const menuMap = new Map(menu.map(item => [item.id, item]));
 
   const items: FoodOrderQuote['items'] = [];
   for (const selection of input.selections || []) {
     const item = menuMap.get(selection.item_id);
     if (!item) {
-      throw new Error(`Selected food item is unavailable: ${selection.item_id}`);
+      throw new Error(
+        `Selected food item is unavailable: ${selection.item_id}`,
+      );
     }
-    const quantity = Math.max(1, Math.min(20, normalizeInt(selection.quantity)));
+    const quantity = Math.max(
+      1,
+      Math.min(20, normalizeInt(selection.quantity)),
+    );
     items.push({
       item_id: item.id,
       name: item.name,
@@ -403,7 +261,10 @@ export async function buildFoodOrderQuote(input: {
     throw new Error('Food order must include at least one menu item.');
   }
 
-  const subtotal_cents = items.reduce((sum, item) => sum + item.line_total_cents, 0);
+  const subtotal_cents = items.reduce(
+    (sum, item) => sum + item.line_total_cents,
+    0,
+  );
   const delivery_fee_cents = Math.max(
     0,
     normalizeMoney(input.deliveryFeeCents ?? DEFAULT_FOOD_DELIVERY_FEE_CENTS),
@@ -418,7 +279,10 @@ export async function buildFoodOrderQuote(input: {
       promo_discount_cents = Math.min(delivery_fee_cents, promo.value_cents);
     }
   }
-  const total_cents = Math.max(0, subtotal_cents + delivery_fee_cents - promo_discount_cents);
+  const total_cents = Math.max(
+    0,
+    subtotal_cents + delivery_fee_cents - promo_discount_cents,
+  );
 
   return {
     merchant,

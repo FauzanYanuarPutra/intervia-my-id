@@ -275,6 +275,50 @@ services:
       - web
     restart: unless-stopped
 
+  # ---------------- Community Service (Rust) ----------------
+  community_service:
+    build:
+      context: ./backend/rust_apps
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: community_service
+        INSTALL_SQLX: "true"
+    ports:
+      - "${PORT_COMMUNITY:-8082}:8082"
+    environment:
+      ENV: ${ENV:-development}
+      APP_NAME: ${APP_NAME:-community_service}
+      APP_PORT: "8082"
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@postgres_db:5432/${DB_NAME}
+      REDIS_URL: redis://:${REDIS_PASS}@redis_cache:6379
+      REDIS_HOST: redis_cache
+      REDIS_PASSWORD: ${REDIS_PASS}
+      RABBITMQ_URL: amqp://${RABBIT_USER}:${RABBIT_PASS}@rabbitmq:5672/%2f
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBIT_USER}
+      RABBITMQ_PASSWORD: ${RABBIT_PASS}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
+      COMMUNITY_UPLOAD_DIR: /app/uploads/forum
+      COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS_COMMUNITY:-true}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - community_uploads:/app/uploads/forum
+    depends_on:
+      postgres_db: { condition: service_healthy }
+      redis_cache: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8082/health" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - web
+    restart: unless-stopped
+
   # ---------------- Meilisearch ----------------
   meilisearch:
     image: getmeili/meilisearch:v1.5
@@ -482,6 +526,9 @@ services:
       INTERNAL_API_URL: http://identity_service:8080
       INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
       MARKETPLACE_URL: http://marketplace_service:8081
+      INTERNAL_COMMUNITY_URL: http://community_service:8082
+      COMMUNITY_SERVICE_URL: http://community_service:8082
+      NEXT_PUBLIC_COMMUNITY_URL: http://localhost:8082
       INTERNAL_CHAT_URL: http://chat_service:4000
       # INTERNAL_AI_URL: http://ai_service:8080
       MINIO_ENDPOINT: http://minio:9002
@@ -497,6 +544,8 @@ services:
       NEXT_PUBLIC_LOGIN_OTP_REQUIRED: ${NEXT_PUBLIC_LOGIN_OTP_REQUIRED:-false}
       REGISTER_OTP_REQUIRED: ${REGISTER_OTP_REQUIRED:-true}
       REGISTER_PHONE_OTP_REQUIRED: ${REGISTER_PHONE_OTP_REQUIRED:-false}
+      STACK_STARTUP_STATE_FILE: /app/www/.runtime/stack-startup.json
+      STACK_STARTUP_PROBE_DEPS: "true"
       EMAIL_TRANSPORT: ${EMAIL_TRANSPORT:-smtp}
       SMTP_HOST: ${SMTP_HOST:-mailhog}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -513,6 +562,8 @@ services:
       NEXT_PUBLIC_HCAPTCHA_SITE_KEY: ${NEXT_PUBLIC_HCAPTCHA_SITE_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ./.runtime:/app/www/.runtime:ro
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 20s
@@ -522,6 +573,7 @@ services:
     depends_on:
       identity_service: { condition: service_healthy }
       marketplace_service: { condition: service_healthy }
+      community_service: { condition: service_healthy }
       chat_service: { condition: service_healthy }
       # ai_service: { condition: service_healthy }
     networks:
@@ -552,6 +604,9 @@ services:
       INTERNAL_API_URL: http://identity_service:8080
       INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
       MARKETPLACE_URL: http://marketplace_service:8081
+      INTERNAL_COMMUNITY_URL: http://community_service:8082
+      COMMUNITY_SERVICE_URL: http://community_service:8082
+      NEXT_PUBLIC_COMMUNITY_URL: http://localhost:8082
       INTERNAL_CHAT_URL: http://chat_service:4000
       MINIO_ENDPOINT: http://minio:9002
       MINIO_ACCESS_KEY: ${MINIO_USER}
@@ -583,7 +638,7 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     healthcheck:
-      test: [ "CMD", "node", "-e", "fetch('http://localhost:3003').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
+      test: [ "CMD", "node", "-e", "fetch('http://localhost:3003/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 20s
       timeout: 5s
       retries: 5
@@ -591,6 +646,7 @@ services:
     depends_on:
       identity_service: { condition: service_healthy }
       marketplace_service: { condition: service_healthy }
+      community_service: { condition: service_healthy }
       chat_service: { condition: service_healthy }
     networks:
       - web
@@ -674,13 +730,13 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     networks:
       - web
-  
+
   cloudflare_tunnel:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in your env file}
+    command: tunnel --no-autoupdate run
     networks:
       - web
 
@@ -750,7 +806,7 @@ volumes:
   minio_data:
   pgadmin_data:
   meili_data:
-
+  community_uploads:
 
 networks:
   web:

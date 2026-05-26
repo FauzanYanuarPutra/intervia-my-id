@@ -295,11 +295,10 @@ export function HeroSection() {
           Lajukan Workspace
         </p>
         <h1 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
-          Cari peluang, bangun tim, dan jual layanan dalam satu alur.
+          Cari, pilih, chat, jalan.
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-          Dibuat untuk langsung dipakai tanpa setup ribet, baik dari mobile
-          kecil maupun desktop.
+          Langsung dipakai dari mobile atau desktop.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] px-3 py-1 text-[11px] font-bold text-[color:var(--app-accent)] dark:border-[color:var(--app-accent-border)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_30%,_transparent)] dark:text-[color:var(--app-accent)]">
@@ -490,11 +489,11 @@ function GenericCard({ kind, ...props }: GenericCardProps & { kind: string }) {
   const imageSrc = image || DEFAULT_CARD_IMAGE;
 
   const body = (
-    <article className="relative overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:shadow-md dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
+    <article className="relative min-w-0 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_-32px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
       <img
         src={imageSrc}
         alt={title}
-        className="h-40 w-full object-cover"
+        className="aspect-[4/3] h-auto w-full object-cover sm:aspect-[5/4]"
         loading="lazy"
         onError={event => {
           const target = event.currentTarget;
@@ -503,25 +502,25 @@ function GenericCard({ kind, ...props }: GenericCardProps & { kind: string }) {
         }}
       />
       {!image ? (
-        <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+        <div className="pointer-events-none absolute left-2 top-2 rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_86%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_86%,_transparent)] dark:text-[color:var(--app-text-soft)]">
           {kind}
         </div>
       ) : null}
-      <div className="space-y-2 p-4">
-        <h3 className="line-clamp-2 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <div className="min-w-0 space-y-1.5 p-2.5 sm:p-3">
+        <h3 className="line-clamp-2 text-[0.82rem] font-bold leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
           {title}
         </h3>
         {subtitle ? (
-          <p className="line-clamp-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+          <p className="line-clamp-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:line-clamp-2 sm:text-xs">
             {subtitle}
           </p>
         ) : null}
         {meta.length ? (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex min-w-0 gap-1 overflow-hidden">
             {meta.slice(0, 3).map(item => (
               <span
                 key={item}
-                className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]"
+                className="min-w-0 truncate rounded-full bg-[color:var(--app-surface-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
               >
                 {item}
               </span>

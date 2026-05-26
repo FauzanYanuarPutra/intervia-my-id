@@ -14,9 +14,11 @@ import {
   Loader2,
   Search,
   RefreshCw,
+  ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 
 type DiscoverUser = {
   id: string;
@@ -110,6 +112,13 @@ function normalizeRoomId(raw: unknown): string {
 function buildDraftRoomId(contact: string): string {
   return `draft:${encodeURIComponent(contact)}`;
 }
+
+const CHAT_LAYOUT_LABEL_CLASS =
+  'mb-1.5 block text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]';
+const CHAT_LAYOUT_INPUT_CLASS =
+  'w-full min-h-[46px] rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+const CHAT_LAYOUT_SEARCH_INPUT_CLASS =
+  'w-full min-h-[44px] rounded-full border-2 border-slate-300 bg-white py-2 pl-9 pr-3 text-[14px] font-semibold text-[#111b21] shadow-none outline-none transition placeholder:text-[#667781] hover:border-slate-400 focus:border-[#25d366] focus:ring-4 focus:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#111b21] dark:text-[#e9edef] dark:placeholder:text-[#8696a0] dark:hover:border-[#54656f]';
 
 export default function ChatLayout({ children }: { children: ReactNode }) {
   const params = useParams() ?? {};
@@ -386,6 +395,8 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
     router.push(`/chat/${encodeURIComponent(roomId)}`);
   };
 
+  const handleBack = useAppBack(router, '/home');
+
   const handleAddMember = (entry: DiscoverUser) => {
     if (selectedMemberIds.has(entry.id)) return;
     setSelectedMembers(prev => [...prev, entry]);
@@ -603,7 +614,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-[100dvh] overflow-hidden bg-[#d9dbd5] dark:bg-[#0b141a]">
+    <div className="h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#d9dbd5] dark:bg-[#0b141a]">
       <div className="mx-auto flex h-[100dvh] w-full min-w-0 max-w-[1600px] overflow-hidden lg:px-4 lg:py-4">
         <div className="flex h-full w-full min-w-0 overflow-hidden bg-[#f7f5f3] shadow-none dark:bg-[#111b21] lg:rounded-[18px] lg:border lg:border-black/5 lg:shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)] dark:lg:border-white/10">
           <section
@@ -611,24 +622,37 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
               activeRoomId ? 'hidden lg:flex' : 'flex'
             }`}
           >
-            <div className="border-b border-black/5 bg-[#f0f2f5] px-3 py-3 dark:border-white/6 dark:bg-[#202c33] sm:px-4">
+            <div className="shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 py-3 dark:border-white/6 dark:bg-[#202c33] sm:px-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h1 className="truncate text-lg font-semibold text-[#111b21] dark:text-[#e9edef]">
-                    {isId ? 'Chat' : 'Chats'}
-                  </h1>
-                  <p className="mt-0.5 text-xs text-[#667781] dark:text-[#8696a0]">
-                    {isId
-                      ? `${rooms.length} percakapan, ${unreadCount} belum dibaca`
-                      : `${rooms.length} conversations, ${unreadCount} unread`}
-                  </p>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#54656f] shadow-sm transition hover:bg-black/5 dark:border-white/10 dark:bg-[#111b21] dark:text-[#aebac1] dark:hover:bg-white/5"
+                    aria-label={isId ? 'Kembali' : 'Back'}
+                    title={isId ? 'Kembali' : 'Back'}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <div className="min-w-0">
+                    <h1 className="truncate text-lg font-semibold text-[#111b21] dark:text-[#e9edef]">
+                      {isId ? 'Chat' : 'Chats'}
+                    </h1>
+                    <p className="mt-0.5 truncate text-xs text-[#667781] dark:text-[#8696a0]">
+                      {isId
+                        ? `${rooms.length} percakapan, ${unreadCount} belum dibaca`
+                        : `${rooms.length} conversations, ${unreadCount} unread`}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => refetch()}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#54656f] transition hover:bg-black/5 dark:text-[#aebac1] dark:hover:bg-white/5"
-                    aria-label={isId ? 'Muat ulang daftar chat' : 'Refresh chats'}
+                    aria-label={
+                      isId ? 'Muat ulang daftar chat' : 'Refresh chats'
+                    }
                     title={isId ? 'Muat ulang' : 'Refresh'}
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -655,7 +679,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                     placeholder={
                       isId ? 'Cari nama atau isi chat' : 'Search chats'
                     }
-                    className="w-full rounded-full border border-black/5 bg-white py-2 pl-9 pr-3 text-[13px] text-[#111b21] placeholder:text-[#667781] focus:border-[#25d366] focus:outline-none dark:border-white/8 dark:bg-[#111b21] dark:text-[#e9edef] dark:placeholder:text-[#8696a0]"
+                    className={CHAT_LAYOUT_SEARCH_INPUT_CLASS}
                   />
                 </div>
 
@@ -688,7 +712,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-white dark:bg-[#111b21]">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-white pb-[calc(5rem+env(safe-area-inset-bottom))] dark:bg-[#111b21] lg:pb-0">
               {loading ? (
                 <div className="flex justify-center py-16">
                   <Loader2 className="h-6 w-6 animate-spin text-[#25d366]" />
@@ -834,7 +858,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
           <div
             className={`min-h-0 w-full min-w-0 flex-1 ${activeRoomId ? 'flex' : 'hidden lg:flex'}`}
           >
-            <div className="h-full w-full min-w-0 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+            <div className="h-full min-h-0 w-full min-w-0 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
               {children}
             </div>
           </div>
@@ -908,7 +932,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                 {newChatMode === 'group' ? (
                   <div className="space-y-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      <label className={CHAT_LAYOUT_LABEL_CLASS}>
                         Nama grup
                       </label>
                       <input
@@ -916,12 +940,12 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                         value={groupName}
                         onChange={e => setGroupName(e.target.value)}
                         placeholder="Contoh: Tim usaha Jakarta"
-                        className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]"
+                        className={CHAT_LAYOUT_INPUT_CLASS}
                       />
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      <label className={CHAT_LAYOUT_LABEL_CLASS}>
                         Tambah anggota
                       </label>
                       <div className="relative">
@@ -931,7 +955,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                           value={contactInput}
                           onChange={e => setContactInput(e.target.value)}
                           placeholder="Cari nama, email, atau telepon"
-                          className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]"
+                          className={`${CHAT_LAYOUT_INPUT_CLASS} pl-9`}
                         />
                       </div>
 
@@ -1007,7 +1031,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                   </div>
                 ) : (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                    <label className={CHAT_LAYOUT_LABEL_CLASS}>
                       {isId ? 'Nomor HP atau email' : 'Phone number or email'}
                     </label>
                     <div className="relative">
@@ -1021,7 +1045,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                             ? '+62 812 3456 7890 atau user@email.com'
                             : '+62 812 3456 7890 or user@example.com'
                         }
-                        className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] py-2 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]"
+                        className={`${CHAT_LAYOUT_INPUT_CLASS} pl-10`}
                       />
                     </div>
 

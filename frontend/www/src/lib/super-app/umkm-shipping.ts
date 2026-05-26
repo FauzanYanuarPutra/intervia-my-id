@@ -25,6 +25,7 @@ export type UmkmShippingQuoteOption = {
 
 export type UmkmShippingQuoteIntegration = {
   environment: 'sandbox' | 'live';
+  runtime_environment: 'development' | 'staging' | 'production';
   provider: string;
   provider_label: string;
   quote_source: 'local_estimate' | 'provider_api';
@@ -40,21 +41,29 @@ export type UmkmShippingQuoteResult = {
 };
 
 type QuoteInput = {
-  store: Pick<UmkmStore, 'id' | 'name' | 'lat' | 'lng' | 'city' | 'address'>;
+  store: Pick<UmkmStore, 'id' | 'name' | 'lat' | 'lng' | 'city' | 'address'> & {
+    metadata?: Record<string, unknown>;
+  };
   selectedProducts: UmkmSelectedProduct[];
   deliveryAddress?: string | null;
   deliveryLat?: number | null;
   deliveryLng?: number | null;
+  deliveryDestinationId?: string | null;
   preferredMode?: UmkmOnlineFulfillmentMode | null;
 };
 
 type ShippingConfig = {
   environment: 'sandbox' | 'live';
+  runtimeEnvironment: 'development' | 'staging' | 'production';
   provider: string;
   providerLabel: string;
   providerQuoteUrl: string | null;
   providerApiKey: string | null;
   allowProviderApi: boolean;
+  rajaOngkirBaseUrl: string;
+  rajaOngkirApiKey: string | null;
+  rajaOngkirDefaultOriginId: string | null;
+  rajaOngkirCouriers: string;
 };
 
 type ShippingContext = {
@@ -86,6 +95,15 @@ function readStringEnv(name: string): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readDelimitedEnv(name: string, fallback: string): string {
+  const value = readStringEnv(name) || fallback;
+  return value
+    .split(/[,:\s]+/)
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .join(':');
 }
 
 function readBooleanEnv(name: string, fallback: boolean): boolean {
@@ -183,7 +201,19 @@ function normalizeShippingEnvironment(value: string | null): 'sandbox' | 'live' 
   return 'sandbox';
 }
 
+function normalizeRuntimeEnvironment(value: string | null): 'development' | 'staging' | 'production' {
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'production' || normalized === 'prod' || normalized === 'live') return 'production';
+  if (normalized === 'staging' || normalized === 'stage' || normalized === 'preview') return 'staging';
+  return 'development';
+}
+
+function isRajaOngkirProvider(provider: string): boolean {
+  return provider === 'rajaongkir' || provider === 'raja_ongkir' || provider === 'komerce_rajaongkir';
+}
+
 function formatProviderLabel(provider: string): string {
+  if (isRajaOngkirProvider(provider)) return 'RajaOngkir';
   return provider
     .split(/[_\s-]+/)
     .filter(Boolean)
@@ -192,10 +222,17 @@ function formatProviderLabel(provider: string): string {
 }
 
 function readShippingConfig(): ShippingConfig {
+  const runtimeEnvironment = normalizeRuntimeEnvironment(
+    readStringEnv('APP_ENV') ||
+      readStringEnv('ENV') ||
+      readStringEnv('NEXT_PUBLIC_APP_ENV') ||
+      process.env.NODE_ENV ||
+      null,
+  );
   const environment = normalizeShippingEnvironment(
     readStringEnv('UMKM_SHIPPING_ENV') ||
       readStringEnv('UMKM_EXPEDITION_ENV') ||
-      (process.env.NODE_ENV === 'production' ? 'live' : 'sandbox'),
+      (runtimeEnvironment === 'production' ? 'live' : 'sandbox'),
   );
   const provider =
     (readStringEnv('UMKM_SHIPPING_PROVIDER') || readStringEnv('UMKM_EXPEDITION_PROVIDER') || 'manual_estimate')
@@ -211,20 +248,55 @@ function readShippingConfig(): ShippingConfig {
   const providerApiKey =
     readStringEnv('UMKM_SHIPPING_API_KEY') ||
     readStringEnv('UMKM_EXPEDITION_API_KEY');
+  const rajaOngkirBaseUrl =
+    readStringEnv(
+      environment === 'live'
+        ? 'RAJAONGKIR_PRODUCTION_BASE_URL'
+        : 'RAJAONGKIR_STAGING_BASE_URL',
+    ) ||
+    readStringEnv('RAJAONGKIR_BASE_URL') ||
+    'https://rajaongkir.komerce.id/api/v1';
+  const rajaOngkirApiKey =
+    readStringEnv(
+      environment === 'live'
+        ? 'RAJAONGKIR_PRODUCTION_API_KEY'
+        : 'RAJAONGKIR_STAGING_API_KEY',
+    ) ||
+    readStringEnv('RAJAONGKIR_API_KEY') ||
+    providerApiKey;
+  const rajaOngkirDefaultOriginId =
+    readStringEnv('RAJAONGKIR_DEFAULT_ORIGIN_ID') ||
+    readStringEnv('RAJAONGKIR_ORIGIN_ID') ||
+    readStringEnv('UMKM_SHIPPING_DEFAULT_ORIGIN_ID');
+  const rajaOngkirCouriers = readDelimitedEnv(
+    'RAJAONGKIR_DEFAULT_COURIERS',
+    'jne,sicepat,jnt,anteraja,pos,tiki',
+  );
+  const hasProviderEndpoint =
+    Boolean(providerQuoteUrl) ||
+    (isRajaOngkirProvider(provider) && Boolean(rajaOngkirBaseUrl) && Boolean(rajaOngkirApiKey));
+  const providerApiDefault =
+    hasProviderEndpoint &&
+    provider !== 'manual_estimate' &&
+    (runtimeEnvironment !== 'development' || environment === 'live');
   const allowProviderApi =
-    Boolean(providerQuoteUrl) &&
     readBooleanEnv(
       'UMKM_SHIPPING_ENABLE_PROVIDER_API',
-      environment === 'live' && provider !== 'manual_estimate',
+      providerApiDefault,
     );
 
   return {
     environment,
+    runtimeEnvironment,
     provider,
     providerLabel,
     providerQuoteUrl,
     providerApiKey,
     allowProviderApi,
+    rajaOngkirBaseUrl,
+    rajaOngkirApiKey,
+    rajaOngkirDefaultOriginId,
+    rajaOngkirCouriers,
   };
 }
 
@@ -397,12 +469,202 @@ function sanitizeExternalCourierOptions(
   return options;
 }
 
+function metadataString(
+  metadata: Record<string, unknown> | undefined,
+  keys: string[],
+): string | null {
+  if (!metadata) return null;
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
+function readRajaOngkirOriginId(input: QuoteInput, config: ShippingConfig): string | null {
+  return (
+    metadataString(input.store.metadata, [
+      'rajaongkir_origin_id',
+      'rajaongkir_origin_district_id',
+      'rajaongkir_district_id',
+      'origin_district_id',
+      'shipping_origin_id',
+    ]) || config.rajaOngkirDefaultOriginId
+  );
+}
+
+function readRajaOngkirDestinationId(input: QuoteInput): string | null {
+  const fromInput =
+    typeof input.deliveryDestinationId === 'string' && input.deliveryDestinationId.trim()
+      ? input.deliveryDestinationId.trim()
+      : null;
+  return (
+    fromInput ||
+    metadataString(input.store.metadata, [
+      'rajaongkir_destination_id',
+      'destination_district_id',
+      'shipping_destination_id',
+    ])
+  );
+}
+
+function buildProviderUrl(baseUrl: string, path: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
+function normalizeEtaLabel(value: unknown): string {
+  const raw = asString(value);
+  if (!raw) return 'Estimasi tersedia';
+  const cleaned = raw.replace(/\s*hari\s*$/i, '').trim();
+  if (/^\d+([-\s]\d+)?$/.test(cleaned)) return `${cleaned.replace(/\s+/g, '-')} hari`;
+  return raw;
+}
+
+function rajaOngkirRowsFromPayload(payload: unknown): Record<string, unknown>[] {
+  const root = asRecord(payload);
+  const data = root.data;
+  if (Array.isArray(data)) return data.map(asRecord);
+
+  const rajaongkir = asRecord(root.rajaongkir);
+  const results = rajaongkir.results;
+  if (!Array.isArray(results)) return [];
+
+  const rows: Record<string, unknown>[] = [];
+  for (const result of results) {
+    const resultRow = asRecord(result);
+    const code = asString(resultRow.code);
+    const name = asString(resultRow.name);
+    const costs = resultRow.costs;
+    if (!Array.isArray(costs)) continue;
+    for (const costEntry of costs) {
+      const costRow = asRecord(costEntry);
+      const costList = costRow.cost;
+      const firstCost = Array.isArray(costList) ? asRecord(costList[0]) : {};
+      rows.push({
+        code,
+        name,
+        service: costRow.service,
+        description: costRow.description,
+        cost: firstCost.value,
+        etd: firstCost.etd,
+      });
+    }
+  }
+  return rows;
+}
+
+function normalizeRajaOngkirOptions(
+  payload: unknown,
+  context: ShippingContext,
+  profile: ReturnType<typeof buildUmkmOrderComposition>,
+): UmkmShippingQuoteOption[] {
+  const options: UmkmShippingQuoteOption[] = [];
+  for (const [index, row] of rajaOngkirRowsFromPayload(payload).entries()) {
+    const code = asString(row.code).toLowerCase() || asString(row.courier).toLowerCase();
+    const service = asString(row.service).toUpperCase();
+    const name = asString(row.name) || code.toUpperCase();
+    const cost = asNumber(row.cost);
+    if (!code || !service || cost === null || cost < 0) continue;
+    const serviceKey = `${code}-${service.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    options.push({
+      id: `rajaongkir-${serviceKey}-${index + 1}`,
+      label: `${name} ${service}`,
+      mode: 'courier',
+      provider: `rajaongkir:${code}`,
+      service_level: serviceKey,
+      fee_cents: Math.round(cost * 100),
+      eta_label: normalizeEtaLabel(row.etd),
+      requires_address: context.deliveryAddress.length < 6,
+      requires_dispatch: false,
+      tracking_kind: 'standard',
+      source: 'api',
+      distance_km: context.distanceKm,
+      weight_grams: profile.total_weight_grams,
+    });
+  }
+  return options;
+}
+
+async function fetchRajaOngkirCourierQuote(
+  input: QuoteInput,
+  context: ShippingContext,
+  profile: ReturnType<typeof buildUmkmOrderComposition>,
+  config: ShippingConfig,
+): Promise<ExternalCourierQuoteSuccess | null> {
+  if (!config.allowProviderApi || !config.rajaOngkirApiKey) return null;
+
+  const origin = readRajaOngkirOriginId(input, config);
+  const destination = readRajaOngkirDestinationId(input);
+  if (!origin || !destination) {
+    console.warn('[UMKM_SHIPPING_RAJAONGKIR_MISSING_LOCATION]', {
+      hasOrigin: Boolean(origin),
+      hasDestination: Boolean(destination),
+    });
+    return null;
+  }
+
+  const body = new URLSearchParams({
+    origin,
+    destination,
+    weight: String(Math.max(1, Math.round(profile.total_weight_grams))),
+    courier: config.rajaOngkirCouriers,
+    price: 'lowest',
+  });
+
+  try {
+    const res = await fetch(buildProviderUrl(config.rajaOngkirBaseUrl, '/calculate/domestic-cost'), {
+      method: 'POST',
+      headers: {
+        key: config.rajaOngkirApiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Lajukan-Environment': config.runtimeEnvironment,
+      },
+      body,
+      cache: 'no-store',
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const root = asRecord(payload);
+      const meta = asRecord(root.meta);
+      throw new Error(
+        asString(root.message) ||
+          asString(root.error) ||
+          asString(meta.message) ||
+          `RajaOngkir returned ${res.status}`,
+      );
+    }
+
+    const options = normalizeRajaOngkirOptions(payload, context, profile);
+    if (options.length === 0) {
+      throw new Error('RajaOngkir returned no usable courier options');
+    }
+
+    return {
+      options,
+      recommended_option_id: options[0]?.id || null,
+      notice:
+        config.runtimeEnvironment === 'staging'
+          ? 'Mode staging memakai tarif RajaOngkir. Validasi ulang sebelum go-live.'
+          : null,
+    };
+  } catch (error) {
+    console.warn('[UMKM_SHIPPING_RAJAONGKIR_FALLBACK]', error);
+    return null;
+  }
+}
+
 async function fetchExternalCourierQuote(
   input: QuoteInput,
   context: ShippingContext,
   profile: ReturnType<typeof buildUmkmOrderComposition>,
   config: ShippingConfig,
 ): Promise<ExternalCourierQuoteSuccess | null> {
+  if (isRajaOngkirProvider(config.provider)) {
+    return fetchRajaOngkirCourierQuote(input, context, profile, config);
+  }
+
   if (!config.allowProviderApi || !config.providerQuoteUrl) return null;
 
   const body = {
@@ -420,6 +682,7 @@ async function fetchExternalCourierQuote(
       address: context.deliveryAddress || undefined,
       lat: input.deliveryLat ?? undefined,
       lng: input.deliveryLng ?? undefined,
+      destination_id: input.deliveryDestinationId ?? undefined,
     },
     preferred_mode: input.preferredMode || profile.default_mode,
     composition: profile,
@@ -544,10 +807,11 @@ export async function buildUmkmShippingQuote(
     recommended_option_id: recommended?.id || null,
     integration: {
       environment: config.environment,
+      runtime_environment: config.runtimeEnvironment,
       provider: config.provider,
       provider_label: config.providerLabel,
       quote_source: quoteSource,
-      uses_live_rates: quoteSource === 'provider_api' && config.environment === 'live',
+      uses_live_rates: quoteSource === 'provider_api',
       notice: providerNotice,
     },
   };

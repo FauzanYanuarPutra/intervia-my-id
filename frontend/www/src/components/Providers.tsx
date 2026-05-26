@@ -12,6 +12,7 @@ import { DialogProvider } from '@/components/system/feedback/DialogProvider';
 import { BrowserNotificationBridge } from '@/components/system/feedback/BrowserNotificationBridge';
 import { ToastProvider } from '@/components/system/feedback/ToastProvider';
 import { ClientSecurityGuards } from '@/components/common/ClientSecurityGuards';
+import { GlobalImageFallback } from '@/components/common/GlobalImageFallback';
 
 type Props = {
   children: React.ReactNode;
@@ -28,9 +29,10 @@ export function Providers({ children }: Props) {
     const unregisterStaleWorkers = async () => {
       try {
         if ('serviceWorker' in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations();
+          const registrations =
+            await navigator.serviceWorker.getRegistrations();
           await Promise.all(
-            registrations.map(async (registration) => {
+            registrations.map(async registration => {
               const scriptUrl =
                 registration.active?.scriptURL ||
                 registration.waiting?.scriptURL ||
@@ -47,7 +49,7 @@ export function Providers({ children }: Props) {
         }
         if ('caches' in window) {
           const keys = await caches.keys();
-          await Promise.all(keys.map((key) => caches.delete(key)));
+          await Promise.all(keys.map(key => caches.delete(key)));
         }
       } catch (error) {
         console.warn('[PWA_CLEANUP_FAILED]', error);
@@ -62,6 +64,7 @@ export function Providers({ children }: Props) {
   return (
     <ThemeProvider>
       <ClientSecurityGuards />
+      <GlobalImageFallback />
       <UISettingsProvider>
         <ToastProvider>
           <DialogProvider>
@@ -70,7 +73,9 @@ export function Providers({ children }: Props) {
               <ChatInboxProvider>
                 <NotificationInboxProvider>
                   <SectorProvider>
-                    <PageMetaProviderWrapper>{children}</PageMetaProviderWrapper>
+                    <PageMetaProviderWrapper>
+                      {children}
+                    </PageMetaProviderWrapper>
                   </SectorProvider>
                 </NotificationInboxProvider>
               </ChatInboxProvider>

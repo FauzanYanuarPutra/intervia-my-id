@@ -21,7 +21,12 @@ describe('authRoutes', () => {
   it('detects protected routes', () => {
     expect(isProtectedRoutePath('/id/create')).toBe(true);
     expect(isProtectedRoutePath('/en/transactions/123/review')).toBe(true);
+    expect(isProtectedRoutePath('/id/payments')).toBe(true);
+    expect(isProtectedRoutePath('/id/content/listing-123/edit')).toBe(true);
     expect(isProtectedRoutePath('/id/home')).toBe(false);
+    expect(isProtectedRoutePath('/id/search?type=umkm')).toBe(false);
+    expect(isProtectedRoutePath('/id/reels?video=6')).toBe(false);
+    expect(isProtectedRoutePath('/id/profile/dapur-kawan')).toBe(false);
   });
 
   it('builds login callback with full route state', () => {
@@ -31,8 +36,8 @@ describe('authRoutes', () => {
   });
 
   it('does not add callback for auth pages', () => {
-    expect(buildLoginPath('en', '/en/login', 'callbackUrl=%2Fen%2Fcreate')).toBe(
-      '/en/login',
-    );
+    expect(
+      buildLoginPath('en', '/en/login', 'callbackUrl=%2Fen%2Fcreate'),
+    ).toBe('/en/login');
   });
 });

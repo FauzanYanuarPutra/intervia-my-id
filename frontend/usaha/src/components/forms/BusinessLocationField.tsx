@@ -206,23 +206,23 @@ export function BusinessLocationField({
   }
 
   return (
-    <div className="grid gap-4 rounded-[24px] border border-portal-line/70 bg-portal-sand/30 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-portal-ink">Lokasi usaha di peta</p>
-          <p className="mt-1 text-xs leading-5 text-portal-soft">
-            Bisa paste link Google Maps, tulis nama tempat, atau langsung geser marker sampai titik outlet pas.
+    <div className="grid gap-3 rounded-[18px] border border-portal-line/70 bg-portal-sand/20 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-black text-portal-ink">Titik peta</p>
+          <p className="mt-0.5 text-xs leading-5 text-portal-soft">
+            Paste link Maps, cari tempat, atau pakai GPS.
           </p>
         </div>
-        <div className="rounded-full border border-portal-line/70 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-portal-forest">
-          {point ? 'Marker aktif' : 'Preview aktif'}
-        </div>
+        <span className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-portal-forest">
+          {point ? 'Tersimpan' : 'Opsional'}
+        </span>
       </div>
 
-      <label className="grid gap-2 text-sm font-semibold text-portal-ink">
-        Google Maps atau query lokasi
+      <label className="grid gap-1.5 text-sm font-semibold text-portal-ink">
+        Link Maps / nama tempat
         <input
-          placeholder="Paste link Google Maps, koordinat, atau nama tempat"
+          placeholder="Contoh: Kopi Braga Bandung"
           value={locationQuery}
           onChange={event => onLocationQueryChange(event.target.value)}
           className="portal-input"
@@ -230,13 +230,13 @@ export function BusinessLocationField({
       </label>
 
       {suggestions.length > 0 ? (
-        <div className="grid gap-2 rounded-[20px] border border-portal-line/70 bg-white p-2">
+        <div className="grid gap-1.5 rounded-[16px] border border-portal-line/70 bg-white p-1.5">
           {suggestions.map(item => (
             <button
               key={`${item.rawLabel}-${item.point.lat}-${item.point.lng}`}
               type="button"
               onClick={() => handleSelectSuggestion(item)}
-              className="rounded-2xl border border-transparent px-3 py-3 text-left transition hover:border-portal-line hover:bg-portal-sand/30"
+              className="rounded-[14px] border border-transparent px-3 py-2 text-left transition hover:border-portal-line hover:bg-portal-sand/30"
             >
               <div className="text-sm font-semibold text-portal-ink">{item.title}</div>
               {item.subtitle ? (
@@ -253,7 +253,7 @@ export function BusinessLocationField({
           type="button"
           onClick={handleSearchOnMap}
           disabled={isSearching}
-          className="portal-button-secondary min-h-11 px-4"
+          className="portal-button-secondary min-h-10 px-3 text-xs"
         >
           {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           Cari di peta
@@ -262,33 +262,40 @@ export function BusinessLocationField({
           type="button"
           onClick={handleUseCurrentLocation}
           disabled={isLocating}
-          className="portal-button-secondary min-h-11 px-4"
+          className="portal-button-secondary min-h-10 px-3 text-xs"
         >
           {isLocating ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <LocateFixed className="h-4 w-4" />
           )}
-          Pakai lokasi saya
+          Pakai GPS
         </button>
         {googleMapsUrl ? (
-          <a href={googleMapsUrl} target="_blank" rel="noreferrer" className="portal-button-secondary min-h-11 px-4">
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="portal-button-secondary min-h-10 px-3 text-xs"
+          >
             <MapPinned className="h-4 w-4" />
-            Preview Google Maps
+            Preview
           </a>
         ) : null}
       </div>
 
       {effectiveQuery ? (
-        <div className="rounded-[20px] border border-portal-line/70 bg-white px-4 py-3 text-xs leading-5 text-portal-soft">
-          Query aktif: <span className="font-semibold text-portal-ink">{effectiveQuery}</span>
-        </div>
+        <p className="line-clamp-2 rounded-[14px] border border-portal-line/70 bg-white px-3 py-2 text-xs leading-5 text-portal-soft">
+          Dicari: <span className="font-semibold text-portal-ink">{effectiveQuery}</span>
+        </p>
       ) : null}
 
       <BusinessLocationMap
         value={point}
         searchQuery={effectiveQuery}
         onChange={handleMapChange}
+        className="rounded-[18px]"
+        heightClassName="h-[168px] w-full sm:h-[210px]"
         markerLabel={
           point
             ? 'Geser marker atau tap peta untuk koreksi titik usaha'
@@ -298,23 +305,23 @@ export function BusinessLocationField({
 
       <div className="flex flex-wrap gap-2 text-xs">
         {point ? (
-          <div className="rounded-full border border-portal-line/70 bg-white px-3 py-1.5 font-semibold text-portal-ink">
+          <div className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 font-semibold text-portal-ink">
             Lat {point.lat} | Lng {point.lng}
           </div>
         ) : (
-          <div className="rounded-full border border-portal-line/70 bg-white px-3 py-1.5 font-semibold text-portal-soft">
-            Belum ada titik presisi tersimpan
+          <div className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 font-semibold text-portal-soft">
+            Titik presisi belum diisi
           </div>
         )}
         {isSuggesting ? (
-          <div className="rounded-full border border-portal-line/70 bg-white px-3 py-1.5 font-semibold text-portal-soft">
-            Mencari saran alamat...
+          <div className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 font-semibold text-portal-soft">
+            Mencari saran...
           </div>
         ) : null}
       </div>
 
-      {error ? <p className="text-sm text-portal-ember">{error}</p> : null}
-      {!error && feedback ? <p className="text-sm text-portal-forest">{feedback}</p> : null}
+      {error ? <p className="text-xs leading-5 text-portal-ember">{error}</p> : null}
+      {!error && feedback ? <p className="text-xs leading-5 text-portal-forest">{feedback}</p> : null}
     </div>
   );
 }

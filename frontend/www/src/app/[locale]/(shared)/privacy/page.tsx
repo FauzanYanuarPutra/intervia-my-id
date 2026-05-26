@@ -16,7 +16,7 @@ export default async function PrivacyPage({ params }: PageProps) {
   const isId = locale === 'id';
 
   return (
-    <main className="page-shell page-rhythm pb-24 pt-6 lg:pb-10">
+    <main className="page-shell page-rhythm pb-6 pt-6 lg:pb-10">
       <SummaryCard
         title={isId ? 'Privasi & data di Lajukan' : 'Lajukan Privacy Policy'}
         description={

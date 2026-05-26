@@ -4,6 +4,7 @@ import '@/styles/ux-overhaul-foundation.css';
 import 'leaflet/dist/leaflet.css';
 import React from 'react';
 import { Providers } from '@/components/Providers';
+import AutoHideScrollbars from '@/components/common/AutoHideScrollbars';
 import ScrollToTop from '@/components/common/ScrollToTop';
 import Script from 'next/script';
 import { Metadata, Viewport } from 'next';
@@ -19,8 +20,8 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#16A34A' },
-    { media: '(prefers-color-scheme: dark)', color: '#0B1220' },
+    { media: '(prefers-color-scheme: light)', color: '#F7FAF7' },
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
 };
 
@@ -28,6 +29,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: 'Lajukan',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.png', sizes: '512x512', type: 'image/png' },
+    ],
+    shortcut: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/favicon.png', sizes: '512x512', type: 'image/png' }],
+  },
   title: {
     default: 'Lajukan | Supply, Sourcing, dan Operasional Usaha',
     template: '%s | Lajukan',
@@ -115,7 +124,7 @@ const organizationSchema = {
   '@type': 'Organization',
   name: 'Lajukan',
   url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
+  logo: `${SITE_URL}/logo.svg`,
   sameAs: [SITE_URL],
 };
 
@@ -301,8 +310,9 @@ export default function RootLayout({
         />
       </head>
 
-      <body className="min-h-screen bg-[color:var(--app-surface-muted)] font-sans text-[color:var(--app-text)] antialiased dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
+      <body className="app-cohesive-theme m-0 min-h-screen w-full overflow-x-hidden bg-[color:var(--app-surface-muted)] p-0 font-sans text-[color:var(--app-text)] antialiased dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
         <ScrollToTop />
+        <AutoHideScrollbars />
         <Providers>{children}</Providers>
       </body>
     </html>

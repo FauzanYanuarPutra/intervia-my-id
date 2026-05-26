@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import { useState } from 'react';
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { CONTENT_TYPES, getContentTypeName } from '@/data/contentTypes';
@@ -30,18 +30,18 @@ type ContentItem = {
   } | null;
 };
 
-function getThumbnail(item: ContentItem): string | null {
-  return parseImages(item as Parameters<typeof parseImages>[0])[0] || null;
-}
-
 function getImageCandidates(item: ContentItem): string[] {
   const seen = new Set<string>();
-  return parseImages(item as Parameters<typeof parseImages>[0]).filter(entry => {
-    const key = String(entry || '').trim().toLowerCase();
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return parseImages(item as Parameters<typeof parseImages>[0]).filter(
+    entry => {
+      const key = String(entry || '')
+        .trim()
+        .toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    },
+  );
 }
 
 export default function SearchResultCard({
@@ -54,7 +54,6 @@ export default function SearchResultCard({
   const locale = useLocale() || 'id';
   const { getSectorById } = useSectors();
   const thumbnails = getImageCandidates(item);
-  const thumbnail = thumbnails[0] || getThumbnail(item);
   const fallbackThumbnail = defaultImageForContent(
     item as Parameters<typeof defaultImageForContent>[0],
   );
@@ -62,12 +61,10 @@ export default function SearchResultCard({
     (entry, index, source) => Boolean(entry) && source.indexOf(entry) === index,
   );
   const imageCandidateKey = imageCandidates.join('|');
-  const [imageIndex, setImageIndex] = useState(0);
+  const [imageState, setImageState] = useState({ key: '', index: 0 });
+  const imageIndex =
+    imageState.key === imageCandidateKey ? imageState.index : 0;
   const imageSrc = imageCandidates[imageIndex] || null;
-
-  useEffect(() => {
-    setImageIndex(0);
-  }, [item.id, imageCandidateKey]);
 
   const meta = item.metadata as Record<string, unknown> | null;
   const sectorId = meta?.sector as string | undefined;
@@ -124,11 +121,15 @@ export default function SearchResultCard({
               className="object-cover"
               unoptimized
               onError={() => {
-                setImageIndex(currentIndex =>
-                  currentIndex + 1 < imageCandidates.length
-                    ? currentIndex + 1
-                    : currentIndex,
-                );
+                setImageState(current => {
+                  const currentIndex =
+                    current.key === imageCandidateKey ? current.index : 0;
+                  const nextIndex =
+                    currentIndex + 1 < imageCandidates.length
+                      ? currentIndex + 1
+                      : currentIndex;
+                  return { key: imageCandidateKey, index: nextIndex };
+                });
               }}
             />
           </div>
@@ -164,9 +165,7 @@ export default function SearchResultCard({
                 <PromotionIcon className="h-3 w-3" />
                 {promotionSnapshot.promoLabel}
               </span>
-              <span
-                className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text)]"
-              >
+              <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text)]">
                 {promotionSnapshot.offerType === 'loyalty_card'
                   ? locale === 'id'
                     ? 'Repeat order'

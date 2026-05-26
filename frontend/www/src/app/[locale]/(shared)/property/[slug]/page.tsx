@@ -1,6 +1,8 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { PropertyDetail } from '@/components/ui-kit';
+import { MarketPageFrame } from '@/components/marketplace';
+import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import {
   asNumber,
   asString,
@@ -165,9 +167,9 @@ export async function generateMetadata({
 export default async function PropertyDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   const item = await fetchPropertyContent(slug);
   if (!item) notFound();
 
@@ -207,7 +209,18 @@ export default async function PropertyDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <PropertyDetail property={property} />
+      <MarketPageFrame
+        variant="detail"
+        className="lajukan-market-property"
+        contentClassName="pb-2"
+      >
+        <DetailMobileTopBar
+          title={property.title}
+          eyebrow={locale === 'id' ? 'Detail lokasi' : 'Property detail'}
+          backLabel={locale === 'id' ? 'Kembali' : 'Back'}
+        />
+        <PropertyDetail property={property} />
+      </MarketPageFrame>
     </>
   );
 }

@@ -1,11 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
-import { ArrowRight, MapPinned, QrCode, Wifi } from 'lucide-react';
+import { ArrowRight, MapPinned, ShoppingCart } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import {
-  buildUmkmStorefrontPath,
-} from '@/lib/umkmSurface';
+import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 
 export type UmkmPreviewStore = {
   id: string;
@@ -23,12 +20,15 @@ type SearchUmkmPreviewProps = {
   stores: UmkmPreviewStore[];
   loading: boolean;
   error: string | null;
+  cartQuantities?: Record<string, number>;
   onOpenUmkmView: () => void;
-  onApplyCity: (city: string) => void;
+  onAddStoreToCart?: (store: UmkmPreviewStore) => void;
+  onOpenCart?: () => void;
 };
 
 function formatDistance(distanceKm: number | null): string | null {
-  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return null;
+  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm))
+    return null;
   return `${distanceKm.toFixed(1)} km`;
 }
 
@@ -37,142 +37,110 @@ export function SearchUmkmPreview({
   stores,
   loading,
   error,
+  cartQuantities,
   onOpenUmkmView,
-  onApplyCity,
+  onAddStoreToCart,
+  onOpenCart,
 }: SearchUmkmPreviewProps) {
-  const topCities = useMemo(
-    () => Array.from(new Set(stores.map((store) => store.city).filter(Boolean))).slice(0, 6),
-    [stores],
-  );
   const leadStore = stores[0] || null;
-  const offlineReadyCount = useMemo(
-    () => stores.filter((store) => store.recommended_qr === 'offline').length,
-    [stores],
-  );
+  const visibleStores = stores.slice(0, 3);
+  const getCartQuantity = (store: UmkmPreviewStore) =>
+    cartQuantities?.[`umkm:${store.id}`] || 0;
 
   return (
-    <section className="rounded-[24px] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,246,255,0.92))] p-3 shadow-[0_18px_34px_-28px_rgba(15,23,42,0.12)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(30,64,175,0.16))] sm:p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-sky-300">
-            {isId ? 'Usaha' : 'Business'}
-          </p>
-          <h2 className="mt-1 text-sm font-black text-[color:var(--app-text)] sm:text-base">
-            {isId ? 'Preview bisnis aktif di area ini' : 'Preview active businesses in this area'}
+    <section className="rounded-[22px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.12)] dark:bg-[color:var(--app-surface-strong)] sm:p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-black text-[color:var(--app-text)] sm:text-base">
+            {isId ? 'Usaha ditemukan' : 'Business results'}
           </h2>
-          <p className="mt-0.5 hidden text-[11px] ui-text-soft sm:block">
+          <p className="mt-0.5 line-clamp-1 text-[11px] ui-text-soft">
             {isId
-              ? 'Cek bisnis teratas di sini, lalu lanjut ke peta usaha kalau perlu eksplor storefront, booking, atau mode onsite lebih jauh.'
-              : 'Check the top businesses here, then open the business map if you want to explore the storefront, booking, or onsite modes further.'}
+              ? 'Hasil cepat. Peta lengkap ada di Lajukan Maps.'
+              : 'Quick results. Full map is in Lajukan Maps.'}
           </p>
         </div>
 
         <button
           type="button"
           onClick={onOpenUmkmView}
-          className="ui-pressable inline-flex items-center justify-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white hover:text-[color:var(--app-accent)] dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-950 dark:hover:text-sky-200"
+          className="ui-pressable inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-full bg-slate-100 px-3 text-xs font-semibold text-slate-700 transition hover:bg-white hover:text-[color:var(--app-accent)] dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-950 dark:hover:text-[color:var(--app-accent)]"
         >
-          {isId ? 'Buka peta usaha' : 'Open business map'}
+          {isId ? 'Maps' : 'Maps'}
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-[18px] bg-white/88 px-2.5 py-2 shadow-[0_14px_24px_-22px_rgba(15,23,42,0.12)] dark:bg-slate-950/70">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] ui-text-soft">{isId ? 'Usaha' : 'Businesses'}</p>
-          <p className="mt-0.5 text-sm font-black text-[color:var(--app-text)]">{stores.length}</p>
-        </div>
-        <div className="rounded-[18px] bg-white/88 px-2.5 py-2 shadow-[0_14px_24px_-22px_rgba(15,23,42,0.12)] dark:bg-slate-950/70">
-          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] ui-text-soft">{isId ? 'Onsite' : 'Onsite'}</p>
-          <p className="mt-0.5 text-sm font-black text-[color:var(--app-text)]">{offlineReadyCount}</p>
-        </div>
-      </div>
-
       {loading ? (
-        <div className="mt-3 rounded-[22px] bg-white/82 px-4 py-5 text-sm ui-text-soft dark:bg-slate-950/70">
-          {isId ? 'Memuat preview usaha...' : 'Loading business preview...'}
+        <div className="mt-3 rounded-[18px] bg-[color:var(--app-surface-muted)] px-4 py-4 text-sm ui-text-soft">
+          {isId ? 'Memuat usaha...' : 'Loading businesses...'}
         </div>
       ) : error ? (
-        <div className="mt-3 rounded-[22px] bg-white/82 px-4 py-4 text-sm ui-text-soft dark:bg-slate-950/70">{error}</div>
+        <div className="mt-3 rounded-[18px] bg-[color:var(--app-surface-muted)] px-4 py-4 text-sm ui-text-soft">
+          {error}
+        </div>
       ) : leadStore ? (
-        <div className="mt-3 space-y-2.5">
-          <article className="rounded-[22px] bg-white/88 p-3 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.12)] dark:bg-slate-950/72">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] ui-text-soft">{leadStore.city}</p>
-                  <span
-                    className={`ui-inline-meta ${
-                      leadStore.recommended_qr === 'offline' ? ' ui-success-text' : ' ui-info-text'
-                    }`}
-                  >
-                    {leadStore.recommended_qr === 'offline' ? (
-                      <>
-                        <QrCode className="h-3.5 w-3.5" />
-                        {isId ? 'Mode onsite' : 'Onsite mode'}
-                      </>
-                    ) : (
-                      <>
-                        <Wifi className="h-3.5 w-3.5" />
-                        {isId ? 'Mode online' : 'Online mode'}
-                      </>
-                    )}
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {visibleStores.map(store => {
+            const cartQuantity = getCartQuantity(store);
+            return (
+              <article
+                key={store.id}
+                className="min-w-0 rounded-[18px] bg-[color:var(--app-surface-muted)] p-3"
+              >
+                <div className="flex min-w-0 items-start gap-2">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-white text-[color:var(--app-accent)] dark:bg-slate-900">
+                    <MapPinned className="h-4 w-4" />
                   </span>
-                  {formatDistance(leadStore.distance_km) ? (
-                    <span className="ui-inline-meta ui-border ui-text-soft">{formatDistance(leadStore.distance_km)}</span>
+                  <div className="min-w-0">
+                    <h3 className="line-clamp-2 min-h-[2.25rem] text-sm font-black leading-[1.15] text-[color:var(--app-text)]">
+                      {store.name}
+                    </h3>
+                    <p className="mt-1 line-clamp-1 text-[11px] font-semibold ui-text-soft">
+                      {store.city}
+                      {formatDistance(store.distance_km)
+                        ? ` / ${formatDistance(store.distance_km)}`
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 flex gap-2">
+                  <Link
+                    href={buildUmkmStorefrontPath(store.slug)}
+                    className="ui-pressable inline-flex min-h-[34px] flex-1 items-center justify-center rounded-full bg-white px-3 text-xs font-semibold text-slate-700 transition hover:text-[color:var(--app-accent)] dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    {isId ? 'Buka' : 'Open'}
+                  </Link>
+                  {onAddStoreToCart ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        cartQuantity > 0
+                          ? onOpenCart?.()
+                          : onAddStoreToCart(store)
+                      }
+                      aria-label={isId ? 'Tambah ke keranjang' : 'Add to cart'}
+                      className="ui-pressable relative inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white transition hover:brightness-[1.03]"
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5" />
+                      {cartQuantity > 0 ? (
+                        <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-[color:var(--app-text)] px-1 text-[10px] font-black text-white">
+                          {cartQuantity}
+                        </span>
+                      ) : null}
+                    </button>
                   ) : null}
                 </div>
-                <h3 className="mt-1 text-sm font-bold text-[color:var(--app-text)] sm:text-base">
-                  {leadStore.name}
-                </h3>
-                <p className="mt-1 line-clamp-2 text-xs ui-text-soft">{leadStore.description || leadStore.address}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] ui-text-soft">
-                  <span className="inline-flex items-center gap-1">
-                    <MapPinned className="h-3.5 w-3.5" />
-                    {leadStore.address}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              <Link
-                href={buildUmkmStorefrontPath(leadStore.slug)}
-                className="ui-pressable inline-flex items-center justify-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white hover:text-[color:var(--app-accent)] dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-950 dark:hover:text-sky-200"
-              >
-                {isId ? 'Buka bisnis' : 'Open business'}
-              </Link>
-              <button
-                type="button"
-                onClick={() => onApplyCity(leadStore.city)}
-                className="ui-pressable inline-flex items-center justify-center gap-2 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white hover:text-[color:var(--app-accent)] dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-950 dark:hover:text-sky-200"
-              >
-                {isId ? `Filter ${leadStore.city}` : `Filter ${leadStore.city}`}
-              </button>
-            </div>
-          </article>
-
-          {topCities.length > 0 ? (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {topCities.map((city) => (
-                <button
-                  key={city}
-                  type="button"
-                  onClick={() => onApplyCity(city)}
-                  className="ui-inline-meta ui-accent-border ui-accent-text shrink-0"
-                >
-                  {city}
-                </button>
-              ))}
-            </div>
-          ) : null}
+              </article>
+            );
+          })}
         </div>
       ) : (
-        <div className="mt-3 rounded-[22px] bg-white/82 px-4 py-5 text-sm ui-text-soft dark:bg-slate-950/70">
-          {isId ? 'Belum ada usaha yang cocok untuk pencarian ini.' : 'No businesses matched this search yet.'}
+        <div className="mt-3 rounded-[18px] bg-[color:var(--app-surface-muted)] px-4 py-4 text-sm ui-text-soft">
+          {isId ? 'Belum ada usaha yang cocok.' : 'No matching businesses yet.'}
         </div>
       )}
     </section>
   );
 }
-

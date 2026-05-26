@@ -9,6 +9,9 @@ import {
   Building2,
   Briefcase,
   Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   FileText,
   Gift,
@@ -44,12 +47,12 @@ import {
 import { buildContentHref, extractContentId } from '@/lib/content/routes';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
-import ImageCarousel from '@/components/content/ImageCarousel';
 import { Modal } from '@/components/common/Modal';
-import { DetailAccordion } from '@/components/ui/DetailAccordion';
+import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import { ContentDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { TransactionVerificationPromptModal } from '@/components/verification/TransactionVerificationPromptModal';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   PHONE_VERIFICATION_SETTINGS_PATH,
   readTransactionVerification,
@@ -228,7 +231,7 @@ function resolveRelatedTxnGuidance(
 ): string {
   if (!txn) {
     return locale === 'id'
-      ? 'Belum ada order. Mulai dari tombol aksi biar chat dan pembayaran rapi.'
+      ? 'Belum ada order. Mulai dari tombol aksi.'
       : 'No order yet. Start from the action button to keep chat and payments tidy.';
   }
 
@@ -242,7 +245,7 @@ function resolveRelatedTxnGuidance(
         : 'Buyer funds are protected. Continue in chat.';
     }
     return locale === 'id'
-      ? 'Lanjut ke workspace order untuk bayar aman dan simpan detail transaksi.'
+      ? 'Lanjut order untuk bayar aman.'
       : 'Continue to the order workspace for safe payment and organized transaction details.';
   }
 
@@ -283,7 +286,7 @@ function resolveRelatedTxnGuidance(
   }
 
   return locale === 'id'
-    ? 'Buka workspace order untuk lihat langkah berikutnya dan status pembayaran.'
+    ? 'Buka order untuk cek langkah berikutnya.'
     : 'Open the order workspace to see the next step and payment status.';
 }
 
@@ -515,6 +518,7 @@ type PageProps = {
 
 export default function ContentDetailPage({ params }: PageProps) {
   const router = useRouter();
+  const handleBack = useAppBack(router, '/search');
   const locale = useLocale() || 'id';
   const { user, authFetch } = useAuth();
   const { getSectorById } = useSectors();
@@ -554,6 +558,7 @@ export default function ContentDetailPage({ params }: PageProps) {
   const [shareError, setShareError] = useState<string | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [relatedTx, setRelatedTx] = useState<RelatedTransaction | null>(null);
   const [relatedTxLoading, setRelatedTxLoading] = useState(false);
   const [nowTs, setNowTs] = useState<number>(Date.now());
@@ -626,6 +631,7 @@ export default function ContentDetailPage({ params }: PageProps) {
   useEffect(() => {
     if (!item) return;
     const meta = (item.metadata as Record<string, unknown> | null) || {};
+    setActiveImageIndex(0);
     setApplyLocation(
       prev =>
         prev ||
@@ -786,22 +792,22 @@ export default function ContentDetailPage({ params }: PageProps) {
     const directPrefillMessage =
       displayType === 'tool_rental'
         ? locale === 'id'
-          ? 'Halo kak, saya mau lanjut sewa ini. Tolong info jadwal ready, deposit, dan cara ambilnya.'
+          ? 'Halo kak, saya mau sewa. Jadwal, deposit, ambilnya gimana?'
           : 'Hi, I want to proceed with this rental. Please share the available schedule, deposit, and pickup details.'
         : displayType === 'property'
           ? locale === 'id'
-            ? 'Halo kak, saya tertarik lanjut untuk lokasi ini. Tolong info langkah survey dan syarat dealnya.'
+            ? 'Halo kak, saya tertarik lokasi ini. Bisa survey kapan?'
             : 'Hi, I want to proceed with this location. Please share the viewing steps and key deal terms.'
           : displayType === 'service' || displayType === 'profile'
             ? locale === 'id'
-              ? 'Halo kak, saya mau lanjut deal jasa ini. Tolong kirim langkah mulai, timeline, dan detail kerja utamanya.'
+              ? 'Halo kak, saya mau lanjut jasa ini. Mulainya gimana?'
               : 'Hi, I want to proceed with this service. Please share the start steps, timeline, and key work details.'
             : displayType === 'product'
               ? locale === 'id'
-                ? 'Halo kak, saya mau lanjut order sesuai harga listing. Mohon info stok, ongkir, dan langkah bayarnya.'
+                ? 'Halo kak, saya mau order. Stok dan ongkirnya ada?'
                 : 'Hi, I want to proceed at the listed price. Please confirm stock, delivery, and payment steps.'
               : locale === 'id'
-                ? 'Halo kak, saya mau lanjut sesuai detail listing. Tolong kirim langkah berikutnya.'
+                ? 'Halo kak, saya mau lanjut. Langkah berikutnya apa?'
                 : 'Hi, I want to proceed based on the listing details. Please share the next steps.';
     if (mode === 'direct' && listPriceCents > 0) {
       setOfferAmount(String(Math.round(listPriceCents / 100)));
@@ -915,7 +921,7 @@ export default function ContentDetailPage({ params }: PageProps) {
               created_at: createdAt,
               next_step:
                 locale === 'id'
-                  ? 'Lanjutkan detail di chat agar scope, harga, dan timeline tersimpan rapi.'
+                  ? 'Lanjut di chat biar detail tersimpan.'
                   : 'Continue the discussion in chat so scope, price, and timeline stay clear.',
             },
           },
@@ -1115,7 +1121,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         if (!roomId) {
           setChatError(
             locale === 'id'
-              ? 'Offer berhasil dibuat, tapi room chat belum tersedia. Coba tekan tombol chat.'
+              ? 'Offer dibuat. Kalau chat belum muncul, tekan tombol chat.'
               : 'Offer created, but chat room is not available yet. Please start chat manually.',
           );
         } else {
@@ -1137,7 +1143,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           }
           setOfferError(
             locale === 'id'
-              ? 'Transaksi belum bisa diproses sekarang. Coba lanjutkan chat atau ulangi lagi nanti.'
+              ? 'Transaksi belum bisa diproses. Lanjut chat atau coba lagi.'
               : 'This transaction cannot be processed right now. Continue in chat or try again later.',
           );
           return;
@@ -1471,7 +1477,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           created_at: submittedAt,
           next_step:
             locale === 'id'
-              ? 'Recruiter bisa buka chat ini untuk review profil, CV, dan lanjut tanya detail.'
+              ? 'Recruiter bisa review profil, CV, lalu lanjut chat.'
               : 'The recruiter can review this profile, CV, and continue the discussion in chat.',
         },
         snapshot_listing: listingSnapshot,
@@ -1907,19 +1913,19 @@ export default function ContentDetailPage({ params }: PageProps) {
         : 'Send the compensation you propose.'
       : displayType === 'tool_rental'
         ? locale === 'id'
-          ? 'Jelaskan tanggal pakai, durasi sewa, dan kebutuhan alat Anda.'
+          ? 'Tulis tanggal, durasi, kebutuhan alat.'
           : 'Share your rental date, duration, and asset needs.'
         : displayType === 'company'
           ? locale === 'id'
-            ? 'Jelaskan konteks intro, kemitraan, atau kebutuhan percakapan Anda.'
+            ? 'Tulis konteks intro atau kemitraan.'
             : 'Explain the intro context, partnership angle, or what you want to discuss.'
           : isDemandListing
             ? locale === 'id'
-              ? 'Jelaskan bagaimana Anda bisa memenuhi kebutuhan listing ini.'
+              ? 'Tulis cara Anda memenuhi kebutuhan ini.'
               : 'Explain how you can fulfill this listing need.'
             : displayType === 'service'
               ? locale === 'id'
-                ? 'Jelaskan kebutuhan layanan dan budget Anda.'
+                ? 'Tulis layanan dan budget.'
                 : 'Share your service needs and budget.'
               : displayType === 'profile'
                 ? locale === 'id'
@@ -1990,7 +1996,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         : 'Share the rental date, duration, pickup location, and key details...'
       : displayType === 'company'
         ? locale === 'id'
-          ? 'Tulis konteks intro, kebutuhan kemitraan, atau topik yang ingin dibahas...'
+          ? 'Tulis konteks intro atau topik...'
           : 'Describe the intro context, partnership need, or what you want to discuss...'
         : displayType === 'service'
           ? locale === 'id'
@@ -2147,7 +2153,6 @@ export default function ContentDetailPage({ params }: PageProps) {
       : sellerTotalTransactions > 0
         ? sellerCancelledTransactions / sellerTotalTransactions
         : 0;
-  const sellerRatingRounded = Math.round(sellerRating);
   const showSellerStats = sellerReviewCount > 0 || sellerTotalTransactions > 0;
   const metadataOwnerProfile =
     meta.owner_profile &&
@@ -2185,7 +2190,6 @@ export default function ContentDetailPage({ params }: PageProps) {
     ownerProfile?.avatar_url ||
       (typeof meta.avatar_url === 'string' ? meta.avatar_url : ''),
   );
-  const hasReviews = reviews.length > 0 || (item.review_count ?? 0) > 0;
   const workModeValue =
     typeof meta.work_mode === 'string' ? meta.work_mode : '';
   const workModeOption = WORK_MODE_OPTIONS.find(o => o.value === workModeValue);
@@ -2921,32 +2925,6 @@ export default function ContentDetailPage({ params }: PageProps) {
     item.body,
     displayType === 'product' || displayType === 'property' ? 120 : 140,
   );
-  const hasEssentialsPanel =
-    Boolean(bodyPreview) ||
-    previewHighlightItems.length > 0 ||
-    previewTags.length > 0;
-  const hiddenDetailCount = expandedDetailItems.length + extraTagCount;
-  const showDetailAccordion =
-    Boolean(item.body) || expandedDetailItems.length > 0 || extraTagCount > 0;
-  const detailAccordionDescriptionParts = [
-    item.body ? (locale === 'id' ? 'deskripsi' : 'overview') : '',
-    expandedDetailItems.length > 0
-      ? locale === 'id'
-        ? `${expandedDetailItems.length} spec`
-        : `${expandedDetailItems.length} specs`
-      : '',
-    tags.length > 0
-      ? locale === 'id'
-        ? `${tags.length} tag`
-        : `${tags.length} tags`
-      : '',
-  ].filter(Boolean);
-  const detailAccordionDescription =
-    detailAccordionDescriptionParts.length > 0
-      ? detailAccordionDescriptionParts.join(' / ')
-      : locale === 'id'
-        ? 'Buka detail lengkap.'
-        : 'Open full details.';
   const flowSteps = (() => {
     if (isOwner) {
       return locale === 'id'
@@ -3101,34 +3079,34 @@ export default function ContentDetailPage({ params }: PageProps) {
   const primaryActionHint =
     displayType === 'job'
       ? locale === 'id'
-        ? 'Mulai seperti chat WhatsApp. Tanyakan langkah lanjut atau langsung apply.'
+        ? 'Chat dulu. Lanjut apply.'
         : 'Apply fast or chat the recruiter.'
       : displayType === 'company'
         ? locale === 'id'
-          ? 'Mulai dari chat singkat dulu, lalu lanjut ke profil atau listing yang relevan.'
+          ? 'Chat dulu. Lanjut profil/listing.'
           : 'Start with chat or the owner profile.'
         : displayType === 'tool_rental'
           ? locale === 'id'
-            ? 'Mulai dari chat jadwal dulu. Kalau cocok, baru lanjut request sewa.'
+            ? 'Chat jadwal. Lanjut sewa.'
             : 'Check schedule and rate, then send a rental request.'
           : displayType === 'property'
             ? locale === 'id'
-              ? 'Mulai dari chat survey dulu. Kalau cocok, baru lanjut deal.'
+              ? 'Chat survey. Lanjut deal.'
               : 'Start by chatting about the viewing first, then continue the deal.'
             : displayType === 'service' || displayType === 'profile'
               ? locale === 'id'
-                ? 'Mulai dari chat singkat dulu. Kalau cocok, lanjut offer dan transaksi.'
+                ? 'Chat dulu. Lanjut offer.'
                 : 'Start with a short chat first, then continue to offers and transactions.'
               : displayType === 'product'
                 ? locale === 'id'
-                  ? 'Mulai dari chat stok dulu. Kalau cocok, lanjut offer atau bayar aman.'
+                  ? 'Chat stok. Lanjut bayar.'
                   : 'Start by confirming stock in chat, then continue to offers or safe payment.'
                 : isDemandListing
                   ? locale === 'id'
-                    ? 'Mulai dari chat singkat dulu. Kalau sudah paham, baru kirim respons atau offer.'
+                    ? 'Chat dulu. Baru kirim offer.'
                     : 'Start with a short chat, then send a response or offer.'
                   : locale === 'id'
-                    ? 'Mulai dari chat dulu, lalu lanjutkan deal kalau sudah cocok.'
+                    ? 'Chat dulu. Deal kalau cocok.'
                     : 'Start with chat first, then continue the deal when ready.';
   const chatStarterDraft = (() => {
     const title =
@@ -3136,42 +3114,42 @@ export default function ContentDetailPage({ params }: PageProps) {
 
     if (displayType === 'job') {
       return locale === 'id'
-        ? `Halo kak, saya tertarik ${title}. Masih buka? Saya mau tanya langkah lanjutnya.`
+        ? `Halo kak, ${title} masih buka?`
         : `Hi, I am interested in ${title}. Is it still open? I want to ask about the next step.`;
     }
 
     if (displayType === 'company') {
       return locale === 'id'
-        ? `Halo kak, saya lihat ${title}. Saya mau tanya lebih lanjut soal usaha dan peluang kerjanya.`
+        ? `Halo kak, mau tanya ${title}.`
         : `Hi, I saw ${title}. I want to ask more about the business and the opportunity.`;
     }
 
     if (displayType === 'tool_rental') {
       return locale === 'id'
-        ? `Halo kak, ${title} masih ready? Saya mau tanya jadwal sewa, deposit, dan cara ambilnya.`
+        ? `Halo kak, ${title} masih ready? Jadwal dan depositnya?`
         : `Hi, is ${title} still available? I want to ask about schedule, deposit, and pickup.`;
     }
 
     if (displayType === 'property') {
       return locale === 'id'
-        ? `Halo kak, ${title} masih tersedia? Saya mau tanya survey, harga, dan syarat sewanya.`
+        ? `Halo kak, ${title} tersedia? Survey dan harganya?`
         : `Hi, is ${title} still available? I want to ask about viewing, price, and terms.`;
     }
 
     if (displayType === 'service' || displayType === 'profile') {
       return locale === 'id'
-        ? `Halo kak, saya tertarik ${title}. Boleh info scope, timeline, dan cara mulainya?`
+        ? `Halo kak, tertarik ${title}. Scope dan timeline?`
         : `Hi, I am interested in ${title}. Can you share the scope, timeline, and how to start?`;
     }
 
     if (isDemandListing) {
       return locale === 'id'
-        ? `Halo kak, saya lihat kebutuhan ${title}. Saya bisa bantu. Boleh kirim detail inti yang paling penting dulu?`
+        ? `Halo kak, saya bisa bantu ${title}. Detail intinya apa?`
         : `Hi, I saw the need for ${title}. I may be able to help. Can you share the key details first?`;
     }
 
     return locale === 'id'
-      ? `Halo kak, saya lihat ${title}. Masih tersedia? Saya mau cek stok, harga, dan cara ordernya.`
+      ? `Halo kak, ${title} masih ada? Stok dan harganya berapa?`
       : `Hi, I saw ${title}. Is it still available? I want to check stock, price, and how to order.`;
   })();
   const chatFirstLabel =
@@ -3197,26 +3175,26 @@ export default function ContentDetailPage({ params }: PageProps) {
   const chatFirstBody =
     displayType === 'job'
       ? locale === 'id'
-        ? 'Masuk ke chat dulu seperti WhatsApp supaya langkah berikutnya lebih gampang.'
+        ? 'Masuk chat dulu biar lanjutnya gampang.'
         : 'Open chat first so the next step feels more natural.'
       : displayType === 'tool_rental'
         ? locale === 'id'
-          ? 'Cek jadwal, deposit, dan cara ambil dulu sebelum kirim request.'
+          ? 'Cek jadwal, deposit, cara ambil.'
           : 'Confirm schedule, deposit, and pickup before sending the request.'
         : displayType === 'property'
           ? locale === 'id'
-            ? 'Cek survey, harga, dan syarat deal dulu sebelum lanjut.'
+            ? 'Cek survey, harga, syarat deal.'
             : 'Confirm viewing, price, and terms before continuing.'
           : displayType === 'product'
             ? locale === 'id'
-              ? 'Cek stok, ongkir, dan cara order dulu supaya tidak bolak-balik.'
+              ? 'Cek stok, ongkir, cara order.'
               : 'Confirm stock, delivery, and ordering first so the chat stays simple.'
             : isDemandListing
               ? locale === 'id'
-                ? 'Tanya detail inti dulu supaya respons yang kamu kirim langsung pas.'
+                ? 'Tanya detail inti dulu.'
                 : 'Ask for the core details first so your response is more precise.'
               : locale === 'id'
-                ? 'Mulai dari chat singkat dulu seperti WhatsApp, lalu lanjutkan deal kalau sudah cocok.'
+                ? 'Chat dulu. Deal kalau cocok.'
                 : 'Start with a short WhatsApp-like chat first, then continue the deal when ready.';
   const offerCardTitle =
     displayType === 'job'
@@ -3240,18 +3218,18 @@ export default function ContentDetailPage({ params }: PageProps) {
               : 'Prepare an offer';
   const offerCardBody = isDemandListing
     ? locale === 'id'
-      ? 'Masukkan nominal, scope, dan catatan supaya lawan bicara langsung paham.'
+      ? 'Isi nominal, scope, catatan.'
       : 'Send amount, scope, and notes so the other side understands quickly.'
     : displayType === 'tool_rental'
       ? locale === 'id'
-        ? 'Kirim nominal, durasi sewa, dan catatan kebutuhan agar mudah dibalas.'
+        ? 'Kirim nominal, durasi, catatan.'
         : 'Send amount, rental duration, and notes so the other side can respond quickly.'
       : displayType === 'property'
         ? locale === 'id'
-          ? 'Cocok kalau harga, survey, atau syarat deal masih perlu dinego.'
+          ? 'Kalau harga atau syarat masih dinego.'
           : 'Best when price, viewing, or terms still need negotiation.'
         : locale === 'id'
-          ? 'Cocok kalau nominal, scope, atau timeline masih perlu dirapikan dulu.'
+          ? 'Kalau nominal, scope, atau timeline belum rapi.'
           : 'Best when amount, scope, or timeline still need negotiation.';
   const directDealTitle =
     displayType === 'tool_rental'
@@ -3272,18 +3250,18 @@ export default function ContentDetailPage({ params }: PageProps) {
   const directDealBody =
     displayType === 'tool_rental'
       ? locale === 'id'
-        ? 'Cocok kalau jadwal sewa sudah pas. Pickup dan deposit tetap lanjut rapi di chat.'
+        ? 'Kalau jadwal sewa sudah pas.'
         : 'Best when the rental schedule already fits. Pickup and deposit can still be finalized in chat.'
       : displayType === 'property'
         ? locale === 'id'
-          ? 'Cocok kalau lokasi sudah sesuai. Detail survey dan syarat tetap lanjut di chat.'
+          ? 'Kalau lokasi sudah sesuai.'
           : 'Best when the location already fits. Viewing and term details can continue in chat.'
         : displayType === 'service' || displayType === 'profile'
           ? locale === 'id'
-            ? 'Cocok kalau scope sudah jelas. Timeline dan revisi tetap bisa dibahas di chat.'
+            ? 'Kalau scope sudah jelas.'
             : 'Best when the scope is already clear. Timeline and revisions can still be discussed in chat.'
           : locale === 'id'
-            ? 'Transaksi dibuat dulu, lalu detail teknis tetap lanjut di chat seperti WhatsApp.'
+            ? 'Buat transaksi dulu. Detail lanjut di chat.'
             : 'Create the transaction first, then continue the practical details in chat.';
 
   const relatedTxStatus = resolveTxnStatusText(relatedTx);
@@ -3319,11 +3297,11 @@ export default function ContentDetailPage({ params }: PageProps) {
     ? `/transactions?focus_transaction_id=${encodeURIComponent(relatedTx.id)}`
     : '/transactions';
   const detailPageShellClass =
-    'page-shell overflow-x-hidden py-0 pb-10 sm:pb-0 sm:py-3';
+    'lajukan-market-page lajukan-market-detail page-shell overflow-x-hidden py-0 pb-20 sm:py-2 lg:pb-8';
   const detailShellStackClass =
-    'flex w-full flex-col gap-3 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-3.5';
+    'flex w-full flex-col gap-2.5 sm:mx-auto sm:max-w-[1700px] sm:gap-3';
   const detailSectionClass =
-    'relative overflow-hidden rounded-[24px] bg-white px-4 py-4 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[28px] sm:p-5 sm:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.16)]';
+    'relative overflow-hidden rounded-[20px] bg-white px-3.5 py-3.5 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.16)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px] sm:p-4';
   const detailInsetClass =
     'rounded-[18px] bg-slate-50 px-3 py-3 ring-1 ring-slate-200/60 dark:bg-slate-900 dark:ring-slate-800/70';
   const detailInsetCompactClass =
@@ -3336,7 +3314,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     'text-sm font-semibold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]';
 
   const actionButtons = (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(132px,1fr))] gap-2 lg:grid-cols-1">
       {isOwner && (
         <Link
           href={`/create?draft=${item.id}`}
@@ -3455,7 +3433,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           </span>
         </div>
       </div>
-      <div className="mt-2 text-[30px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <div className="mt-2 text-[26px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
         {primaryPrice}
       </div>
       <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[color:color-mix(in_srgb,var(--app-accent-soft)_46%,white)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))]">
@@ -3721,349 +3699,491 @@ export default function ContentDetailPage({ params }: PageProps) {
     </section>
   );
 
+  const safeActiveImageIndex =
+    images.length > 0 && activeImageIndex >= 0 && activeImageIndex < images.length
+      ? activeImageIndex
+      : 0;
+  const activeImageUrl = images[safeActiveImageIndex] || '';
+  const galleryThumbs = images.slice(0, 6);
+  const hiddenImageCount = Math.max(0, images.length - galleryThumbs.length);
+  const typeLabel = ct ? getContentTypeName(ct, locale) : humanizeToken(displayType);
+  const locationLabel =
+    quickSpecs.find(spec => spec.key === 'location')?.value ||
+    readMetaText(meta, 'location', 'city', 'region', 'address') ||
+    (locale === 'id' ? 'Indonesia' : 'Indonesia');
+  const localizedListingHref = listingHref.startsWith(`/${locale}/`)
+    ? listingHref
+    : `/${locale}${listingHref.startsWith('/') ? listingHref : `/${listingHref}`}`;
+  const handleNativeShare = async () => {
+    if (typeof window === 'undefined') return;
+    const shareUrl = new URL(localizedListingHref, window.location.origin).toString();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: item.title, url: shareUrl });
+        return;
+      }
+      await navigator.clipboard?.writeText(shareUrl);
+    } catch {
+      // Native share and clipboard can be cancelled by the user.
+    }
+  };
+  const detailVisual =
+    displayType === 'property'
+      ? {
+          chip: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/12 dark:text-rose-200 dark:ring-rose-400/20',
+          icon: 'bg-rose-50 text-rose-600 dark:bg-rose-500/12 dark:text-rose-300',
+          line: 'from-rose-500 via-orange-400 to-emerald-500',
+          wash: 'bg-[linear-gradient(135deg,rgba(255,241,242,0.86),rgba(255,255,255,0.96)_48%,rgba(240,253,244,0.72))] dark:bg-[linear-gradient(135deg,rgba(76,5,25,0.28),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+          eyebrow: locale === 'id' ? 'Detail properti' : 'Property detail',
+        }
+      : displayType === 'service' || displayType === 'profile'
+        ? {
+            chip: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-500/12 dark:text-teal-200 dark:ring-teal-400/20',
+            icon: 'bg-teal-50 text-teal-700 dark:bg-teal-500/12 dark:text-teal-300',
+            line: 'from-teal-500 via-emerald-400 to-emerald-500',
+            wash: 'bg-[linear-gradient(135deg,rgba(240,249,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.76))] dark:bg-[linear-gradient(135deg,rgba(8,47,73,0.34),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+            eyebrow:
+              displayType === 'profile'
+                ? locale === 'id'
+                  ? 'Detail profil'
+                  : 'Profile detail'
+                : locale === 'id'
+                  ? 'Detail layanan'
+                  : 'Service detail',
+          }
+        : displayType === 'job'
+          ? {
+              chip: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/12 dark:text-amber-200 dark:ring-amber-400/20',
+              icon: 'bg-amber-50 text-amber-600 dark:bg-amber-500/12 dark:text-amber-300',
+              line: 'from-amber-500 via-orange-400 to-emerald-500',
+              wash: 'bg-[linear-gradient(135deg,rgba(255,251,235,0.9),rgba(255,255,255,0.97)_48%,rgba(240,253,244,0.74))] dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.3),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+              eyebrow: locale === 'id' ? 'Detail lowongan' : 'Job detail',
+            }
+          : displayType === 'tool_rental'
+            ? {
+                chip: 'bg-lime-50 text-lime-800 ring-lime-100 dark:bg-lime-500/12 dark:text-lime-200 dark:ring-lime-400/20',
+                icon: 'bg-lime-50 text-lime-700 dark:bg-lime-500/12 dark:text-lime-300',
+                line: 'from-lime-500 via-emerald-400 to-emerald-500',
+                wash: 'bg-[linear-gradient(135deg,rgba(238,242,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.74))] dark:bg-[linear-gradient(135deg,rgba(49,46,129,0.32),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+                eyebrow: locale === 'id' ? 'Detail sewa alat' : 'Rental detail',
+              }
+            : {
+                chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
+                icon: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/12 dark:text-emerald-300',
+                line: 'from-emerald-500 via-teal-400 to-lime-500',
+                wash: 'bg-[linear-gradient(135deg,rgba(236,253,245,0.9),rgba(255,255,255,0.97)_48%,rgba(240,249,255,0.74))] dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_54%,rgba(8,47,73,0.2))]',
+                eyebrow:
+                  displayType === 'company'
+                    ? locale === 'id'
+                      ? 'Detail perusahaan'
+                      : 'Company detail'
+                    : locale === 'id'
+                      ? 'Detail item'
+                      : 'Item detail',
+              };
+  const detailSurfaceClass =
+    'overflow-hidden rounded-[20px] border border-slate-200/80 bg-white shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-950 sm:rounded-[22px]';
+  const reviewBuckets = [5, 4, 3, 2, 1].map(score => ({
+    score,
+    count: reviews.filter(review => Math.round(review.rating) === score).length,
+  }));
+  const reviewBucketTotal = Math.max(1, reviews.length);
+
   return (
     <div className={detailPageShellClass}>
+      <DetailMobileTopBar
+        title={item.title}
+        eyebrow={typeLabel}
+        backLabel={locale === 'id' ? 'Kembali' : 'Back'}
+        shareLabel={locale === 'id' ? 'Bagikan' : 'Share'}
+        onShare={() => void handleNativeShare()}
+      />
       <div className={detailShellStackClass}>
-        <section className="ui-page-section ui-home-section-shell px-2 sm:px-3">
-          <div className="ui-home-section-content">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(280px,320px)] lg:items-start lg:gap-4 xl:grid-cols-[minmax(0,1fr)_348px]">
-              <div className="space-y-3 sm:space-y-4">
-                <section className="overflow-hidden rounded-[24px] bg-white shadow-[0_16px_30px_-26px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[28px] sm:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.16)]">
-                  {images.length > 0 ? (
-                    <div className="bg-slate-100/70 dark:bg-slate-900/70">
-                      <ImageCarousel images={images} />
-                    </div>
-                  ) : (
-                    <div className="flex aspect-video items-center justify-center bg-slate-100/80 text-xs text-[color:var(--app-text-soft)] dark:bg-slate-900/80">
-                      {locale === 'id' ? 'Belum ada foto' : 'No images yet'}
-                    </div>
-                  )}
+        <section className="ui-page-section px-2 sm:px-3">
+          <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-3">
+            <div className="hidden items-center justify-between gap-3 px-1 text-xs text-[color:var(--app-text-soft)] lg:flex">
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-[color:var(--app-text)] ring-1 ring-slate-200 transition hover:bg-slate-50 dark:bg-slate-950 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800"
+                  aria-label={locale === 'id' ? 'Kembali' : 'Back'}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <Link href="/search" className="font-semibold text-[color:var(--app-text)]">
+                  {locale === 'id' ? 'Search' : 'Search'}
+                </Link>
+                <ChevronRight className="h-3.5 w-3.5" />
+                <span className="truncate">{typeLabel}</span>
+                {sectorObj ? (
+                  <>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                    <span className="truncate">
+                      {getSectorLabel(sectorObj, locale)}
+                    </span>
+                  </>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleNativeShare()}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 font-semibold text-[color:var(--app-text)] ring-1 ring-slate-200 transition hover:bg-slate-50 dark:bg-slate-950 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                {locale === 'id' ? 'Bagikan' : 'Share'}
+              </button>
+            </div>
 
-                  <div className="p-4 sm:p-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {ct && (
-                        <span className="rounded-full bg-[color:color-mix(in_srgb,var(--app-accent-soft)_52%,white)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_22%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
-                          {getContentTypeName(ct, locale)}
-                        </span>
-                      )}
-                      {sectorObj && (
-                        <Link
-                          href={`/search?sector=${sectorId}`}
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${sectorColorClass} text-[color:var(--app-text-inverse)] hover:opacity-90 transition-opacity`}
-                          style={sectorColorStyle}
-                        >
-                          <sectorObj.icon className="h-3.5 w-3.5" />
-                          {getSectorLabel(sectorObj, locale)}
-                        </Link>
-                      )}
-                      {subSectorObj && (
-                        <Link
-                          href={`/search?sector=${sectorId}&sub_sector=${subSectorId}`}
-                          className="inline-flex items-center rounded-full bg-[color:var(--app-info-soft)] px-2.5 py-1 text-xs font-medium text-[color:var(--app-info)] transition-colors hover:bg-[color:var(--app-info-border)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface)]"
-                        >
-                          {getSubSectorName(subSectorObj, locale)}
-                        </Link>
-                      )}
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusBadgeClass}`}
-                      >
-                        {statusLabel}
-                      </span>
-                    </div>
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.98fr)_minmax(340px,0.78fr)_300px] lg:items-start xl:grid-cols-[minmax(0,1fr)_minmax(390px,0.82fr)_320px]">
+              <section className={`${detailSurfaceClass} p-1.5 sm:p-2`}>
+                <div className="relative overflow-hidden rounded-[18px] bg-slate-100 dark:bg-slate-900">
+                  <div className="absolute right-3 top-3 z-10 hidden items-center gap-2 lg:flex">
+                    <button
+                      type="button"
+                      onClick={() => void handleNativeShare()}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/92 text-slate-800 shadow-sm backdrop-blur transition hover:bg-white"
+                      aria-label={locale === 'id' ? 'Bagikan' : 'Share'}
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
+                  </div>
 
-                    <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 max-w-3xl">
-                        <h1 className="text-2xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[28px]">
-                          {item.title}
-                        </h1>
-                        {summaryPreview ? (
-                          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-[color:var(--app-text-soft)]">
-                            {summaryPreview}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="shrink-0 rounded-[20px] bg-slate-50 px-3 py-2.5 text-right dark:bg-slate-900/72 lg:hidden">
-                        <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                          {priceHeading}
-                        </div>
-                        <div className="text-lg font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {primaryPrice}
-                        </div>
-                        {hasOriginalPrice && (
-                          <div className="mt-1 text-[11px] text-[color:var(--app-text-soft)] line-through">
-                            {formatCurrency(
-                              displayOriginalPriceCents as number,
-                              item.currency || 'IDR',
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                      {quickSpecs.map(spec => {
-                        const SpecIcon = spec.icon;
-                        return (
-                          <div
-                            key={spec.key}
-                            className={detailInsetCompactClass}
-                          >
-                            <div className="flex items-start gap-2">
-                              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[color:var(--app-accent)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-950">
-                                <SpecIcon className="h-4 w-4" />
-                              </span>
-                              <div className="min-w-0">
-                                <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                                  {spec.label}
-                                </div>
-                                <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                  {spec.value}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {hasEssentialsPanel && (
-                      <div className={`mt-4 space-y-3 ${detailInsetClass}`}>
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                              <TypeIcon className="h-4 w-4" />
-                              {highlightHeading}
-                            </p>
-                            <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                              {locale === 'id'
-                                ? 'Poin utama langsung terlihat'
-                                : 'Key details are surfaced first'}
-                            </p>
-                          </div>
-                          {hiddenDetailCount > 0 && (
-                            <span className="inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--app-accent-soft)_52%,white)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_22%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
-                              {locale === 'id'
-                                ? `${hiddenDetailCount} detail lanjutan`
-                                : `${hiddenDetailCount} more details`}
-                            </span>
-                          )}
-                        </div>
-
-                        {bodyPreview && (
-                          <p className="text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {bodyPreview}
-                          </p>
-                        )}
-
-                        {previewHighlightItems.length > 0 && (
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {previewHighlightItems.map(item => (
-                              <div
-                                key={item.key}
-                                className={detailInsetCompactClass}
-                              >
-                                <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                                  {item.label}
-                                </div>
-                                <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                  {item.value}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {previewTags.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {previewTags.map(tag => (
-                              <span
-                                key={tag}
-                                className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-800/80"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {extraTagCount > 0 && (
-                              <span className="rounded-full bg-[color:color-mix(in_srgb,var(--app-accent-soft)_52%,white)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_22%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
-                                +{extraTagCount}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {showDetailAccordion && (
-                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[16px] bg-white px-3 py-2 text-[11px] text-[color:var(--app-text-soft)] ring-1 ring-slate-200/70 dark:bg-slate-950 dark:ring-slate-800/80">
-                            <span>
-                              {locale === 'id'
-                                ? 'Detail lengkap ada di panel bawah.'
-                                : 'Full details live in the panel below.'}
-                            </span>
-                            <span className="font-semibold text-[color:var(--app-accent)]">
-                              {locale === 'id'
-                                ? 'Buka saat perlu'
-                                : 'Open when needed'}
-                            </span>
-                          </div>
-                        )}
+                  <div className="relative aspect-[16/11] w-full sm:aspect-[16/9] lg:aspect-[4/3] xl:aspect-[16/10]">
+                    {activeImageUrl ? (
+                      <NextImage
+                        src={activeImageUrl}
+                        alt={item.title}
+                        fill
+                        sizes="(min-width: 1280px) 760px, (min-width: 1024px) 48vw, 100vw"
+                        className="object-cover"
+                        priority
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                        <ImageIcon className="h-8 w-8" />
+                        {locale === 'id' ? 'Belum ada foto' : 'No images yet'}
                       </div>
                     )}
-
-                    {ratingValue > 0 && (
-                      <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-amber-700 dark:bg-amber-500/12 dark:text-amber-200">
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <Star
-                              key={`header-rating-${i}`}
-                              className={`h-4 w-4 ${
-                                i < ratingRounded
-                                  ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
-                                  : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-xs font-semibold">
-                          {ratingValue.toFixed(1)} ({item.review_count || 0}{' '}
-                          {locale === 'id' ? 'review' : 'reviews'})
+                    <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-slate-950/68 via-slate-950/12 to-transparent p-2.5 text-white sm:p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {locale === 'id' ? 'Terverifikasi' : 'Verified'}
+                        </span>
+                        <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
+                          {listingSideContextLabel}
                         </span>
                       </div>
-                    )}
-
-                    {(displayType === 'job' ||
-                      displayType === 'service' ||
-                      displayType === 'profile') &&
-                      (meta.work_mode as string) && (
-                        <div className="mt-4">
-                          {(() => {
-                            const wm = WORK_MODE_OPTIONS.find(
-                              o => o.value === (meta.work_mode as string),
-                            );
-                            if (!wm) return null;
-                            return (
-                              <div className="inline-flex flex-wrap items-center gap-2 rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_46%,white)] px-3 py-2 text-sm font-medium text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
-                                <span className="text-lg">{wm.icon}</span>
-                                <span>
-                                  {locale === 'id' ? wm.labelId : wm.labelEn}
-                                </span>
-                                <span className="text-xs text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
-                                  {locale === 'id' ? wm.descId : wm.descEn}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {updatedLabel && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 dark:bg-slate-900">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {locale === 'id' ? 'Diperbarui' : 'Updated'}{' '}
-                          {updatedLabel}
+                      {images.length > 0 ? (
+                        <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
+                          {safeActiveImageIndex + 1}/{images.length}
                         </span>
-                      )}
-                      {images.length > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 dark:bg-slate-900">
-                          <ImageIcon className="h-3.5 w-3.5" />
-                          {images.length} {locale === 'id' ? 'foto' : 'images'}
-                        </span>
-                      )}
-                      {documents.length > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 dark:bg-slate-900">
-                          <FileText className="h-3.5 w-3.5" />
-                          {documents.length}{' '}
-                          {locale === 'id' ? 'dokumen' : 'documents'}
-                        </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                </section>
-
-                <div className="grid gap-3 lg:hidden sm:grid-cols-2">
-                  {ownerProfileCard}
-                  {actionCard}
                 </div>
 
-                {showDetailAccordion && (
-                  <DetailAccordion
-                    title={
-                      locale === 'id'
-                        ? 'Lihat detail lengkap'
-                        : 'See full details'
-                    }
-                    description={detailAccordionDescription}
-                    className="rounded-[24px] border-transparent bg-white shadow-[0_16px_30px_-26px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[28px] sm:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.16)]"
-                  >
-                    <div className="space-y-5">
-                      {item.body ? (
-                        <div>
-                          <div className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                            {locale === 'id'
-                              ? 'Deskripsi lengkap'
-                              : 'Full overview'}
-                          </div>
-                          <div className="prose prose-sm mt-3 max-w-none whitespace-pre-line text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
-                            {item.body}
-                          </div>
+                {galleryThumbs.length > 1 ? (
+                  <div className="mt-1.5 grid grid-cols-5 gap-1.5 sm:grid-cols-6">
+                    {galleryThumbs.map((image, index) => (
+                      <button
+                        key={`${image}-${index}`}
+                        type="button"
+                        onClick={() => setActiveImageIndex(index)}
+                        className={`relative aspect-[4/3] overflow-hidden rounded-[12px] bg-slate-100 ring-offset-2 transition dark:bg-slate-900 ${
+                          index === safeActiveImageIndex
+                            ? 'ring-2 ring-[color:var(--app-accent)]'
+                            : 'ring-1 ring-slate-200 hover:ring-slate-300 dark:ring-slate-800'
+                        }`}
+                        aria-label={`${locale === 'id' ? 'Lihat foto' : 'View image'} ${index + 1}`}
+                      >
+                        <NextImage
+                          src={image}
+                          alt={`${item.title} ${index + 1}`}
+                          fill
+                          sizes="140px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                        {hiddenImageCount > 0 && index === galleryThumbs.length - 1 ? (
+                          <span className="absolute inset-0 flex items-center justify-center bg-slate-950/58 text-xs font-semibold text-white">
+                            +{hiddenImageCount}
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+
+              <section className={`${detailSurfaceClass} ${detailVisual.wash} p-3.5 sm:p-4`}>
+                <div className={`h-1 w-20 rounded-full bg-gradient-to-r ${detailVisual.line}`} />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}>
+                    <TypeIcon className="h-3.5 w-3.5" />
+                    {detailVisual.eyebrow}
+                  </span>
+                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusBadgeClass}`}>
+                    {statusLabel}
+                  </span>
+                  {ct ? (
+                    <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70 dark:bg-slate-950/70 dark:text-slate-200 dark:ring-slate-800">
+                      {typeLabel}
+                    </span>
+                  ) : null}
+                </div>
+
+                <h1 className="mt-3 text-[24px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[30px] lg:text-[28px] xl:text-[32px]">
+                  {item.title}
+                </h1>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  {ratingValue > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1.5 font-semibold text-amber-700 dark:bg-amber-500/12 dark:text-amber-200">
+                      <Star className="h-3.5 w-3.5 fill-[color:var(--app-warning)] text-[color:var(--app-warning)]" />
+                      {ratingValue.toFixed(1)}
+                      <span className="font-medium text-amber-700/80 dark:text-amber-100/80">
+                        ({item.review_count || 0})
+                      </span>
+                    </span>
+                  ) : null}
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/78 px-2.5 py-1.5 font-semibold ring-1 ring-slate-200/70 dark:bg-slate-950/70 dark:ring-slate-800">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {locationLabel}
+                  </span>
+                  {updatedLabel ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/78 px-2.5 py-1.5 font-semibold ring-1 ring-slate-200/70 dark:bg-slate-950/70 dark:ring-slate-800">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {locale === 'id' ? 'Update' : 'Updated'} {updatedLabel}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 rounded-[18px] bg-white/82 p-3 ring-1 ring-slate-200/70 dark:bg-slate-950/72 dark:ring-slate-800">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                        {priceHeading}
+                      </p>
+                      <p className="mt-1 text-[26px] font-semibold leading-none text-[color:var(--app-accent)] sm:text-3xl">
+                        {primaryPrice}
+                      </p>
+                      {hasOriginalPrice ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="text-[color:var(--app-text-soft)] line-through">
+                            {formatCurrency(displayOriginalPriceCents as number, item.currency || 'IDR')}
+                          </span>
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-600 dark:bg-red-500/12 dark:text-red-300">
+                            -{discountPercent}%
+                          </span>
                         </div>
                       ) : null}
-
-                      {expandedDetailItems.length > 0 && (
-                        <div>
-                          <div className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                            {detailHeading}
-                          </div>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2 text-[color:var(--app-text)]">
-                            {expandedDetailItems.map(entry => (
-                              <div
-                                key={entry.key}
-                                className={detailInsetCompactClass}
-                              >
-                                <div className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                                  {entry.label}
-                                </div>
-                                <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                  {entry.value}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {tags.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                            <Tag className="h-4 w-4" />
-                            {locale === 'id' ? 'Tag terkait' : 'Related tags'}
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {tags.map(tag => (
-                              <span
-                                key={tag}
-                                className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </DetailAccordion>
-                )}
+                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}>
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      {primaryActionHint}
+                    </span>
+                  </div>
+                </div>
 
-                {(reviewsLoading || hasReviews) && (
-                  <section className={detailSectionClass}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id' ? 'Ulasan' : 'Reviews'}
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {quickSpecs.slice(0, 3).map(spec => {
+                    const SpecIcon = spec.icon;
+                    return (
+                      <div
+                        key={spec.key}
+                        className="rounded-[16px] bg-white/78 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/66 dark:ring-slate-800"
+                      >
+                        <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${detailVisual.icon}`}>
+                    <SpecIcon className="h-3.5 w-3.5" />
+                        </span>
+                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                          {spec.label}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                          {spec.value}
+                        </p>
                       </div>
-                      {ratingValue > 0 && (
-                        <div className="flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:bg-amber-500/12 dark:text-amber-200">
+                    );
+                  })}
+                </div>
+
+                {summaryPreview || bodyPreview ? (
+                  <div className="mt-3 rounded-[18px] bg-white/68 p-3 text-sm leading-6 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800">
+                    {summaryPreview ? <p className="font-medium">{summaryPreview}</p> : null}
+                    {bodyPreview ? <p className={summaryPreview ? 'mt-2' : ''}>{bodyPreview}</p> : null}
+                  </div>
+                ) : null}
+
+                {previewHighlightItems.length > 0 ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {previewHighlightItems.map(entry => (
+                      <div
+                        key={entry.key}
+                        className="rounded-[16px] bg-white/72 px-3 py-2 ring-1 ring-slate-200/70 dark:bg-slate-950/62 dark:ring-slate-800"
+                      >
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                          {entry.label}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                          {entry.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {previewTags.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {previewTags.map(tag => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-white/82 px-3 py-1 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200/70 dark:bg-slate-950/72 dark:text-slate-200 dark:ring-slate-800"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {extraTagCount > 0 ? (
+                      <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}>
+                        +{extraTagCount}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+
+              <div className="grid gap-3 lg:hidden">
+                {actionCard}
+                {ownerProfileCard}
+              </div>
+
+              <aside className="hidden lg:block">
+                <div className="sticky top-24 space-y-3">
+                  {actionCard}
+                  {ownerProfileCard}
+                  <section className={`${detailSurfaceClass} p-3.5`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Lokasi' : 'Location'}
+                      </p>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${detailVisual.chip}`}>
+                        {listingSideLabel}
+                      </span>
+                    </div>
+                    <div className="relative mt-3 h-32 overflow-hidden rounded-[18px] bg-[linear-gradient(135deg,#e2e8f0,#f8fafc_48%,#dcfce7)] dark:bg-[linear-gradient(135deg,#0f172a,#020617_52%,#064e3b)]">
+                      <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(15,23,42,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white shadow-[0_18px_34px_-20px_rgba(16,185,129,0.8)]">
+                          <MapPin className="h-5 w-5" />
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      {locationLabel}
+                    </p>
+                  </section>
+                  <section className={`${detailSurfaceClass} p-3.5`}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                      {locale === 'id' ? 'Info listing' : 'Listing info'}
+                    </p>
+                    <div className="mt-3 space-y-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                      {[
+                        updatedLabel
+                          ? `${locale === 'id' ? 'Diperbarui' : 'Updated'}: ${updatedLabel}`
+                          : '',
+                        createdLabel
+                          ? `${locale === 'id' ? 'Dibuat' : 'Created'}: ${createdLabel}`
+                          : '',
+                        images.length
+                          ? `${images.length} ${locale === 'id' ? 'foto' : 'images'}`
+                          : '',
+                        documents.length
+                          ? `${documents.length} ${locale === 'id' ? 'dokumen' : 'documents'}`
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .map(label => (
+                          <div key={label} className="flex items-center gap-2 rounded-[14px] bg-slate-50 px-3 py-2 dark:bg-slate-900">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                            <span>{label}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </section>
+                </div>
+              </aside>
+
+              <div className="space-y-3 lg:col-span-2">
+                <section className={`${detailSurfaceClass} p-3.5 sm:p-4`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                        {detailHeading}
+                      </p>
+                      <h2 className="mt-1 text-xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {locale === 'id' ? 'Informasi lengkap' : 'Full information'}
+                      </h2>
+                    </div>
+                    <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}>
+                      {highlightHeading}
+                    </span>
+                  </div>
+
+                  {item.body ? (
+                    <div className="prose prose-sm mt-3 max-w-none whitespace-pre-line text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
+                      {item.body}
+                    </div>
+                  ) : null}
+
+                  {expandedDetailItems.length > 0 ? (
+                    <div className="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                      {expandedDetailItems.map(entry => (
+                        <div
+                          key={entry.key}
+                          className="rounded-[16px] bg-slate-50 px-3 py-2.5 ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800"
+                        >
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                            {entry.label}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {entry.value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {tags.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {tags.map(tag => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className={`${detailSurfaceClass} p-3.5 sm:p-4`}>
+                  <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Ulasan pelanggan' : 'Customer reviews'}
+                      </p>
+                      <div className="mt-3 flex items-end gap-2">
+                        <span className="text-3xl font-semibold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          {ratingValue > 0 ? ratingValue.toFixed(1) : '0.0'}
+                        </span>
+                        <div className="pb-1">
                           <div className="flex items-center gap-0.5">
                             {Array.from({ length: 5 }).map((_, i) => (
                               <Star
-                                key={`reviews-rating-${i}`}
+                                key={`reviews-summary-${i}`}
                                 className={`h-3.5 w-3.5 ${
                                   i < ratingRounded
                                     ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
@@ -4072,38 +4192,47 @@ export default function ContentDetailPage({ params }: PageProps) {
                               />
                             ))}
                           </div>
-                          <span>
-                            {ratingValue.toFixed(1)} ({item.review_count || 0}{' '}
-                            {locale === 'id' ? 'review' : 'reviews'})
-                          </span>
+                          <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                            {item.review_count || reviews.length}{' '}
+                            {locale === 'id' ? 'review' : 'reviews'}
+                          </p>
                         </div>
-                      )}
+                      </div>
+                      <div className="mt-4 space-y-1.5">
+                        {reviewBuckets.map(bucket => (
+                          <div key={bucket.score} className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]">
+                            <span className="w-3">{bucket.score}</span>
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-900">
+                              <div
+                                className="h-full rounded-full bg-[color:var(--app-accent)]"
+                                style={{ width: `${(bucket.count / reviewBucketTotal) * 100}%` }}
+                              />
+                            </div>
+                            <span className="w-5 text-right">{bucket.count}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="mt-4 space-y-3">
-                      {reviewsLoading && (
-                        <div className="text-xs text-[color:var(--app-text)]">
-                          {locale === 'id'
-                            ? 'Memuat ulasan...'
-                            : 'Loading reviews...'}
+
+                    <div className="space-y-3">
+                      {reviewsLoading ? (
+                        <div className="rounded-[18px] bg-slate-50 p-3 text-xs text-[color:var(--app-text)] dark:bg-slate-900 dark:text-[color:var(--app-text-soft)]">
+                          {locale === 'id' ? 'Memuat ulasan...' : 'Loading reviews...'}
                         </div>
-                      )}
-                      {!reviewsLoading && reviews.length === 0 && (
-                        <div
-                          className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                        >
+                      ) : reviews.length === 0 ? (
+                        <div className="rounded-[18px] bg-slate-50 p-3 text-xs text-[color:var(--app-text)] dark:bg-slate-900 dark:text-[color:var(--app-text-soft)]">
                           {locale === 'id'
                             ? 'Belum ada ulasan untuk listing ini.'
                             : 'No reviews for this listing yet.'}
                         </div>
-                      )}
-                      {reviews.slice(0, 5).map(review => (
-                        <div
-                          key={review.id}
-                          className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-0.5">
+                      ) : (
+                        reviews.slice(0, 4).map(review => (
+                          <div
+                            key={review.id}
+                            className="rounded-[18px] bg-slate-50 p-3 text-sm text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1">
                                 {Array.from({ length: 5 }).map((_, i) => (
                                   <Star
                                     key={`review-${review.id}-star-${i}`}
@@ -4115,197 +4244,100 @@ export default function ContentDetailPage({ params }: PageProps) {
                                   />
                                 ))}
                               </div>
-                              <span className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                {review.rating.toFixed(1)}
+                              <span className="text-[11px] text-[color:var(--app-text-soft)]">
+                                {formatDate(review.created_at || '')}
                               </span>
                             </div>
-                            <span className="text-[11px] text-[color:var(--app-text-soft)]">
-                              {formatDate(review.created_at || '')}
-                            </span>
+                            <p className="mt-2 leading-6">
+                              {review.comment ||
+                                (locale === 'id' ? 'Tanpa komentar.' : 'No comment provided.')}
+                            </p>
                           </div>
-                          <div className="mt-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {review.comment ||
-                              (locale === 'id'
-                                ? 'Tanpa komentar.'
-                                : 'No comment provided.')}
-                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                {showSellerStats ? (
+                  <section className={`${detailSurfaceClass} p-3.5 sm:p-4 lg:hidden`}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                      {locale === 'id' ? 'Kepercayaan penjual' : 'Seller trust'}
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      {[
+                        {
+                          label: locale === 'id' ? 'Rating penjual' : 'Seller rating',
+                          value: sellerRating > 0 ? sellerRating.toFixed(1) : '0.0',
+                        },
+                        {
+                          label: locale === 'id' ? 'Transaksi selesai' : 'Completed deals',
+                          value: `${sellerCompletedTransactions}/${sellerTotalTransactions}`,
+                        },
+                        {
+                          label: locale === 'id' ? 'Acceptance rate' : 'Acceptance rate',
+                          value: formatPercent(sellerAcceptanceRate),
+                        },
+                      ].map(stat => (
+                        <div key={stat.label} className="rounded-[16px] bg-slate-50 p-3 ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                            {stat.label}
+                          </p>
+                          <p className="mt-1 text-lg font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {stat.value}
+                          </p>
                         </div>
                       ))}
                     </div>
                   </section>
-                )}
+                ) : null}
 
-                {documents.length > 0 && (
-                  <section className={detailSectionClass}>
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                {documents.length > 0 ? (
+                  <section className={`${detailSurfaceClass} p-3.5 sm:p-4`}>
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                       <FileText className="h-4 w-4" />
                       {locale === 'id' ? 'Dokumen' : 'Documents'}
                     </div>
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
                       {documents.map(doc => (
                         <a
                           key={`${doc.url}-${doc.name}`}
                           href={doc.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="group flex items-center justify-between gap-3 rounded-[20px] bg-slate-50/92 px-3 py-2.5 text-sm transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_32%,white)] dark:bg-slate-900/72 dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent)_20%,rgba(15,23,42,0.96))]"
+                          className="group flex items-center justify-between gap-3 rounded-[18px] bg-slate-50 px-3 py-2.5 text-sm ring-1 ring-slate-200/70 transition hover:bg-emerald-50 dark:bg-slate-900 dark:ring-slate-800 dark:hover:bg-emerald-500/12"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[color:var(--app-text)] shadow-[0_10px_22px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-950 dark:text-[color:var(--app-text-soft)]">
-                              <FileText className="h-4 w-4" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                                {doc.name}
-                              </p>
-                              <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                {doc.mime ||
-                                  (locale === 'id' ? 'Dokumen' : 'Document')}
-                                {doc.size ? ` - ${formatSize(doc.size)}` : ''}
-                              </p>
-                            </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              {doc.name}
+                            </p>
+                            <p className="text-xs text-[color:var(--app-text-soft)]">
+                              {doc.mime || (locale === 'id' ? 'Dokumen' : 'Document')}
+                              {doc.size ? ` - ${formatSize(doc.size)}` : ''}
+                            </p>
                           </div>
-                          <span className="text-xs font-semibold text-[color:var(--app-accent)] group-hover:underline dark:text-[color:var(--app-accent)]">
+                          <span className="text-xs font-semibold text-[color:var(--app-accent)]">
                             {locale === 'id' ? 'Lihat' : 'View'}
                           </span>
                         </a>
                       ))}
                     </div>
                   </section>
-                )}
+                ) : null}
               </div>
-
-              <aside className="hidden lg:block">
-                <div className="sticky top-24 space-y-3">
-                  {ownerProfileCard}
-                  {actionCard}
-                  {showSellerStats && (
-                    <section className={detailSectionClass}>
-                      <div className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? 'Kepercayaan Penjual'
-                          : 'Seller Trust'}
-                      </div>
-                      <div className="mt-3 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {locale === 'id'
-                              ? 'Rating penjual'
-                              : 'Seller rating'}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-0.5">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star
-                                  key={`seller-rating-${i}`}
-                                  className={`h-3.5 w-3.5 ${
-                                    i < sellerRatingRounded
-                                      ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
-                                      : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                            <span className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {sellerRating > 0
-                                ? sellerRating.toFixed(1)
-                                : '0.0'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {sellerReviewCount > 0
-                            ? `${sellerReviewCount} ${locale === 'id' ? 'ulasan' : 'reviews'}`
-                            : locale === 'id'
-                              ? 'Belum ada ulasan'
-                              : 'No reviews yet'}
-                        </div>
-                        <div
-                          className={`${detailInsetCompactClass} grid gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>
-                              {locale === 'id'
-                                ? 'Transaksi selesai'
-                                : 'Completed transactions'}
-                            </span>
-                            <span className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {sellerCompletedTransactions}/
-                              {sellerTotalTransactions}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span>
-                              {locale === 'id'
-                                ? 'Acceptance rate'
-                                : 'Acceptance rate'}
-                            </span>
-                            <span className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {formatPercent(sellerAcceptanceRate)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span>
-                              {locale === 'id' ? 'Cancel rate' : 'Cancel rate'}
-                            </span>
-                            <span className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {formatPercent(sellerCancelRate)}
-                            </span>
-                          </div>
-                          {sellerPendingTransactions > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span>
-                                {locale === 'id'
-                                  ? 'Transaksi berjalan'
-                                  : 'Active deals'}
-                              </span>
-                              <span className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                                {sellerPendingTransactions}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </section>
-                  )}
-                  <section className={detailSectionClass}>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                      {locale === 'id' ? 'Info Listing' : 'Listing Info'}
-                    </div>
-                    <div
-                      className={`${detailInsetCompactClass} mt-3 space-y-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                    >
-                      {updatedLabel && (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-3.5 w-3.5 text-[color:var(--app-text-soft)]" />
-                          <span>
-                            {locale === 'id' ? 'Diperbarui' : 'Updated'}:{' '}
-                            {updatedLabel}
-                          </span>
-                        </div>
-                      )}
-                      {createdLabel && (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-3.5 w-3.5 text-[color:var(--app-text-soft)]" />
-                          <span>
-                            {locale === 'id' ? 'Dibuat' : 'Created'}:{' '}
-                            {createdLabel}
-                          </span>
-                        </div>
-                      )}
-                      {item.id && (
-                        <div className="flex items-center gap-2">
-                          <Tag className="h-3.5 w-3.5 text-[color:var(--app-text-soft)]" />
-                          <span>ID: {item.id.slice(0, 8)}...</span>
-                        </div>
-                      )}
-                    </div>
-                  </section>
-                </div>
-              </aside>
             </div>
           </div>
         </section>
+
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2 lg:hidden"
+          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
+        >
+          <div className="mx-auto max-w-md rounded-[22px] border border-slate-200/80 bg-white/96 p-2 shadow-[0_18px_44px_-26px_rgba(15,23,42,0.36)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/94">
+            {actionButtons}
+          </div>
+        </div>
+
       </div>
 
       {showShareModal && (
@@ -4682,7 +4714,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                       </p>
                       <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
                         {locale === 'id'
-                          ? 'Cocok kalau ingin kirim profil, pengalaman, ekspektasi, dan catatan lebih lengkap.'
+                          ? 'Kirim profil, pengalaman, dan catatan.'
                           : 'Use this when you want to send a fuller profile, experience, expectations, and note.'}
                       </p>
                     </button>
@@ -4922,10 +4954,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                   ? 'Order sudah tersimpan dan bisa dibuka lagi dari halaman Pesanan Saya.'
                   : 'The order is stored and can be reopened from My Orders.',
                 locale === 'id'
-                  ? 'Chat tetap dipakai untuk tektokan, update progres, dan bukti percakapan.'
+                  ? 'Chat tetap untuk progres dan bukti.'
                   : 'Chat is still used for discussion, progress updates, and conversation evidence.',
                 locale === 'id'
-                  ? 'Kalau ada masalah, CRM bisa lihat kronologi order, status dana, dan bukti dari sini.'
+                  ? 'Kalau ada masalah, bukti tetap rapi.'
                   : 'If something goes wrong, CRM can review the order timeline, fund status, and evidence from this flow.',
               ].map((copy, index) => (
                 <div
@@ -4945,10 +4977,10 @@ export default function ContentDetailPage({ params }: PageProps) {
             <div className="rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-info-soft)_62%,white)] p-3 text-xs text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,var(--app-info)_18%,rgba(15,23,42,0.96))]">
               {createdDealHandoff.flowMode === 'direct'
                 ? locale === 'id'
-                  ? 'Untuk pembelian langsung, lanjutkan ke workspace order agar user bisa bayar aman di platform sebelum pekerjaan atau pengiriman dimulai.'
+                  ? 'Lanjut ke order biar pembayaran aman.'
                   : 'For direct purchases, continue to the order workspace so the buyer can pay safely on-platform before work or delivery starts.'
                 : locale === 'id'
-                  ? 'Untuk offer, gunakan workspace order untuk memantau status, lalu lanjutkan detail teknis di chat tanpa kehilangan jejak transaksi.'
+                  ? 'Pantau status di order. Detail tetap lanjut di chat.'
                   : 'For offer-based deals, use the order workspace to track status, then continue technical discussion in chat without losing the transaction trail.'}
             </div>
           </div>
@@ -4970,7 +5002,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                 <p className="mt-1 text-xs text-[color:var(--app-text)]">
                   {offerFlowMode === 'direct'
                     ? locale === 'id'
-                      ? 'Cek nominal dan kirim konfirmasi. Penjual akan menerima permintaan beli langsung.'
+                      ? 'Cek nominal, lalu kirim konfirmasi.'
                       : 'Review amount and send confirmation. Seller will receive a direct purchase request.'
                     : offerPrompt}
                 </p>

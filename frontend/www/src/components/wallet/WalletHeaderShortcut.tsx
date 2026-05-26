@@ -114,7 +114,7 @@ export function WalletHeaderShortcut({
   const amountLabel = account
     ? formatMoney(account.available_balance_cents, account.currency)
     : isId
-      ? 'Buka pembayaran'
+      ? 'Pembayaran'
       : 'Open payments';
   const envLabel = account?.environment === 'live'
     ? isId
@@ -163,7 +163,7 @@ export function WalletHeaderShortcut({
           >
             <span className="inline-flex items-center gap-2">
               <Wallet className="h-4 w-4" />
-              {isId ? 'Buka saldo & top up' : 'Open balance and top-up'}
+              {isId ? 'Saldo' : 'Open balance and top-up'}
             </span>
             <ArrowUpRight className="h-4 w-4" />
           </Link>
@@ -174,7 +174,7 @@ export function WalletHeaderShortcut({
           >
             <span className="inline-flex items-center gap-2">
               <ReceiptText className="h-4 w-4" />
-              {isId ? 'Buka transaksi' : 'Open transactions'}
+              {isId ? 'Transaksi' : 'Open transactions'}
             </span>
             <ArrowUpRight className="h-4 w-4" />
           </Link>
@@ -187,13 +187,14 @@ export function WalletHeaderShortcut({
     <Link
       href="/payments"
       onClick={onNavigate}
-      className="inline-flex min-h-[42px] items-center gap-3 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 pr-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
+      className="inline-flex min-h-[42px] items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] 2xl:gap-3 2xl:px-3 2xl:pr-4"
       aria-label={isId ? 'Buka saldo dan pembayaran' : 'Open balance and payments'}
+      title={isId ? 'Saldo' : 'Balance'}
     >
       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
       </span>
-      <span className="flex flex-col leading-none">
+      <span className="hidden flex-col leading-none 2xl:flex">
         <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
           {isId ? 'Saldo' : 'Balance'}
         </span>

@@ -25,6 +25,7 @@ type SearchType =
   | 'property'
   | 'service'
   | 'tool_rental'
+  | 'business_transfer'
   | 'umkm';
 type SearchContentType = Exclude<SearchType, 'all' | 'umkm'>;
 
@@ -82,6 +83,17 @@ function asString(value: unknown): string {
   return '';
 }
 
+function isEnabledFlag(value: string | null): boolean {
+  const normalized = (value || '').trim().toLowerCase();
+  return (
+    normalized === '1' ||
+    normalized === 'true' ||
+    normalized === 'yes' ||
+    normalized === 'database' ||
+    normalized === 'content_items'
+  );
+}
+
 function asObject(value: unknown): ContentRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as ContentRecord)
@@ -91,7 +103,7 @@ function asObject(value: unknown): ContentRecord | null {
 function asStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
-    .map((entry) => asString(entry))
+    .map(entry => asString(entry))
     .filter((entry): entry is string => Boolean(entry));
 }
 
@@ -101,7 +113,8 @@ function hasValue(value: unknown): boolean {
   if (typeof value === 'number') return Number.isFinite(value) && value > 0;
   if (typeof value === 'boolean') return value;
   if (Array.isArray(value)) return value.length > 0;
-  if (typeof value === 'object') return Object.keys(value as ContentRecord).length > 0;
+  if (typeof value === 'object')
+    return Object.keys(value as ContentRecord).length > 0;
   return false;
 }
 
@@ -120,6 +133,18 @@ function normalizeSearchType(value: string | null): SearchType {
   if (value === 'property') return 'property';
   if (value === 'service') return 'service';
   if (value === 'tool_rental') return 'tool_rental';
+  if (
+    value === 'business_transfer' ||
+    value === 'business-transfer' ||
+    value === 'oper-usaha' ||
+    value === 'oper_usaha' ||
+    value === 'jual-usaha' ||
+    value === 'usaha-berjalan' ||
+    value === 'handover' ||
+    value === 'takeover'
+  ) {
+    return 'business_transfer';
+  }
   if (value === 'umkm') return 'umkm';
   return 'all';
 }
@@ -127,16 +152,19 @@ function normalizeSearchType(value: string | null): SearchType {
 function isDiscoverableTalentUser(user: DiscoverUser): boolean {
   return Boolean(
     asString(user.full_name) ||
-      asString(user.username) ||
-      asString(user.headline) ||
-      asString(user.location) ||
-      (Array.isArray(user.roles) && user.roles.length > 0) ||
-      hasValue(user.freelancer_profile) ||
-      hasValue(user.hourly_rate),
+    asString(user.username) ||
+    asString(user.headline) ||
+    asString(user.location) ||
+    (Array.isArray(user.roles) && user.roles.length > 0) ||
+    hasValue(user.freelancer_profile) ||
+    hasValue(user.hourly_rate),
   );
 }
 
-function normalizeLocationMatch(value: string, locationFilter: string): boolean {
+function normalizeLocationMatch(
+  value: string,
+  locationFilter: string,
+): boolean {
   if (!locationFilter.trim()) return true;
   const source = normalizeSearchText(value);
   const target = normalizeSearchText(locationFilter);
@@ -168,9 +196,7 @@ function pickFirstNonEmpty(...values: unknown[]): string {
 }
 
 function listPreview(value: unknown, limit = 3): string {
-  return asStringList(value)
-    .slice(0, limit)
-    .join(', ');
+  return asStringList(value).slice(0, limit).join(', ');
 }
 
 function joinPreviewParts(parts: Array<unknown>, limit = 4): string {
@@ -224,6 +250,16 @@ function inferBuyerDomain(
       .join(' '),
   );
 
+  if (
+    signal.includes('oper usaha') ||
+    signal.includes('jual usaha') ||
+    signal.includes('usaha berjalan') ||
+    signal.includes('business transfer') ||
+    signal.includes('handover') ||
+    signal.includes('takeover')
+  ) {
+    return 'business_transfer';
+  }
   if (
     signal.includes('property') ||
     signal.includes('properti') ||
@@ -289,7 +325,10 @@ function buildPersonSearchRecord({
     asString(user.username) ||
     asString(user.email) ||
     'Lajukan member';
-  const userLocation = asString(user.location) || asString(profile?.preferred_location) || 'Indonesia';
+  const userLocation =
+    asString(user.location) ||
+    asString(profile?.preferred_location) ||
+    'Indonesia';
   const publicPath = buildPublicProfileHref({
     id: user.id,
     username: user.username,
@@ -436,8 +475,7 @@ function buildBuyerSearchRecord(
       asString(profile.preferred_sub_sector),
       pickFirstNonEmpty(profile.preferred_location, user.location),
       priceCents ? `Budget ${budgetLabel}` : '',
-    ]) ||
-    `${displayName} is looking for ${inferredType.replace(/_/g, ' ')}`;
+    ]) || `${displayName} is looking for ${inferredType.replace(/_/g, ' ')}`;
 
   return buildPersonSearchRecord({
     user,
@@ -465,8 +503,8 @@ function normalizeSearchText(value: string): string {
 function tokenizeSearch(value: string): string[] {
   return normalizeSearchText(value)
     .split(' ')
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2)
+    .map(token => token.trim())
+    .filter(token => token.length >= 2)
     .slice(0, 12);
 }
 
@@ -547,7 +585,10 @@ function diceCoefficient(a: string, b: string): number {
 function tokenSimilarity(queryToken: string, candidateToken: string): number {
   if (!queryToken || !candidateToken) return 0;
   if (queryToken === candidateToken) return 1;
-  if (candidateToken.includes(queryToken) || queryToken.includes(candidateToken)) {
+  if (
+    candidateToken.includes(queryToken) ||
+    queryToken.includes(candidateToken)
+  ) {
     const lengthDelta = Math.abs(queryToken.length - candidateToken.length);
     return Math.max(0.76, 0.95 - lengthDelta * 0.03);
   }
@@ -561,11 +602,17 @@ function tokenSimilarity(queryToken: string, candidateToken: string): number {
   return Math.max(dice * 0.82, editSimilarity * 0.9);
 }
 
-function scoreField(queryNormalized: string, queryTokens: string[], field: string): number {
+function scoreField(
+  queryNormalized: string,
+  queryTokens: string[],
+  field: string,
+): number {
   if (!queryNormalized || !field) return 0;
   if (field.includes(queryNormalized)) return 1;
 
-  const fieldTokens = uniqueTokens(field.split(' ').filter((token) => token.length >= 2));
+  const fieldTokens = uniqueTokens(
+    field.split(' ').filter(token => token.length >= 2),
+  );
   if (fieldTokens.length === 0 || queryTokens.length === 0) return 0;
 
   let total = 0;
@@ -583,9 +630,15 @@ function scoreField(queryNormalized: string, queryTokens: string[], field: strin
 
   const coverage = matched / queryTokens.length;
   const tokenAverage = total / queryTokens.length;
-  const phraseSimilarity = diceCoefficient(queryNormalized, field.slice(0, 220));
+  const phraseSimilarity = diceCoefficient(
+    queryNormalized,
+    field.slice(0, 220),
+  );
 
-  return Math.min(1, Math.max(tokenAverage * 0.78 + coverage * 0.22, phraseSimilarity * 0.75));
+  return Math.min(
+    1,
+    Math.max(tokenAverage * 0.78 + coverage * 0.22, phraseSimilarity * 0.75),
+  );
 }
 
 function collectMetadataText(metadata: unknown): string {
@@ -643,7 +696,8 @@ function collectMetadataText(metadata: unknown): string {
         parts.push(String(value));
       } else if (Array.isArray(value)) {
         for (const entry of value.slice(0, 8)) {
-          if (typeof entry === 'string' && entry.trim()) parts.push(entry.trim());
+          if (typeof entry === 'string' && entry.trim())
+            parts.push(entry.trim());
         }
       }
       if (parts.length >= 20) break;
@@ -653,7 +707,10 @@ function collectMetadataText(metadata: unknown): string {
   return normalizeSearchText(parts.join(' ').slice(0, 700));
 }
 
-function scoreContentItem(item: ContentRecord, query: string): {
+function scoreContentItem(
+  item: ContentRecord,
+  query: string,
+): {
   score: number;
   textSignal: number;
   exact: boolean;
@@ -672,7 +729,7 @@ function scoreContentItem(item: ContentRecord, query: string): {
   const tags = normalizeSearchText(
     Array.isArray(item.tags)
       ? item.tags
-          .map((value) => asString(value))
+          .map(value => asString(value))
           .filter(Boolean)
           .join(' ')
       : asString(item.tags),
@@ -686,9 +743,13 @@ function scoreContentItem(item: ContentRecord, query: string): {
   const tagsScore = scoreField(queryNormalized, queryTokens, tags);
   const metadataScore = scoreField(queryNormalized, queryTokens, metadata);
 
-  const combinedText = [title, summary, slug, tags, metadata].filter(Boolean).join(' ');
+  const combinedText = [title, summary, slug, tags, metadata]
+    .filter(Boolean)
+    .join(' ');
   const exact = combinedText.includes(queryNormalized);
-  const tokenCoverage = queryTokens.filter((token) => combinedText.includes(token)).length / queryTokens.length;
+  const tokenCoverage =
+    queryTokens.filter(token => combinedText.includes(token)).length /
+    queryTokens.length;
 
   let score =
     titleScore * 0.44 +
@@ -702,7 +763,10 @@ function scoreContentItem(item: ContentRecord, query: string): {
   if (tokenCoverage >= 0.8) score += 0.06;
   else if (tokenCoverage >= 0.55) score += 0.03;
 
-  const createdAt = Math.max(toIsoTimestamp(item.created_at), toIsoTimestamp(item.updated_at));
+  const createdAt = Math.max(
+    toIsoTimestamp(item.created_at),
+    toIsoTimestamp(item.updated_at),
+  );
   if (createdAt > 0) {
     const ageDays = (Date.now() - createdAt) / 86_400_000;
     if (ageDays <= 7) score += 0.04;
@@ -710,7 +774,13 @@ function scoreContentItem(item: ContentRecord, query: string): {
     else if (ageDays <= 90) score += 0.01;
   }
 
-  const textSignal = Math.max(titleScore, summaryScore, tagsScore, metadataScore, slugScore);
+  const textSignal = Math.max(
+    titleScore,
+    summaryScore,
+    tagsScore,
+    metadataScore,
+    slugScore,
+  );
   return {
     score: Math.min(score, 1.35),
     textSignal,
@@ -719,9 +789,15 @@ function scoreContentItem(item: ContentRecord, query: string): {
   };
 }
 
-function isLikelyRelevant(score: number, signal: number, tokenCount: number, exact: boolean): boolean {
+function isLikelyRelevant(
+  score: number,
+  signal: number,
+  tokenCount: number,
+  exact: boolean,
+): boolean {
   if (exact) return true;
-  const scoreThreshold = tokenCount <= 1 ? 0.22 : tokenCount === 2 ? 0.18 : 0.15;
+  const scoreThreshold =
+    tokenCount <= 1 ? 0.22 : tokenCount === 2 ? 0.18 : 0.15;
   const signalThreshold = tokenCount <= 1 ? 0.2 : 0.14;
   return score >= scoreThreshold && signal >= signalThreshold;
 }
@@ -732,11 +808,18 @@ function normalizePayload(
   fallbackOffset: number,
 ): ContentListPayload {
   if (!payload || typeof payload !== 'object') {
-    return { items: [], limit: fallbackLimit, offset: fallbackOffset, has_more: false };
+    return {
+      items: [],
+      limit: fallbackLimit,
+      offset: fallbackOffset,
+      has_more: false,
+    };
   }
   return {
     items: Array.isArray(payload.items)
-      ? payload.items.filter((item): item is ContentRecord => Boolean(asObject(item)))
+      ? payload.items.filter((item): item is ContentRecord =>
+          Boolean(asObject(item)),
+        )
       : [],
     limit: toNumber(payload.limit) ?? fallbackLimit,
     offset: toNumber(payload.offset) ?? fallbackOffset,
@@ -762,33 +845,48 @@ function rerankByQuery(items: ContentRecord[], query: string): ContentRecord[] {
   if (!query || queryTokens.length === 0 || items.length === 0) return items;
 
   const ranked = items
-    .map((item) => {
+    .map(item => {
       const scored = scoreContentItem(item, query);
       return { item, ...scored };
     })
-    .filter((entry) =>
-      isLikelyRelevant(entry.score, entry.textSignal, queryTokens.length, entry.exact),
+    .filter(entry =>
+      isLikelyRelevant(
+        entry.score,
+        entry.textSignal,
+        queryTokens.length,
+        entry.exact,
+      ),
     )
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
-      if (left.exact !== right.exact) return Number(right.exact) - Number(left.exact);
+      if (left.exact !== right.exact)
+        return Number(right.exact) - Number(left.exact);
       return right.createdAt - left.createdAt;
     });
 
-  return ranked.map((entry) => entry.item);
+  return ranked.map(entry => entry.item);
 }
 
-function parseSafeInt(value: string | null, fallback: number, min: number, max: number): number {
+function parseSafeInt(
+  value: string | null,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   const parsed = Number.parseInt(value || '', 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(Math.max(parsed, min), max);
 }
 
-function mapUserToFreelancerContent(user: DiscoverUser): Record<string, unknown> {
+function mapUserToFreelancerContent(
+  user: DiscoverUser,
+): Record<string, unknown> {
   const displayName = user.full_name || user.username || user.email || 'Talent';
   const primaryRole =
     user.level ||
-    (Array.isArray(user.roles) && user.roles.length > 0 ? user.roles[0] : null) ||
+    (Array.isArray(user.roles) && user.roles.length > 0
+      ? user.roles[0]
+      : null) ||
     'member';
   const roleLabel = String(primaryRole).replace(/_/g, ' ');
   const rating = toNumber(user.rating);
@@ -811,7 +909,8 @@ function mapUserToFreelancerContent(user: DiscoverUser): Record<string, unknown>
     status: 'active',
     cover_image: user.avatar_url || null,
     owner_id: user.id,
-    price_cents: hourlyRate != null ? Math.max(0, Math.round(hourlyRate * 100)) : 0,
+    price_cents:
+      hourlyRate != null ? Math.max(0, Math.round(hourlyRate * 100)) : 0,
     currency: 'IDR',
     rating: rating ?? undefined,
     seller_stats: {
@@ -867,12 +966,17 @@ async function fetchMarketplaceContent(
   params: URLSearchParams,
 ): Promise<{ response: Response; payload: ContentListPayload | null }> {
   const query = params.toString();
-  const response = await fetch(`${marketplaceBase}/v1/content${query ? `?${query}` : ''}`, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(15000),
-  });
-  const payload = (await response.json().catch(() => null)) as ContentListPayload | null;
+  const response = await fetch(
+    `${marketplaceBase}/v1/content${query ? `?${query}` : ''}`,
+    {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15000),
+    },
+  );
+  const payload = (await response
+    .json()
+    .catch(() => null)) as ContentListPayload | null;
   return { response, payload };
 }
 
@@ -920,7 +1024,7 @@ function filterDiscoverCandidatesByLocation(
 ): ContentRecord[] {
   if (!locationFilter.trim()) return items;
 
-  return items.filter((item) => {
+  return items.filter(item => {
     const metadata = asObject(item.metadata);
     const source = [
       asString(metadata?.location),
@@ -1028,12 +1132,17 @@ async function getTalentFallback(
       Math.max(Number.parseInt(searchParams.get('limit') || '12', 10) || 12, 1),
       60,
     );
-    const offset = Math.max(Number.parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+    const offset = Math.max(
+      Number.parseInt(searchParams.get('offset') || '0', 10) || 0,
+      0,
+    );
     const q = (searchParams.get('q') || '').trim();
-    const users = (await fetchDiscoverUsers(req, {
-      query: q,
-      limit: Math.min(limit, 25),
-    })).filter(isDiscoverableTalentUser);
+    const users = (
+      await fetchDiscoverUsers(req, {
+        query: q,
+        limit: Math.min(limit, 25),
+      })
+    ).filter(isDiscoverableTalentUser);
 
     return {
       items: users.map(mapUserToFreelancerContent),
@@ -1059,8 +1168,15 @@ export async function GET(req: NextRequest) {
   const searchParams = url.searchParams;
   const queryText = (searchParams.get('q') || '').trim();
   const requestedLimit = parseSafeInt(searchParams.get('limit'), 20, 1, 100);
-  const requestedOffset = parseSafeInt(searchParams.get('offset'), 0, 0, Number.MAX_SAFE_INTEGER);
-  const requestedTypeRaw = (searchParams.get('type') || '').trim().toLowerCase();
+  const requestedOffset = parseSafeInt(
+    searchParams.get('offset'),
+    0,
+    0,
+    Number.MAX_SAFE_INTEGER,
+  );
+  const requestedTypeRaw = (searchParams.get('type') || '')
+    .trim()
+    .toLowerCase();
   const requestedType =
     requestedTypeRaw === 'talent' ||
     requestedTypeRaw === 'user' ||
@@ -1069,35 +1185,47 @@ export async function GET(req: NextRequest) {
       ? 'freelancer'
       : normalizeSearchType(searchParams.get('type'));
   const includeOwnerProfiles = shouldIncludeOwnerProfiles(searchParams);
+  const databaseOnly =
+    isEnabledFlag(searchParams.get('database_only')) ||
+    isEnabledFlag(searchParams.get('backend_only')) ||
+    isEnabledFlag(searchParams.get('content_items_only')) ||
+    isEnabledFlag(searchParams.get('source'));
   const shouldFallbackTalent =
-    requestedType === 'freelancer' ||
-    requestedTypeRaw === 'talent' ||
-    requestedTypeRaw === 'user' ||
-    requestedTypeRaw === 'users' ||
-    requestedTypeRaw === 'profile';
+    !databaseOnly &&
+    (requestedType === 'freelancer' ||
+      requestedTypeRaw === 'talent' ||
+      requestedTypeRaw === 'user' ||
+      requestedTypeRaw === 'users' ||
+      requestedTypeRaw === 'profile');
 
   try {
-    const { response: backendRes, payload: data } = await fetchMarketplaceContent(searchParams);
+    const { response: backendRes, payload: data } =
+      await fetchMarketplaceContent(searchParams);
     if (!backendRes.ok) {
       console.error('[api/content] backend error:', backendRes.status, data);
       return NextResponse.json(
         {
           error: 'Marketplace service returned an error',
           status: backendRes.status,
-          data: Array.isArray(data) ? data : data ?? null,
+          data: Array.isArray(data) ? data : (data ?? null),
         },
         { status: backendRes.status },
       );
     }
 
-    let resolvedPayload = normalizePayload(data, requestedLimit, requestedOffset);
+    let resolvedPayload = normalizePayload(
+      data,
+      requestedLimit,
+      requestedOffset,
+    );
     let resolvedItems = resolvedPayload.items || [];
 
     const shouldIncludeDiscoverCandidates =
-      requestedType === 'all' ||
-      requestedType === 'service' ||
-      requestedType === 'freelancer' ||
-      queryText.length >= 2;
+      !databaseOnly &&
+      (requestedType === 'all' ||
+        requestedType === 'service' ||
+        requestedType === 'freelancer' ||
+        queryText.length >= 2);
     const discoverCandidates = shouldIncludeDiscoverCandidates
       ? await fetchDiscoverContentCandidates(req, {
           requestedType,
@@ -1109,8 +1237,16 @@ export async function GET(req: NextRequest) {
 
     if (shouldFallbackTalent && resolvedItems.length === 0) {
       const fallback = await getTalentFallback(req, searchParams);
-      if (fallback && Array.isArray(fallback.items) && fallback.items.length > 0) {
-        resolvedPayload = normalizePayload(fallback, requestedLimit, requestedOffset);
+      if (
+        fallback &&
+        Array.isArray(fallback.items) &&
+        fallback.items.length > 0
+      ) {
+        resolvedPayload = normalizePayload(
+          fallback,
+          requestedLimit,
+          requestedOffset,
+        );
         resolvedItems = resolvedPayload.items || [];
       }
     }
@@ -1121,7 +1257,10 @@ export async function GET(req: NextRequest) {
       const shouldExpandCandidates =
         candidates.length < Math.min(Math.max(requestedLimit * 2, 14), 40);
       if (shouldExpandCandidates) {
-        const expanded = await fetchExpandedCandidates(searchParams, requestedLimit);
+        const expanded = await fetchExpandedCandidates(
+          searchParams,
+          requestedLimit,
+        );
         if (expanded.length > 0) {
           candidates = mergeUniqueContent([...candidates, ...expanded]);
         }
@@ -1144,10 +1283,7 @@ export async function GET(req: NextRequest) {
           has_more: start + requestedLimit < reranked.length,
         };
       }
-    } else if (
-      requestedOffset === 0 &&
-      discoverCandidates.length > 0
-    ) {
+    } else if (requestedOffset === 0 && discoverCandidates.length > 0) {
       const mergedItems = mergeUniqueContent([
         ...resolvedItems,
         ...discoverCandidates,
@@ -1157,11 +1293,16 @@ export async function GET(req: NextRequest) {
         items: mergedItems.slice(0, requestedLimit),
         limit: requestedLimit,
         offset: 0,
-        has_more: mergedItems.length > requestedLimit || resolvedPayload.has_more,
+        has_more:
+          mergedItems.length > requestedLimit || resolvedPayload.has_more,
       };
     }
 
-    if (includeOwnerProfiles && Array.isArray(resolvedPayload.items) && resolvedPayload.items.length > 0) {
+    if (
+      includeOwnerProfiles &&
+      Array.isArray(resolvedPayload.items) &&
+      resolvedPayload.items.length > 0
+    ) {
       const ownerProfiles = await fetchOwnerPublicProfiles({
         req,
         identityBase,
@@ -1170,7 +1311,10 @@ export async function GET(req: NextRequest) {
       if (ownerProfiles.size > 0) {
         resolvedPayload = {
           ...resolvedPayload,
-          items: attachOwnerProfilesToContent(resolvedPayload.items, ownerProfiles),
+          items: attachOwnerProfilesToContent(
+            resolvedPayload.items,
+            ownerProfiles,
+          ),
         };
       }
     }
@@ -1185,4 +1329,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-

@@ -388,8 +388,9 @@ export function UmkmHubClient({
   const [storeForm, setStoreForm] = useState<StoreFormState>(() =>
     createStoreFormState('culinary'),
   );
-  const [basicStoreForm, setBasicStoreForm] =
-    useState<BasicStoreEditFormState>(createBasicStoreEditFormState);
+  const [basicStoreForm, setBasicStoreForm] = useState<BasicStoreEditFormState>(
+    createBasicStoreEditFormState,
+  );
   const [storeCreateStep, setStoreCreateStep] =
     useState<StoreCreateStepId>('group');
   const [storeSetupMode, setStoreSetupMode] = useState<'guided' | 'full'>(
@@ -471,7 +472,8 @@ export function UmkmHubClient({
       selectedStore.address,
       selectedStore.phone,
       selectedStore.description,
-    ].filter(value => normalizeTextBlock(String(value || '')).length > 0).length;
+    ].filter(value => normalizeTextBlock(String(value || '')).length > 0)
+      .length;
   }, [selectedStore]);
   const basicStoreDraftCompletion = useMemo(
     () =>
@@ -656,12 +658,11 @@ export function UmkmHubClient({
             });
       }
 
-      const basePath =
-        isAssistantSetupRoute
-          ? buildUsahaPath('assistant')
-          : view === 'create'
-            ? buildUsahaPath('onboarding')
-            : buildUsahaPath('profile');
+      const basePath = isAssistantSetupRoute
+        ? buildUsahaPath('assistant')
+        : view === 'create'
+          ? buildUsahaPath('onboarding')
+          : buildUsahaPath('profile');
       const params = new URLSearchParams(searchParams.toString());
 
       params.delete('assistant');
@@ -671,12 +672,7 @@ export function UmkmHubClient({
       const target = query ? `${basePath}?${query}` : basePath;
       return hash ? `${target}#${hash}` : target;
     },
-    [
-      isAssistantSetupRoute,
-      requestedStoreId,
-      searchParams,
-      selectedStoreId,
-    ],
+    [isAssistantSetupRoute, requestedStoreId, searchParams, selectedStoreId],
   );
   const buildWorkspaceHref = useCallback(
     (
@@ -903,18 +899,18 @@ export function UmkmHubClient({
       descriptionLabel: isId ? 'Deskripsi singkat' : 'Short description',
       descriptionPlaceholder: isDigitalProfile
         ? isId
-          ? 'Jelaskan layanan utama dan hasil yang buyer terima.'
+          ? 'Tulis layanan dan hasil untuk buyer.'
           : 'Describe the main service, deliverable format, and how your team works.'
         : isServiceProfile
           ? isId
-            ? 'Jelaskan jasa, area layanan, dan hasil kerja.'
+            ? 'Tulis jasa, area, hasil kerja.'
             : 'Describe the service type, coverage area, booking flow, and what buyers receive.'
           : storeRegistrationProfile.id === 'made_to_order'
             ? isId
-              ? 'Jelaskan order custom, bahan, dan estimasi jadi.'
+              ? 'Tulis order custom, bahan, estimasi.'
               : 'Describe the custom order type, materials, sizing, and production lead time.'
             : isId
-              ? 'Jelaskan jualan utama dan keunggulannya.'
+              ? 'Tulis jualan utama dan keunggulan.'
               : 'Describe the main products and what makes the business strong.',
       locationHint: isDigitalProfile
         ? isId
@@ -962,15 +958,15 @@ export function UmkmHubClient({
   );
   const isGuidedStoreSetup = storeSetupMode === 'guided';
   const compactStoreControlClass =
-    'min-h-[36px] rounded-[13px] px-3 text-[12px]';
+    'min-h-[40px] rounded-[13px] px-3 text-[13px]';
   const compactStoreTextAreaClass =
-    'min-h-[76px] rounded-[13px] px-3 py-2.5 text-[12px]';
+    'min-h-[84px] rounded-[13px] px-3 py-2.5 text-[13px]';
   const manageFormHeroClass =
-    'rounded-[18px] bg-white/96 px-3 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.16)] dark:bg-slate-950/88';
+    'rounded-[18px] border border-slate-200/85 bg-white/96 px-3 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.16)] dark:border-slate-800/80 dark:bg-slate-950/88';
   const manageInfoCardClass =
-    'rounded-[14px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_52%,white)] px-2.5 py-2 dark:bg-slate-900/72';
+    'rounded-[14px] border border-[color:color-mix(in_srgb,var(--app-accent-border)_52%,transparent)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_42%,white)] px-2.5 py-2 dark:bg-slate-900/72';
   const manageSectionBlockClass =
-    'rounded-[16px] bg-white/96 px-3 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.16)] dark:bg-slate-950/88';
+    'rounded-[16px] border border-slate-200/85 bg-white/96 px-3 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.16)] dark:border-slate-800/80 dark:bg-slate-950/88';
   const buildStoreBaseAddress = useCallback(
     (city: string, locationMode: StoreFormState['location_mode']) => {
       const trimmedCity = city.trim();
@@ -1465,13 +1461,17 @@ export function UmkmHubClient({
   const startCompanionNotes = useMemo(
     () => [
       {
-        title: isId ? 'Tidak harus lengkap hari ini' : 'It does not need to be perfect today',
+        title: isId
+          ? 'Tidak harus lengkap hari ini'
+          : 'It does not need to be perfect today',
         desc: isId
           ? 'Nama usaha, kota, alamat, dan titik peta sudah cukup untuk mulai. Detail lain bisa nyusul setelah fondasinya ada.'
           : 'The business name, city, address, and map pin are enough to get started. The rest can follow once the foundation exists.',
       },
       {
-        title: isId ? 'Fokus ke satu kebutuhan dulu' : 'Solve one need at a time',
+        title: isId
+          ? 'Fokus ke satu kebutuhan dulu'
+          : 'Solve one need at a time',
         desc: isId
           ? 'Kalau masih bingung, pilih kebutuhan paling nyata dulu: supplier, lokasi, jasa operasional, legalitas, atau talent.'
           : 'If it still feels fuzzy, pick the most concrete need first: supply, location, operations support, legal help, or talent.',
@@ -1486,8 +1486,10 @@ export function UmkmHubClient({
     [isId],
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Used in the setup playbook JSX below; this large component can trip the lint reference pass.
   const prioritizedPlaybooks = useMemo(() => {
-    const focusToken = `${selectedBusinessCategory} ${guideBusinessFocus}`.toLowerCase();
+    const focusToken =
+      `${selectedBusinessCategory} ${guideBusinessFocus}`.toLowerCase();
     const scorePlaybook = (id: string) => {
       if (
         id === 'kopi' &&
@@ -1536,11 +1538,16 @@ export function UmkmHubClient({
           ? 'lokasi usaha strategis'
           : 'strategic business location';
 
-    const supplierQuery = `${businessNeed} supplier bahan baku${citySuffix}`.trim();
-    const locationQuery = `${guideBusinessLabel} ${locationNeed}${citySuffix}`.trim();
-    const operationsQuery = `${businessNeed} kemasan foto admin usaha${citySuffix}`.trim();
-    const legalQuery = `${guideBusinessLabel} legalitas izin usaha${citySuffix}`.trim();
-    const talentQuery = `${businessNeed} admin toko kasir helper${citySuffix}`.trim();
+    const supplierQuery =
+      `${businessNeed} supplier bahan baku${citySuffix}`.trim();
+    const locationQuery =
+      `${guideBusinessLabel} ${locationNeed}${citySuffix}`.trim();
+    const operationsQuery =
+      `${businessNeed} kemasan foto admin usaha${citySuffix}`.trim();
+    const legalQuery =
+      `${guideBusinessLabel} legalitas izin usaha${citySuffix}`.trim();
+    const talentQuery =
+      `${businessNeed} admin toko kasir helper${citySuffix}`.trim();
 
     return [
       {
@@ -2069,7 +2076,7 @@ export function UmkmHubClient({
         if (!isActive) {
           nextActionLabel = isId ? 'Aktifkan outlet' : 'Activate outlet';
           nextActionDesc = isId
-            ? 'Nyalakan outlet supaya siap dipakai tim dan pembeli.'
+            ? 'Nyalakan outlet biar siap dipakai.'
             : 'Turn the outlet on so the team and buyers can use it.';
         } else if (!hasOwnerContact) {
           nextActionLabel = isId
@@ -2493,11 +2500,11 @@ export function UmkmHubClient({
       setSelectedStoreId(current => {
         const savedStoreId =
           typeof window !== 'undefined'
-            ? window.localStorage.getItem(UMKM_ACTIVE_STORE_STORAGE_KEY)?.trim() ||
-              ''
+            ? window.localStorage
+                .getItem(UMKM_ACTIVE_STORE_STORAGE_KEY)
+                ?.trim() || ''
             : '';
-        const useBlankCreateSelection =
-          !forcedStoreId && isSetupCreateView;
+        const useBlankCreateSelection = !forcedStoreId && isSetupCreateView;
 
         if (useBlankCreateSelection) {
           return '';
@@ -2526,13 +2533,7 @@ export function UmkmHubClient({
     } finally {
       setLoadingStores(false);
     }
-  }, [
-    authFetch,
-    forcedStoreId,
-    isId,
-    isSetupCreateView,
-    requestedStoreId,
-  ]);
+  }, [authFetch, forcedStoreId, isId, isSetupCreateView, requestedStoreId]);
 
   const loadStoreData = useCallback(
     async (storeId: string) => {
@@ -2636,10 +2637,7 @@ export function UmkmHubClient({
   }, [authLoading, isAuthenticated, loadMyStores]);
 
   useEffect(() => {
-    if (
-      !requestedStoreId ||
-      (!forcedStoreId && isSetupCreateView)
-    ) {
+    if (!requestedStoreId || (!forcedStoreId && isSetupCreateView)) {
       return;
     }
     setSelectedStoreId(current =>
@@ -2913,7 +2911,7 @@ export function UmkmHubClient({
         if (!active) return;
         setLiveLocationMessage(
           isId
-            ? 'Izin lokasi dibutuhkan agar titik PKL bisa ikut bergerak.'
+            ? 'Izinkan lokasi biar titik PKL ikut bergerak.'
             : 'Location permission is required to keep the mobile vendor pin moving.',
         );
       },
@@ -3638,7 +3636,7 @@ export function UmkmHubClient({
         'success',
         isId ? 'Usaha berhasil disimpan' : 'Business saved',
         isId
-          ? 'Lanjut dari langkah prioritas supaya usaha cepat siap dipakai.'
+          ? 'Lanjut dari prioritas biar cepat siap.'
           : 'Continue from the priority flow so the business becomes usable quickly.',
       );
       router.push(buildWorkspaceHref('overview', payload.data.store.id));
@@ -3826,7 +3824,9 @@ export function UmkmHubClient({
       }
       if (city.length < 2) {
         throw new Error(
-          isId ? 'Kota minimal 2 karakter.' : 'City must be at least 2 characters.',
+          isId
+            ? 'Kota minimal 2 karakter.'
+            : 'City must be at least 2 characters.',
         );
       }
       if (city.length > STORE_LIMITS.city) {
@@ -3838,7 +3838,9 @@ export function UmkmHubClient({
       }
       if (address.length < 3) {
         throw new Error(
-          isId ? 'Alamat minimal 3 karakter.' : 'Address must be at least 3 characters.',
+          isId
+            ? 'Alamat minimal 3 karakter.'
+            : 'Address must be at least 3 characters.',
         );
       }
       if (address.length > STORE_LIMITS.address) {
@@ -3863,17 +3865,20 @@ export function UmkmHubClient({
         );
       }
 
-      const res = await authFetch(`/api/super-app/umkm/stores/${selectedStoreId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          city,
-          address,
-          phone,
-          description,
-        }),
-      });
+      const res = await authFetch(
+        `/api/super-app/umkm/stores/${selectedStoreId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            city,
+            address,
+            phone,
+            description,
+          }),
+        },
+      );
 
       const payload = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -3912,9 +3917,7 @@ export function UmkmHubClient({
       setSubmitError(message);
       showHubToast(
         'error',
-        isId
-          ? 'Info outlet belum tersimpan'
-          : 'Outlet info could not be saved',
+        isId ? 'Info outlet belum tersimpan' : 'Outlet info could not be saved',
         message,
       );
     } finally {
@@ -4133,7 +4136,7 @@ export function UmkmHubClient({
       ) {
         throw new Error(
           isId
-            ? 'Produk digital wajib punya catatan pengiriman agar buyer tahu cara menerima produk.'
+            ? 'Tambahkan catatan kirim digital.'
             : 'Digital products need a delivery note so buyers know how delivery works.',
         );
       }
@@ -4664,51 +4667,78 @@ export function UmkmHubClient({
     }
   };
 
-  const nextOwnerStep = selectedStore
-    ? hasEnabledPublishChannel &&
+  const nextOwnerStep = useMemo(() => {
+    if (!selectedStore) return null;
+
+    if (
+      hasEnabledPublishChannel &&
       ((verificationForm.publish_food && !publishReadiness.food.ok) ||
         (verificationForm.publish_mart && !publishReadiness.mart.ok))
-      ? {
-          target: 'umkm-verification',
-          label: isId ? 'Lengkapi usaha' : 'Complete business',
-          desc: isId
-            ? 'Isi data yang kurang dulu.'
-            : 'Fill the missing core info first.',
-        }
-      : products.length === 0
-        ? {
-            target: 'umkm-products',
-            label: isId ? 'Masukkin jualan' : 'Add products',
-            desc: isId
-              ? 'Biar toko cepat siap jual.'
-              : 'Get the store ready to sell.',
-          }
-        : supportsDineInFlow &&
-            tables.length === 0 &&
-            selectedStore.offline_order_enabled !== false
-          ? {
-              target: 'umkm-tables',
-              label: isId ? 'Bikin meja & QR' : 'Create tables & QR',
-              desc: isId
-                ? 'Sekali bikin, langsung jalan.'
-                : 'Create once and use right away.',
-            }
-          : supportsReservationFlow && reservations.length > 0
-            ? {
-                target: 'umkm-reservations',
-                label: isId ? 'Cek booking' : 'Check bookings',
-                desc: isId
-                  ? 'Lihat yang aktif hari ini.'
-                  : 'Review today active bookings.',
-              }
-            : {
-                target: 'umkm-orders',
-                label: isId ? 'Buka pesanan' : 'Open orders',
-                desc: isId
-                  ? 'Masuk ke kerjaan yang lagi jalan.'
-                  : 'Jump into the live work queue.',
-              }
-    : null;
+    ) {
+      return {
+        target: 'umkm-verification',
+        label: isId ? 'Lengkapi usaha' : 'Complete business',
+        desc: isId
+          ? 'Isi data yang kurang dulu.'
+          : 'Fill the missing core info first.',
+      };
+    }
+
+    if (products.length === 0) {
+      return {
+        target: 'umkm-products',
+        label: isId ? 'Masukkin jualan' : 'Add products',
+        desc: isId
+          ? 'Biar toko cepat siap jual.'
+          : 'Get the store ready to sell.',
+      };
+    }
+
+    if (
+      supportsDineInFlow &&
+      tables.length === 0 &&
+      selectedStore.offline_order_enabled !== false
+    ) {
+      return {
+        target: 'umkm-tables',
+        label: isId ? 'Bikin meja & QR' : 'Create tables & QR',
+        desc: isId
+          ? 'Sekali bikin, langsung jalan.'
+          : 'Create once and use right away.',
+      };
+    }
+
+    if (supportsReservationFlow && reservations.length > 0) {
+      return {
+        target: 'umkm-reservations',
+        label: isId ? 'Cek booking' : 'Check bookings',
+        desc: isId
+          ? 'Lihat yang aktif hari ini.'
+          : 'Review today active bookings.',
+      };
+    }
+
+    return {
+      target: 'umkm-orders',
+      label: isId ? 'Buka pesanan' : 'Open orders',
+      desc: isId
+        ? 'Masuk ke kerjaan yang lagi jalan.'
+        : 'Jump into the live work queue.',
+    };
+  }, [
+    hasEnabledPublishChannel,
+    isId,
+    products.length,
+    publishReadiness.food.ok,
+    publishReadiness.mart.ok,
+    reservations.length,
+    selectedStore,
+    supportsDineInFlow,
+    supportsReservationFlow,
+    tables.length,
+    verificationForm.publish_food,
+    verificationForm.publish_mart,
+  ]);
 
   const ownerAlerts = useMemo(() => {
     const items: Array<{
@@ -4944,7 +4974,7 @@ export function UmkmHubClient({
               : 'Create the first business',
           desc: hasStores
             ? isId
-              ? 'Satu akun bisa punya banyak usaha. Pilih usaha aktif dulu supaya halaman lain langsung fokus.'
+              ? 'Pilih usaha aktif dulu.'
               : 'One account can manage multiple businesses. Pick the active business first so the next pages stay focused.'
             : isId
               ? 'Mulai dari usaha pertama dulu. Setelah tersimpan, Anda bisa tambah usaha lain kapan saja.'
@@ -4975,7 +5005,9 @@ export function UmkmHubClient({
           desc: isId
             ? 'Nama usaha, alamat, kontak, dan profil publish cukup dulu.'
             : 'Start with the business name, address, contact, and publishing profile.',
-          badge: isId ? 'Setelah usaha dipilih' : 'After a business is selected',
+          badge: isId
+            ? 'Setelah usaha dipilih'
+            : 'After a business is selected',
           tone: 'default',
           done: false,
           action: {
@@ -5062,7 +5094,7 @@ export function UmkmHubClient({
         stepLabel: `${stepPrefix} 2`,
         title: isId ? 'Masukkin jualan' : 'Add listings',
         desc: isId
-          ? 'Tambah menu atau produk dulu supaya outlet langsung bisa dipakai jualan.'
+          ? 'Tambah menu/produk dulu.'
           : 'Add the first menu or product so the outlet becomes usable for selling.',
         badge: sellingReady
           ? `${products.length} ${isId ? 'jualan masuk' : 'listings added'}`
@@ -5090,31 +5122,34 @@ export function UmkmHubClient({
         desc: isId
           ? 'Setelah setup dan katalog aman, fokus ke order yang sedang jalan.'
           : 'Once setup and catalog are in shape, focus on the live order flow.',
-        badge: openOrders.length > 0
-          ? `${openOrders.length} ${isId ? 'pesanan aktif' : 'active orders'}`
-          : ordersReady
-            ? isId
-              ? 'Siap dipakai'
-              : 'Ready to use'
-            : isId
-              ? 'Nyalakan alur jual'
-              : 'Turn on the selling flow',
-        tone: openOrders.length > 0
-          ? 'accent'
-          : ordersReady
-            ? 'success'
-            : 'default',
+        badge:
+          openOrders.length > 0
+            ? `${openOrders.length} ${isId ? 'pesanan aktif' : 'active orders'}`
+            : ordersReady
+              ? isId
+                ? 'Siap dipakai'
+                : 'Ready to use'
+              : isId
+                ? 'Nyalakan alur jual'
+                : 'Turn on the selling flow',
+        tone:
+          openOrders.length > 0
+            ? 'accent'
+            : ordersReady
+              ? 'success'
+              : 'default',
         done: ordersReady,
         action: {
           kind: 'href',
           href: buildWorkspaceHref('orders', selectedStore.id),
-          label: openOrders.length > 0
-            ? isId
-              ? 'Cek pesanan'
-              : 'Check orders'
-            : isId
-              ? 'Buka pesanan'
-              : 'Open orders',
+          label:
+            openOrders.length > 0
+              ? isId
+                ? 'Cek pesanan'
+                : 'Check orders'
+              : isId
+                ? 'Buka pesanan'
+                : 'Open orders',
         },
       },
     ];
@@ -5205,25 +5240,27 @@ export function UmkmHubClient({
         stepLabel: `${stepPrefix} 3`,
         title: isId ? 'Jualan pertama' : 'First listing',
         desc: isId
-          ? 'Masukkin minimal satu produk supaya outlet bisa langsung dipakai.'
+          ? 'Masukkan minimal satu produk.'
           : 'Add at least one product so the outlet can be used right away.',
-        badge: products.length > 0
-          ? `${products.length} ${isId ? 'produk masuk' : 'products added'}`
-          : isId
-            ? 'Belum ada jualan'
-            : 'No listings yet',
+        badge:
+          products.length > 0
+            ? `${products.length} ${isId ? 'produk masuk' : 'products added'}`
+            : isId
+              ? 'Belum ada jualan'
+              : 'No listings yet',
         tone: products.length > 0 ? 'success' : 'warning',
         done: products.length > 0,
         action: {
           kind: 'target',
           target: 'umkm-products',
-          label: products.length > 0
-            ? isId
-              ? 'Buka katalog'
-              : 'Open catalog'
-            : isId
-              ? 'Tambah jualan'
-              : 'Add listing',
+          label:
+            products.length > 0
+              ? isId
+                ? 'Buka katalog'
+                : 'Open catalog'
+              : isId
+                ? 'Tambah jualan'
+                : 'Add listing',
         },
       },
     ];
@@ -5552,9 +5589,13 @@ export function UmkmHubClient({
     () =>
       selectedStore
         ? workspaceJumpTiles.filter(item =>
-            ['register', 'portfolio', 'verification', 'products', 'orders'].includes(
-              item.id,
-            ),
+            [
+              'register',
+              'portfolio',
+              'verification',
+              'products',
+              'orders',
+            ].includes(item.id),
           )
         : workspaceJumpTiles.filter(item =>
             ['register', 'portfolio'].includes(item.id),
@@ -5655,7 +5696,9 @@ export function UmkmHubClient({
   const simpleWorkspaceHero = useMemo<SimpleWorkspaceHero>(() => {
     if (!selectedStore) {
       return {
-        eyebrow: isId ? 'Pilih usaha aktif dulu' : 'Choose the active business first',
+        eyebrow: isId
+          ? 'Pilih usaha aktif dulu'
+          : 'Choose the active business first',
         title: isId
           ? 'Buka usaha yang mau dipakai sekarang'
           : 'Open the business you want to use now',
@@ -5870,7 +5913,7 @@ export function UmkmHubClient({
         return {
           tone: 'warning' as const,
           text: isId
-            ? 'Belum ada jualan. Tambah satu produk dulu supaya katalog langsung kepakai.'
+            ? 'Belum ada jualan. Tambah satu produk dulu.'
             : 'No products yet. Add one listing first so the catalog becomes usable.',
         };
       }
@@ -6196,8 +6239,8 @@ export function UmkmHubClient({
                         {selectedStore
                           ? isId
                             ? myStores.length > 1
-                              ? `Sekarang fokus dulu ke ${selectedStore.name}. Rapikan fondasi, masukkin jualan, lalu pindah cepat ke usaha lain dari portfolio di bawah.`
-                              : `Sekarang fokus dulu ke ${selectedStore.name}. Rapikan fondasi, masukkin jualan, lalu lanjut ke pesanan.`
+                              ? `Fokus ke ${selectedStore.name}. Rapikan fondasi, tambah jualan.`
+                              : `Fokus ke ${selectedStore.name}. Rapikan fondasi, tambah jualan.`
                             : myStores.length > 1
                               ? `Focus on ${selectedStore.name} first. Clean up the foundation, add the listings, then switch quickly to the other businesses from the portfolio below.`
                               : `Focus on ${selectedStore.name} first. Clean up the foundation, add the listings, then move into orders.`
@@ -6241,7 +6284,11 @@ export function UmkmHubClient({
                     ) : (
                       <Link
                         href={buildSetupHref(
-                          selectedStore ? 'detail' : myStores.length > 0 ? 'list' : 'create',
+                          selectedStore
+                            ? 'detail'
+                            : myStores.length > 0
+                              ? 'list'
+                              : 'create',
                           selectedStore?.id,
                         )}
                         className="ui-button-primary px-3.5 text-[12px] font-semibold"
@@ -6326,7 +6373,9 @@ export function UmkmHubClient({
                           >
                             {step.stepLabel}
                           </span>
-                          <InlineBadge tone={step.tone}>{step.badge}</InlineBadge>
+                          <InlineBadge tone={step.tone}>
+                            {step.badge}
+                          </InlineBadge>
                         </div>
                         <p className="mt-3 text-[14px] font-black text-[color:var(--app-text)]">
                           {step.title}
@@ -6357,7 +6406,9 @@ export function UmkmHubClient({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                              {isId ? 'Usaha yang dipakai sekarang' : 'Currently active business'}
+                              {isId
+                                ? 'Usaha yang dipakai sekarang'
+                                : 'Currently active business'}
                             </p>
                             <h3 className="mt-1 truncate text-[14px] font-black text-[color:var(--app-text)]">
                               {selectedStore.name}
@@ -6440,7 +6491,7 @@ export function UmkmHubClient({
                           <h3 className="mt-1 text-[14px] font-black text-[color:var(--app-text)]">
                             {myStores.length > 0
                               ? isId
-                                ? 'Usahanya sudah ada, tinggal pilih yang aktif'
+                                ? 'Pilih usaha aktif'
                                 : 'The businesses are ready, pick the active one'
                               : isId
                                 ? 'Mulai dari usaha pertama'
@@ -6449,10 +6500,10 @@ export function UmkmHubClient({
                           <p className="mt-1 text-[10px] leading-4 ui-text-soft sm:text-[11px]">
                             {myStores.length > 0
                               ? isId
-                                ? `${myStores.length} usaha sudah tersedia. Pilih yang mau dipakai sekarang, dan tambah usaha lain kapan saja kalau perlu.`
+                                ? `${myStores.length} usaha tersedia. Pilih yang dipakai sekarang.`
                                 : `${myStores.length} businesses are already available. Choose the one to use now, and add more businesses anytime when needed.`
                               : isId
-                                ? 'Begitu usaha pertama tersimpan, halaman ini langsung kasih langkah lanjut yang jelas dan Anda tetap bisa menambah usaha lain nanti.'
+                                ? 'Simpan usaha pertama, lanjut langkah berikutnya.'
                                 : 'Once the first business is saved, this page can point you clearly to the next step, and you can still add more businesses later.'}
                           </p>
                         </div>
@@ -6483,10 +6534,10 @@ export function UmkmHubClient({
                         <p className="mt-1 text-[11px] leading-5 ui-text-soft">
                           {selectedStore
                             ? isId
-                              ? 'Jangan kerjain semuanya sekaligus. Bereskan yang paling ngaruh dulu.'
+                              ? 'Bereskan yang paling ngaruh dulu.'
                               : 'Do not tackle everything at once. Fix the highest-impact piece first.'
                             : isId
-                              ? 'Begitu usaha dipilih, bagian ini akan nunjukin langkah berikutnya.'
+                              ? 'Pilih usaha dulu.'
                               : 'Once a business is selected, this area will point to the next move.'}
                         </p>
                       </div>
@@ -6515,13 +6566,13 @@ export function UmkmHubClient({
                       {!selectedStore ? (
                         <div className="rounded-[16px] border border-dashed border-[color:var(--app-accent-border)] bg-white/92 px-3 py-3 text-[11px] leading-5 ui-text-soft dark:bg-slate-950/84">
                           {isId
-                            ? 'Kalau masih bingung, urutannya simpel: pilih usaha, rapikan info inti, lalu masukkin jualan pertama.'
+                            ? 'Urutan simpel: pilih usaha, rapikan info, tambah jualan.'
                             : 'If it still feels fuzzy, keep the order simple: choose a business, tidy the essentials, then add the first listing.'}
                         </div>
                       ) : ownerAlerts.length === 0 ? (
                         <div className="rounded-[16px] border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] px-3 py-3 text-[11px] leading-5 ui-success-text">
                           {isId
-                            ? 'Fondasi usaha ini sudah cukup rapi. Sekarang tinggal lanjut ke katalog, pesanan, atau operasional.'
+                            ? 'Fondasi rapi. Lanjut katalog, order, atau operasional.'
                             : 'The business foundation is already in good shape. Continue with the catalog, orders, or operations.'}
                         </div>
                       ) : (
@@ -6564,17 +6615,17 @@ export function UmkmHubClient({
                           <div className="max-w-3xl">
                             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[color:var(--app-accent)]/72">
                               {isId
-                                ? 'Control center multi usaha'
+                                ? 'Control center'
                                 : 'Multi-business control center'}
                             </p>
                             <h3 className="mt-1 text-[1.02rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.18rem]">
                               {isId
-                                ? 'Pilih usaha aktif, cek prioritas, lalu lompat ke aksi utama'
+                                ? 'Pilih usaha. Cek prioritas. Lanjut aksi.'
                                 : 'Pick the active business, review priorities, then jump into the next action'}
                             </h3>
                             <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
                               {isId
-                                ? 'Halaman ini sekarang jadi pusat kontrol owner. Anda bisa cari outlet, filter yang butuh aksi, ganti usaha aktif tanpa pindah halaman, lalu buka detail saat memang perlu.'
+                                ? 'Cari outlet, filter yang perlu aksi, lalu buka detail.'
                                 : 'This page now acts as the owner control center. Search outlets, filter what needs action, switch the active business without leaving the page, then open the detail workspace only when needed.'}
                             </p>
                           </div>
@@ -6594,12 +6645,14 @@ export function UmkmHubClient({
                               {portfolioPriorityStore
                                 ? portfolioPriorityStore.nextActionDesc
                                 : isId
-                                  ? 'Tambah usaha dulu supaya control center ini bisa dipakai.'
+                                  ? 'Tambah usaha dulu.'
                                   : 'Add a business first so this control center can be used.'}
                             </p>
                             {portfolioPriorityStore ? (
                               <div className="mt-3 flex flex-wrap gap-1.5">
-                                <InlineBadge tone={portfolioPriorityStore.healthTone}>
+                                <InlineBadge
+                                  tone={portfolioPriorityStore.healthTone}
+                                >
                                   {portfolioPriorityStore.healthLabel}
                                 </InlineBadge>
                                 <InlineBadge
@@ -6688,9 +6741,7 @@ export function UmkmHubClient({
                                 <button
                                   key={option.id}
                                   type="button"
-                                  onClick={() =>
-                                    setStoreListFilter(option.id)
-                                  }
+                                  onClick={() => setStoreListFilter(option.id)}
                                   className={cn(
                                     'ui-pressable inline-flex min-h-[42px] items-center gap-2 rounded-full px-3.5 text-[12px] font-semibold transition',
                                     active
@@ -6730,9 +6781,7 @@ export function UmkmHubClient({
                                     }}
                                     className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
                                   >
-                                    {isId
-                                      ? 'Reset pencarian'
-                                      : 'Reset search'}
+                                    {isId ? 'Reset pencarian' : 'Reset search'}
                                   </button>
                                 )}
                                 <Link
@@ -6936,7 +6985,9 @@ export function UmkmHubClient({
                               className="ui-button-primary inline-flex w-full items-center justify-between px-4 text-sm font-semibold"
                             >
                               <span>
-                                {isId ? 'Tambah usaha baru' : 'Add new business'}
+                                {isId
+                                  ? 'Tambah usaha baru'
+                                  : 'Add new business'}
                               </span>
                               <ChevronRight className="h-4 w-4" />
                             </Link>
@@ -6956,7 +7007,9 @@ export function UmkmHubClient({
                               className="ui-button-secondary inline-flex w-full items-center justify-between px-4 text-sm font-semibold"
                             >
                               <span>
-                                {isId ? 'Pakai asisten usaha' : 'Open business assistant'}
+                                {isId
+                                  ? 'Pakai asisten usaha'
+                                  : 'Open business assistant'}
                               </span>
                               <ChevronRight className="h-4 w-4" />
                             </Link>
@@ -7258,7 +7311,7 @@ export function UmkmHubClient({
                   <p className="mt-1 text-sm ui-text-soft">
                     {isAssistantSetupRoute
                       ? isId
-                        ? 'Page ini bantu owner mulai dari fondasi dulu, lalu kasih rekomendasi search supaya langkah berikutnya terasa lebih aman.'
+                        ? 'Mulai dari fondasi, lalu lanjut rekomendasi.'
                         : 'This page helps the owner start from the foundation first, then adds search recommendations so the next move feels safer.'
                       : isId
                         ? 'Pilih tipe usaha, isi info utama, pasang titik, lalu simpan. Detail lain bisa nyusul setelah usaha jadi.'
@@ -7521,12 +7574,14 @@ export function UmkmHubClient({
                   </div>
                   <InlineBadge
                     tone={
-                      simpleSetupCompletedSteps === simpleSetupProgressCards.length
+                      simpleSetupCompletedSteps ===
+                      simpleSetupProgressCards.length
                         ? 'success'
                         : 'accent'
                     }
                   >
-                    {simpleSetupCompletedSteps}/{simpleSetupProgressCards.length}{' '}
+                    {simpleSetupCompletedSteps}/
+                    {simpleSetupProgressCards.length}{' '}
                     {isId ? 'fokus beres' : 'focus areas done'}
                   </InlineBadge>
                 </div>
@@ -7605,7 +7660,9 @@ export function UmkmHubClient({
                   <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3.5 py-3">
                     <p className="text-[13px] font-black text-[color:var(--app-accent)]">
                       {ownerAlerts[0]?.title ||
-                        (isId ? 'Setup inti sudah aman' : 'The core setup is already safe')}
+                        (isId
+                          ? 'Setup inti sudah aman'
+                          : 'The core setup is already safe')}
                     </p>
                     <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-accent)]/78">
                       {ownerAlerts[0]?.desc ||
@@ -7634,7 +7691,9 @@ export function UmkmHubClient({
                       href={buildSetupHref('list', selectedStore.id)}
                       className="ui-button-secondary inline-flex w-full items-center justify-between px-4 text-sm font-semibold"
                     >
-                      <span>{isId ? 'Lihat daftar usaha' : 'Open business list'}</span>
+                      <span>
+                        {isId ? 'Lihat daftar usaha' : 'Open business list'}
+                      </span>
                       <ChevronRight className="h-4 w-4" />
                     </Link>
                     <Link
@@ -7868,7 +7927,7 @@ export function UmkmHubClient({
                                   </p>
                                   <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/76">
                                     {isId
-                                      ? 'Kalau masih mencari bentuk usaha yang paling cocok, mulai dari contoh playbook yang paling dekat dengan kebutuhanmu.'
+                                      ? 'Mulai dari playbook yang paling dekat.'
                                       : 'If the business direction is still fuzzy, start with the closest playbook first.'}
                                   </p>
                                 </div>
@@ -7878,17 +7937,21 @@ export function UmkmHubClient({
                                 </InlineBadge>
                               </div>
 
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                {prioritizedPlaybooks.map(playbook => (
-                                  <Link
-                                    key={playbook.id}
-                                    href={playbook.href}
-                                    className="ui-button-secondary inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-bold"
-                                  >
-                                    {isId ? playbook.titleId : playbook.titleEn}
-                                  </Link>
-                                ))}
-                              </div>
+                              {prioritizedPlaybooks.length > 0 ? (
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  {prioritizedPlaybooks.map(playbook => (
+                                    <Link
+                                      key={playbook.id}
+                                      href={playbook.href}
+                                      className="ui-button-secondary inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-bold"
+                                    >
+                                      {isId
+                                        ? playbook.titleId
+                                        : playbook.titleEn}
+                                    </Link>
+                                  ))}
+                                </div>
+                              ) : null}
                             </div>
                           </div>
 
@@ -8037,566 +8100,691 @@ export function UmkmHubClient({
                           }}
                           className="space-y-3"
                         >
-                        <div className={manageFormHeroClass}>
-                          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
-                            <div className="max-w-3xl">
-                              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[color:var(--app-accent)]/68">
-                                {storeRegistrationCopy.sectionTitle}
-                              </p>
-                              <h4 className="mt-1 text-[1.05rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.2rem]">
-                                {isId ? 'Mulai dari sini' : 'Start here'}
-                              </h4>
-                              <p className="mt-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
-                                {useSimpleSetupCreateLayout
-                                  ? isId
-                                    ? 'Pilih tipe, isi info, pasang titik, simpan. Satu fokus tiap langkah.'
-                                    : 'Pick the type, fill the info, set the pin, save. One focus per step.'
-                                  : isGuidedStoreSetup
+                          <div className={manageFormHeroClass}>
+                            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="max-w-3xl">
+                                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[color:var(--app-accent)]/68">
+                                  {storeRegistrationCopy.sectionTitle}
+                                </p>
+                                <h4 className="mt-1 text-[1.05rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.2rem]">
+                                  {isId ? 'Mulai dari sini' : 'Start here'}
+                                </h4>
+                                <p className="mt-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
+                                  {useSimpleSetupCreateLayout
                                     ? isId
-                                      ? 'Pilih tipe, isi info, pasang titik, simpan.'
-                                      : 'Pick the type, fill the info, set the pin, save.'
-                                    : isId
-                                      ? 'Urutannya sama, detailnya dibuka.'
-                                      : 'Same order, more detail open.'}
-                              </p>
-                            </div>
-
-                            <div
-                              className={cn(
-                                manageInfoCardClass,
-                                useSimpleSetupCreateLayout
-                                  ? 'w-full max-w-[240px]'
-                                  : 'w-full max-w-[220px]',
-                              )}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/62">
-                                    {isId ? 'Sekarang' : 'Now'}
-                                  </p>
-                                  <p className="mt-1 text-[13px] font-black text-[color:var(--app-text)]">
-                                    {currentStoreCreateStep.title}
-                                  </p>
-                                </div>
-                                <InlineBadge
-                                  tone={
-                                    storeCreateValidation[storeCreateStep]
-                                      ? 'success'
-                                      : 'warning'
-                                  }
-                                >
-                                  {storeCreateStepIndex + 1}/
-                                  {STORE_CREATE_STEP_ORDER.length}
-                                </InlineBadge>
-                              </div>
-                              {!useSimpleSetupCreateLayout ? (
-                                <div className="mt-2.5 h-2 rounded-full bg-[color:var(--app-accent-soft)]">
-                                  <div
-                                    className="h-full rounded-full bg-[color:var(--app-accent)] transition-[width] duration-300"
-                                    style={{ width: `${storeCreateProgress}%` }}
-                                  />
-                                </div>
-                              ) : null}
-                              <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
-                                {currentStoreCreateStep.summary}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-[11px] leading-4 text-[color:var(--app-text-soft)]">
-                              {useSimpleSetupCreateLayout
-                                ? isId
-                                  ? `Fokus ke ${currentStoreCreateStep.title.toLowerCase()} dulu.`
-                                  : `Focus on ${currentStoreCreateStep.title.toLowerCase()} first.`
-                                : isGuidedStoreSetup
-                                  ? isId
-                                    ? 'Isi yang wajib dulu. Detail bisa belakangan.'
-                                    : 'Fill the essentials first. Extra detail can come later.'
-                                  : isId
-                                    ? 'Mode detail aktif.'
-                                    : 'Detail mode is active.'}
-                            </p>
-
-                            {!useSimpleSetupCreateLayout ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setStoreSetupMode(
-                                    isGuidedStoreSetup ? 'full' : 'guided',
-                                  )
-                                }
-                                className="ui-button-secondary ui-button-compact px-3 text-xs font-semibold"
-                              >
-                                {isGuidedStoreSetup
-                                  ? isId
-                                    ? 'Pengaturan lengkap'
-                                    : 'More settings'
-                                  : isId
-                                    ? 'Mode ringkas'
-                                    : 'Easy mode'}
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {submitError ? (
-                          <div className="rounded-[18px] border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3.5 py-2.5 text-sm text-[color:var(--app-accent)]">
-                            {submitError}
-                          </div>
-                        ) : null}
-
-                        {!useSimpleSetupCreateLayout ? (
-                          <div className={manageSectionBlockClass}>
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/68">
-                                {isId ? 'Urutan isi' : 'Fill order'}
-                              </p>
-                              <InlineBadge
-                                tone={
-                                  storeCreateChecklist.every(item => item.done)
-                                    ? 'success'
-                                    : 'warning'
-                                }
-                              >
-                                {
-                                  storeCreateChecklist.filter(item => item.done)
-                                    .length
-                                }
-                                /{storeCreateChecklist.length}
-                              </InlineBadge>
-                            </div>
-
-                            <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1">
-                              {storeCreateSteps.map((step, index) => {
-                                const active = step.id === storeCreateStep;
-                                const done =
-                                  index < storeCreateStepIndex ||
-                                  (index === storeCreateStepIndex &&
-                                    step.id !== 'operations' &&
-                                    storeCreateValidation[step.id]);
-                                const unlocked =
-                                  index <= highestUnlockedStoreCreateStepIndex;
-
-                                return (
-                                  <button
-                                    key={step.id}
-                                    type="button"
-                                    onClick={() =>
-                                      jumpToStoreCreateStep(step.id)
-                                    }
-                                    disabled={!unlocked}
-                                    className={cn(
-                                      'ui-pressable inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-full px-3 text-left transition',
-                                      active
-                                        ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_36%,white)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.18)] ring-1 ring-[color:var(--app-accent-border)]'
-                                        : unlocked
-                                          ? 'bg-slate-50/92 ring-1 ring-slate-200/80 hover:bg-white dark:bg-slate-900/72 dark:ring-slate-800/80'
-                                          : 'cursor-not-allowed bg-slate-100/80 opacity-65 ring-1 ring-dashed ring-slate-200/80 dark:bg-slate-900/60 dark:ring-slate-800/80',
-                                    )}
-                                  >
-                                    <span
-                                      className={cn(
-                                        'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                                        active || done
-                                          ? 'bg-[color:var(--app-accent)] text-white'
-                                          : 'bg-white text-[color:var(--app-accent)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80',
-                                      )}
-                                    >
-                                      {done ? (
-                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                      ) : (
-                                        index + 1
-                                      )}
-                                    </span>
-                                    <span className="whitespace-nowrap text-[11px] font-black text-[color:var(--app-text)]">
-                                      {step.title}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-
-                            <div className={cn(manageInfoCardClass, 'mt-2')}>
-                              <p className="text-[11px] font-black">
-                                {isId
-                                  ? `Fokus ke ${currentStoreCreateStep.title.toLowerCase()} aja dulu.`
-                                  : `Focus on ${currentStoreCreateStep.title.toLowerCase()} only for now.`}
-                              </p>
-                              <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                                {currentStoreCreateStep.summary}
-                              </p>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        <div className="space-y-3.5">
-                          {storeCreateStep === 'group' ? (
-                            <>
-                              <div className="rounded-[18px] border border-[color:var(--app-border)] bg-white px-3 py-3 shadow-[0_14px_24px_-22px_rgba(15,23,42,0.12)] sm:px-3.5 sm:py-3.5 dark:border-[color:var(--app-border-strong)]">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-                                      {storeRegistrationCopy.modelLabel}
-                                    </p>
-                                    <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
-                                      {isGuidedStoreSetup
-                                        ? isId
-                                          ? 'Pilih yang paling mirip dulu.'
-                                          : 'Pick the closest fit first.'
-                                        : storeRegistrationCopy.modelHint}
-                                    </p>
-                                  </div>
-                                  <InlineBadge tone="accent">
-                                    {isId
-                                      ? 'Pilih yang paling dekat'
-                                      : 'Pick the closest fit'}
-                                  </InlineBadge>
-                                </div>
-
-                                <div className="mt-3 grid gap-2 md:grid-cols-2">
-                                  {registrationPathOptions.map(option => (
-                                    <SectionJumpTile
-                                      key={option.groupId}
-                                      icon={option.icon}
-                                      title={option.title}
-                                      desc={option.desc}
-                                      badge={option.badge}
-                                      tone={option.tone}
-                                      selected={
-                                        selectedStoreCategoryGroup ===
-                                        option.groupId
-                                      }
-                                      actionLabel={isId ? 'Pilih' : 'Pick'}
-                                      selectedLabel={
-                                        isId ? 'Terpilih' : 'Selected'
-                                      }
-                                      compact
-                                      onClick={() =>
-                                        applyStoreCategoryGroup(option.groupId)
-                                      }
-                                    />
-                                  ))}
-                                </div>
+                                      ? 'Pilih tipe, isi info, pasang titik, simpan. Satu fokus tiap langkah.'
+                                      : 'Pick the type, fill the info, set the pin, save. One focus per step.'
+                                    : isGuidedStoreSetup
+                                      ? isId
+                                        ? 'Pilih tipe, isi info, pasang titik, simpan.'
+                                        : 'Pick the type, fill the info, set the pin, save.'
+                                      : isId
+                                        ? 'Urutannya sama, detailnya dibuka.'
+                                        : 'Same order, more detail open.'}
+                                </p>
                               </div>
 
                               <div
                                 className={cn(
-                                  'grid gap-3',
-                                  !isGuidedStoreSetup ||
-                                    showStoreBusinessFocus ||
-                                    storeForm.business_focus.trim().length > 0
-                                    ? 'sm:grid-cols-2'
-                                    : 'sm:grid-cols-1',
+                                  manageInfoCardClass,
+                                  useSimpleSetupCreateLayout
+                                    ? 'w-full max-w-[240px]'
+                                    : 'w-full max-w-[220px]',
                                 )}
                               >
-                                <SelectInput
-                                  label={
-                                    isId ? 'Jenis detail' : 'Detailed type'
-                                  }
-                                  className={compactStoreControlClass}
-                                  value={storeForm.business_category}
-                                  onChange={event =>
-                                    applyStoreCategory(
-                                      event.target
-                                        .value as UmkmBusinessCategoryId,
-                                    )
-                                  }
-                                >
-                                  {filteredStoreBusinessCategoryOptions.map(
-                                    option => (
-                                      <option key={option.id} value={option.id}>
-                                        {isId ? option.labelId : option.labelEn}
-                                      </option>
-                                    ),
-                                  )}
-                                </SelectInput>
-                                {!isGuidedStoreSetup ||
-                                showStoreBusinessFocus ||
-                                storeForm.business_focus.trim().length > 0 ? (
-                                  <TextInput
-                                    label={
-                                      isId ? 'Fokus usaha' : 'Business focus'
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/62">
+                                      {isId ? 'Sekarang' : 'Now'}
+                                    </p>
+                                    <p className="mt-1 text-[13px] font-black text-[color:var(--app-text)]">
+                                      {currentStoreCreateStep.title}
+                                    </p>
+                                  </div>
+                                  <InlineBadge
+                                    tone={
+                                      storeCreateValidation[storeCreateStep]
+                                        ? 'success'
+                                        : 'warning'
                                     }
-                                    className={compactStoreControlClass}
-                                    value={storeForm.business_focus}
-                                    onChange={event =>
-                                      setStoreForm(current => ({
-                                        ...current,
-                                        business_focus: event.target.value,
-                                      }))
-                                    }
-                                    placeholder={getUmkmBusinessFocusPlaceholder(
-                                      storeForm.business_category,
-                                      isId,
-                                    )}
-                                  />
+                                  >
+                                    {storeCreateStepIndex + 1}/
+                                    {STORE_CREATE_STEP_ORDER.length}
+                                  </InlineBadge>
+                                </div>
+                                {!useSimpleSetupCreateLayout ? (
+                                  <div className="mt-2.5 h-2 rounded-full bg-[color:var(--app-accent-soft)]">
+                                    <div
+                                      className="h-full rounded-full bg-[color:var(--app-accent)] transition-[width] duration-300"
+                                      style={{
+                                        width: `${storeCreateProgress}%`,
+                                      }}
+                                    />
+                                  </div>
                                 ) : null}
+                                <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
+                                  {currentStoreCreateStep.summary}
+                                </p>
                               </div>
+                            </div>
 
-                              {isGuidedStoreSetup &&
-                              !showStoreBusinessFocus &&
-                              storeForm.business_focus.trim().length === 0 ? (
+                            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+                                {useSimpleSetupCreateLayout
+                                  ? isId
+                                    ? `Fokus ke ${currentStoreCreateStep.title.toLowerCase()} dulu.`
+                                    : `Focus on ${currentStoreCreateStep.title.toLowerCase()} first.`
+                                  : isGuidedStoreSetup
+                                    ? isId
+                                      ? 'Isi yang wajib dulu. Detail bisa belakangan.'
+                                      : 'Fill the essentials first. Extra detail can come later.'
+                                    : isId
+                                      ? 'Mode detail aktif.'
+                                      : 'Detail mode is active.'}
+                              </p>
+
+                              {!useSimpleSetupCreateLayout ? (
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    setShowStoreBusinessFocus(true)
+                                    setStoreSetupMode(
+                                      isGuidedStoreSetup ? 'full' : 'guided',
+                                    )
                                   }
                                   className="ui-button-secondary ui-button-compact px-3 text-xs font-semibold"
                                 >
-                                  {isId ? 'Tambah fokus' : 'Add focus'}
+                                  {isGuidedStoreSetup
+                                    ? isId
+                                      ? 'Pengaturan lengkap'
+                                      : 'More settings'
+                                    : isId
+                                      ? 'Mode ringkas'
+                                      : 'Easy mode'}
                                 </button>
                               ) : null}
+                            </div>
+                          </div>
 
-                              <div className="rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/84">
-                                <p className="font-black text-[color:var(--app-accent)]">
-                                  {getUmkmBusinessCategoryLabel(
-                                    storeForm.business_category,
-                                    isId,
-                                  )}
-                                </p>
-                                <p className="mt-2">
-                                  {getUmkmBusinessCategoryDescription(
-                                    storeForm.business_category,
-                                    isId,
-                                  )}
-                                </p>
-                              </div>
-
-                              <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-                                      {isId ? 'Tipe lokasi' : 'Location type'}
-                                    </p>
-                                    <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
-                                      {isGuidedStoreSetup
-                                        ? isId
-                                          ? 'Pilih tetap atau pindah-pindah.'
-                                          : 'Choose fixed or moving.'
-                                        : isId
-                                          ? 'Pisahkan jenis usaha dari pola lokasinya. Jadi seller keliling, booth event, atau workshop tetap masuk ke kategori yang benar.'
-                                          : 'Keep the business type separate from how the location behaves so mobile sellers, booths, and workshops still stay in the correct category.'}
-                                    </p>
-                                  </div>
-                                  <InlineBadge tone="accent">
-                                    {getUmkmLocationModeLabel(
-                                      storeForm.location_mode,
-                                      isId,
-                                    )}
-                                  </InlineBadge>
-                                </div>
-
-                                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                                  {(['fixed', 'mobile'] as const).map(mode => {
-                                    const active =
-                                      storeForm.location_mode === mode;
-                                    return (
-                                      <button
-                                        key={mode}
-                                        type="button"
-                                        onClick={() =>
-                                          setStoreForm(current => ({
-                                            ...current,
-                                            location_mode: mode,
-                                          }))
-                                        }
-                                        className={cn(
-                                          'rounded-[18px] border px-3 py-3 text-left transition',
-                                          active
-                                            ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] shadow-sm ring-1 ring-[color:var(--app-accent)]/14'
-                                            : 'border-[color:var(--app-accent-border)] bg-white hover:border-[color:var(--app-accent)]/35',
-                                        )}
-                                      >
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="flex items-center gap-2">
-                                            <span
-                                              className={cn(
-                                                'inline-flex h-8 w-8 items-center justify-center rounded-[14px] border',
-                                                active
-                                                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
-                                                  : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)]',
-                                              )}
-                                            >
-                                              {mode === 'fixed' ? (
-                                                <Store className="h-4 w-4" />
-                                              ) : (
-                                                <ArrowRightLeft className="h-4 w-4" />
-                                              )}
-                                            </span>
-                                            <div>
-                                              <p className="text-[13px] font-black text-[color:var(--app-accent)]">
-                                                {getUmkmLocationModeLabel(
-                                                  mode,
-                                                  isId,
-                                                )}
-                                              </p>
-                                              <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--app-accent)]/72">
-                                                {getUmkmLocationModeHint(
-                                                  mode,
-                                                  isId,
-                                                )}
-                                              </p>
-                                            </div>
-                                          </div>
-                                          {active ? (
-                                            <CheckCircle2 className="h-5 w-5 text-[color:var(--app-accent)]" />
-                                          ) : null}
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            </>
+                          {submitError ? (
+                            <div className="rounded-[18px] border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3.5 py-2.5 text-sm text-[color:var(--app-accent)]">
+                              {submitError}
+                            </div>
                           ) : null}
 
-                          {storeCreateStep === 'identity' ? (
-                            <>
-                              <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
-                                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-                                  {isGuidedStoreSetup
-                                    ? isId
-                                      ? 'Isi 3 data dulu'
-                                      : 'Fill these 3 fields first'
-                                    : isId
-                                      ? 'Identitas inti usaha'
-                                      : 'Core business identity'}
+                          {!useSimpleSetupCreateLayout ? (
+                            <div className={manageSectionBlockClass}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/68">
+                                  {isId ? 'Urutan isi' : 'Fill order'}
                                 </p>
-                                <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/72">
-                                  {isGuidedStoreSetup
-                                    ? isId
-                                      ? 'Nama, kota, alamat. WA dan deskripsi bisa nanti.'
-                                      : 'Name, city, and address are enough for now. Phone and description can wait.'
-                                    : isId
-                                      ? 'Lengkapi identitas dasar yang dipakai owner dan tim untuk operasional harian.'
-                                      : 'Complete the core identity used by the owner and team for daily operations.'}
-                                </p>
-                                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                                  <TextInput
-                                    label={storeRegistrationCopy.nameLabel}
-                                    className={compactStoreControlClass}
-                                    name="business_name"
-                                    value={storeForm.name}
-                                    onChange={event =>
-                                      setStoreForm(current => ({
-                                        ...current,
-                                        name: event.target.value,
-                                      }))
-                                    }
-                                    autoComplete="organization"
-                                    maxLength={STORE_LIMITS.name}
-                                    placeholder={
-                                      storeRegistrationCopy.namePlaceholder
-                                    }
-                                    required
-                                  />
-                                  <TextInput
-                                    label={storeRegistrationCopy.cityLabel}
-                                    className={compactStoreControlClass}
-                                    name="business_city"
-                                    value={storeForm.city}
-                                    onChange={event =>
-                                      setStoreForm(current => ({
-                                        ...current,
-                                        city: event.target.value,
-                                      }))
-                                    }
-                                    autoComplete="address-level2"
-                                    maxLength={STORE_LIMITS.city}
-                                    placeholder={isId ? 'Jakarta' : 'Jakarta'}
-                                    required
-                                  />
-                                  <TextInput
-                                    label={storeRegistrationCopy.addressLabel}
-                                    className={compactStoreControlClass}
-                                    name="business_address"
-                                    value={storeForm.address}
-                                    onChange={event =>
-                                      setStoreForm(current => ({
-                                        ...current,
-                                        address: event.target.value,
-                                      }))
-                                    }
-                                    autoComplete="street-address"
-                                    maxLength={STORE_LIMITS.address}
-                                    placeholder={
-                                      isGuidedStoreSetup
-                                        ? isId
-                                          ? 'Jalan, patokan, atau nama area'
-                                          : 'Street, landmark, or area name'
-                                        : storeRegistrationCopy.addressPlaceholder
-                                    }
-                                    required
-                                  />
-                                </div>
-                                {storeSuggestedBaseAddress &&
-                                normalizeSingleLineInput(storeForm.address)
-                                  .length < 3 ? (
-                                  <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] px-4 py-3">
-                                    <p className="text-xs leading-5 text-[color:var(--app-accent)]/74">
-                                      {isId
-                                        ? `Belum sempat isi lengkap? Pakai dulu "${storeSuggestedBaseAddress}".`
-                                        : `Not ready with the full address yet? Start with "${storeSuggestedBaseAddress}".`}
-                                    </p>
-                                    <button
-                                      type="button"
-                                      onClick={fillSuggestedStoreAddress}
-                                      className="ui-button-secondary ui-button-compact px-3 text-xs font-semibold"
-                                    >
-                                      {isId
-                                        ? 'Pakai alamat ini'
-                                        : 'Use this address'}
-                                    </button>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </>
-                          ) : null}
-
-                          {storeCreateStep === 'operations' ? (
-                            <div className="rounded-[20px] border border-transparent bg-[color:var(--app-accent-soft)] px-3 py-3 text-[color:var(--app-accent)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.34)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-[11px] font-black uppercase tracking-[0.16em]">
-                                    {isGuidedStoreSetup
-                                      ? isId
-                                        ? 'Setting awal otomatis'
-                                        : 'Automatic starting setup'
-                                      : isId
-                                        ? storeRegistrationProfile.labelId
-                                        : storeRegistrationProfile.labelEn}
-                                  </p>
-                                  <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
-                                    {isGuidedStoreSetup
-                                      ? isId
-                                        ? 'Setelan umum saya nyalakan dulu. Bisa diubah nanti.'
-                                        : 'The common defaults are enabled first. You can change them later.'
-                                      : isId
-                                        ? storeRegistrationProfile.registrationHintId
-                                        : storeRegistrationProfile.registrationHintEn}
-                                  </p>
-                                </div>
-                                <InlineBadge tone="accent">
-                                  {isGuidedStoreSetup
-                                    ? isId
-                                      ? 'Siap pakai'
-                                      : 'Ready to use'
-                                    : isId
-                                      ? 'Bisa diubah'
-                                      : 'Customizable'}
+                                <InlineBadge
+                                  tone={
+                                    storeCreateChecklist.every(
+                                      item => item.done,
+                                    )
+                                      ? 'success'
+                                      : 'warning'
+                                  }
+                                >
+                                  {
+                                    storeCreateChecklist.filter(
+                                      item => item.done,
+                                    ).length
+                                  }
+                                  /{storeCreateChecklist.length}
                                 </InlineBadge>
                               </div>
 
-                              {isGuidedStoreSetup ? (
-                                <>
-                                  <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white px-3 py-3">
-                                    <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                              <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                                {storeCreateSteps.map((step, index) => {
+                                  const active = step.id === storeCreateStep;
+                                  const done =
+                                    index < storeCreateStepIndex ||
+                                    (index === storeCreateStepIndex &&
+                                      step.id !== 'operations' &&
+                                      storeCreateValidation[step.id]);
+                                  const unlocked =
+                                    index <=
+                                    highestUnlockedStoreCreateStepIndex;
+
+                                  return (
+                                    <button
+                                      key={step.id}
+                                      type="button"
+                                      onClick={() =>
+                                        jumpToStoreCreateStep(step.id)
+                                      }
+                                      disabled={!unlocked}
+                                      className={cn(
+                                        'ui-pressable inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-full px-3 text-left transition',
+                                        active
+                                          ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_36%,white)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.18)] ring-1 ring-[color:var(--app-accent-border)]'
+                                          : unlocked
+                                            ? 'bg-slate-50/92 ring-1 ring-slate-200/80 hover:bg-white dark:bg-slate-900/72 dark:ring-slate-800/80'
+                                            : 'cursor-not-allowed bg-slate-100/80 opacity-65 ring-1 ring-dashed ring-slate-200/80 dark:bg-slate-900/60 dark:ring-slate-800/80',
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                                          active || done
+                                            ? 'bg-[color:var(--app-accent)] text-white'
+                                            : 'bg-white text-[color:var(--app-accent)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80',
+                                        )}
+                                      >
+                                        {done ? (
+                                          <CheckCircle2 className="h-3.5 w-3.5" />
+                                        ) : (
+                                          index + 1
+                                        )}
+                                      </span>
+                                      <span className="whitespace-nowrap text-[11px] font-black text-[color:var(--app-text)]">
+                                        {step.title}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <div className={cn(manageInfoCardClass, 'mt-2')}>
+                                <p className="text-[11px] font-black">
+                                  {isId
+                                    ? `Fokus ke ${currentStoreCreateStep.title.toLowerCase()} aja dulu.`
+                                    : `Focus on ${currentStoreCreateStep.title.toLowerCase()} only for now.`}
+                                </p>
+                                <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+                                  {currentStoreCreateStep.summary}
+                                </p>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="space-y-3.5">
+                            {storeCreateStep === 'group' ? (
+                              <>
+                                <div className="rounded-[18px] border border-[color:var(--app-border)] bg-white px-3 py-3 shadow-[0_14px_24px_-22px_rgba(15,23,42,0.12)] sm:px-3.5 sm:py-3.5 dark:border-[color:var(--app-border-strong)]">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                        {storeRegistrationCopy.modelLabel}
+                                      </p>
+                                      <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
+                                        {isGuidedStoreSetup
+                                          ? isId
+                                            ? 'Pilih yang paling mirip dulu.'
+                                            : 'Pick the closest fit first.'
+                                          : storeRegistrationCopy.modelHint}
+                                      </p>
+                                    </div>
+                                    <InlineBadge tone="accent">
                                       {isId
-                                        ? 'Yang aktif duluan'
-                                        : 'Starts enabled'}
+                                        ? 'Pilih yang paling dekat'
+                                        : 'Pick the closest fit'}
+                                    </InlineBadge>
+                                  </div>
+
+                                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                                    {registrationPathOptions.map(option => (
+                                      <SectionJumpTile
+                                        key={option.groupId}
+                                        icon={option.icon}
+                                        title={option.title}
+                                        desc={option.desc}
+                                        badge={option.badge}
+                                        tone={option.tone}
+                                        selected={
+                                          selectedStoreCategoryGroup ===
+                                          option.groupId
+                                        }
+                                        actionLabel={isId ? 'Pilih' : 'Pick'}
+                                        selectedLabel={
+                                          isId ? 'Terpilih' : 'Selected'
+                                        }
+                                        compact
+                                        onClick={() =>
+                                          applyStoreCategoryGroup(
+                                            option.groupId,
+                                          )
+                                        }
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div
+                                  className={cn(
+                                    'grid gap-3',
+                                    !isGuidedStoreSetup ||
+                                      showStoreBusinessFocus ||
+                                      storeForm.business_focus.trim().length > 0
+                                      ? 'sm:grid-cols-2'
+                                      : 'sm:grid-cols-1',
+                                  )}
+                                >
+                                  <SelectInput
+                                    label={
+                                      isId ? 'Jenis detail' : 'Detailed type'
+                                    }
+                                    className={compactStoreControlClass}
+                                    value={storeForm.business_category}
+                                    onChange={event =>
+                                      applyStoreCategory(
+                                        event.target
+                                          .value as UmkmBusinessCategoryId,
+                                      )
+                                    }
+                                  >
+                                    {filteredStoreBusinessCategoryOptions.map(
+                                      option => (
+                                        <option
+                                          key={option.id}
+                                          value={option.id}
+                                        >
+                                          {isId
+                                            ? option.labelId
+                                            : option.labelEn}
+                                        </option>
+                                      ),
+                                    )}
+                                  </SelectInput>
+                                  {!isGuidedStoreSetup ||
+                                  showStoreBusinessFocus ||
+                                  storeForm.business_focus.trim().length > 0 ? (
+                                    <TextInput
+                                      label={
+                                        isId ? 'Fokus usaha' : 'Business focus'
+                                      }
+                                      className={compactStoreControlClass}
+                                      value={storeForm.business_focus}
+                                      onChange={event =>
+                                        setStoreForm(current => ({
+                                          ...current,
+                                          business_focus: event.target.value,
+                                        }))
+                                      }
+                                      placeholder={getUmkmBusinessFocusPlaceholder(
+                                        storeForm.business_category,
+                                        isId,
+                                      )}
+                                    />
+                                  ) : null}
+                                </div>
+
+                                {isGuidedStoreSetup &&
+                                !showStoreBusinessFocus &&
+                                storeForm.business_focus.trim().length === 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setShowStoreBusinessFocus(true)
+                                    }
+                                    className="ui-button-secondary ui-button-compact px-3 text-xs font-semibold"
+                                  >
+                                    {isId ? 'Tambah fokus' : 'Add focus'}
+                                  </button>
+                                ) : null}
+
+                                <div className="rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/84">
+                                  <p className="font-black text-[color:var(--app-accent)]">
+                                    {getUmkmBusinessCategoryLabel(
+                                      storeForm.business_category,
+                                      isId,
+                                    )}
+                                  </p>
+                                  <p className="mt-2">
+                                    {getUmkmBusinessCategoryDescription(
+                                      storeForm.business_category,
+                                      isId,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                        {isId ? 'Tipe lokasi' : 'Location type'}
+                                      </p>
+                                      <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
+                                        {isGuidedStoreSetup
+                                          ? isId
+                                            ? 'Pilih tetap atau pindah-pindah.'
+                                            : 'Choose fixed or moving.'
+                                          : isId
+                                            ? 'Pisahkan jenis usaha dari pola lokasinya. Jadi seller keliling, booth event, atau workshop tetap masuk ke kategori yang benar.'
+                                            : 'Keep the business type separate from how the location behaves so mobile sellers, booths, and workshops still stay in the correct category.'}
+                                      </p>
+                                    </div>
+                                    <InlineBadge tone="accent">
+                                      {getUmkmLocationModeLabel(
+                                        storeForm.location_mode,
+                                        isId,
+                                      )}
+                                    </InlineBadge>
+                                  </div>
+
+                                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                                    {(['fixed', 'mobile'] as const).map(
+                                      mode => {
+                                        const active =
+                                          storeForm.location_mode === mode;
+                                        return (
+                                          <button
+                                            key={mode}
+                                            type="button"
+                                            onClick={() =>
+                                              setStoreForm(current => ({
+                                                ...current,
+                                                location_mode: mode,
+                                              }))
+                                            }
+                                            className={cn(
+                                              'rounded-[18px] border px-3 py-3 text-left transition',
+                                              active
+                                                ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] shadow-sm ring-1 ring-[color:var(--app-accent)]/14'
+                                                : 'border-[color:var(--app-accent-border)] bg-white hover:border-[color:var(--app-accent)]/35',
+                                            )}
+                                          >
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex items-center gap-2">
+                                                <span
+                                                  className={cn(
+                                                    'inline-flex h-8 w-8 items-center justify-center rounded-[14px] border',
+                                                    active
+                                                      ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                                                      : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)]',
+                                                  )}
+                                                >
+                                                  {mode === 'fixed' ? (
+                                                    <Store className="h-4 w-4" />
+                                                  ) : (
+                                                    <ArrowRightLeft className="h-4 w-4" />
+                                                  )}
+                                                </span>
+                                                <div>
+                                                  <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                                                    {getUmkmLocationModeLabel(
+                                                      mode,
+                                                      isId,
+                                                    )}
+                                                  </p>
+                                                  <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--app-accent)]/72">
+                                                    {getUmkmLocationModeHint(
+                                                      mode,
+                                                      isId,
+                                                    )}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                              {active ? (
+                                                <CheckCircle2 className="h-5 w-5 text-[color:var(--app-accent)]" />
+                                              ) : null}
+                                            </div>
+                                          </button>
+                                        );
+                                      },
+                                    )}
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}
+
+                            {storeCreateStep === 'identity' ? (
+                              <>
+                                <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
+                                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                    {isGuidedStoreSetup
+                                      ? isId
+                                        ? 'Isi 3 data dulu'
+                                        : 'Fill these 3 fields first'
+                                      : isId
+                                        ? 'Identitas inti usaha'
+                                        : 'Core business identity'}
+                                  </p>
+                                  <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/72">
+                                    {isGuidedStoreSetup
+                                      ? isId
+                                        ? 'Nama, kota, alamat. WA dan deskripsi bisa nanti.'
+                                        : 'Name, city, and address are enough for now. Phone and description can wait.'
+                                      : isId
+                                        ? 'Lengkapi identitas dasar yang dipakai owner dan tim untuk operasional harian.'
+                                        : 'Complete the core identity used by the owner and team for daily operations.'}
+                                  </p>
+                                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                    <TextInput
+                                      label={storeRegistrationCopy.nameLabel}
+                                      className={compactStoreControlClass}
+                                      name="business_name"
+                                      value={storeForm.name}
+                                      onChange={event =>
+                                        setStoreForm(current => ({
+                                          ...current,
+                                          name: event.target.value,
+                                        }))
+                                      }
+                                      autoComplete="organization"
+                                      maxLength={STORE_LIMITS.name}
+                                      placeholder={
+                                        storeRegistrationCopy.namePlaceholder
+                                      }
+                                      required
+                                    />
+                                    <TextInput
+                                      label={storeRegistrationCopy.cityLabel}
+                                      className={compactStoreControlClass}
+                                      name="business_city"
+                                      value={storeForm.city}
+                                      onChange={event =>
+                                        setStoreForm(current => ({
+                                          ...current,
+                                          city: event.target.value,
+                                        }))
+                                      }
+                                      autoComplete="address-level2"
+                                      maxLength={STORE_LIMITS.city}
+                                      placeholder={isId ? 'Jakarta' : 'Jakarta'}
+                                      required
+                                    />
+                                    <TextInput
+                                      label={storeRegistrationCopy.addressLabel}
+                                      className={compactStoreControlClass}
+                                      name="business_address"
+                                      value={storeForm.address}
+                                      onChange={event =>
+                                        setStoreForm(current => ({
+                                          ...current,
+                                          address: event.target.value,
+                                        }))
+                                      }
+                                      autoComplete="street-address"
+                                      maxLength={STORE_LIMITS.address}
+                                      placeholder={
+                                        isGuidedStoreSetup
+                                          ? isId
+                                            ? 'Jalan, patokan, atau nama area'
+                                            : 'Street, landmark, or area name'
+                                          : storeRegistrationCopy.addressPlaceholder
+                                      }
+                                      required
+                                    />
+                                  </div>
+                                  {storeSuggestedBaseAddress &&
+                                  normalizeSingleLineInput(storeForm.address)
+                                    .length < 3 ? (
+                                    <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] px-4 py-3">
+                                      <p className="text-xs leading-5 text-[color:var(--app-accent)]/74">
+                                        {isId
+                                          ? `Belum sempat isi lengkap? Pakai dulu "${storeSuggestedBaseAddress}".`
+                                          : `Not ready with the full address yet? Start with "${storeSuggestedBaseAddress}".`}
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={fillSuggestedStoreAddress}
+                                        className="ui-button-secondary ui-button-compact px-3 text-xs font-semibold"
+                                      >
+                                        {isId
+                                          ? 'Pakai alamat ini'
+                                          : 'Use this address'}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </>
+                            ) : null}
+
+                            {storeCreateStep === 'operations' ? (
+                              <div className="rounded-[20px] border border-transparent bg-[color:var(--app-accent-soft)] px-3 py-3 text-[color:var(--app-accent)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.34)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                                      {isGuidedStoreSetup
+                                        ? isId
+                                          ? 'Setting awal otomatis'
+                                          : 'Automatic starting setup'
+                                        : isId
+                                          ? storeRegistrationProfile.labelId
+                                          : storeRegistrationProfile.labelEn}
                                     </p>
-                                    <div className="mt-3 flex flex-wrap gap-2">
+                                    <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
+                                      {isGuidedStoreSetup
+                                        ? isId
+                                          ? 'Setelan umum saya nyalakan dulu. Bisa diubah nanti.'
+                                          : 'The common defaults are enabled first. You can change them later.'
+                                        : isId
+                                          ? storeRegistrationProfile.registrationHintId
+                                          : storeRegistrationProfile.registrationHintEn}
+                                    </p>
+                                  </div>
+                                  <InlineBadge tone="accent">
+                                    {isGuidedStoreSetup
+                                      ? isId
+                                        ? 'Siap pakai'
+                                        : 'Ready to use'
+                                      : isId
+                                        ? 'Bisa diubah'
+                                        : 'Customizable'}
+                                  </InlineBadge>
+                                </div>
+
+                                {isGuidedStoreSetup ? (
+                                  <>
+                                    <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white px-3 py-3">
+                                      <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                                        {isId
+                                          ? 'Yang aktif duluan'
+                                          : 'Starts enabled'}
+                                      </p>
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {storePrimaryCapabilities
+                                          .filter(capability =>
+                                            storeForm.business_capabilities.includes(
+                                              capability,
+                                            ),
+                                          )
+                                          .map(capability => (
+                                            <span
+                                              key={capability}
+                                              className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-bold"
+                                            >
+                                              {getCapabilityLabel(
+                                                capability,
+                                                isId,
+                                              )}
+                                            </span>
+                                          ))}
+                                      </div>
+                                    </div>
+
+                                    {storeTablePlanningAvailable ? (
+                                      <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white px-3 py-3">
+                                        <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                                          {isId ? 'Pakai meja?' : 'Use tables?'}
+                                        </p>
+                                        <p className="mt-1 text-[11px] leading-4 text-[color:var(--app-accent)]/72">
+                                          {isId
+                                            ? 'Kalau ragu, pilih tanpa meja dulu.'
+                                            : 'If you are unsure, start without tables.'}
+                                        </p>
+                                        <div className="mt-2.5 grid gap-1.5 sm:grid-cols-4">
+                                          {[
+                                            {
+                                              id: 'none' as const,
+                                              label: isId
+                                                ? 'Tanpa meja'
+                                                : 'No tables',
+                                            },
+                                            {
+                                              id: 'small' as const,
+                                              label: isId
+                                                ? '4 meja'
+                                                : '4 tables',
+                                            },
+                                            {
+                                              id: 'medium' as const,
+                                              label: isId
+                                                ? '8 meja'
+                                                : '8 tables',
+                                            },
+                                            {
+                                              id: 'large' as const,
+                                              label: isId
+                                                ? '12 meja'
+                                                : '12 tables',
+                                            },
+                                          ].map(preset => (
+                                            <button
+                                              key={preset.id}
+                                              type="button"
+                                              onClick={() =>
+                                                applyQuickStoreTablePreset(
+                                                  preset.id,
+                                                )
+                                              }
+                                              className={cn(
+                                                'rounded-[14px] border px-2.5 py-2.5 text-[12px] font-bold transition',
+                                                activeStoreTablePreset ===
+                                                  preset.id
+                                                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] shadow-sm'
+                                                  : 'border-[color:var(--app-accent-border)] bg-white hover:border-[color:var(--app-accent)]/35',
+                                              )}
+                                            >
+                                              {preset.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-3 rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
+                                        {storeRegistrationCopy.noTablesMessage}
+                                      </div>
+                                    )}
+
+                                    {!useSimpleSetupCreateLayout ? (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setShowDetailedStoreOperations(
+                                            current => !current,
+                                          )
+                                        }
+                                        className="ui-button-secondary ui-button-compact mt-4 px-3 text-xs font-bold"
+                                      >
+                                        {showDetailedStoreOperations
+                                          ? isId
+                                            ? 'Sembunyikan detail'
+                                            : 'Hide details'
+                                          : isId
+                                            ? 'Ubah detail'
+                                            : 'Adjust details'}
+                                      </button>
+                                    ) : null}
+                                  </>
+                                ) : null}
+
+                                {!isGuidedStoreSetup ||
+                                showDetailedStoreOperations ? (
+                                  <>
+                                    <div className="mt-4 grid gap-3 md:grid-cols-2">
                                       {storePrimaryCapabilities
                                         .filter(capability =>
                                           storeForm.business_capabilities.includes(
@@ -8604,526 +8792,426 @@ export function UmkmHubClient({
                                           ),
                                         )
                                         .map(capability => (
-                                          <span
+                                          <div
                                             key={capability}
-                                            className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-bold"
+                                            className="rounded-2xl border border-[color:var(--app-accent-border)] bg-white px-3 py-3"
                                           >
-                                            {getCapabilityLabel(
-                                              capability,
-                                              isId,
-                                            )}
-                                          </span>
-                                        ))}
-                                    </div>
-                                  </div>
-
-                                  {storeTablePlanningAvailable ? (
-                                    <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white px-3 py-3">
-                                      <p className="text-[13px] font-black text-[color:var(--app-accent)]">
-                                        {isId ? 'Pakai meja?' : 'Use tables?'}
-                                      </p>
-                                      <p className="mt-1 text-[11px] leading-4 text-[color:var(--app-accent)]/72">
-                                        {isId
-                                          ? 'Kalau ragu, pilih tanpa meja dulu.'
-                                          : 'If you are unsure, start without tables.'}
-                                      </p>
-                                      <div className="mt-2.5 grid gap-1.5 sm:grid-cols-4">
-                                        {[
-                                          {
-                                            id: 'none' as const,
-                                            label: isId
-                                              ? 'Tanpa meja'
-                                              : 'No tables',
-                                          },
-                                          {
-                                            id: 'small' as const,
-                                            label: isId ? '4 meja' : '4 tables',
-                                          },
-                                          {
-                                            id: 'medium' as const,
-                                            label: isId ? '8 meja' : '8 tables',
-                                          },
-                                          {
-                                            id: 'large' as const,
-                                            label: isId
-                                              ? '12 meja'
-                                              : '12 tables',
-                                          },
-                                        ].map(preset => (
-                                          <button
-                                            key={preset.id}
-                                            type="button"
-                                            onClick={() =>
-                                              applyQuickStoreTablePreset(
-                                                preset.id,
-                                              )
-                                            }
-                                            className={cn(
-                                              'rounded-[14px] border px-2.5 py-2.5 text-[12px] font-bold transition',
-                                              activeStoreTablePreset ===
-                                                preset.id
-                                                ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] shadow-sm'
-                                                : 'border-[color:var(--app-accent-border)] bg-white hover:border-[color:var(--app-accent)]/35',
-                                            )}
-                                          >
-                                            {preset.label}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="mt-3 rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
-                                      {storeRegistrationCopy.noTablesMessage}
-                                    </div>
-                                  )}
-
-                                  {!useSimpleSetupCreateLayout ? (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setShowDetailedStoreOperations(
-                                          current => !current,
-                                        )
-                                      }
-                                      className="ui-button-secondary ui-button-compact mt-4 px-3 text-xs font-bold"
-                                    >
-                                      {showDetailedStoreOperations
-                                        ? isId
-                                          ? 'Sembunyikan detail'
-                                          : 'Hide details'
-                                        : isId
-                                          ? 'Ubah detail'
-                                          : 'Adjust details'}
-                                    </button>
-                                  ) : null}
-                                </>
-                              ) : null}
-
-                              {!isGuidedStoreSetup ||
-                              showDetailedStoreOperations ? (
-                                <>
-                                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                                    {storePrimaryCapabilities
-                                      .filter(capability =>
-                                        storeForm.business_capabilities.includes(
-                                          capability,
-                                        ),
-                                      )
-                                      .map(capability => (
-                                        <div
-                                          key={capability}
-                                          className="rounded-2xl border border-[color:var(--app-accent-border)] bg-white px-3 py-3"
-                                        >
-                                          <p className="text-sm font-bold text-[color:var(--app-accent)]">
-                                            {getCapabilityLabel(
-                                              capability,
-                                              isId,
-                                            )}
-                                          </p>
-                                          <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
-                                            {getCapabilityDescription(
-                                              capability,
-                                              isId,
-                                            )}
-                                          </p>
-                                        </div>
-                                      ))}
-                                  </div>
-
-                                  <div className="mt-4">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
-                                      {isId
-                                        ? 'Capability yang relevan'
-                                        : 'Relevant capabilities'}
-                                    </p>
-                                    <div className="mt-2.5 flex flex-wrap gap-1.5">
-                                      {storePrimaryCapabilities.map(
-                                        capability => {
-                                          const active =
-                                            storeForm.business_capabilities.includes(
-                                              capability,
-                                            );
-                                          return (
-                                            <button
-                                              key={capability}
-                                              type="button"
-                                              onClick={() =>
-                                                toggleStoreCapability(
-                                                  capability,
-                                                )
-                                              }
-                                              className={cn(
-                                                'inline-flex min-h-[42px] items-center gap-2 rounded-full border px-3.5 text-xs font-bold transition',
-                                                active
-                                                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-sm'
-                                                  : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] hover:border-[color:var(--app-accent)]/35',
-                                              )}
-                                            >
-                                              {active ? (
-                                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                              ) : (
-                                                <Circle className="h-3.5 w-3.5" />
-                                              )}
+                                            <p className="text-sm font-bold text-[color:var(--app-accent)]">
                                               {getCapabilityLabel(
                                                 capability,
                                                 isId,
                                               )}
-                                            </button>
-                                          );
-                                        },
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {storeAdvancedCapabilities.length > 0 ? (
-                                    <div className="mt-4">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setShowAdvancedStoreCapabilities(
-                                            current => !current,
-                                          )
-                                        }
-                                        className="ui-button-secondary ui-button-compact px-3 text-xs font-bold"
-                                      >
-                                        {showAdvancedStoreCapabilities
-                                          ? isId
-                                            ? 'Sembunyikan opsi lanjutan'
-                                            : 'Hide advanced options'
-                                          : isId
-                                            ? 'Lihat opsi lanjutan'
-                                            : 'Show advanced options'}
-                                      </button>
-
-                                      {showAdvancedStoreCapabilities ? (
-                                        <div className="mt-3 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
-                                            {isId
-                                              ? 'Opsi tambahan untuk usaha hybrid'
-                                              : 'Extra options for hybrid businesses'}
-                                          </p>
-                                          <div className="mt-3 flex flex-wrap gap-2">
-                                            {storeAdvancedCapabilities.map(
-                                              capability => {
-                                                const active =
-                                                  storeForm.business_capabilities.includes(
-                                                    capability,
-                                                  );
-                                                return (
-                                                  <button
-                                                    key={capability}
-                                                    type="button"
-                                                    onClick={() =>
-                                                      toggleStoreCapability(
-                                                        capability,
-                                                      )
-                                                    }
-                                                    className={cn(
-                                                      'inline-flex min-h-[42px] items-center gap-2 rounded-full border px-3.5 text-xs font-bold transition',
-                                                      active
-                                                        ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-sm'
-                                                        : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] hover:border-[color:var(--app-accent)]/35',
-                                                    )}
-                                                  >
-                                                    {active ? (
-                                                      <CheckCircle2 className="h-3.5 w-3.5" />
-                                                    ) : (
-                                                      <Circle className="h-3.5 w-3.5" />
-                                                    )}
-                                                    {getCapabilityLabel(
-                                                      capability,
-                                                      isId,
-                                                    )}
-                                                  </button>
-                                                );
-                                              },
-                                            )}
+                                            </p>
+                                            <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
+                                              {getCapabilityDescription(
+                                                capability,
+                                                isId,
+                                              )}
+                                            </p>
                                           </div>
-                                        </div>
-                                      ) : null}
+                                        ))}
                                     </div>
-                                  ) : null}
-                                </>
-                              ) : null}
-                            </div>
-                          ) : null}
 
-                          {storeCreateStep === 'identity' &&
-                          (!isGuidedStoreSetup ||
-                            showOptionalStoreIdentity ||
-                            storeForm.phone.trim().length > 0 ||
-                            storeForm.description.trim().length > 0) ? (
-                            <>
-                              <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
+                                    <div className="mt-4">
+                                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
+                                        {isId
+                                          ? 'Capability yang relevan'
+                                          : 'Relevant capabilities'}
+                                      </p>
+                                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                                        {storePrimaryCapabilities.map(
+                                          capability => {
+                                            const active =
+                                              storeForm.business_capabilities.includes(
+                                                capability,
+                                              );
+                                            return (
+                                              <button
+                                                key={capability}
+                                                type="button"
+                                                onClick={() =>
+                                                  toggleStoreCapability(
+                                                    capability,
+                                                  )
+                                                }
+                                                className={cn(
+                                                  'inline-flex min-h-[42px] items-center gap-2 rounded-full border px-3.5 text-xs font-bold transition',
+                                                  active
+                                                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-sm'
+                                                    : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] hover:border-[color:var(--app-accent)]/35',
+                                                )}
+                                              >
+                                                {active ? (
+                                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                                ) : (
+                                                  <Circle className="h-3.5 w-3.5" />
+                                                )}
+                                                {getCapabilityLabel(
+                                                  capability,
+                                                  isId,
+                                                )}
+                                              </button>
+                                            );
+                                          },
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {storeAdvancedCapabilities.length > 0 ? (
+                                      <div className="mt-4">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setShowAdvancedStoreCapabilities(
+                                              current => !current,
+                                            )
+                                          }
+                                          className="ui-button-secondary ui-button-compact px-3 text-xs font-bold"
+                                        >
+                                          {showAdvancedStoreCapabilities
+                                            ? isId
+                                              ? 'Sembunyikan opsi lanjutan'
+                                              : 'Hide advanced options'
+                                            : isId
+                                              ? 'Lihat opsi lanjutan'
+                                              : 'Show advanced options'}
+                                        </button>
+
+                                        {showAdvancedStoreCapabilities ? (
+                                          <div className="mt-3 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-4 py-4">
+                                            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                              {isId
+                                                ? 'Opsi tambahan untuk usaha hybrid'
+                                                : 'Extra options for hybrid businesses'}
+                                            </p>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                              {storeAdvancedCapabilities.map(
+                                                capability => {
+                                                  const active =
+                                                    storeForm.business_capabilities.includes(
+                                                      capability,
+                                                    );
+                                                  return (
+                                                    <button
+                                                      key={capability}
+                                                      type="button"
+                                                      onClick={() =>
+                                                        toggleStoreCapability(
+                                                          capability,
+                                                        )
+                                                      }
+                                                      className={cn(
+                                                        'inline-flex min-h-[42px] items-center gap-2 rounded-full border px-3.5 text-xs font-bold transition',
+                                                        active
+                                                          ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-sm'
+                                                          : 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] hover:border-[color:var(--app-accent)]/35',
+                                                      )}
+                                                    >
+                                                      {active ? (
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                                      ) : (
+                                                        <Circle className="h-3.5 w-3.5" />
+                                                      )}
+                                                      {getCapabilityLabel(
+                                                        capability,
+                                                        isId,
+                                                      )}
+                                                    </button>
+                                                  );
+                                                },
+                                              )}
+                                            </div>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                  </>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            {storeCreateStep === 'identity' &&
+                            (!isGuidedStoreSetup ||
+                              showOptionalStoreIdentity ||
+                              storeForm.phone.trim().length > 0 ||
+                              storeForm.description.trim().length > 0) ? (
+                              <>
+                                <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                        {isId
+                                          ? 'Info tambahan'
+                                          : 'Additional info'}
+                                      </p>
+                                      <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/72">
+                                        {isId
+                                          ? 'Opsional. Isi kalau sudah ada.'
+                                          : 'Optional. Fill it only if you already have it.'}
+                                      </p>
+                                    </div>
+                                    {isGuidedStoreSetup ? (
+                                      <InlineBadge tone="accent">
+                                        {isId ? 'Opsional' : 'Optional'}
+                                      </InlineBadge>
+                                    ) : null}
+                                  </div>
+                                  <div className="mt-4 grid gap-4">
+                                    <TextInput
+                                      label={storeRegistrationCopy.phoneLabel}
+                                      className={compactStoreControlClass}
+                                      type="tel"
+                                      name="business_phone"
+                                      value={storeForm.phone}
+                                      onChange={event =>
+                                        setStoreForm(current => ({
+                                          ...current,
+                                          phone: event.target.value,
+                                        }))
+                                      }
+                                      autoComplete="tel"
+                                      maxLength={STORE_LIMITS.phone}
+                                      placeholder={
+                                        isId ? '08xxxxxxxxxx' : '08xxxxxxxxxx'
+                                      }
+                                    />
+
+                                    <TextArea
+                                      label={
+                                        storeRegistrationCopy.descriptionLabel
+                                      }
+                                      className={compactStoreTextAreaClass}
+                                      name="business_description"
+                                      value={storeForm.description}
+                                      onChange={event =>
+                                        setStoreForm(current => ({
+                                          ...current,
+                                          description: event.target.value,
+                                        }))
+                                      }
+                                      maxLength={STORE_LIMITS.description}
+                                      placeholder={
+                                        storeRegistrationCopy.descriptionPlaceholder
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}
+
+                            {storeCreateStep === 'identity' &&
+                            isGuidedStoreSetup &&
+                            !showOptionalStoreIdentity &&
+                            storeForm.phone.trim().length === 0 &&
+                            storeForm.description.trim().length === 0 ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowOptionalStoreIdentity(true)
+                                }
+                                className="ui-button-secondary ui-button-compact px-3 text-xs font-semibold"
+                              >
+                                {isId
+                                  ? 'Tambah WA / deskripsi'
+                                  : 'Add phone / description'}
+                              </button>
+                            ) : null}
+
+                            {storeCreateStep === 'location' &&
+                            !isGuidedStoreSetup &&
+                            storeRegistrationCopy.locationHint ? (
+                              <div className="rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
+                                {storeRegistrationCopy.locationHint}
+                              </div>
+                            ) : null}
+
+                            {storeCreateStep === 'location' ? (
+                              <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 text-[color:var(--app-accent)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-                                      {isId
-                                        ? 'Info tambahan'
-                                        : 'Additional info'}
+                                    <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                                      {storeForm.location_mode === 'mobile'
+                                        ? isId
+                                          ? 'Titik live awal usaha'
+                                          : 'Initial live business point'
+                                        : isId
+                                          ? 'Pin lokasi usaha'
+                                          : 'Business location pin'}
                                     </p>
-                                    <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/72">
-                                      {isId
-                                        ? 'Opsional. Isi kalau sudah ada.'
-                                        : 'Optional. Fill it only if you already have it.'}
+                                    <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--app-accent)]/76">
+                                      {isGuidedStoreSetup
+                                        ? isId
+                                          ? 'Kalau bingung, pakai lokasi saya dulu.'
+                                          : 'If you are unsure, use your current location first.'
+                                        : isId
+                                          ? 'Tap peta atau geser marker sampai titik usahanya pas.'
+                                          : 'Tap the map or drag the marker until the business point is correct.'}
                                     </p>
                                   </div>
-                                  {isGuidedStoreSetup ? (
+                                  <div className="flex flex-wrap gap-2">
                                     <InlineBadge tone="accent">
-                                      {isId ? 'Opsional' : 'Optional'}
+                                      {storeLocationPoint
+                                        ? `${storeLocationPoint.lat.toFixed(6)}, ${storeLocationPoint.lng.toFixed(6)}`
+                                        : isId
+                                          ? 'Belum ada titik'
+                                          : 'No point yet'}
                                     </InlineBadge>
-                                  ) : null}
+                                    <button
+                                      type="button"
+                                      onClick={() => fillCurrentCoords('store')}
+                                      className="ui-button-secondary ui-button-compact inline-flex items-center gap-2 px-3 text-xs font-semibold"
+                                    >
+                                      <MapPinned className="h-3.5 w-3.5" />
+                                      {isId ? 'Lokasi saya' : 'My location'}
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="mt-4 grid gap-4">
+
+                                <div className="mt-4">
+                                  <UmkmLocationPicker
+                                    value={storeLocationPoint}
+                                    onChange={point =>
+                                      setStoreCoords(
+                                        point.lat.toFixed(6),
+                                        point.lng.toFixed(6),
+                                      )
+                                    }
+                                    isId={isId}
+                                    markerLabel={
+                                      storeForm.location_mode === 'mobile'
+                                        ? isId
+                                          ? 'Titik live awal usaha'
+                                          : 'Initial live business point'
+                                        : isId
+                                          ? 'Lokasi usaha'
+                                          : 'Business location'
+                                    }
+                                  />
+                                </div>
+
+                                <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10px] font-semibold text-[color:var(--app-accent)]/80">
+                                  <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5">
+                                    {isId ? 'Lat' : 'Lat'}: {storeForm.lat}
+                                  </span>
+                                  <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5">
+                                    {isId ? 'Lng' : 'Lng'}: {storeForm.lng}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {storeCreateStep === 'operations' ? (
+                              storeSupportsTables &&
+                              (!isGuidedStoreSetup ||
+                                showDetailedStoreOperations) ? (
+                                <div className="grid gap-4 sm:grid-cols-3">
                                   <TextInput
-                                    label={storeRegistrationCopy.phoneLabel}
-                                    className={compactStoreControlClass}
-                                    type="tel"
-                                    name="business_phone"
-                                    value={storeForm.phone}
-                                    onChange={event =>
-                                      setStoreForm(current => ({
-                                        ...current,
-                                        phone: event.target.value,
-                                      }))
-                                    }
-                                    autoComplete="tel"
-                                    maxLength={STORE_LIMITS.phone}
-                                    placeholder={
-                                      isId ? '08xxxxxxxxxx' : '08xxxxxxxxxx'
-                                    }
-                                  />
-
-                                  <TextArea
                                     label={
-                                      storeRegistrationCopy.descriptionLabel
+                                      isId ? 'Meja awal' : 'Initial tables'
                                     }
-                                    className={compactStoreTextAreaClass}
-                                    name="business_description"
-                                    value={storeForm.description}
+                                    className={compactStoreControlClass}
+                                    inputMode="numeric"
+                                    value={storeForm.table_count}
                                     onChange={event =>
                                       setStoreForm(current => ({
                                         ...current,
-                                        description: event.target.value,
+                                        table_count: event.target.value,
                                       }))
                                     }
-                                    maxLength={STORE_LIMITS.description}
-                                    placeholder={
-                                      storeRegistrationCopy.descriptionPlaceholder
+                                  />
+                                  <TextInput
+                                    label={isId ? 'Kode meja' : 'Table code'}
+                                    className={compactStoreControlClass}
+                                    maxLength={STORE_LIMITS.tablePrefix}
+                                    value={storeForm.table_prefix}
+                                    onChange={event =>
+                                      setStoreForm(current => ({
+                                        ...current,
+                                        table_prefix: event.target.value,
+                                      }))
+                                    }
+                                  />
+                                  <TextInput
+                                    label={isId ? 'Kapasitas' : 'Capacity'}
+                                    className={compactStoreControlClass}
+                                    inputMode="numeric"
+                                    value={storeForm.default_capacity}
+                                    onChange={event =>
+                                      setStoreForm(current => ({
+                                        ...current,
+                                        default_capacity: event.target.value,
+                                      }))
                                     }
                                   />
                                 </div>
-                              </div>
-                            </>
-                          ) : null}
+                              ) : !isGuidedStoreSetup ? (
+                                <div className="rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
+                                  {storeRegistrationCopy.noTablesMessage}
+                                </div>
+                              ) : null
+                            ) : null}
 
-                          {storeCreateStep === 'identity' &&
-                          isGuidedStoreSetup &&
-                          !showOptionalStoreIdentity &&
-                          storeForm.phone.trim().length === 0 &&
-                          storeForm.description.trim().length === 0 ? (
-                            <button
-                              type="button"
-                              onClick={() => setShowOptionalStoreIdentity(true)}
-                              className="ui-button-secondary ui-button-compact px-3 text-xs font-semibold"
-                            >
-                              {isId
-                                ? 'Tambah WA / deskripsi'
-                                : 'Add phone / description'}
-                            </button>
-                          ) : null}
-
-                          {storeCreateStep === 'location' &&
-                          !isGuidedStoreSetup &&
-                          storeRegistrationCopy.locationHint ? (
-                            <div className="rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
-                              {storeRegistrationCopy.locationHint}
-                            </div>
-                          ) : null}
-
-                          {storeCreateStep === 'location' ? (
-                            <div className="rounded-[20px] border border-transparent bg-white px-3 py-3 text-[color:var(--app-accent)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.38)] sm:border-[color:var(--app-accent-border)] sm:px-4 sm:py-4">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="sticky bottom-2 z-20 rounded-[18px] border border-transparent bg-white/96 px-3 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.44)] backdrop-blur sm:border-[color:var(--app-accent-border)] sm:px-4">
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                                 <div>
-                                  <p className="text-[11px] font-black uppercase tracking-[0.16em]">
-                                    {storeForm.location_mode === 'mobile'
-                                      ? isId
-                                        ? 'Titik live awal usaha'
-                                        : 'Initial live business point'
-                                      : isId
-                                        ? 'Pin lokasi usaha'
-                                        : 'Business location pin'}
+                                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
+                                    {isId ? 'Aksi' : 'Action'}
                                   </p>
-                                  <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--app-accent)]/76">
-                                    {isGuidedStoreSetup
+                                  <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
+                                    {storeCreateStep !== 'operations'
                                       ? isId
-                                        ? 'Kalau bingung, pakai lokasi saya dulu.'
-                                        : 'If you are unsure, use your current location first.'
+                                        ? `Kalau sudah, lanjut ke ${storeCreateSteps[storeCreateStepIndex + 1]?.title?.toLowerCase() || 'langkah berikutnya'}.`
+                                        : `When you're done, continue to ${storeCreateSteps[storeCreateStepIndex + 1]?.title?.toLowerCase() || 'the next step'}.`
                                       : isId
-                                        ? 'Tap peta atau geser marker sampai titik usahanya pas.'
-                                        : 'Tap the map or drag the marker until the business point is correct.'}
+                                        ? 'Cek bentar, lalu simpan.'
+                                        : 'Review once, then save.'}
                                   </p>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                  <InlineBadge tone="accent">
-                                    {storeLocationPoint
-                                      ? `${storeLocationPoint.lat.toFixed(6)}, ${storeLocationPoint.lng.toFixed(6)}`
-                                      : isId
-                                        ? 'Belum ada titik'
-                                        : 'No point yet'}
-                                  </InlineBadge>
+                                <div className="flex flex-col-reverse gap-2 sm:flex-row">
                                   <button
                                     type="button"
-                                    onClick={() => fillCurrentCoords('store')}
-                                    className="ui-button-secondary ui-button-compact inline-flex items-center gap-2 px-3 text-xs font-semibold"
+                                    onClick={() => moveStoreCreateStep('back')}
+                                    disabled={storeCreateStepIndex === 0}
+                                    className="ui-button-secondary inline-flex items-center justify-center gap-2 px-3.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-55"
                                   >
-                                    <MapPinned className="h-3.5 w-3.5" />
-                                    {isId ? 'Lokasi saya' : 'My location'}
+                                    <ChevronLeft className="h-4 w-4" />
+                                    {isId ? 'Kembali' : 'Back'}
                                   </button>
+                                  {storeCreateStep !== 'operations' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        moveStoreCreateStep('next')
+                                      }
+                                      className="ui-button-primary inline-flex items-center justify-center gap-2 px-3.5 text-[13px] font-semibold"
+                                    >
+                                      {isId ? 'Lanjut' : 'Continue'}
+                                      <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="submit"
+                                      disabled={submittingStore}
+                                      className="ui-button-primary inline-flex items-center justify-center gap-2 px-3.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {submittingStore ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Store className="h-4 w-4" />
+                                      )}
+                                      {isGuidedStoreSetup
+                                        ? isId
+                                          ? 'Simpan usaha'
+                                          : 'Save business'
+                                        : isId
+                                          ? 'Simpan usaha'
+                                          : 'Save business'}
+                                    </button>
+                                  )}
                                 </div>
-                              </div>
-
-                              <div className="mt-4">
-                                <UmkmLocationPicker
-                                  value={storeLocationPoint}
-                                  onChange={point =>
-                                    setStoreCoords(
-                                      point.lat.toFixed(6),
-                                      point.lng.toFixed(6),
-                                    )
-                                  }
-                                  isId={isId}
-                                  markerLabel={
-                                    storeForm.location_mode === 'mobile'
-                                      ? isId
-                                        ? 'Titik live awal usaha'
-                                        : 'Initial live business point'
-                                      : isId
-                                        ? 'Lokasi usaha'
-                                        : 'Business location'
-                                  }
-                                />
-                              </div>
-
-                              <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10px] font-semibold text-[color:var(--app-accent)]/80">
-                                <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5">
-                                  {isId ? 'Lat' : 'Lat'}: {storeForm.lat}
-                                </span>
-                                <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5">
-                                  {isId ? 'Lng' : 'Lng'}: {storeForm.lng}
-                                </span>
-                              </div>
-                            </div>
-                          ) : null}
-
-                          {storeCreateStep === 'operations' ? (
-                            storeSupportsTables &&
-                            (!isGuidedStoreSetup ||
-                              showDetailedStoreOperations) ? (
-                              <div className="grid gap-4 sm:grid-cols-3">
-                                <TextInput
-                                  label={isId ? 'Meja awal' : 'Initial tables'}
-                                  className={compactStoreControlClass}
-                                  inputMode="numeric"
-                                  value={storeForm.table_count}
-                                  onChange={event =>
-                                    setStoreForm(current => ({
-                                      ...current,
-                                      table_count: event.target.value,
-                                    }))
-                                  }
-                                />
-                                <TextInput
-                                  label={isId ? 'Kode meja' : 'Table code'}
-                                  className={compactStoreControlClass}
-                                  maxLength={STORE_LIMITS.tablePrefix}
-                                  value={storeForm.table_prefix}
-                                  onChange={event =>
-                                    setStoreForm(current => ({
-                                      ...current,
-                                      table_prefix: event.target.value,
-                                    }))
-                                  }
-                                />
-                                <TextInput
-                                  label={isId ? 'Kapasitas' : 'Capacity'}
-                                  className={compactStoreControlClass}
-                                  inputMode="numeric"
-                                  value={storeForm.default_capacity}
-                                  onChange={event =>
-                                    setStoreForm(current => ({
-                                      ...current,
-                                      default_capacity: event.target.value,
-                                    }))
-                                  }
-                                />
-                              </div>
-                            ) : !isGuidedStoreSetup ? (
-                              <div className="rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
-                                {storeRegistrationCopy.noTablesMessage}
-                              </div>
-                            ) : null
-                          ) : null}
-
-                          <div className="sticky bottom-2 z-20 rounded-[18px] border border-transparent bg-white/96 px-3 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.44)] backdrop-blur sm:border-[color:var(--app-accent-border)] sm:px-4">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                              <div>
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
-                                  {isId ? 'Aksi' : 'Action'}
-                                </p>
-                                <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
-                                  {storeCreateStep !== 'operations'
-                                    ? isId
-                                      ? `Kalau sudah, lanjut ke ${storeCreateSteps[storeCreateStepIndex + 1]?.title?.toLowerCase() || 'langkah berikutnya'}.`
-                                      : `When you're done, continue to ${storeCreateSteps[storeCreateStepIndex + 1]?.title?.toLowerCase() || 'the next step'}.`
-                                    : isId
-                                      ? 'Cek bentar, lalu simpan.'
-                                      : 'Review once, then save.'}
-                                </p>
-                              </div>
-                              <div className="flex flex-col-reverse gap-2 sm:flex-row">
-                                <button
-                                  type="button"
-                                  onClick={() => moveStoreCreateStep('back')}
-                                  disabled={storeCreateStepIndex === 0}
-                                  className="ui-button-secondary inline-flex items-center justify-center gap-2 px-3.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-55"
-                                >
-                                  <ChevronLeft className="h-4 w-4" />
-                                  {isId ? 'Kembali' : 'Back'}
-                                </button>
-                                {storeCreateStep !== 'operations' ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => moveStoreCreateStep('next')}
-                                    className="ui-button-primary inline-flex items-center justify-center gap-2 px-3.5 text-[13px] font-semibold"
-                                  >
-                                    {isId ? 'Lanjut' : 'Continue'}
-                                    <ChevronRight className="h-4 w-4" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="submit"
-                                    disabled={submittingStore}
-                                    className="ui-button-primary inline-flex items-center justify-center gap-2 px-3.5 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    {submittingStore ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Store className="h-4 w-4" />
-                                    )}
-                                    {isGuidedStoreSetup
-                                      ? isId
-                                        ? 'Simpan usaha'
-                                        : 'Save business'
-                                      : isId
-                                        ? 'Simpan usaha'
-                                        : 'Save business'}
-                                  </button>
-                                )}
                               </div>
                             </div>
                           </div>
-                        </div>
                         </form>
                       </SectionCard>
                     </>
@@ -9177,7 +9265,9 @@ export function UmkmHubClient({
                             className="ui-button-secondary mt-4 mr-2 inline-flex items-center gap-2 px-4 text-sm font-semibold"
                           >
                             <ShieldCheck className="h-4 w-4" />
-                            {isId ? 'Pakai asisten usaha' : 'Use business assistant'}
+                            {isId
+                              ? 'Pakai asisten usaha'
+                              : 'Use business assistant'}
                           </Link>
                           <Link
                             href={buildSetupHref('create')}
@@ -9875,9 +9965,7 @@ export function UmkmHubClient({
                     {isSetupDetailView ? (
                       <SectionCard
                         id="umkm-store-basic"
-                        title={
-                          isId ? 'Info dasar outlet' : 'Basic outlet info'
-                        }
+                        title={isId ? 'Info dasar outlet' : 'Basic outlet info'}
                         desc={
                           isId
                             ? 'Owner bisa punya banyak usaha. Form ini hanya mengubah outlet yang sedang dipilih.'
@@ -9927,7 +10015,9 @@ export function UmkmHubClient({
                               />
                               <TextInput
                                 label={
-                                  isId ? 'Kota / area utama' : 'City / main area'
+                                  isId
+                                    ? 'Kota / area utama'
+                                    : 'City / main area'
                                 }
                                 value={basicStoreForm.city}
                                 onChange={event =>
@@ -9995,7 +10085,7 @@ export function UmkmHubClient({
                               rows={5}
                               placeholder={
                                 isId
-                                  ? 'Jelaskan jualan utama, keunggulan, dan apa yang owner atau tim perlu pahami cepat.'
+                                  ? 'Tulis jualan utama dan hal penting.'
                                   : 'Describe the main offer, strengths, and what the owner or team should understand quickly.'
                               }
                             />
@@ -10085,7 +10175,9 @@ export function UmkmHubClient({
                                   : 'View all businesses'}
                               </Link>
                               <Link
-                                href={buildUmkmStorefrontPath(selectedStore.slug)}
+                                href={buildUmkmStorefrontPath(
+                                  selectedStore.slug,
+                                )}
                                 className="ui-button-secondary ui-button-compact flex w-full items-center justify-center px-4 text-sm font-bold"
                               >
                                 {storefrontActionLabel}
@@ -10179,7 +10271,9 @@ export function UmkmHubClient({
                           <div className="space-y-4">
                             <div className="grid gap-3 sm:grid-cols-2">
                               <StatCard
-                                label={isId ? 'Fondasi outlet' : 'Outlet foundation'}
+                                label={
+                                  isId ? 'Fondasi outlet' : 'Outlet foundation'
+                                }
                                 value={`${basicStoreCompletion}/5`}
                                 desc={
                                   isId
@@ -10188,7 +10282,9 @@ export function UmkmHubClient({
                                 }
                               />
                               <StatCard
-                                label={isId ? 'Arah pencarian' : 'Search directions'}
+                                label={
+                                  isId ? 'Arah pencarian' : 'Search directions'
+                                }
                                 value={launchRecommendationCards.length}
                                 desc={
                                   isId
@@ -10222,11 +10318,13 @@ export function UmkmHubClient({
 
                               <div className="mt-4 rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-4 py-4">
                                 <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
-                                  {isId ? 'Kalau masih ragu' : 'If it still feels uncertain'}
+                                  {isId
+                                    ? 'Kalau masih ragu'
+                                    : 'If it still feels uncertain'}
                                 </p>
                                 <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/78">
                                   {isId
-                                    ? `Mulai dari satu keputusan dulu untuk ${selectedStore.name}: cari supplier, cari lokasi, atau cari jasa operasional. Setelah itu baru naik ke keputusan berikutnya.`
+                                    ? `Mulai satu keputusan untuk ${selectedStore.name}: supplier, lokasi, atau jasa.`
                                     : `Start with one decision only for ${selectedStore.name}: supply, location, or operations support. Then move to the next decision.`}
                                 </p>
                               </div>
@@ -10312,7 +10410,7 @@ export function UmkmHubClient({
                             {teamMembers.length === 0 ? (
                               <div className="rounded-[24px] border border-dashed border-[color:var(--app-accent-border)] px-4 py-8 text-sm text-[color:var(--app-accent)]">
                                 {isId
-                                  ? 'Belum ada anggota tim selain owner. Tambahkan kasir, stok, atau operasional agar dashboard ini bisa dipakai seharian.'
+                                  ? 'Tambah kasir, stok, atau operasional.'
                                   : 'No team members besides the owner yet. Add cashier, stock, or ops so this dashboard can support all-day use.'}
                               </div>
                             ) : (
@@ -10568,7 +10666,7 @@ export function UmkmHubClient({
                               </p>
                               <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/78">
                                 {isId
-                                  ? 'Ini baseline struktur akses yang saya pakai supaya backend dan FE tetap satu arah.'
+                                  ? 'Baseline akses untuk backend dan FE.'
                                   : 'This is the baseline access structure keeping backend and frontend aligned.'}
                               </p>
                             </div>
@@ -10599,7 +10697,7 @@ export function UmkmHubClient({
                               </p>
                               <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/78">
                                 {isId
-                                  ? 'Owner pegang semua outlet. Kasir, stok, dan operasional cukup diberi area kerja yang spesifik per outlet supaya dashboard ini bisa dipakai terus dari pagi sampai tutup.'
+                                  ? 'Owner pegang semua outlet. Tim cukup pegang area kerja.'
                                   : 'The owner keeps full business control. Cashier, stock, and ops should each get a narrow outlet-specific workspace so this dashboard remains useful from morning until closing.'}
                               </p>
                             </div>
@@ -10619,7 +10717,7 @@ export function UmkmHubClient({
                               </p>
                               <p className="mt-2 text-xs leading-5 text-[color:var(--app-accent)]/76">
                                 {isId
-                                  ? 'Kasir dan operasional tidak perlu melihat semua bisnis owner. Pilih satu outlet aktif lalu kerjakan dari situ.'
+                                  ? 'Tim pilih satu outlet aktif lalu kerja dari situ.'
                                   : 'Cashiers and ops should not see every business. Choose one active outlet and work from there.'}
                               </p>
                             </div>
@@ -11420,7 +11518,7 @@ export function UmkmHubClient({
                                   </p>
                                   <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
                                     {isId
-                                      ? 'Tambahkan field yang benar-benar dibutuhkan buyer atau tim operasional. Ini supaya jasa tidak dipaksa pakai form retail, dan retail tidak dipaksa pakai flow jasa.'
+                                      ? 'Tambahkan field yang benar-benar dibutuhkan.'
                                       : 'Add the fields your buyers or ops team actually need. This keeps service businesses away from retail-only forms and retail away from service-only flow.'}
                                   </p>
                                 </div>
@@ -11848,7 +11946,7 @@ export function UmkmHubClient({
                                 </p>
                                 <p className="mt-3 text-xs leading-5 text-[color:var(--app-accent)]/76">
                                   {isId
-                                    ? 'Kategori jasa atau digital tidak perlu dipaksa masuk Food/Mart. Rapikan brief, slot, dan delivery lebih dulu.'
+                                    ? 'Jasa/digital cukup pakai brief, slot, delivery.'
                                     : 'Service and digital businesses do not need to be forced into Food/Mart. Clean up briefs, slots, and delivery first.'}
                                 </p>
                               </div>
@@ -12398,7 +12496,7 @@ export function UmkmHubClient({
                                   {!canUseFoodChannel && !canUseMartChannel ? (
                                     <div className={manageInfoCardClass}>
                                       {isId
-                                        ? 'Listing ini akan lebih fokus ke booking, brief, atau delivery digital. Food/Mart tidak perlu dipakai kecuali usaha memang juga menjual menu atau barang fisik.'
+                                        ? 'Fokus ke booking, brief, atau delivery digital.'
                                         : 'This listing is better focused on bookings, briefs, or digital delivery. Food/Mart is optional unless the business also sells meals or physical goods.'}
                                     </div>
                                   ) : null}
@@ -12545,7 +12643,7 @@ export function UmkmHubClient({
                                   {productForm.product_kind === 'digital' &&
                                   !productForm.digital_delivery_note.trim()
                                     ? isId
-                                      ? 'Tambahkan catatan pengiriman digital supaya buyer tahu file, voucher, atau akses dikirim ke mana.'
+                                      ? 'Tambahkan catatan kirim digital.'
                                       : 'Add a digital delivery note so buyers know where files, vouchers, or access will be sent.'
                                     : productForm.product_kind === 'physical' &&
                                         productForm.channel_online &&
@@ -12561,7 +12659,7 @@ export function UmkmHubClient({
                                             Number(productForm.weight_grams) > 0
                                           )
                                         ? isId
-                                          ? 'Isi berat produk supaya ongkir expedisi bisa dihitung dengan benar.'
+                                          ? 'Isi berat produk untuk hitung ongkir.'
                                           : 'Fill product weight so courier fees can be calculated correctly.'
                                         : isId
                                           ? 'Listing ini sudah cukup jelas untuk buyer dan siap dipakai.'
@@ -13458,7 +13556,7 @@ export function UmkmHubClient({
                 ) : (
                   <div className="rounded-[30px] border border-dashed border-[color:var(--app-accent-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(255,247,240,0.96))] px-5 py-12 text-sm text-[color:var(--app-accent)]">
                     {isId
-                      ? 'Pilih outlet dulu supaya halaman operasional ini kebuka.'
+                      ? 'Pilih outlet dulu.'
                       : 'Choose an outlet first to open this operations page.'}
                   </div>
                 )}

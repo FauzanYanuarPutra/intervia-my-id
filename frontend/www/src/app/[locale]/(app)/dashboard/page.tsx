@@ -32,9 +32,9 @@ export default function DashboardPage() {
   const quickActions: QuickAction[] = [
     {
       href: '/create?mode=quick',
-      title: isId ? 'Posting cepat' : 'Quick post',
+      title: isId ? 'Buat baru' : 'Create',
       description: isId
-        ? 'Buat kebutuhan atau penawaran tanpa langkah tambahan.'
+        ? 'Tulis kebutuhan atau tawaran.'
         : 'Create a need or offer without extra steps.',
       icon: PlusSquare,
     },
@@ -42,7 +42,7 @@ export default function DashboardPage() {
       href: '/search',
       title: isId ? 'Cari' : 'Search',
       description: isId
-        ? 'Cari supplier, jasa, atau talent yang paling dekat dulu.'
+        ? 'Supplier, jasa, talent.'
         : 'Start from the closest suppliers, services, or talent.',
       icon: Search,
     },
@@ -50,7 +50,7 @@ export default function DashboardPage() {
       href: '/chat',
       title: isId ? 'Chat' : 'Chat',
       description: isId
-        ? 'Balas pesan penting dan lanjutkan deal aktif.'
+        ? 'Balas yang penting.'
         : 'Reply to important messages and continue active deals.',
       icon: MessageCircle,
     },
@@ -58,7 +58,7 @@ export default function DashboardPage() {
       href: '/profile',
       title: isId ? 'Profil' : 'Profile',
       description: isId
-        ? 'Rapikan profil supaya orang lebih cepat percaya.'
+        ? 'Biar lebih dipercaya.'
         : 'Tidy your profile so people trust faster.',
       icon: UserRound,
     },
@@ -66,35 +66,36 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
-        <div className="rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6 text-sm text-[color:var(--app-text-soft)]">
+      <main className="page-shell py-4">
+        <div className="ui-panel p-4 text-sm text-[color:var(--app-text-soft)]">
           {isId ? 'Memuat dashboard...' : 'Loading dashboard...'}
         </div>
-      </div>
+      </main>
     );
   }
 
   if (!user) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
-        <div className="rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6">
-          <h1 className="text-2xl font-semibold text-[color:var(--app-text)]">
+      <main className="page-shell py-4">
+        <div className="ui-panel p-4">
+          <p className="ui-page-eyebrow">{isId ? 'Akses akun' : 'Account access'}</p>
+          <h1 className="ui-page-title mt-2">
             {isId ? 'Dashboard' : 'Dashboard'}
           </h1>
-          <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
+          <p className="ui-page-copy mt-2">
             {isId
               ? 'Login dulu untuk membuka halaman ini.'
               : 'Please sign in to open this page.'}
           </p>
           <Link
             href="/login"
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-sm font-semibold text-[color:var(--app-text-inverse)]"
+            className="ui-button-primary mt-4 inline-flex items-center gap-2 px-4"
           >
             {isId ? 'Login' : 'Sign in'}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -104,59 +105,63 @@ export default function DashboardPage() {
   const PrimaryIcon = primaryAction.icon;
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-6 sm:px-6">
-      <section className="rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+    <main className="page-shell page-rhythm pb-6 pt-4 lg:pb-8">
+      <section className="ui-panel ui-hero-panel p-4">
+        <p className="ui-page-eyebrow">
           {isId ? 'Dashboard ringkas' : 'Compact dashboard'}
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[color:var(--app-text)]">
+        <h1 className="ui-page-title mt-2">
           {isId ? `Halo, ${displayName}` : `Hi, ${displayName}`}
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-[color:var(--app-text-soft)]">
+        <p className="ui-page-copy mt-2">
           {isId
-            ? 'Pilih satu aksi utama lalu lanjut. Yang lain tetap dekat kalau dibutuhkan.'
-            : 'Pick one main action and continue. The rest stay close if needed.'}
+            ? 'Pilih aksi. Lanjut.'
+            : 'Pick one action and continue. Key shortcuts stay nearby.'}
         </p>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(240px,0.8fr)]">
+        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.08fr)_260px]">
           <Link
             href={primaryAction.href}
-            className="rounded-[28px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] p-5 text-[color:var(--app-text-inverse)] shadow-[0_22px_48px_-28px_color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
+            className="group overflow-hidden rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-accent)_42%,transparent)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] p-4 text-[color:var(--app-text-inverse)] shadow-[0_20px_36px_-28px_color-mix(in_srgb,var(--app-accent)_46%,transparent)]"
           >
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
-              <PrimaryIcon className="h-5 w-5" />
-            </span>
-            <p className="mt-4 text-[11px] font-black uppercase tracking-[0.18em] text-white/80">
-              {isId ? 'Aksi utama' : 'Primary action'}
-            </p>
-            <p className="mt-1 text-2xl font-black tracking-[-0.04em]">
-              {primaryAction.title}
-            </p>
-            <p className="mt-2 max-w-md text-sm text-white/88">
-              {primaryAction.description}
-            </p>
-            <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold">
-              {isId ? 'Mulai sekarang' : 'Start now'}
-              <ArrowRight className="h-4 w-4" />
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-white/15">
+                <PrimaryIcon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/78">
+                  {isId ? 'Utama' : 'Primary'}
+                </p>
+                <p className="mt-1 text-[1.05rem] font-black tracking-[-0.025em]">
+                  {primaryAction.title}
+                </p>
+                <p className="mt-1.5 max-w-md text-xs leading-5 text-white/86">
+                  {primaryAction.description}
+                </p>
+              </div>
+            </div>
+            <span className="mt-3 inline-flex items-center gap-2 text-xs font-semibold transition group-hover:translate-x-0.5">
+              {isId ? 'Gas' : 'Start'}
+              <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </Link>
 
-          <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+          <div className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] p-3.5">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
               {isId ? 'Akun aktif' : 'Active account'}
             </p>
-            <p className="mt-2 text-base font-semibold text-[color:var(--app-text)]">
+            <p className="mt-2 truncate text-sm font-semibold text-[color:var(--app-text)]">
               {displayName}
             </p>
-            <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+            <p className="mt-1 truncate text-xs text-[color:var(--app-text-soft)]">
               {user.email}
             </p>
             <Link
               href="/profile"
-              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--app-accent)]"
+              className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--app-accent)]"
             >
               {isId ? 'Buka profil' : 'Open profile'}
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
@@ -169,21 +174,21 @@ export default function DashboardPage() {
             <Link
               key={action.href}
               href={action.href}
-              className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 transition hover:border-[color:var(--app-accent-border)]"
+              className="ui-page-link-card p-3.5"
             >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]">
-                <Icon className="h-5 w-5" />
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                <Icon className="h-4 w-4" />
               </span>
-              <p className="mt-3 text-sm font-semibold text-[color:var(--app-text)]">
+              <p className="mt-3 text-sm font-semibold leading-tight text-[color:var(--app-text)]">
                 {action.title}
               </p>
-              <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+              <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
                 {action.description}
               </p>
             </Link>
           );
         })}
       </section>
-    </div>
+    </main>
   );
 }

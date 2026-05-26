@@ -30,7 +30,7 @@ export function Modal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-0 backdrop-blur-md sm:items-center sm:p-4"
+          className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-0 backdrop-blur-md sm:items-center sm:p-4"
         >
           <motion.section
             role="dialog"

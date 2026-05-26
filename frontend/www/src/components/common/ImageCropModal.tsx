@@ -209,7 +209,7 @@ export function ImageCropModal({
   const frameClass = shape === 'round' ? 'rounded-full' : 'rounded-2xl';
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_55%,_transparent)] p-4">
+    <div className="ui-layer-modal fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_55%,_transparent)] p-4">
       <div className="max-h-[80svh] w-full max-w-lg overflow-y-auto rounded-3xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl">
         <div className="mb-3 flex items-center justify-between">
           <div>

@@ -81,7 +81,7 @@ function formatRelativeTime(iso: string, isId: boolean): string {
 
 function toneClass(tone: Tone): string {
   if (tone === 'sky') {
-    return 'border-sky-200 bg-sky-50 text-sky-700';
+    return 'border-teal-200 bg-teal-50 text-teal-700';
   }
   if (tone === 'emerald') {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700';

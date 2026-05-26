@@ -185,6 +185,7 @@ export type ListUmkmStoresOptions = {
   slug?: string;
   ownerUserId?: string;
   activeOnly?: boolean;
+  backendOnly?: boolean;
   limit?: number;
 };
 

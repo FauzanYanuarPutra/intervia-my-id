@@ -19,6 +19,7 @@ import { useRouter } from '@/i18n/navigation';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { useAuth } from '@/context/AuthContext';
 import { resolveLocaleFromPathname } from '@/lib/locale';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 import { buildUsahaPath } from '@/lib/umkmSurface';
 
 function cn(...classes: (string | boolean | undefined)[]) {
@@ -210,7 +211,7 @@ export function PageAssistDock() {
     return {
       title: isId ? 'Mau mulai dari mana dulu?' : 'Where do you want to start?',
       description: isId
-        ? 'Cari kebutuhan, bikin posting, atau minta bantuan.'
+        ? 'Cari, posting, atau minta bantuan.'
         : 'Search needs, post an offer, or ask for human help.',
       actions: [
         user
@@ -241,14 +242,7 @@ export function PageAssistDock() {
     };
   }, [cleanPath, locale, user]);
 
-  const handleBack = () => {
-    if (typeof window === 'undefined') return;
-    if (window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.push('/home');
-  };
+  const handleBack = useAppBack(router, '/home');
 
   const scrollToTop = () => {
     if (typeof window === 'undefined') return;
@@ -352,7 +346,7 @@ export function PageAssistDock() {
 
   return (
     <aside
-      className="pointer-events-none fixed bottom-[max(env(safe-area-inset-bottom),1rem)] right-[max(env(safe-area-inset-right),1.25rem)] z-[70] hidden items-end justify-end lg:flex"
+      className="ui-layer-sticky pointer-events-none fixed bottom-[max(env(safe-area-inset-bottom),1rem)] right-[max(env(safe-area-inset-right),1.25rem)] hidden items-end justify-end lg:flex"
       style={{
         maxWidth: 'calc(100vw - 1rem)',
       }}

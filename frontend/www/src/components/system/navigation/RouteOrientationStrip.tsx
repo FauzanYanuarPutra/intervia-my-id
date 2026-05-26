@@ -108,9 +108,9 @@ function buildOrientationConfig(
           : 'Read the latest updates, then continue into transactions or funds.',
       icon: Bell,
       panelClass:
-        'border-violet-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(245,243,255,0.98)_42%,rgba(224,231,255,0.92)_100%)] dark:border-violet-500/20 dark:bg-[linear-gradient(135deg,rgba(16,10,37,0.96)_0%,rgba(24,18,61,0.94)_46%,rgba(67,56,202,0.72)_100%)]',
+        'border-emerald-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_42%,rgba(187,247,208,0.92)_100%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(5,23,17,0.96)_0%,rgba(8,46,33,0.94)_46%,rgba(5,150,105,0.58)_100%)]',
       iconWrapClass:
-        'bg-violet-100 text-violet-700 ring-1 ring-violet-200/80 dark:bg-violet-400/14 dark:text-violet-200 dark:ring-violet-400/20',
+        'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
       actions: [
         {
           href: '/transactions',
@@ -131,13 +131,13 @@ function buildOrientationConfig(
         eyebrow: isId ? 'Transaksi' : 'Transactions',
         title: isId ? 'Lihat yang perlu ditindak dulu.' : 'See what needs action first.',
         body: isId
-          ? 'Kalau ada yang macet, langsung buka saldo atau bantuan.'
+          ? 'Kalau macet, buka saldo atau bantuan.'
           : 'If anything is blocked, move into balance or support.',
       icon: ReceiptText,
       panelClass:
-        'border-sky-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(240,249,255,0.98)_42%,rgba(186,230,253,0.92)_100%)] dark:border-sky-500/20 dark:bg-[linear-gradient(135deg,rgba(4,20,31,0.96)_0%,rgba(8,37,54,0.94)_46%,rgba(3,105,161,0.72)_100%)]',
+        'border-teal-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(240,253,250,0.98)_42%,rgba(153,246,228,0.88)_100%)] dark:border-teal-500/20 dark:bg-[linear-gradient(135deg,rgba(4,25,24,0.96)_0%,rgba(9,48,44,0.94)_46%,rgba(15,118,110,0.58)_100%)]',
       iconWrapClass:
-        'bg-sky-100 text-sky-700 ring-1 ring-sky-200/80 dark:bg-sky-400/14 dark:text-sky-200 dark:ring-sky-400/20',
+        'bg-teal-100 text-teal-700 ring-1 ring-teal-200/80 dark:bg-teal-400/14 dark:text-teal-200 dark:ring-teal-400/20',
       actions: [
         {
           href: '/payments',
@@ -186,9 +186,9 @@ function buildOrientationConfig(
           : 'Clear photos, names, location, and identity make people feel safer.',
       icon: UserRound,
       panelClass:
-        'border-cyan-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(240,249,255,0.98)_38%,rgba(207,250,254,0.92)_100%)] dark:border-cyan-500/20 dark:bg-[linear-gradient(135deg,rgba(5,22,28,0.96)_0%,rgba(9,41,52,0.94)_44%,rgba(8,145,178,0.68)_100%)]',
+        'border-teal-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(240,253,250,0.98)_38%,rgba(204,251,241,0.92)_100%)] dark:border-teal-500/20 dark:bg-[linear-gradient(135deg,rgba(4,25,24,0.96)_0%,rgba(9,48,44,0.94)_44%,rgba(15,118,110,0.58)_100%)]',
       iconWrapClass:
-        'bg-cyan-100 text-cyan-700 ring-1 ring-cyan-200/80 dark:bg-cyan-400/14 dark:text-cyan-200 dark:ring-cyan-400/20',
+        'bg-teal-100 text-teal-700 ring-1 ring-teal-200/80 dark:bg-teal-400/14 dark:text-teal-200 dark:ring-teal-400/20',
       actions: [
         {
           href: dashboardHref,
@@ -205,7 +205,7 @@ function buildOrientationConfig(
         eyebrow: isId ? 'Detail postingan' : 'Post detail',
         title: isId ? 'Lihat inti infonya dulu.' : 'Scan fast, then continue to chat or transaction.',
         body: isId
-          ? 'Yang penting harus langsung kelihatan tanpa baca panjang.'
+          ? 'Yang penting langsung kelihatan.'
           : 'The core should feel clear without forcing people to read too much.',
       icon: FileText,
       panelClass:
@@ -231,9 +231,9 @@ function buildOrientationConfig(
           : 'Reply to chats, check transactions, and continue the drafts that are almost done.',
       icon: LayoutDashboard,
       panelClass:
-        'border-indigo-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(238,242,255,0.98)_42%,rgba(199,210,254,0.92)_100%)] dark:border-indigo-500/20 dark:bg-[linear-gradient(135deg,rgba(12,15,38,0.96)_0%,rgba(20,27,63,0.94)_46%,rgba(79,70,229,0.68)_100%)]',
+        'border-emerald-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_42%,rgba(187,247,208,0.92)_100%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(5,23,17,0.96)_0%,rgba(8,46,33,0.94)_46%,rgba(5,150,105,0.58)_100%)]',
       iconWrapClass:
-        'bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200/80 dark:bg-indigo-400/14 dark:text-indigo-200 dark:ring-indigo-400/20',
+        'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
       actions: [
         {
           href: '/transactions',
@@ -259,9 +259,9 @@ function buildOrientationConfig(
           : 'If you still cannot find it, send a short ticket and we will take it from there.',
       icon: LifeBuoy,
       panelClass:
-        'border-fuchsia-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(250,245,255,0.98)_42%,rgba(233,213,255,0.92)_100%)] dark:border-fuchsia-500/20 dark:bg-[linear-gradient(135deg,rgba(24,7,32,0.96)_0%,rgba(49,12,67,0.94)_46%,rgba(162,28,175,0.68)_100%)]',
+        'border-lime-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(247,254,231,0.98)_42%,rgba(217,249,157,0.92)_100%)] dark:border-lime-500/20 dark:bg-[linear-gradient(135deg,rgba(20,29,8,0.96)_0%,rgba(36,52,13,0.94)_46%,rgba(77,124,15,0.58)_100%)]',
       iconWrapClass:
-        'bg-fuchsia-100 text-fuchsia-700 ring-1 ring-fuchsia-200/80 dark:bg-fuchsia-400/14 dark:text-fuchsia-200 dark:ring-fuchsia-400/20',
+        'bg-lime-100 text-lime-800 ring-1 ring-lime-200/80 dark:bg-lime-400/14 dark:text-lime-200 dark:ring-lime-400/20',
       actions: [
         {
           href: '/search',
@@ -277,7 +277,7 @@ function buildOrientationConfig(
     eyebrow: isId ? 'Lajukan' : 'Lajukan',
     title: isId ? 'Masuk ke yang kamu butuhkan.' : 'Move straight into the core flow.',
     body: isId
-      ? 'Cari kebutuhan, bikin posting, atau minta bantuan.'
+      ? 'Cari, posting, atau minta bantuan.'
       : 'Search needs, post an offer, or get help.',
     icon: Search,
     panelClass:

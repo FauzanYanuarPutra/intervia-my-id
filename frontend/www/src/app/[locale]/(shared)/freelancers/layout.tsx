@@ -8,7 +8,7 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
   id: {
     title: 'Lajukan Talent Usaha | Admin, Konten, Ads & Operasional',
     description:
-      'Temukan talent terdaftar untuk admin marketplace, konten, CS, ads, desain, dan kebutuhan operasional usaha.',
+      'Cari talent admin, konten, CS, ads, desain, dan operasional.',
     keywords: [
       'talent umkm',
       'admin marketplace',

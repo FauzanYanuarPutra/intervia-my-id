@@ -4,12 +4,15 @@ import { useMemo, useState } from 'react';
 import {
   BadgeCheck,
   Camera,
+  CheckCircle2,
+  ChevronDown,
   FileText,
   Loader2,
+  MessageCircle,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   UploadCloud,
+  WalletCards,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -30,7 +33,9 @@ type DocumentPreview = {
   ttl?: string;
 };
 
-function kycLabel(status: IdentityVerificationRecord['kyc_status'] | undefined) {
+function kycLabel(
+  status: IdentityVerificationRecord['kyc_status'] | undefined,
+) {
   if (status === 'enhanced') return 'Enhanced';
   if (status === 'full') return 'Full';
   if (status === 'basic') return 'Basic';
@@ -38,14 +43,14 @@ function kycLabel(status: IdentityVerificationRecord['kyc_status'] | undefined) 
 }
 
 function statusText(record: IdentityVerificationRecord | null) {
-  if (!record) return 'Belum ada verifikasi identitas.';
+  if (!record) return 'Mulai dari upload KTP dan selfie. Prosesnya sebentar.';
   if (record.status === 'approved') {
-    return 'Identitas siap dipakai untuk trust badge, transaksi, dan review yang lebih cepat.';
+    return 'Identitas sudah siap untuk trust badge, transaksi, dan review.';
   }
   if (record.status === 'manual_review') {
-    return 'Bukti identitas sudah masuk, tetapi masih perlu review manual.';
+    return 'Dokumen sudah masuk. Tim perlu cek sebentar lagi.';
   }
-  return 'Capture terakhir belum cukup kuat. Silakan unggah ulang dengan foto lebih jelas.';
+  return 'Foto sebelumnya kurang jelas. Upload ulang dengan cahaya terang.';
 }
 
 function formatWhen(value?: string) {
@@ -82,38 +87,82 @@ export function IdentityVerificationPanel({
   );
   const [currentRecord, setCurrentRecord] =
     useState<IdentityVerificationRecord | null>(null);
-  const [documentPreview, setDocumentPreview] = useState<DocumentPreview | null>(
-    null,
-  );
+  const [documentPreview, setDocumentPreview] =
+    useState<DocumentPreview | null>(null);
   const [ktpFile, setKtpFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const activeRecord = currentRecord || existingRecord;
-  const proofItems = [
+  const isApproved = activeRecord?.status === 'approved';
+  const verificationSteps = [
     {
-      label: 'Phone',
+      label: 'Nomor HP',
+      hint: 'Biar akun mudah dihubungi',
       ok: activeRecord?.phone_verified,
+      icon: MessageCircle,
     },
     {
-      label: 'KTP OCR',
+      label: 'Foto KTP',
+      hint: 'Untuk cek nama dan identitas',
       ok: activeRecord?.document_verified,
+      icon: FileText,
     },
     {
-      label: 'Liveness',
+      label: 'Selfie',
+      hint: 'Pastikan akun dipakai orang asli',
       ok: activeRecord?.liveness_verified,
+      icon: Camera,
     },
   ];
-
-  const benefits =
+  const completedSteps = verificationSteps.filter(item => item.ok).length;
+  const canSubmit = Boolean(ktpFile && selfieFile);
+  const benefitCards = [
+    {
+      title: 'Lebih dipercaya',
+      text: 'Badge trust lebih kuat saat orang lihat profil atau chat.',
+      icon: BadgeCheck,
+    },
+    {
+      title: 'Transaksi lebih aman',
+      text: 'Bantu naikkan limit dan proteksi saat order bernilai besar.',
+      icon: WalletCards,
+    },
+    {
+      title: 'Bantuan lebih cepat',
+      text: 'Kalau ada sengketa, tim punya sinyal verifikasi yang jelas.',
+      icon: ShieldCheck,
+    },
+  ];
+  const technicalBenefits =
     activeRecord?.benefits && activeRecord.benefits.length > 0
       ? activeRecord.benefits
-      : [
-          'Membantu akun lebih dipercaya di transaksi dan chat.',
-          'Mempercepat review support saat sengketa atau high-risk order.',
-          'Menjadi pondasi untuk onboarding usaha, driver flow, dan compliance trail.',
-        ];
+      : benefitCards.map(item => item.text);
+  const summaryRows = [
+    {
+      label: 'Nama dokumen',
+      value:
+        documentPreview?.document_name || activeRecord?.document_name || '-',
+    },
+    {
+      label: 'NIK',
+      value: documentPreview?.nik_masked || activeRecord?.nik_masked || '-',
+    },
+    {
+      label: 'Tipe dokumen',
+      value:
+        documentPreview?.document_type || activeRecord?.document_type || 'KTP',
+    },
+    {
+      label: 'TTL',
+      value: documentPreview?.ttl || '-',
+    },
+    {
+      label: 'Review',
+      value: activeRecord?.review_recommendation || '-',
+    },
+  ];
 
   const handleSubmit = async () => {
     if (!ktpFile || !selfieFile) {
@@ -147,8 +196,8 @@ export function IdentityVerificationPanel({
 
       setCurrentRecord(readIdentityVerification(data.verification) || null);
       setDocumentPreview(
-        ((data.ai as Record<string, unknown> | undefined)
-          ?.document_preview || null) as DocumentPreview | null,
+        ((data.ai as Record<string, unknown> | undefined)?.document_preview ||
+          null) as DocumentPreview | null,
       );
       setMessage(
         (typeof data.message === 'string' && data.message) ||
@@ -169,168 +218,198 @@ export function IdentityVerificationPanel({
   };
 
   return (
-    <section className="overflow-x-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:shadow-[0_18px_40px_-30px_rgba(15,23,42,0.45)] dark:border-[color:var(--app-border-strong)] sm:p-6">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-sm sm:p-4 sm:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.34)] dark:border-[color:var(--app-border-strong)]">
+      <div className="flex flex-col gap-3 rounded-[20px] bg-[linear-gradient(135deg,#f7fff9_0%,#ffffff_64%,#ecfdf5_100%)] p-3 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_62%,#10251e_100%)] sm:flex-row sm:items-start sm:justify-between sm:p-4">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-            Trust & Verification
-          </h2>
-          <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-            Nomor HP terverifikasi jadi fondasi utama. Upload KTP + selfie liveness dipakai
-            saat trust badge, limit transaksi, dan review sengketa perlu ditingkatkan.
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent)] text-white">
+              {isApproved ? (
+                <ShieldCheck className="h-5 w-5" />
+              ) : (
+                <ShieldAlert className="h-5 w-5" />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                Trust
+              </p>
+              <h2 className="truncate text-base font-black text-[color:var(--app-text)] dark:text-white sm:text-lg">
+                {isApproved
+                  ? 'Akun sudah terpercaya'
+                  : 'Biar akun lebih dipercaya'}
+              </h2>
+            </div>
+          </div>
+          <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[color:var(--app-text-soft)] dark:text-white/68">
+            {statusText(activeRecord)}
           </p>
         </div>
-        <span className="inline-flex items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_50%,_transparent)] dark:text-[color:var(--app-accent)]">
-          KYC {kycLabel(activeRecord?.kyc_status)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-black text-[color:var(--app-accent)] shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-100 dark:ring-white/10">
+            KYC {kycLabel(activeRecord?.kyc_status)}
+          </span>
+          <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-black text-[color:var(--app-text)] shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-white dark:ring-white/10">
+            {completedSteps}/3 siap
+          </span>
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.15fr,0.85fr]">
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <div className="flex items-start gap-3">
-              <div className="rounded-2xl bg-[color:var(--app-surface-strong)] p-2 ui-accent-text">
-                {activeRecord?.status === 'approved' ? (
-                  <ShieldCheck className="h-5 w-5" />
-                ) : (
-                  <ShieldAlert className="h-5 w-5" />
-                )}
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-3">
+            {benefitCards.map(item => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.title}
+                  className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05]"
+                >
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
+                  <p className="mt-2 text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-[color:var(--app-text-soft)] dark:text-white/62">
+                    {item.text}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05] sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                  3 langkah saja
+                </p>
+                <p className="mt-1 text-xs font-medium text-[color:var(--app-text-soft)]">
+                  Nomor HP, KTP, dan selfie. Detail teknis disimpan di belakang.
+                </p>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {activeRecord?.status === 'approved'
-                    ? 'Verified identity ready'
-                    : activeRecord?.status === 'manual_review'
-                      ? 'Manual review recommended'
-                      : 'Verification not complete'}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {statusText(activeRecord)}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {proofItems.map(item => (
+              <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-xs font-black text-[color:var(--app-accent)]">
+                {completedSteps}/3
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {verificationSteps.map(item => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.label}
+                    className="flex min-w-0 items-center gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 dark:border-[color:var(--app-border-strong)] dark:bg-black/10"
+                  >
                     <span
-                      key={item.label}
-                      className={`inline-flex max-w-full items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ${
                         item.ok
-                          ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                          : 'bg-[color:var(--app-surface)] text-[color:var(--app-text-soft)]'
+                          ? 'bg-[color:var(--app-accent)] text-white'
+                          : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]'
                       }`}
                     >
-                      {item.label}
+                      {item.ok ? (
+                        <CheckCircle2 className="h-4.5 w-4.5" />
+                      ) : (
+                        <Icon className="h-4.5 w-4.5" />
+                      )}
                     </span>
-                  ))}
-                </div>
-              </div>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                        {item.label}
+                      </span>
+                      <span className="line-clamp-1 text-xs font-medium text-[color:var(--app-text-soft)]">
+                        {item.ok ? 'Sudah siap' : item.hint}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="ui-panel-muted p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold ui-text">
-                <Sparkles className="h-4 w-4 ui-accent-text" />
-                Trust Score
-              </div>
-              <p className="mt-2 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {formatScore(activeRecord?.trust_score)}
-              </p>
-            </div>
-            <div className="ui-panel-muted p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold ui-text">
-                <BadgeCheck className="h-4 w-4 ui-accent-text" />
-                Quality
-              </div>
-              <p className="mt-2 text-lg font-bold capitalize text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {activeRecord?.capture_quality || '-'}
-              </p>
-            </div>
-            <div className="ui-panel-muted p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold ui-text">
-                <Camera className="h-4 w-4 ui-accent-text" />
-                Face Coverage
-              </div>
-              <p className="mt-2 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {formatPercent(activeRecord?.face_coverage)}
-              </p>
-            </div>
-            <div className="ui-panel-muted p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold ui-text">
-                <ShieldCheck className="h-4 w-4 ui-accent-text" />
-                Last Verified
-              </div>
-              <p className="mt-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {formatWhen(activeRecord?.verified_at)}
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Upload files
+          <div className="rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/40 p-3 dark:bg-emerald-400/5 sm:p-4">
+            <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+              Upload dokumen
             </p>
-            <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-              Kami simpan ringkasan verifikasi, bukan raw NIK penuh sebagai
-              data tampilan. Itu membantu user tetap aman sambil memberi sinyal
-              trust untuk operasi, usaha, dan compliance.
+            <p className="mt-1 text-xs font-medium leading-5 text-[color:var(--app-text-soft)]">
+              Cukup dua foto. NIK penuh tidak ditampilkan di profil.
             </p>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="space-y-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)]">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  <FileText className="h-4 w-4 ui-accent-text" />
-                  Foto KTP
-                </span>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <label className="ui-pressable flex cursor-pointer items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.07]">
                 <input
                   type="file"
                   accept="image/*"
-                  className="block min-w-0 w-full max-w-full text-xs text-[color:var(--app-text)] file:mr-3 file:rounded-xl file:border-0 file:bg-[color:var(--app-accent-soft)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)] dark:file:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_60%,_transparent)] dark:file:text-[color:var(--app-accent)]"
+                  className="sr-only"
                   onChange={event =>
                     setKtpFile(event.target.files?.[0] || null)
                   }
                   disabled={submitting}
                 />
-                <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                  Pastikan semua sudut KTP terlihat dan tidak blur.
-                </p>
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <FileText className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                    KTP
+                  </span>
+                  <span className="block truncate text-xs font-medium text-[color:var(--app-text-soft)]">
+                    {ktpFile ? ktpFile.name : 'Pilih foto KTP'}
+                  </span>
+                </span>
+                {ktpFile ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[color:var(--app-accent)]" />
+                ) : null}
               </label>
 
-              <label className="space-y-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)]">
-                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  <Camera className="h-4 w-4 ui-accent-text" />
-                  Selfie Liveness
-                </span>
+              <label className="ui-pressable flex cursor-pointer items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.07]">
                 <input
                   type="file"
                   accept="image/*"
-                  className="block min-w-0 w-full max-w-full text-xs text-[color:var(--app-text)] file:mr-3 file:rounded-xl file:border-0 file:bg-[color:var(--app-accent-soft)] file:px-3 file:py-2 file:text-xs file:font-semibold file:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)] dark:file:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_60%,_transparent)] dark:file:text-[color:var(--app-accent)]"
+                  className="sr-only"
                   onChange={event =>
                     setSelfieFile(event.target.files?.[0] || null)
                   }
                   disabled={submitting}
                 />
-                <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                  Gunakan cahaya merata dan wajah memenuhi frame.
-                </p>
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <Camera className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                    Selfie
+                  </span>
+                  <span className="block truncate text-xs font-medium text-[color:var(--app-text-soft)]">
+                    {selfieFile ? selfieFile.name : 'Pilih foto selfie'}
+                  </span>
+                </span>
+                {selfieFile ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[color:var(--app-accent)]" />
+                ) : null}
               </label>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="ui-button-primary inline-flex items-center gap-2 px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                className="ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <UploadCloud className="h-4 w-4" />
                 )}
-                {submitting ? 'Memproses verifikasi...' : 'Verifikasi identitas'}
+                {submitting
+                  ? 'Sedang dicek...'
+                  : canSubmit
+                    ? 'Kirim verifikasi'
+                    : 'Upload KTP + selfie'}
               </button>
 
               {message ? (
-                <p className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                <p className="text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                   {message}
                 </p>
               ) : null}
@@ -338,64 +417,69 @@ export function IdentityVerificationPanel({
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="ui-panel-muted p-4">
-            <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Verification summary
-            </p>
-            <div className="mt-3 space-y-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span>Nama dokumen</span>
-                <span className="break-words text-left font-semibold sm:text-right">
-                  {documentPreview?.document_name || activeRecord?.document_name || '-'}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span>NIK</span>
-                <span className="break-all text-left font-semibold sm:text-right">
-                  {documentPreview?.nik_masked || activeRecord?.nik_masked || '-'}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span>Document type</span>
-                <span className="break-words text-left font-semibold uppercase sm:text-right">
-                  {documentPreview?.document_type || activeRecord?.document_type || 'KTP'}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span>TTL</span>
-                <span className="break-words text-left font-semibold sm:text-right">
-                  {documentPreview?.ttl || '-'}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                <span>Review mode</span>
-                <span className="break-words text-left font-semibold capitalize sm:text-right">
-                  {activeRecord?.review_recommendation || '-'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="ui-panel-muted p-4">
-            <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Immediate product impact
+        <aside className="space-y-3">
+          <div className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05]">
+            <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+              Setelah aktif
             </p>
             <div className="mt-3 space-y-2">
-              {benefits.map(item => (
+              {technicalBenefits.slice(0, 3).map(item => (
                 <div
                   key={item}
-                  className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
+                  className="flex gap-2 rounded-[16px] bg-white px-3 py-2 text-sm font-medium leading-5 text-[color:var(--app-text)] dark:bg-white/[0.07] dark:text-white/72"
                 >
-                  {item}
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                  <span>{item}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="ui-panel-muted p-4">
-            <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Use cases unlocked
+          <details className="group rounded-[20px] border border-[color:var(--app-border)] bg-white p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05]">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[color:var(--app-text)] dark:text-white">
+              Detail teknis
+              <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-open:rotate-180" />
+            </summary>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[
+                ['Trust score', formatScore(activeRecord?.trust_score)],
+                ['Kualitas', activeRecord?.capture_quality || '-'],
+                ['Wajah', formatPercent(activeRecord?.face_coverage)],
+                ['Terakhir', formatWhen(activeRecord?.verified_at)],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-[14px] bg-[color:var(--app-surface-muted)] p-2.5 dark:bg-black/10"
+                >
+                  <p className="text-[11px] font-bold text-[color:var(--app-text-soft)]">
+                    {label}
+                  </p>
+                  <p className="mt-1 truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 space-y-2 text-sm text-[color:var(--app-text)] dark:text-white/72">
+              {summaryRows.map(item => (
+                <div
+                  key={item.label}
+                  className="flex flex-col gap-1 rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-2 dark:bg-black/10"
+                >
+                  <span className="text-[11px] font-bold text-[color:var(--app-text-soft)]">
+                    {item.label}
+                  </span>
+                  <span className="break-words font-semibold">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+
+          <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05]">
+            <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+              Fitur yang kebuka
             </p>
             {activeRecord?.use_cases && activeRecord.use_cases.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -409,12 +493,12 @@ export function IdentityVerificationPanel({
                 ))}
               </div>
             ) : (
-              <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
-                Belum ada use case aktif sampai verifikasi dijalankan.
+              <p className="mt-2 text-sm font-medium leading-5 text-[color:var(--app-text-soft)]">
+                Akan muncul setelah verifikasi berhasil.
               </p>
             )}
           </div>
-        </div>
+        </aside>
       </div>
     </section>
   );

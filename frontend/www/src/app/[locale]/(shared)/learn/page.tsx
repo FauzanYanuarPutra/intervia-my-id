@@ -16,10 +16,10 @@ export default async function LearnPage({ params }: PageProps) {
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
       <div className="page-shell space-y-6 py-6">
         <SummaryCard
-          title={isId ? 'Belajar operasional usaha di Lajukan' : 'Learn business operations on Lajukan'}
+          title={isId ? 'Belajar singkat' : 'Learn business operations on Lajukan'}
           description={
             isId
-              ? 'Materi singkat, checklist, dan inspirasi komunitas untuk bantu kamu sourcing lebih rapi, eksekusi lebih cepat, dan repeat order lebih stabil.'
+              ? 'Checklist pendek buat sourcing, eksekusi, repeat order.'
               : 'Short lessons, checklists, and community inspiration to help you source better, execute faster, and stabilize repeat orders.'
           }
           meta={isId ? 'Belajar' : 'Learn'}
@@ -33,15 +33,15 @@ export default async function LearnPage({ params }: PageProps) {
             ]}
           />
           <Link href="/education" className="ui-button-secondary inline-flex items-center px-4 text-sm">
-            {isId ? 'Ke pusat edukasi' : 'Go to education'}
+            {isId ? 'Pusat edukasi' : 'Go to education'}
           </Link>
         </SummaryCard>
 
         <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <TrustBadge label={isId ? 'JALUR BELAJAR' : 'LEARNING PATHS'} />
+            <TrustBadge label={isId ? 'MULAI' : 'LEARNING PATHS'} />
             <h2 className="text-lg font-bold text-[color:var(--app-text)]">
-              {isId ? 'Mulai dari sini' : 'Start here'}
+              {isId ? 'Mulai sini' : 'Start here'}
             </h2>
           </div>
           <div className="grid gap-3 lg:grid-cols-3">
@@ -84,9 +84,9 @@ export default async function LearnPage({ params }: PageProps) {
 
         <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <TrustBadge label={isId ? 'HIBURAN RINGAN' : 'LIGHT ENTERTAINMENT'} />
+            <TrustBadge label={isId ? 'RINGAN' : 'LIGHT ENTERTAINMENT'} />
             <h2 className="text-lg font-bold text-[color:var(--app-text)]">
-              {isId ? 'Belajar lewat format ringan' : 'Learn through lighter formats'}
+              {isId ? 'Format ringan' : 'Learn through lighter formats'}
             </h2>
           </div>
           <div className="grid gap-3 md:grid-cols-3">

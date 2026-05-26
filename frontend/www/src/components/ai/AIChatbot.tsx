@@ -108,7 +108,7 @@ export function AIChatbot() {
                 <div className="text-center text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] py-6">
                   <MessageCircle className="w-12 h-12 mx-auto mb-3 text-[color:var(--app-accent)]" />
                   <p className="font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">Hai, aku asisten Lajukan.</p>
-                  <p className="mt-1">Tanya aja tentang supplier, distributor, rental alat, jasa operasional, freelancer usaha, atau cara pakai. Jawabannya usahakan natural, bukan template.</p>
+                  <p className="mt-1">Tanya supplier, jasa, rental, freelancer, atau cara pakai.</p>
                   <div className="mt-4 flex flex-wrap gap-2 justify-center">
                     {SUGGESTED_QUESTIONS.map((q, i) => (
                       <button

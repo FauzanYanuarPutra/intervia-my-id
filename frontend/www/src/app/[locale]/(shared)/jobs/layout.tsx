@@ -8,7 +8,7 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
   id: {
     title: 'Lajukan Brief Usaha | Kebutuhan Operasional & Tim Cepat',
     description:
-      'Buka kebutuhan operasional usaha, brief pekerjaan, dan kebutuhan tim cepat di Lajukan.',
+      'Buka brief operasional, pekerjaan, dan tim cepat.',
     keywords: [
       'brief umkm',
       'kebutuhan operasional',
@@ -29,7 +29,7 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
     openGraph: {
       title: 'Lajukan Brief Usaha | Kebutuhan Operasional & Tim Cepat',
       description:
-        'Cari brief operasional, kebutuhan tim cepat, dan bantuan eksekusi usaha di Lajukan.',
+        'Cari brief operasional, tim cepat, dan bantuan eksekusi.',
       url: 'https://www.lajukan.com/id/jobs',
       type: 'website',
       siteName: 'Lajukan',
@@ -40,7 +40,7 @@ const METADATA_BY_LOCALE: Record<string, Metadata> = {
       card: 'summary_large_image',
       title: 'Lajukan Brief Usaha | Kebutuhan Operasional & Tim Cepat',
       description:
-        'Cari brief operasional, kebutuhan tim cepat, dan bantuan eksekusi usaha di Lajukan.',
+        'Cari brief operasional, tim cepat, dan bantuan eksekusi.',
       images: ['https://www.lajukan.com/og-image-jobs.png'],
     },
   },

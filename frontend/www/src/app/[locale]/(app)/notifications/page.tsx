@@ -157,14 +157,14 @@ export default function NotificationsPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="ui-page-eyebrow">Notifikasi</p>
-            <h1 className="ui-page-title mt-2 text-[1.35rem] sm:text-[1.55rem]">Update penting</h1>
+            <h1 className="ui-page-title mt-2 text-[1.35rem] sm:text-[1.55rem]">Notifikasi</h1>
             <p className="ui-page-copy mt-2">
-              Cek dulu, lalu lanjut ke transaksi atau saldo.
+              Cek yang penting.
             </p>
           </div>
           <div className="ui-page-actions items-center">
             <span className="rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
-              Belum dibaca: {unreadCount}
+              Baru: {unreadCount}
             </span>
             <button
               type="button"
@@ -172,7 +172,7 @@ export default function NotificationsPage() {
               className="ui-button-secondary ui-button-compact inline-flex items-center gap-2 px-3 text-xs font-semibold"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
-              Muat ulang
+              Refresh
             </button>
             <button
               type="button"
@@ -192,7 +192,7 @@ export default function NotificationsPage() {
               ) : (
                 <CheckCheck className="h-3.5 w-3.5" />
               )}
-              Tandai semua
+              Bereskan
             </button>
           </div>
         </div>
@@ -257,9 +257,6 @@ export default function NotificationsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className={`truncate text-sm font-black ${meta.title}`}>
-                          <span className="mr-2" aria-hidden="true">
-                            {meta.emoji}
-                          </span>
                           {item.title}
                         </p>
 
@@ -277,9 +274,9 @@ export default function NotificationsPage() {
                         </div>
                       </div>
 
-                      <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">{item.message}</p>
+                      <p className="mt-1 line-clamp-2 text-xs text-[color:var(--app-text-soft)]">{item.message}</p>
 
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]">
+                      <div className="mt-2 hidden flex-wrap items-center gap-2 text-[11px] text-[color:var(--app-text-soft)] sm:flex">
                         <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5">
                           {item.event_type}
                         </span>
@@ -290,7 +287,7 @@ export default function NotificationsPage() {
                               : 'bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] text-[color:var(--app-accent)]'
                           }`}
                         >
-                          {item.is_read ? 'read' : 'unread'}
+                          {item.is_read ? 'Dibaca' : 'Baru'}
                         </span>
                       </div>
                     </div>

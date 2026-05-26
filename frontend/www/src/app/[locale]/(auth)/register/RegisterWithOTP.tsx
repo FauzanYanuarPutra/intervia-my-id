@@ -13,6 +13,7 @@ import {
   DEFAULT_AUTH_PHONE_COUNTRY,
   formatPhonePreview,
   getPhoneCountry,
+  getPhoneCountryFlagEmoji,
   isPhoneNumberReady,
   type PhoneCountryCode,
 } from '@/lib/phoneCountry';
@@ -62,30 +63,22 @@ export default function RegisterWithOTP() {
   const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
   const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
   const selectedCountry = getPhoneCountry(phoneCountryCode);
+  const selectedCountryFlag = getPhoneCountryFlagEmoji(selectedCountry.code);
   const currentStep = step === 'phone' ? 1 : step === 'otp' ? 2 : 3;
   const shellCopy = {
     phone: {
       title: locale === 'id' ? 'Daftar' : 'Register',
-      description:
-        locale === 'id'
-          ? 'Pakai nomor aktif untuk terima OTP.'
-          : 'Use an active phone number for OTP.',
+      description: locale === 'id' ? 'Nomor HP + OTP.' : 'Phone + OTP.',
       progressLabel: locale === 'id' ? 'Daftar' : 'Register',
     },
     otp: {
       title: locale === 'id' ? 'Masukkan kode' : 'Enter code',
-      description:
-        locale === 'id'
-          ? 'Isi 6 digit dari SMS.'
-          : 'Enter the 6-digit SMS code.',
+      description: locale === 'id' ? '6 digit dari SMS.' : '6 digits from SMS.',
       progressLabel: locale === 'id' ? 'Kode' : 'Code',
     },
     profile: {
       title: locale === 'id' ? 'Nama kamu' : 'Your name',
-      description:
-        locale === 'id'
-          ? 'Email opsional. Akun langsung siap dipakai.'
-          : 'Email is optional. The account is ready after this.',
+      description: locale === 'id' ? 'Email opsional.' : 'Email optional.',
       progressLabel: locale === 'id' ? 'Akun' : 'Account',
     },
   }[step];
@@ -119,21 +112,18 @@ export default function RegisterWithOTP() {
             description: 'Focus on creating the account first.',
           },
         ];
-  const shellHelperText =
-    locale === 'id'
-      ? 'Nama dulu, detail nanti.'
-      : 'Name first, details later.';
+  const shellHelperText = '';
 
   const authInputClass =
-    'w-full min-h-[56px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3.5 text-[15px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] outline-none transition-[border-color,background-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] sm:text-sm';
+    'w-full min-h-[50px] rounded-[14px] border border-[color:var(--app-border)] bg-white px-3.5 py-3 text-[15px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] outline-none transition-[border-color,background-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] sm:text-sm dark:bg-[color:var(--app-surface-strong)]';
   const primaryButtonClass =
-    'flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-accent-strong)_42%,_transparent)] bg-[color:var(--app-accent)] px-4 py-3.5 text-[15px] font-semibold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-18px_color-mix(in_srgb,_var(--app-accent)_50%,_transparent)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:border-[color:var(--app-border)] disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] disabled:shadow-none sm:text-sm';
+    'flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 py-3 text-sm font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]';
   const utilityButtonClass =
-    'flex min-h-[52px] w-full items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-sm font-medium text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] disabled:hover:border-[color:var(--app-border)] disabled:hover:text-[color:var(--app-text-soft)] sm:w-auto sm:shrink-0';
+    'flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] sm:w-auto sm:shrink-0 dark:bg-[color:var(--app-surface-strong)]';
   const statusCardClass =
-    'rounded-[20px] border border-[color:color-mix(in_srgb,_var(--app-accent)_14%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_30%,_var(--app-surface-strong))] px-4 py-3';
+    'rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 py-3';
   const secondaryTextButtonClass =
-    'inline-flex min-h-[44px] items-center gap-1 rounded-full px-1 text-sm font-medium text-[color:var(--app-text)] transition hover:text-[color:var(--app-accent)]';
+    'inline-flex min-h-[38px] items-center gap-1 rounded-full text-sm font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)]';
   const clearRegisterDraft = () => {
     if (typeof window === 'undefined') return;
     window.sessionStorage.removeItem(REGISTER_FLOW_STORAGE_KEY);
@@ -370,9 +360,9 @@ export default function RegisterWithOTP() {
         return (
           <motion.div
             key="phone"
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            exit={{ opacity: 0, x: -8 }}
             className="space-y-4"
           >
             <div>
@@ -384,11 +374,6 @@ export default function RegisterWithOTP() {
                 onCountryCodeChange={setPhoneCountryCode}
                 inputClassName={authInputClass}
               />
-              <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                {locale === 'id'
-                  ? 'Pakai nomor yang bisa menerima SMS sekarang.'
-                  : 'Use a number that can receive SMS right now.'}
-              </p>
             </div>
 
             <button
@@ -397,15 +382,15 @@ export default function RegisterWithOTP() {
               disabled={sendingOtp || !phoneReady}
               className={primaryButtonClass}
             >
-                {sendingOtp ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    {locale === 'id' ? 'Kirim kode' : 'Send code'}
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
+              {sendingOtp ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  {locale === 'id' ? 'Kirim kode' : 'Send code'}
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
           </motion.div>
         );
 
@@ -413,9 +398,9 @@ export default function RegisterWithOTP() {
         return (
           <motion.div
             key="otp"
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            exit={{ opacity: 0, x: -8 }}
             className="space-y-4"
           >
             <button
@@ -426,17 +411,17 @@ export default function RegisterWithOTP() {
                 setStep('phone');
               }}
               className={secondaryTextButtonClass}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {locale === 'id' ? 'Ganti nomor HP' : 'Change phone'}
-              </button>
+            >
+              <ArrowLeft className="h-4 w-4" />
+              {locale === 'id' ? 'Ganti nomor HP' : 'Change phone'}
+            </button>
 
             <div className={statusCardClass}>
               <p className="text-xs font-medium text-[color:var(--app-text-soft)]">
                 {locale === 'id' ? 'Kode ke' : 'Code sent to'}
               </p>
               <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                {selectedCountry.flag}{' '}
+                {selectedCountryFlag}{' '}
                 {formatPhonePreview(phone, phoneCountryCode)}
               </p>
             </div>
@@ -488,7 +473,7 @@ export default function RegisterWithOTP() {
             </button>
 
             {devOtp ? (
-              <div className="rounded-[20px] border border-[color:color-mix(in_srgb,_var(--app-warning)_22%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-warning-soft)_72%,_var(--app-surface-strong))] px-4 py-3 text-center text-xs text-[color:var(--app-warning)]">
+              <div className="rounded-[16px] border border-[color:color-mix(in_srgb,_var(--app-warning)_22%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-warning-soft)_72%,_var(--app-surface-strong))] px-4 py-3 text-center text-xs text-[color:var(--app-warning)]">
                 Dev OTP:{' '}
                 <span className="font-mono font-semibold">{devOtp}</span>
               </div>
@@ -500,9 +485,9 @@ export default function RegisterWithOTP() {
         return (
           <motion.div
             key="profile"
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
+            exit={{ opacity: 0, x: -8 }}
             className="space-y-4"
           >
             <button
@@ -512,17 +497,17 @@ export default function RegisterWithOTP() {
                 setStep('otp');
               }}
               className={secondaryTextButtonClass}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {locale === 'id' ? 'Kembali ke OTP' : 'Back to OTP'}
-              </button>
+            >
+              <ArrowLeft className="h-4 w-4" />
+              {locale === 'id' ? 'Kembali ke OTP' : 'Back to OTP'}
+            </button>
 
             <div className={statusCardClass}>
               <p className="text-xs font-medium text-[color:var(--app-text-soft)]">
                 {locale === 'id' ? 'Nomor siap dipakai' : 'Ready number'}
               </p>
               <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-                {selectedCountry.flag}{' '}
+                {selectedCountryFlag}{' '}
                 {formatPhonePreview(phone, phoneCountryCode)}
               </p>
             </div>
@@ -581,7 +566,7 @@ export default function RegisterWithOTP() {
   return (
     <AuthFlowShell
       locale={locale as 'id' | 'en'}
-      badge={locale === 'id' ? 'Daftar tanpa password' : 'Passwordless sign up'}
+      badge="OTP"
       title={shellCopy.title}
       description={shellCopy.description}
       currentStep={currentStep}
@@ -594,7 +579,7 @@ export default function RegisterWithOTP() {
         <AnimatePresence mode="wait">{renderStep()}</AnimatePresence>
 
         {error ? (
-          <p className="mt-4 rounded-[22px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-4 py-3 text-sm font-medium text-[color:var(--app-danger)]">
+          <p className="mt-4 rounded-[16px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-4 py-3 text-sm font-medium text-[color:var(--app-danger)]">
             {error}
           </p>
         ) : null}

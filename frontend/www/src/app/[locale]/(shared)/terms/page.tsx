@@ -25,7 +25,7 @@ export default async function TermsPage({ params }: PageProps) {
   const isId = locale === 'id';
 
   return (
-    <main className="page-shell page-rhythm pb-24 pt-6 lg:pb-10">
+    <main className="page-shell page-rhythm pb-6 pt-6 lg:pb-10">
       <SummaryCard
         title={isId ? 'Aturan pakai Lajukan' : 'Lajukan Terms'}
         description={

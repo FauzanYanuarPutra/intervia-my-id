@@ -89,7 +89,7 @@ export function ZeroCapitalJourney({
         ? 'Urutannya dibuat sehat seperti progression ladder: jangan loncat ke stok, tim, atau toko sebelum ada bukti kerja, cashflow, buffer, dan sistem.'
         : 'The order is intentionally healthy like a progression ladder: do not jump into stock, teams, or stores before proof of work, cashflow, buffer, and systems exist.'
       : isId
-        ? 'Flow ini memaksa urutan yang sehat: belajar yang langsung kepakai, cari uang pertama, bangun modal kecil, lalu buka usaha saat waktunya memang tepat.'
+        ? 'Urutan sehat: belajar, cari uang pertama, bangun modal, buka usaha.'
         : 'This flow enforces a healthy sequence: learn what gets used immediately, find the first money, build small capital, then open the business at the right moment.';
 
   return (

@@ -380,10 +380,10 @@ export default function CrmDashboard() {
             CRM Command Center
           </p>
           <h1 className="text-3xl font-black tracking-tight text-[color:var(--app-text)]">
-            Leads, support, and assignment in one flow.
+            Leads, support, assignment.
           </h1>
           <p className="mt-2 text-sm text-[color:var(--app-text)]">
-            Ticket support dari floating chat otomatis masuk CRM dan bisa langsung di-assign.
+            Ticket chat masuk CRM dan bisa langsung di-assign.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -637,7 +637,7 @@ export default function CrmDashboard() {
               Prioritaskan urgent + unassigned
             </p>
             <p className="mt-1 text-xs text-[color:var(--app-text)]">
-              Gunakan filter queue untuk ambil ticket baru lebih cepat sebelum SLA terlewat.
+              Pakai filter queue. Ambil ticket sebelum SLA lewat.
             </p>
           </div>
         </aside>

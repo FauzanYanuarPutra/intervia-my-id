@@ -76,11 +76,11 @@ function guidanceMessage(
   const target = mediaTargetLabel(need, isId);
   if (inNativeApp) {
     return isId
-      ? `Buka pengaturan perangkat untuk mengizinkan ${target}, lalu kembali ke aplikasi.`
+      ? `Izinkan ${target} di pengaturan, lalu kembali.`
       : `Open device settings to allow ${target}, then return to the app.`;
   }
   return isId
-    ? `Jika izin diblokir, klik ikon gembok di URL, ubah ${target} ke Allow, lalu muat ulang.`
+    ? `Jika diblokir, klik ikon gembok, izinkan ${target}, lalu muat ulang.`
     : `If permission is blocked, click the lock icon in the URL bar, set ${target} to Allow, then reload.`;
 }
 
@@ -259,7 +259,7 @@ export function MediaPermissionGate({
   }
 
   return (
-    <div className="fixed inset-0 z-[190] flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4 backdrop-blur-sm">
+    <div className="ui-layer-modal fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4 backdrop-blur-sm">
       <section
         role="dialog"
         aria-modal="true"

@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { MarketplacePageFrame } from '@/components/layout/MarketplacePageFrame';
 import { MyProjectsSkeleton } from '@/components/system/feedback/RouteSkeletons';
 import { LAJUKAN_SAMPLE_REQUESTS } from '@/data/lajukanMobileReference';
 import {
@@ -15,7 +17,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock3,
-  LifeBuoy,
+  ImageIcon,
   MapPin,
   MessageCircleMore,
   Search,
@@ -23,16 +25,10 @@ import {
   Store,
   TrendingUp,
   Wallet,
+  X,
   type LucideIcon,
 } from 'lucide-react';
-
-type ChatRoom = {
-  unread_count?: number;
-};
-
-type Transaction = {
-  status?: string;
-};
+import { cn } from '@/lib/utils';
 
 type RequestTone = 'active' | 'waiting' | 'completed';
 
@@ -66,6 +62,8 @@ type RequestCardView = {
   createdLabel: string;
   offersLabel: string;
   offerCount: number;
+  coverImage?: string | null;
+  imageUrls: string[];
   status: string;
   statusKey: 'active' | 'waiting' | 'completed' | string;
   detail: RequestDetail;
@@ -77,6 +75,22 @@ type LajukanRequestsResponse = {
   error?: string;
 };
 
+function MyProjectsPageChrome({ children }: { children: ReactNode }) {
+  return (
+    <MarketplacePageFrame
+      className="lajukan-page-scroll lg:!h-auto lg:!max-h-none lg:!min-h-screen lg:!overflow-x-hidden lg:!overflow-y-visible lg:!pb-8"
+      shellClassName="lajukan-page-scroll-shell lg:!h-auto lg:!max-h-none lg:!overflow-visible"
+    >
+      <main
+        className="lajukan-my-projects min-w-0 flex-1 overflow-x-hidden pb-6 lg:flex lg:flex-none lg:flex-col lg:overflow-visible lg:overscroll-auto lg:px-3 lg:pb-8"
+        data-auto-scrollbar
+      >
+        {children}
+      </main>
+    </MarketplacePageFrame>
+  );
+}
+
 const REQUEST_DETAILS: Record<string, RequestDetail> = {
   'req-supplier': {
     category: 'Bahan Baku',
@@ -84,10 +98,9 @@ const REQUEST_DETAILS: Record<string, RequestDetail> = {
     amountLabel: '100 - 150 kg',
     deadlineLabel: '10 Mei 2025',
     budgetLabel: 'Rp 28.000 - Rp 32.000 / kg',
-    description:
-      'Saya membutuhkan daging ayam segar kualitas bagus untuk kebutuhan usaha restoran. Pengiriman rutin setiap minggu dengan standar kebersihan yang konsisten.',
+    description: 'Butuh ayam segar rutin tiap minggu. Kirim pagi, stok stabil.',
     locationLabel: 'Jakarta Selatan, DKI Jakarta',
-    extraLabel: 'Prioritas vendor yang bisa kirim pagi dan punya stok stabil.',
+    extraLabel: 'Prioritas: kirim pagi, kualitas stabil.',
   },
   'req-location': {
     category: 'Lokasi Usaha',
@@ -95,10 +108,9 @@ const REQUEST_DETAILS: Record<string, RequestDetail> = {
     amountLabel: '40 - 70 m2',
     deadlineLabel: '18 Mei 2025',
     budgetLabel: 'Rp 45.000.000 - Rp 70.000.000 / tahun',
-    description:
-      'Mencari ruko atau kios untuk coffee shop dengan trafik kaki yang baik, akses parkir mudah, dan area sekitar perkantoran atau kampus.',
+    description: 'Cari ruko/kios coffee shop. Ramai, parkir mudah, siap pakai.',
     locationLabel: 'Bandung, Jawa Barat',
-    extraLabel: 'Lebih ideal jika sudah siap listrik dan air, tidak perlu renovasi besar.',
+    extraLabel: 'Nilai plus: listrik dan air siap.',
   },
   'req-social': {
     category: 'Jasa',
@@ -107,9 +119,9 @@ const REQUEST_DETAILS: Record<string, RequestDetail> = {
     deadlineLabel: '15 Mei 2025',
     budgetLabel: 'Rp 3.500.000 - Rp 5.000.000 / bulan',
     description:
-      'Butuh partner untuk mengelola konten Instagram dan TikTok, mulai dari ide konten, desain sederhana, caption, sampai optimasi performa mingguan.',
+      'Butuh tim kelola IG dan TikTok. Ide, desain, caption, report.',
     locationLabel: 'Surabaya, Jawa Timur',
-    extraLabel: 'Lebih disukai tim yang paham konten kuliner dan bisa laporan mingguan.',
+    extraLabel: 'Nilai plus: paham konten kuliner.',
   },
   'req-pos': {
     category: 'Peralatan Usaha',
@@ -117,10 +129,9 @@ const REQUEST_DETAILS: Record<string, RequestDetail> = {
     amountLabel: '1 paket',
     deadlineLabel: 'Selesai',
     budgetLabel: 'Rp 8.000.000 - Rp 12.000.000',
-    description:
-      'Permintaan ini sudah selesai dan dipakai untuk implementasi kasir, printer struk, dan dashboard laporan penjualan harian.',
+    description: 'Kasir, printer struk, dan laporan harian sudah jalan.',
     locationLabel: 'Yogyakarta, DIY',
-    extraLabel: 'Vendor terpilih menangani instalasi dan training tim kasir.',
+    extraLabel: 'Vendor sudah instalasi dan training tim.',
   },
   'req-packaging': {
     category: 'Kemasan',
@@ -129,9 +140,9 @@ const REQUEST_DETAILS: Record<string, RequestDetail> = {
     deadlineLabel: 'Selesai',
     budgetLabel: 'Rp 1.800 - Rp 3.200 / pcs',
     description:
-      'Kebutuhan box, stiker, dan kemasan sekunder untuk produk makanan dengan fokus pada kualitas cetak dan konsistensi produksi.',
+      'Box, stiker, dan kemasan makanan. Cetak rapi, produksi stabil.',
     locationLabel: 'Semarang, Jawa Tengah',
-    extraLabel: 'Sudah menemukan supplier dengan lead time dan kualitas yang sesuai.',
+    extraLabel: 'Supplier sudah cocok dari harga dan lead time.',
   },
 };
 
@@ -145,7 +156,7 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
       priceLabel: 'Rp 29.500 / kg',
       deliveryLabel: '1 - 2 hari',
       guaranteeLabel: '100% Segar',
-      note: 'Kualitas premium, ayam potong pagi, bersih dan higienis.',
+      note: 'Ayam potong pagi. Bersih, segar, siap kirim.',
     },
     {
       id: 'chickengo',
@@ -155,7 +166,7 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
       priceLabel: 'Rp 28.000 / kg',
       deliveryLabel: '2 - 3 hari',
       guaranteeLabel: 'Uang kembali 100%',
-      note: 'Ayam segar langsung dari peternak dengan harga kompetitif.',
+      note: 'Dari peternak. Harga masuk, stok rutin.',
     },
     {
       id: 'prima-poultry',
@@ -165,7 +176,7 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
       priceLabel: 'Rp 30.000 / kg',
       deliveryLabel: '1 - 2 hari',
       guaranteeLabel: 'Stok stabil',
-      note: 'Cocok untuk kebutuhan rutin restoran dengan pengiriman terjadwal.',
+      note: 'Cocok buat restoran. Jadwal kirim rapi.',
     },
   ],
   'req-location': [
@@ -177,7 +188,7 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
       priceLabel: 'Rp 58.000.000 / tahun',
       deliveryLabel: 'Survey 1 hari',
       guaranteeLabel: 'Legal lengkap',
-      note: 'Lokasi dekat area kampus dan perkantoran dengan parkir memadai.',
+      note: 'Dekat kampus dan kantor. Parkir aman.',
     },
     {
       id: 'bandung-hub',
@@ -187,7 +198,7 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
       priceLabel: 'Rp 64.000.000 / tahun',
       deliveryLabel: 'Survey 2 hari',
       guaranteeLabel: 'Negosiasi fleksibel',
-      note: 'Unit siap pakai dengan tampilan frontage yang kuat untuk coffee shop.',
+      note: 'Siap pakai. Tampak depan cocok buat coffee shop.',
     },
   ],
   'req-social': [
@@ -199,7 +210,7 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
       priceLabel: 'Rp 4.200.000 / bulan',
       deliveryLabel: 'Mulai 3 hari',
       guaranteeLabel: 'Report mingguan',
-      note: 'Punya pengalaman di brand makanan dan rutin produksi short video.',
+      note: 'Biasa handle brand makanan dan video pendek.',
     },
     {
       id: 'daily-buzz',
@@ -209,12 +220,56 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
       priceLabel: 'Rp 3.800.000 / bulan',
       deliveryLabel: 'Mulai 5 hari',
       guaranteeLabel: '2 revisi / konten',
-      note: 'Paket efisien untuk bisnis baru yang butuh ritme posting stabil.',
+      note: 'Paket hemat untuk posting rutin.',
     },
   ],
   'req-pos': [],
   'req-packaging': [],
 };
+
+const REQUEST_FALLBACK_IMAGES: Record<string, string> = {
+  'req-supplier':
+    'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=900&q=80',
+  'req-location':
+    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80',
+  'req-social':
+    'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80',
+  'req-pos':
+    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80',
+  'req-packaging':
+    'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=900&q=80',
+};
+
+function normalizeProjectImage(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (
+    trimmed.startsWith('/') ||
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:image/')
+  ) {
+    return trimmed;
+  }
+  return null;
+}
+
+function normalizeProjectImageList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(normalizeProjectImage)
+    .filter((entry): entry is string => Boolean(entry));
+}
+
+function getProjectImage(item: RequestCardView): string | null {
+  return (
+    normalizeProjectImage(item.coverImage) ||
+    item.imageUrls.find(Boolean) ||
+    REQUEST_FALLBACK_IMAGES[item.id] ||
+    null
+  );
+}
 
 function legacyStatusKey(status: string): 'active' | 'waiting' | 'completed' {
   if (status === 'Menunggu') return 'waiting';
@@ -244,6 +299,8 @@ function mapBackendRequestCard(item: BackendRequestCard): RequestCardView {
     createdLabel: item.created_label,
     offersLabel: item.offers_label,
     offerCount: item.offer_count,
+    coverImage: normalizeProjectImage(item.cover_image),
+    imageUrls: normalizeProjectImageList(item.image_urls),
     status: item.status,
     statusKey: item.status_key,
     detail: {
@@ -261,13 +318,20 @@ function mapBackendRequestCard(item: BackendRequestCard): RequestCardView {
 }
 
 function buildLegacyRequestViews(): RequestCardView[] {
-  return [...LAJUKAN_SAMPLE_REQUESTS.active, ...LAJUKAN_SAMPLE_REQUESTS.completed].map(item => ({
+  return [
+    ...LAJUKAN_SAMPLE_REQUESTS.active,
+    ...LAJUKAN_SAMPLE_REQUESTS.completed,
+  ].map(item => ({
     id: item.id,
     title: item.title,
     city: item.city,
     createdLabel: item.createdLabel,
     offersLabel: item.offersLabel,
     offerCount: Number.parseInt(item.offersLabel.split(' ')[0] || '0', 10) || 0,
+    coverImage: REQUEST_FALLBACK_IMAGES[item.id] || null,
+    imageUrls: REQUEST_FALLBACK_IMAGES[item.id]
+      ? [REQUEST_FALLBACK_IMAGES[item.id]]
+      : [],
     status: item.status,
     statusKey: legacyStatusKey(item.status),
     detail: REQUEST_DETAILS[item.id],
@@ -280,7 +344,7 @@ function summaryTone(index: number) {
     return 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60';
   }
   if (index === 2) {
-    return 'bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-950/40 dark:text-sky-200 dark:ring-sky-900/60';
+    return 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-950/40 dark:text-teal-200 dark:ring-teal-900/60';
   }
   if (index === 3) {
     return 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60';
@@ -289,15 +353,22 @@ function summaryTone(index: number) {
 }
 
 function requestTone(status: string): RequestTone {
-  if (status === 'Menunggu') return 'waiting';
-  if (status === 'Selesai') return 'completed';
+  if (status === 'Menunggu' || status === 'waiting') return 'waiting';
+  if (status === 'Selesai' || status === 'completed') return 'completed';
   return 'active';
+}
+
+function displayStatusLabel(status: string) {
+  if (status === 'waiting' || status === 'Menunggu') return 'Nunggu';
+  if (status === 'completed' || status === 'Selesai') return 'Selesai';
+  if (status === 'active' || status === 'Aktif') return 'Aktif';
+  return status;
 }
 
 function statusPillClass(status: string) {
   const tone = requestTone(status);
   if (tone === 'waiting') {
-    return 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-200';
+    return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-200';
   }
   if (tone === 'completed') {
     return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-300';
@@ -317,16 +388,20 @@ function SummaryCard({
   index: number;
 }) {
   return (
-    <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_94%,transparent))] p-4 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.12)]">
+    <div className="flex min-h-[52px] min-w-0 items-center gap-2 overflow-hidden rounded-[14px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] px-2 py-2 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.18)] sm:min-h-[62px] sm:gap-3 sm:px-3 sm:py-2.5">
       <span
-        className={`inline-flex h-11 w-11 items-center justify-center rounded-[16px] ring-1 ${summaryTone(index)}`}
+        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ring-1 sm:h-9 sm:w-9 sm:rounded-[13px] ${summaryTone(index)}`}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
       </span>
-      <p className="mt-4 text-[1.65rem] font-black tracking-[-0.06em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-        {value}
-      </p>
-      <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{label}</p>
+      <div className="min-w-0">
+        <p className="text-base font-black leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.25rem]">
+          {value}
+        </p>
+        <p className="mt-0.5 truncate text-[10px] font-semibold leading-tight text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[11px]">
+          {label}
+        </p>
+      </div>
     </div>
   );
 }
@@ -341,92 +416,370 @@ function DetailMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,white_14%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-muted)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_92%,transparent))] px-4 py-3">
-      <div className="flex items-center gap-2 text-[color:var(--app-accent)]">
-        <Icon className="h-4 w-4" />
-        <span className="text-[11px] font-black uppercase tracking-[0.16em]">
+    <div className="min-w-0 overflow-hidden rounded-[13px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,white_14%)] bg-[color:var(--app-surface-muted)] px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-[color:var(--app-accent)]">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate text-[9px] font-black uppercase tracking-[0.08em] sm:text-[10px]">
           {label}
         </span>
       </div>
-      <p className="mt-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <p className="mt-1 truncate text-[12px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[13px]">
         {value}
       </p>
     </div>
   );
 }
 
-export default function MyProjectsPage() {
-  const { user, authFetch } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [chatCount, setChatCount] = useState(0);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [transactionCount, setTransactionCount] = useState(0);
-  const [activeTransactionCount, setActiveTransactionCount] = useState(0);
-  const [requestsData, setRequestsData] = useState<LajukanRequestsPayload | null>(null);
-  const [selectedRequestId, setSelectedRequestId] = useState(
-    '',
+function ProjectThumbnail({
+  item,
+  variant = 'list',
+}: {
+  item: RequestCardView;
+  variant?: 'list' | 'detail';
+}) {
+  const image = getProjectImage(item);
+  const completed = item.statusKey === 'completed';
+  const Icon = completed ? ShieldCheck : ImageIcon;
+  const sizeClass =
+    variant === 'detail'
+      ? 'h-16 w-16 rounded-[16px] sm:h-20 sm:w-20'
+      : 'h-14 w-14 rounded-[14px] sm:h-16 sm:w-16';
+
+  return (
+    <div
+      className={cn(
+        'relative shrink-0 overflow-hidden border border-[color:color-mix(in_srgb,var(--app-border)_76%,transparent)] bg-[color:var(--app-surface-muted)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.28)]',
+        sizeClass,
+      )}
+    >
+      {image ? (
+        <Image
+          src={image}
+          alt=""
+          fill
+          sizes={variant === 'detail' ? '80px' : '64px'}
+          className="object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,var(--app-accent-soft),var(--app-surface-muted))] text-[color:var(--app-accent)]">
+          <Icon className="h-5 w-5" />
+        </div>
+      )}
+      <span className="absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-black/24 to-transparent" />
+    </div>
   );
+}
+
+function RequestListCard({
+  item,
+  selected,
+  onSelect,
+}: {
+  item: RequestCardView;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const completed = item.statusKey === 'completed';
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'group w-full min-w-0 overflow-hidden rounded-[18px] border px-2.5 py-2 text-left transition sm:px-3 sm:py-2.5',
+        selected
+          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong))] shadow-[0_18px_34px_-28px_color-mix(in_srgb,var(--app-accent)_38%,transparent)]'
+          : 'border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] shadow-[0_14px_28px_-30px_rgba(15,23,42,0.2)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
+      )}
+    >
+      <div className="flex items-start gap-2 sm:gap-3">
+        <ProjectThumbnail item={item} />
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span
+              className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px] ${statusPillClass(item.status)}`}
+            >
+              {displayStatusLabel(item.status)}
+            </span>
+            <span className="truncate text-[10px] text-[color:var(--app-text-soft)] sm:text-[11px]">
+              {item.createdLabel}
+            </span>
+          </div>
+          <h3 className="mt-1.5 line-clamp-2 text-[0.85rem] font-black leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[0.92rem] sm:leading-5">
+            {item.title}
+          </h3>
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-[color:var(--app-text-soft)] sm:mt-2 sm:text-[12px]">
+            <MapPin className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
+            <span className="truncate">{item.city}</span>
+          </div>
+        </div>
+        <div className="shrink-0 rounded-[13px] bg-[color:var(--app-surface-muted)] px-2 py-1 text-center ring-1 ring-[color:var(--app-border)] transition group-hover:ring-[color:var(--app-accent-border)]">
+          <p
+            className={cn(
+              'text-base font-black leading-none sm:text-lg',
+              completed
+                ? 'text-[color:var(--app-text)]'
+                : 'text-[color:var(--app-accent)]',
+            )}
+          >
+            {item.offerCount}
+          </p>
+          <p className="mt-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[10px]">
+            tawaran
+          </p>
+        </div>
+        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] transition group-hover:bg-[color:var(--app-accent)] group-hover:text-[color:var(--app-text-inverse)] xl:inline-flex">
+          <ArrowRight className="h-3.5 w-3.5" />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function OfferCard({ offer }: { offer: OfferPreview }) {
+  return (
+    <article className="min-w-0 overflow-hidden rounded-[14px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] p-2.5 sm:p-3">
+      <div className="min-w-0">
+        <h4 className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
+          {offer.vendor}
+        </h4>
+        <p className="mt-0.5 text-[10px] text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[11px]">
+          {offer.ratingLabel} - {offer.reviewLabel}
+        </p>
+      </div>
+      <div className="mt-2 grid min-w-0 grid-cols-2 gap-2 text-[10px] sm:mt-3 sm:text-[11px]">
+        <div className="min-w-0">
+          <p className="font-bold text-[color:var(--app-text-soft)]">Harga</p>
+          <p className="mt-0.5 line-clamp-2 break-words font-semibold leading-snug text-[color:var(--app-text)] sm:mt-1">
+            {offer.priceLabel}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="font-bold text-[color:var(--app-text-soft)]">
+            Estimasi
+          </p>
+          <p className="mt-0.5 line-clamp-2 break-words font-semibold leading-snug text-[color:var(--app-text)] sm:mt-1">
+            {offer.deliveryLabel}
+          </p>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3">
+        <Link
+          href="/chat"
+          className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] sm:min-h-[38px] sm:gap-2 sm:px-3 sm:text-xs"
+        >
+          <MessageCircleMore className="h-3.5 w-3.5" />
+          Chat
+        </Link>
+        <Link
+          href="/transactions"
+          className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[12px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-2.5 text-[11px] font-semibold text-[color:var(--app-text-inverse)] sm:min-h-[38px] sm:gap-2 sm:px-3 sm:text-xs"
+        >
+          <Wallet className="h-3.5 w-3.5" />
+          Pilih
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function RequestDetailDialog({
+  request,
+  onClose,
+}: {
+  request: RequestCardView | null;
+  onClose: () => void;
+}) {
+  if (!request?.detail) {
+    return null;
+  }
+
+  const detail = request.detail;
+  const offers = request.offers || [];
+  const hasOffers = offers.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-5">
+      <button
+        type="button"
+        aria-label="Tutup detail"
+        className="absolute inset-0 bg-slate-950/48 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="request-detail-title"
+        className="relative z-10 flex max-h-[calc(100svh-1.5rem)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_80px_-38px_rgba(15,23,42,0.55)] sm:max-h-[calc(100svh-2.5rem)] sm:rounded-[26px]"
+      >
+        <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] px-3 py-2.5 backdrop-blur-xl sm:px-4 sm:py-3">
+          <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
+            <ProjectThumbnail item={request} variant="detail" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold sm:px-2.5 sm:py-1 sm:text-xs ${statusPillClass(request.status)}`}
+                >
+                  {displayStatusLabel(request.status)}
+                </span>
+                <span className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:inline sm:text-xs">
+                  #{request.id.slice(0, 8).toUpperCase()}
+                </span>
+              </div>
+              <h2
+                id="request-detail-title"
+                className="mt-1 line-clamp-2 text-[1rem] font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.25rem]"
+              >
+                {request.title}
+              </h2>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[color:var(--app-text-soft)] sm:text-sm">
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  {request.city}
+                </span>
+                <span>{request.createdLabel}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Tutup detail"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="min-w-0 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4">
+          <div className="grid min-w-0 grid-cols-2 gap-1.5">
+            <Link
+              href="/chat"
+              className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-[12px] font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] sm:min-h-[42px] sm:text-xs"
+            >
+              <MessageCircleMore className="h-3.5 w-3.5" />
+              Chat
+            </Link>
+            <Link
+              href={hasOffers ? '/transactions' : '/umkm'}
+              className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[12px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-2 text-[12px] font-bold text-[color:var(--app-text-inverse)] sm:min-h-[42px] sm:text-xs"
+            >
+              {hasOffers ? (
+                <Wallet className="h-3.5 w-3.5" />
+              ) : (
+                <Search className="h-3.5 w-3.5" />
+              )}
+              {hasOffers ? 'Deal' : 'Cari Vendor'}
+            </Link>
+          </div>
+
+          <div className="mt-3 grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
+            <DetailMetric icon={Store} label="Butuh" value={detail.needType} />
+            <DetailMetric
+              icon={TrendingUp}
+              label="Jumlah"
+              value={detail.amountLabel}
+            />
+            <DetailMetric
+              icon={Wallet}
+              label="Dana"
+              value={detail.budgetLabel}
+            />
+            <DetailMetric
+              icon={Clock3}
+              label="Batas"
+              value={detail.deadlineLabel}
+            />
+          </div>
+
+          <div className="mt-3 min-w-0 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
+            <p className="text-[13px] leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
+              {detail.description}
+            </p>
+            <p className="mt-2 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+              {detail.category} - {detail.locationLabel}
+            </p>
+          </div>
+
+          <section className="mt-3 min-w-0 overflow-hidden rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-muted)] p-2.5 sm:p-3">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                  Tawaran Masuk
+                </h3>
+                <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)] sm:text-xs">
+                  {hasOffers
+                    ? 'Pilih satu.'
+                    : request.statusKey === 'completed'
+                      ? 'Sudah selesai.'
+                      : 'Belum ada tawaran.'}
+                </p>
+              </div>
+              <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-accent)] sm:px-2.5 sm:py-1 sm:text-xs">
+                {offers.length}
+              </span>
+            </div>
+
+            <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2">
+              {!hasOffers ? (
+                <div className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 text-[12px] text-[color:var(--app-text-soft)] sm:col-span-2 sm:text-sm">
+                  <p className="font-semibold text-[color:var(--app-text)]">
+                    Belum ada tawaran.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Link
+                      href="/umkm"
+                      className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[12px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-[11px] font-semibold text-[color:var(--app-text-inverse)] sm:min-h-[38px] sm:gap-2 sm:text-xs"
+                    >
+                      Cari Vendor
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                offers.map(offer => <OfferCard key={offer.id} offer={offer} />)
+              )}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default function MyProjectsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [requestsData, setRequestsData] =
+    useState<LajukanRequestsPayload | null>(null);
+  const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       if (!user) {
-        setLoading(false);
         return;
       }
 
-      setLoading(true);
       try {
-        const [chatRes, txRes, requestRes] = await Promise.all([
-          authFetch('/api/chat/inbox'),
-          authFetch('/api/transactions'),
-          fetch('/api/lajukan/requests?limit=18', {
-            cache: 'no-store',
-            credentials: 'include',
-          }),
-        ]);
+        const requestRes = await fetch('/api/lajukan/requests?limit=18', {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        const requestData = (await requestRes
+          .json()
+          .catch(() => ({}))) as LajukanRequestsResponse;
 
-        const chatData = (await chatRes.json().catch(() => ({}))) as {
-          rooms?: ChatRoom[];
-          data?: ChatRoom[];
-        };
-        const txData = (await txRes.json().catch(() => ({}))) as
-          | Transaction[]
-          | { data?: Transaction[] };
-        const requestData = (await requestRes.json().catch(() => ({}))) as LajukanRequestsResponse;
-
-        const rooms = Array.isArray(chatData.rooms)
-          ? chatData.rooms
-          : Array.isArray(chatData.data)
-            ? chatData.data
-            : [];
-
-        const transactions = Array.isArray(txData)
-          ? txData
-          : Array.isArray(txData.data)
-            ? txData.data
-            : [];
-        const nextRequests = requestRes.ok && requestData.data ? requestData.data : null;
+        const nextRequests =
+          requestRes.ok && requestData.data ? requestData.data : null;
 
         if (!cancelled) {
-          setChatCount(rooms.length);
-          setUnreadCount(
-            rooms.reduce(
-              (total, room) => total + Math.max(0, room.unread_count || 0),
-              0,
-            ),
-          );
-          setTransactionCount(transactions.length);
-          setActiveTransactionCount(
-            transactions.filter(tx =>
-              ['pending', 'accepted'].includes((tx.status || '').toLowerCase()),
-            ).length,
-          );
           setRequestsData(nextRequests);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
+      } catch {
+        if (!cancelled) setRequestsData(null);
       }
     };
 
@@ -434,11 +787,13 @@ export default function MyProjectsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authFetch, user]);
+  }, [user]);
 
   const requestCards = useMemo(() => {
     if (requestsData) {
-      return [...requestsData.active, ...requestsData.completed].map(mapBackendRequestCard);
+      return [...requestsData.active, ...requestsData.completed].map(
+        mapBackendRequestCard,
+      );
     }
     return buildLegacyRequestViews();
   }, [requestsData]);
@@ -452,201 +807,152 @@ export default function MyProjectsPage() {
     [requestCards],
   );
 
+  const detailRequest = detailRequestId
+    ? requestCards.find(item => item.id === detailRequestId) || null
+    : null;
+  const totalOfferCount = useMemo(
+    () => requestCards.reduce((total, item) => total + item.offerCount, 0),
+    [requestCards],
+  );
+
   useEffect(() => {
-    if (!selectedRequestId) {
-      setSelectedRequestId(activeRequests[0]?.id || completedRequests[0]?.id || '');
+    if (!detailRequestId || !detailRequest) {
       return;
     }
 
-    if (!requestCards.some(item => item.id === selectedRequestId)) {
-      setSelectedRequestId(activeRequests[0]?.id || completedRequests[0]?.id || '');
-    }
-  }, [activeRequests, completedRequests, requestCards, selectedRequestId]);
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setDetailRequestId(null);
+      }
+    };
 
-  const selectedRequest =
-    requestCards.find(item => item.id === selectedRequestId) ||
-    activeRequests[0] ||
-    completedRequests[0];
-  const selectedDetail = selectedRequest?.detail;
-  const selectedOffers = selectedRequest?.offers || [];
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [detailRequest, detailRequestId]);
 
   const summaryCards = useMemo(
     () => [
       {
         icon: ClipboardList,
-        label: 'Permintaan Aktif',
+        label: 'Aktif',
         value: requestsData?.counts.active ?? activeRequests.length,
       },
       {
         icon: Clock3,
-        label: 'Menunggu Penawaran',
+        label: 'Nunggu',
         value:
           requestsData?.counts.waiting ??
           activeRequests.filter(item => item.statusKey === 'waiting').length,
       },
       {
         icon: MessageCircleMore,
-        label: 'Penawaran Masuk',
-        value: Math.max(unreadCount, chatCount),
+        label: 'Tawaran',
+        value: totalOfferCount,
       },
       {
         icon: CheckCircle2,
         label: 'Selesai',
-        value: Math.max(requestsData?.counts.completed ?? completedRequests.length, activeTransactionCount),
+        value: requestsData?.counts.completed ?? completedRequests.length,
       },
     ],
-    [activeRequests, activeTransactionCount, chatCount, completedRequests.length, requestsData, unreadCount],
+    [activeRequests, completedRequests.length, requestsData, totalOfferCount],
   );
 
-  if (loading) {
-    return <MyProjectsSkeleton />;
+  if (authLoading) {
+    return (
+      <MyProjectsPageChrome>
+        <MyProjectsSkeleton />
+      </MyProjectsPageChrome>
+    );
   }
 
   if (!user) {
     return (
-      <div className="page-shell py-6">
-        <div className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6 text-center shadow-[var(--app-shadow)]">
-          <h2 className="text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            Masuk dulu untuk melihat permintaanmu
-          </h2>
-          <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
-            Halaman ini menyimpan alur permintaan, penawaran masuk, dan progress
-            kerja sama dengan vendor.
-          </p>
-          <Link
-            href="/login"
-            className="mt-4 inline-flex min-h-[48px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-semibold text-[color:var(--app-text-inverse)]"
-          >
-            Masuk
-          </Link>
+      <MyProjectsPageChrome>
+        <div className="py-6">
+          <div className="mx-auto max-w-xl rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 text-center shadow-[var(--app-shadow)]">
+            <h2 className="text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              Masuk dulu
+            </h2>
+            <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
+              Masuk buat lanjut.
+            </p>
+            <Link
+              href="/login"
+              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-semibold text-[color:var(--app-text-inverse)]"
+            >
+              Masuk
+            </Link>
+          </div>
         </div>
-      </div>
+      </MyProjectsPageChrome>
     );
   }
 
-  if (!selectedRequest || !selectedDetail) {
+  if (requestCards.length === 0) {
     return (
-      <div className="page-shell py-6">
-        <div className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6 text-center shadow-[var(--app-shadow)]">
-          <h2 className="text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            Belum ada permintaan yang bisa ditampilkan
-          </h2>
-          <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
-            Saat backend permintaan sudah terisi, daftar kebutuhan dan penawaran akan muncul di sini.
-          </p>
-          <Link
-            href="/create"
-            className="mt-4 inline-flex min-h-[48px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-semibold text-[color:var(--app-text-inverse)]"
-          >
-            Buat Permintaan
-          </Link>
+      <MyProjectsPageChrome>
+        <div className="py-6">
+          <div className="mx-auto max-w-xl rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 text-center shadow-[var(--app-shadow)]">
+            <h2 className="text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              Belum ada kebutuhan
+            </h2>
+            <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
+              Tulis kebutuhan, vendor nanti nawar.
+            </p>
+            <Link
+              href="/create"
+              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-semibold text-[color:var(--app-text-inverse)]"
+            >
+              Buat Baru
+            </Link>
+          </div>
         </div>
-      </div>
+      </MyProjectsPageChrome>
     );
   }
 
   return (
-    <main className="page-shell overflow-x-hidden py-3 pb-8 sm:py-5">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-2 sm:px-3">
-        <section className="overflow-hidden rounded-[30px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(238,253,245,0.98)_34%,rgba(232,245,255,0.96)_100%)] px-4 py-5 shadow-[var(--app-shadow)] dark:border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] dark:bg-[linear-gradient(140deg,rgba(7,17,27,0.98)_0%,rgba(8,37,28,0.96)_44%,rgba(10,25,43,0.96)_100%)] sm:px-6 sm:py-6">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(280px,0.88fr)] xl:items-start">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                Permintaan
-              </p>
-              <h1 className="mt-3 text-[2.35rem] font-black leading-[0.94] tracking-[-0.08em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[3rem]">
-                Kelola semua kebutuhan usahamu
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-                Buat request, pantau penawaran yang masuk, lalu lanjutkan ke chat
-                atau transaksi tanpa pindah alur.
-              </p>
-
-              <div className="mt-5 grid gap-3 rounded-[26px] border border-white/70 bg-white/82 p-2 shadow-[0_18px_34px_-24px_rgba(15,23,42,0.14)] backdrop-blur dark:border-white/10 dark:bg-slate-950/68 sm:grid-cols-2">
-                <div className="rounded-[20px] border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,white)] px-4 py-3">
-                  <p className="text-base font-bold text-[color:var(--app-accent)]">
-                    Permintaan Saya
-                  </p>
-                  <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                    Saya butuh sesuatu
-                  </p>
-                </div>
-                <Link
-                  href="/umkm"
-                  className="rounded-[20px] px-4 py-3 transition hover:bg-[color:var(--app-surface-muted)]"
-                >
-                  <p className="text-base font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Cari Kebutuhan
-                  </p>
-                  <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                    Saya ingin eksplor vendor
-                  </p>
-                </Link>
+    <MyProjectsPageChrome>
+      <div className="mx-auto grid w-full min-w-0 max-w-[1700px] gap-2 overflow-x-hidden px-1 sm:px-2 lg:min-h-0 lg:gap-3 lg:px-0">
+        <section className="min-w-0 overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[linear-gradient(135deg,var(--app-surface-strong)_0%,color-mix(in_srgb,var(--app-accent-soft)_20%,var(--app-surface-strong))_100%)] p-3 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.24)] sm:p-4">
+          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+                <ClipboardList className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+                  Kebutuhan
+                </p>
+                <h1 className="mt-0.5 text-[1.18rem] font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.55rem]">
+                  Proyek Saya
+                </h1>
+                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                  Klik kartu untuk lihat detail.
+                </p>
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-white/70 bg-white/84 p-4 shadow-[0_18px_34px_-24px_rgba(15,23,42,0.14)] backdrop-blur dark:border-white/10 dark:bg-slate-950/70">
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                  <Store className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-lg font-black tracking-[-0.04em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Buat permintaan kebutuhanmu
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                    Dapatkan penawaran terbaik dari supplier, lokasi, jasa, atau
-                    talent yang relevan dengan usahamu.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <Link
-                  href="/create"
-                  className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)] shadow-[0_16px_30px_-20px_color-mix(in_srgb,var(--app-accent)_46%,transparent)]"
-                >
-                  Buat Permintaan
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/support"
-                  className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white/72 px-4 text-sm font-semibold text-[color:var(--app-accent)] dark:bg-slate-950/55"
-                >
-                  <LifeBuoy className="h-4 w-4" />
-                  Hubungi Tim
-                </Link>
-              </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                <div className="rounded-[18px] bg-[color:var(--app-surface-muted)] px-3 py-2">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                    Chat aktif
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {chatCount} room
-                  </p>
-                </div>
-                <div className="rounded-[18px] bg-[color:var(--app-surface-muted)] px-3 py-2">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                    Pesan belum dibaca
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {unreadCount}
-                  </p>
-                </div>
-                <div className="rounded-[18px] bg-[color:var(--app-surface-muted)] px-3 py-2">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                    Transaksi
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {transactionCount} total
-                  </p>
-                </div>
-              </div>
+            <div className="grid w-full min-w-0 grid-cols-1 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:gap-2">
+              <Link
+                href="/create"
+                className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[12px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-[12px] font-semibold text-[color:var(--app-text-inverse)] sm:min-h-[38px] sm:gap-2 sm:px-4 sm:text-sm"
+              >
+                <span>Buat Baru</span>
+                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Link>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-4">
           {summaryCards.map((item, index) => (
             <SummaryCard
               key={item.label}
@@ -658,422 +964,70 @@ export default function MyProjectsPage() {
           ))}
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(320px,0.78fr)]">
-          <div className="space-y-4">
-            <section className="rounded-[30px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] p-4 shadow-[var(--app-shadow)] sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-[1.4rem] font-black tracking-[-0.05em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Permintaan Aktif
-                  </h2>
-                  <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                    Pilih satu request untuk melihat detail dan penawaran masuk.
-                  </p>
-                </div>
-                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-sm font-semibold text-[color:var(--app-accent)]">
-                  {activeRequests.length}
-                </span>
+        <section className="min-w-0 overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_16px_36px_-34px_rgba(15,23,42,0.22)] sm:p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                <Store className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                  Kebutuhan
+                </h2>
+                <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)] sm:text-xs">
+                  {requestCards.length} item
+                </p>
               </div>
-
-              <div className="mt-4 space-y-3">
-                {activeRequests.map(item => {
-                  const isActive = item.id === selectedRequest.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setSelectedRequestId(item.id)}
-                      className={`w-full rounded-[26px] border px-4 py-4 text-left transition ${
-                        isActive
-                          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_14%,white)] shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)]'
-                          : 'border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_94%,transparent))] hover:border-[color:var(--app-accent-border)]'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                          <ClipboardList className="h-6 w-6" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusPillClass(item.status)}`}
-                            >
-                              {item.status}
-                            </span>
-                          </div>
-                          <h3 className="mt-3 text-xl font-black tracking-[-0.04em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {item.title}
-                          </h3>
-                          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--app-text-soft)]">
-                            <span className="inline-flex items-center gap-1.5">
-                              <MapPin className="h-4 w-4" />
-                              {item.city}
-                            </span>
-                            <span>{item.createdLabel}</span>
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-[1.6rem] font-black tracking-[-0.06em] text-[color:var(--app-accent)]">
-                            {item.offerCount}
-                          </p>
-                          <p className="text-sm text-[color:var(--app-text-soft)]">
-                            penawaran
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="rounded-[30px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] p-4 shadow-[var(--app-shadow)] sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-[1.4rem] font-black tracking-[-0.05em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Permintaan Selesai
-                  </h2>
-                  <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                    Arsip kebutuhan yang sudah menemukan vendor paling cocok.
-                  </p>
-                </div>
-                <span className="rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1 text-sm font-semibold text-[color:var(--app-text-soft)]">
-                  {completedRequests.length}
-                </span>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {completedRequests.map(item => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSelectedRequestId(item.id)}
-                    className={`w-full rounded-[26px] border px-4 py-4 text-left transition ${
-                      item.id === selectedRequest.id
-                        ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_12%,white)]'
-                        : 'border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_94%,transparent))] hover:border-[color:var(--app-accent-border)]'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]">
-                        <ShieldCheck className="h-6 w-6" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <span
-                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusPillClass(item.status)}`}
-                        >
-                          {item.status}
-                        </span>
-                        <h3 className="mt-3 text-lg font-black tracking-[-0.04em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {item.title}
-                        </h3>
-                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--app-text-soft)]">
-                          <span className="inline-flex items-center gap-1.5">
-                            <MapPin className="h-4 w-4" />
-                            {item.city}
-                          </span>
-                          <span>{item.createdLabel}</span>
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-[1.6rem] font-black tracking-[-0.06em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {item.offerCount}
-                        </p>
-                        <p className="text-sm text-[color:var(--app-text-soft)]">
-                          penawaran
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[30px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(238,253,245,0.98)_34%,rgba(239,248,255,0.96)_100%)] p-4 shadow-[var(--app-shadow)] dark:border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] dark:bg-[linear-gradient(140deg,rgba(7,17,27,0.98)_0%,rgba(8,37,28,0.94)_46%,rgba(9,21,38,0.96)_100%)] sm:p-5">
-              <div className="flex items-start gap-4">
-                <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-white/85 text-[color:var(--app-accent)] shadow-sm dark:bg-white/10">
-                  <LifeBuoy className="h-6 w-6" />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="text-[1.4rem] font-black tracking-[-0.05em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Butuh bantuan?
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                    Tim kami siap membantu memilih vendor, membandingkan
-                    penawaran, atau menyusun request yang lebih jelas.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Link
-                      href="/support"
-                      className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white/76 px-4 text-sm font-semibold text-[color:var(--app-accent)] dark:bg-slate-950/55"
-                    >
-                      <LifeBuoy className="h-4 w-4" />
-                      Hubungi Kami
-                    </Link>
-                    <Link
-                      href="/chat"
-                      className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)]"
-                    >
-                      <MessageCircleMore className="h-4 w-4" />
-                      Buka Chat
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </section>
+            </div>
+            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-accent)] sm:px-2.5 sm:py-1 sm:text-xs">
+              {activeRequests.length} aktif
+            </span>
           </div>
 
-          <aside className="space-y-4 xl:sticky xl:top-24">
-            <section className="rounded-[30px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] p-4 shadow-[var(--app-shadow)] sm:p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusPillClass(selectedRequest.status)}`}
-                >
-                  {selectedRequest.status}
-                </span>
-                <span className="text-sm text-[color:var(--app-text-soft)]">
-                  ID: #{selectedRequest.id.slice(0, 8).toUpperCase()}
-                </span>
+          <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {activeRequests.length === 0 ? (
+              <div className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 text-sm text-[color:var(--app-text-soft)] sm:col-span-2 lg:col-span-3 2xl:col-span-4">
+                Belum ada yang aktif.
               </div>
-
-              <h2 className="mt-4 text-[1.7rem] font-black leading-tight tracking-[-0.06em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {selectedRequest.title}
-              </h2>
-
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--app-text-soft)]">
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" />
-                  {selectedRequest.city}
-                </span>
-                <span>{selectedRequest.createdLabel}</span>
-              </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <DetailMetric
-                  icon={Store}
-                  label="Jenis Kebutuhan"
-                  value={selectedDetail.needType}
+            ) : (
+              activeRequests.map(item => (
+                <RequestListCard
+                  key={item.id}
+                  item={item}
+                  selected={item.id === detailRequestId}
+                  onSelect={() => setDetailRequestId(item.id)}
                 />
-                <DetailMetric
-                  icon={ClipboardList}
-                  label="Kategori"
-                  value={selectedDetail.category}
-                />
-                <DetailMetric
-                  icon={TrendingUp}
-                  label="Jumlah"
-                  value={selectedDetail.amountLabel}
-                />
-                <DetailMetric
-                  icon={Clock3}
-                  label="Batas Waktu"
-                  value={selectedDetail.deadlineLabel}
-                />
+              ))
+            )}
+          </div>
+
+          {completedRequests.length > 0 ? (
+            <details
+              className="mt-2 min-w-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2"
+              open={activeRequests.length === 0}
+            >
+              <summary className="cursor-pointer px-1 py-0.5 text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] sm:text-xs">
+                Selesai ({completedRequests.length})
+              </summary>
+              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                {completedRequests.map(item => (
+                  <RequestListCard
+                    key={item.id}
+                    item={item}
+                    selected={item.id === detailRequestId}
+                    onSelect={() => setDetailRequestId(item.id)}
+                  />
+                ))}
               </div>
-
-              <div className="mt-5 rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-muted)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_92%,transparent))] px-4 py-4">
-                <p className="text-sm font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                  Deskripsi Kebutuhan
-                </p>
-                <p className="mt-3 text-sm leading-7 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  {selectedDetail.description}
-                </p>
-                <p className="mt-3 text-sm font-medium text-[color:var(--app-text-soft)]">
-                  {selectedDetail.extraLabel}
-                </p>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-muted)] px-4 py-4">
-                  <p className="text-sm font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                    Lokasi
-                  </p>
-                  <p className="mt-3 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {selectedDetail.locationLabel}
-                  </p>
-                </div>
-                <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-muted)] px-4 py-4">
-                  <p className="text-sm font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                    Anggaran
-                  </p>
-                  <p className="mt-3 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {selectedDetail.budgetLabel}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link
-                  href="/create"
-                  className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]"
-                >
-                  Edit Permintaan
-                </Link>
-                <Link
-                  href="/support"
-                  className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-[18px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-4 text-sm font-semibold text-[color:var(--app-danger)]"
-                >
-                  Tutup Permintaan
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[30px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] p-4 shadow-[var(--app-shadow)] sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-[1.3rem] font-black tracking-[-0.05em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Penawaran Masuk
-                  </h3>
-                  <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                    {selectedOffers.length > 0
-                      ? `${selectedOffers.length} vendor siap ditinjau`
-                      : 'Belum ada penawaran untuk request ini'}
-                  </p>
-                </div>
-                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-sm font-semibold text-[color:var(--app-accent)]">
-                  {selectedOffers.length}
-                </span>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {selectedOffers.length === 0 ? (
-                  <div className="rounded-[24px] border border-dashed border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[color:var(--app-surface-muted)] px-4 py-5">
-                    <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      Request ini sudah selesai.
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                      Kalau perlu vendor baru, Anda bisa duplikasi permintaan ini
-                      atau buat request baru dengan detail yang lebih spesifik.
-                    </p>
-                    <Link
-                      href="/create"
-                      className="mt-4 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)]"
-                    >
-                      Buat Request Baru
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </div>
-                ) : (
-                  selectedOffers.map(offer => (
-                    <article
-                      key={offer.id}
-                      className="rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_94%,transparent))] p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-lg font-black tracking-[-0.04em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {offer.vendor}
-                          </p>
-                          <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                            {offer.ratingLabel} · {offer.reviewLabel}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--app-accent)]">
-                          Vendor
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <div>
-                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                            Harga
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {offer.priceLabel}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                            Estimasi
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {offer.deliveryLabel}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                            Garansi
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {offer.guaranteeLabel}
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="mt-4 rounded-[18px] bg-amber-50/70 px-3 py-2 text-sm text-[color:var(--app-text-soft)] dark:bg-amber-950/20">
-                        {offer.note}
-                      </p>
-
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        <Link
-                          href="/chat"
-                          className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]"
-                        >
-                          <MessageCircleMore className="h-4 w-4" />
-                          Chat
-                        </Link>
-                        <Link
-                          href="/transactions"
-                          className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)]"
-                        >
-                          <Wallet className="h-4 w-4" />
-                          Tinjau Penawaran
-                        </Link>
-                      </div>
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
-
-            <section className="rounded-[30px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] p-4 shadow-[var(--app-shadow)] sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-[1.3rem] font-black tracking-[-0.05em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Jalur Cepat
-                  </h3>
-                  <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                    Pindah cepat ke area yang paling sering dipakai.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-2">
-                <Link
-                  href="/umkm"
-                  className="flex min-h-[54px] items-center justify-between rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,white_16%)] bg-[color:var(--app-surface-muted)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]"
-                >
-                  <span className="inline-flex items-center gap-3">
-                    <Search className="h-4.5 w-4.5" />
-                    Cari supplier & vendor
-                  </span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/chat"
-                  className="flex min-h-[54px] items-center justify-between rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,white_16%)] bg-[color:var(--app-surface-muted)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]"
-                >
-                  <span className="inline-flex items-center gap-3">
-                    <MessageCircleMore className="h-4.5 w-4.5" />
-                    Chat vendor
-                  </span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/transactions"
-                  className="flex min-h-[54px] items-center justify-between rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,white_16%)] bg-[color:var(--app-surface-muted)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]"
-                >
-                  <span className="inline-flex items-center gap-3">
-                    <TrendingUp className="h-4.5 w-4.5" />
-                    Lihat transaksi
-                  </span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </section>
-          </aside>
+            </details>
+          ) : null}
         </section>
       </div>
-    </main>
+
+      <RequestDetailDialog
+        request={detailRequest}
+        onClose={() => setDetailRequestId(null)}
+      />
+    </MyProjectsPageChrome>
   );
 }

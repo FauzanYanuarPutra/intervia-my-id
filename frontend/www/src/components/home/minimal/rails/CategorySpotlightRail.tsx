@@ -83,7 +83,7 @@ export function CategorySpotlightRail({
               <Link
                 key={spotlight.id}
                 href={spotlight.href}
-                className={`group relative min-w-[82%] max-w-[300px] snap-start overflow-hidden rounded-2xl border border-transparent p-4 shadow-none transition hover:-translate-y-0.5 sm:max-w-none sm:border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] sm:shadow-sm sm:hover:shadow-md sm:min-w-[260px] sm:dark:border-[color:var(--app-border-strong)] ${tone.card}`}
+                className={`group relative w-[82%] min-w-[82%] max-w-[300px] snap-start overflow-hidden rounded-2xl border border-transparent p-4 shadow-none transition hover:-translate-y-0.5 sm:w-[260px] sm:min-w-[260px] sm:max-w-[260px] sm:border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] sm:shadow-sm sm:hover:shadow-md sm:dark:border-[color:var(--app-border-strong)] ${tone.card}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className={`flex h-11 w-11 items-center justify-center rounded-2xl text-lg ${tone.badge}`}>

@@ -1,466 +1,510 @@
-# Intervia Platform - AI Development Rules & Principles
-
-## 🎯 CORE PHILOSOPHY: Mobile-First, Thumb-Friendly, Minimal Effort
-
-### 1. MOBILE-FIRST DEVELOPMENT (CRITICAL)
-
-#### Touch Target Requirements
-- **MINIMUM touch target**: 44x44px (iOS/Android standard)
-- **PREFERRED touch target**: 56-64px for primary actions
-- **OPTIMAL touch target**: 120x120px for main feature cards
-- All interactive elements MUST be easily reachable with thumb
-
-#### Screen Size Strategy
-- Design for mobile FIRST (320px - 768px)
-- Tablet second (768px - 1024px)  
-- Desktop last (1024px+)
-- NEVER assume desktop first
-
-#### Thumb Zone Optimization
-```
-EASY REACH (Priority 1):
-- Bottom 1/3 of screen
-- Center of screen
-- Primary actions go here
-
-STRETCH REACH (Priority 2):
-- Middle 1/3 of screen
-- Secondary actions
-
-HARD REACH (Avoid):
-- Top 1/3 of screen
-- Top corners
-- Only for occasional actions (logout, settings)
-```
-
-### 2. UI/UX PATTERNS
-
-#### Navigation
-- **Mobile (< 1024px)**: Fixed bottom navigation bar
-  - 5 main items max
-  - Large icons (24-28px)
-  - Clear labels
-  - Active state indicators
-- **Desktop (≥ 1024px)**: Top navigation or sidebar
-  - Bottom nav HIDDEN on desktop (`lg:hidden` class)
-
-#### Content Sections
-
-##### Hero Section
-- **Mobile**: 
-  - Large CTA button (h-14, full-width or centered)
-  - Simplified search → Link to search page
-  - Short heading (2-3 lines max)
-  - Minimal text
-- **Desktop**: 
-  - Full search form allowed
-  - Longer text acceptable
-
-##### Quick Access Cards
-- **Mobile**:
-  - 3 columns max
-  - Min height: 120px
-  - Large icons (48-56px)
-  - Distinct colors per category
-  - Active feedback: `active:scale-95`
-- **Desktop**:
-  - Hover effects
-  - Can expand to 4-5 columns
-
-##### Content Lists (Products, Jobs, etc.)
-- **Mobile**: 
-  - Horizontal scroll with snap points
-  - `overflow-x-auto` + `snap-x snap-mandatory`
-  - Hide scrollbar but keep functionality
-  - Card width: 120-160px
-  - Show ALL items (no truncation)
-- **Desktop**: 
-  - Grid layout (3-5 columns)
-  - Show limited items + "View All" link
-  - Hover states
-
-### 3. RESPONSIVE DESIGN RULES
-
-#### Breakpoints (Tailwind)
-```css
-sm: 640px   /* Small tablets */
-md: 768px   /* Tablets */
-lg: 1024px  /* Desktop - PRIMARY BREAKPOINT */
-xl: 1280px  /* Large desktop */
-2xl: 1536px /* Extra large */
-```
-
-#### Mobile-Desktop Differences Template
-```tsx
-{/* Mobile: Simple/Scroll/Touch */}
-<div className="lg:hidden">
-  {/* Horizontal scroll, large tap targets, simplified */}
-</div>
-
-{/* Desktop: Complex/Grid/Hover */}
-<div className="hidden lg:block">
-  {/* Grid layout, hover effects, detailed */}
-</div>
-```
-
-### 4. INTERACTION PATTERNS
-
-#### Touch Feedback (Mobile)
-```tsx
-className="active:scale-95 transition-transform duration-150"
-```
-
-#### Hover Effects (Desktop Only)
-```tsx
-className="lg:hover:shadow-xl lg:hover:-translate-y-1"
-```
-
-#### Loading States
-- Skeleton screens (no spinners)
-- Optimistic UI updates
-- Progressive loading
-
-### 5. COLOR & VISUAL HIERARCHY
-
-#### Primary Actions
-- Emerald/Green: `emerald-500`, `emerald-600`
-- High contrast
-- Large size
-- Bottom 1/3 of screen on mobile
-
-#### Secondary Actions  
-- Blue: `blue-500`
-- Gray: `slate-600`
-- Smaller size
-
-#### Destructive Actions
-- Red: `red-500`
-- Confirmation required
-- Not in easy reach zone
-
-#### Category Colors (Quick Access)
-- Jobs: Emerald (`emerald-500`)
-- Property: Blue (`blue-500`)
-- Talent: Purple (`purple-500`)
-- Consistent across app
-
-### 6. PERFORMANCE REQUIREMENTS
-
-#### Critical Metrics
-- First Contentful Paint: < 1.5s
-- Time to Interactive: < 3.5s
-- Cumulative Layout Shift: < 0.1
-
-#### Optimization Rules
-- Use `loading="lazy"` for images below fold
-- Implement infinite scroll, not pagination
-- Debounce search inputs (300ms)
-- Use React.memo for list items
-- Virtual scrolling for long lists (100+ items)
-
-### 7. ACCESSIBILITY (A11Y)
-
-#### REQUIRED
-- All interactive elements have proper `aria-label`
-- Keyboard navigation works
-- Focus visible on all controls
-- Color contrast ratio ≥ 4.5:1 (text)
-- Color contrast ratio ≥ 3:1 (UI elements)
-
-#### Touch/Click Areas
-- Min 44x44px for WCAG AA
-- Min 48x48px for WCAG AAA
-
-### 8. FORM DESIGN
-
-#### Mobile Forms
-- One field per row
-- Large inputs (h-12 to h-14)
-- Show keyboard type hints
-  - `type="email"` for email
-  - `type="tel"` for phone
-  - `inputMode="numeric"` for numbers
-- Submit button at bottom (easy reach)
-- Floating labels or placeholders
-
-#### Desktop Forms
-- 2-3 fields per row allowed
-- Inline validation
-- More compact spacing acceptable
-
-### 9. SCROLLING & GESTURES
-
-#### Horizontal Scrolling (Mobile)
-```tsx
-<div className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-  <div className="snap-start shrink-0 w-[120px]">...</div>
-</div>
-```
-
-#### Pull to Refresh
-- Native feel
-- Clear indicator
-- Haptic feedback if possible
-
-### 10. TYPOGRAPHY
-
-#### Mobile
-- Body: 14-16px
-- Headings: 
-  - H1: 24-28px
-  - H2: 20-24px
-  - H3: 18-20px
-- Line height: 1.5 minimum
-- Max 60 characters per line
-
-#### Desktop  
-- Body: 16px
-- Headings: Can be larger
-- Max 80 characters per line
-
-### 11. SPACING SYSTEM (Tailwind)
-
-#### Mobile Spacing
-- Section padding: `py-6 px-4`
-- Card padding: `p-4`
-- Gap between items: `gap-3`
-
-#### Desktop Spacing
-- Section padding: `lg:py-10 lg:px-8`
-- Card padding: `lg:p-6`
-- Gap between items: `lg:gap-6`
-
-### 12. IMAGES & MEDIA
-
-#### Responsive Images
-```tsx
-<Image
-  src={src}
-  alt={alt}
-  width={400}
-  height={300}
-  className="w-full h-auto"
-  loading="lazy"
-  placeholder="blur"
-/>
-```
-
-#### Image Sizes
-- Mobile thumbnail: 80-120px
-- Desktop thumbnail: 200-300px
-- Hero images: Responsive, max 1920px width
-
-### 13. ERROR HANDLING
-
-#### User-Friendly Errors
-- NO technical jargon
-- Clear action to resolve
-- Inline validation, not alerts
-- Toast notifications (bottom on mobile)
-
-#### Example
-❌ "Error 500: Internal Server Error"
-✅ "Oops! Something went wrong. Please try again."
-
-### 14. DEVELOPMENT WORKFLOW
-
-#### Before Coding
-1. Check: Is this mobile-first?
-2. Check: Are touch targets large enough?
-3. Check: Is it in thumb reach zone?
-4. Check: Different UI for mobile vs desktop?
-
-#### Code Review Checklist
-- [ ] Works on 320px width?
-- [ ] Touch targets ≥ 44px?
-- [ ] Horizontal scroll on mobile works?
-- [ ] Bottom nav hidden on desktop?
-- [ ] Active states on mobile?
-- [ ] Hover states on desktop only?
-- [ ] No content under bottom nav?
-- [ ] Loading states implemented?
-
-### 15. COMPONENTS LIBRARY STANDARDS
-
-#### Button Component
-```tsx
-// Primary - Large touch target
-<Button 
-  size="lg"           // h-12 to h-14
-  variant="primary"   // bg-emerald-500
-  fullWidth          // w-full on mobile
-  className="active:scale-95 lg:hover:bg-emerald-600"
->
-  Action
-</Button>
-```
-
-#### Card Component
-```tsx
-// Mobile-friendly card
-<Card className="
-  p-4 
-  min-h-[120px]
-  rounded-2xl 
-  border-2
-  active:scale-95
-  lg:hover:shadow-xl
-">
-  Content
-</Card>
-```
-
-### 16. STATE MANAGEMENT
-
-#### Loading States
-- Skeleton screens preferred
-- Inline loading indicators
-- NO full-page spinners on mobile
-
-#### Error States  
-- Retry button always visible
-- Clear error message
-- Maintain scroll position
-
-### 17. SEARCH & FILTERING
-
-#### Mobile
-- Full-screen search overlay
-- Large search input (h-12+)
-- Filters in bottom sheet
-- Swipe to close
-
-#### Desktop
-- Inline search bar
-- Side panel filters
-- Instant results
-
-### 18. COPY & CONTENT
-
-#### Mobile Copy
-- Short and concise
-- Action-oriented
-- 1-2 sentences max
-- Use bullet points
-
-#### Button Text
-- Action verbs: "Search", "Book", "Apply"
-- Max 2 words on mobile
-- Clear, not clever
-
-### 19. TESTING REQUIREMENTS
-
-#### Must Test On
-- iPhone SE (375px) - smallest modern phone
-- iPhone 14 Pro (390px)
-- Android mid-range (360px)
-- iPad (768px)
-- Desktop (1920px)
-
-#### Test Scenarios
-- Thumb navigation only (no mouse)
-- Slow 3G network
-- Landscape orientation
-- Dark mode
-
-### 20. ANIMATION GUIDELINES
-
-#### Mobile
-- Quick animations (150-200ms)
-- Use transform (GPU-accelerated)
-- `transition-transform duration-150`
-
-#### Desktop
-- Slower animations acceptable (200-300ms)
-- More elaborate hover effects
-- Parallax OK
-
----
-
-## 🚨 ABSOLUTE RULES (NEVER BREAK)
-
-1. **ALWAYS design for mobile FIRST**
-2. **NEVER** make touch targets smaller than 44x44px
-3. **ALWAYS** hide bottom nav on desktop (`lg:hidden`)
-4. **NEVER** put important actions in top corners on mobile
-5. **ALWAYS** provide active feedback on mobile taps
-6. **NEVER** use hover-only interactions on mobile
-7. **ALWAYS** test on actual devices, not just DevTools
-8. **NEVER** assume fast internet connection
-9. **ALWAYS** provide offline fallbacks
-10. **NEVER** use more than 3 columns on mobile
-
----
-
-## 📝 QUICK REFERENCE: Common Patterns
-
-### Horizontal Scroll Section (Mobile)
-```tsx
-<div className="lg:hidden">
-  <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide px-4">
-    {items.map(item => (
-      <div key={item.id} className="snap-start shrink-0 w-[120px] h-[120px]">
-        {item.content}
-      </div>
-    ))}
-  </div>
-</div>
-```
-
-### Grid Section (Desktop)
-```tsx
-<div className="hidden lg:grid grid-cols-5 gap-4">
-  {items.slice(0, 15).map(item => (
-    <div key={item.id}>
-      {item.content}
-    </div>
-  ))}
-</div>
-```
-
-### Touch-Friendly Button
-```tsx
-<button className="
-  h-14 px-6 
-  rounded-2xl 
-  bg-emerald-500 text-white
-  font-semibold
-  active:scale-95
-  lg:hover:bg-emerald-600
-  transition-all
-  shadow-lg
-">
-  Action
-</button>
-```
-
----
-
-## 🎨 Design System Quick Ref
-
-### Colors
-- Primary: `emerald-500` to `emerald-600`
-- Secondary: `blue-500`, `purple-500`
-- Text: `slate-900` (dark) / `white` (on dark bg)
-- Background: `slate-100` (light mode), `slate-950` (dark mode)
-
-### Spacing Scale (use these values)
-- `gap-3` (12px) - Mobile items
-- `gap-4` (16px) - Desktop items
-- `p-4` (16px) - Mobile padding
-- `p-6` (24px) - Desktop padding
-- `py-6` (24px) - Mobile section padding
-- `py-10` (40px) - Desktop section padding
-
-### Border Radius
-- `rounded-xl` (12px) - Buttons, inputs
-- `rounded-2xl` (16px) - Cards, large elements
-
-### Shadows
-- `shadow-lg` - Mobile cards
-- `shadow-xl` - Desktop hover
-- `shadow-emerald-500/30` - Colored shadows
-
----
-
-**Remember**: When in doubt, optimize for mobile thumb usage. Desktop is the enhancement, not the baseline.
+# =============================================================================
+# LAJUKAN.COM — GLOBAL AI DEVELOPMENT RULES
+# =============================================================================
+# Version: 2026 Final
+# Platform: Lajukan.com
+# Architecture: Polyglot Microservices
+# Environment: Docker-based Local + Cloud Deployment
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. AI ROLE & BEHAVIOR
+# -----------------------------------------------------------------------------
+
+You are a Principal Software Architect, Senior Product Designer, and Autonomous AI Engineer working on Lajukan.com.
+
+Your responsibility is NOT only writing code.
+
+You must:
+- think independently
+- analyze architecture impact
+- detect performance bottlenecks
+- prevent bad UX
+- prevent unnecessary complexity
+- suggest better alternatives before implementation
+- write production-ready code completely
+
+You do NOT wait for detailed instructions for every small step.
+
+You are expected to:
+- infer missing technical details
+- design clean architecture
+- propose best flow
+- improve UX automatically
+- protect scalability of the system
+
+Before coding always ask internally:
+
+- Is this scalable?
+- Is this mobile-first?
+- Is this efficient in memory?
+- Is this maintainable?
+- Is this safe?
+- Is this clear for end-users?
+- Is there a simpler better implementation?
+
+If something is inefficient:
+STOP and propose better solution first.
+
+
+# -----------------------------------------------------------------------------
+# 2. PROJECT CONTEXT
+# -----------------------------------------------------------------------------
+
+Platform name:
+
+LAJUKAN.COM
+
+Allowed naming:
+- Lajukan
+- Lajukan.com
+
+Never use:
+- Intervia
+- old project names
+- legacy brand names
+
+This platform is an ecosystem platform for Indonesia:
+- Marketplace
+- Freelance Services
+- Jobs
+- Property
+- Business Maps
+- Community
+- Supplier Network
+- Live Chat
+- Business Tools for UMKM
+
+Target users:
+- Indonesian users
+- UMKM owners
+- freelancers
+- workers
+- suppliers
+- regular mobile users
+- users unfamiliar with technology
+
+UI must feel:
+- simple
+- clear
+- fast
+- lightweight
+- modern
+- easy for all ages
+
+
+# -----------------------------------------------------------------------------
+# 3. UI/UX CORE PHILOSOPHY
+# -----------------------------------------------------------------------------
+
+PRIMARY RULE:
+
+MOBILE FIRST ALWAYS.
+
+Desktop is enhancement.
+Mobile is baseline.
+
+Every feature must be designed starting from mobile first.
+
+Priorities:
+- Thumb friendly
+- Fast interaction
+- Minimal effort
+- Minimal confusion
+- Minimal scrolling fatigue
+- Maximum readability
+- Space efficient
+
+
+# -----------------------------------------------------------------------------
+# 4. TOUCH TARGET RULES
+# -----------------------------------------------------------------------------
+
+Minimum touch target:
+44x44px
+
+Preferred touch target:
+56x56px
+
+Primary CTA:
+56–64px minimum
+
+Feature cards:
+minimum 120x120px
+
+All clickable elements must include:
+
+active:scale-95 transition-transform duration-150
+
+Buttons must feel native-app like.
+
+
+# -----------------------------------------------------------------------------
+# 5. RESPONSIVE DESIGN RULES
+# -----------------------------------------------------------------------------
+
+Tailwind breakpoints:
+
+sm: 640px
+md: 768px
+lg: 1024px
+xl: 1280px
+2xl: 1536px
+
+Pattern:
+
+Mobile:
+block lg:hidden
+
+Desktop:
+hidden lg:block
+
+Rules:
+- maximum 3 columns on mobile
+- prefer 2 columns on mobile
+- avoid cramped layouts
+- avoid text truncation whenever possible
+- avoid horizontal overflow bugs
+
+
+# -----------------------------------------------------------------------------
+# 6. LAJUKAN DESIGN SYSTEM
+# -----------------------------------------------------------------------------
+
+Primary Brand:
+#6cd698
+
+Tailwind:
+emerald-500
+emerald-600
+
+Module colors:
+
+Main Brand:
+emerald
+
+Marketplace:
+emerald
+
+Supplier:
+emerald
+
+Logistics:
+blue
+
+Jobs:
+purple
+
+Property:
+indigo
+
+Community:
+amber
+
+Maps:
+orange / amber
+
+Danger:
+red
+
+Text:
+slate-900
+
+Muted:
+slate-500
+
+Background:
+white
+slate-50
+
+Dark:
+slate-950
+
+
+# -----------------------------------------------------------------------------
+# 7. COMPONENT RULES
+# -----------------------------------------------------------------------------
+
+Buttons:
+- rounded-xl or rounded-2xl
+- large touch area
+- active scale effect
+- clear text
+- action-oriented label
+
+Cards:
+- rounded-2xl
+- soft shadow
+- generous padding
+- minimal clutter
+
+Forms:
+- one field per row on mobile
+- h-12 or h-14 minimum
+- easy keyboard usage
+- proper inputMode
+
+Lists:
+mobile:
+horizontal scroll preferred
+
+desktop:
+grid layout
+
+Loading:
+prefer skeleton loaders
+
+avoid:
+full page blocking spinner
+
+
+# -----------------------------------------------------------------------------
+# 8. FRONTEND RULES (NEXT.JS)
+# -----------------------------------------------------------------------------
+
+Use:
+- Next.js App Router
+- TypeScript
+- TailwindCSS
+- Server Components by default
+
+Use Client Components only when necessary:
+- useState
+- useEffect
+- browser APIs
+- event listeners
+
+Prefer:
+- SSR
+- streaming
+- lazy loading
+- route-level loading.tsx
+- error.tsx
+
+Optimize:
+- hydration
+- bundle size
+- rerenders
+
+Avoid:
+- unnecessary client-side rendering
+- deeply nested prop drilling
+- duplicated fetching
+
+
+# -----------------------------------------------------------------------------
+# 9. BACKEND RULES
+# -----------------------------------------------------------------------------
+
+Respect service boundaries.
+
+Current services:
+
+identity_service → Rust
+marketplace_service → Rust
+chat_service → Elixir/Phoenix
+www → Next.js
+cms → Next.js
+crm → Next.js
+
+Infrastructure:
+Postgres
+Redis
+RabbitMQ
+ScyllaDB
+MinIO
+Meilisearch
+Caddy
+Cloudflare Tunnel
+
+Rules:
+- code modular
+- loosely coupled
+- easy to split
+- easy to deploy independently
+- minimal resource usage
+- predictable scaling
+
+
+# -----------------------------------------------------------------------------
+# 10. REALTIME & CHAT
+# -----------------------------------------------------------------------------
+
+Chat must feel native.
+
+Requirements:
+- instant send feedback
+- optimistic UI
+- auto scroll bottom
+- preview image before sending
+- upload progress
+- typing state
+- read state
+- minimal delay
+
+Avoid laggy websocket interactions.
+
+Always clean:
+- socket listeners
+- subscriptions
+- event handlers
+
+Prevent memory leaks.
+
+
+# -----------------------------------------------------------------------------
+# 11. DATABASE RULES
+# -----------------------------------------------------------------------------
+
+Design database carefully.
+
+Priorities:
+- normalized where needed
+- denormalized where beneficial for performance
+- indexed properly
+- scalable query patterns
+- avoid N+1 query issues
+
+Always think:
+- read performance
+- write performance
+- concurrency
+- locking impact
+
+
+# -----------------------------------------------------------------------------
+# 12. SECURITY RULES
+# -----------------------------------------------------------------------------
+
+Always protect against:
+
+- XSS
+- SQL Injection
+- CSRF
+- auth bypass
+- insecure uploads
+- unsafe file access
+
+Validate:
+- all inputs
+- request body
+- params
+- headers
+
+Never trust client-side validation only.
+
+Sensitive config must always use:
+.env
+
+Never hardcode:
+- secrets
+- tokens
+- passwords
+- DB credentials
+- API endpoints
+
+
+# -----------------------------------------------------------------------------
+# 13. PERFORMANCE RULES
+# -----------------------------------------------------------------------------
+
+Target:
+
+Fast initial load
+Fast interaction
+Low memory usage
+Low CPU usage
+
+Prefer:
+- lazy loading
+- dynamic import
+- memoization
+- debouncing
+- virtual list if large dataset
+- image optimization
+- cache where useful
+
+Debounce search:
+300ms
+
+Images:
+loading="lazy"
+
+Optimize for:
+mid-range Android devices in Indonesia
+
+
+# -----------------------------------------------------------------------------
+# 14. COPYWRITING RULES
+# -----------------------------------------------------------------------------
+
+UI language:
+Bahasa Indonesia
+
+Must be:
+- friendly
+- clear
+- concise
+- easy to understand
+- action oriented
+
+Avoid:
+technical jargon
+
+Bad:
+"Internal server error"
+
+Good:
+"Terjadi kendala. Coba lagi sebentar ya."
+
+
+# -----------------------------------------------------------------------------
+# 15. CODE OUTPUT RULES
+# -----------------------------------------------------------------------------
+
+Every implementation response must follow this structure:
+
+## 1. Architecture / Flow
+Explain briefly:
+- what is built
+- why this approach is chosen
+
+## 2. Files Changed
+List:
+- new files
+- modified files
+
+## 3. Production Ready Code
+Write COMPLETE code.
+
+NEVER:
+- leave placeholders
+- write pseudo-code
+- write "...continue here..."
+- write "implement later"
+
+Code must be:
+- complete
+- runnable
+- production-ready
+- clean
+- typed
+- maintainable
+
+
+# -----------------------------------------------------------------------------
+# 16. ABSOLUTE RULES — NEVER BREAK
+# -----------------------------------------------------------------------------
+
+- Always design mobile first
+- Never use "Intervia"
+- Never write incomplete code
+- Never hardcode secrets
+- Never ignore responsive design
+- Never create tiny touch targets
+- Never break service boundaries
+- Never create unnecessary complexity
+- Always optimize for performance
+- Always prioritize UX clarity
+- Always think before coding
+- Always generate production-ready code

@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -33,6 +33,7 @@ import {
   Handshake,
   Loader2,
   MessageSquareText,
+  Package,
   RefreshCcw,
   Rocket,
   Shield,
@@ -301,7 +302,7 @@ function resolveTransactionGuidance(
   if (status === 'pending') {
     if (isBuyer && !paymentReady) {
       return locale === 'id'
-        ? 'Bayar dulu supaya order bisa diproses.'
+        ? 'Bayar dulu biar order diproses.'
         : 'Pay first so the order can continue.';
     }
     if (isSeller && paymentReady) {
@@ -440,6 +441,74 @@ function resolveTransactionHeadline(
 
   return locale === 'id' ? 'Perlu ditinjau' : 'Needs review';
 }
+
+function resolveTransactionProgress(
+  txn: Transaction,
+  userId: string | null | undefined,
+  locale: string,
+): {
+  percent: number;
+  label: string;
+  steps: Array<{ label: string; state: 'done' | 'current' | 'waiting' }>;
+} {
+  const status = resolveTxnStatus(txn);
+  const paymentReady = isTransactionPaymentReady(txn);
+  const headline = resolveTransactionHeadline(txn, userId, locale);
+  const labels =
+    locale === 'id'
+      ? [
+          'Order dibuat',
+          'Seller terima',
+          'Dana aman',
+          'Diproses',
+          'Hasil dikirim',
+          'Selesai',
+        ]
+      : [
+          'Order created',
+          'Seller accepts',
+          'Funds secured',
+          'In progress',
+          'Delivered',
+          'Done',
+        ];
+
+  const statusIndex: Record<string, number> = {
+    pending: paymentReady ? 1 : 0,
+    accepted: paymentReady ? 2 : 1,
+    in_progress: 3,
+    delivered: 4,
+    completed: 5,
+    disputed: 3,
+    cancelled: 0,
+  };
+  const currentIndex = statusIndex[status] ?? 0;
+  const percent =
+    status === 'completed'
+      ? 100
+      : status === 'cancelled'
+        ? 0
+        : status === 'pending' && paymentReady
+          ? 33
+          : Math.max(
+              16,
+              Math.round(((currentIndex + 1) / labels.length) * 100),
+            );
+
+  return {
+    percent,
+    label: headline,
+    steps: labels.map((label, index) => ({
+      label,
+      state:
+        index < currentIndex || (paymentReady && index === 2)
+          ? 'done'
+          : index === currentIndex
+            ? 'current'
+            : 'waiting',
+    })),
+  };
+}
 async function sha256Hex(value: string): Promise<string> {
   const input = String(value || '');
   if (!globalThis.crypto?.subtle) {
@@ -469,6 +538,108 @@ function asObject(value: unknown): Record<string, unknown> {
 function asString(value: unknown): string {
   if (value == null) return '';
   return String(value).trim();
+}
+
+function readFirstString(...values: unknown[]): string {
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      const nested = readFirstString(...value);
+      if (nested) return nested;
+      continue;
+    }
+    const text = asString(value);
+    if (text) return text;
+  }
+  return '';
+}
+
+function resolveTransactionVisual(txn: Transaction): string {
+  const snapshot = asObject(txn.snapshot_listing);
+  const meta = readTransactionMeta(txn);
+  const content = asObject(meta.content || meta.listing || meta.item);
+  const media = asObject(meta.media);
+
+  return readFirstString(
+    snapshot.cover_image,
+    snapshot.coverImage,
+    snapshot.image,
+    snapshot.image_url,
+    snapshot.thumbnail,
+    snapshot.thumbnail_url,
+    snapshot.media_url,
+    snapshot.media_urls,
+    content.cover_image,
+    content.image,
+    content.image_url,
+    content.thumbnail,
+    media.cover_image,
+    media.image,
+    media.url,
+  );
+}
+
+function resolveCounterparty(
+  txn: Transaction,
+  userId: string | null | undefined,
+  locale: string,
+): { id: string; name: string; avatar: string; role: string } {
+  const isBuyer = Boolean(
+    userId && normalizeId(txn.buyer_id) === normalizeId(userId),
+  );
+  const side = isBuyer ? 'seller' : 'buyer';
+  const id = side === 'seller' ? txn.seller_id : txn.buyer_id;
+  const role =
+    side === 'seller'
+      ? locale === 'id'
+        ? 'Penjual'
+        : 'Seller'
+      : locale === 'id'
+        ? 'Pembeli'
+        : 'Buyer';
+  const meta = readTransactionMeta(txn);
+  const snapshot = asObject(txn.snapshot_listing);
+  const profile = asObject(
+    meta[`${side}_profile`] || meta[side] || snapshot[`${side}_profile`],
+  );
+  const owner = asObject(snapshot.owner || snapshot.owner_profile);
+  const displayFallback = `${role} ${formatShortOrderId(id)}`;
+  const name = readFirstString(
+    profile.name,
+    profile.full_name,
+    profile.fullName,
+    profile.username,
+    meta[`${side}_name`],
+    meta[`${side}_username`],
+    snapshot[`${side}_name`],
+    side === 'seller' ? snapshot.seller_name : snapshot.buyer_name,
+    side === 'seller' ? owner.name || owner.username : '',
+    displayFallback,
+  );
+  const avatar = readFirstString(
+    profile.avatar_url,
+    profile.avatarUrl,
+    profile.photo_url,
+    profile.image,
+    meta[`${side}_avatar`],
+    meta[`${side}_avatar_url`],
+    snapshot[`${side}_avatar`],
+    snapshot[`${side}_avatar_url`],
+    side === 'seller' ? owner.avatar_url || owner.avatarUrl : '',
+  );
+
+  return { id, name, avatar, role };
+}
+
+function initialsFromName(value: string): string {
+  const parts = String(value || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials = parts
+    .slice(0, 2)
+    .map(part => part.charAt(0).toUpperCase())
+    .join('');
+  return initials || 'LA';
 }
 
 type WalletTopupListResponse = {
@@ -795,16 +966,6 @@ function resolveFriendlyFetchError(
   return message;
 }
 
-function resolveTransactionRoleLabel(
-  isBuyer: boolean,
-  isSeller: boolean,
-  locale: string,
-): string {
-  if (isBuyer) return locale === 'id' ? 'Pembeli' : 'Buyer';
-  if (isSeller) return locale === 'id' ? 'Penjual' : 'Seller';
-  return locale === 'id' ? 'Peserta' : 'Viewer';
-}
-
 function resolveTransactionFundsChip(
   txn: Transaction,
   locale: string,
@@ -951,17 +1112,23 @@ function prioritizeTransactionActions(
 
 function PaymentMethodPill({ option }: { option: PaymentOption }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
-      <Image
-        src={option.image}
-        alt={option.title}
-        width={20}
-        height={20}
-        className="h-4 w-4 rounded object-contain"
-      />
-      {option.title}
-      <span className="ml-1 rounded-full bg-[color:var(--app-surface)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
-        {option.badge}
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--app-surface-muted)]">
+        <Image
+          src={option.image}
+          alt={option.title}
+          width={32}
+          height={32}
+          className="h-7 w-7 rounded object-contain"
+        />
+      </span>
+      <span className="min-w-0 text-left">
+        <span className="block truncate text-sm font-black text-[color:var(--app-text)]">
+          {option.title}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+          {option.badge}
+        </span>
       </span>
     </span>
   );
@@ -992,8 +1159,8 @@ export default function TransactionsPage() {
     null,
   );
   const [refreshingTransactions, setRefreshingTransactions] = useState(false);
-  const [listFilter, setListFilter] =
-    useState<TransactionListFilter>('all');
+  const [listFilter, setListFilter] = useState<TransactionListFilter>('all');
+  const [detailTxn, setDetailTxn] = useState<Transaction | null>(null);
 
   const [paymentTxn, setPaymentTxn] = useState<Transaction | null>(null);
   const [selectedPaymentOptionId, setSelectedPaymentOptionId] = useState(
@@ -1397,7 +1564,9 @@ export default function TransactionsPage() {
       providerOptions.find(option => option.id === selectedPaymentOptionId),
     );
 
-    const latestTopupMethod = asString(latestTopup?.payment_method).toLowerCase();
+    const latestTopupMethod = asString(
+      latestTopup?.payment_method,
+    ).toLowerCase();
     const latestTopupProvider = asString(
       latestTopup?.payment_provider,
     ).toLowerCase();
@@ -1798,7 +1967,7 @@ export default function TransactionsPage() {
         throw new Error(
           errorPayload.code === 'delivery_attempt_limit_reached'
             ? locale === 'id'
-              ? 'Batas pengiriman sudah habis. Kalau buyer masih keberatan, order akan diteruskan ke review support.'
+              ? 'Batas habis. Kalau masih keberatan, masuk review support.'
               : 'The delivery limit has been reached. If the buyer still disagrees, the order will move to support review.'
             : errorPayload.error ||
                 (locale === 'id'
@@ -1818,7 +1987,7 @@ export default function TransactionsPage() {
       ).catch(() => {});
       setActionNotice(
         locale === 'id'
-          ? 'Hasil kerja berhasil dikirim. Buyer sekarang bisa terima atau minta revisi dari order ini.'
+          ? 'Hasil kerja dikirim. Buyer bisa terima atau minta revisi.'
           : 'The delivery package was sent. The buyer can now accept it or request a revision.',
       );
       setDeliveryTxn(null);
@@ -1869,7 +2038,7 @@ export default function TransactionsPage() {
     ) {
       setDeliveryReviewError(
         locale === 'id'
-          ? 'Jelaskan revisi yang diminta agar seller punya dasar yang jelas.'
+          ? 'Tulis revisi yang diminta.'
           : 'Explain the requested revision so the seller has clear guidance.',
       );
       return;
@@ -1923,10 +2092,10 @@ export default function TransactionsPage() {
             : 'The delivery was accepted and the transaction is now complete.'
           : updated.status === 'disputed'
             ? locale === 'id'
-              ? 'Batas pengiriman tercapai. Order otomatis diteruskan ke review support dengan bukti yang sudah terkumpul.'
+              ? 'Batas tercapai. Order masuk review support.'
               : 'The delivery limit was reached. The order has been auto-escalated to support review with the evidence collected so far.'
             : locale === 'id'
-              ? 'Permintaan revisi dikirim. Seller bisa mengirim revisi baru dari order ini.'
+              ? 'Permintaan revisi dikirim. Seller bisa kirim revisi baru.'
               : 'The revision request was sent. The seller can now submit a revised delivery package.',
       );
       setDeliveryReviewTxn(null);
@@ -2010,7 +2179,7 @@ export default function TransactionsPage() {
       ).catch(() => {});
       setActionNotice(
         locale === 'id'
-          ? 'Permintaan pembatalan berhasil dikirim dan tercatat di riwayat transaksi.'
+          ? 'Pembatalan terkirim dan tercatat.'
           : 'The cancellation was submitted and recorded in transaction history.',
       );
       setCancelTxn(null);
@@ -2131,7 +2300,7 @@ export default function TransactionsPage() {
       ).catch(() => {});
       setActionNotice(
         locale === 'id'
-          ? 'Counter offer berhasil dikirim. Lawan transaksi bisa membalas dari chat atau halaman ini.'
+          ? 'Counter offer terkirim. Balas dari chat atau halaman ini.'
           : 'The counter offer was sent. The counterparty can continue from chat or this page.',
       );
       setCounterOfferTxn(null);
@@ -2176,7 +2345,7 @@ export default function TransactionsPage() {
     if (!disputeMessage.trim()) {
       setDisputeError(
         locale === 'id'
-          ? 'Jelaskan masalah utamanya dulu.'
+          ? 'Tulis masalah utama dulu.'
           : 'Describe the main issue first.',
       );
       return;
@@ -2245,7 +2414,7 @@ export default function TransactionsPage() {
       );
       setActionNotice(
         locale === 'id'
-          ? 'Dispute berhasil dikirim. Dana tetap ditahan sambil CRM meninjau kronologi dan bukti.'
+          ? 'Dispute terkirim. Dana ditahan sambil bukti dicek.'
           : 'The dispute was submitted. Funds stay on hold while CRM reviews the timeline and evidence.',
       );
       setDisputeTxn(null);
@@ -2309,7 +2478,9 @@ export default function TransactionsPage() {
       ? locale === 'id'
         ? 'Memproses saldo wallet...'
         : 'Processing wallet balance...'
-      : 'Creating payment...'
+      : locale === 'id'
+        ? 'Membuat instruksi bayar...'
+        : 'Creating payment...'
     : selectedPaymentUsesWalletBalance && loadingWalletBalances
       ? locale === 'id'
         ? 'Mengecek saldo wallet...'
@@ -2384,7 +2555,7 @@ export default function TransactionsPage() {
         }
 
         setPaymentInfo(
-          'Ditemukan top-up pending sebelumnya untuk transaksi ini. Lanjutkan pembayaran dari instruksi yang tersedia.',
+          'Ada top-up pending. Lanjutkan dari instruksi yang tersedia.',
         );
       } catch (error) {
         console.error(error);
@@ -2474,9 +2645,7 @@ export default function TransactionsPage() {
           syncedTopup?.status,
         ).toLowerCase();
         if (normalizedTopupStatus === 'paid') {
-          setPaymentInfo(
-            'Pembayaran terkonfirmasi. Dana transaksi sudah masuk proteksi dan status transaksi akan ikut diperbarui.',
-          );
+          setPaymentInfo('Pembayaran terkonfirmasi. Dana masuk proteksi.');
           await loadTransactions();
           await loadWalletBalances();
           return;
@@ -2588,7 +2757,7 @@ export default function TransactionsPage() {
         setLatestTopup(null);
         setPaymentInfo(
           locale === 'id'
-            ? 'Pembayaran langsung dari saldo wallet berhasil. Dana sekarang sudah ditahan untuk transaksi ini.'
+            ? 'Pembayaran wallet berhasil. Dana masuk escrow.'
             : 'Wallet balance payment succeeded. Funds are now held for this transaction.',
         );
         await loadWalletBalances();
@@ -2634,9 +2803,7 @@ export default function TransactionsPage() {
       setLatestTopup(topup || null);
 
       if (topup?.status === 'paid') {
-        setPaymentInfo(
-          'Pembayaran terkonfirmasi. Dana sudah ditahan untuk transaksi ini, tinggal lanjut proses transaksi.',
-        );
+        setPaymentInfo('Pembayaran terkonfirmasi. Dana ditahan aman.');
         await loadTransactions();
         await loadWalletBalances();
         return;
@@ -2644,7 +2811,7 @@ export default function TransactionsPage() {
 
       if (payload.reused_pending_topup) {
         setPaymentInfo(
-          'Instruksi pembayaran sebelumnya masih aktif. Lanjutkan dari tombol bayar yang sudah tersedia.',
+          'Instruksi pembayaran masih aktif. Lanjut dari tombol bayar.',
         );
         return;
       }
@@ -2654,9 +2821,7 @@ export default function TransactionsPage() {
           'Instruksi pembayaran sudah siap. Lanjutkan ke halaman bayar sekarang.',
         );
       } else {
-        setPaymentInfo(
-          'Instruksi pembayaran sudah siap. Ikuti langkah di bawah lalu cek status setelah bayar.',
-        );
+        setPaymentInfo('Instruksi siap. Ikuti langkah, lalu cek status.');
       }
     } catch (error) {
       setPaymentError(
@@ -2852,7 +3017,7 @@ export default function TransactionsPage() {
               </h1>
               <p className="mt-0.5 text-xs text-[color:var(--app-text)]">
                 {locale === 'id'
-                  ? 'Lihat status dan lanjutkan yang penting.'
+                  ? 'Cek status. Lanjut aksi.'
                   : 'See the status and continue the important step.'}
               </p>
             </div>
@@ -2934,7 +3099,7 @@ export default function TransactionsPage() {
             ) : (
               <div className="ui-feed-section rounded-none border border-x-0 border-dashed border-[color:var(--app-border)] p-6 text-center text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] sm:rounded-2xl sm:border-x">
                 {locale === 'id'
-                  ? 'Belum ada transaksi. Mulai dari listing atau chat, nanti semua order akan terkumpul di sini.'
+                  ? 'Belum ada transaksi. Mulai dari chat atau listing.'
                   : 'No transactions yet. Start from a listing or chat and all orders will gather here.'}
               </div>
             )
@@ -2949,21 +3114,12 @@ export default function TransactionsPage() {
               const status = resolveTxnStatus(txn);
               const statusM = statusMeta(status);
 
-              const isBuyer = Boolean(
-                user && normalizeId(txn.buyer_id) === normalizeId(user.id),
-              );
-              const isSeller = Boolean(
-                user && normalizeId(txn.seller_id) === normalizeId(user.id),
-              );
               const { title: snapshotTitle } = resolveSnapshot(txn);
+              const snapshotImage = resolveTransactionVisual(txn);
+              const counterparty = resolveCounterparty(txn, user?.id, locale);
 
               const updatedLabel = formatTransactionListDate(
                 txn.updated_at || txn.created_at,
-                locale,
-              );
-              const guidance = resolveTransactionGuidance(
-                txn,
-                user?.id,
                 locale,
               );
               const isFocused = focusTransactionId === txn.id;
@@ -2972,30 +3128,32 @@ export default function TransactionsPage() {
                 user?.id,
                 locale,
               );
-              const fundsChip = resolveTransactionFundsChip(txn, locale);
-              const shortOrderId = formatShortOrderId(txn.id);
-              const roleLabel = resolveTransactionRoleLabel(
-                isBuyer,
-                isSeller,
+              const progress = resolveTransactionProgress(
+                txn,
+                user?.id,
                 locale,
               );
-              const metaSummary = [
-                humanize(txn.deal_kind || ''),
-                humanize(txn.fulfillment_mode || ''),
-              ]
-                .filter(part => part && part !== '-')
-                .slice(0, 2);
               const cardActions = prioritizeTransactionActions(
                 buildTransactionActions(txn).filter(
-                  action => action.key !== 'support' && action.key !== 'listing',
+                  action =>
+                    action.key !== 'support' && action.key !== 'listing',
                 ),
-              ).slice(0, 2);
+              ).slice(0, 1);
 
               return (
                 <article
                   key={txn.id}
                   id={`transaction-card-${txn.id}`}
-                  className={`ui-feed-row relative overflow-hidden rounded-none border border-x-0 bg-[color:var(--app-surface-strong)] p-4 shadow-sm transition hover:shadow-md dark:bg-[color:var(--app-surface-strong)] sm:rounded-2xl sm:border-x ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setDetailTxn(txn)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setDetailTxn(txn);
+                    }
+                  }}
+                  className={`ui-feed-row relative cursor-pointer overflow-hidden rounded-none border border-x-0 bg-[color:var(--app-surface-strong)] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_28%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-2xl sm:border-x sm:p-4 ${
                     isFocused
                       ? 'border-[color:var(--app-accent-border)] ring-2 ring-[color:color-mix(in_srgb,_var(--app-accent)_25%,_transparent)]'
                       : 'border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)]'
@@ -3005,107 +3163,131 @@ export default function TransactionsPage() {
                     className={`absolute left-0 top-0 h-full w-1.5 opacity-80 ${statusM.accentClass}`}
                   />
 
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Chip meta={statusM} label={humanize(status)} />
-                        <Chip
-                          meta={fundsChip.meta}
-                          label={fundsChip.label}
-                          size="xs"
-                        />
-                        {isFocused ? (
-                          <span className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)]">
-                            {locale === 'id'
-                              ? 'Dari notifikasi'
-                              : 'From notification'}
-                          </span>
-                        ) : null}
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-[92px_minmax(0,1fr)_auto] sm:items-center">
+                    <div className="grid grid-cols-[76px_minmax(0,1fr)] gap-3 sm:contents">
+                      <div className="relative h-[76px] w-[76px] overflow-hidden rounded-2xl bg-[color:var(--app-surface-muted)] sm:h-[92px] sm:w-[92px]">
+                        {snapshotImage ? (
+                          <Image
+                            src={snapshotImage}
+                            alt={snapshotTitle}
+                            fill
+                            unoptimized
+                            sizes="92px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="grid h-full w-full place-items-center text-[color:var(--app-accent)]">
+                            <Package className="h-7 w-7" />
+                          </div>
+                        )}
                       </div>
 
-                      <Link
-                        href={`/transactions/${txn.id}`}
-                        className="mt-3 block max-w-full text-sm font-semibold text-[color:var(--app-text)] transition hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-inverse)] sm:text-base"
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Chip meta={statusM} label={humanize(status)} />
+                          {isFocused ? (
+                            <span className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)]">
+                              {locale === 'id' ? 'Notifikasi' : 'Notification'}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <h2 className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                          {snapshotTitle}
+                        </h2>
+
+                        <div className="mt-2 flex min-w-0 items-center gap-2">
+                          <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[11px] font-black text-[color:var(--app-accent)]">
+                            {counterparty.avatar ? (
+                              <Image
+                                src={counterparty.avatar}
+                                alt={counterparty.name}
+                                fill
+                                unoptimized
+                                sizes="32px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              initialsFromName(counterparty.name)
+                            )}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                              {counterparty.name}
+                            </span>
+                            <span className="block truncate text-[11px] text-[color:var(--app-text-soft)]">
+                              {counterparty.role} - {updatedLabel}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 sm:block sm:min-w-[160px] sm:text-right">
+                      <div>
+                        <p className="text-base font-black text-[color:var(--app-accent)]">
+                          {formatPrice(txn.amount_cents, txn.currency)}
+                        </p>
+                      </div>
+
+                      <div
+                        className="shrink-0 sm:mt-3"
+                        onClick={event => event.stopPropagation()}
+                        onKeyDown={event => event.stopPropagation()}
                       >
-                        <span className="line-clamp-2">{snapshotTitle}</span>
-                      </Link>
+                        {cardActions.map(action => {
+                          const ActionIcon = action.Icon;
+                          const className = `inline-flex min-h-[38px] items-center justify-center gap-2 rounded-2xl px-3 text-[12px] font-semibold transition ${getTransactionActionClass(action.tone)}`;
 
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[color:var(--app-text-soft)]">
-                        <span>{shortOrderId}</span>
-                        <span>{updatedLabel}</span>
-                        <span>{roleLabel}</span>
+                          if (action.href) {
+                            return (
+                              <Link
+                                key={`${txn.id}-${action.key}`}
+                                href={action.href}
+                                className={className}
+                              >
+                                <ActionIcon className="h-4 w-4" />
+                                {action.label}
+                              </Link>
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={`${txn.id}-${action.key}`}
+                              type="button"
+                              onClick={action.onClick}
+                              className={className}
+                            >
+                              <ActionIcon className="h-4 w-4" />
+                              {action.label}
+                            </button>
+                          );
+                        })}
                       </div>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id' ? 'Nominal' : 'Amount'}
-                      </p>
-                      <p className="mt-1 text-base font-black text-[color:var(--app-accent)]">
-                        {formatPrice(txn.amount_cents, txn.currency)}
-                      </p>
                     </div>
                   </div>
 
-                  <div className="mt-3 rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:var(--app-surface-muted)] px-3 py-3 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                    <p className="text-sm font-semibold text-[color:var(--app-text)]">
-                      {headline}
+                  <div className="mt-3 border-t border-[color:var(--app-border)] pt-3 dark:border-[color:var(--app-border-strong)]">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="line-clamp-1 min-w-0 text-xs font-semibold text-[color:var(--app-text)]">
+                        {headline}
+                      </p>
+                      <span className="shrink-0 text-xs font-black text-[color:var(--app-accent)]">
+                        {progress.percent}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                      <div
+                        className="h-full rounded-full bg-[color:var(--app-accent)]"
+                        style={{ width: `${progress.percent}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                      {locale === 'id'
+                        ? 'Tekan kartu untuk detail'
+                        : 'Tap card for details'}
                     </p>
-                    <p className="mt-1 line-clamp-2 text-[color:var(--app-text-soft)]">
-                      {guidance}
-                    </p>
-                    {metaSummary.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {metaSummary.map(item => (
-                          <span
-                            key={`${txn.id}-${item}`}
-                            className="inline-flex items-center rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
-                          >
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    {cardActions.map(action => {
-                      const ActionIcon = action.Icon;
-                      const className = `inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-2xl px-3 text-[13px] font-semibold transition ${getTransactionActionClass(action.tone)}`;
-
-                      if (action.href) {
-                        return (
-                          <Link
-                            key={`${txn.id}-${action.key}`}
-                            href={action.href}
-                            className={className}
-                          >
-                            <ActionIcon className="h-4 w-4" />
-                            {action.label}
-                          </Link>
-                        );
-                      }
-
-                      return (
-                        <button
-                          key={`${txn.id}-${action.key}`}
-                          type="button"
-                          onClick={action.onClick}
-                          className={className}
-                        >
-                          <ActionIcon className="h-4 w-4" />
-                          {action.label}
-                        </button>
-                      );
-                    })}
-
-                    <Link
-                      href={`/transactions/${txn.id}`}
-                      className="inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[13px] font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      {locale === 'id' ? 'Lihat detail' : 'View details'}
-                    </Link>
                   </div>
                 </article>
               );
@@ -3135,6 +3317,280 @@ export default function TransactionsPage() {
           router.push(`/${locale}/profile`);
         }}
       />
+
+      <Modal
+        open={Boolean(detailTxn)}
+        onClose={() => setDetailTxn(null)}
+        title={locale === 'id' ? 'Ringkasan transaksi' : 'Transaction summary'}
+        className="sm:max-w-xl"
+        footer={
+          detailTxn ? (
+            <>
+              {prioritizeTransactionActions(buildTransactionActions(detailTxn))
+                .slice(0, 3)
+                .map(action => {
+                  const ActionIcon = action.Icon;
+                  const className = `inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl px-3 text-[13px] font-semibold transition ${getTransactionActionClass(action.tone)}`;
+
+                  if (action.href) {
+                    return (
+                      <Link
+                        key={`detail-${detailTxn.id}-${action.key}`}
+                        href={action.href}
+                        className={className}
+                        onClick={() => setDetailTxn(null)}
+                      >
+                        <ActionIcon className="h-4 w-4" />
+                        {action.label}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={`detail-${detailTxn.id}-${action.key}`}
+                      type="button"
+                      onClick={() => {
+                        setDetailTxn(null);
+                        action.onClick?.();
+                      }}
+                      className={className}
+                    >
+                      <ActionIcon className="h-4 w-4" />
+                      {action.label}
+                    </button>
+                  );
+                })}
+            </>
+          ) : undefined
+        }
+      >
+        {detailTxn ? (
+          <div className="space-y-4">
+            {(() => {
+              const status = resolveTxnStatus(detailTxn);
+              const statusM = statusMeta(status);
+              const fundsChip = resolveTransactionFundsChip(detailTxn, locale);
+              const { title: snapshotTitle } = resolveSnapshot(detailTxn);
+              const snapshotImage = resolveTransactionVisual(detailTxn);
+              const counterparty = resolveCounterparty(
+                detailTxn,
+                user?.id,
+                locale,
+              );
+              const guidance = resolveTransactionGuidance(
+                detailTxn,
+                user?.id,
+                locale,
+              );
+              const progress = resolveTransactionProgress(
+                detailTxn,
+                user?.id,
+                locale,
+              );
+              const metaSummary = [
+                humanize(detailTxn.deal_kind || ''),
+                humanize(detailTxn.fulfillment_mode || ''),
+              ].filter(part => part && part !== '-');
+
+              return (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-[128px_minmax(0,1fr)]">
+                    <div className="relative h-[128px] overflow-hidden rounded-2xl bg-[color:var(--app-surface-muted)]">
+                      {snapshotImage ? (
+                        <Image
+                          src={snapshotImage}
+                          alt={snapshotTitle}
+                          fill
+                          unoptimized
+                          sizes="128px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="grid h-full w-full place-items-center text-[color:var(--app-accent)]">
+                          <Package className="h-9 w-9" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap gap-2">
+                        <Chip meta={statusM} label={humanize(status)} />
+                        <Chip
+                          meta={fundsChip.meta}
+                          label={fundsChip.label}
+                          size="xs"
+                        />
+                      </div>
+                      <h3 className="mt-3 text-base font-black leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {snapshotTitle}
+                      </h3>
+                      <p className="mt-1 text-lg font-black text-[color:var(--app-accent)]">
+                        {formatPrice(
+                          detailTxn.amount_cents,
+                          detailTxn.currency,
+                        )}
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                        <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-xs font-black text-[color:var(--app-accent)]">
+                          {counterparty.avatar ? (
+                            <Image
+                              src={counterparty.avatar}
+                              alt={counterparty.name}
+                              fill
+                              unoptimized
+                              sizes="40px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            initialsFromName(counterparty.name)
+                          )}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">
+                            {counterparty.name}
+                          </p>
+                          <p className="text-xs text-[color:var(--app-text-soft)]">
+                            {counterparty.role}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-[color:var(--app-text)]">
+                          {progress.label}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                          {guidance}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-xs font-black text-[color:var(--app-accent)]">
+                        {progress.percent}%
+                      </span>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-strong)]">
+                      <div
+                        className="h-full rounded-full bg-[color:var(--app-accent)] transition-all"
+                        style={{ width: `${progress.percent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                      {locale === 'id'
+                        ? 'Detail transaksi'
+                        : 'Transaction detail'}
+                      <span className="ml-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'opsional' : 'optional'}
+                      </span>
+                    </summary>
+                    <div className="space-y-3 border-t border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                      <div className="grid gap-2 text-xs sm:grid-cols-2">
+                        {[
+                          [
+                            locale === 'id' ? 'Order' : 'Order',
+                            formatShortOrderId(detailTxn.id),
+                          ],
+                          [
+                            locale === 'id' ? 'Update' : 'Updated',
+                            formatTransactionListDate(
+                              detailTxn.updated_at || detailTxn.created_at,
+                              locale,
+                            ),
+                          ],
+                          [
+                            locale === 'id' ? 'Tipe' : 'Type',
+                            metaSummary.join(' / ') || '-',
+                          ],
+                          [
+                            locale === 'id' ? 'Listing' : 'Listing',
+                            formatShortOrderId(detailTxn.content_id),
+                          ],
+                        ].map(([label, value]) => (
+                          <div
+                            key={`${detailTxn.id}-${label}`}
+                            className="rounded-2xl bg-[color:var(--app-surface-muted)] p-3"
+                          >
+                            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                              {label}
+                            </p>
+                            <p className="mt-1 truncate font-semibold text-[color:var(--app-text)]">
+                              {value}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="rounded-2xl bg-[color:var(--app-surface-muted)] p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                          {locale === 'id' ? 'Alur' : 'Flow'}
+                        </p>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {progress.steps.map((step, index) => (
+                            <div
+                              key={`${detailTxn.id}-step-${step.label}`}
+                              className="flex items-center gap-2 text-xs font-semibold text-[color:var(--app-text)]"
+                            >
+                              <span
+                                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
+                                  step.state === 'done'
+                                    ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                                    : step.state === 'current'
+                                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                                      : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]'
+                                }`}
+                              >
+                                {index + 1}
+                              </span>
+                              <span className="truncate">{step.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </details>
+
+                  {detailTxn.offer_message || detailTxn.response_message ? (
+                    <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
+                      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                        {locale === 'id'
+                          ? 'Catatan negosiasi'
+                          : 'Negotiation notes'}
+                      </summary>
+                      <div className="space-y-2 border-t border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                        {detailTxn.offer_message ? (
+                          <p className="rounded-2xl bg-[color:var(--app-surface-muted)] p-3 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                            {detailTxn.offer_message}
+                          </p>
+                        ) : null}
+                        {detailTxn.response_message ? (
+                          <p className="rounded-2xl bg-[color:var(--app-surface-muted)] p-3 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                            {detailTxn.response_message}
+                          </p>
+                        ) : null}
+                      </div>
+                    </details>
+                  ) : null}
+
+                  <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                      {locale === 'id' ? 'Keamanan & bantuan' : 'Safety & help'}
+                    </summary>
+                    <p className="border-t border-[color:var(--app-border)] p-3 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                      {guidance}
+                    </p>
+                  </details>
+                </>
+              );
+            })()}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={Boolean(deliveryTxn)}
@@ -3185,7 +3641,7 @@ export default function TransactionsPage() {
                     </p>
                     <p className="mt-1 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                       {locale === 'id'
-                        ? `Ini akan jadi pengiriman ke-${nextAttempt}/${deliveryState.maxAttempts}. Buyer bisa terima, minta revisi, atau kalau sudah mentok akan naik ke review support.`
+                        ? `Pengiriman ke-${nextAttempt}/${deliveryState.maxAttempts}. Buyer bisa terima atau minta revisi.`
                         : `This will be delivery ${nextAttempt}/${deliveryState.maxAttempts}. The buyer can accept it, request a revision, or it will escalate to support review if the limit is reached.`}
                     </p>
                   </div>
@@ -3220,7 +3676,7 @@ export default function TransactionsPage() {
                       className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                       placeholder={
                         locale === 'id'
-                          ? 'Jelaskan apa yang dikirim, scope yang sudah selesai, dan poin penting untuk buyer review.'
+                          ? 'Tulis yang dikirim dan scope yang selesai.'
                           : 'Explain what was delivered, what scope is complete, and the key points for the buyer to review.'
                       }
                     />
@@ -3247,7 +3703,7 @@ export default function TransactionsPage() {
                     />
                     <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
                       {locale === 'id'
-                        ? 'Masukkan Google Drive, GitHub, Figma, Loom, invoice, atau referensi kerja lain yang relevan.'
+                        ? 'Masukkan link bukti kerja.'
                         : 'Add Google Drive, GitHub, Figma, Loom, invoice, or other relevant proof references.'}
                     </p>
                   </div>
@@ -3384,7 +3840,7 @@ export default function TransactionsPage() {
                       <p className="mt-1 text-[11px]">
                         {willEscalate
                           ? locale === 'id'
-                            ? 'Ini sudah attempt terakhir. Kalau ditolak lagi, order otomatis naik ke review support, bukan refund instan.'
+                            ? 'Attempt terakhir. Kalau ditolak, masuk review support.'
                             : 'This is the final attempt. Rejecting it will auto-escalate the order to support review instead of an instant refund.'
                           : locale === 'id'
                             ? 'Seller akan diminta kirim revisi baru dengan bukti yang lebih jelas.'
@@ -3413,10 +3869,10 @@ export default function TransactionsPage() {
                       placeholder={
                         deliveryReviewDecision === 'accept'
                           ? locale === 'id'
-                            ? 'Opsional: tulis catatan singkat kalau ingin menegaskan bahwa pekerjaan sudah sesuai.'
+                            ? 'Opsional: tulis catatan singkat.'
                             : 'Optional: add a short note if you want to confirm the work meets expectations.'
                           : locale === 'id'
-                            ? 'Jelaskan bagian yang kurang, apa yang harus diperbaiki, dan output yang Anda harapkan.'
+                            ? 'Tulis yang kurang dan harus diperbaiki.'
                             : 'Explain what is missing, what should be fixed, and the output you expect.'
                       }
                     />
@@ -3437,7 +3893,7 @@ export default function TransactionsPage() {
                       className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                       placeholder={
                         locale === 'id'
-                          ? 'Satu baris satu link. Pakai ini kalau ada screenshot, doc feedback, atau bukti lain.'
+                          ? 'Satu baris satu link bukti.'
                           : 'One link per line. Use this for screenshots, feedback docs, or other supporting proof.'
                       }
                     />
@@ -3446,7 +3902,7 @@ export default function TransactionsPage() {
                   {willEscalate ? (
                     <div className="rounded-2xl border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3 py-2 text-xs text-[color:var(--app-warning)]">
                       {locale === 'id'
-                        ? 'Penolakan di attempt ke-3 tidak langsung refund. Sistem akan tahan dana dan kirim kronologi + bukti ke support/CRM untuk keputusan yang lebih aman.'
+                        ? 'Attempt ke-3 masuk review support. Dana tetap ditahan.'
                         : 'Rejecting the 3rd attempt does not instantly refund the order. The system will keep funds on hold and send the timeline plus evidence to support/CRM for a safer decision.'}
                     </div>
                   ) : null}
@@ -3532,7 +3988,7 @@ export default function TransactionsPage() {
               />
               <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
                 {locale === 'id'
-                  ? 'Masukkan nominal sederhana agar lawan transaksi cepat memahami revisinya.'
+                  ? 'Masukkan nominal yang jelas.'
                   : 'Use a simple amount so the counterparty can immediately understand the revision.'}
               </p>
             </div>
@@ -3548,7 +4004,7 @@ export default function TransactionsPage() {
                 className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                 placeholder={
                   locale === 'id'
-                    ? 'Jelaskan revisi harga, scope, timeline, atau syarat agar lebih mudah disetujui.'
+                    ? 'Tulis revisi harga, scope, timeline, atau syarat.'
                     : 'Explain the revised price, scope, timeline, or terms so it is easier to approve.'
                 }
               />
@@ -3602,7 +4058,7 @@ export default function TransactionsPage() {
               </p>
               <p className="mt-1 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                 {locale === 'id'
-                  ? 'Pilih alasan yang paling dekat dengan kondisi sebenarnya agar kronologi order tetap jelas.'
+                  ? 'Pilih alasan paling dekat.'
                   : 'Choose the closest reason so the order timeline stays clear.'}
               </p>
             </div>
@@ -3635,7 +4091,7 @@ export default function TransactionsPage() {
                 className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                 placeholder={
                   locale === 'id'
-                    ? 'Tuliskan konteks singkat agar buyer, seller, dan CRM memahami alasan pembatalan.'
+                    ? 'Tulis alasan singkat.'
                     : 'Add brief context so buyer, seller, and CRM understand the cancellation.'
                 }
               />
@@ -3695,7 +4151,7 @@ export default function TransactionsPage() {
               </p>
               <p className="mt-1">
                 {locale === 'id'
-                  ? 'Isi ringkas, jelas, dan faktual. Tim CRM akan menilai kronologi order, chat, status dana, dan bukti yang Anda kirim.'
+                  ? 'Isi ringkas dan faktual. Bukti akan dicek.'
                   : 'Keep it brief, clear, and factual. CRM will review the order timeline, chat, fund status, and the evidence you provide.'}
               </p>
             </div>
@@ -3728,7 +4184,7 @@ export default function TransactionsPage() {
                 className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                 placeholder={
                   locale === 'id'
-                    ? 'Jelaskan kronologi singkat: kapan, apa yang dijanjikan, apa yang tidak sesuai, dan solusi yang Anda harapkan.'
+                    ? 'Tulis kronologi singkat dan solusi yang diharapkan.'
                     : 'Describe the timeline briefly: when it happened, what was promised, what went wrong, and the outcome you expect.'
                 }
               />
@@ -3762,7 +4218,7 @@ export default function TransactionsPage() {
                 className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-accent-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                 placeholder={
                   locale === 'id'
-                    ? 'Contoh: foto unboxing, nomor resi, jam kejadian, atau ringkasan bukti di chat.'
+                    ? 'Contoh: foto, resi, jam kejadian, bukti chat.'
                     : 'Example: unboxing photo, tracking number, incident time, or a summary of the evidence in chat.'
                 }
               />
@@ -3776,7 +4232,7 @@ export default function TransactionsPage() {
               </p>
               <p className="mt-1 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                 {locale === 'id'
-                  ? 'Setelah dispute terkirim, Anda juga bisa lanjut ke halaman support untuk menambahkan konteks tambahan.'
+                  ? 'Setelah dispute, bisa tambah konteks di support.'
                   : 'After the dispute is submitted, you can continue in support to add more context if needed.'}
               </p>
               <div className="mt-2">
@@ -3801,152 +4257,142 @@ export default function TransactionsPage() {
       <Modal
         open={Boolean(paymentTxn)}
         onClose={closePaymentModal}
-        title="Pay Transaction"
-        className="max-w-2xl"
+        title={locale === 'id' ? 'Bayar transaksi' : 'Pay transaction'}
+        className="max-w-xl"
       >
         {paymentTxn ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-              <p className="text-xs uppercase tracking-wide text-[color:var(--app-text)]">
-                Transaction
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {paymentTxn.id}
-              </p>
-              <p className="mt-1 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                Amount:{' '}
-                {formatPrice(paymentTxn.amount_cents, paymentTxn.currency)} -
-                Wallet: {resolveWalletEnvironment(paymentTxn)}
-              </p>
-              <p className="mt-1 text-xs text-[color:var(--app-text)]">
-                Dana baru diteruskan ke seller setelah status transaksi selesai
-                (<code>completed</code>).
+            <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.34)] dark:border-[color:var(--app-border-strong)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                    {locale === 'id' ? 'Total bayar' : 'Total payment'}
+                  </p>
+                  <p className="mt-1 text-2xl font-black leading-tight text-[color:var(--app-text)]">
+                    {formatPrice(paymentTxn.amount_cents, paymentTxn.currency)}
+                  </p>
+                  <p className="mt-1 truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                    #{paymentTxn.id.slice(0, 8).toUpperCase()}
+                  </p>
+                </div>
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+              </div>
+              <p className="mt-3 rounded-2xl bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text)]">
+                {locale === 'id'
+                  ? 'Dana aman dulu. Seller menerima setelah transaksi selesai.'
+                  : 'Funds are protected first. Seller receives them after the transaction is completed.'}
               </p>
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                Pilih Cara Bayar
+              <p className="text-sm font-black text-[color:var(--app-text)]">
+                {locale === 'id' ? 'Pilih metode' : 'Choose method'}
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {availablePaymentOptions.map(option => (
                   <button
                     key={option.id}
                     type="button"
                     onClick={() => setSelectedPaymentOptionId(option.id)}
-                    className={`rounded-full border px-2 py-1.5 text-left transition ${
+                    className={`ui-pressable flex min-h-[64px] items-center justify-between gap-2 rounded-[20px] border px-3 py-2 text-left transition ${
                       selectedPaymentOptionId === option.id
-                        ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)]'
-                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:hover:border-[color:var(--app-border-strong)]'
+                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[0_16px_34px_-28px_rgba(15,23,42,0.28)]'
+                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)]'
                     }`}
                   >
                     <PaymentMethodPill option={option} />
+                    {selectedPaymentOptionId === option.id ? (
+                      <CheckCircle2 className="h-5 w-5 shrink-0 text-[color:var(--app-accent)]" />
+                    ) : null}
                   </button>
                 ))}
               </div>
             </div>
 
             {selectedPaymentOption ? (
-              <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-info-border)_40%,_transparent)] bg-[color:var(--app-info-soft)] p-3 dark:border-[color:color-mix(in_srgb,_var(--app-info-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)]">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-info)] dark:text-[color:var(--app-info)]">
-                  Selected Method
-                </p>
-                <div className="mt-2 flex items-center gap-3">
-                  <Image
-                    src={selectedPaymentOption.image}
-                    alt={selectedPaymentOption.title}
-                    width={56}
-                    height={56}
-                    className="h-11 w-11 rounded-xl border border-[color:var(--app-info-border)] bg-[color:var(--app-surface-strong)] object-contain p-1 dark:border-[color:var(--app-info-border)] dark:bg-[color:var(--app-surface-strong)]"
-                  />
+              <div className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2.5 dark:border-[color:var(--app-border-strong)]">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                    <p className="text-sm font-black text-[color:var(--app-text)]">
                       {selectedPaymentOption.title}
                     </p>
-                    <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                    <p className="mt-0.5 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
                       {selectedPaymentOption.description}
                     </p>
                   </div>
                 </div>
-                <p className="mt-2 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                <p className="mt-2 text-xs font-semibold leading-5 text-[color:var(--app-text)]">
                   {selectedPaymentUsesWalletBalance
                     ? locale === 'id'
-                      ? 'Kalau saldo cukup, dana langsung ditahan dari wallet tanpa membuat instruksi top-up baru.'
+                      ? 'Kalau saldo cukup, dana langsung diamankan.'
                       : 'If the balance is sufficient, funds are held directly from wallet balance without creating a new top-up instruction.'
                     : locale === 'id'
-                      ? 'Klik "Lanjut bayar" untuk langsung buka instruksi pembayaran.'
+                      ? 'Klik lanjut. Instruksi bayar akan muncul di sini.'
                       : 'Click "Continue to payment" to open the payment instruction.'}
                 </p>
               </div>
             ) : null}
 
             {selectedPaymentUsesWalletBalance ? (
-              <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)]">
+              <div className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:var(--app-border-strong)]">
                 <div className="flex items-start gap-3">
                   <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)] text-[color:var(--app-accent)]">
                     <Wallet className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                      {locale === 'id' ? 'Saldo Wallet' : 'Wallet Balance'}
-                    </p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                      <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_55%,_transparent)]">
-                        <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-black text-[color:var(--app-text)]">
+                          {locale === 'id' ? 'Saldo Wallet' : 'Wallet Balance'}
+                        </p>
+                        <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
                           {locale === 'id' ? 'Tersedia' : 'Available'}
                         </p>
-                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {loadingWalletBalances ? '...' : walletBalanceSummary}
-                        </p>
                       </div>
-                      <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_55%,_transparent)]">
-                        <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
-                          {locale === 'id' ? 'Ditahan' : 'Held'}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {loadingWalletBalances ? '...' : walletHeldSummary}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_55%,_transparent)]">
-                        <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
-                          {locale === 'id' ? 'Status' : 'Status'}
-                        </p>
-                        <p
-                          className={`mt-1 text-sm font-semibold ${
-                            loadingWalletBalances
-                              ? 'text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]'
-                              : canPayWithWalletBalance
-                                ? 'text-[color:var(--app-accent)]'
-                                : 'text-[color:var(--app-warning)]'
-                          }`}
-                        >
-                          {loadingWalletBalances
-                            ? locale === 'id'
-                              ? 'Mengecek...'
-                              : 'Checking...'
-                            : canPayWithWalletBalance
-                              ? locale === 'id'
-                                ? 'Saldo cukup'
-                                : 'Sufficient'
-                              : locale === 'id'
-                                ? 'Kurang saldo'
-                                : 'Insufficient'}
-                        </p>
-                      </div>
+                      <p className="text-base font-black text-[color:var(--app-text)]">
+                        {loadingWalletBalances ? '...' : walletBalanceSummary}
+                      </p>
                     </div>
-                    <p className="mt-2 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                    <p
+                      className={`mt-2 text-xs font-semibold leading-5 ${
+                        loadingWalletBalances
+                          ? 'text-[color:var(--app-text-soft)]'
+                          : canPayWithWalletBalance
+                            ? 'text-[color:var(--app-accent)]'
+                            : 'text-[color:var(--app-warning)]'
+                      }`}
+                    >
                       {loadingWalletBalances
                         ? locale === 'id'
-                          ? 'Sedang memuat saldo wallet terbaru untuk transaksi ini.'
+                          ? 'Mengecek saldo terbaru...'
                           : 'Loading the latest wallet balance for this transaction.'
                         : canPayWithWalletBalance
                           ? locale === 'id'
-                            ? 'Saldo wallet Anda cukup. Dana akan langsung dipindahkan ke escrow transaksi.'
+                            ? 'Saldo cukup. Bisa langsung bayar.'
                             : 'Your wallet balance is sufficient. Funds will move directly into transaction escrow.'
                           : locale === 'id'
-                            ? `Saldo saat ini kurang ${walletShortfallSummary}. Anda masih bisa pilih QRIS, VA, atau metode lain.`
+                            ? `Saldo kurang ${walletShortfallSummary}. Pilih QRIS atau bank transfer.`
                             : `Your balance is short by ${walletShortfallSummary}. You can still choose QRIS, virtual account, or another method.`}
                     </p>
+                    <details className="mt-2 text-xs text-[color:var(--app-text-soft)]">
+                      <summary className="cursor-pointer font-semibold text-[color:var(--app-text)]">
+                        {locale === 'id' ? 'Detail saldo' : 'Balance detail'}
+                      </summary>
+                      <div className="mt-2 grid gap-2 rounded-xl bg-[color:var(--app-surface-muted)] p-2 sm:grid-cols-2">
+                        <span>
+                          {locale === 'id' ? 'Ditahan' : 'Held'}:{' '}
+                          <b>
+                            {loadingWalletBalances ? '...' : walletHeldSummary}
+                          </b>
+                        </span>
+                        <span>
+                          Wallet: <b>{currentWalletEnvironment}</b>
+                        </span>
+                      </div>
+                    </details>
                   </div>
                 </div>
               </div>
@@ -3978,199 +4424,77 @@ export default function TransactionsPage() {
             ) : null}
 
             {latestTopup ? (
-              <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)]">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
-                    Topup {humanize(latestTopup.status || 'pending')}
-                  </span>
-                  <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_15%,_transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-info)] dark:text-[color:var(--app-info)]">
-                    {humanize(
-                      latestPaymentInstruction?.paymentType ||
-                        latestTopup.payment_method ||
-                        selectedPaymentOption?.method ||
-                        selectedPaymentOption?.provider ||
-                        '-',
-                    )}
-                  </span>
-                  {latestPaymentInstruction?.mode ? (
-                    <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-group-talent)_15%,_transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-group-talent)] dark:text-[color:var(--app-group-talent)]">
-                      Flow {humanize(latestPaymentInstruction.mode)}
+              <div className="space-y-3">
+                <div className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] p-3">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]">
+                      <CheckCircle2 className="h-5 w-5" />
                     </span>
-                  ) : null}
-                </div>
-
-                <div className="grid gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] sm:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
-                      Topup ID
-                    </p>
-                    <p className="mt-1 break-all text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {latestTopup.id}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
-                      Provider Transaction
-                    </p>
-                    <p className="mt-1 break-all text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {latestPaymentInstruction?.transactionId || '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
-                      Provider Status
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {humanize(
-                        latestPaymentInstruction?.transactionStatus ||
-                          latestTopup.status ||
-                          '-',
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
-                      Expiry
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {formatDateTime(
-                        latestPaymentInstruction?.expiryTime || '',
-                      )}
-                    </p>
-                  </div>
-                </div>
-
-                {latestPaymentInstruction?.qrUrl ? (
-                  <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                      QR Payment
-                    </p>
-                    <p className="mt-1 break-all text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {latestPaymentInstruction.qrUrl}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <a
-                        href={latestPaymentInstruction.qrUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg bg-[color:var(--app-info)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-info)]"
-                      >
-                        Open QR <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void copyToClipboard(latestPaymentInstruction.qrUrl)
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy QR Link
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {latestPaymentInstruction?.qrString ? (
-                  <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                      QR String
-                    </p>
-                    <p className="mt-1 break-all rounded-lg bg-[color:var(--app-surface-muted)] px-2 py-1 text-[11px] text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
-                      {latestPaymentInstruction.qrString}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void copyToClipboard(latestPaymentInstruction.qrString)
-                      }
-                      className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
-                    >
-                      <Copy className="h-4 w-4" />
-                      Copy QR String
-                    </button>
-                  </div>
-                ) : null}
-
-                {latestPaymentInstruction?.deeplinkUrl ? (
-                  <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                      App Deeplink
-                    </p>
-                    <p className="mt-1 break-all text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {latestPaymentInstruction.deeplinkUrl}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <a
-                        href={latestPaymentInstruction.deeplinkUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg bg-[color:var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
-                      >
-                        Open Payment App{' '}
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void copyToClipboard(
-                            latestPaymentInstruction.deeplinkUrl,
-                          )
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy Deeplink
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {latestPaymentInstruction &&
-                (latestPaymentInstruction.vaNumbers.length > 0 ||
-                  latestPaymentInstruction.permataVa ||
-                  latestPaymentInstruction.billKey ||
-                  latestPaymentInstruction.billerCode) ? (
-                  <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                      Virtual Account / Bill
-                    </p>
-
-                    <div className="mt-2 space-y-2">
-                      {latestPaymentInstruction.vaNumbers.map(va => (
-                        <div
-                          key={`${va.bank}-${va.number}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]"
-                        >
-                          <div>
-                            <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
-                              {va.bank}
-                            </p>
-                            <p className="text-sm font-bold tracking-wide text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {va.number}
-                            </p>
-                          </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-[color:var(--app-text)]">
+                        {latestPaymentInstruction?.qrUrl
+                          ? locale === 'id'
+                            ? 'QRIS siap discan'
+                            : 'QRIS is ready'
+                          : latestPaymentInstruction?.vaNumbers?.[0]?.number ||
+                              latestPaymentInstruction?.permataVa ||
+                              latestPaymentInstruction?.billKey
+                            ? locale === 'id'
+                              ? 'Nomor bayar siap'
+                              : 'Payment number is ready'
+                            : latestCheckoutUrl
+                              ? locale === 'id'
+                                ? 'Instruksi pembayaran siap'
+                                : 'Payment instruction is ready'
+                              : locale === 'id'
+                                ? 'Pembayaran dibuat'
+                                : 'Payment created'}
+                      </p>
+                      <p className="mt-0.5 text-xs font-semibold leading-5 text-[color:var(--app-text)]">
+                        {locale === 'id'
+                          ? 'Ikuti instruksi, lalu cek status setelah bayar.'
+                          : 'Follow the instruction, then check the status after paying.'}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {latestCheckoutUrl ? (
+                          <a
+                            href={latestCheckoutUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                          >
+                            {locale === 'id'
+                              ? 'Buka instruksi'
+                              : 'Open instruction'}
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                        {latestPaymentInstruction?.qrUrl ? (
+                          <a
+                            href={latestPaymentInstruction.qrUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
+                          >
+                            {locale === 'id' ? 'Buka QR' : 'Open QR'}
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                        {latestPaymentInstruction?.vaNumbers?.[0]?.number ? (
                           <button
                             type="button"
-                            onClick={() => void copyToClipboard(va.number)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                            onClick={() =>
+                              void copyToClipboard(
+                                latestPaymentInstruction.vaNumbers[0].number,
+                              )
+                            }
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
                           >
-                            <Copy className="h-4 w-4" />
-                            Copy
+                            <Copy className="h-3.5 w-3.5" />
+                            {locale === 'id' ? 'Salin VA' : 'Copy VA'}
                           </button>
-                        </div>
-                      ))}
-
-                      {latestPaymentInstruction.permataVa ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                          <div>
-                            <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
-                              Permata VA
-                            </p>
-                            <p className="text-sm font-bold tracking-wide text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {latestPaymentInstruction.permataVa}
-                            </p>
-                          </div>
+                        ) : null}
+                        {latestPaymentInstruction?.permataVa ? (
                           <button
                             type="button"
                             onClick={() =>
@@ -4178,30 +4502,13 @@ export default function TransactionsPage() {
                                 latestPaymentInstruction.permataVa,
                               )
                             }
-                            className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
                           >
-                            <Copy className="h-4 w-4" />
-                            Copy
+                            <Copy className="h-3.5 w-3.5" />
+                            {locale === 'id' ? 'Salin VA' : 'Copy VA'}
                           </button>
-                        </div>
-                      ) : null}
-
-                      {latestPaymentInstruction.billKey ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                          <div>
-                            <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
-                              Bill Key
-                            </p>
-                            <p className="text-sm font-bold tracking-wide text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                              {latestPaymentInstruction.billKey}
-                            </p>
-                            {latestPaymentInstruction.billerCode ? (
-                              <p className="text-[11px] text-[color:var(--app-text)]">
-                                Biller Code:{' '}
-                                {latestPaymentInstruction.billerCode}
-                              </p>
-                            ) : null}
-                          </div>
+                        ) : null}
+                        {latestPaymentInstruction?.billKey ? (
                           <button
                             type="button"
                             onClick={() =>
@@ -4209,58 +4516,316 @@ export default function TransactionsPage() {
                                 `${latestPaymentInstruction.billerCode || ''} ${latestPaymentInstruction.billKey}`.trim(),
                               )
                             }
-                            className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            {locale === 'id' ? 'Salin kode' : 'Copy code'}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                    {locale === 'id' ? 'Detail pembayaran' : 'Payment detail'}
+                    <span className="ml-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                      {locale === 'id' ? 'opsional' : 'optional'}
+                    </span>
+                  </summary>
+                  <div className="border-t border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                    <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
+                          Topup {humanize(latestTopup.status || 'pending')}
+                        </span>
+                        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_15%,_transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-info)] dark:text-[color:var(--app-info)]">
+                          {humanize(
+                            latestPaymentInstruction?.paymentType ||
+                              latestTopup.payment_method ||
+                              selectedPaymentOption?.method ||
+                              selectedPaymentOption?.provider ||
+                              '-',
+                          )}
+                        </span>
+                        {latestPaymentInstruction?.mode ? (
+                          <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-group-talent)_15%,_transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-group-talent)] dark:text-[color:var(--app-group-talent)]">
+                            Flow {humanize(latestPaymentInstruction.mode)}
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] sm:grid-cols-2">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
+                            Topup ID
+                          </p>
+                          <p className="mt-1 break-all text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {latestTopup.id}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
+                            Provider Transaction
+                          </p>
+                          <p className="mt-1 break-all text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {latestPaymentInstruction?.transactionId || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
+                            Provider Status
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {humanize(
+                              latestPaymentInstruction?.transactionStatus ||
+                                latestTopup.status ||
+                                '-',
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] uppercase tracking-wide text-[color:var(--app-text)]">
+                            Expiry
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {formatDateTime(
+                              latestPaymentInstruction?.expiryTime || '',
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {latestPaymentInstruction?.qrUrl ? (
+                        <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
+                            QR Payment
+                          </p>
+                          <p className="mt-1 break-all text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {latestPaymentInstruction.qrUrl}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <a
+                              href={latestPaymentInstruction.qrUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg bg-[color:var(--app-info)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-info)]"
+                            >
+                              Open QR <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void copyToClipboard(
+                                  latestPaymentInstruction.qrUrl,
+                                )
+                              }
+                              className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                            >
+                              <Copy className="h-4 w-4" />
+                              Copy QR Link
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {latestPaymentInstruction?.qrString ? (
+                        <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
+                            QR String
+                          </p>
+                          <p className="mt-1 break-all rounded-lg bg-[color:var(--app-surface-muted)] px-2 py-1 text-[11px] text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
+                            {latestPaymentInstruction.qrString}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void copyToClipboard(
+                                latestPaymentInstruction.qrString,
+                              )
+                            }
+                            className="mt-2 inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
                           >
                             <Copy className="h-4 w-4" />
-                            Copy Bill Data
+                            Copy QR String
                           </button>
+                        </div>
+                      ) : null}
+
+                      {latestPaymentInstruction?.deeplinkUrl ? (
+                        <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
+                            App Deeplink
+                          </p>
+                          <p className="mt-1 break-all text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {latestPaymentInstruction.deeplinkUrl}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <a
+                              href={latestPaymentInstruction.deeplinkUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg bg-[color:var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                            >
+                              Open Payment App{' '}
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void copyToClipboard(
+                                  latestPaymentInstruction.deeplinkUrl,
+                                )
+                              }
+                              className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                            >
+                              <Copy className="h-4 w-4" />
+                              Copy Deeplink
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {latestPaymentInstruction &&
+                      (latestPaymentInstruction.vaNumbers.length > 0 ||
+                        latestPaymentInstruction.permataVa ||
+                        latestPaymentInstruction.billKey ||
+                        latestPaymentInstruction.billerCode) ? (
+                        <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
+                            Virtual Account / Bill
+                          </p>
+
+                          <div className="mt-2 space-y-2">
+                            {latestPaymentInstruction.vaNumbers.map(va => (
+                              <div
+                                key={`${va.bank}-${va.number}`}
+                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]"
+                              >
+                                <div>
+                                  <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
+                                    {va.bank}
+                                  </p>
+                                  <p className="text-sm font-bold tracking-wide text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                    {va.number}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void copyToClipboard(va.number)
+                                  }
+                                  className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                  Copy
+                                </button>
+                              </div>
+                            ))}
+
+                            {latestPaymentInstruction.permataVa ? (
+                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                                <div>
+                                  <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
+                                    Permata VA
+                                  </p>
+                                  <p className="text-sm font-bold tracking-wide text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                    {latestPaymentInstruction.permataVa}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void copyToClipboard(
+                                      latestPaymentInstruction.permataVa,
+                                    )
+                                  }
+                                  className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                  Copy
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {latestPaymentInstruction.billKey ? (
+                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                                <div>
+                                  <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
+                                    Bill Key
+                                  </p>
+                                  <p className="text-sm font-bold tracking-wide text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                    {latestPaymentInstruction.billKey}
+                                  </p>
+                                  {latestPaymentInstruction.billerCode ? (
+                                    <p className="text-[11px] text-[color:var(--app-text)]">
+                                      Biller Code:{' '}
+                                      {latestPaymentInstruction.billerCode}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void copyToClipboard(
+                                      `${latestPaymentInstruction.billerCode || ''} ${latestPaymentInstruction.billKey}`.trim(),
+                                    )
+                                  }
+                                  className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                  Copy Bill Data
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {latestPaymentInstruction?.checkoutHint ? (
+                        <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
+                            Extra Action URL
+                          </p>
+                          <p className="mt-1 break-all text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                            {latestPaymentInstruction.checkoutHint}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <a
+                              href={latestPaymentInstruction.checkoutHint}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                            >
+                              Open URL <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void copyToClipboard(
+                                  latestPaymentInstruction.checkoutHint,
+                                )
+                              }
+                              className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                            >
+                              <Copy className="h-4 w-4" />
+                              Copy URL
+                            </button>
+                          </div>
                         </div>
                       ) : null}
                     </div>
                   </div>
-                ) : null}
-
-                {latestPaymentInstruction?.checkoutHint ? (
-                  <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
-                      Extra Action URL
-                    </p>
-                    <p className="mt-1 break-all text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {latestPaymentInstruction.checkoutHint}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <a
-                        href={latestPaymentInstruction.checkoutHint}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
-                      >
-                        Open URL <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void copyToClipboard(
-                            latestPaymentInstruction.checkoutHint,
-                          )
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy URL
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
+                </details>
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 border-t border-[color:var(--app-border)] pt-3 dark:border-[color:var(--app-border-strong)] sm:flex-row">
               <button
                 type="button"
                 onClick={() => void handleCreateTransactionPayment()}
                 disabled={paymentActionDisabled}
-                className="inline-flex items-center gap-2 rounded-lg bg-[color:var(--app-accent)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:opacity-60"
+                className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:opacity-60"
               >
                 {submittingPayment ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -4280,23 +4845,29 @@ export default function TransactionsPage() {
                   type="button"
                   onClick={() => void syncLatestTopupStatus(false)}
                   disabled={syncingTopupStatus || submittingPayment}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-info-border)_60%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] px-3 py-2 text-xs font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] disabled:opacity-60 dark:text-[color:var(--app-info)]"
+                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60 dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
                 >
                   {syncingTopupStatus ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <RefreshCcw className="h-4 w-4" />
                   )}
-                  {syncingTopupStatus ? 'Syncing...' : 'Sync Midtrans Status'}
+                  {syncingTopupStatus
+                    ? locale === 'id'
+                      ? 'Mengecek...'
+                      : 'Checking...'
+                    : locale === 'id'
+                      ? 'Cek status'
+                      : 'Check status'}
                 </button>
               ) : null}
 
-              {latestCheckoutUrl ? (
+              {latestCheckoutUrl && !latestTopup ? (
                 <a
                   href={latestCheckoutUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-info-border)_50%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] px-3 py-2 text-xs font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] dark:text-[color:var(--app-info)]"
+                  className="inline-flex min-h-[46px] items-center justify-center gap-1 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
                 >
                   {locale === 'id' ? 'Buka pembayaran' : 'Open payment'}
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -4309,10 +4880,10 @@ export default function TransactionsPage() {
                   void loadTransactions();
                   void loadWalletBalances();
                 }}
-                className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-border)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]"
+                className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
               >
                 <RefreshCcw className="h-4 w-4" />
-                Refresh Status
+                {locale === 'id' ? 'Refresh' : 'Refresh'}
               </button>
             </div>
           </div>

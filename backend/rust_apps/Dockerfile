@@ -22,13 +22,15 @@ COPY common/Cargo.toml common/Cargo.toml
 COPY identity_service/Cargo.toml identity_service/Cargo.toml
 COPY marketplace_service/Cargo.toml marketplace_service/Cargo.toml
 COPY ai_service/Cargo.toml ai_service/Cargo.toml
+COPY community_service/Cargo.toml community_service/Cargo.toml
 
 # Buat source placeholder agar cargo bisa resolve dependency graph workspace.
-RUN mkdir -p common/src identity_service/src marketplace_service/src ai_service/src && \
+RUN mkdir -p common/src identity_service/src marketplace_service/src ai_service/src community_service/src && \
     printf "pub fn _build_cache_placeholder() {}\n" > common/src/lib.rs && \
     printf "fn main() {}\n" > identity_service/src/main.rs && \
     printf "fn main() {}\n" > marketplace_service/src/main.rs && \
-    printf "fn main() {}\n" > ai_service/src/main.rs
+    printf "fn main() {}\n" > ai_service/src/main.rs && \
+    printf "fn main() {}\n" > community_service/src/main.rs
 
 RUN for i in 1 2 3 4 5; do cargo fetch && break || (echo "cargo fetch failed, retry $i/5" && sleep 8); done
 RUN cargo build --release --bins
@@ -39,11 +41,11 @@ COPY . .
 # Docker COPY bisa membawa timestamp file host yang lebih lama dari placeholder
 # yang dibuat sebelumnya. Touch source nyata agar cargo tidak memakai binary
 # placeholder lama secara keliru.
-RUN find common identity_service marketplace_service ai_service -type f \( -name '*.rs' -o -name 'Cargo.toml' \) -exec touch {} +
+RUN find common identity_service marketplace_service ai_service community_service -type f \( -name '*.rs' -o -name 'Cargo.toml' \) -exec touch {} +
 
 # Ensure migration sources exist for all known Rust services so runtime COPY
 # won't fail for services without migrations (e.g. ai_service).
-RUN for svc in identity_service marketplace_service ai_service; do \
+RUN for svc in identity_service marketplace_service ai_service community_service; do \
       if ! ls /app/${svc}/migrations* >/dev/null 2>&1; then \
         mkdir -p /app/${svc}/migrations && \
         touch /app/${svc}/migrations/.keep; \

@@ -24,9 +24,13 @@ const SUPPLY_CREATE_TYPE_IDS = new Set([
   'service',
   'property',
   'tool_rental',
+  'business_transfer',
 ]);
 
-function isTypeAllowedForIntent(intent: 'demand' | 'supply', typeId: string): boolean {
+function isTypeAllowedForIntent(
+  intent: 'demand' | 'supply',
+  typeId: string,
+): boolean {
   return intent === 'demand'
     ? DEMAND_CREATE_TYPE_IDS.has(typeId)
     : SUPPLY_CREATE_TYPE_IDS.has(typeId);
@@ -66,6 +70,12 @@ const TYPE_LABELS: Record<
     needId: 'alat usaha',
     needEn: 'business tools',
   },
+  business_transfer: {
+    id: 'oper usaha',
+    en: 'business transfer',
+    needId: 'usaha berjalan',
+    needEn: 'running business',
+  },
   company: {
     id: 'profil usaha',
     en: 'business profile',
@@ -75,7 +85,7 @@ const TYPE_LABELS: Record<
 };
 
 export default async function CreateFlowListingPage({ params }: PageProps) {
-  const { locale, flow, listing } = await params;
+  const { flow, listing } = await params;
   const intent = normalizeCreateFlowSegment(flow);
   const typeId = normalizeCreateTypeSegment(listing);
   if (intent === 'supply' && typeId === 'company') {
@@ -127,10 +137,10 @@ export async function generateMetadata({
   const description =
     intent === 'demand'
       ? isId
-        ? `Buat brief ${labels.needId} dengan detail kebutuhan, area, budget, dan target bisnis di Lajukan.`
+        ? `Buat brief ${labels.needId}. Isi kebutuhan, area, budget.`
         : `Create a ${labels.needEn} brief with requirements, area, budget, and business goals on Lajukan.`
       : isId
-        ? `Buat listing ${labels.id} dengan detail yang rapi agar pembeli, tenant, atau partner cepat paham penawaran Anda di Lajukan.`
+        ? `Buat listing ${labels.id}. Isi yang penting dulu.`
         : `Create a ${labels.en} listing with structured details so buyers, tenants, or partners can understand the offer faster on Lajukan.`;
 
   return {

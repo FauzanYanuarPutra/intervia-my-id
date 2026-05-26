@@ -427,8 +427,8 @@ function StorePreviewCard({
     compact ? 'rounded-2xl p-2.5' : 'rounded-[20px] p-3'
   } ${
     active
-      ? 'border-blue-500 bg-blue-50/90 text-blue-950'
-      : 'border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/50'
+      ? 'border-emerald-500 bg-emerald-50/90 text-emerald-950'
+      : 'border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/50'
   }`;
 
   if (compact) {
@@ -525,7 +525,7 @@ function StorePreviewCard({
           </span>
         ))}
         {selectable ? (
-          <span className="ml-auto inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-blue-700">
+          <span className="ml-auto inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-700">
             {active ? 'Selected' : 'Click to select'}
           </span>
         ) : null}
@@ -1058,8 +1058,8 @@ function StoreMarkersLayer({
                         }}
                         className={`inline-flex min-h-[34px] items-center rounded-full border px-3 text-[11px] font-bold transition ${
                           active
-                            ? 'border-blue-500 bg-blue-600 text-white'
-                            : 'border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-400'
+                            ? 'border-emerald-500 bg-emerald-600 text-white'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400'
                         }`}
                       >
                         {active ? 'Selected outlet' : 'Select outlet'}

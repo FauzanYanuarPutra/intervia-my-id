@@ -1,11 +1,10 @@
-﻿import { NextResponse } from 'next/server';
-import { getForumStore } from '@/lib/forum/store';
-import { syncForumDerivedState } from '@/lib/forum/queries';
+import { NextRequest } from 'next/server';
+import { proxyCommunityBackend } from '@/lib/community/backendProxy';
 
-export async function GET() {
-  const store = getForumStore();
-  syncForumDerivedState(store);
-  const categories = [...store.categories].sort((a, b) => a.order - b.order);
-  return NextResponse.json({ data: categories });
+export async function GET(req: NextRequest) {
+  return proxyCommunityBackend(req, '/v1/forum/categories');
 }
 
+export async function POST(req: NextRequest) {
+  return proxyCommunityBackend(req, '/v1/forum/categories');
+}

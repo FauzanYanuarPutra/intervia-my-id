@@ -15,7 +15,7 @@
   </url>
 
   <!-- Paths for all locales -->
-  <!-- Example path: home, search, forum, login, register -->
+  <!-- Example path: home, search, community, login, register -->
   <!-- Structure is the same, just loop in generator if programmatically -->
   <url>
     <loc>https://www.lajukan.com/id/home</loc>
@@ -52,22 +52,22 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/search"/>
   </url>
 
-  <!-- forum -->
+  <!-- community -->
   <url>
-    <loc>https://www.lajukan.com/id/forum</loc>
+    <loc>https://www.lajukan.com/id/community</loc>
     <lastmod>2025-12-12T12:34:56.789Z</lastmod>
     <changefreq>yearly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/forum"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/forum"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/community"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/community"/>
   </url>
   <url>
-    <loc>https://www.lajukan.com/en/forum</loc>
+    <loc>https://www.lajukan.com/en/community</loc>
     <lastmod>2025-12-12T12:34:56.789Z</lastmod>
     <changefreq>yearly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/forum"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/forum"/>
+    <xhtml:link rel="alternate" hreflang="id" href="https://www.lajukan.com/id/community"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.lajukan.com/en/community"/>
   </url>
 
   <!-- login -->

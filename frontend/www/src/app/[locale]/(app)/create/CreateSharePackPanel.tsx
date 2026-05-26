@@ -60,7 +60,7 @@ export function CreateSharePackPanel({
       <div className="relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="inline-flex rounded-full border border-sky-200/80 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/20 dark:text-sky-200">
+            <p className="inline-flex rounded-full border border-teal-200/80 bg-teal-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
               Share Pack
             </p>
             <p className="mt-2 text-[13px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
@@ -158,7 +158,7 @@ export function CreateSharePackPanel({
                         channel.status === 'connected'
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
                           : channel.status === 'ready'
-                            ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200'
+                            ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-200'
                             : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
                       }`}
                     >
@@ -221,15 +221,15 @@ export function CreateSharePackPanel({
     <div className="relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="inline-flex rounded-full border border-sky-200/80 bg-sky-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-sky-700 dark:border-sky-900/70 dark:bg-sky-950/20 dark:text-sky-200">
+          <p className="inline-flex rounded-full border border-teal-200/80 bg-teal-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
             {isId ? 'Share Pack' : 'Share Pack'}
           </p>
           <p className="mt-2.5 text-[15px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            {isId ? 'Sebarin listing' : 'Share listing'}
+            {isId ? 'Sebarin' : 'Share listing'}
           </p>
           <p className="mt-1.5 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
             {isId
-              ? 'Tinggal salin caption, buka channel, terus kirim. WhatsApp kita taruh paling depan.'
+              ? 'Salin caption. Kirim ke channel.'
               : 'Copy the caption, open the channel, and send it. WhatsApp stays first.'}
           </p>
         </div>
@@ -238,7 +238,7 @@ export function CreateSharePackPanel({
           className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
         >
           <Settings2 className="h-3.5 w-3.5" />
-          {isId ? 'Jalur share' : 'Channels'}
+          {isId ? 'Channel' : 'Channels'}
         </Link>
       </div>
 
@@ -249,20 +249,20 @@ export function CreateSharePackPanel({
             <p className="text-[11px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {input.title ||
                 (isId
-                  ? 'Judul listingnya belum ada'
+                  ? 'Judul belum ada'
                   : 'Listing title is not filled yet')}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
               {input.summary ||
                 input.body ||
                 (isId
-                  ? 'Isi judul sama singkatnya dulu biar enak dishare.'
+                  ? 'Isi judul dan ringkasan dulu.'
                   : 'Add the title and summary first so the share pack becomes stronger.')}
             </p>
             {!listingUrl ? (
               <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-warning)]">
                 {isId
-                  ? 'Publish dulu biar link live-nya nyala. Caption sama jalur share udah bisa disiapin dari sekarang.'
+                  ? 'Publish dulu biar link aktif.'
                   : 'Publish the listing first to unlock the live link. The caption and posting paths can already be prepared now.'}
               </p>
             ) : null}
@@ -277,7 +277,7 @@ export function CreateSharePackPanel({
               className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 text-[11px] font-semibold text-white shadow-[0_18px_28px_-20px_rgba(5,150,105,0.34)]"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              {isId ? 'Share ke WhatsApp' : 'Continue in WhatsApp'}
+              {isId ? 'WhatsApp' : 'Continue in WhatsApp'}
             </a>
           ) : null}
           <button
@@ -291,7 +291,7 @@ export function CreateSharePackPanel({
             className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/70"
           >
             <Copy className="h-3.5 w-3.5" />
-            {isId ? 'Salin caption' : 'Copy caption'}
+            {isId ? 'Caption' : 'Copy caption'}
           </button>
           {listingUrl ? (
             <button
@@ -300,7 +300,7 @@ export function CreateSharePackPanel({
               className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/70"
             >
               <Link2 className="h-3.5 w-3.5" />
-              {isId ? 'Salin link' : 'Copy link'}
+              {isId ? 'Link' : 'Copy link'}
             </button>
           ) : null}
           {coverImage ? (
@@ -312,7 +312,7 @@ export function CreateSharePackPanel({
               className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/70"
             >
               <Download className="h-3.5 w-3.5" />
-              {isId ? 'Ambil cover' : 'Download cover'}
+              {isId ? 'Cover' : 'Download cover'}
             </a>
           ) : null}
           {listingUrl ? (
@@ -323,7 +323,7 @@ export function CreateSharePackPanel({
               className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/70"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              {isId ? 'Lihat listing' : 'Open listing'}
+              {isId ? 'Lihat' : 'Open listing'}
             </a>
           ) : null}
         </div>
@@ -346,7 +346,7 @@ export function CreateSharePackPanel({
                       channel.status === 'connected'
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
                         : channel.status === 'ready'
-                          ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200'
+                          ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-200'
                           : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
                     }`}
                   >

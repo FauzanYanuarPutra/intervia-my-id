@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
+import CreateMarketplaceShell from './CreateMarketplaceShell';
 
 type LayoutProps = {
   children: React.ReactNode;
 };
 
 export default function CreateLayout({ children }: LayoutProps) {
-  return children;
+  return <CreateMarketplaceShell>{children}</CreateMarketplaceShell>;
 }
 
 export async function generateMetadata({

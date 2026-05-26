@@ -88,7 +88,7 @@ export default function CrmSecurityLogin({
         <section className="ui-panel ui-hero-panel relative overflow-hidden rounded-[34px] p-5 sm:p-6 lg:p-7">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -left-16 top-12 h-40 w-40 rounded-full bg-sky-200/20 blur-3xl"
+            className="pointer-events-none absolute -left-16 top-12 h-40 w-40 rounded-full bg-emerald-200/20 blur-3xl"
           />
           <div
             aria-hidden="true"

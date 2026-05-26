@@ -133,7 +133,7 @@ export default function MicrogigsClient() {
     title: locale === 'id' ? 'Microgigs' : 'Microgigs',
     subtitle:
       locale === 'id'
-        ? 'Tugas cepat dengan scope jelas, cocok untuk kebutuhan harian.'
+        ? 'Tugas cepat. Scope jelas.'
         : 'Quick tasks with clear scope for everyday needs.',
     placeholder: locale === 'id' ? 'Cari microgig...' : 'Search microgigs...',
     empty: locale === 'id' ? 'Belum ada microgig tersedia.' : 'No microgigs available.',
@@ -180,7 +180,7 @@ export default function MicrogigsClient() {
         ) : loading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={`micro-skel-${index}`} className="ui-panel-muted h-32 animate-pulse" />
+              <div key={`micro-skel-${index}`} className="ui-panel-muted ui-skeleton-pulse h-32" />
             ))}
           </div>
         ) : filteredItems.length === 0 ? (

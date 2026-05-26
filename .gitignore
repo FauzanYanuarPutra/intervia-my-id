@@ -87,7 +87,11 @@ ollama_data/
 caddy_data/
 caddy_config/
 rabbitmq_data/
+.runtime/
 .docker-build-state.*
+frontend/www/.codex-*.png
+frontend/www/tmp-storefront.png
+AppDataLocalDockerwsldataext4.vhdx
 
 # ------------------------------------------------------------
 # Misc

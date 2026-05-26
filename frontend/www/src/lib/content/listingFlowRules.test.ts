@@ -94,9 +94,7 @@ describe('validateListingPayload', () => {
     if (result.ok) return;
 
     expect(
-      result.issues.some(issue =>
-        issue.includes('safe margin buffer'),
-      ),
+      result.issues.some(issue => issue.includes('safe margin buffer')),
     ).toBe(true);
   });
 
@@ -228,6 +226,99 @@ describe('validateListingPayload', () => {
     expect(
       result.issues.some(issue =>
         issue.includes('foreign brand signals detected'),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts active business transfer listings with required handover details', () => {
+    const result = validateListingPayload(
+      {
+        content_type: 'oper-usaha',
+        content_status: 'active',
+        title: 'Oper laundry kiloan aktif di Bekasi',
+        summary: 'Usaha berjalan lengkap dengan aset, SOP, dan laporan dasar.',
+        body: 'Calon pembeli bisa cek aset, kontrak sewa, laporan omzet, biaya operasional, dan risiko sebelum deal.',
+        price_cents: 185000000,
+        cover_image:
+          'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80',
+        metadata: {
+          listing_mode: 'detail',
+          business_name: 'Laundry Kilat Bekasi',
+          business_category: 'service',
+          business_age_months: 18,
+          average_monthly_revenue_cents: 42000000,
+          average_monthly_profit_cents: 11000000,
+          monthly_operational_cost_cents: 26000000,
+          included_assets:
+            'Mesin cuci 4 unit, dryer 2 unit, stok deterjen, rak, dan meja kasir.',
+          handover_items:
+            'SOP, kontak supplier, template promosi, training 7 hari, dan daftar pelanggan yang boleh dialihkan.',
+          rating_summary: 'Google Maps 4,8 dari 320 review',
+          rating_transfer_policy: 'included_needs_platform_approval',
+          transferable_channels:
+            'Google Maps, marketplace, nomor outlet, website, dan katalog pelanggan jika disetujui pihak terkait.',
+          lease_contract_status: 'lease_needs_approval',
+          liabilities_note:
+            'Tidak ada hutang supplier. Sewa outlet perlu approval pemilik.',
+          reason_for_sale: 'Owner pindah domisili.',
+          handover_timeline:
+            '14 hari setelah tanda jadi dan verifikasi dokumen',
+          training_support: 'Training operasional 7 hari.',
+          ownership_proof:
+            'NIB, invoice aset, bukti sewa, dan laporan omzet ringkas.',
+          legal_transfer_note:
+            'Disarankan memakai perjanjian tertulis dan escrow/tahap pembayaran.',
+          handover_risks:
+            'Kontrak sewa perlu persetujuan pemilik dan omzet bisa berubah setelah owner baru.',
+        },
+      },
+      { mode: 'create', strictActiveValidation: true },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload.content_type).toBe('business_transfer');
+  });
+
+  it('rejects business transfer listings when platform/rating transfer details are missing', () => {
+    const result = validateListingPayload(
+      {
+        content_type: 'business_transfer',
+        content_status: 'active',
+        title: 'Oper toko aktif',
+        summary: 'Usaha berjalan.',
+        body: 'Aset dan laporan bisa dicek.',
+        price_cents: 100000000,
+        cover_image:
+          'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80',
+        metadata: {
+          listing_mode: 'detail',
+          business_name: 'Toko Aktif',
+          business_category: 'retail',
+          business_age_months: 12,
+          average_monthly_revenue_cents: 30000000,
+          monthly_operational_cost_cents: 18000000,
+          included_assets: 'Rak, stok awal, dan perlengkapan kasir.',
+          handover_items: 'SOP dan kontak supplier.',
+          rating_transfer_policy: 'included_needs_platform_approval',
+          lease_contract_status: 'owned',
+          liabilities_note: 'Tidak ada hutang supplier.',
+          reason_for_sale: 'Owner fokus ke usaha lain.',
+          handover_timeline: '7 hari',
+          training_support: 'Pendampingan 3 hari.',
+          ownership_proof: 'Invoice aset.',
+          legal_transfer_note: 'Perlu perjanjian tertulis.',
+          handover_risks: 'Traffic toko bisa berubah.',
+        },
+      },
+      { mode: 'create', strictActiveValidation: true },
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(
+      result.issues.some(issue =>
+        issue.includes('metadata.transferable_channels is required'),
       ),
     ).toBe(true);
   });

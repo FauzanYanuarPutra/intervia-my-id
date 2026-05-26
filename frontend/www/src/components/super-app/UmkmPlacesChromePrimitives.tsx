@@ -50,8 +50,8 @@ export function getPlaceIcon(kind: UmkmPlacePresentation['kind']): LucideIcon {
 
 export function toneClass(tone: UmkmPlacePresentation['markerTone']): string {
   if (tone === 'food') return 'bg-rose-50 text-rose-700';
-  if (tone === 'retail') return 'bg-blue-50 text-blue-700';
-  if (tone === 'service') return 'bg-violet-50 text-violet-700';
+  if (tone === 'retail') return 'bg-emerald-50 text-emerald-700';
+  if (tone === 'service') return 'bg-teal-50 text-teal-700';
   if (tone === 'craft') return 'bg-amber-50 text-amber-700';
   if (tone === 'agri') return 'bg-emerald-50 text-emerald-700';
   if (tone === 'workshop') return 'bg-slate-100 text-slate-700';
@@ -356,7 +356,7 @@ function PlaceActionPill({ action }: { action: UmkmPlaceAction }) {
       <a
         href={action.href}
         target={action.href.startsWith('http') ? '_blank' : undefined}
-        rel={action.href.startsWith('http') ? 'noreferrer' : undefined}
+        rel={action.href.startsWith('http') ? 'noopener noreferrer' : undefined}
         className={commonClassName}
         aria-label={action.ariaLabel || action.label}
       >

@@ -44,6 +44,7 @@ class _LajukanWebViewState extends State<LajukanWebView> {
   late final WebViewController _controller;
   late final Widget _webView;
   final ValueNotifier<double> _progress = ValueNotifier(0);
+  bool _handlingSystemBack = false;
   String? _errorMessage;
 
   Future<void> _handlePermissionRequest(
@@ -79,7 +80,8 @@ class _LajukanWebViewState extends State<LajukanWebView> {
     if (result.shouldOpenSettings) {
       await _showSettingsDialog(
         title: 'Izin kamera/mikrofon diblokir',
-        message: 'Buka pengaturan perangkat untuk mengizinkan akses kamera '
+        message:
+            'Buka pengaturan perangkat untuk mengizinkan akses kamera '
             'dan mikrofon agar panggilan bisa berjalan.',
       );
     } else {
@@ -100,8 +102,7 @@ class _LajukanWebViewState extends State<LajukanWebView> {
       if (status.isPermanentlyDenied || status.isRestricted) {
         await _showSettingsDialog(
           title: 'Izin lokasi diblokir',
-          message:
-              'Buka pengaturan perangkat untuk mengizinkan akses lokasi.',
+          message: 'Buka pengaturan perangkat untuk mengizinkan akses lokasi.',
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -234,6 +235,47 @@ class _LajukanWebViewState extends State<LajukanWebView> {
     }
   }
 
+  Future<bool> _canGoBackInsideWebApp() async {
+    try {
+      final result = await _controller.runJavaScriptReturningResult(
+        'Boolean(window.history && window.history.length > 1)',
+      );
+      if (result is bool) return result;
+      final text = result.toString().replaceAll('"', '').trim().toLowerCase();
+      return text == 'true' || text == '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _navigateBackOrShouldClose() async {
+    if (await _controller.canGoBack()) {
+      await _controller.goBack();
+      return false;
+    }
+
+    if (await _canGoBackInsideWebApp()) {
+      await _controller.runJavaScript('window.history.back();');
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<void> _handleSystemBack() async {
+    if (_handlingSystemBack) return;
+    _handlingSystemBack = true;
+
+    try {
+      final shouldClose = await _navigateBackOrShouldClose();
+      if (shouldClose && mounted) {
+        await SystemNavigator.pop();
+      }
+    } finally {
+      _handlingSystemBack = false;
+    }
+  }
+
   Future<void> _handleNativeMessage(JavaScriptMessage message) async {
     if (!mounted) return;
     final raw = message.message.trim();
@@ -252,13 +294,10 @@ class _LajukanWebViewState extends State<LajukanWebView> {
             final mapped = _mapPermissions(permissions);
             if (mapped.isNotEmpty) {
               final result = await _requestPermissions(mapped);
-              if (!result.granted &&
-                  result.shouldOpenSettings &&
-                  mounted) {
+              if (!result.granted && result.shouldOpenSettings && mounted) {
                 await _showSettingsDialog(
                   title: 'Izin diblokir',
-                  message:
-                      'Buka pengaturan perangkat untuk mengizinkan akses.',
+                  message: 'Buka pengaturan perangkat untuk mengizinkan akses.',
                 );
               }
             }
@@ -304,7 +343,10 @@ class _LajukanWebViewState extends State<LajukanWebView> {
     List<Permission> permissions,
   ) async {
     if (permissions.isEmpty) {
-      return const _PermissionRequestResult(granted: true, shouldOpenSettings: false);
+      return const _PermissionRequestResult(
+        granted: true,
+        shouldOpenSettings: false,
+      );
     }
     final statuses = await permissions.request();
     var granted = true;
@@ -364,26 +406,37 @@ class _LajukanWebViewState extends State<LajukanWebView> {
       return _buildExternalLauncher(context);
     }
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: const Color(0xFF0B1220),
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0B1220),
-        body: Stack(
-          children: [
-            RepaintBoundary(child: _webView),
-            ValueListenableBuilder<double>(
-              valueListenable: _progress,
-              builder: (context, value, child) {
-                if (value >= 1) return const SizedBox.shrink();
-                return LinearProgressIndicator(value: value);
-              },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        unawaited(_handleSystemBack());
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: const Color(0xFF0B1220),
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+          systemNavigationBarColor: const Color(0xFF0B1220),
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: const Color(0xFF0B1220),
+          body: SafeArea(
+            child: Stack(
+              children: [
+                Positioned.fill(child: RepaintBoundary(child: _webView)),
+                ValueListenableBuilder<double>(
+                  valueListenable: _progress,
+                  builder: (context, value, child) {
+                    if (value >= 1) return const SizedBox.shrink();
+                    return LinearProgressIndicator(value: value);
+                  },
+                ),
+                if (_errorMessage != null) _buildErrorBanner(context),
+              ],
             ),
-            if (_errorMessage != null) _buildErrorBanner(context),
-          ],
+          ),
         ),
       ),
     );

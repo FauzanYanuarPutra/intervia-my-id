@@ -69,12 +69,12 @@ export default function ChatIndexPage() {
 
           <h1 className="mt-6 text-[28px] font-light tracking-[-0.02em] text-[#111b21] dark:text-[#e9edef]">
             {isId
-              ? 'Pilih percakapan untuk mulai'
+              ? 'Pilih chat'
               : 'Select a conversation to start'}
           </h1>
           <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#667781] dark:text-[#8696a0]">
             {isId
-              ? 'Layout chat ini dibuat rapat dan familiar seperti aplikasi chat yang sudah umum dipakai, jadi balas pesan lebih cepat di desktop maupun mobile.'
+              ? 'Buka chat, balas, lanjut deal.'
               : 'This chat area is tuned for a familiar, compact messaging flow so replying feels natural on desktop and mobile.'}
           </p>
 
@@ -91,7 +91,7 @@ export default function ChatIndexPage() {
               <p className="mt-2 truncate text-base font-medium text-[#111b21] dark:text-[#e9edef]">
                 {latestRoomName}
               </p>
-              <p className="mt-1 line-clamp-3 text-sm leading-6 text-[#667781] dark:text-[#8696a0]">
+              <p className="mt-1 line-clamp-1 text-sm leading-6 text-[#667781] dark:text-[#8696a0]">
                 {latestPreview}
               </p>
 
@@ -100,22 +100,20 @@ export default function ChatIndexPage() {
                 onClick={openLatest}
                 className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#25d366] px-4 py-2 text-sm font-semibold text-[#111b21] transition hover:bg-[#22c55e]"
               >
-                {isId ? 'Buka chat terbaru' : 'Open latest chat'}
+                {isId ? 'Buka terbaru' : 'Open latest'}
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           ) : (
             <p className="mt-8 text-sm text-[#667781] dark:text-[#8696a0]">
               {isId
-                ? 'Belum ada percakapan. Mulai chat baru dari panel kiri.'
+                ? 'Belum ada chat.'
                 : 'No conversations yet. Start a new chat from the left panel.'}
             </p>
           )}
 
           <p className="mt-8 text-xs text-[#667781] dark:text-[#8696a0]">
-            {isId
-              ? 'Semua follow-up tetap berada di room yang sama supaya konteks percakapan tidak pecah.'
-              : 'Keep follow-ups in the same room so the conversation context stays intact.'}
+            {isId ? 'Satu room. Satu konteks.' : 'One room. One context.'}
           </p>
         </div>
       </div>

@@ -21,8 +21,8 @@ export function Skeleton({
   const baseClasses = 'ui-skeleton';
   
   const animationClasses = {
-    pulse: 'animate-pulse',
-    wave: 'animate-shimmer',
+    pulse: 'ui-skeleton-pulse',
+    wave: 'ui-shimmer',
     none: '',
   };
 
@@ -39,6 +39,7 @@ export function Skeleton({
 
   return (
     <div
+      aria-hidden="true"
       className={clsx(
         baseClasses,
         animationClasses[animation],

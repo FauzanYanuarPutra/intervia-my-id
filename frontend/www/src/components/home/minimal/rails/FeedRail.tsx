@@ -72,7 +72,7 @@ export function FeedRail({ isId, items, loading, error }: FeedRailProps) {
         {Array.from({ length: 3 }).map((_, index) => (
           <div
             key={index}
-            className="h-36 min-w-[84%] max-w-[320px] animate-pulse rounded-2xl border border-transparent bg-[color:var(--app-surface-muted)] ring-1 ring-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] dark:bg-[color:var(--app-surface-strong)] dark:ring-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] sm:max-w-none sm:min-w-[250px]"
+            className="ui-skeleton ui-skeleton-pulse h-36 w-[84%] min-w-[84%] max-w-[320px] rounded-2xl border border-transparent ring-1 ring-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] dark:ring-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] sm:w-[250px] sm:min-w-[250px] sm:max-w-[250px]"
           />
         ))}
       </HorizontalRail>
@@ -99,7 +99,7 @@ export function FeedRail({ isId, items, loading, error }: FeedRailProps) {
           <Link
             key={card.id}
             href={card.href}
-            className="group flex min-h-[136px] min-w-[84%] max-w-[320px] snap-start flex-col justify-between rounded-2xl border border-transparent bg-[color:var(--app-surface-muted)] p-3 shadow-none ring-1 ring-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] transition hover:bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] dark:hover:bg-[color:var(--app-surface-strong)] sm:max-w-none sm:min-w-[280px]"
+            className="group flex min-h-[136px] w-[84%] min-w-[84%] max-w-[320px] snap-start flex-col justify-between rounded-2xl border border-transparent bg-[color:var(--app-surface-muted)] p-3 shadow-none ring-1 ring-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] transition hover:bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] dark:hover:bg-[color:var(--app-surface-strong)] sm:w-[280px] sm:min-w-[280px] sm:max-w-[280px]"
           >
             <div className="min-w-0">
               <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${visual.chipClass}`}>

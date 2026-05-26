@@ -2,9 +2,10 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { JobCard } from '@/components/ui-kit';
+import { Header } from '@/components/layout/Header';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   ChevronLeft,
   Filter,
@@ -97,9 +98,9 @@ export default function JobsClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const lastScrollYRef = useRef(0);
   const autoLoadTargetRef = useRef<HTMLDivElement>(null);
   const autoLoadLockRef = useRef(false);
+  const fallbackHomePath = pathname.startsWith('/en') ? '/en/home' : '/id/home';
 
   const initialFilters = useMemo<Filters>(
     () => ({
@@ -119,20 +120,8 @@ export default function JobsClient() {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isVisible, setIsVisible] = useState(true);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const y = window.scrollY;
-      const delta = y - lastScrollYRef.current;
-      if (y <= 10) setIsVisible(true);
-      else if (delta > 15) setIsVisible(false);
-      else if (delta < -10) setIsVisible(true);
-      lastScrollYRef.current = y;
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const handleBack = useAppBack(router, fallbackHomePath);
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -268,21 +257,21 @@ export default function JobsClient() {
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <header
-        className={clsx(
-          'fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] backdrop-blur-xl transition-transform duration-300 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)]',
-          isVisible ? 'translate-y-0' : '-translate-y-full',
-        )}
-      >
-        <div className="mx-auto max-w-7xl space-y-4 px-4 py-4">
-          <div className="flex flex-col gap-3 md:flex-row">
+      <div className="hidden lg:block">
+        <Header />
+      </div>
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
+        <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
+          <div className="flex flex-col gap-2 md:flex-row">
             <div className="flex flex-grow items-center gap-2">
               <button
+                type="button"
                 title="Back"
-                onClick={() => router.back()}
-                className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 transition-all active:scale-95 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                aria-label="Back"
+                onClick={handleBack}
+                className="inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition-all active:scale-95 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               >
-                <ChevronLeft className="h-5 w-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
+                <ChevronLeft className="h-4.5 w-4.5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]" />
               </button>
 
               <div className="relative flex-grow">
@@ -290,7 +279,7 @@ export default function JobsClient() {
                 <input
                   type="text"
                   placeholder="Search jobs, company, or keyword"
-                  className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-3 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                  className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={draftFilters.search}
                   onChange={(event) =>
                     setDraftFilters((prev) => ({ ...prev, search: event.target.value }))
@@ -300,7 +289,7 @@ export default function JobsClient() {
               </div>
             </div>
 
-            <div className="grid flex-1 gap-2 md:max-w-md md:grid-cols-2">
+            <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] md:max-w-md md:grid md:grid-cols-2 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
               <input
                 type="text"
                 placeholder="Location filter"
@@ -309,7 +298,7 @@ export default function JobsClient() {
                   setDraftFilters((prev) => ({ ...prev, location: event.target.value }))
                 }
                 onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
-                className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
               <input
                 type="text"
@@ -319,7 +308,7 @@ export default function JobsClient() {
                   setDraftFilters((prev) => ({ ...prev, level: event.target.value }))
                 }
                 onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
-                className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                className="min-w-[180px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
             </div>
           </div>
@@ -335,7 +324,7 @@ export default function JobsClient() {
               <div className="flex flex-wrap items-center gap-2">
                 {filters.search && (
                   <span className="rounded-lg border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-xs font-semibold text-[color:var(--app-accent)]">
-                    "{filters.search}"
+                    &quot;{filters.search}&quot;
                   </span>
                 )}
                 {filters.location && (
@@ -358,13 +347,13 @@ export default function JobsClient() {
             )}
           </div>
 
-          <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">Auto-apply filter aktif</p>
+          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">Auto-apply filter aktif</p>
         </div>
       </header>
 
-      <div className="h-[200px] md:h-[160px]" />
+      <div className="h-[126px] md:h-[112px] lg:h-[calc(112px+3.5rem+env(safe-area-inset-top))]" />
 
-      <main className="mx-auto max-w-7xl px-4 pb-20">
+      <main className="mx-auto max-w-[1500px] px-2 pb-5 sm:px-3">
         {loadError ? (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-warning-border)_70%,_transparent)] bg-[color:var(--app-warning-soft)] px-4 py-3 text-xs text-[color:var(--app-warning)]">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -385,7 +374,7 @@ export default function JobsClient() {
             {Array.from({ length: 9 }).map((_, index) => (
               <div
                 key={index}
-                className="h-48 animate-pulse rounded-2xl bg-[color:var(--app-surface)] dark:bg-[color:var(--app-surface-strong)]"
+                className="ui-skeleton ui-skeleton-pulse h-48 rounded-2xl"
               />
             ))}
           </div>
@@ -409,7 +398,7 @@ export default function JobsClient() {
 
             <div
               ref={autoLoadTargetRef}
-              className="flex min-h-[120px] w-full flex-col items-center justify-center py-12"
+              className="flex min-h-[72px] w-full flex-col items-center justify-center py-5"
             >
               {loadingMore ? (
                 <div className="inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--app-text)]">
@@ -424,14 +413,14 @@ export default function JobsClient() {
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center py-24 text-center">
+          <div className="flex flex-col items-center py-8 text-center">
             <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">No jobs found</h2>
             <p className="mt-2 text-sm text-[color:var(--app-text)]">
               Try adjusting your filters or search keyword.
             </p>
             <button
               onClick={resetFilters}
-              className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-8 py-3 font-bold text-[color:var(--app-text-inverse)] shadow-lg hover:bg-[color:var(--app-accent-strong)]"
+              className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-5 py-2.5 font-bold text-[color:var(--app-text-inverse)] shadow-lg hover:bg-[color:var(--app-accent-strong)]"
             >
               <RotateCcw className="h-4 w-4" />
               Reset filters

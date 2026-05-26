@@ -26,7 +26,7 @@ export async function generateMetadata({
   const description =
     messages.register?.description ||
     (locale === 'id'
-      ? 'Daftar pakai nomor HP dan mulai cari, jual, atau kelola usaha lebih cepat di Lajukan.'
+      ? 'Daftar pakai nomor HP. Mulai cari, jual, kelola usaha.'
       : 'Create a new account on Lajukan and start accessing freelance projects, jobs, properties, and top opportunities across Indonesia.');
 
   const canonicalUrl = `https://www.lajukan.com/${locale}/register`;
@@ -69,7 +69,7 @@ export default async function RegisterLayout({
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <main>{children}</main>
+      {children}
     </NextIntlClientProvider>
   );
 }

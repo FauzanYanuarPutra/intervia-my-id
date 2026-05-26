@@ -24,9 +24,9 @@ export default function AISummaryCard({ loading, summary }: Props) {
             <span className="text-sm">Analyzing search results...</span>
           </div>
           <div className="space-y-2 pt-2">
-            <div className="h-3 w-full animate-pulse rounded bg-[color:var(--app-surface)] dark:bg-[color:var(--app-surface-strong)]" />
-            <div className="h-3 w-5/6 animate-pulse rounded bg-[color:var(--app-surface)] dark:bg-[color:var(--app-surface-strong)]" />
-            <div className="h-3 w-4/5 animate-pulse rounded bg-[color:var(--app-surface)] dark:bg-[color:var(--app-surface-strong)]" />
+            <div className="ui-skeleton ui-skeleton-pulse h-3 w-full rounded" />
+            <div className="ui-skeleton ui-skeleton-pulse h-3 w-5/6 rounded" />
+            <div className="ui-skeleton ui-skeleton-pulse h-3 w-4/5 rounded" />
           </div>
         </div>
       ) : (

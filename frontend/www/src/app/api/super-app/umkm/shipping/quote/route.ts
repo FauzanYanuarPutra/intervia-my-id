@@ -12,6 +12,7 @@ const ShippingQuoteSchema = z.object({
   delivery_address: z.string().max(500).optional(),
   delivery_lat: z.number().min(-90).max(90).optional(),
   delivery_lng: z.number().min(-180).max(180).optional(),
+  delivery_destination_id: z.string().max(80).optional(),
   preferred_mode: z.enum(['courier', 'pickup', 'digital']).optional(),
   items: z
     .array(
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
       deliveryAddress: payload.delivery_address,
       deliveryLat: payload.delivery_lat,
       deliveryLng: payload.delivery_lng,
+      deliveryDestinationId: payload.delivery_destination_id,
       preferredMode: payload.preferred_mode,
     });
 

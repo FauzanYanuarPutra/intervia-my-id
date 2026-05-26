@@ -6,6 +6,7 @@ import { useLocale } from 'next-intl';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { useAuth } from '@/context/AuthContext';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
+import { useAppBack } from '@/lib/navigation/useAppBack';
 
 export default function ReviewPage({
   params,
@@ -14,6 +15,7 @@ export default function ReviewPage({
 }) {
   const router = useRouter();
   const locale = useLocale() || 'id';
+  const handleBack = useAppBack(router, '/transactions');
   const { authFetch } = useAuth();
   const { notify } = useToast();
   const [rating, setRating] = useState(0);
@@ -196,7 +198,7 @@ export default function ReviewPage({
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => router.back()}
+                onClick={handleBack}
                 className="h-12 rounded-xl border border-[color:var(--app-border)] px-6 text-sm font-semibold dark:border-[color:var(--app-border-strong)]"
               >
                 {locale === 'id' ? 'Nanti' : 'Cancel'}

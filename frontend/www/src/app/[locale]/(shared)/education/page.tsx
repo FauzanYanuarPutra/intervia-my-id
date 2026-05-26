@@ -34,11 +34,11 @@ export default async function EducationPage({ params }: PageProps) {
           meta={isId ? 'Edukasi' : 'Education'}
         >
           <InfoChips items={EDUCATION_HERO.chips.map((chip) => pickText(locale, chip))} />
-          <AnchorLink href="#edu-topics" label={isId ? 'Topik utama' : 'Core topics'} />
-          <AnchorLink href="#edu-actions" label={isId ? 'Langkah aman' : 'Safety steps'} />
+          <AnchorLink href="#edu-topics" label={isId ? 'Topik' : 'Core topics'} />
+          <AnchorLink href="#edu-actions" label={isId ? 'Aman' : 'Safety steps'} />
           <AnchorLink href="#edu-resources" label={isId ? 'Resource' : 'Resources'} />
           <Link href="/learn" className="ui-button-primary inline-flex items-center px-4 text-sm">
-            {isId ? 'Mulai belajar' : 'Start learning'}
+            {isId ? 'Mulai' : 'Start learning'}
           </Link>
         </SummaryCard>
 
@@ -46,7 +46,7 @@ export default async function EducationPage({ params }: PageProps) {
           <div className="flex items-center gap-2">
             <TrustBadge label={isId ? 'PANDUAN' : 'GUIDE'} />
             <h2 className="text-lg font-bold text-[color:var(--app-text)]">
-              {isId ? 'Panduan per kebutuhan usaha' : 'Guides by business need'}
+              {isId ? 'Panduan usaha' : 'Guides by business need'}
             </h2>
           </div>
 
@@ -71,7 +71,7 @@ export default async function EducationPage({ params }: PageProps) {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-[color:var(--app-warning)]">
                     <AlertTriangle className="h-4 w-4" />
-                    <span className="font-semibold">{isId ? 'Risiko utama' : 'Main risks'}</span>
+                    <span className="font-semibold">{isId ? 'Risiko' : 'Main risks'}</span>
                   </div>
                   <ul className="space-y-1 text-[color:var(--app-text-soft)]">
                     {topic.risks.map((risk) => (
@@ -102,7 +102,7 @@ export default async function EducationPage({ params }: PageProps) {
                   <div className="flex items-center gap-2 text-[color:var(--app-info)]">
                     <BookOpen className="h-4 w-4" />
                     <span className="font-semibold">
-                      {isId ? 'Proteksi Lajukan' : 'Lajukan safeguards'}
+                      {isId ? 'Proteksi' : 'Lajukan safeguards'}
                     </span>
                   </div>
                   <ul className="space-y-1 text-[color:var(--app-text-soft)]">
@@ -123,7 +123,7 @@ export default async function EducationPage({ params }: PageProps) {
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-[color:var(--app-accent)]" />
             <h2 className="text-base font-semibold text-[color:var(--app-text)]">
-              {isId ? 'Langkah cepat saat supply atau transaksi bermasalah' : 'Fast steps when supply or transactions break'}
+              {isId ? 'Kalau bermasalah' : 'Fast steps when supply or transactions break'}
             </h2>
           </div>
           <ol className="space-y-2 text-sm text-[color:var(--app-text-soft)]">
@@ -133,7 +133,7 @@ export default async function EducationPage({ params }: PageProps) {
               </span>
               <span>
                 {isId
-                  ? 'Hentikan transaksi di luar aplikasi. Simpan chat, invoice, foto barang, dan file pendukung.'
+                  ? 'Stop transaksi luar app. Simpan bukti.'
                   : 'Stop any off-platform transaction. Save chat, invoices, item photos, and supporting files.'}
               </span>
             </li>
@@ -143,7 +143,7 @@ export default async function EducationPage({ params }: PageProps) {
               </span>
               <span>
                 {isId
-                  ? 'Laporkan dari halaman listing, chat, atau order, sertakan detail supplier, jasa, atau shipment yang bermasalah.'
+                  ? 'Laporkan dari listing, chat, atau order.'
                   : 'Report from the listing, chat, or order and attach the supplier, service, or shipment details.'}
               </span>
             </li>
@@ -153,7 +153,7 @@ export default async function EducationPage({ params }: PageProps) {
               </span>
               <span>
                 {isId
-                  ? 'Aktifkan dispute dan eskalasi jika deal, shipment, atau pekerjaan sudah berjalan.'
+                  ? 'Aktifkan dispute kalau deal sudah jalan.'
                   : 'Trigger disputes and escalation if the deal, shipment, or work is already in progress.'}
               </span>
             </li>
@@ -163,28 +163,28 @@ export default async function EducationPage({ params }: PageProps) {
               </span>
               <span>
                 {isId
-                  ? 'Update keamanan akun: ganti password, aktifkan MFA.'
+                  ? 'Ganti password. Aktifkan MFA.'
                   : 'Secure your account: change password and enable MFA.'}
               </span>
             </li>
           </ol>
           <div className="flex flex-wrap gap-2">
             <Link href="/support" className="ui-button-primary inline-flex items-center px-4 text-sm">
-              {isId ? 'Hubungi Support' : 'Contact support'}
+              {isId ? 'Support' : 'Contact support'}
             </Link>
             <Link href="/trust" className="ui-button-secondary inline-flex items-center px-4 text-sm">
-              {isId ? 'Lihat Trust Center' : 'Open Trust Center'}
+              {isId ? 'Trust' : 'Open Trust Center'}
             </Link>
           </div>
         </section>
 
         <section id="edu-resources" className="ui-panel rounded-[20px] p-4 space-y-2">
           <h2 className="text-base font-semibold text-[color:var(--app-text)]">
-            {isId ? 'Resource dan standar operasional aman' : 'Resources and safe operating standards'}
+            {isId ? 'Resource aman' : 'Resources and safe operating standards'}
           </h2>
           <p className="text-sm text-[color:var(--app-text-soft)]">
             {isId
-              ? 'Semua deal supplier, jasa, storefront, dan pengiriman mengikuti kebijakan Lajukan, escrow, dan audit trail. Panduan lengkap tersedia di Trust Center.'
+              ? 'Aturan lengkap ada di Trust Center.'
               : 'All supplier, service, storefront, and delivery flows follow Lajukan policies, escrow, and audit trails. Full guidance is in Trust Center.'}
           </p>
           <div className="flex flex-wrap gap-2">

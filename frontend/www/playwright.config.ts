@@ -2,6 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
 const useExistingServer = process.env.E2E_USE_EXISTING_SERVER === 'true';
+const browserChannel =
+  process.env.E2E_BROWSER_CHANNEL ||
+  (process.platform === 'win32' && !process.env.CI ? 'chrome' : undefined);
+const recordVideo = process.env.E2E_VIDEO === 'true';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -19,7 +23,7 @@ export default defineConfig({
     baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: recordVideo ? 'retain-on-failure' : 'off',
   },
   webServer: useExistingServer
     ? undefined
@@ -32,7 +36,10 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(browserChannel ? { channel: browserChannel } : {}),
+      },
     },
   ],
 });

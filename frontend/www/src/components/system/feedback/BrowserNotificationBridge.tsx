@@ -68,12 +68,34 @@ function playBackgroundSound(sound: 'messageReceive' | 'callAlert') {
   soundManager.play(sound);
 }
 
+function runWhenIdle(task: () => void, timeout = 1800) {
+  if (typeof window === 'undefined') return () => {};
+  const idleWindow = window as Window &
+    typeof globalThis & {
+      requestIdleCallback?: (
+        callback: IdleRequestCallback,
+        options?: IdleRequestOptions,
+      ) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    const idleId = idleWindow.requestIdleCallback(task, { timeout });
+    return () => idleWindow.cancelIdleCallback?.(idleId);
+  }
+
+  const timeoutId = globalThis.setTimeout(task, Math.min(timeout, 600));
+  return () => globalThis.clearTimeout(timeoutId);
+}
+
 export function BrowserNotificationBridge() {
   const { user } = useAuth();
 
   useEffect(() => {
     if (!user || !isBrowserNotificationSupported()) return;
-    void ensureNotificationServiceWorkerRegistered();
+    return runWhenIdle(() => {
+      void ensureNotificationServiceWorkerRegistered();
+    });
   }, [user]);
 
   useEffect(() => {
@@ -83,19 +105,30 @@ export function BrowserNotificationBridge() {
     const promptKey = `lajukan:notifications:prompted:v1:${user.id}`;
     if (window.localStorage.getItem(promptKey) === 'done') return;
 
-    const requestPermission = () => {
-      window.localStorage.setItem(promptKey, 'done');
-      void requestBrowserNotificationPermission().then((permission) => {
-        if (permission === 'granted') {
-          void ensureNotificationServiceWorkerRegistered();
-        }
-      });
-    };
-
+    let cancelIdle: (() => void) | null = null;
+    let promptScheduled = false;
     const options: AddEventListenerOptions = {
-      once: true,
       passive: true,
       capture: true,
+    };
+    const cleanupPromptListeners = () => {
+      window.removeEventListener('pointerdown', requestPermission, options);
+      window.removeEventListener('keydown', requestPermission, options);
+      window.removeEventListener('touchstart', requestPermission, options);
+    };
+    const requestPermission = () => {
+      if (promptScheduled) return;
+      promptScheduled = true;
+      cleanupPromptListeners();
+
+      cancelIdle = runWhenIdle(() => {
+        window.localStorage.setItem(promptKey, 'done');
+        void requestBrowserNotificationPermission().then(permission => {
+          if (permission === 'granted') {
+            void ensureNotificationServiceWorkerRegistered();
+          }
+        });
+      });
     };
 
     window.addEventListener('pointerdown', requestPermission, options);
@@ -103,9 +136,8 @@ export function BrowserNotificationBridge() {
     window.addEventListener('touchstart', requestPermission, options);
 
     return () => {
-      window.removeEventListener('pointerdown', requestPermission, options);
-      window.removeEventListener('keydown', requestPermission, options);
-      window.removeEventListener('touchstart', requestPermission, options);
+      cancelIdle?.();
+      cleanupPromptListeners();
     };
   }, [user]);
 

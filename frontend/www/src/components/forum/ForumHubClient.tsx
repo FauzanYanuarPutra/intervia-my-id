@@ -156,10 +156,10 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
     const payload = await res.json().catch(() => ({}));
     setSavingThread(false);
     if (!res.ok) {
-      notify({ title: isId ? 'Topik gagal diposting' : 'Failed to create thread', description: payload.error || '', variant: 'error' });
+      notify({ title: isId ? 'Topik gagal diposting' : 'Failed to create topic', description: payload.error || '', variant: 'error' });
       return;
     }
-    notify({ title: isId ? 'Topik berhasil diposting' : 'Thread published', variant: 'success' });
+    notify({ title: isId ? 'Topik berhasil diposting' : 'Topic published', variant: 'success' });
     setTitle('');
     setBody('');
     setComposerOpen(false);
@@ -202,27 +202,27 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
       <section className="ui-panel ui-hero-panel rounded-3xl p-6">
         <p className="ui-kicker">
           <Sparkles className="h-3.5 w-3.5" />
-          {isId ? 'Forum bisnis UMKM' : 'UMKM business forum'}
+          {isId ? 'Komunitas usaha UMKM' : 'UMKM business community'}
         </p>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
             <h1 className="text-3xl font-black tracking-tight text-[color:var(--app-text)]">
               {storeHint
                 ? isId
-                  ? `Diskusi bisnis untuk ${storeHint}`
-                  : `Business discussion for ${storeHint}`
+                  ? `Komunitas bisnis untuk ${storeHint}`
+                  : `Business community for ${storeHint}`
                 : isId
-                  ? 'Tanya supplier, operasional, dan channel jual di sini'
-                  : 'Discuss suppliers, ops, and sales channels here'}
+                  ? 'Diskusi supplier, operasional, dan channel jual di sini'
+                  : 'Discuss suppliers, operations, and sales channels here'}
             </h1>
             <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
               {isId
-                ? 'Bukan timeline random. Forum ini dipakai untuk tanya hal yang benar-benar bikin usaha lebih rapi dan lebih laku.'
-                : 'Not a random timeline. This forum is for practical questions that improve execution and revenue.'}
+                ? 'Diskusi yang bikin usaha lebih rapi.'
+                : 'Not a random timeline. This community is for practical questions that improve execution and revenue.'}
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-black text-[color:var(--app-text)]">{overview?.stats.totalThreads || 0}</span>{isId ? 'topik' : 'threads'}</div>
+            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-black text-[color:var(--app-text)]">{overview?.stats.totalThreads || 0}</span>{isId ? 'topik' : 'topics'}</div>
             <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-black text-[color:var(--app-text)]">{overview?.stats.totalPosts || 0}</span>{isId ? 'balasan' : 'posts'}</div>
             <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-black text-[color:var(--app-text)]">{overview?.stats.totalUsers || 0}</span>{isId ? 'kontributor' : 'contributors'}</div>
           </div>
@@ -265,17 +265,17 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
           <section className="ui-panel rounded-3xl p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)]">{isId ? 'Topik aktif' : 'Active threads'}</h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{isId ? 'Klik topik untuk buka detail dan balas.' : 'Open a thread to read details and reply.'}</p>
+                <h2 className="text-base font-semibold text-[color:var(--app-text)]">{isId ? 'Topik aktif' : 'Active topics'}</h2>
+                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{isId ? 'Buka topik, balas.' : 'Open a topic to read details and reply.'}</p>
               </div>
               <button type="button" onClick={() => setComposerOpen(value => !value)} className="ui-button-secondary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold">
                 <MessageSquarePlus className="h-4 w-4" />
-                {composerOpen ? (isId ? 'Tutup composer' : 'Close composer') : (isId ? 'Buat topik' : 'New thread')}
+                {composerOpen ? (isId ? 'Tutup composer' : 'Close composer') : (isId ? 'Buat topik' : 'New topic')}
               </button>
             </div>
             {composerOpen ? (
               <form onSubmit={submitThread} className="mt-4 space-y-3 rounded-3xl border border-[color:var(--app-border)] p-4">
-                <input value={title} onChange={event => setTitle(event.target.value)} placeholder={isId ? 'Judul topik yang jelas' : 'Clear thread title'} className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-3 text-sm text-[color:var(--app-text)]" />
+                <input value={title} onChange={event => setTitle(event.target.value)} placeholder={isId ? 'Judul topik yang jelas' : 'Clear topic title'} className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-3 text-sm text-[color:var(--app-text)]" />
                 <div className="grid gap-3 md:grid-cols-2">
                   <select value={composerCategory} onChange={event => setComposerCategory(event.target.value)} className="rounded-2xl border border-[color:var(--app-border)] px-3 py-3 text-sm text-[color:var(--app-text)]">
                     {categories.map(item => <option key={item.id} value={item.slug}>{item.name}</option>)}
@@ -285,20 +285,20 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
                     {tags.map(item => <option key={item.id} value={item.slug}>{item.name}</option>)}
                   </select>
                 </div>
-                <textarea value={body} onChange={event => setBody(event.target.value)} rows={5} placeholder={isId ? 'Jelaskan konteks usaha, masalah, dan target hasil yang kamu cari.' : 'Describe the business context, the problem, and the outcome you want.'} className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-3 text-sm text-[color:var(--app-text)]" />
+                <textarea value={body} onChange={event => setBody(event.target.value)} rows={5} placeholder={isId ? 'Konteks, masalah, target hasil.' : 'Describe the business context, the problem, and the outcome you want.'} className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-3 text-sm text-[color:var(--app-text)]" />
                 <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[color:var(--app-text-soft)]">
-                  <span>{user ? (isId ? 'Posting sebagai user yang sedang login.' : 'Posting with the current account.') : (isId ? 'Login dulu untuk posting.' : 'Log in to post.')}</span>
+                  <span>{user ? (isId ? 'Posting dari akun ini.' : 'Posting with the current account.') : (isId ? 'Login dulu untuk posting.' : 'Log in to post.')}</span>
                   {user ? (
-                    <button type="submit" disabled={savingThread} className="ui-button-primary inline-flex items-center justify-center px-4 text-sm font-semibold disabled:opacity-60">{savingThread ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Posting topik' : 'Publish thread')}</button>
+                    <button type="submit" disabled={savingThread} className="ui-button-primary inline-flex items-center justify-center px-4 text-sm font-semibold disabled:opacity-60">{savingThread ? (isId ? 'Menyimpan...' : 'Saving...') : (isId ? 'Posting topik' : 'Publish topic')}</button>
                   ) : (
-                    <Link href={loginHref} className="ui-button-primary inline-flex items-center justify-center px-4 text-sm font-semibold">{isId ? 'Login untuk posting' : 'Log in to post'}</Link>
+                    <Link href={loginHref} className="ui-button-primary inline-flex items-center justify-center px-4 text-sm font-semibold">{isId ? 'Login dulu' : 'Log in to post'}</Link>
                   )}
                 </div>
               </form>
             ) : null}
             <div className="mt-4 space-y-3">
-              {loading ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Memuat topik...' : 'Loading threads...'}</p> : null}
-              {!loading && threads.length === 0 ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Belum ada topik yang cocok dengan filter ini.' : 'No threads match the current filters.'}</p> : null}
+              {loading ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Memuat topik...' : 'Loading topics...'}</p> : null}
+              {!loading && threads.length === 0 ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Belum ada topik yang cocok dengan filter ini.' : 'No topics match the current filters.'}</p> : null}
               {threads.map(item => (
                 <button key={item.id} type="button" onClick={() => openThread(item.id)} className={`w-full rounded-3xl border px-4 py-4 text-left transition ${threadId === item.id ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)]/20' : 'border-[color:var(--app-border)] bg-white hover:border-[color:var(--app-accent-border)]'}`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -323,8 +323,8 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
           <section className="ui-panel rounded-3xl p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-[color:var(--app-text)]">{activeThread?.title || (isId ? 'Pilih topik dulu' : 'Pick a thread')}</h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{activeThread ? `${activeThread.category?.name || '-'} / ${activeThread.author?.name || '-'} / ${fmtTime(activeThread.lastActivityAt, isId)}` : (isId ? 'Detail diskusi akan muncul di sini.' : 'Thread details will appear here.')}</p>
+                <h2 className="text-base font-semibold text-[color:var(--app-text)]">{activeThread?.title || (isId ? 'Pilih topik dulu' : 'Pick a topic')}</h2>
+                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{activeThread ? `${activeThread.category?.name || '-'} / ${activeThread.author?.name || '-'} / ${fmtTime(activeThread.lastActivityAt, isId)}` : (isId ? 'Detail muncul di sini.' : 'Topic details will appear here.')}</p>
               </div>
               {overview?.featuredThreads?.length ? (
                 <div className="flex flex-wrap gap-2">
@@ -334,7 +334,7 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
             </div>
             <div className="mt-4 space-y-3">
               {detailLoading ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Memuat isi diskusi...' : 'Loading discussion...'}</p> : null}
-              {!detailLoading && !activeThread ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Belum ada thread yang dipilih.' : 'No thread selected yet.'}</p> : null}
+              {!detailLoading && !activeThread ? <p className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Belum ada topik yang dipilih.' : 'No topic selected yet.'}</p> : null}
               {posts.map(post => (
                 <article key={post.id} className="rounded-3xl border border-[color:var(--app-border)] px-4 py-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -349,12 +349,12 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
           </section>
 
           <section className="ui-panel rounded-3xl p-5">
-            <h2 className="text-base font-semibold text-[color:var(--app-text)]">{isId ? 'Balas diskusi' : 'Reply to thread'}</h2>
-            <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{isId ? 'Tulis jawaban yang bisa langsung dipakai oleh pelaku usaha lain.' : 'Write a reply another operator can use immediately.'}</p>
+            <h2 className="text-base font-semibold text-[color:var(--app-text)]">{isId ? 'Balas diskusi' : 'Reply to topic'}</h2>
+            <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{isId ? 'Tulis jawaban yang bisa dipakai.' : 'Write a reply another operator can use immediately.'}</p>
             <form onSubmit={submitReply} className="mt-4 space-y-3">
-              <textarea value={reply} onChange={event => setReply(event.target.value)} rows={5} disabled={!activeThread} placeholder={isId ? 'Contoh: supplier A lebih stabil untuk partai kecil, SOP packing sebaiknya begini...' : 'Example: supplier A is stable for small batches, and this packing SOP works better...'} className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-3 text-sm text-[color:var(--app-text)] disabled:opacity-60" />
+              <textarea value={reply} onChange={event => setReply(event.target.value)} rows={5} disabled={!activeThread} placeholder={isId ? 'Contoh: supplier A stabil, SOP packing begini...' : 'Example: supplier A is stable for small batches, and this packing SOP works better...'} className="w-full rounded-2xl border border-[color:var(--app-border)] px-3 py-3 text-sm text-[color:var(--app-text)] disabled:opacity-60" />
               <div className="flex flex-wrap items-center justify-between gap-3">
-                {user ? <span className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Balasan akan terkirim dari akun yang sedang login.' : 'Replies will be sent from the current account.'}</span> : <Link href={loginHref} className="text-sm font-semibold ui-accent-text">{isId ? 'Login untuk membalas' : 'Log in to reply'}</Link>}
+                {user ? <span className="text-sm text-[color:var(--app-text-soft)]">{isId ? 'Balasan dari akun ini.' : 'Replies will be sent from the current account.'}</span> : <Link href={loginHref} className="text-sm font-semibold ui-accent-text">{isId ? 'Login untuk membalas' : 'Log in to reply'}</Link>}
                 <button type="submit" disabled={!activeThread || !reply.trim() || savingReply || !user} className="ui-button-primary inline-flex items-center justify-center gap-2 px-4 text-sm font-semibold disabled:opacity-60">
                   <Send className="h-4 w-4" />
                   {savingReply ? (isId ? 'Mengirim...' : 'Sending...') : (isId ? 'Kirim balasan' : 'Send reply')}

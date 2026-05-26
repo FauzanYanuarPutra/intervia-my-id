@@ -85,11 +85,3 @@ time = "0.3"
 # Argon2 compatible
 rand = "0.8.5"
 rand_core = "0.6.4"
-
-[profile.release]
-opt-level = 3
-lto = "fat"          # Link Time Optimization maksimal
-codegen-units = 1    # Optimasi antar-modul maksimal
-panic = "abort"      # Mengurangi ukuran binary & meningkatkan speed (unwinding overhead)
-strip = "symbols"    # Menghapus debug symbols otomatis
-incremental = false

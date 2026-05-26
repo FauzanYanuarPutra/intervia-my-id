@@ -21,8 +21,13 @@ const LISTING_TYPES = [
   'property',
   'tool_rental',
   'company',
+  'business_transfer',
 ] as const;
-const SIMPLE_MODE_ALLOWED_TYPES = ['product', 'service'] as const;
+const SIMPLE_MODE_ALLOWED_TYPES = [
+  'product',
+  'service',
+  'business_transfer',
+] as const;
 const UPSERT_LISTING_KEYS = [
   'owner_id',
   'content_type',
@@ -57,6 +62,7 @@ const REQUIRED_IMAGE_TYPES = new Set([
   'property',
   'material',
   'tool_rental',
+  'business_transfer',
   'image',
 ]);
 
@@ -129,6 +135,22 @@ const TRUST_SAFETY_FIELD_LIMITS: Record<string, number> = {
   return_terms: 5000,
   dispute_process: 5000,
   maintenance_history: 5000,
+  business_name: 180,
+  business_category: 120,
+  included_assets: 5000,
+  handover_items: 5000,
+  rating_summary: 1000,
+  rating_transfer_policy: 120,
+  transferable_channels: 2000,
+  lease_contract_status: 1500,
+  liabilities_note: 5000,
+  optional_extra_costs: 5000,
+  reason_for_sale: 3000,
+  handover_timeline: 1500,
+  training_support: 3000,
+  staff_transfer_note: 3000,
+  legal_transfer_note: 5000,
+  handover_risks: 5000,
   microgig_brief: 2000,
   microgig_category: 80,
   promo_headline: 200,
@@ -189,7 +211,9 @@ function stripNullishDeep(value: unknown): unknown {
   }
   if (typeof value === 'object') {
     const next: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, entry] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       const normalized = stripNullishDeep(entry);
       if (normalized !== undefined) {
         next[key] = normalized;
@@ -323,6 +347,18 @@ function canonicalType(value: string): string {
     case 'organisation':
     case 'business':
       return 'company';
+    case 'business-transfer':
+    case 'business_transfer':
+    case 'business_handover':
+    case 'oper-usaha':
+    case 'oper_usaha':
+    case 'jual-usaha':
+    case 'jual_usaha':
+    case 'usaha-berjalan':
+    case 'usaha_berjalan':
+    case 'handover':
+    case 'takeover':
+      return 'business_transfer';
     default:
       return normalized;
   }
@@ -497,32 +533,56 @@ function validatePromotion(
       40,
     )?.toLowerCase();
     if (!discountKind) {
-      issues.push('promotion.promo_discount_kind is required for discount offers');
+      issues.push(
+        'promotion.promo_discount_kind is required for discount offers',
+      );
     }
     if (discountKind === 'percent') {
       const discountPercent = Number(promotion.promo_discount_percent);
-      if (!Number.isFinite(discountPercent) || discountPercent <= 0 || discountPercent > 90) {
-        issues.push('promotion.promo_discount_percent must be between 1 and 90');
+      if (
+        !Number.isFinite(discountPercent) ||
+        discountPercent <= 0 ||
+        discountPercent > 90
+      ) {
+        issues.push(
+          'promotion.promo_discount_percent must be between 1 and 90',
+        );
       }
     } else {
-      const discountAmount = parsePositiveCents(promotion.promo_discount_amount);
+      const discountAmount = parsePositiveCents(
+        promotion.promo_discount_amount,
+      );
       if (discountAmount == null) {
-        issues.push('promotion.promo_discount_amount is required for flat/shipping discount offers');
+        issues.push(
+          'promotion.promo_discount_amount is required for flat/shipping discount offers',
+        );
       }
     }
   }
 
   if (offerType === 'loyalty_card') {
     const stampTarget = Number(promotion.promo_loyalty_stamp_target);
-    if (!Number.isFinite(stampTarget) || stampTarget < 2 || stampTarget > 1000) {
-      issues.push('promotion.promo_loyalty_stamp_target must be between 2 and 1000');
+    if (
+      !Number.isFinite(stampTarget) ||
+      stampTarget < 2 ||
+      stampTarget > 1000
+    ) {
+      issues.push(
+        'promotion.promo_loyalty_stamp_target must be between 2 and 1000',
+      );
     }
-    const rewardValue = parsePositiveCents(promotion.promo_loyalty_reward_value);
+    const rewardValue = parsePositiveCents(
+      promotion.promo_loyalty_reward_value,
+    );
     if (rewardValue == null) {
-      issues.push('promotion.promo_loyalty_reward_value is required for loyalty cards');
+      issues.push(
+        'promotion.promo_loyalty_reward_value is required for loyalty cards',
+      );
     }
     if (!hasValue(promotion.promo_loyalty_reward_type)) {
-      issues.push('promotion.promo_loyalty_reward_type is required for loyalty cards');
+      issues.push(
+        'promotion.promo_loyalty_reward_type is required for loyalty cards',
+      );
     }
   }
 
@@ -538,15 +598,27 @@ function validatePromotion(
       issues.push('promotion.promo_raffle_draw_date is required for raffles');
     }
     const expectedEntries = Number(promotion.promo_raffle_expected_entries);
-    if (!Number.isFinite(expectedEntries) || expectedEntries < 2 || expectedEntries > 1_000_000) {
-      issues.push('promotion.promo_raffle_expected_entries must be between 2 and 1000000');
+    if (
+      !Number.isFinite(expectedEntries) ||
+      expectedEntries < 2 ||
+      expectedEntries > 1_000_000
+    ) {
+      issues.push(
+        'promotion.promo_raffle_expected_entries must be between 2 and 1000000',
+      );
     }
   }
 
   if (normalizedOfferType && normalizedOfferType !== 'bundle') {
     const marginPercent = Number(promotion.promo_estimated_margin_percent);
-    if (!Number.isFinite(marginPercent) || marginPercent <= 0 || marginPercent > 95) {
-      issues.push('promotion.promo_estimated_margin_percent must be between 1 and 95');
+    if (
+      !Number.isFinite(marginPercent) ||
+      marginPercent <= 0 ||
+      marginPercent > 95
+    ) {
+      issues.push(
+        'promotion.promo_estimated_margin_percent must be between 1 and 95',
+      );
     }
   }
 
@@ -559,11 +631,7 @@ function validatePromotion(
       return;
     }
 
-    const snapshot = createPromotionSnapshot(
-      promotion,
-      priceCents,
-      'id',
-    );
+    const snapshot = createPromotionSnapshot(promotion, priceCents, 'id');
     if (snapshot?.status === 'unsafe') {
       issues.push(
         'promotion benefit exceeds the safe margin buffer after fees, tax, and opex',
@@ -699,6 +767,66 @@ function enforceStrictListingRules(
     if (photoInventoryPolicy !== 'required') {
       issues.push(
         'metadata.requires_photo_inventory must be set to required for tool_rental listing',
+      );
+    }
+  }
+
+  if (listingType === 'business_transfer') {
+    const businessAgeMonths = parsePositiveInteger(
+      metadata.business_age_months,
+    );
+    const averageRevenue = parsePositiveCents(
+      metadata.average_monthly_revenue_cents,
+    );
+    const operatingCost = parsePositiveCents(
+      metadata.monthly_operational_cost_cents,
+    );
+    const askingPrice = parsePositiveCents(payload.price_cents);
+    const ratingPolicy = normalizeText(
+      metadata.rating_transfer_policy,
+      80,
+    )?.toLowerCase();
+    const allowedRatingPolicies = new Set([
+      'included_verified',
+      'included_needs_platform_approval',
+      'not_included',
+    ]);
+
+    if (!askingPrice) {
+      issues.push(
+        'business_transfer listing requires fixed price_cents as asking price',
+      );
+    }
+    if (payload.pricing_mode === 'request') {
+      issues.push('business_transfer listing cannot use request pricing_mode');
+    }
+    if (!businessAgeMonths) {
+      issues.push(
+        'metadata.business_age_months must be a positive integer for business_transfer listing',
+      );
+    }
+    if (!averageRevenue) {
+      issues.push(
+        'metadata.average_monthly_revenue_cents is required for business_transfer listing',
+      );
+    }
+    if (!operatingCost) {
+      issues.push(
+        'metadata.monthly_operational_cost_cents is required for business_transfer listing',
+      );
+    }
+    if (!ratingPolicy || !allowedRatingPolicies.has(ratingPolicy)) {
+      issues.push(
+        'metadata.rating_transfer_policy must describe transferability for business_transfer listing',
+      );
+    }
+    if (
+      ratingPolicy &&
+      ratingPolicy !== 'not_included' &&
+      !hasValue(metadata.transferable_channels)
+    ) {
+      issues.push(
+        'metadata.transferable_channels is required when ratings/accounts are included',
       );
     }
   }
@@ -948,15 +1076,20 @@ export function validateListingPayload(
     }
   }
   if (finalType === 'company') {
-    if (hasValue(payload.price_cents) || hasValue(payload.original_price_cents)) {
-      issues.push('company listing cannot set price_cents or original_price_cents');
+    if (
+      hasValue(payload.price_cents) ||
+      hasValue(payload.original_price_cents)
+    ) {
+      issues.push(
+        'company listing cannot set price_cents or original_price_cents',
+      );
     }
     if (payload.pricing_mode === 'fixed') {
       issues.push('company listing cannot use fixed pricing_mode');
     }
   }
   const shouldEnforceStrict =
-    !simpleMode &&
+    (!simpleMode || finalType === 'business_transfer') &&
     (options.strictActiveValidation ||
       (options.mode === 'create' && finalStatus === 'active'));
   const moderation =

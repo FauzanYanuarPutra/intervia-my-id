@@ -216,7 +216,7 @@ function resolveNextStep(
   if (status === 'pending') {
     if (isBuyer && !paymentReady) {
       return locale === 'id'
-        ? 'Bayar dulu supaya seller bisa memproses order.'
+        ? 'Bayar dulu biar seller bisa proses.'
         : 'Pay first so the seller can process the order.';
     }
     if (isSeller && paymentReady) {
@@ -890,7 +890,7 @@ export default function TransactionDetailPage({
                     <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
                       {computed.latestDelivery?.note ||
                         (locale === 'id'
-                          ? 'Belum ada catatan rinci, tapi sistem sudah mencatat update pengiriman.'
+                          ? 'Update pengiriman sudah tercatat.'
                           : 'There is no detailed note yet, but the system has recorded a delivery update.')}
                     </p>
                   </div>

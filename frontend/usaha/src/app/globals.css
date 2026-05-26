@@ -29,15 +29,15 @@
 
 @layer components {
   .portal-panel {
-    @apply rounded-[32px] border border-portal-line/80 bg-portal-paper shadow-card;
+    @apply rounded-[24px] border border-portal-line/80 bg-portal-paper shadow-card;
   }
 
   .portal-panel-muted {
-    @apply rounded-[28px] border border-portal-line/70 bg-white/75 shadow-card;
+    @apply rounded-[20px] border border-portal-line/70 bg-white/75 shadow-card;
   }
 
   .portal-panel-soft {
-    @apply rounded-[28px] border border-portal-line/70 bg-portal-sand/45 shadow-card;
+    @apply rounded-[20px] border border-portal-line/70 bg-portal-sand/45 shadow-card;
   }
 
   .portal-kicker {
@@ -49,18 +49,18 @@
   }
 
   .portal-input {
-    @apply min-h-11 rounded-[20px] border border-portal-line bg-white px-4 py-3 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
+    @apply min-h-10 rounded-[14px] border border-portal-line/90 bg-white px-3.5 py-2.5 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
   }
 
   .portal-textarea {
-    @apply rounded-[20px] border border-portal-line bg-white px-4 py-3 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
+    @apply rounded-[14px] border border-portal-line/90 bg-white px-3.5 py-2.5 text-sm text-portal-ink outline-none transition placeholder:text-portal-soft focus:border-portal-forest focus:ring-2 focus:ring-portal-forest/15;
   }
 
   .portal-button-primary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-portal-forest px-5 py-3 text-sm font-semibold text-white transition hover:bg-portal-forest/90 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[14px] bg-portal-forest px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-portal-forest/90 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .portal-button-secondary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-portal-line bg-white px-5 py-3 text-sm font-semibold text-portal-ink transition hover:bg-portal-sand/35 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[14px] border border-portal-line bg-white px-4 py-2.5 text-sm font-semibold text-portal-ink transition hover:bg-portal-sand/35 disabled:cursor-not-allowed disabled:opacity-60;
   }
 }

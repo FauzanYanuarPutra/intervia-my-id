@@ -573,7 +573,7 @@ export function UmkmOwnerDashboard() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/transactions" className="ui-shell-button px-3 text-xs font-semibold">
               <BriefcaseBusiness className="h-3.5 w-3.5" />
-              {isId ? 'Buka transaksi' : 'Open transactions'}
+              {isId ? 'Transaksi' : 'Open transactions'}
             </Link>
             <Link href="/chat" className="ui-shell-button px-3 text-xs font-semibold">
               <BellRing className="h-3.5 w-3.5" />
