@@ -8,7 +8,12 @@ import ReelsClient from './ReelsClient';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ video?: string; q?: string }>;
+  searchParams: Promise<{
+    video?: string;
+    q?: string;
+    upload?: string;
+    create?: string;
+  }>;
 };
 
 function getCommunityBackendBase(): string | null {
@@ -106,7 +111,16 @@ function getRequestedReelIndex(
 
 export default async function ReelsPage({ params, searchParams }: PageProps) {
   const { locale } = await params;
-  const { video, q } = await searchParams;
+  const { video, q, upload, create } = await searchParams;
+  const uploadRequest = String(upload || create || '').toLowerCase();
+  const initialUploadOpen = [
+    '1',
+    'true',
+    'camera',
+    'reel',
+    'reels',
+    'studio',
+  ].includes(uploadRequest);
 
   const requestedIndex = getRequestedNumericIndex(video);
   const needsIdLookup = requestedIndex === null;
@@ -121,9 +135,9 @@ export default async function ReelsPage({ params, searchParams }: PageProps) {
   const requestedReel = needsIdLookup ? await getInitialReel(video) : null;
   const initialItems = requestedReel
     ? [
-        requestedReel,
-        ...initialPage.items.filter(item => item.id !== requestedReel.id),
-      ]
+      requestedReel,
+      ...initialPage.items.filter(item => item.id !== requestedReel.id),
+    ]
     : initialPage.items;
   const initialIndex = requestedReel
     ? 0
@@ -137,6 +151,7 @@ export default async function ReelsPage({ params, searchParams }: PageProps) {
       initialCursor={initialPage.nextCursor}
       initialHasMore={initialPage.hasMore}
       initialSearchQuery={q || ''}
+      initialUploadOpen={initialUploadOpen}
     />
   );
 }

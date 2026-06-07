@@ -38,8 +38,17 @@ export const CreateOfferSchema = z
       .enum(['standard', 'shipping', 'pickup', 'remote', 'onsite', 'instant'])
       .optional(),
     transaction_meta: z.record(z.string(), z.unknown()).optional(),
+    safety_checklist: z
+      .object({
+        identity_confirmed: z.boolean(),
+        platform_payment_confirmed: z.boolean(),
+        item_detail_confirmed: z.boolean(),
+        anti_scam_acknowledged: z.boolean(),
+      })
+      .optional(),
+    risk_flags: z.array(z.string().min(1)).max(20).optional(),
   })
-  .passthrough();
+  .strip();
 
 export const CreateCounterOfferSchema = z
   .object({
@@ -64,8 +73,17 @@ export const CreateCounterOfferSchema = z
       .enum(['standard', 'shipping', 'pickup', 'remote', 'onsite', 'instant'])
       .optional(),
     transaction_meta: z.record(z.string(), z.unknown()).optional(),
+    safety_checklist: z
+      .object({
+        identity_confirmed: z.boolean(),
+        platform_payment_confirmed: z.boolean(),
+        item_detail_confirmed: z.boolean(),
+        anti_scam_acknowledged: z.boolean(),
+      })
+      .optional(),
+    risk_flags: z.array(z.string().min(1)).max(20).optional(),
   })
-  .passthrough();
+  .strip();
 
 export const TransactionActionSchema = z
   .object({
@@ -73,7 +91,7 @@ export const TransactionActionSchema = z
     message: optionalTrimmed,
     reason_code: optionalTrimmed,
   })
-  .passthrough();
+  .strip();
 
 export const TransactionDeliverySubmitSchema = z
   .object({
@@ -94,7 +112,7 @@ export const TransactionDeliverySubmitSchema = z
       });
     }
   })
-  .passthrough();
+  .strip();
 
 export const TransactionDeliveryReviewSchema = z
   .object({
@@ -115,7 +133,7 @@ export const TransactionDeliveryReviewSchema = z
       });
     }
   })
-  .passthrough();
+  .strip();
 
 const sha256Hex = z.preprocess(
   value => {
@@ -153,7 +171,7 @@ const DisputeEvidenceAttachmentObjectSchema = z
       });
     }
   })
-  .passthrough();
+  .strip();
 
 export const TransactionDisputeSchema = z
   .object({
@@ -173,7 +191,7 @@ export const TransactionDisputeSchema = z
       .min(1)
       .max(10),
   })
-  .passthrough();
+  .strip();
 
 export const TransactionDisputeResolveSchema = z
   .object({
@@ -197,11 +215,11 @@ export const TransactionDisputeResolveSchema = z
     verified_damage_cost_cents: z.number().int().min(0).optional(),
     deposit_amount_cents: z.number().int().min(0).optional(),
   })
-  .passthrough();
+  .strip();
 
 export const TransactionReviewSchema = z
   .object({
     rating: z.number().int().min(1).max(5),
     comment: optionalTrimmed,
   })
-  .passthrough();
+  .strip();

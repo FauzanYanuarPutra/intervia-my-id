@@ -1,0 +1,2 @@
+-- No destructive rollback: the up migration only mirrors existing cover_image
+-- values into metadata so older rows expose media consistently.

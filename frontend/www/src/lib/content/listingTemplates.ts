@@ -129,7 +129,7 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
       'Template cepat untuk jasa operasional yang ingin langsung tayang.',
     summaryEn:
       'Fast template for operational services that should go live quickly.',
-    badgeId: 'Jual jasa',
+    badgeId: 'Tawarkan jasa',
     badgeEn: 'Offer service',
     fields: {
       title: 'Paket admin Shopee dan Tokopedia 30 hari',

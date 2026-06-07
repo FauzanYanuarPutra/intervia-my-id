@@ -15,6 +15,8 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
+  const body = await req.text().catch(() => '');
+  const contentType = req.headers.get('content-type') || 'application/json';
 
   try {
     return withProtectedRoute(
@@ -28,13 +30,15 @@ export async function POST(
       async ctx =>
         withIdempotency(req, {
           scope: `tx-fund:${id}`,
-          actorHint: ctx.token,
+          actorHint: ctx.userId,
           forward: () =>
             fetch(`${MARKETPLACE_URL}/v1/transactions/${id}/fund`, {
               method: 'POST',
               headers: buildForwardAuthHeaders(ctx, {
                 'X-Idempotency-Key': req.headers.get('x-idempotency-key') || '',
+                ...(body ? { 'Content-Type': contentType } : {}),
               }),
+              body: body || undefined,
             }),
         }),
     );

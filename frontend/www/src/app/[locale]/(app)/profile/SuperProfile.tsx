@@ -23,6 +23,7 @@ import {
   extractFirstUploadedImageUrl,
   normalizeProfileMediaUrl,
 } from '@/lib/profile/profileMedia';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import {
   Activity,
   Award,
@@ -561,27 +562,32 @@ export default function SuperProfile() {
   const [activeMarketplaceTab, setActiveMarketplaceTab] =
     useState<ProfileContentTab>('all');
 
-  const hydrateForm = useCallback((value: UserDetail) => {
-    setFullNameInput(value.full_name || value.fullName || '');
-    setUsernameInput(
-      normalizePublicProfileHandleInput(value.username || user?.username || ''),
-    );
-    setPhoneInput(value.phone || '');
-    setLocationInput(value.location || '');
-    setBioInput(value.bio || '');
-    setAvatarUrlInput(
-      normalizeProfileMediaUrl(
-        value.avatar_url || value.avatarUrl || value.metadata?.avatar_url,
-      ) || '',
-    );
-    const metaMedia = asRecord(value.metadata?.media) || {};
-    setCoverUrlInput(
-      normalizeProfileMediaUrl(value.cover_image) ||
-        normalizeProfileMediaUrl(value.metadata?.cover_image) ||
-        normalizeProfileMediaUrl(metaMedia.cover_image) ||
-        '',
-    );
-  }, [user?.username]);
+  const hydrateForm = useCallback(
+    (value: UserDetail) => {
+      setFullNameInput(value.full_name || value.fullName || '');
+      setUsernameInput(
+        normalizePublicProfileHandleInput(
+          value.username || user?.username || '',
+        ),
+      );
+      setPhoneInput(value.phone || '');
+      setLocationInput(value.location || '');
+      setBioInput(value.bio || '');
+      setAvatarUrlInput(
+        normalizeProfileMediaUrl(
+          value.avatar_url || value.avatarUrl || value.metadata?.avatar_url,
+        ) || '',
+      );
+      const metaMedia = asRecord(value.metadata?.media) || {};
+      setCoverUrlInput(
+        normalizeProfileMediaUrl(value.cover_image) ||
+          normalizeProfileMediaUrl(value.metadata?.cover_image) ||
+          normalizeProfileMediaUrl(metaMedia.cover_image) ||
+          '',
+      );
+    },
+    [user?.username],
+  );
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) {
@@ -1050,17 +1056,27 @@ export default function SuperProfile() {
       {
         key: 'seller',
         title: 'Seller / Provider',
-        description: 'Service coverage, pricing, dan cara Anda menerima pekerjaan.',
+        description:
+          'Service coverage, pricing, dan cara Anda menerima pekerjaan.',
         href: '/profile/edit?focus=seller',
         progress: [
           readString(
-            getPathValue(asRecord(mergedMetadata), ['provider_profile', 'headline']),
+            getPathValue(asRecord(mergedMetadata), [
+              'provider_profile',
+              'headline',
+            ]),
           ),
           readString(
-            getPathValue(asRecord(mergedMetadata), ['provider_profile', 'work_mode']),
+            getPathValue(asRecord(mergedMetadata), [
+              'provider_profile',
+              'work_mode',
+            ]),
           ),
           readString(
-            getPathValue(asRecord(mergedMetadata), ['provider_profile', 'response_time']),
+            getPathValue(asRecord(mergedMetadata), [
+              'provider_profile',
+              'response_time',
+            ]),
           ),
         ].filter(Boolean).length,
         total: 3,
@@ -1071,9 +1087,14 @@ export default function SuperProfile() {
         description: 'Intent, budget, dan area yang Anda cari untuk matching.',
         href: '/profile/edit?focus=buyer',
         progress: [
-          readString(getPathValue(asRecord(mergedMetadata), ['buyer_profile', 'intent'])),
           readString(
-            getPathValue(asRecord(mergedMetadata), ['buyer_profile', 'preferred_location']),
+            getPathValue(asRecord(mergedMetadata), ['buyer_profile', 'intent']),
+          ),
+          readString(
+            getPathValue(asRecord(mergedMetadata), [
+              'buyer_profile',
+              'preferred_location',
+            ]),
           ),
         ].filter(Boolean).length,
         total: 2,
@@ -1083,8 +1104,9 @@ export default function SuperProfile() {
         title: 'Media & dokumen',
         description: 'Avatar, cover, gallery, CV, dan dokumen pendukung.',
         href: '/profile/edit?focus=media',
-        progress: [effectiveAvatarUrl, effectiveCoverUrl, qaResumeUrl].filter(Boolean)
-          .length,
+        progress: [effectiveAvatarUrl, effectiveCoverUrl, qaResumeUrl].filter(
+          Boolean,
+        ).length,
         total: 3,
       },
     ],
@@ -1236,7 +1258,7 @@ export default function SuperProfile() {
                 <div className="-mt-12 sm:-mt-16">
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-3xl border-4 border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-md sm:shadow-xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:h-24 sm:w-24 lg:h-28 lg:w-28">
                     <NextImage
-                      src={effectiveAvatarUrl}
+                      src={profileAvatarSrc(effectiveAvatarUrl)}
                       alt={
                         detail?.username ||
                         currentUser.username ||
@@ -1802,7 +1824,9 @@ export default function SuperProfile() {
                   <div className="mt-3 space-y-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                     <div className="flex items-center gap-2">
                       <User2 className="h-4 w-4 ui-accent-text" />
-                      <span>{fullNameInput || currentUser.full_name || '-'}</span>
+                      <span>
+                        {fullNameInput || currentUser.full_name || '-'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 ui-accent-text" />

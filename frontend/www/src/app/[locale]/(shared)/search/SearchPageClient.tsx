@@ -1,12 +1,12 @@
 'use client';
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { Modal } from '@/components/common/Modal';
 import { AuthCtaLink } from '@/components/home/AuthCtaLink';
-import { Header } from '@/components/layout/Header';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import { SearchUmkmPreview, type UmkmPreviewStore } from './SearchUmkmPreview';
 import {
@@ -20,6 +20,7 @@ import {
   Layers3,
   MapPin,
   Minus,
+  MoreHorizontal,
   Package,
   Plus,
   RefreshCcw,
@@ -60,6 +61,10 @@ import {
   formatIDRFromCents,
   parseImages,
 } from '@/lib/content/catalog';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 import { buildPublicProfileHrefFromContent } from '@/lib/profile/publicProfileLink';
 import {
   getListingSideContextLabel,
@@ -97,6 +102,7 @@ type SearchCard = {
   summary: string;
   location: string;
   priceLabel: string;
+  priceUnitLabel: string;
   typeLabel: string;
   typeKey: CardType;
   side: ListingSide;
@@ -729,8 +735,20 @@ function mapContentItem(
     asString(meta.region) ||
     'Indonesia';
   const price = formatIDRFromCents(item.price_cents);
+  const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const fallbackPriceLabel =
+    asString(meta.price_label) ||
+    asString(meta.salary_range) ||
+    asString(meta.budget_range) ||
+    asString(meta.rate_label);
   const priceLabel =
-    price !== '-' ? price : locale === 'id' ? 'Negosiasi' : 'Negotiable';
+    price !== '-'
+      ? formatPriceWithUnit(price, priceUnitLabel)
+      : fallbackPriceLabel
+        ? formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
+        : locale === 'id'
+          ? 'Negosiasi'
+          : 'Negotiable';
 
   const typeToken = [
     item.content_type,
@@ -804,6 +822,7 @@ function mapContentItem(
     summary,
     location,
     priceLabel,
+    priceUnitLabel,
     typeLabel,
     typeKey,
     side,
@@ -926,14 +945,6 @@ function sideFilterClass(active: boolean) {
   }
 
   return 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]';
-}
-
-function SearchDesktopTopBar() {
-  return (
-    <div className="hidden lg:block">
-      <Header />
-    </div>
-  );
 }
 
 function SearchActiveChip({
@@ -1079,7 +1090,8 @@ function SearchResultListingCard({
   onOpenCart: () => void;
 }) {
   const isId = locale === 'id';
-  const previewImage = item.image || item.images[0];
+  const previewImages =
+    item.images.length > 0 ? item.images : item.image ? [item.image] : [];
   const updatedLabel = formatShortDate(item.updatedAt, locale);
   const visual = getCategoryVisual(item.typeKey);
   const CategoryIcon = visual.icon;
@@ -1112,12 +1124,18 @@ function SearchResultListingCard({
           )}
           aria-label={isId ? 'Buka detail' : 'Open details'}
         >
-          {previewImage ? (
-            <Image
-              src={previewImage}
+          {previewImages.length > 0 ? (
+            <MediaPreviewCarousel
+              items={previewImages}
               alt={item.title}
-              fill
-              className="object-cover transition duration-500 hover:scale-[1.035]"
+              aspectClassName="h-full min-h-[150px] w-full sm:min-h-[170px]"
+              className="h-full w-full bg-transparent"
+              mediaClassName="transition duration-500 hover:scale-[1.035]"
+              sizes="(max-width: 640px) 112px, 160px"
+              controls={false}
+              lightbox={false}
+              showCounter={previewImages.length > 1}
+              showDots={previewImages.length > 1}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
@@ -1198,6 +1216,11 @@ function SearchResultListingCard({
               >
                 {item.priceLabel}
               </p>
+              {item.priceUnitLabel ? (
+                <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                  {isId ? 'Harga per' : 'Price per'} {item.priceUnitLabel}
+                </p>
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <button
@@ -1211,7 +1234,11 @@ function SearchResultListingCard({
                   visual.solidButtonClass,
                 )}
               >
-                <ShoppingCart className="h-3.5 w-3.5" />
+                {cartQuantity > 0 ? (
+                  <ShoppingCart className="h-3.5 w-3.5" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
                 {cartQuantity > 0 ? (
                   <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-[color:var(--app-text)] px-1 text-[10px] font-black text-white">
                     {cartQuantity}
@@ -1237,6 +1264,11 @@ function SearchResultListingCard({
             >
               {item.priceLabel}
             </p>
+            {item.priceUnitLabel ? (
+              <p className="mt-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                {isId ? 'Harga per' : 'Price per'} {item.priceUnitLabel}
+              </p>
+            ) : null}
             <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
               {item.sideContextLabel}
             </p>
@@ -1254,12 +1286,16 @@ function SearchResultListingCard({
                   visual.solidButtonClass,
                 )}
               >
-                <ShoppingCart className="h-3.5 w-3.5" />
+                {cartQuantity > 0 ? (
+                  <ShoppingCart className="h-3.5 w-3.5" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
                 {cartQuantity > 0
                   ? `${cartQuantity} ${isId ? 'item' : 'items'}`
                   : isId
-                    ? 'Simpan'
-                    : 'Save'}
+                    ? 'Tambah'
+                    : 'Add'}
               </button>
               {cartQuantity > 0 ? (
                 <button
@@ -1313,45 +1349,85 @@ function SearchCartDock({
 }) {
   if (cart.itemCount <= 0) return null;
 
-  const visibleItems = cart.items.slice(0, 4);
+  const visibleItems = cart.items;
+  const previewItems = cart.items.slice(0, 3);
   const firstItem = cart.items[0];
   const countLabel = `${cart.itemCount} ${isId ? 'item' : 'items'}`;
+  const subtotalCents = cart.items.reduce(
+    (sum, item) => sum + (item.priceCents || 0) * item.quantity,
+    0,
+  );
+  const hasSubtotal = subtotalCents > 0;
 
   return (
-    <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-[70] lg:bottom-5 lg:left-auto lg:right-5 lg:w-[360px]">
+    <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-[70] lg:bottom-5 lg:left-auto lg:right-5 lg:w-[390px]">
       {!open ? (
         <button
           type="button"
           onClick={() => onOpenChange(true)}
-          className="ui-pressable flex min-h-[54px] w-full items-center justify-between gap-3 rounded-[20px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-left shadow-[0_22px_46px_-28px_rgba(15,23,42,0.34)] backdrop-blur-xl"
+          className="ui-pressable pointer-events-auto mx-auto flex min-h-[60px] w-full max-w-[440px] items-center justify-between gap-3 rounded-[22px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-left shadow-[0_24px_54px_-28px_rgba(15,23,42,0.36)] backdrop-blur-xl"
         >
-          <span className="inline-flex min-w-0 items-center gap-2">
-            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent)] text-white">
+          <span className="inline-flex min-w-0 items-center gap-3">
+            <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent)] text-white shadow-[0_14px_26px_-18px_rgba(22,163,74,0.58)]">
               <ShoppingCart className="h-4.5 w-4.5" />
+              <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[color:var(--app-text)] px-1 text-[10px] font-black text-white">
+                {cart.itemCount}
+              </span>
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[13px] font-black text-[color:var(--app-text)]">
-                {isId ? 'Keranjang' : 'Cart'}
+                {isId ? 'Keranjang pencarian' : 'Search cart'}
               </span>
               <span className="block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                {countLabel}
+                {firstItem?.title || countLabel}
               </span>
             </span>
           </span>
-          <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-black text-[color:var(--app-accent)]">
-            {isId ? 'Buka' : 'Open'}
+          <span className="inline-flex shrink-0 items-center gap-2">
+            {previewItems.length > 0 ? (
+              <span className="hidden -space-x-2 sm:flex">
+                {previewItems.map(item => (
+                  <span
+                    key={item.id}
+                    className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-[color:var(--app-surface-muted)]"
+                  >
+                    {item.image ? (
+                      <Image
+                        src={item.image}
+                        alt=""
+                        fill
+                        sizes="32px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-[color:var(--app-accent)]">
+                        <Package className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </span>
+            ) : null}
+            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
+              {isId ? 'Cek' : 'View'}
+            </span>
           </span>
         </button>
       ) : (
-        <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_24px_54px_-26px_rgba(15,23,42,0.34)] backdrop-blur-xl">
-          <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-3">
-            <div className="min-w-0">
-              <p className="text-[13px] font-black text-[color:var(--app-text)]">
-                {isId ? 'Keranjang' : 'Cart'}
-              </p>
-              <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                {countLabel}
-              </p>
+        <section className="pointer-events-auto mx-auto max-h-[min(74svh,560px)] w-full max-w-[440px] overflow-hidden rounded-[26px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_64px_-28px_rgba(15,23,42,0.38)] backdrop-blur-xl lg:max-w-none">
+          <div className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)] px-3.5 py-3.5">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                <ShoppingCart className="h-4.5 w-4.5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[14px] font-black text-[color:var(--app-text)]">
+                  {isId ? 'Keranjang pencarian' : 'Search cart'}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  {countLabel}
+                </p>
+              </div>
             </div>
             <button
               type="button"
@@ -1363,88 +1439,121 @@ function SearchCartDock({
             </button>
           </div>
 
+          <div className="grid grid-cols-2 gap-2 px-3.5 py-3">
+            <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2">
+              <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                {isId ? 'Estimasi total' : 'Estimated total'}
+              </p>
+              <p className="mt-0.5 truncate text-[13px] font-black text-[color:var(--app-text)]">
+                {hasSubtotal
+                  ? formatIDRFromCents(subtotalCents)
+                  : isId
+                    ? 'Cek di detail'
+                    : 'See details'}
+              </p>
+            </div>
+            <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2">
+              <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                {isId ? 'Lanjut dari' : 'Continue from'}
+              </p>
+              <p className="mt-0.5 truncate text-[13px] font-black text-[color:var(--app-text)]">
+                {firstItem?.typeLabel || (isId ? 'Item pertama' : 'First item')}
+              </p>
+            </div>
+          </div>
+
           <div
-            className="max-h-[min(52vh,360px)] overflow-y-auto p-2.5"
+            className="max-h-[min(46svh,360px)] overflow-y-auto px-2.5 pb-2.5"
             data-auto-scrollbar
           >
             <div className="space-y-2">
               {visibleItems.map(item => (
                 <div
                   key={item.id}
-                  className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-2 rounded-[18px] bg-[color:var(--app-surface-muted)] p-2"
+                  className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5"
                 >
-                  <Link
-                    href={item.href}
-                    className="relative h-11 w-11 overflow-hidden rounded-[14px] bg-white"
-                  >
-                    {item.image ? (
-                      <Image
-                        src={item.image}
-                        alt={item.title}
-                        fill
-                        sizes="44px"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-[color:var(--app-accent)]">
-                        <Package className="h-5 w-5" />
-                      </span>
-                    )}
-                  </Link>
-                  <div className="min-w-0">
+                  <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-2.5">
                     <Link
                       href={item.href}
-                      className="block truncate text-[12px] font-black text-[color:var(--app-text)]"
+                      className="relative h-[52px] w-[52px] overflow-hidden rounded-[16px] bg-white"
                     >
-                      {item.title}
+                      {item.image ? (
+                        <Image
+                          src={item.image}
+                          alt={item.title}
+                          fill
+                          sizes="52px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-[color:var(--app-accent)]">
+                          <Package className="h-5 w-5" />
+                        </span>
+                      )}
                     </Link>
-                    <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                      {item.typeLabel} - {item.priceLabel}
-                    </p>
+                    <div className="min-w-0">
+                      <Link
+                        href={item.href}
+                        className="line-clamp-2 text-[12px] font-black leading-snug text-[color:var(--app-text)]"
+                      >
+                        {item.title}
+                      </Link>
+                      <p className="mt-1 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                        {item.typeLabel} - {item.location}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] font-black text-[color:var(--app-accent)]">
+                        {item.priceLabel}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => onDecrement(item.id)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-[color:var(--app-text)]"
-                      aria-label={isId ? 'Kurangi item' : 'Decrease item'}
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <Link
+                      href={item.href}
+                      className="inline-flex min-h-[32px] items-center justify-center rounded-full bg-white px-3 text-[11px] font-bold text-[color:var(--app-text)]"
                     >
-                      <Minus className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="min-w-[20px] text-center text-[11px] font-black text-[color:var(--app-text)]">
-                      {item.quantity}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onIncrement(item)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-[color:var(--app-accent)]"
-                      aria-label={isId ? 'Tambah item' : 'Increase item'}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
+                      {isId ? 'Detail' : 'Details'}
+                    </Link>
+                    <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-border)_86%,transparent)]">
+                      <button
+                        type="button"
+                        onClick={() => onDecrement(item.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)]"
+                        aria-label={isId ? 'Kurangi item' : 'Decrease item'}
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="min-w-[26px] text-center text-[12px] font-black text-[color:var(--app-text)]">
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onIncrement(item)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white"
+                        aria-label={isId ? 'Tambah item' : 'Increase item'}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-            {cart.items.length > visibleItems.length ? (
-              <p className="px-2 pt-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                +{cart.items.length - visibleItems.length}{' '}
-                {isId ? 'item lain tersimpan' : 'more saved items'}
-              </p>
-            ) : null}
           </div>
 
           <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 border-t border-[color:var(--app-border)] p-3">
             <button
               type="button"
               onClick={onClear}
-              className="inline-flex min-h-[42px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] px-3 text-[12px] font-semibold text-[color:var(--app-text-soft)]"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[15px] border border-[color:var(--app-border)] px-3 text-[12px] font-bold text-[color:var(--app-text-soft)]"
             >
               <Trash2 className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                {isId ? 'Kosongkan' : 'Clear'}
+              </span>
             </button>
             <Link
               href={firstItem?.href || '/search'}
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-[12px] font-black text-white"
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[15px] bg-[color:var(--app-accent)] px-4 text-[12px] font-black text-white shadow-[0_18px_30px_-20px_rgba(22,163,74,0.5)]"
             >
               {firstItem?.actionLabel || (isId ? 'Lanjut' : 'Continue')}
               <ArrowRight className="h-4 w-4" />
@@ -1630,6 +1739,7 @@ export default function SearchPageClient() {
     EMPTY_SEARCH_CART_SESSION,
   );
   const [cartOpen, setCartOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   const canToggleUmkmView = type === 'all' || type === 'umkm';
   const shouldShowUmkmPreview = resultsView === 'umkm' || type === 'umkm';
@@ -1727,6 +1837,7 @@ export default function SearchPageClient() {
   const applyFilters = useCallback(() => {
     const nextQuery = queryInput.trim();
     const nextLocation = locationInput.trim();
+    setMobileActionsOpen(false);
     setQuery(nextQuery);
     setLocation(nextLocation);
     if (type === 'umkm') setResultsView('umkm');
@@ -1744,6 +1855,7 @@ export default function SearchPageClient() {
     setUsedOnly(false);
     setResultsView('results');
     setFiltersOpen(false);
+    setMobileActionsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -1971,16 +2083,16 @@ export default function SearchPageClient() {
     : resolveUmkmCreateHrefForType(locale, type);
   const briefCreateLabel = usedOnly
     ? isId
-      ? 'Jual barang bekas'
+      ? 'Tawarkan barang bekas'
       : 'Sell used goods'
     : isId
       ? type === 'service'
-        ? 'Butuh jasa'
+        ? 'Cari jasa'
         : type === 'business_transfer'
-          ? 'Jual usaha'
+          ? 'Tawarkan usaha'
           : type === 'freelancer' || type === 'job'
-            ? 'Butuh talent'
-            : 'Butuh supplier'
+            ? 'Cari talent'
+            : 'Cari supplier'
       : type === 'service'
         ? 'Post a service need'
         : type === 'business_transfer'
@@ -2020,10 +2132,10 @@ export default function SearchPageClient() {
   );
 
   return (
-    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen px-3 pb-6 pt-0 sm:px-4 lg:h-[100svh] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen px-1 pb-6 pt-0 sm:px-4 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell lajukan-search-shell mx-auto h-full lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
         <div className="space-y-4 lg:hidden">
-          <div className="ui-layer-local-topbar fixed inset-x-0 top-0 flex items-center gap-2 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)] backdrop-blur-xl sm:px-3">
+          <div className="ui-layer-local-topbar fixed inset-x-0 top-0 z-[80] flex items-center gap-2 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)] backdrop-blur-xl sm:px-3">
             <button
               type="button"
               onClick={handleBack}
@@ -2058,19 +2170,131 @@ export default function SearchPageClient() {
                 />
               </label>
             </form>
-            {canToggleUmkmView ? (
+            <AuthCtaLink
+              hrefWhenAuth={briefCreateHref}
+              hrefWhenGuest="/register"
+              className="ui-pressable inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white shadow-[0_14px_28px_-20px_rgba(22,163,74,0.55)]"
+              ariaLabel={briefCreateLabel}
+            >
+              <Plus className="h-4.5 w-4.5" />
+            </AuthCtaLink>
+            <div className="relative shrink-0">
+              {mobileActionsOpen ? (
+                <button
+                  type="button"
+                  className="fixed inset-0 z-[71] cursor-default bg-transparent"
+                  aria-label={isId ? 'Tutup menu' : 'Close menu'}
+                  onClick={() => setMobileActionsOpen(false)}
+                />
+              ) : null}
               <button
                 type="button"
-                onClick={() =>
-                  setResultsView(resultsView === 'umkm' ? 'results' : 'umkm')
-                }
-                className="inline-flex min-h-[42px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[12px] font-semibold text-[color:var(--app-text)] shadow-[0_12px_24px_-22px_rgba(15,23,42,0.16)]"
-                data-testid="search-mobile-view-toggle"
+                onClick={() => setMobileActionsOpen(value => !value)}
+                className={cn(
+                  'ui-pressable relative z-[72] inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border text-[color:var(--app-text)] shadow-[0_12px_24px_-22px_rgba(15,23,42,0.18)]',
+                  mobileActionsOpen
+                    ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
+                    : 'border-[color:var(--app-border)] bg-white',
+                )}
+                data-testid="search-mobile-actions-button"
+                aria-label={isId ? 'Menu pencarian' : 'Search actions'}
+                aria-expanded={mobileActionsOpen}
               >
-                <Layers3 className="h-4 w-4" />
-                {mobileMapLabel}
+                <MoreHorizontal className="h-5 w-5" />
+                {activeFilterCount > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-1 text-[9px] font-black text-white">
+                    {activeFilterCount}
+                  </span>
+                ) : null}
               </button>
-            ) : null}
+              {mobileActionsOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-[calc(100%+0.55rem)] z-[72] w-[min(17rem,calc(100vw-1rem))] overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-1.5 text-left shadow-[0_24px_54px_-26px_rgba(15,23,42,0.34)]"
+                >
+                  <div className="px-3 py-2">
+                    <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                      {isId ? 'Aksi pencarian' : 'Search actions'}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                      {hasMore ? `${resultCountLabel}+` : resultCountLabel}{' '}
+                      {isId ? 'hasil' : 'results'}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-1">
+                    {searchCart.itemCount > 0 ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setCartOpen(true);
+                          setMobileActionsOpen(false);
+                        }}
+                        className="flex min-h-[46px] items-center justify-between gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
+                      >
+                        <span className="inline-flex min-w-0 items-center gap-3">
+                          <ShoppingCart className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                          <span className="truncate">
+                            {isId ? 'Buka keranjang' : 'Open cart'}
+                          </span>
+                        </span>
+                        <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
+                          {searchCart.itemCount}
+                        </span>
+                      </button>
+                    ) : null}
+                    {canToggleUmkmView ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setResultsView(
+                            resultsView === 'umkm' ? 'results' : 'umkm',
+                          );
+                          setMobileActionsOpen(false);
+                        }}
+                        className="flex min-h-[46px] items-center gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
+                        data-testid="search-mobile-view-toggle"
+                      >
+                        <Layers3 className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                        <span>{mobileMapLabel}</span>
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setFiltersOpen(true);
+                        setMobileActionsOpen(false);
+                      }}
+                      className="flex min-h-[46px] items-center justify-between gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
+                    >
+                      <span className="inline-flex min-w-0 items-center gap-3">
+                        <Filter className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                        <span className="truncate">
+                          {isId ? 'Filter & urutkan' : 'Filter & sort'}
+                        </span>
+                      </span>
+                      <span className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                        {activeSortLabel}
+                      </span>
+                    </button>
+                    {canReset ? (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={resetAllFilters}
+                        className="flex min-h-[46px] items-center gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
+                      >
+                        <RefreshCcw className="h-4 w-4 shrink-0" />
+                        <span>{isId ? 'Reset pencarian' : 'Reset search'}</span>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div
             aria-hidden="true"
@@ -2094,15 +2318,14 @@ export default function SearchPageClient() {
                   {isId ? 'hasil ditemukan' : 'results found'}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(true)}
-                className="inline-flex min-h-[40px] items-center gap-2 rounded-[13px] border border-[color:var(--app-border)] px-3 text-[13px] font-semibold text-[color:var(--app-text)]"
-                data-testid="search-mobile-filter-button"
-              >
+              <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-surface-muted)] px-3 text-[12px] font-bold text-[color:var(--app-text-soft)]">
                 <Filter className="h-4.5 w-4.5" />
-                {isId ? 'Urutkan' : 'Sort'}
-              </button>
+                <span>
+                  {activeFilterCount > 0
+                    ? `${activeFilterCount} ${isId ? 'filter' : 'filters'}`
+                    : activeSortLabel}
+                </span>
+              </div>
             </div>
 
             <SearchFilterTabs
@@ -2117,6 +2340,7 @@ export default function SearchPageClient() {
                 type="button"
                 onClick={() => setFiltersOpen(true)}
                 className="inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-[13px] border border-emerald-200 bg-emerald-50 px-3 text-[12px] font-semibold text-emerald-700"
+                data-testid="search-mobile-filter-button"
               >
                 <Filter className="h-4 w-4" />
                 {activeFilterCount > 0
@@ -2192,7 +2416,7 @@ export default function SearchPageClient() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-1.5">
                 {visibleItems.map(item => (
                   <SearchResultListingCard
                     key={item.id}
@@ -2235,12 +2459,6 @@ export default function SearchPageClient() {
         </div>
 
         <div className="lajukan-home-desktop-shell lajukan-search-desktop-shell hidden min-h-0 overflow-hidden lg:flex lg:flex-1 lg:flex-col">
-          <SearchDesktopTopBar />
-          <div
-            aria-hidden="true"
-            className="hidden h-[4.625rem] shrink-0 lg:block"
-          />
-
           <div className="lajukan-home-desktop-grid lajukan-search-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1700px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[280px_minmax(0,1fr)_280px]">
             <aside className="hidden lg:block lg:h-full lg:min-h-0 lg:overflow-hidden">
               <div
@@ -2566,7 +2784,7 @@ export default function SearchPageClient() {
 
                 {shouldShowResultCards ? (
                   loading ? (
-                    <div className="space-y-2.5">
+                    <div className="space-y-1.5">
                       {Array.from({ length: 5 }).map((_, index) => (
                         <div
                           key={`desktop-loading-${index}`}
@@ -2605,7 +2823,7 @@ export default function SearchPageClient() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
+                    <div className="space-y-1.5">
                       {visibleItems.map(item => (
                         <SearchResultListingCard
                           key={item.id}

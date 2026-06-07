@@ -27,10 +27,15 @@ import {
   type SavedAccount,
 } from '@/lib/accountVault';
 import { resolveLocaleFromPathname } from '@/lib/locale';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { buildUsahaPath } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 
-type AccountDropdownVariant = 'avatar-name' | 'avatar-role' | 'icon-label' | 'icon';
+type AccountDropdownVariant =
+  | 'avatar-name'
+  | 'avatar-role'
+  | 'icon-label'
+  | 'icon';
 
 type AccountDropdownProps = {
   isId?: boolean;
@@ -53,8 +58,16 @@ function normalizePathname(pathname: string | null): string {
   return clean === '' ? '/' : clean;
 }
 
-function getInitial(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || 'A';
+function hrefPath(href: string): string {
+  return href.split(/[?#]/)[0] || '/';
+}
+
+function matchesRoute(pathname: string, matcher: string): boolean {
+  const exact = matcher.endsWith('$');
+  const route = exact ? matcher.slice(0, -1) || '/' : matcher;
+  if (route === '/') return pathname === '/';
+  if (exact) return pathname === route;
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
 
 export function AccountDropdown({
@@ -88,7 +101,9 @@ export function AccountDropdown({
     user?.full_name ||
     user?.username ||
     (idLocale ? 'Akun' : 'Account');
-  const avatar = avatarSrc || user?.avatarUrl || user?.avatar_url || '/default-avatar.svg';
+  const avatar = profileAvatarSrc(
+    avatarSrc || user?.avatarUrl || user?.avatar_url,
+  );
   const subtitle = user?.email || user?.phone || roleLabel || '-';
 
   const text = {
@@ -116,7 +131,11 @@ export function AccountDropdown({
   ];
 
   useEffect(() => {
-    setSavedAccounts(user ? saveAccountSnapshot(user) : readSavedAccounts());
+    const timeoutId = window.setTimeout(() => {
+      setSavedAccounts(user ? saveAccountSnapshot(user) : readSavedAccounts());
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [user]);
 
   useEffect(() => {
@@ -179,10 +198,7 @@ export function AccountDropdown({
   }, [open]);
 
   useEffect(() => {
-    if (!open) {
-      setMenuPosition(null);
-      return undefined;
-    }
+    if (!open) return undefined;
 
     updateMenuPosition();
     window.addEventListener('resize', updateMenuPosition);
@@ -212,8 +228,7 @@ export function AccountDropdown({
 
   const buttonClass = cn(
     'relative inline-flex shrink-0 items-center border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] shadow-[0_14px_24px_-22px_rgba(15,23,42,0.16)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] focus:outline-none focus:ring-4 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)] dark:bg-slate-950/70',
-    variant === 'avatar-name' &&
-      'min-h-[40px] gap-2 rounded-full px-2 pr-3',
+    variant === 'avatar-name' && 'min-h-[40px] gap-2 rounded-full px-2 pr-3',
     variant === 'avatar-role' &&
       'min-h-[42px] gap-2.5 rounded-full px-2 pr-2 xl:px-2.5 xl:pr-3',
     variant === 'icon-label' &&
@@ -298,117 +313,131 @@ export function AccountDropdown({
               )}
               data-auto-scrollbar
             >
-          <div className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <Image
-                src={avatar}
-                alt={name}
-                width={44}
-                height={44}
-                className="h-11 w-11 rounded-full object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{name}</p>
-                <p className="truncate text-xs text-[color:var(--app-text-soft)]">
-                  {subtitle}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-2 grid gap-1">
-            {items.map(item => {
-              const Icon = item.icon;
-              const active =
-                cleanPath === item.href || cleanPath.startsWith(`${item.href}/`);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  role="menuitem"
-                  className={cn(
-                    'flex min-h-[42px] items-center gap-2 rounded-[14px] px-3 text-sm font-semibold transition hover:bg-[color:var(--app-surface-muted)]',
-                    active
-                      ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'text-[color:var(--app-text)]',
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="my-2 border-t border-[color:var(--app-border)]" />
-
-          <div className="space-y-1">
-            <p className="px-3 text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-              {text.savedAccounts}
-            </p>
-            {savedAccounts.slice(0, 8).map(account => {
-              const isCurrent = account.id === user?.id;
-
-              return (
-                <div
-                  key={account.id}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[14px] px-2 py-1 hover:bg-[color:var(--app-surface-muted)]"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isCurrent) void switchAccount(account);
-                    }}
-                    className="flex min-w-0 items-center gap-2 rounded-[12px] px-1 py-1 text-left"
-                  >
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-xs font-black text-[color:var(--app-text-inverse)]">
-                      {getInitial(account.displayName)}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">
-                        {account.displayName}
-                      </span>
-                      <span className="block truncate text-[11px] text-[color:var(--app-text-soft)]">
-                        {isCurrent ? text.current : formatSavedAccountIdentifier(account)}
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeAccount(account.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-danger-soft)] hover:text-[color:var(--app-danger)]"
-                    aria-label={text.remove}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+              <div className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <Image
+                    src={avatar}
+                    alt={name}
+                    width={44}
+                    height={44}
+                    className="h-11 w-11 rounded-full object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">{name}</p>
+                    <p className="truncate text-xs text-[color:var(--app-text-soft)]">
+                      {subtitle}
+                    </p>
+                  </div>
                 </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => void addAccount()}
-              className="flex min-h-[40px] w-full items-center gap-2 rounded-[14px] px-3 text-sm font-semibold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
-            >
-              <Plus className="h-4 w-4" />
-              {text.add}
-            </button>
-          </div>
+              </div>
 
-          <div className="my-2 border-t border-[color:var(--app-border)]" />
+              <div className="mt-2 grid gap-1">
+                {items.map(item => {
+                  const Icon = item.icon;
+                  const itemPath = hrefPath(item.href);
+                  const active =
+                    itemPath === '/profile'
+                      ? matchesRoute(cleanPath, '/profile$') ||
+                        matchesRoute(cleanPath, '/profile/edit')
+                      : matchesRoute(cleanPath, itemPath);
 
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              void logout();
-            }}
-            className="flex min-h-[42px] w-full items-center gap-2 rounded-[14px] px-3 text-sm font-semibold text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
-          >
-            <LogOut className="h-4 w-4" />
-            {text.logout}
-          </button>
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      role="menuitem"
+                      className={cn(
+                        'flex min-h-[42px] items-center gap-2 rounded-[14px] px-3 text-sm font-semibold transition hover:bg-[color:var(--app-surface-muted)]',
+                        active
+                          ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                          : 'text-[color:var(--app-text)]',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <div className="my-2 border-t border-[color:var(--app-border)]" />
+
+              <div className="space-y-1">
+                <p className="px-3 text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                  {text.savedAccounts}
+                </p>
+                {savedAccounts.slice(0, 8).map(account => {
+                  const isCurrent = account.id === user?.id;
+
+                  return (
+                    <div
+                      key={account.id}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[14px] px-2 py-1 hover:bg-[color:var(--app-surface-muted)]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isCurrent) void switchAccount(account);
+                        }}
+                        className="flex min-w-0 items-center gap-2 rounded-[12px] px-1 py-1 text-left"
+                      >
+                        <span className="inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                          <Image
+                            src={profileAvatarSrc(account.avatarUrl)}
+                            alt=""
+                            width={32}
+                            height={32}
+                            className="h-full w-full object-cover"
+                          />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">
+                            {account.displayName}
+                          </span>
+                          <span className="block truncate text-[11px] text-[color:var(--app-text-soft)]">
+                            {isCurrent
+                              ? text.current
+                              : formatSavedAccountIdentifier(account)}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeAccount(account.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-danger-soft)] hover:text-[color:var(--app-danger)]"
+                        aria-label={text.remove}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => void addAccount()}
+                  className="flex min-h-[40px] w-full items-center gap-2 rounded-[14px] px-3 text-sm font-semibold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
+                >
+                  <Plus className="h-4 w-4" />
+                  {text.add}
+                </button>
+              </div>
+
+              <div className="my-2 border-t border-[color:var(--app-border)]" />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  void logout();
+                }}
+                className="flex min-h-[42px] w-full items-center gap-2 rounded-[14px] px-3 text-sm font-semibold text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
+              >
+                <LogOut className="h-4 w-4" />
+                {text.logout}
+              </button>
             </div>,
             document.body,
           )

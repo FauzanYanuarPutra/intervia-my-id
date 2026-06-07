@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeContentMediaUrl, parseImages } from './catalog';
+import {
+  normalizeContentMediaUrl,
+  parseImages,
+  resolveImageGallery,
+} from './catalog';
 
 describe('normalizeContentMediaUrl', () => {
   it('keeps internal upload paths as-is', () => {
@@ -71,5 +75,21 @@ describe('parseImages', () => {
       '/uploads/content/cover-camera.jpg',
       '/uploads/content/cover-camera-2.jpg',
     ]);
+  });
+
+  it('does not replace first-party category placeholders with synthetic media', () => {
+    const item = {
+      id: 'listing-service',
+      title: 'Jasa Project Management',
+      content_type: 'service',
+      cover_image: '/images/umkm/content-service.svg',
+      metadata: {
+        image_urls: ['/images/umkm/content-service.svg'],
+        media_source: 'first_party_category_asset',
+      },
+    };
+
+    expect(parseImages(item)).toEqual([]);
+    expect(resolveImageGallery(item)).toEqual([]);
   });
 });

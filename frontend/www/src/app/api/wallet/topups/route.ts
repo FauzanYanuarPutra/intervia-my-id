@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       async (ctx) =>
         withIdempotency(req, {
           scope: `wallet-topup:${body.data.environment || 'default'}:${body.data.currency || 'IDR'}`,
-          actorHint: ctx.token,
+          actorHint: ctx.userId,
           forward: () =>
             fetch(`${MARKETPLACE_URL}/v1/wallet/topups`, {
               method: 'POST',

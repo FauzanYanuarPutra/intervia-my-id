@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -16,6 +17,7 @@ import {
   type SavedAccount,
 } from '@/lib/accountVault';
 import { mapCommonAuthError } from '@/lib/authErrors';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import {
   buildInternationalPhoneNumber,
   DEFAULT_AUTH_PHONE_COUNTRY,
@@ -34,12 +36,8 @@ import {
   Users,
 } from 'lucide-react';
 
-type Mode = 'phone' | 'otp' | 'profile';
+type Mode = 'phone' | 'profile';
 const LOGIN_FLOW_STORAGE_KEY = 'lajukan_auth_login_phone_flow_v2';
-
-function getAccountInitial(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || 'A';
-}
 
 export default function LoginClient() {
   const {
@@ -72,11 +70,7 @@ export default function LoginClient() {
     DEFAULT_AUTH_PHONE_COUNTRY,
   );
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
   const [otpToken, setOtpToken] = useState<string | null>(null);
-  const [devOtp, setDevOtp] = useState('');
-  const [otpResendAt, setOtpResendAt] = useState(0);
-  const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -94,21 +88,21 @@ export default function LoginClient() {
   );
   const phoneReady = isPhoneNumberReady(phone, phoneCountryCode);
   const normalizedEmail = email.trim().toLowerCase();
-  const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
-  const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
   const selectedCountry = getPhoneCountry(phoneCountryCode);
   const selectedCountryFlag = getPhoneCountryFlagEmoji(selectedCountry.code);
-  const currentStep = mode === 'phone' ? 1 : mode === 'otp' ? 2 : 3;
+  const currentStep = mode === 'phone' ? 1 : 2;
   const shellCopy = {
     phone: {
       title: locale === 'id' ? 'Masuk' : 'Sign in',
-      description: locale === 'id' ? 'Nomor HP + OTP.' : 'Phone + OTP.',
+      description: locale === 'id' ? 'Nomor HP langsung.' : 'Phone number only.',
       progressLabel: locale === 'id' ? 'Masuk' : 'Sign in',
     },
     otp: {
-      title: locale === 'id' ? 'Masukkan kode' : 'Enter code',
-      description: locale === 'id' ? '6 digit dari SMS.' : '6 digits from SMS.',
-      progressLabel: locale === 'id' ? 'Kode' : 'Code',
+      title: locale === 'id' ? 'Verifikasi OTP' : 'Verify OTP',
+      description: locale === 'id'
+        ? 'Masukkan kode OTP'
+        : 'Enter OTP code',
+      progressLabel: locale === 'id' ? 'OTP' : 'OTP',
     },
     profile: {
       title: locale === 'id' ? 'Lengkapi nama' : 'Add your name',
@@ -116,44 +110,43 @@ export default function LoginClient() {
       progressLabel: locale === 'id' ? 'Akun' : 'Account',
     },
   }[mode];
+
   const shellHighlights =
     locale === 'id'
       ? [
-          {
-            title: 'Nomor aktif',
-            description: 'Pakai nomor yang kamu pakai sekarang.',
-          },
-          {
-            title: 'Kode OTP',
-            description: 'Cek SMS lalu isi 6 digit.',
-          },
-          {
-            title: 'Data aman',
-            description: 'Draft, chat, dan transaksi tetap tersimpan.',
-          },
-        ]
+        {
+          title: 'Nomor aktif',
+          description: 'Pakai nomor yang kamu pakai sekarang.',
+        },
+        {
+          title: 'Akses ringan',
+          description: 'Login dibuat tanpa kode tambahan di layar publik.',
+        },
+        {
+          title: 'Data aman',
+          description: 'Draft, chat, dan transaksi tetap tersimpan.',
+        },
+      ]
       : [
-          {
-            title: 'Active phone',
-            description: 'Use the number you use right now.',
-          },
-          {
-            title: 'OTP code',
-            description: 'Check SMS and enter 6 digits.',
-          },
-          {
-            title: 'Data stays ready',
-            description: 'Drafts, chats, and transactions stay saved.',
-          },
-        ];
+        {
+          title: 'Active phone',
+          description: 'Use the number you use right now.',
+        },
+        {
+          title: 'Light access',
+          description: 'Public login stays free from extra code prompts.',
+        },
+        {
+          title: 'Data stays ready',
+          description: 'Drafts, chats, and transactions stay saved.',
+        },
+      ];
   const shellHelperText = '';
 
   const authInputClass =
-    'w-full min-h-[50px] rounded-[14px] border border-[color:var(--app-border)] bg-white px-3.5 py-3 text-[15px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] outline-none transition-[border-color,background-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] sm:text-sm dark:bg-[color:var(--app-surface-strong)]';
+    'w-full min-h-[42px] rounded-[12px] border border-[color:var(--app-border)] bg-white px-3 py-2 text-[14px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] outline-none transition-[border-color,background-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] sm:text-[13px] dark:bg-[color:var(--app-surface-strong)]';
   const primaryButtonClass =
     'flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 py-3 text-sm font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]';
-  const utilityButtonClass =
-    'flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] sm:w-auto sm:shrink-0 dark:bg-[color:var(--app-surface-strong)]';
   const statusCardClass =
     'rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 py-3';
   const secondaryTextButtonClass =
@@ -175,9 +168,8 @@ export default function LoginClient() {
     (account: SavedAccount) => {
       const phoneDraft = getSavedAccountPhoneDraft(account);
       setSelectedSavedAccountId(account.id);
-      setOtp('');
+
       setOtpToken(null);
-      setDevOtp('');
       setCaptchaToken('');
       setError(null);
       setMode('phone');
@@ -201,9 +193,7 @@ export default function LoginClient() {
   const clearSelectedAccount = useCallback(() => {
     setSelectedSavedAccountId(null);
     setPhone('');
-    setOtp('');
     setOtpToken(null);
-    setDevOtp('');
     setMode('phone');
     setError(null);
     clearLoginDraft();
@@ -274,11 +264,11 @@ export default function LoginClient() {
 
       if (
         draft.mode === 'phone' ||
-        draft.mode === 'otp' ||
         draft.mode === 'profile'
       ) {
         setMode(draft.mode);
       }
+
       if (typeof draft.phone === 'string') setPhone(draft.phone);
       if (draft.phoneCountryCode) setPhoneCountryCode(draft.phoneCountryCode);
       if (typeof draft.otpToken === 'string') setOtpToken(draft.otpToken);
@@ -343,121 +333,29 @@ export default function LoginClient() {
       );
       return;
     }
-    if (otpCooldownLeft > 0) {
-      setError(
-        locale === 'id'
-          ? `Tunggu ${otpCooldownSeconds} detik sebelum kirim ulang kode.`
-          : `Wait ${otpCooldownSeconds} seconds before resending the code.`,
-      );
-      return;
-    }
-
-    setSendingOtp(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'phone',
-          target: normalizedPhone,
-          purpose: 'login',
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(mapCommonAuthError(data?.error, res.status));
-        return;
-      }
-
-      setOtp('');
-      setOtpToken(null);
-      setOtpResendAt(Date.now() + 30_000);
-      if (typeof data?.devOtp === 'string') {
-        setDevOtp(data.devOtp);
-      }
-      setMode('otp');
-    } catch {
-      setError(
-        locale === 'id'
-          ? 'Gagal kirim OTP nomor HP. Coba lagi.'
-          : 'Failed to send phone OTP. Try again.',
-      );
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  const verifyPhoneOtp = async () => {
-    if (!phoneReady || normalizedPhone.length < 8) {
-      setError(
-        locale === 'id'
-          ? 'Masukkan nomor HP aktif dulu.'
-          : 'Enter an active phone number first.',
-      );
-      return;
-    }
-    if (otp.length !== 6) {
-      setError(
-        locale === 'id' ? 'Masukkan OTP 6 digit.' : 'Enter the 6-digit OTP.',
-      );
-      return;
-    }
-
     setVerifyingOtp(true);
     setError(null);
 
     try {
-      const verifyRes = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'phone',
-          target: normalizedPhone,
-          otp,
-          purpose: 'login',
-        }),
+      const destination = callbackUrl ?? `/${locale}/home`;
+      authSuccessTargetRef.current = destination;
+      await loginWithPhone(normalizedPhone, {
+        silent: true,
+        redirectTo: destination,
       });
-
-      const verifyData = await verifyRes.json().catch(() => ({}));
-      if (!verifyRes.ok || !verifyData?.token) {
-        setError(mapCommonAuthError(verifyData?.error, verifyRes.status));
+      finishLoginRedirect(destination);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      const normalizedMessage = message.toLowerCase();
+      if (normalizedMessage.includes('phone login is not available')) {
+        authSuccessTargetRef.current = null;
+        setMode('profile');
+        setError(null);
         return;
       }
-
-      const token = String(verifyData.token);
-      setOtpToken(token);
-
-      try {
-        const destination = callbackUrl ?? `/${locale}/home`;
-        authSuccessTargetRef.current = destination;
-        await loginWithPhone(normalizedPhone, {
-          silent: true,
-          redirectTo: destination,
-          phoneOtpToken: token,
-        });
-        finishLoginRedirect(destination);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : '';
-        const normalizedMessage = message.toLowerCase();
-        if (normalizedMessage.includes('phone login is not available')) {
-          authSuccessTargetRef.current = null;
-          setMode('profile');
-          setError(null);
-          return;
-        }
-        setError(mapCommonAuthError(message));
-        clearRedirectFallback();
-        authSuccessTargetRef.current = null;
-      }
-    } catch {
-      setError(
-        locale === 'id'
-          ? 'Gagal verifikasi OTP. Coba lagi.'
-          : 'Failed to verify OTP. Try again.',
-      );
+      setError(mapCommonAuthError(message));
+      clearRedirectFallback();
+      authSuccessTargetRef.current = null;
     } finally {
       setVerifyingOtp(false);
     }
@@ -470,7 +368,7 @@ export default function LoginClient() {
           ? 'Verifikasi OTP dulu sebelum lanjut.'
           : 'Verify OTP before continuing.',
       );
-      setMode('otp');
+      setMode('phone');
       return;
     }
     if (!fullName.trim()) {
@@ -557,19 +455,24 @@ export default function LoginClient() {
             return (
               <div
                 key={account.id}
-                className={`grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 rounded-[16px] border p-1.5 transition ${
-                  selected
-                    ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
-                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface)]'
-                }`}
+                className={`grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 rounded-[16px] border p-1.5 transition ${selected
+                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
+                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface)]'
+                  }`}
               >
                 <button
                   type="button"
                   onClick={() => applySavedAccount(account)}
                   className="grid min-w-0 grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2 rounded-[12px] px-1.5 py-1.5 text-left transition hover:bg-[color:var(--app-surface-muted)]"
                 >
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-sm font-black text-[color:var(--app-text-inverse)]">
-                    {getAccountInitial(account.displayName)}
+                  <span className="inline-flex h-9 w-9 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                    <Image
+                      src={profileAvatarSrc(account.avatarUrl)}
+                      alt=""
+                      width={36}
+                      height={36}
+                      className="h-full w-full object-cover"
+                    />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-bold text-[color:var(--app-text)]">
@@ -637,104 +540,18 @@ export default function LoginClient() {
       <button
         type="button"
         onClick={sendPhoneOtp}
-        disabled={sendingOtp || !phoneReady}
+        disabled={verifyingOtp || !phoneReady}
         className={primaryButtonClass}
-      >
-        {sendingOtp ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <>
-            {locale === 'id' ? 'Kirim kode' : 'Send code'}
-            <ArrowRight className="h-4 w-4" />
-          </>
-        )}
-      </button>
-    </motion.div>
-  );
-
-  const renderOtpStep = () => (
-    <motion.div
-      key="otp"
-      initial={{ opacity: 0, x: 8 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -8 }}
-      className="space-y-4"
-    >
-      <button
-        type="button"
-        onClick={() => {
-          setOtp('');
-          setOtpToken(null);
-          setError(null);
-          setMode('phone');
-        }}
-        className={secondaryTextButtonClass}
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {locale === 'id' ? 'Ganti nomor HP' : 'Change phone'}
-      </button>
-
-      <div className={statusCardClass}>
-        <p className="text-xs font-medium text-[color:var(--app-text-soft)]">
-          {locale === 'id' ? 'Kode ke' : 'Code sent to'}
-        </p>
-        <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
-          {selectedCountryFlag} {formatPhonePreview(phone, phoneCountryCode)}
-        </p>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <input
-          type="text"
-          autoFocus
-          value={otp}
-          maxLength={6}
-          onChange={event =>
-            setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))
-          }
-          placeholder="000000"
-          inputMode="numeric"
-          enterKeyHint="done"
-          className={`${authInputClass} w-full min-w-0 text-center tracking-[0.28em] sm:tracking-[0.4em]`}
-        />
-
-        <button
-          type="button"
-          onClick={sendPhoneOtp}
-          disabled={sendingOtp || otpCooldownLeft > 0}
-          className={utilityButtonClass}
-        >
-          {sendingOtp
-            ? 'SEND...'
-            : otpCooldownLeft > 0
-              ? `${otpCooldownSeconds}s`
-              : locale === 'id'
-                ? 'Kirim lagi'
-                : 'Resend'}
-        </button>
-      </div>
-
-      <button
-        type="button"
-        onClick={verifyPhoneOtp}
-        disabled={verifyingOtp || otp.length !== 6}
-        className={`mt-3 ${primaryButtonClass}`}
       >
         {verifyingOtp ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <>
-            {locale === 'id' ? 'Lanjut' : 'Continue'}
+            {locale === 'id' ? 'Masuk' : 'Sign in'}
             <ArrowRight className="h-4 w-4" />
           </>
         )}
       </button>
-
-      {devOtp && (
-        <div className="rounded-[16px] border border-[color:color-mix(in_srgb,_var(--app-warning)_22%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-warning-soft)_72%,_var(--app-surface-strong))] px-4 py-3 text-center text-xs text-[color:var(--app-warning)]">
-          Dev OTP: <span className="font-mono font-semibold">{devOtp}</span>
-        </div>
-      )}
     </motion.div>
   );
 
@@ -750,12 +567,12 @@ export default function LoginClient() {
         type="button"
         onClick={() => {
           setError(null);
-          setMode('otp');
+          setMode('phone');
         }}
         className={secondaryTextButtonClass}
       >
         <ArrowLeft className="h-4 w-4" />
-        {locale === 'id' ? 'Kembali ke OTP' : 'Back to OTP'}
+        {locale === 'id' ? 'Kembali' : 'Back'}
       </button>
 
       <div className={statusCardClass}>
@@ -820,8 +637,6 @@ export default function LoginClient() {
     switch (mode) {
       case 'phone':
         return renderPhoneStep();
-      case 'otp':
-        return renderOtpStep();
       case 'profile':
         return renderProfileStep();
       default:
@@ -832,11 +647,11 @@ export default function LoginClient() {
   return (
     <AuthFlowShell
       locale={locale as 'id' | 'en'}
-      badge="OTP"
+      badge={locale === 'id' ? 'Masuk cepat' : 'Fast sign-in'}
       title={shellCopy.title}
       description={shellCopy.description}
       currentStep={currentStep}
-      totalSteps={3}
+      totalSteps={2}
       progressLabel={shellCopy.progressLabel}
       highlights={shellHighlights}
       helperText={shellHelperText}

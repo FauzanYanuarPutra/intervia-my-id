@@ -2,10 +2,8 @@
 
 import { type ReactNode } from 'react';
 import {
-  CalendarClock,
   ClipboardList,
   FolderKanban,
-  Heart,
   Home,
   MapPin,
   Package,
@@ -19,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
-import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { resolveMarketplaceCreatePath } from '@/lib/createRoutes';
 import { cn } from '@/lib/utils';
@@ -41,14 +38,6 @@ function normalizeCreatePathname(pathname: string): string {
   return withoutLocale === '' ? '/' : withoutLocale;
 }
 
-function CreateDesktopTopBar() {
-  return (
-    <div className="hidden lg:block">
-      <Header />
-    </div>
-  );
-}
-
 function CreateDesktopSidebar({
   locale,
   pathname,
@@ -60,6 +49,14 @@ function CreateDesktopSidebar({
 }) {
   const isId = locale === 'id';
   const currentPath = normalizeCreatePathname(pathname);
+  const supplyCreateHref = buildCreateBasePath({
+    locale,
+    sideId: 'supply',
+  });
+  const demandCreateHref = buildCreateBasePath({
+    locale,
+    sideId: 'demand',
+  });
   const primaryItems: CreateNavItem[] = [
     {
       href: '/home',
@@ -68,40 +65,36 @@ function CreateDesktopSidebar({
       icon: Home,
     },
     {
-      href: buildCreateBasePath({ locale, sideId: 'demand' }),
-      label: isId ? 'Permintaan Saya' : 'My requests',
-      caption: isId ? 'Kebutuhan' : 'Need briefs',
-      icon: Target,
+      href: '/create',
+      label: isId ? 'Mulai Buat' : 'Start Create',
+      caption: isId ? 'Tawarkan atau cari' : 'Choose offer or need',
+      icon: Plus,
     },
     {
-      href: buildCreateBasePath({ locale, sideId: 'supply' }),
-      label: isId ? 'Penawaran Saya' : 'My offers',
-      caption: isId ? 'Listing' : 'Offer listings',
+      href: supplyCreateHref,
+      label: isId ? 'Tawarkan' : 'Offer',
+      caption: isId ? 'Produk, jasa, lokasi' : 'Products, services, spaces',
       icon: ClipboardList,
     },
     {
+      href: demandCreateHref,
+      label: isId ? 'Cari Kebutuhan' : 'Need Something',
+      caption: isId
+        ? 'Supplier, jasa, talent'
+        : 'Find suppliers, services, talent',
+      icon: Target,
+    },
+    {
       href: '/my-listings',
-      label: isId ? 'Proyek Saya' : 'My projects',
-      caption: isId ? 'Draft dan posting' : 'Drafts and posts',
+      label: isId ? 'Posting Saya' : 'My posts',
+      caption: isId ? 'Posting, favorit, riwayat' : 'Posts, saved, history',
       icon: FolderKanban,
-    },
-    {
-      href: '/my-listings?filter=favorites',
-      label: isId ? 'Favorit' : 'Favorites',
-      caption: isId ? 'Referensi' : 'Saved references',
-      icon: Heart,
-    },
-    {
-      href: '/my-listings?filter=history',
-      label: isId ? 'Riwayat Dilihat' : 'Viewed history',
-      caption: isId ? 'Terakhir dibuka' : 'Recently viewed',
-      icon: CalendarClock,
     },
   ];
   const businessItems: CreateNavItem[] = [
     {
       href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
-      label: isId ? 'Usaha Saya' : 'My business',
+      label: isId ? 'Profil Usaha' : 'Business profile',
       caption: isId ? 'Profil usaha' : 'Business profile',
       icon: Store,
     },
@@ -111,8 +104,8 @@ function CreateDesktopSidebar({
         sideId: 'supply',
         typeId: 'product',
       }),
-      label: isId ? 'Produk Saya' : 'My products',
-      caption: isId ? 'Stok dan supplier' : 'Stock and suppliers',
+      label: isId ? 'Produk' : 'Products',
+      caption: isId ? 'Stok, harga, foto' : 'Stock, price, photos',
       icon: Package,
     },
     {
@@ -121,14 +114,16 @@ function CreateDesktopSidebar({
         sideId: 'supply',
         typeId: 'service',
       }),
-      label: isId ? 'Jasa Saya' : 'My services',
-      caption: isId ? 'Layanan usaha' : 'Business services',
+      label: isId ? 'Jasa' : 'Services',
+      caption: isId ? 'Paket dan layanan' : 'Packages and services',
       icon: Wrench,
     },
     {
       href: resolveMarketplaceCreatePath(locale, 'talent', 'supply'),
-      label: isId ? 'Talent Saya' : 'My talent',
-      caption: isId ? 'Profil skill' : 'Skill profile',
+      label: isId ? 'Talent' : 'Talent',
+      caption: isId
+        ? 'Skill, level, verifikasi'
+        : 'Skills, level, verification',
       icon: Users,
     },
     {
@@ -137,7 +132,7 @@ function CreateDesktopSidebar({
         sideId: 'supply',
         typeId: 'property',
       }),
-      label: isId ? 'Lokasi Saya' : 'My spaces',
+      label: isId ? 'Lokasi' : 'Spaces',
       caption: isId ? 'Ruko, booth, kios' : 'Shops and booths',
       icon: MapPin,
     },
@@ -145,9 +140,16 @@ function CreateDesktopSidebar({
   const renderNavItem = (item: CreateNavItem) => {
     const itemPath = item.href.split('?')[0];
     const active =
-      itemPath === '/create'
-        ? currentPath === '/create'
-        : currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
+      itemPath === supplyCreateHref
+        ? currentPath === supplyCreateHref ||
+          currentPath.startsWith(`${supplyCreateHref}/`)
+        : itemPath === demandCreateHref
+          ? currentPath === demandCreateHref ||
+            currentPath.startsWith(`${demandCreateHref}/`)
+          : itemPath === '/create'
+            ? currentPath === '/create'
+            : currentPath === itemPath ||
+              currentPath.startsWith(`${itemPath}/`);
     const Icon = item.icon;
 
     return (
@@ -210,7 +212,7 @@ function CreateDesktopSidebar({
             className="mt-3 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-[12px] border border-[color:var(--app-accent-border)] bg-white px-3 text-xs font-semibold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)] dark:bg-slate-950/50"
           >
             <Plus className="h-3.5 w-3.5" />
-            {isId ? 'Buat Baru' : 'Create New'}
+            {isId ? 'Buat posting baru' : 'Create new post'}
           </Link>
         </nav>
         <div className="m-2 shrink-0 overflow-hidden rounded-[18px] border border-emerald-100 bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_100%)] p-3 text-emerald-800 shadow-[0_18px_36px_-32px_rgba(22,163,74,0.22)] dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100">
@@ -220,12 +222,12 @@ function CreateDesktopSidebar({
             </span>
             <div>
               <p className="text-[0.92rem] font-black tracking-[-0.03em]">
-                {isId ? 'Satset & aman' : 'Fast and safe flow'}
+                {isId ? 'Bingung mulai?' : 'Not sure where to start?'}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-emerald-800/78 dark:text-emerald-100/78">
                 {isId
-                  ? 'Data aman. Bisa edit. Tayang setelah cek.'
-                  : 'Data is saved safely, editable anytime, and published after checks pass.'}
+                  ? 'Pilih Tawarkan kalau Anda menyediakan sesuatu. Pilih Cari Kebutuhan kalau sedang mencari vendor.'
+                  : 'Choose Want to Sell when offering. Choose Need Something when looking.'}
               </p>
             </div>
           </div>
@@ -251,13 +253,8 @@ export function CreateMarketplaceShell({
   const pathname = usePathname();
 
   return (
-    <div className="lajukan-home-compact lajukan-market-page lajukan-market-create lajukan-create-compact relative min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 pb-6 pt-3 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)] sm:px-4 lg:h-[100svh] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <div className="lajukan-home-compact lajukan-market-page lajukan-market-create lajukan-create-compact relative min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)] sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell lajukan-create-shell relative mx-auto lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-        <CreateDesktopTopBar />
-        <div
-          aria-hidden="true"
-          className="hidden h-[4.625rem] shrink-0 lg:block"
-        />
         <div className="lajukan-home-desktop-grid lajukan-create-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1540px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[232px_minmax(0,1fr)] 2xl:grid-cols-[244px_minmax(0,1fr)]">
           <CreateDesktopSidebar
             locale={locale}

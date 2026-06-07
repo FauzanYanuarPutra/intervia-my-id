@@ -190,7 +190,7 @@ export const CORE_LAJUKAN_FLOWS: LajukanFlow[] = [
     steps: [
       {
         id: 'umkm-discovery',
-        route: '/super-app/umkm',
+        route: '/umkm',
         labelId: 'Cari UMKM',
         primaryActionId: 'open-store',
         expectedSignals: ['nearby', 'category', 'map-or-list', 'order-cta'],
@@ -198,7 +198,7 @@ export const CORE_LAJUKAN_FLOWS: LajukanFlow[] = [
       },
       {
         id: 'umkm-manage',
-        route: '/super-app/umkm/manage',
+        route: '/usaha',
         labelId: 'Kelola toko',
         primaryActionId: 'setup-store',
         expectedSignals: ['catalog', 'orders', 'team', 'qr'],

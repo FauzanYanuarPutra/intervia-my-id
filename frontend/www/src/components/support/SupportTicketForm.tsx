@@ -48,9 +48,18 @@ type ChatMessage = {
 function getCategoryOptions(isId: boolean) {
   return [
     { value: 'account', label: isId ? 'Akun & login' : 'Account & Login' },
-    { value: 'payment', label: isId ? 'Pembayaran & tagihan' : 'Payment & Billing' },
-    { value: 'transaction', label: isId ? 'Proyek / transaksi' : 'Project/Transaction' },
-    { value: 'security', label: isId ? 'Keamanan & penyalahgunaan' : 'Security & Abuse' },
+    {
+      value: 'payment',
+      label: isId ? 'Pembayaran & tagihan' : 'Payment & Billing',
+    },
+    {
+      value: 'transaction',
+      label: isId ? 'Proyek / transaksi' : 'Project/Transaction',
+    },
+    {
+      value: 'security',
+      label: isId ? 'Keamanan & penyalahgunaan' : 'Security & Abuse',
+    },
     { value: 'technical', label: isId ? 'Masalah teknis' : 'Technical Issue' },
     { value: 'other', label: isId ? 'Lainnya' : 'Other' },
   ];
@@ -76,20 +85,32 @@ function getStatusLabels(isId: boolean): Record<string, string> {
 
 const STATUS_BADGE: Record<string, string> = {
   open: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
-  in_progress: 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
-  pending_customer: 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]',
-  resolved: 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
-  closed: 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]',
+  in_progress:
+    'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
+  pending_customer:
+    'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]',
+  resolved:
+    'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+  closed:
+    'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]',
 };
 
 const PRIORITY_BADGE: Record<string, string> = {
-  urgent: 'border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]',
+  urgent:
+    'border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]',
   high: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
-  normal: 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+  normal:
+    'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
 };
 
 const BADGE_BASE =
   'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide';
+const SUPPORT_CONTROL_CLASS =
+  'ui-data-control min-h-10 rounded-[12px] px-3 py-2 text-[13px] font-semibold';
+const SUPPORT_TEXTAREA_CLASS =
+  'ui-data-control min-h-[96px] rounded-[12px] px-3 py-2.5 text-[13px] font-medium leading-5';
+const SUPPORT_LABEL_CLASS =
+  'block text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]';
 
 function formatDate(value: string): string {
   const parsed = new Date(value);
@@ -117,7 +138,7 @@ export default function SupportTicketForm() {
   const defaultEmail = useMemo(() => user?.email || '', [user?.email]);
   const needsCaptcha = Boolean(
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
-      process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY,
+    process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY,
   );
   const ticketFromQuery = searchParams.get('ticket');
   const shouldOpenLiveTools = searchParams.get('openLive') === '1';
@@ -141,7 +162,9 @@ export default function SupportTicketForm() {
   const [replyBody, setReplyBody] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
   const [aiInput, setAiInput] = useState('');
-  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [aiMessages, setAiMessages] = useState<
+    Array<{ role: 'user' | 'assistant'; content: string }>
+  >([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [chatRoomId, setChatRoomId] = useState<string | null>(null);
@@ -158,12 +181,12 @@ export default function SupportTicketForm() {
   const statusLabels = useMemo(() => getStatusLabels(isId), [isId]);
   const categoryLabels = useMemo(
     () =>
-      Object.fromEntries(categoryOptions.map((item) => [item.value, item.label])),
+      Object.fromEntries(categoryOptions.map(item => [item.value, item.label])),
     [categoryOptions],
   );
   const priorityLabels = useMemo(
     () =>
-      Object.fromEntries(priorityOptions.map((item) => [item.value, item.label])),
+      Object.fromEntries(priorityOptions.map(item => [item.value, item.label])),
     [priorityOptions],
   );
 
@@ -208,7 +231,7 @@ export default function SupportTicketForm() {
       const data: TicketListResponse = await res.json().catch(() => ({}));
       const items = Array.isArray(data.items) ? data.items : [];
       setTickets(items);
-      setSelectedTicketId((prev) => prev || items[0]?.id || null);
+      setSelectedTicketId(prev => prev || items[0]?.id || null);
     } catch {
       setTickets([]);
       setSelectedTicketId(null);
@@ -234,7 +257,9 @@ export default function SupportTicketForm() {
           setDetailError(data?.error || 'Gagal memuat detail ticket.');
           return;
         }
-        const data: TicketDetail = await res.json().catch(() => ({ ticket: null, replies: [] }));
+        const data: TicketDetail = await res
+          .json()
+          .catch(() => ({ ticket: null, replies: [] }));
         setTicketDetail(data && data.ticket ? data : null);
       } catch {
         setTicketDetail(null);
@@ -276,7 +301,9 @@ export default function SupportTicketForm() {
       try {
         let token = accessToken;
         if (!token) {
-          const tokenRes = await authFetch('/api/chat/token', { method: 'POST' });
+          const tokenRes = await authFetch('/api/chat/token', {
+            method: 'POST',
+          });
           const tokenData = await tokenRes.json().catch(() => ({}));
           token = tokenData?.token || null;
         }
@@ -295,9 +322,12 @@ export default function SupportTicketForm() {
           }),
         });
 
-        const res = await authFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages?limit=50`, {
-          cache: 'no-store',
-        });
+        const res = await authFetch(
+          `/api/chat/rooms/${encodeURIComponent(roomId)}/messages?limit=50`,
+          {
+            cache: 'no-store',
+          },
+        );
         const data = await res.json().catch(() => ({}));
         const messages = Array.isArray(data.messages) ? data.messages : [];
         setChatMessages(messages);
@@ -305,23 +335,27 @@ export default function SupportTicketForm() {
         cleanupChat();
         const channel = await joinRoom(roomId, token);
         chatChannelRef.current = channel;
-        chatCleanupRef.current = onMessage(channel, (msg) => {
+        chatCleanupRef.current = onMessage(channel, msg => {
           const content = msg.content ?? msg.body ?? '';
           if (!content) return;
           const next: ChatMessage = {
-            id: msg.message_id || msg.client_ref || msg.sent_at || `msg-${Date.now()}`,
+            id:
+              msg.message_id ||
+              msg.client_ref ||
+              msg.sent_at ||
+              `msg-${Date.now()}`,
             sender_id: msg.sender_id || '',
             content,
             message_type: msg.message_type || 'text',
             attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
             created_at: msg.sent_at || new Date().toISOString(),
           };
-          setChatMessages((prev) => {
-            if (prev.some((m) => m.id === next.id)) return prev;
+          setChatMessages(prev => {
+            if (prev.some(m => m.id === next.id)) return prev;
             return [...prev, next];
           });
         });
-      } catch (err) {
+      } catch {
         setChatError('Gagal memuat chat support.');
       } finally {
         setChatLoading(false);
@@ -329,7 +363,6 @@ export default function SupportTicketForm() {
     },
     [accessToken, authFetch, cleanupChat, isAuthenticated, user?.id],
   );
-
 
   useEffect(() => {
     if (!isAuthenticated || !selectedTicketId) {
@@ -339,29 +372,24 @@ export default function SupportTicketForm() {
     void loadTicketDetail(selectedTicketId);
   }, [isAuthenticated, loadTicketDetail, selectedTicketId]);
 
+  const activeTicket = ticketDetail?.ticket ?? null;
+
   useEffect(() => {
-    if (!isAuthenticated || !ticketDetail?.ticket) {
+    if (!isAuthenticated || !activeTicket) {
       setChatRoomId(null);
       setChatMessages([]);
       cleanupChat();
       return;
     }
 
-    const roomId = ticketDetail.ticket.support_room_id || `support:${ticketDetail.ticket.id}`;
+    const roomId = activeTicket.support_room_id || `support:${activeTicket.id}`;
     setChatRoomId(roomId);
-    void loadSupportChat(roomId, ticketDetail.ticket.subject);
+    void loadSupportChat(roomId, activeTicket.subject);
 
     return () => {
       cleanupChat();
     };
-  }, [
-    cleanupChat,
-    isAuthenticated,
-    loadSupportChat,
-    ticketDetail?.ticket?.id,
-    ticketDetail?.ticket?.support_room_id,
-    ticketDetail?.ticket?.subject,
-  ]);
+  }, [activeTicket, cleanupChat, isAuthenticated, loadSupportChat]);
 
   const submitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -397,7 +425,7 @@ export default function SupportTicketForm() {
       updated_at: new Date().toISOString(),
     };
     if (isAuthenticated) {
-      setTickets((prev) => [optimisticTicket, ...prev]);
+      setTickets(prev => [optimisticTicket, ...prev]);
     }
 
     try {
@@ -428,7 +456,7 @@ export default function SupportTicketForm() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (isAuthenticated) {
-          setTickets((prev) => prev.filter((ticket) => ticket.id !== optimisticId));
+          setTickets(prev => prev.filter(ticket => ticket.id !== optimisticId));
         }
         setError(data?.error || 'Gagal membuat ticket.');
         return;
@@ -441,7 +469,7 @@ export default function SupportTicketForm() {
       await loadMyTickets();
     } catch {
       if (isAuthenticated) {
-        setTickets((prev) => prev.filter((ticket) => ticket.id !== optimisticId));
+        setTickets(prev => prev.filter(ticket => ticket.id !== optimisticId));
       }
       setError('Gagal membuat ticket.');
     } finally {
@@ -457,18 +485,25 @@ export default function SupportTicketForm() {
     setReplyLoading(true);
     setDetailError('');
     try {
-      const res = await authFetch(`/api/support/tickets/${selectedTicketId}/replies`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: cleanBody }),
-      });
+      const res = await authFetch(
+        `/api/support/tickets/${selectedTicketId}/replies`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body: cleanBody }),
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setDetailError(data?.error || 'Gagal mengirim balasan.');
         return;
       }
       if (chatChannelRef.current) {
-        await sendMessageViaSocket(chatChannelRef.current, cleanBody, crypto.randomUUID());
+        await sendMessageViaSocket(
+          chatChannelRef.current,
+          cleanBody,
+          crypto.randomUUID(),
+        );
       }
       setReplyBody('');
       await Promise.all([loadTicketDetail(selectedTicketId), loadMyTickets()]);
@@ -485,7 +520,7 @@ export default function SupportTicketForm() {
     setAiLoading(true);
     setAiError('');
     setAiInput('');
-    setAiMessages((prev) => [...prev, { role: 'user', content: message }]);
+    setAiMessages(prev => [...prev, { role: 'user', content: message }]);
 
     try {
       const res = await fetch('/api/ai/chat', {
@@ -495,19 +530,25 @@ export default function SupportTicketForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errText = data?.response || data?.error || 'AI belum bisa membantu.';
-        setAiMessages((prev) => [...prev, { role: 'assistant', content: String(errText) }]);
+        const errText =
+          data?.response || data?.error || 'AI belum bisa membantu.';
+        setAiMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: String(errText) },
+        ]);
         return;
       }
       const replyText = data?.response || 'AI belum bisa membantu.';
-      setAiMessages((prev) => [...prev, { role: 'assistant', content: String(replyText) }]);
+      setAiMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: String(replyText) },
+      ]);
     } catch {
       setAiError('AI gagal merespons. Coba lagi ya.');
     } finally {
       setAiLoading(false);
     }
   };
-
 
   const sendChatMessage = useCallback(async () => {
     if (!selectedTicketId || !chatRoomId || !isAuthenticated) return;
@@ -524,7 +565,11 @@ export default function SupportTicketForm() {
       });
 
       if (chatChannelRef.current) {
-        await sendMessageViaSocket(chatChannelRef.current, content, crypto.randomUUID());
+        await sendMessageViaSocket(
+          chatChannelRef.current,
+          content,
+          crypto.randomUUID(),
+        );
       }
 
       setChatInput('');
@@ -547,7 +592,9 @@ export default function SupportTicketForm() {
   return (
     <div className="mt-6 space-y-4">
       <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-4 shadow-sm">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">Alur cepat</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
+          Alur cepat
+        </p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-accent-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_70%,_transparent)] p-3 text-xs text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]">
             <p className="font-semibold">1. Buat ticket</p>
@@ -571,392 +618,486 @@ export default function SupportTicketForm() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <div className="lg:col-span-3 rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
-        <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Buat Ticket Bantuan</h3>
-        <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-          Tulis kendala singkat. Tambahkan ID jika ada.
-        </p>
-
-        <form className="mt-4 space-y-3" onSubmit={submitTicket}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
-              type="email"
-              value={requesterEmail}
-              onChange={(e) => setRequesterEmail(e.target.value)}
-              placeholder="Email"
-              className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2.5 text-sm shadow-sm shadow-[var(--app-shadow)]"
-              required
-            />
-            <input
-              type="text"
-              value={requesterName}
-              onChange={(e) => setRequesterName(e.target.value)}
-              placeholder="Nama (opsional)"
-              className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2.5 text-sm shadow-sm shadow-[var(--app-shadow)]"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2.5 text-sm shadow-sm shadow-[var(--app-shadow)]"
-            >
-              {categoryOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2.5 text-sm shadow-sm shadow-[var(--app-shadow)]"
-            >
-              {priorityOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder="Subjek masalah"
-            className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2.5 text-sm shadow-sm shadow-[var(--app-shadow)]"
-            required
-          />
-
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Tulis kendala singkat."
-            rows={5}
-            className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2.5 text-sm shadow-sm shadow-[var(--app-shadow)]"
-            required
-          />
-
-          <CaptchaField
-            action="support"
-            onTokenChange={setCaptchaToken}
-            className="min-h-[70px]"
-          />
-
-          {error && <p className="text-xs text-[color:var(--app-danger)]">{error}</p>}
-          {success && <p className="text-xs text-[color:var(--app-accent)]">{success}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-accent)] px-4 py-2.5 text-xs font-semibold text-[color:var(--app-text-inverse)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-accent-strong)] transition disabled:opacity-50"
-          >
-            {loading ? 'Mengirim...' : isId ? 'Kirim tiket' : 'Submit ticket'}
-          </button>
-        </form>
-      </div>
-
-      <div className="lg:col-span-2 space-y-4">
-        <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
-          <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Ticket Terakhir</h3>
+        <div className="lg:col-span-3 rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
+          <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            Buat Ticket Bantuan
+          </h3>
           <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-          {isAuthenticated
-            ? 'Pantau progress ticket akun Anda di sini.'
-            : 'Login untuk melihat riwayat ticket Anda.'}
+            Tulis kendala singkat. Tambahkan ID jika ada.
           </p>
 
-          <div className="mt-4 space-y-2">
-            {!isAuthenticated ? (
-              <p className="text-xs text-[color:var(--app-text)]">Belum login.</p>
-            ) : ticketLoading ? (
-              <p className="text-xs text-[color:var(--app-text)]">Memuat ticket...</p>
-            ) : tickets.length === 0 ? (
-              <p className="text-xs text-[color:var(--app-text)]">Belum ada ticket.</p>
-            ) : (
-              tickets.map((ticket) => (
-                <button
-                  key={ticket.id}
-                  type="button"
-                  onClick={() => setSelectedTicketId(ticket.id)}
-                  className={`w-full text-left rounded-2xl border p-3 transition ${
-                    selectedTicketId === ticket.id
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_60%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)]'
-                      : 'border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]'
-                  }`}
+          <form className="mt-4 space-y-3" onSubmit={submitTicket}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="space-y-1.5">
+                <span className={SUPPORT_LABEL_CLASS}>Email</span>
+                <input
+                  type="email"
+                  value={requesterEmail}
+                  onChange={e => setRequesterEmail(e.target.value)}
+                  placeholder="nama@email.com"
+                  className={SUPPORT_CONTROL_CLASS}
+                  required
+                />
+              </label>
+              <label className="space-y-1.5">
+                <span className={SUPPORT_LABEL_CLASS}>Nama</span>
+                <input
+                  type="text"
+                  value={requesterName}
+                  onChange={e => setRequesterName(e.target.value)}
+                  placeholder="Opsional"
+                  className={SUPPORT_CONTROL_CLASS}
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="space-y-1.5">
+                <span className={SUPPORT_LABEL_CLASS}>Kategori</span>
+                <select
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                  className={SUPPORT_CONTROL_CLASS}
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{ticket.subject}</p>
-                    <span className={`${BADGE_BASE} ${STATUS_BADGE[ticket.status] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}>
-                      {statusLabels[ticket.status] || ticket.status}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--app-text)]">
-                    <span className={`${BADGE_BASE} ${PRIORITY_BADGE[ticket.priority] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}>
-                      {priorityLabels[ticket.priority] || ticket.priority}
-                    </span>
-                    <span className="text-[11px] text-[color:var(--app-text)]">
-                      {categoryLabels[ticket.category] || ticket.category}
-                    </span>
-                    <span className="text-[11px] text-[color:var(--app-text)]">
-                      {isId ? 'Update' : 'Updated'}: {formatDate(ticket.updated_at)}
-                    </span>
-                  </div>
-                </button>
-              ))
+                  {categoryOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1.5">
+                <span className={SUPPORT_LABEL_CLASS}>Prioritas</span>
+                <select
+                  value={priority}
+                  onChange={e => setPriority(e.target.value)}
+                  className={SUPPORT_CONTROL_CLASS}
+                >
+                  {priorityOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="space-y-1.5">
+              <span className={SUPPORT_LABEL_CLASS}>Subjek</span>
+              <input
+                type="text"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                placeholder="Contoh: Refund TRX-123 belum masuk"
+                className={SUPPORT_CONTROL_CLASS}
+                required
+              />
+            </label>
+
+            <label className="space-y-1.5">
+              <span className={SUPPORT_LABEL_CLASS}>Kronologi</span>
+              <textarea
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                placeholder="Tulis kendala singkat, langkah yang sudah dicoba, dan ID transaksi bila ada."
+                rows={5}
+                className={SUPPORT_TEXTAREA_CLASS}
+                required
+              />
+            </label>
+
+            <CaptchaField
+              action="support"
+              onTokenChange={setCaptchaToken}
+              className="min-h-[70px]"
+            />
+
+            {error && (
+              <p className="text-xs text-[color:var(--app-danger)]">{error}</p>
             )}
-          </div>
+            {success && (
+              <p className="text-xs text-[color:var(--app-accent)]">
+                {success}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-accent)] px-4 py-2.5 text-xs font-semibold text-[color:var(--app-text-inverse)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-accent-strong)] transition disabled:opacity-50"
+            >
+              {loading ? 'Mengirim...' : isId ? 'Kirim tiket' : 'Submit ticket'}
+            </button>
+          </form>
         </div>
 
-        <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
-          <div className="flex items-center justify-between">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
             <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              {isId ? 'Detail tiket' : 'Ticket details'}
+              Ticket Terakhir
             </h3>
-            {selectedTicketId ? (
-              <button
-                type="button"
-                onClick={() => selectedTicketId && loadTicketDetail(selectedTicketId)}
-                className="text-[11px] font-semibold text-[color:var(--app-accent)] hover:text-[color:var(--app-accent)]"
-              >
-                {isId ? 'Muat ulang' : 'Refresh'}
-              </button>
-            ) : null}
+            <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              {isAuthenticated
+                ? 'Pantau progress ticket akun Anda di sini.'
+                : 'Login untuk melihat riwayat ticket Anda.'}
+            </p>
+
+            <div className="mt-4 space-y-2">
+              {!isAuthenticated ? (
+                <p className="text-xs text-[color:var(--app-text)]">
+                  Belum login.
+                </p>
+              ) : ticketLoading ? (
+                <p className="text-xs text-[color:var(--app-text)]">
+                  Memuat ticket...
+                </p>
+              ) : tickets.length === 0 ? (
+                <p className="text-xs text-[color:var(--app-text)]">
+                  Belum ada ticket.
+                </p>
+              ) : (
+                tickets.map(ticket => (
+                  <button
+                    key={ticket.id}
+                    type="button"
+                    onClick={() => setSelectedTicketId(ticket.id)}
+                    className={`w-full text-left rounded-2xl border p-3 transition ${
+                      selectedTicketId === ticket.id
+                        ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_60%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)]'
+                        : 'border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {ticket.subject}
+                      </p>
+                      <span
+                        className={`${BADGE_BASE} ${STATUS_BADGE[ticket.status] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}
+                      >
+                        {statusLabels[ticket.status] || ticket.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--app-text)]">
+                      <span
+                        className={`${BADGE_BASE} ${PRIORITY_BADGE[ticket.priority] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}
+                      >
+                        {priorityLabels[ticket.priority] || ticket.priority}
+                      </span>
+                      <span className="text-[11px] text-[color:var(--app-text)]">
+                        {categoryLabels[ticket.category] || ticket.category}
+                      </span>
+                      <span className="text-[11px] text-[color:var(--app-text)]">
+                        {isId ? 'Update' : 'Updated'}:{' '}
+                        {formatDate(ticket.updated_at)}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
-          <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-            {isAuthenticated
-              ? 'Balas agent dari sini.'
-              : 'Login dulu untuk melihat percakapan ticket.'}
-          </p>
 
-          <div className="mt-4">
-            {!isAuthenticated ? (
-              <p className="text-xs text-[color:var(--app-text)]">Belum login.</p>
-            ) : !selectedTicketId ? (
-              <p className="text-xs text-[color:var(--app-text)]">Pilih ticket.</p>
-            ) : detailLoading ? (
-              <p className="text-xs text-[color:var(--app-text)]">Memuat detail...</p>
-            ) : detailError ? (
-              <p className="text-xs text-[color:var(--app-danger)]">{detailError}</p>
-            ) : ticketDetail ? (
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-muted)_70%,_transparent)] p-3 text-xs text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-                  <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {ticketDetail.ticket.subject}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span className={`${BADGE_BASE} ${STATUS_BADGE[ticketDetail.ticket.status] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}>
-                      {statusLabels[ticketDetail.ticket.status] || ticketDetail.ticket.status}
-                    </span>
-                    <span className={`${BADGE_BASE} ${PRIORITY_BADGE[ticketDetail.ticket.priority] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}>
-                      {priorityLabels[ticketDetail.ticket.priority] || ticketDetail.ticket.priority}
-                    </span>
-                    <span className="text-[11px] text-[color:var(--app-text)]">
-                      {categoryLabels[ticketDetail.ticket.category] || ticketDetail.ticket.category}
-                    </span>
+          <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {isId ? 'Detail tiket' : 'Ticket details'}
+              </h3>
+              {selectedTicketId ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    selectedTicketId && loadTicketDetail(selectedTicketId)
+                  }
+                  className="text-[11px] font-semibold text-[color:var(--app-accent)] hover:text-[color:var(--app-accent)]"
+                >
+                  {isId ? 'Muat ulang' : 'Refresh'}
+                </button>
+              ) : null}
+            </div>
+            <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              {isAuthenticated
+                ? 'Balas agent dari sini.'
+                : 'Login dulu untuk melihat percakapan ticket.'}
+            </p>
+
+            <div className="mt-4">
+              {!isAuthenticated ? (
+                <p className="text-xs text-[color:var(--app-text)]">
+                  Belum login.
+                </p>
+              ) : !selectedTicketId ? (
+                <p className="text-xs text-[color:var(--app-text)]">
+                  Pilih ticket.
+                </p>
+              ) : detailLoading ? (
+                <p className="text-xs text-[color:var(--app-text)]">
+                  Memuat detail...
+                </p>
+              ) : detailError ? (
+                <p className="text-xs text-[color:var(--app-danger)]">
+                  {detailError}
+                </p>
+              ) : ticketDetail ? (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-muted)_70%,_transparent)] p-3 text-xs text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                    <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {ticketDetail.ticket.subject}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`${BADGE_BASE} ${STATUS_BADGE[ticketDetail.ticket.status] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}
+                      >
+                        {statusLabels[ticketDetail.ticket.status] ||
+                          ticketDetail.ticket.status}
+                      </span>
+                      <span
+                        className={`${BADGE_BASE} ${PRIORITY_BADGE[ticketDetail.ticket.priority] || 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'}`}
+                      >
+                        {priorityLabels[ticketDetail.ticket.priority] ||
+                          ticketDetail.ticket.priority}
+                      </span>
+                      <span className="text-[11px] text-[color:var(--app-text)]">
+                        {categoryLabels[ticketDetail.ticket.category] ||
+                          ticketDetail.ticket.category}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-[color:var(--app-text)]">
+                      {isId ? 'Update terakhir' : 'Last updated'}:{' '}
+                      {formatDate(ticketDetail.ticket.updated_at)}
+                    </p>
                   </div>
-                  <p className="mt-2 text-[11px] text-[color:var(--app-text)]">
-                    {isId ? 'Update terakhir' : 'Last updated'}: {formatDate(ticketDetail.ticket.updated_at)}
-                  </p>
-                </div>
 
-                <div className="max-h-64 space-y-2 overflow-auto pr-1">
-                  {ticketDetail.replies.length === 0 ? (
-                    <p className="text-xs text-[color:var(--app-text)]">Belum ada balasan.</p>
-                  ) : (
-                    ticketDetail.replies
-                      .filter((reply) => !reply.is_internal)
-                      .map((reply) => (
-                        <div
-                          key={reply.id}
-                          className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-3 text-xs text-[color:var(--app-text)] shadow-sm dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] dark:text-[color:var(--app-text-soft)]"
-                        >
-                          <div className="flex items-center justify-between text-[11px] text-[color:var(--app-text-soft)]">
-                            <span>{formatAuthor(reply.author_role, isId)}</span>
-                            <span>{formatDate(reply.created_at)}</span>
+                  <div className="max-h-64 space-y-2 overflow-auto pr-1">
+                    {ticketDetail.replies.length === 0 ? (
+                      <p className="text-xs text-[color:var(--app-text)]">
+                        Belum ada balasan.
+                      </p>
+                    ) : (
+                      ticketDetail.replies
+                        .filter(reply => !reply.is_internal)
+                        .map(reply => (
+                          <div
+                            key={reply.id}
+                            className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-3 text-xs text-[color:var(--app-text)] shadow-sm dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] dark:text-[color:var(--app-text-soft)]"
+                          >
+                            <div className="flex items-center justify-between text-[11px] text-[color:var(--app-text-soft)]">
+                              <span>
+                                {formatAuthor(reply.author_role, isId)}
+                              </span>
+                              <span>{formatDate(reply.created_at)}</span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-wrap text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                              {reply.body}
+                            </p>
                           </div>
-                          <p className="mt-2 whitespace-pre-wrap text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {reply.body}
+                        ))
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <textarea
+                      value={replyBody}
+                      onChange={e => setReplyBody(e.target.value)}
+                      placeholder="Tulis balasan untuk agent..."
+                      rows={3}
+                      className={SUPPORT_TEXTAREA_CLASS}
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={sendReply}
+                        disabled={replyLoading || replyBody.trim().length < 2}
+                        className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-accent-strong)] transition disabled:opacity-50"
+                      >
+                        {replyLoading ? 'Mengirim...' : 'Kirim Balasan'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[color:var(--app-text)]">
+                  Detail ticket belum tersedia.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <details
+            className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm"
+            open={liveToolsOpen}
+            onToggle={e => setLiveToolsOpen(e.currentTarget.open)}
+          >
+            <summary className="cursor-pointer list-none text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {isId ? 'Bantuan live: chat & AI' : 'Live tools: Chat & AI'}
+            </summary>
+            <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              Buka chat/AI kalau perlu.
+            </p>
+
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {isId ? 'Chat langsung dengan tim' : 'Live Support Chat'}
+                  </h4>
+                  {chatRoomId ? (
+                    <span className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                      Room {chatRoomId.slice(0, 10)}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  Realtime chat dengan agent. Semua pesan otomatis tersimpan ke
+                  ticket.
+                </p>
+
+                <div className="mt-3 max-h-56 space-y-2 overflow-auto pr-1">
+                  {!isAuthenticated ? (
+                    <p className="text-xs text-[color:var(--app-text)]">
+                      Login dulu untuk chat.
+                    </p>
+                  ) : chatLoading ? (
+                    <p className="text-xs text-[color:var(--app-text)]">
+                      Menghubungkan chat...
+                    </p>
+                  ) : chatMessages.length === 0 ? (
+                    <p className="text-xs text-[color:var(--app-text)]">
+                      Belum ada pesan.
+                    </p>
+                  ) : (
+                    chatMessages.map(msg => {
+                      const isMine = msg.sender_id === user?.id;
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`max-w-[85%] rounded-2xl border p-3 text-xs shadow-sm ${
+                            isMine
+                              ? 'ml-auto border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_70%,_transparent)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]'
+                              : 'border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] dark:text-[color:var(--app-text-soft)]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[10px] text-[color:var(--app-text-soft)]">
+                            <span>
+                              {isMine ? 'Anda' : isId ? 'Tim support' : 'Agent'}
+                            </span>
+                            <span>{formatDate(msg.created_at)}</span>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap text-sm">
+                            {msg.content}
                           </p>
                         </div>
-                      ))
+                      );
+                    })
                   )}
                 </div>
 
-                <div className="space-y-2">
+                {chatError && (
+                  <p className="mt-2 text-xs text-[color:var(--app-danger)]">
+                    {chatError}
+                  </p>
+                )}
+
+                <div className="mt-3 space-y-2">
                   <textarea
-                    value={replyBody}
-                    onChange={(e) => setReplyBody(e.target.value)}
-                    placeholder="Tulis balasan untuk agent..."
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
                     rows={3}
-                    className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2 text-sm shadow-sm shadow-[var(--app-shadow)]"
+                    placeholder="Ketik pesan untuk agent..."
+                    className={SUPPORT_TEXTAREA_CLASS}
                   />
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={sendReply}
-                      disabled={replyLoading || replyBody.trim().length < 2}
-                      className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-accent-strong)] transition disabled:opacity-50"
+                      onClick={sendChatMessage}
+                      disabled={chatSending || chatInput.trim().length < 2}
+                      className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-surface-strong)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-surface-strong)] transition disabled:opacity-50 dark:text-[color:var(--app-text-inverse)]"
                     >
-                      {replyLoading ? 'Mengirim...' : 'Kirim Balasan'}
+                      {chatSending
+                        ? 'Mengirim...'
+                        : isId
+                          ? 'Kirim chat'
+                          : 'Send chat'}
                     </button>
                   </div>
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-[color:var(--app-text)]">Detail ticket belum tersedia.</p>
-            )}
-          </div>
-        </div>
 
-        
-        <details
-          className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm"
-          open={liveToolsOpen}
-          onToggle={(e) => setLiveToolsOpen(e.currentTarget.open)}
-        >
-          <summary className="cursor-pointer list-none text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            {isId ? 'Bantuan live: chat & AI' : 'Live tools: Chat & AI'}
-          </summary>
-          <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-            Buka chat/AI kalau perlu.
-          </p>
-
-          <div className="mt-4 space-y-4">
-            <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4">
-              <div className="flex items-center justify-between">
+              <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4">
                 <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {isId ? 'Chat langsung dengan tim' : 'Live Support Chat'}
+                  {isId ? 'Asisten bantuan AI' : 'AI Support Assistant'}
                 </h4>
-                {chatRoomId ? (
-                  <span className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                    Room {chatRoomId.slice(0, 10)}
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                Realtime chat dengan agent. Semua pesan otomatis tersimpan ke ticket.
-              </p>
+                <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  Tanya AI dulu.
+                </p>
 
-              <div className="mt-3 max-h-56 space-y-2 overflow-auto pr-1">
-                {!isAuthenticated ? (
-                  <p className="text-xs text-[color:var(--app-text)]">Login dulu untuk chat.</p>
-                ) : chatLoading ? (
-                  <p className="text-xs text-[color:var(--app-text)]">Menghubungkan chat...</p>
-                ) : chatMessages.length === 0 ? (
-                  <p className="text-xs text-[color:var(--app-text)]">Belum ada pesan.</p>
-                ) : (
-                  chatMessages.map((msg) => {
-                    const isMine = msg.sender_id === user?.id;
-                    return (
+                <div className="mt-3 max-h-56 space-y-2 overflow-auto pr-1">
+                  {aiMessages.length === 0 ? (
+                    <p className="text-xs text-[color:var(--app-text)]">
+                      Belum ada percakapan AI.
+                    </p>
+                  ) : (
+                    aiMessages.map((msg, index) => (
                       <div
-                        key={msg.id}
-                        className={`max-w-[85%] rounded-2xl border p-3 text-xs shadow-sm ${
-                          isMine
-                            ? 'ml-auto border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_70%,_transparent)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]'
+                        key={`${msg.role}-${index}`}
+                        className={`rounded-2xl border p-3 text-xs ${
+                          msg.role === 'assistant'
+                            ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_70%,_transparent)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]'
                             : 'border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] dark:text-[color:var(--app-text-soft)]'
                         }`}
                       >
-                        <div className="flex items-center justify-between text-[10px] text-[color:var(--app-text-soft)]">
-                          <span>{isMine ? 'Anda' : isId ? 'Tim support' : 'Agent'}</span>
-                          <span>{formatDate(msg.created_at)}</span>
-                        </div>
-                        <p className="mt-2 whitespace-pre-wrap text-sm">{msg.content}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
+                          {msg.role === 'assistant' ? 'AI' : 'Anda'}
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm">
+                          {msg.content}
+                        </p>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {chatError && <p className="mt-2 text-xs text-[color:var(--app-danger)]">{chatError}</p>}
-
-              <div className="mt-3 space-y-2">
-                <textarea
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  rows={3}
-                  placeholder="Ketik pesan untuk agent..."
-                  className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2 text-sm shadow-sm shadow-[var(--app-shadow)]"
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={sendChatMessage}
-                    disabled={chatSending || chatInput.trim().length < 2}
-                    className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-surface-strong)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-surface-strong)] transition disabled:opacity-50 dark:text-[color:var(--app-text-inverse)]"
-                  >
-                    {chatSending ? 'Mengirim...' : isId ? 'Kirim chat' : 'Send chat'}
-                  </button>
+                    ))
+                  )}
                 </div>
-              </div>
-            </div>
 
-            <div className="rounded-2xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4">
-              <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {isId ? 'Asisten bantuan AI' : 'AI Support Assistant'}
-              </h4>
-              <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                Tanya AI dulu.
-              </p>
+                {aiError && (
+                  <p className="mt-2 text-xs text-[color:var(--app-danger)]">
+                    {aiError}
+                  </p>
+                )}
 
-              <div className="mt-3 max-h-56 space-y-2 overflow-auto pr-1">
-                {aiMessages.length === 0 ? (
-                  <p className="text-xs text-[color:var(--app-text)]">Belum ada percakapan AI.</p>
-                ) : (
-                  aiMessages.map((msg, index) => (
-                    <div
-                      key={`${msg.role}-${index}`}
-                      className={`rounded-2xl border p-3 text-xs ${
-                        msg.role === 'assistant'
-                          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_70%,_transparent)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]'
-                          : 'border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] dark:text-[color:var(--app-text-soft)]'
-                      }`}
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    value={aiInput}
+                    onChange={e => setAiInput(e.target.value)}
+                    rows={3}
+                    placeholder="Tulis pertanyaan ke AI..."
+                    className={SUPPORT_TEXTAREA_CLASS}
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={sendAiMessage}
+                      disabled={aiLoading || aiInput.trim().length < 2}
+                      className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-surface-strong)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-surface-strong)] transition disabled:opacity-50 dark:text-[color:var(--app-text-inverse)]"
                     >
-                      <p className="text-[11px] font-semibold uppercase tracking-wide opacity-70">
-                        {msg.role === 'assistant' ? 'AI' : 'Anda'}
-                      </p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm">{msg.content}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {aiError && <p className="mt-2 text-xs text-[color:var(--app-danger)]">{aiError}</p>}
-
-              <div className="mt-3 space-y-2">
-                <textarea
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  rows={3}
-                  placeholder="Tulis pertanyaan ke AI..."
-                  className="w-full rounded-xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-3 py-2 text-sm shadow-sm shadow-[var(--app-shadow)]"
-                />
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={sendAiMessage}
-                    disabled={aiLoading || aiInput.trim().length < 2}
-                    className="inline-flex items-center justify-center rounded-xl bg-[color:var(--app-surface-strong)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] shadow-sm shadow-[var(--app-shadow)] hover:bg-[color:var(--app-surface-strong)] transition disabled:opacity-50 dark:text-[color:var(--app-text-inverse)]"
-                  >
-                    {aiLoading ? 'Menjawab...' : 'Tanya AI'}
-                  </button>
+                      {aiLoading ? 'Menjawab...' : 'Tanya AI'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
+          </details>
+
+          <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
+            <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              Biar cepat
+            </h4>
+            <ul className="mt-3 space-y-2 text-xs text-[color:var(--app-text)]">
+              <li>
+                Gunakan subjek singkat yang jelas, misalnya OTP tidak masuk.
+              </li>
+              <li>Tulis kronologi singkat.</li>
+              <li>Tambahkan ID transaksi jika ada.</li>
+            </ul>
           </div>
-        </details>
-
-        <div className="rounded-3xl border border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-5 shadow-sm">
-          <h4 className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">Biar cepat</h4>
-          <ul className="mt-3 space-y-2 text-xs text-[color:var(--app-text)]">
-            <li>Gunakan subjek singkat yang jelas (contoh: "OTP tidak masuk").</li>
-            <li>Tulis kronologi singkat.</li>
-            <li>Tambahkan ID transaksi jika ada.</li>
-          </ul>
         </div>
-
-      </div>
       </div>
     </div>
   );

@@ -1,12 +1,11 @@
 ﻿'use client';
 
 import { useState, type CSSProperties } from 'react';
-import { LajukanImage } from '@/components/common/LajukanImage';
+import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import {
-  ArrowUpRight,
   BadgeCheck,
   BriefcaseBusiness,
   CircleDollarSign,
@@ -243,13 +242,20 @@ function getInitials(value: string): string {
   return parts.map(part => part[0]?.toUpperCase() || '').join('') || 'MK';
 }
 
-function uniqueMediaCandidates(item: MarketplaceDiscoveryCardItem): string[] {
+function uniqueMediaCandidates(item: any): string[] {
+  const raw =
+    item.images ||
+    item.image_urls ||
+    item.metadata?.images ||
+    (item.cover_image ? [item.cover_image] : []);
+
   const seen = new Set<string>();
 
-  return [item.image, ...(item.images || [])]
-    .map(entry => String(entry || '').trim())
-    .filter(entry => entry.length > 0 && !isLikelyPlaceholderImage(entry))
-    .filter(entry => {
+  return raw
+    .map((e: string) => (e || '').trim())
+    .filter(Boolean)
+    .map((e: string) => (e.startsWith('http') ? e : `${process.env.NEXT_PUBLIC_API_URL}${e}`))
+    .filter((entry: string) => {
       const key = entry.toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
@@ -372,26 +378,26 @@ function useCardActions(
   const profileAction: CardAction | null =
     profileHref && profileHref !== item.href
       ? {
-          label: locale === 'id' ? 'Profil' : 'Profile',
-          href: profileHref,
-          tone: 'secondary',
-        }
+        label: locale === 'id' ? 'Profil' : 'Profile',
+        href: profileHref,
+        tone: 'secondary',
+      }
       : null;
 
   const chatAction: CardAction | null = canStartChat
     ? {
-        label: chatLoading
-          ? locale === 'id'
-            ? 'Membuka...'
-            : 'Opening...'
-          : 'Chat',
-        onClick: () => {
-          void openChat();
-        },
-        loading: chatLoading,
-        disabled: chatLoading,
-        tone: 'secondary',
-      }
+      label: chatLoading
+        ? locale === 'id'
+          ? 'Membuka...'
+          : 'Opening...'
+        : 'Chat',
+      onClick: () => {
+        void openChat();
+      },
+      loading: chatLoading,
+      disabled: chatLoading,
+      tone: 'secondary',
+    }
     : null;
 
   return {
@@ -415,58 +421,47 @@ function MediaThumb({
   variant?: 'tile' | 'avatar' | 'map';
   className?: string;
 }) {
-  const image = uniqueMediaCandidates(item)[0] || '';
-  const initials = getInitials(item.title);
+  const images = uniqueMediaCandidates(item);
+  const image = images[0] || '';
+  const palette = TYPE_ACCENTS[item.typeKey] || TYPE_ACCENTS.other;
   const Icon =
     variant === 'map' ? MapPin : TYPE_ICONS[item.typeKey] || Package2;
-  const palette = TYPE_ACCENTS[item.typeKey] || TYPE_ACCENTS.other;
 
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[18px] bg-slate-100 dark:bg-slate-900',
+        'relative w-full h-full overflow-hidden rounded-[18px] bg-slate-100 dark:bg-slate-900',
         className,
       )}
     >
+      {/* IMAGE LAYER */}
       {image ? (
-        <>
-          <LajukanImage
-            src={image}
-            alt={item.title}
-            fill
-            sizes={
-              variant === 'avatar' ? '96px' : '(max-width: 640px) 75vw, 320px'
-            }
-            className="object-cover transition duration-500 ease-out group-hover:scale-[1.02]"
-            loading="lazy"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.08)_46%,rgba(15,23,42,0.3))]" />
-        </>
+        <MediaPreviewCarousel
+          items={images}
+          alt={item.title}
+          className="absolute inset-0 w-full h-full"
+          aspectClassName="w-full h-full"
+          mediaClassName="w-full h-full object-cover transition duration-500 group-hover:scale-[1.03]"
+          controls={false}
+          lightbox={false}
+          showCounter={images.length > 1}
+          showDots={images.length > 1}
+        />
       ) : (
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,#f8fafc,#eef2f7)] dark:bg-[linear-gradient(180deg,#0f172a,#111827)]">
-          <div className="absolute inset-0 opacity-50">
-            <div className="absolute -left-4 top-2 h-16 w-16 rounded-full bg-white blur-2xl dark:bg-white/5" />
-            <div className="absolute bottom-0 right-0 h-16 w-16 rounded-full bg-slate-200 blur-2xl dark:bg-slate-700/40" />
-          </div>
-        </div>
-      )}
-
-      <div className="absolute inset-0 flex items-center justify-center">
-        {image ? null : variant === 'avatar' ? (
-          <span className="text-sm font-bold tracking-[0.06em] text-slate-700 dark:text-slate-100">
-            {initials}
-          </span>
-        ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/10 to-transparent">
           <span
             className={cn(
-              'inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 shadow-sm dark:border-white/10',
+              'inline-flex h-10 w-10 items-center justify-center rounded-full',
               palette.softBg,
             )}
           >
             <Icon className={cn('h-5 w-5', palette.softText)} />
           </span>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* OPTIONAL DARK OVERLAY (SAFE, TIDAK NUTUP FULL) */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
     </div>
   );
 }
@@ -489,6 +484,7 @@ function CategoryPreview({
   primaryLabel: string;
 }) {
   const hasMedia = uniqueMediaCandidates(item).length > 0;
+
   const heroVariant =
     item.typeKey === 'property' || (item.typeKey === 'umkm' && !hasMedia)
       ? 'map'
@@ -497,11 +493,10 @@ function CategoryPreview({
   const categoryLabel = String(
     item.typeLabel || getCategoryLabel(item.typeKey, locale),
   ).trim();
+
   const locationLabel = String(item.location || '').trim();
   const updatedLabel = String(item.updatedLabel || '').trim();
-  const summaryLabel = String(
-    item.sideContextLabel || item.summary || '',
-  ).trim();
+  const summaryLabel = String(item.sideContextLabel || item.summary || '').trim();
 
   const valueLabel = showPrice
     ? item.priceLabel
@@ -521,118 +516,83 @@ function CategoryPreview({
         ? BadgeCheck
         : null;
 
-  const palette = TYPE_ACCENTS[item.typeKey] || TYPE_ACCENTS.other;
-
   const heroHeightClass = minimal
-    ? 'h-[108px] sm:h-[112px]'
+    ? 'h-[110px]'
     : compact
-      ? 'h-[120px] sm:h-[128px]'
+      ? 'h-[130px]'
       : simple
-        ? 'h-[136px] sm:h-[144px]'
-        : 'h-[148px] sm:h-[160px]';
+        ? 'h-[150px]'
+        : 'h-[170px]';
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2.5">
-      <div className="relative overflow-hidden rounded-[18px]">
-        <MediaThumb
-          item={item}
-          compact={compact}
-          variant={heroVariant}
-          className={cn('w-full', heroHeightClass)}
-        />
+    <div className="flex flex-col gap-2.5 w-full h-full">
+      {/* HERO IMAGE */}
+      <div className="relative w-full overflow-hidden rounded-[18px]">
+        <div className={cn('relative w-full', heroHeightClass)}>
+          <MediaThumb
+            item={item}
+            compact={compact}
+            variant={heroVariant}
+            className="w-full h-full"
+          />
+        </div>
 
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-2 p-2.5">
-          <span
-            className={cn(
-              'inline-flex max-w-[70%] min-h-[24px] items-center rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.06em]',
-              palette.softBg,
-              palette.softText,
-            )}
-          >
-            <span className="truncate">{categoryLabel}</span>
+        {/* CATEGORY BADGE */}
+        <div className="absolute top-0 left-0 right-0 flex justify-between p-2.5">
+          <span className={cn(
+            'text-[9px] font-semibold uppercase px-2.5 py-1 rounded-full',
+            TYPE_ACCENTS[item.typeKey].softBg,
+            TYPE_ACCENTS[item.typeKey].softText,
+          )}>
+            {categoryLabel}
           </span>
 
-          {item.verified ? (
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/92 text-slate-700 shadow-sm backdrop-blur dark:bg-slate-950/84 dark:text-slate-100">
+          {item.verified && (
+            <span className="bg-white/90 rounded-full p-1">
               <BadgeCheck className="h-4 w-4" />
             </span>
-          ) : null}
+          )}
         </div>
 
-        {summaryLabel && !minimal ? (
-          <>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-[linear-gradient(180deg,transparent,rgba(15,23,42,0.6))]" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2.5">
-              <p className="line-clamp-1 text-[11px] font-medium text-white/95">
-                {summaryLabel}
-              </p>
-            </div>
-          </>
-        ) : null}
+        {/* SUMMARY OVERLAY */}
+        {summaryLabel && !minimal && (
+          <div className="absolute bottom-0 left-0 right-0 p-2.5 bg-gradient-to-t from-black/60">
+            <p className="text-white text-[11px] line-clamp-1">
+              {summaryLabel}
+            </p>
+          </div>
+        )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <h3
-          className={cn(
-            'min-h-[calc(2*1lh)] min-w-0 break-words font-semibold tracking-[-0.02em] text-slate-900 dark:text-white',
-            compact
-              ? 'line-clamp-2 text-[14px] leading-[1.35]'
-              : 'line-clamp-2 text-[15px] leading-[1.35] sm:text-[16px]',
-          )}
-        >
-          {item.title}
-        </h3>
+      {/* TITLE */}
+      <h3 className="font-semibold text-slate-900 dark:text-white text-[15px] line-clamp-2">
+        {item.title}
+      </h3>
 
-        {item.summary && !minimal && !simple ? (
-          <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
-            {item.summary}
-          </p>
-        ) : null}
+      {/* META */}
+      <div className="flex flex-wrap gap-1.5">
+        {locationLabel && (
+          <span className="flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
+            <MapPin className="h-3 w-3" />
+            {locationLabel}
+          </span>
+        )}
 
-        <div className="mt-2 flex min-h-[26px] flex-wrap items-center gap-1.5">
-          {locationLabel ? (
-            <span className="inline-flex min-h-[26px] max-w-full min-w-0 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              <MapPin className="h-3 w-3 shrink-0" />
-              <span className="truncate">{locationLabel}</span>
-            </span>
-          ) : null}
+        {updatedLabel && (
+          <span className="flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
+            <Clock3 className="h-3 w-3" />
+            {updatedLabel}
+          </span>
+        )}
+      </div>
 
-          {updatedLabel ? (
-            <span className="inline-flex min-h-[26px] max-w-full min-w-0 items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              <Clock3 className="h-3 w-3 shrink-0" />
-              <span className="truncate">{updatedLabel}</span>
-            </span>
-          ) : null}
-        </div>
-
-        <div className="mt-auto pt-2.5">
-          <div className="rounded-[16px] border border-slate-200 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/70">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <span
-                  className={cn(
-                    'inline-flex min-w-0 items-center gap-1.5 font-semibold text-slate-900 dark:text-white',
-                    compact ? 'text-[12px]' : 'text-[13px] sm:text-[14px]',
-                  )}
-                >
-                  {ValueIcon ? (
-                    <ValueIcon
-                      className={cn(
-                        'h-3.5 w-3.5 shrink-0',
-                        item.ratingLabel ? 'fill-current' : '',
-                      )}
-                    />
-                  ) : null}
-                  <span className="truncate">{valueLabel}</span>
-                </span>
-              </div>
-
-              {/* <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
-                {locale === 'id' ? 'Detail' : 'Detail'}
-                <ArrowUpRight className="h-3.5 w-3.5" />
-              </span> */}
-            </div>
-          </div>
+      {/* VALUE */}
+      <div className="mt-auto">
+        <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded-[14px]">
+          <span className="flex items-center gap-1 text-sm font-semibold">
+            {ValueIcon && <ValueIcon className="h-4 w-4" />}
+            {valueLabel}
+          </span>
         </div>
       </div>
     </div>

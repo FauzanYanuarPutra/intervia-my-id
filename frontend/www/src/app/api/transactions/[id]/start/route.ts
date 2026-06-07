@@ -30,7 +30,7 @@ export async function PUT(
       async (ctx) =>
         withIdempotency(req, {
           scope: `tx-start:${id}`,
-          actorHint: ctx.token,
+          actorHint: ctx.userId,
           forward: () =>
             fetch(`${MARKETPLACE_URL}/v1/transactions/${id}/start`, {
               method: 'PUT',

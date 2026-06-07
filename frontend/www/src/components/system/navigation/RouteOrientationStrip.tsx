@@ -56,29 +56,24 @@ function buildOrientationConfig(
     cleanPath === '/' ||
     cleanPath.startsWith('/home') ||
     cleanPath.startsWith('/search') ||
-    cleanPath.startsWith('/marketplace') ||
     cleanPath.startsWith('/jobs') ||
-    cleanPath.startsWith('/freelancers') ||
     cleanPath.startsWith('/property') ||
     cleanPath.startsWith('/microgigs') ||
     cleanPath.startsWith('/lainnya') ||
-    cleanPath.startsWith('/super-app')
+    cleanPath.startsWith('/umkm') ||
+    cleanPath.startsWith('/toko')
   ) {
     return null;
   }
 
-  if (
-    cleanPath === '/create' ||
-    cleanPath.endsWith('/create') ||
-    cleanPath.startsWith('/company/create')
-  ) {
-      return {
-        eyebrow: isId ? 'Mulai posting' : 'Start posting',
-        title: isId ? 'Isi yang penting dulu.' : 'Answer the easiest part first.',
-        body: isId
-          ? 'Tidak perlu lengkap dari awal. Isi inti dulu, sisanya bisa menyusul.'
-          : 'It does not need to be complete upfront. Fill the core, the rest can follow.',
-        icon: PlusCircle,
+  if (cleanPath === '/create' || cleanPath.endsWith('/create')) {
+    return {
+      eyebrow: isId ? 'Mulai posting' : 'Start posting',
+      title: isId ? 'Isi yang penting dulu.' : 'Answer the easiest part first.',
+      body: isId
+        ? 'Tidak perlu lengkap dari awal. Isi inti dulu, sisanya bisa menyusul.'
+        : 'It does not need to be complete upfront. Fill the core, the rest can follow.',
+      icon: PlusCircle,
       panelClass:
         'border-amber-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(255,247,237,0.98)_42%,rgba(254,243,199,0.92)_100%)] dark:border-amber-500/20 dark:bg-[linear-gradient(135deg,rgba(32,14,5,0.96)_0%,rgba(53,25,7,0.94)_46%,rgba(120,53,15,0.82)_100%)]',
       iconWrapClass:
@@ -100,12 +95,12 @@ function buildOrientationConfig(
   }
 
   if (cleanPath.startsWith('/notifications')) {
-      return {
-        eyebrow: isId ? 'Notifikasi' : 'Notifications',
-        title: isId ? 'Cek yang baru dulu.' : 'Check the important ones first.',
-        body: isId
-          ? 'Lihat update penting, lalu lanjut ke transaksi atau saldo.'
-          : 'Read the latest updates, then continue into transactions or funds.',
+    return {
+      eyebrow: isId ? 'Notifikasi' : 'Notifications',
+      title: isId ? 'Cek yang baru dulu.' : 'Check the important ones first.',
+      body: isId
+        ? 'Lihat update penting, lalu lanjut ke transaksi atau saldo.'
+        : 'Read the latest updates, then continue into transactions or funds.',
       icon: Bell,
       panelClass:
         'border-emerald-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_42%,rgba(187,247,208,0.92)_100%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(5,23,17,0.96)_0%,rgba(8,46,33,0.94)_46%,rgba(5,150,105,0.58)_100%)]',
@@ -127,12 +122,14 @@ function buildOrientationConfig(
   }
 
   if (cleanPath.startsWith('/transactions')) {
-      return {
-        eyebrow: isId ? 'Transaksi' : 'Transactions',
-        title: isId ? 'Lihat yang perlu ditindak dulu.' : 'See what needs action first.',
-        body: isId
-          ? 'Kalau macet, buka saldo atau bantuan.'
-          : 'If anything is blocked, move into balance or support.',
+    return {
+      eyebrow: isId ? 'Transaksi' : 'Transactions',
+      title: isId
+        ? 'Lihat yang perlu ditindak dulu.'
+        : 'See what needs action first.',
+      body: isId
+        ? 'Kalau macet, buka saldo atau bantuan.'
+        : 'If anything is blocked, move into balance or support.',
       icon: ReceiptText,
       panelClass:
         'border-teal-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(240,253,250,0.98)_42%,rgba(153,246,228,0.88)_100%)] dark:border-teal-500/20 dark:bg-[linear-gradient(135deg,rgba(4,25,24,0.96)_0%,rgba(9,48,44,0.94)_46%,rgba(15,118,110,0.58)_100%)]',
@@ -155,12 +152,12 @@ function buildOrientationConfig(
   }
 
   if (cleanPath.startsWith('/settings')) {
-      return {
-        eyebrow: isId ? 'Pengaturan' : 'Settings',
-        title: isId ? 'Atur yang penting saja.' : 'Adjust only what matters.',
-        body: isId
-          ? 'Tampilan, aksesibilitas, dan data akun ada di sini.'
-          : 'Appearance, accessibility, and account data live here.',
+    return {
+      eyebrow: isId ? 'Pengaturan' : 'Settings',
+      title: isId ? 'Atur yang penting saja.' : 'Adjust only what matters.',
+      body: isId
+        ? 'Tampilan, aksesibilitas, dan data akun ada di sini.'
+        : 'Appearance, accessibility, and account data live here.',
       icon: Settings2,
       panelClass:
         'border-rose-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(255,241,242,0.98)_42%,rgba(251,207,232,0.92)_100%)] dark:border-rose-500/20 dark:bg-[linear-gradient(135deg,rgba(34,6,18,0.96)_0%,rgba(62,12,34,0.94)_46%,rgba(190,24,93,0.68)_100%)]',
@@ -178,12 +175,14 @@ function buildOrientationConfig(
   }
 
   if (cleanPath.startsWith('/profile')) {
-      return {
-        eyebrow: isId ? 'Profil' : 'Profile',
-        title: isId ? 'Profil yang jelas bikin orang cepat percaya.' : 'Help people trust your business faster.',
-        body: isId
-          ? 'Foto, nama, lokasi, dan identitas yang jelas bikin orang lebih yakin.'
-          : 'Clear photos, names, location, and identity make people feel safer.',
+    return {
+      eyebrow: isId ? 'Profil' : 'Profile',
+      title: isId
+        ? 'Profil yang jelas bikin orang cepat percaya.'
+        : 'Help people trust your business faster.',
+      body: isId
+        ? 'Foto, nama, lokasi, dan identitas yang jelas bikin orang lebih yakin.'
+        : 'Clear photos, names, location, and identity make people feel safer.',
       icon: UserRound,
       panelClass:
         'border-teal-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(240,253,250,0.98)_38%,rgba(204,251,241,0.92)_100%)] dark:border-teal-500/20 dark:bg-[linear-gradient(135deg,rgba(4,25,24,0.96)_0%,rgba(9,48,44,0.94)_44%,rgba(15,118,110,0.58)_100%)]',
@@ -201,12 +200,14 @@ function buildOrientationConfig(
   }
 
   if (cleanPath.startsWith('/content/')) {
-      return {
-        eyebrow: isId ? 'Detail postingan' : 'Post detail',
-        title: isId ? 'Lihat inti infonya dulu.' : 'Scan fast, then continue to chat or transaction.',
-        body: isId
-          ? 'Yang penting langsung kelihatan.'
-          : 'The core should feel clear without forcing people to read too much.',
+    return {
+      eyebrow: isId ? 'Detail postingan' : 'Post detail',
+      title: isId
+        ? 'Lihat inti infonya dulu.'
+        : 'Scan fast, then continue to chat or transaction.',
+      body: isId
+        ? 'Yang penting langsung kelihatan.'
+        : 'The core should feel clear without forcing people to read too much.',
       icon: FileText,
       panelClass:
         'border-emerald-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_42%,rgba(187,247,208,0.92)_100%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(5,23,17,0.96)_0%,rgba(8,46,33,0.94)_46%,rgba(5,150,105,0.68)_100%)]',
@@ -223,12 +224,14 @@ function buildOrientationConfig(
   }
 
   if (cleanPath.startsWith('/dashboard')) {
-      return {
-        eyebrow: isId ? 'Ringkasan usaha' : 'Business summary',
-        title: isId ? 'Fokus ke yang paling dekat hasilnya.' : 'Focus on what is closest to results today.',
-        body: isId
-          ? 'Balas chat, cek transaksi, lalu lanjutkan yang hampir jadi.'
-          : 'Reply to chats, check transactions, and continue the drafts that are almost done.',
+    return {
+      eyebrow: isId ? 'Ringkasan usaha' : 'Business summary',
+      title: isId
+        ? 'Fokus ke yang paling dekat hasilnya.'
+        : 'Focus on what is closest to results today.',
+      body: isId
+        ? 'Balas chat, cek transaksi, lalu lanjutkan yang hampir jadi.'
+        : 'Reply to chats, check transactions, and continue the drafts that are almost done.',
       icon: LayoutDashboard,
       panelClass:
         'border-emerald-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_42%,rgba(187,247,208,0.92)_100%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(5,23,17,0.96)_0%,rgba(8,46,33,0.94)_46%,rgba(5,150,105,0.58)_100%)]',
@@ -251,12 +254,14 @@ function buildOrientationConfig(
   }
 
   if (cleanPath.startsWith('/support')) {
-      return {
-        eyebrow: isId ? 'Bantuan' : 'Support',
-        title: isId ? 'Pilih masalah yang paling mirip dulu.' : 'Pick the closest problem first.',
-        body: isId
-          ? 'Kalau belum ketemu, kirim tiket singkat. Kami bantu lanjut.'
-          : 'If you still cannot find it, send a short ticket and we will take it from there.',
+    return {
+      eyebrow: isId ? 'Bantuan' : 'Support',
+      title: isId
+        ? 'Pilih masalah yang paling mirip dulu.'
+        : 'Pick the closest problem first.',
+      body: isId
+        ? 'Kalau belum ketemu, kirim tiket singkat. Kami bantu lanjut.'
+        : 'If you still cannot find it, send a short ticket and we will take it from there.',
       icon: LifeBuoy,
       panelClass:
         'border-lime-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(247,254,231,0.98)_42%,rgba(217,249,157,0.92)_100%)] dark:border-lime-500/20 dark:bg-[linear-gradient(135deg,rgba(20,29,8,0.96)_0%,rgba(36,52,13,0.94)_46%,rgba(77,124,15,0.58)_100%)]',
@@ -275,7 +280,9 @@ function buildOrientationConfig(
 
   return {
     eyebrow: isId ? 'Lajukan' : 'Lajukan',
-    title: isId ? 'Masuk ke yang kamu butuhkan.' : 'Move straight into the core flow.',
+    title: isId
+      ? 'Masuk ke yang kamu butuhkan.'
+      : 'Move straight into the core flow.',
     body: isId
       ? 'Cari, posting, atau minta bantuan.'
       : 'Search needs, post an offer, or get help.',
@@ -341,7 +348,9 @@ export function RouteOrientationStrip() {
                     href={action.href}
                     className={cn(
                       'inline-flex min-h-[38px] items-center justify-center gap-2 rounded-full px-3 text-center text-sm font-semibold transition',
-                      action.primary ? 'ui-route-action-primary' : 'ui-route-action-secondary',
+                      action.primary
+                        ? 'ui-route-action-primary'
+                        : 'ui-route-action-secondary',
                     )}
                   >
                     <ActionIcon className="h-4 w-4 shrink-0" />

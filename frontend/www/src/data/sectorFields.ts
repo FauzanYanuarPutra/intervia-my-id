@@ -102,6 +102,39 @@ export const BASE_FIELDS: SectorField[] = [
     inDetail: true,
   },
   {
+    key: 'price_unit',
+    kind: 'select',
+    labelEn: 'Price unit',
+    labelId: 'Harga per',
+    placeholderEn: 'Select unit',
+    placeholderId: 'Pilih satuan',
+    hintEn:
+      'Clarify whether the price is per piece, pack, month, project, session, or deal.',
+    hintId:
+      'Perjelas harga ini untuk pcs, paket, bulan, proyek, sesi, atau deal.',
+    options: [
+      { value: 'pcs', labelEn: 'Per piece', labelId: 'Per pcs' },
+      { value: 'pack', labelEn: 'Per pack', labelId: 'Per paket' },
+      { value: 'bal', labelEn: 'Per bale', labelId: 'Per bal' },
+      { value: 'box', labelEn: 'Per box', labelId: 'Per box' },
+      { value: 'carton', labelEn: 'Per carton', labelId: 'Per karton' },
+      { value: 'kg', labelEn: 'Per kg', labelId: 'Per kg' },
+      { value: 'shipment', labelEn: 'Per shipment', labelId: 'Per pengiriman' },
+      { value: 'hour', labelEn: 'Per hour', labelId: 'Per jam' },
+      { value: 'day', labelEn: 'Per day', labelId: 'Per hari' },
+      { value: 'week', labelEn: 'Per week', labelId: 'Per minggu' },
+      { value: 'month', labelEn: 'Per month', labelId: 'Per bulan' },
+      { value: 'year', labelEn: 'Per year', labelId: 'Per tahun' },
+      { value: 'session', labelEn: 'Per session', labelId: 'Per sesi' },
+      { value: 'project', labelEn: 'Per project', labelId: 'Per proyek' },
+      { value: 'event', labelEn: 'Per event', labelId: 'Per event' },
+      { value: 'deal', labelEn: 'Per deal', labelId: 'Per deal' },
+    ],
+    inCreate: true,
+    inCard: true,
+    inDetail: true,
+  },
+  {
     key: 'location',
     kind: 'text',
     labelEn: 'Location',
@@ -1809,7 +1842,7 @@ export function getFieldsForCreate(
     f =>
       f.inCreate &&
       f.key !== 'images' &&
-      !(type === 'company' && f.key === 'price_cents'),
+      !(type === 'company' && ['price_cents', 'price_unit'].includes(f.key)),
   );
   const needsImages = needsImageGallery(type, sector);
   if (needsImages) {

@@ -11,7 +11,11 @@ type AISearchBarProps = {
   className?: string;
 };
 
-export default function AISearchBar({ onSearch, placeholder, className = '' }: AISearchBarProps) {
+export default function AISearchBar({
+  onSearch,
+  placeholder,
+  className = '',
+}: AISearchBarProps) {
   const router = useRouter();
   const locale = useLocale() || 'id';
   const [query, setQuery] = useState('');
@@ -29,7 +33,7 @@ export default function AISearchBar({ onSearch, placeholder, className = '' }: A
       setShowSuggestions(false);
       return;
     }
-    
+
     setAiLoading(true);
     try {
       const res = await fetch('/api/ai/search-suggestions', {
@@ -40,7 +44,9 @@ export default function AISearchBar({ onSearch, placeholder, className = '' }: A
 
       if (res.ok) {
         const data = await res.json();
-        const suggestions = Array.isArray(data.suggestions) ? data.suggestions.slice(0, 5) : [];
+        const suggestions = Array.isArray(data.suggestions)
+          ? data.suggestions.slice(0, 5)
+          : [];
         if (suggestions.length > 0) {
           setAiSuggestions(suggestions);
           setShowSuggestions(true);
@@ -64,7 +70,7 @@ export default function AISearchBar({ onSearch, placeholder, className = '' }: A
   // Debounced AI suggestions
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    
+
     if (query.trim().length >= 3 && isAIActive) {
       timeoutRef.current = setTimeout(() => {
         fetchAISuggestions(query.trim());
@@ -79,27 +85,33 @@ export default function AISearchBar({ onSearch, placeholder, className = '' }: A
     };
   }, [query, isAIActive, fetchAISuggestions]);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    
-    if (onSearch) {
-      onSearch(query.trim());
-    } else {
-      router.push(`/search?q=${encodeURIComponent(query.trim())}`);
-    }
-    setShowSuggestions(false);
-  }, [query, onSearch, router]);
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!query.trim()) return;
 
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    setQuery(suggestion);
-    setShowSuggestions(false);
-    if (onSearch) {
-      onSearch(suggestion);
-    } else {
-      router.push(`/search?q=${encodeURIComponent(suggestion)}`);
-    }
-  }, [onSearch, router]);
+      if (onSearch) {
+        onSearch(query.trim());
+      } else {
+        router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+      }
+      setShowSuggestions(false);
+    },
+    [query, onSearch, router],
+  );
+
+  const handleSuggestionClick = useCallback(
+    (suggestion: string) => {
+      setQuery(suggestion);
+      setShowSuggestions(false);
+      if (onSearch) {
+        onSearch(suggestion);
+      } else {
+        router.push(`/search?q=${encodeURIComponent(suggestion)}`);
+      }
+    },
+    [onSearch, router],
+  );
 
   const toggleAI = useCallback(() => {
     const newState = !isAIActive;
@@ -115,13 +127,16 @@ export default function AISearchBar({ onSearch, placeholder, className = '' }: A
   return (
     <div className={`relative ${className}`}>
       <form onSubmit={handleSubmit} className="relative">
-        <div className="flex items-center gap-2 rounded-full border border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] px-4 sm:px-5 py-2.5 sm:py-3 shadow-sm hover:shadow-md focus-within:shadow-lg transition-shadow">
-          <Search className="w-5 h-5 text-[color:var(--app-text-soft)] shrink-0" aria-hidden />
+        <div className="ui-field-shell flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 shadow-sm transition-shadow hover:shadow-md focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_12%,transparent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:px-3.5 sm:py-2">
+          <Search
+            className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]"
+            aria-hidden
+          />
           <input
             ref={inputRef}
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={e => setQuery(e.target.value)}
             onFocus={() => {
               if (isAIActive && aiSuggestions.length > 0 && !showSuggestions) {
                 setShowSuggestions(true);
@@ -131,8 +146,11 @@ export default function AISearchBar({ onSearch, placeholder, className = '' }: A
               // Delay hiding to allow click on suggestions
               setTimeout(() => setShowSuggestions(false), 200);
             }}
-            placeholder={placeholder || (locale === 'id' ? 'Cari dengan AI...' : 'Search with AI...')}
-            className="flex-1 min-w-0 bg-transparent text-sm sm:text-base text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] placeholder:text-[color:var(--app-text-soft)] focus:outline-none"
+            placeholder={
+              placeholder ||
+              (locale === 'id' ? 'Cari dengan AI...' : 'Search with AI...')
+            }
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] focus:outline-none dark:text-[color:var(--app-text-soft)] sm:text-sm"
             aria-label="Search"
             role="combobox"
             aria-expanded={showSuggestions && aiSuggestions.length > 0}
@@ -149,12 +167,18 @@ export default function AISearchBar({ onSearch, placeholder, className = '' }: A
                 : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] dark:hover:bg-[color:var(--app-surface-strong)]'
             }`}
             aria-label={locale === 'id' ? 'Toggle AI' : 'Toggle AI'}
-            title={locale === 'id' ? 'Aktifkan AI untuk saran pencarian' : 'Enable AI for search suggestions'}
+            title={
+              locale === 'id'
+                ? 'Aktifkan AI untuk saran pencarian'
+                : 'Enable AI for search suggestions'
+            }
           >
             {aiLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <Sparkles className={`w-4 h-4 ${isAIActive ? 'fill-current' : ''}`} />
+              <Sparkles
+                className={`w-4 h-4 ${isAIActive ? 'fill-current' : ''}`}
+              />
             )}
           </button>
           {query.trim() && (

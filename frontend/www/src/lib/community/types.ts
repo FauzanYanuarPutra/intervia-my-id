@@ -1,5 +1,10 @@
-export type CommunityFeedTab = 'for-you' | 'following' | 'community' | 'reels';
-export type CommunitySearchKind = 'all' | 'posts' | 'people' | 'reels' | 'marketplace' | 'groups';
+export type CommunityFeedTab = 'for-you' | 'community';
+export type CommunitySearchKind =
+  | 'all'
+  | 'posts'
+  | 'people'
+  | 'marketplace'
+  | 'groups';
 
 export type CommunityFeedMedia = {
   type: 'image' | 'video';

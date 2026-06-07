@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 
 const PROJECTS = [
   {
@@ -29,12 +28,6 @@ const PROJECTS = [
 ];
 
 export default function ProjectsDashboard() {
-  const pathname = usePathname();
-  const locale = (() => {
-    const seg = pathname.split('/');
-    return seg[1] && seg[1].length === 2 ? seg[1] : 'id';
-  })();
-
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -51,7 +44,7 @@ export default function ProjectsDashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/collaboration"
+            href="/chat"
             className="rounded-full border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
           >
             Open Rooms

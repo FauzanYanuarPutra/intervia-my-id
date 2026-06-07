@@ -55,7 +55,11 @@ elif ! find ./migrations -maxdepth 1 -type f -name '*.sql' | grep -q .; then
   echo "No migration files found, skipping migration step."
 else
   echo "Running SQLx migrations..."
-  migration_output="$(sqlx migrate run 2>&1)" || migration_status=$?
+  if [ "$STRICT_MIGRATIONS" = "true" ]; then
+    migration_output="$(sqlx migrate run 2>&1)" || migration_status=$?
+  else
+    migration_output="$(sqlx migrate run --ignore-missing 2>&1)" || migration_status=$?
+  fi
   migration_status=${migration_status:-0}
 
   if [ "$migration_status" -eq 0 ]; then

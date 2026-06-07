@@ -4,20 +4,26 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  Bot,
   Briefcase,
   CircleDot,
+  Database,
   FileText,
+  GitBranch,
   MessageCircle,
   PlusSquare,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
+  Zap,
   Workflow,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 
 type OverviewPayload = {
   generated_at: string;
@@ -37,6 +43,59 @@ type OverviewPayload = {
     steps: string[];
     href: string;
   }>;
+  operating_system?: {
+    health_score: number;
+    focus_lane: {
+      id: string;
+      title: string;
+      description: string;
+      href: string;
+    };
+    system_relations: Array<{
+      id: string;
+      from: string;
+      to: string;
+      title: string;
+      signal: string;
+      automation: string;
+      href: string;
+      priority: 'critical' | 'high' | 'medium';
+    }>;
+    automation_queue: Array<{
+      id: string;
+      title: string;
+      trigger: string;
+      action: string;
+      impact: string;
+      href: string;
+    }>;
+    ai_copilot_actions: Array<{
+      id: string;
+      title: string;
+      prompt: string;
+      output: string;
+      href: string;
+    }>;
+    retention_loops: Array<{
+      id: string;
+      title: string;
+      loop: string;
+      reward: string;
+      metric: string;
+    }>;
+    trust_controls: Array<{
+      id: string;
+      title: string;
+      guardrail: string;
+      signal: string;
+    }>;
+    data_flows: Array<{
+      id: string;
+      source: string;
+      enriches: string;
+      usedBy: string;
+    }>;
+  };
 };
 
 type Tone = 'sky' | 'emerald' | 'amber' | 'rose' | 'slate';
@@ -95,6 +154,16 @@ function toneClass(tone: Tone): string {
   return 'border-slate-200 bg-slate-50 text-slate-700';
 }
 
+function relationPriorityClass(priority: 'critical' | 'high' | 'medium') {
+  if (priority === 'critical') {
+    return 'border-rose-200 bg-rose-50 text-rose-700';
+  }
+  if (priority === 'high') {
+    return 'border-amber-200 bg-amber-50 text-amber-700';
+  }
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+}
+
 export function BusinessOsCommandCenter() {
   const locale = useLocale();
   const isId = locale === 'id';
@@ -114,11 +183,15 @@ export function BusinessOsCommandCenter() {
         const res = await authFetch('/api/business-os/overview', {
           cache: 'no-store',
         });
-        const data = (await res.json().catch(() => null)) as OverviewPayload | null;
+        const data = (await res
+          .json()
+          .catch(() => null)) as OverviewPayload | null;
 
         if (!res.ok || !data) {
           throw new Error(
-            isId ? 'Gagal memuat dashboard kerja' : 'Failed to load work dashboard',
+            isId
+              ? 'Gagal memuat dashboard kerja'
+              : 'Failed to load work dashboard',
           );
         }
 
@@ -145,12 +218,14 @@ export function BusinessOsCommandCenter() {
   }, [authLoading, user?.id, loadOverview]);
 
   const displayName =
-    user?.full_name || user?.fullName || user?.username || user?.email || 'User';
-  const dashboardAvatar =
-    user?.avatarUrl ||
-    user?.avatar_url ||
-    user?.metadata?.avatar_url ||
-    '/default-avatar.svg';
+    user?.full_name ||
+    user?.fullName ||
+    user?.username ||
+    user?.email ||
+    'User';
+  const dashboardAvatar = profileAvatarSrc(
+    user?.avatarUrl || user?.avatar_url || user?.metadata?.avatar_url,
+  );
 
   const unreadMessages = toInt(payload?.overview.unread_messages);
   const activeTransactions = toInt(payload?.overview.active_transactions);
@@ -211,7 +286,9 @@ export function BusinessOsCommandCenter() {
         href: '/search',
         icon: Briefcase,
         tone: 'emerald',
-        title: isId ? 'Lanjutkan peluang aktif' : 'Continue active opportunities',
+        title: isId
+          ? 'Lanjutkan peluang aktif'
+          : 'Continue active opportunities',
         description: isId
           ? `${activeLeads} peluang masih bisa ditutup jadi hasil.`
           : `${activeLeads} opportunities can still be pushed forward.`,
@@ -235,7 +312,9 @@ export function BusinessOsCommandCenter() {
         icon: MessageCircle,
         tone: 'sky',
         title: isId ? 'Chat' : 'Chat',
-        description: isId ? 'Lihat pesan dan balas cepat.' : 'Open inbox and reply fast.',
+        description: isId
+          ? 'Lihat pesan dan balas cepat.'
+          : 'Open inbox and reply fast.',
       },
       {
         id: 'transactions',
@@ -284,6 +363,27 @@ export function BusinessOsCommandCenter() {
   const flowRecommendations = useMemo(
     () => (payload?.flow_recommendations || []).slice(0, 2),
     [payload?.flow_recommendations],
+  );
+  const operatingSystem = payload?.operating_system;
+  const topRelations = useMemo(
+    () => (operatingSystem?.system_relations || []).slice(0, 3),
+    [operatingSystem?.system_relations],
+  );
+  const topAutomations = useMemo(
+    () => (operatingSystem?.automation_queue || []).slice(0, 3),
+    [operatingSystem?.automation_queue],
+  );
+  const topAiActions = useMemo(
+    () => (operatingSystem?.ai_copilot_actions || []).slice(0, 3),
+    [operatingSystem?.ai_copilot_actions],
+  );
+  const topTrustControls = useMemo(
+    () => (operatingSystem?.trust_controls || []).slice(0, 2),
+    [operatingSystem?.trust_controls],
+  );
+  const topDataFlows = useMemo(
+    () => (operatingSystem?.data_flows || []).slice(0, 2),
+    [operatingSystem?.data_flows],
   );
 
   if (authLoading) {
@@ -412,7 +512,7 @@ export function BusinessOsCommandCenter() {
             icon: Briefcase,
             tone: 'slate' as Tone,
           },
-        ].map((item) => {
+        ].map(item => {
           const Icon = item.icon;
           return (
             <article
@@ -434,6 +534,204 @@ export function BusinessOsCommandCenter() {
           );
         })}
       </section>
+
+      {operatingSystem ? (
+        <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
+          <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+                  {isId ? 'Operating system' : 'Operating system'}
+                </p>
+                <h2 className="mt-2 text-lg font-black tracking-[-0.02em] text-[color:var(--app-text)]">
+                  {operatingSystem.focus_lane.title}
+                </h2>
+                <p className="mt-2 text-[13px] leading-5 text-[color:var(--app-text-soft)]">
+                  {operatingSystem.focus_lane.description}
+                </p>
+              </div>
+              <div className="shrink-0 rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                  {isId ? 'Skor' : 'Score'}
+                </p>
+                <p className="mt-1 text-3xl font-black tracking-[-0.06em] text-[color:var(--app-text)]">
+                  {operatingSystem.health_score}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,var(--app-accent),var(--app-accent-strong))]"
+                style={{ width: `${operatingSystem.health_score}%` }}
+              />
+            </div>
+
+            <Link
+              href={operatingSystem.focus_lane.href}
+              className="mt-4 inline-flex items-center rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[12px] font-semibold text-[color:var(--app-text-inverse)]"
+            >
+              {isId ? 'Kerjakan fokus ini' : 'Work this focus'}
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+            </Link>
+
+            <div className="mt-5 space-y-3">
+              {topRelations.map(relation => (
+                <Link
+                  key={relation.id}
+                  href={relation.href}
+                  className="group block rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3.5 transition hover:border-[color:var(--app-accent-border)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black ${relationPriorityClass(relation.priority)}`}
+                      >
+                        <GitBranch className="h-3.5 w-3.5" />
+                        {relation.from}
+                        {' -> '}
+                        {relation.to}
+                      </span>
+                      <h3 className="mt-2 text-sm font-black text-[color:var(--app-text)]">
+                        {relation.title}
+                      </h3>
+                      <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                        {relation.automation}
+                      </p>
+                    </div>
+                    <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </article>
+
+          <div className="grid gap-5">
+            <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+                    AI + automation
+                  </p>
+                  <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+                    {isId
+                      ? 'Saran otomatis yang mengikat data lintas fitur.'
+                      : 'Automated suggestions tied to cross-feature data.'}
+                  </p>
+                </div>
+                <Zap className="h-5 w-5 shrink-0 text-[color:var(--app-accent)]" />
+              </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <div className="space-y-2">
+                  {topAiActions.map(action => (
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      className="block rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
+                    >
+                      <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                        <Bot className="h-4 w-4 text-[color:var(--app-accent)]" />
+                        {action.title}
+                      </p>
+                      <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                        {action.output}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  {topAutomations.map(action => (
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      className="block rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
+                    >
+                      <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                        <Workflow className="h-4 w-4 text-[color:var(--app-accent)]" />
+                        {action.title}
+                      </p>
+                      <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                        {action.trigger}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </article>
+
+            <section className="grid gap-5 lg:grid-cols-2">
+              <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
+                <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                  <ShieldCheck className="h-4 w-4 text-[color:var(--app-accent)]" />
+                  {isId ? 'Trust guardrail' : 'Trust guardrail'}
+                </p>
+                <div className="mt-3 space-y-2">
+                  {topTrustControls.map(item => (
+                    <div
+                      key={item.id}
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
+                    >
+                      <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                        {item.guardrail}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
+                <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                  <Database className="h-4 w-4 text-[color:var(--app-accent)]" />
+                  {isId ? 'Data flow' : 'Data flow'}
+                </p>
+                <div className="mt-3 space-y-2">
+                  {topDataFlows.map(item => (
+                    <div
+                      key={item.id}
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
+                    >
+                      <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                        {item.source}
+                      </p>
+                      <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                        {item.usedBy}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </section>
+
+            {operatingSystem.retention_loops.length > 0 ? (
+              <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
+                <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                  <RotateCcw className="h-4 w-4 text-[color:var(--app-accent)]" />
+                  {isId ? 'Retention loop' : 'Retention loop'}
+                </p>
+                <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                  {operatingSystem.retention_loops.slice(0, 3).map(loop => (
+                    <div
+                      key={loop.id}
+                      className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
+                    >
+                      <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                        {loop.title}
+                      </p>
+                      <p className="mt-1 line-clamp-3 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                        {loop.loop}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -458,7 +756,7 @@ export function BusinessOsCommandCenter() {
 
         {priorityItems.length > 0 ? (
           <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {priorityItems.map((item) => {
+            {priorityItems.map(item => {
               const Icon = item.icon;
               return (
                 <Link
@@ -529,7 +827,7 @@ export function BusinessOsCommandCenter() {
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {shortcuts.map((item) => {
+            {shortcuts.map(item => {
               const Icon = item.icon;
               return (
                 <Link
@@ -572,7 +870,7 @@ export function BusinessOsCommandCenter() {
 
           <div className="mt-4 space-y-3">
             {flowRecommendations.length > 0 ? (
-              flowRecommendations.map((flow) => (
+              flowRecommendations.map(flow => (
                 <Link
                   key={flow.id}
                   href={flow.href}

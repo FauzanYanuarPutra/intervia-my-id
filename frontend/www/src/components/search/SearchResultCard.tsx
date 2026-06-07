@@ -1,13 +1,12 @@
 'use client';
-import { useState } from 'react';
-import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
 import { CONTENT_TYPES, getContentTypeName } from '@/data/contentTypes';
 import { getSectorLabel, useSectors } from '@/context/SectorContext';
 import { findSubSector, getSubSectorName } from '@/data/subSectors';
 import { WORK_MODE_OPTIONS } from '@/data/sectorFields';
-import { defaultImageForContent, parseImages } from '@/lib/content/catalog';
+import { parseImages } from '@/lib/content/catalog';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
 import { BadgePercent, Gift, Star, Trophy } from 'lucide-react';
 
@@ -54,17 +53,10 @@ export default function SearchResultCard({
   const locale = useLocale() || 'id';
   const { getSectorById } = useSectors();
   const thumbnails = getImageCandidates(item);
-  const fallbackThumbnail = defaultImageForContent(
-    item as Parameters<typeof defaultImageForContent>[0],
-  );
-  const imageCandidates = [...thumbnails, fallbackThumbnail].filter(
+  const imageCandidates = thumbnails.filter(
     (entry, index, source) => Boolean(entry) && source.indexOf(entry) === index,
   );
-  const imageCandidateKey = imageCandidates.join('|');
-  const [imageState, setImageState] = useState({ key: '', index: 0 });
-  const imageIndex =
-    imageState.key === imageCandidateKey ? imageState.index : 0;
-  const imageSrc = imageCandidates[imageIndex] || null;
+  const hasImages = imageCandidates.length > 0;
 
   const meta = item.metadata as Record<string, unknown> | null;
   const sectorId = meta?.sector as string | undefined;
@@ -111,26 +103,18 @@ export default function SearchResultCard({
     <div className="py-4 sm:py-5">
       <div className="flex gap-4 sm:gap-6">
         {/* Thumbnail - optional, small */}
-        {imageSrc && (
+        {hasImages && (
           <div className="relative hidden h-20 w-20 shrink-0 overflow-hidden rounded bg-[color:var(--app-surface-muted)] sm:block sm:h-24 sm:w-24 dark:bg-[color:var(--app-surface-strong)]">
-            <Image
-              src={imageSrc}
+            <MediaPreviewCarousel
+              items={imageCandidates}
               alt=""
-              fill
+              aspectClassName="h-full w-full"
+              className="h-full w-full bg-transparent"
               sizes="96px"
-              className="object-cover"
-              unoptimized
-              onError={() => {
-                setImageState(current => {
-                  const currentIndex =
-                    current.key === imageCandidateKey ? current.index : 0;
-                  const nextIndex =
-                    currentIndex + 1 < imageCandidates.length
-                      ? currentIndex + 1
-                      : currentIndex;
-                  return { key: imageCandidateKey, index: nextIndex };
-                });
-              }}
+              controls={false}
+              lightbox={false}
+              showCounter={imageCandidates.length > 1}
+              showDots={imageCandidates.length > 1}
             />
           </div>
         )}

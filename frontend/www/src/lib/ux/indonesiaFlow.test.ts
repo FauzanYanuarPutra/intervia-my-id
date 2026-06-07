@@ -52,7 +52,8 @@ describe('Indonesia UX flow contract', () => {
     expect(routes).toContain('/home');
     expect(routes).toContain('/community?compose=post');
     expect(routes).toContain('/reels');
-    expect(routes).toContain('/super-app/umkm');
+    expect(routes).toContain('/umkm');
+    expect(routes).toContain('/usaha');
     expect(routes.every(route => !route.includes(':'))).toBe(true);
     expect(buildLocalizedRoute('/search?q=supplier%20kemasan', 'id')).toBe(
       '/id/search?q=supplier%20kemasan',

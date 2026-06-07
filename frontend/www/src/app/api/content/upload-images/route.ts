@@ -6,6 +6,7 @@ import { isMinIOConfigured, uploadToMinIO } from '@/lib/minio';
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15MB per image
 const MAX_FILES = 10;
+const MINIO_UPLOAD_TIMEOUT_MS = 2500;
 
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
@@ -81,6 +82,36 @@ function collectImageFiles(form: FormData): File[] {
   return collected;
 }
 
+async function writeLocalContentImage(
+  file: File,
+  buffer: Buffer,
+): Promise<string> {
+  const ext = path.extname(file.name || '')?.toLowerCase() || '.jpg';
+  const filename = `content-${Date.now()}-${randomUUID()}-${safeName(path.basename(file.name || 'image', ext))}${ext}`;
+  const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'content');
+
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(path.join(uploadDir, filename), buffer);
+
+  return `/uploads/content/${encodeURIComponent(filename)}`;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error('MinIO upload timed out')),
+      ms,
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const token =
@@ -129,28 +160,21 @@ export async function POST(req: NextRequest) {
       let publicUrl: string;
 
       if (isMinIOConfigured()) {
-        const ext = path.extname(file.name || '')?.toLowerCase() || '.jpg';
-        const filename = `content-${Date.now()}-${randomUUID()}${ext}`;
-        // Upload ke MinIO dengan path content/
-        const { url } = await uploadToMinIO(
-          'content',
-          buffer,
-          file.type,
-          filename,
-        );
-        publicUrl = url;
+        try {
+          const ext = path.extname(file.name || '')?.toLowerCase() || '.jpg';
+          const filename = `content-${Date.now()}-${randomUUID()}${ext}`;
+          // Upload ke MinIO dengan path content/
+          const { url } = await withTimeout(
+            uploadToMinIO('content', buffer, file.type, filename),
+            MINIO_UPLOAD_TIMEOUT_MS,
+          );
+          publicUrl = url;
+        } catch (error) {
+          console.error('[UPLOAD_IMAGES_MINIO_FALLBACK]', error);
+          publicUrl = await writeLocalContentImage(file, buffer);
+        }
       } else {
-        const ext = path.extname(file.name || '')?.toLowerCase() || '.jpg';
-        const filename = `content-${Date.now()}-${randomUUID()}-${safeName(path.basename(file.name || 'image', ext))}${ext}`;
-        const uploadDir = path.join(
-          process.cwd(),
-          'public',
-          'uploads',
-          'content',
-        );
-        await mkdir(uploadDir, { recursive: true });
-        await writeFile(path.join(uploadDir, filename), buffer);
-        publicUrl = `/uploads/content/${encodeURIComponent(filename)}`;
+        publicUrl = await writeLocalContentImage(file, buffer);
       }
 
       uploadedUrls.push(publicUrl);

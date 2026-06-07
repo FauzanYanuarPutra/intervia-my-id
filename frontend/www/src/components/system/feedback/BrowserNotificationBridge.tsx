@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { soundManager } from '@/lib/soundManager';
 import {
   ensureNotificationServiceWorkerRegistered,
@@ -62,7 +63,10 @@ function shouldSuppressChatNotification(roomId: string) {
 }
 
 function playBackgroundSound(sound: 'messageReceive' | 'callAlert') {
-  if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+  if (
+    typeof document !== 'undefined' &&
+    document.visibilityState === 'visible'
+  ) {
     return;
   }
   soundManager.play(sound);
@@ -158,21 +162,23 @@ export function BrowserNotificationBridge() {
     };
 
     const onChatMessageNotification = (event: Event) => {
-      const detail = (event as CustomEvent<ChatMessageNotificationDetail>).detail;
+      const detail = (event as CustomEvent<ChatMessageNotificationDetail>)
+        .detail;
       if (!detail || shouldSuppressChatNotification(detail.roomId)) return;
 
       playBackgroundSound('messageReceive');
       void showBrowserNotification({
         title: detail.roomName || 'Pesan baru',
         body: detail.message || 'Ada pesan baru.',
-        icon: detail.roomAvatar || '/favicon.png',
+        icon: profileAvatarSrc(detail.roomAvatar),
         tag: `chat-message:${detail.id}`,
         url: detail.url,
       });
     };
 
     const onIncomingCallNotification = (event: Event) => {
-      const detail = (event as CustomEvent<IncomingCallNotificationDetail>).detail;
+      const detail = (event as CustomEvent<IncomingCallNotificationDetail>)
+        .detail;
       if (!detail || shouldSuppressChatNotification(detail.room_id)) return;
 
       const title =
@@ -192,7 +198,7 @@ export function BrowserNotificationBridge() {
       void showBrowserNotification({
         title,
         body,
-        icon: detail.caller_avatar || '/favicon.png',
+        icon: profileAvatarSrc(detail.caller_avatar),
         tag: `incoming-call:${detail.call_id}`,
         url: detail.url,
         renotify: true,

@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logAuditEvent } from '@/lib/audit';
 import { createSession } from '@/lib/session';
-import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
+import {
+  authSecurityHeaders,
+  enforceAuthRouteSecurity,
+} from '@/lib/authSecurity';
 import { shouldUseSecureCookies } from '@/lib/server/forwardCookies';
+import { DEFAULT_PROFILE_AVATAR } from '@/lib/profile/avatar';
 import { z } from 'zod';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `${BASE_URL}/api/auth/google/callback`;
+const GOOGLE_REDIRECT_URI =
+  process.env.GOOGLE_REDIRECT_URI || `${BASE_URL}/api/auth/google/callback`;
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
 const GoogleCallbackQuerySchema = z.object({
   code: z.string().optional(),
@@ -51,7 +56,10 @@ function sanitizeCallbackPath(input: string | undefined): string {
   return input;
 }
 
-function getPreferredLocale(req: NextRequest, callbackUrl?: string): 'id' | 'en' {
+function getPreferredLocale(
+  req: NextRequest,
+  callbackUrl?: string,
+): 'id' | 'en' {
   if (callbackUrl?.startsWith('/en')) return 'en';
   if (callbackUrl?.startsWith('/id')) return 'id';
   const cookieLocale =
@@ -72,7 +80,10 @@ export async function GET(req: NextRequest) {
       error: searchParams.get('error') ?? undefined,
     });
     if (!parsedQuery.success) {
-      return NextResponse.json({ error: 'Invalid callback query' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid callback query' },
+        { status: 400 },
+      );
     }
 
     const security = await enforceAuthRouteSecurity(req, {
@@ -91,7 +102,7 @@ export async function GET(req: NextRequest) {
       try {
         const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
         callbackUrl = sanitizeCallbackPath(stateData.callbackUrl);
-      } catch { }
+      } catch {}
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -99,15 +110,21 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error('Google OAuth error:', error);
-      return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=oauth_failed`);
+      return NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=oauth_failed`,
+      );
     }
 
     if (!code) {
-      return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=no_code`);
+      return NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=no_code`,
+      );
     }
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=oauth_not_configured`);
+      return NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=oauth_not_configured`,
+      );
     }
 
     // Exchange code for tokens
@@ -125,19 +142,26 @@ export async function GET(req: NextRequest) {
 
     if (!tokenResponse.ok) {
       console.error('Failed to exchange code for tokens');
-      return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=token_exchange_failed`);
+      return NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=token_exchange_failed`,
+      );
     }
 
     const tokens: GoogleTokenResponse = await tokenResponse.json();
 
     // Get user info from Google
-    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
-    });
+    const userInfoResponse = await fetch(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      },
+    );
 
     if (!userInfoResponse.ok) {
       console.error('Failed to get user info from Google');
-      return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=user_info_failed`);
+      return NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=user_info_failed`,
+      );
     }
 
     const googleUser: GoogleUserInfo = await userInfoResponse.json();
@@ -154,7 +178,7 @@ export async function GET(req: NextRequest) {
         email: googleUser.email,
         email_verified: googleUser.email_verified,
         name: googleUser.name,
-        avatar_url: googleUser.picture,
+        avatar_url: DEFAULT_PROFILE_AVATAR,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
       }),
@@ -162,7 +186,9 @@ export async function GET(req: NextRequest) {
 
     if (!backendResponse.ok) {
       console.error('Backend OAuth failed');
-      return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=backend_failed`);
+      return NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=backend_failed`,
+      );
     }
 
     const authData: BackendOAuthResponse = await backendResponse.json();
@@ -170,13 +196,18 @@ export async function GET(req: NextRequest) {
     const backendSessionId = authData.session_id?.trim() || undefined;
     if (!userId || !authData.access_token) {
       console.error('Backend OAuth response missing required fields');
-      return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=backend_invalid_response`);
+      return NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=backend_invalid_response`,
+      );
     }
 
     // Mirror backend session_id to local session registry when provided.
     const session = await createSession(userId, {
       userAgent: req.headers.get('user-agent') || 'Unknown',
-      ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '127.0.0.1',
+      ipAddress:
+        req.headers.get('x-forwarded-for') ||
+        req.headers.get('x-real-ip') ||
+        '127.0.0.1',
       sessionId: backendSessionId,
     });
     const sessionId = backendSessionId || session.id;
@@ -189,7 +220,9 @@ export async function GET(req: NextRequest) {
     });
 
     // Create response with cookies
-    const response = NextResponse.redirect(`${baseUrl}/${preferredLocale}${callbackUrl}`);
+    const response = NextResponse.redirect(
+      `${baseUrl}/${preferredLocale}${callbackUrl}`,
+    );
 
     response.cookies.set('access_token', authData.access_token, {
       httpOnly: true,
@@ -219,6 +252,8 @@ export async function GET(req: NextRequest) {
     console.error('Google OAuth callback error:', e);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const preferredLocale = getPreferredLocale(req);
-    return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=oauth_error`);
+    return NextResponse.redirect(
+      `${baseUrl}/${preferredLocale}/login?error=oauth_error`,
+    );
   }
 }

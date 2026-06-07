@@ -1,13 +1,13 @@
-'use client';
+// 'use client';
 
-import ClientBottomNav from '@/components/layout/ClientBottomNav';
+// import ClientBottomNav from '@/components/layout/ClientBottomNav';
 
-type HomeMobileBottomNavProps = {
-  locale: 'id' | 'en';
-};
+// type HomeMobileBottomNavProps = {
+//   locale: 'id' | 'en';
+// };
 
-export function HomeMobileBottomNav(_props: HomeMobileBottomNavProps) {
-  return <ClientBottomNav />;
-}
+// export function HomeMobileBottomNav(_props: HomeMobileBottomNavProps) {
+//   return <ClientBottomNav />;
+// }
 
-export default HomeMobileBottomNav;
+// export default HomeMobileBottomNav;

@@ -63,6 +63,37 @@ function absolutizeIfRelativeUrl(value: string, origin: string): string {
   }
 }
 
+function normalizeMediaPayloadValue(value: unknown, origin: string): unknown {
+  if (typeof value === 'string') return absolutizeIfRelativeUrl(value, origin);
+  if (Array.isArray(value)) {
+    return value.map(entry => normalizeMediaPayloadValue(entry, origin));
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const record = { ...(value as Record<string, unknown>) };
+  for (const key of [
+    'url',
+    'src',
+    'image',
+    'image_url',
+    'imageUrl',
+    'cover_image',
+    'coverImage',
+    'thumbnail',
+    'thumbnail_url',
+    'thumbnailUrl',
+    'media_url',
+    'mediaUrl',
+    'photo_url',
+    'photoUrl',
+  ]) {
+    if (typeof record[key] === 'string') {
+      record[key] = absolutizeIfRelativeUrl(record[key] as string, origin);
+    }
+  }
+  return record;
+}
+
 function normalizeContentMediaUrls(
   payload: Record<string, unknown>,
   origin: string,
@@ -87,18 +118,61 @@ function normalizeContentMediaUrls(
     ...(normalized.metadata as Record<string, unknown>),
   };
 
-  for (const key of ['cover_image', 'image', 'thumbnail']) {
+  for (const key of [
+    'cover_image',
+    'coverImage',
+    'cover_image_url',
+    'coverImageUrl',
+    'image',
+    'image_url',
+    'imageUrl',
+    'thumbnail',
+    'thumbnail_url',
+    'thumbnailUrl',
+    'media_url',
+    'mediaUrl',
+    'photo_url',
+    'photoUrl',
+    'banner',
+    'banner_url',
+    'bannerUrl',
+    'logo',
+    'logo_url',
+    'logoUrl',
+  ]) {
     if (typeof metadata[key] === 'string') {
       metadata[key] = absolutizeIfRelativeUrl(metadata[key] as string, origin);
     }
   }
 
-  for (const key of ['images', 'image_urls', 'gallery', 'gallery_images']) {
+  for (const key of [
+    'images',
+    'image_urls',
+    'imageUrls',
+    'gallery',
+    'gallery_images',
+    'galleryImages',
+    'media_urls',
+    'mediaUrls',
+    'media',
+    'media_gallery',
+    'mediaGallery',
+    'photos',
+    'photo_urls',
+    'photoUrls',
+    'attachments',
+    'detail_images',
+    'detailImages',
+    'portfolio_images',
+    'portfolioImages',
+    'property_images',
+    'propertyImages',
+    'listing_images',
+    'listingImages',
+  ]) {
     if (Array.isArray(metadata[key])) {
       metadata[key] = metadata[key].map(entry =>
-        typeof entry === 'string'
-          ? absolutizeIfRelativeUrl(entry, origin)
-          : entry,
+        normalizeMediaPayloadValue(entry, origin),
       );
     }
   }

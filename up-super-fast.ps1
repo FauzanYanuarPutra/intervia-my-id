@@ -5,6 +5,7 @@ param(
     [switch]$BuildAll,
     [switch]$NoBuild,
     [switch]$PullLatest,
+    [switch]$SkipCleanup,
     [string[]]$Services
 )
 
@@ -38,7 +39,8 @@ function Write-StartupState {
             if ($existing.startedAt) {
                 $startedAt = [string]$existing.startedAt
             }
-        } catch {
+        }
+        catch {
             $startedAt = $now
         }
     }
@@ -77,7 +79,8 @@ try {
     if ($LASTEXITCODE -eq 0) {
         $composeV2Available = $true
     }
-} catch {
+}
+catch {
     $composeV2Available = $false
 }
 
@@ -87,7 +90,8 @@ if (-not $composeV2Available) {
         if ($LASTEXITCODE -eq 0 -and $dockerComposeVersion -match '(^|\s)(docker-compose\s+)?version\s+1\.') {
             $composeLegacyV1 = $true
         }
-    } catch {
+    }
+    catch {
         $composeLegacyV1 = $false
     }
 }
@@ -103,7 +107,8 @@ function Invoke-Compose {
     )
     if ($composeV2Available) {
         & docker compose @Args
-    } else {
+    }
+    else {
         & docker-compose @Args
     }
     if ($LASTEXITCODE -ne 0) {
@@ -134,6 +139,145 @@ function Configure-BuildBackend {
 }
 
 Configure-BuildBackend
+
+function Resolve-WorkspacePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $candidate = if ([System.IO.Path]::IsPathRooted($Path)) {
+        $Path
+    }
+    else {
+        Join-Path $PSScriptRoot $Path
+    }
+
+    return [System.IO.Path]::GetFullPath($candidate)
+}
+
+function Test-IsWorkspaceChildPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $root = ([System.IO.Path]::GetFullPath($PSScriptRoot)).TrimEnd('\', '/')
+    $fullPath = ([System.IO.Path]::GetFullPath($Path)).TrimEnd('\', '/')
+    $comparison = [System.StringComparison]::OrdinalIgnoreCase
+
+    return $fullPath.StartsWith($root + [System.IO.Path]::DirectorySeparatorChar, $comparison)
+}
+
+function Remove-WorkspaceJunkItem {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $fullPath = Resolve-WorkspacePath -Path $Path
+    if (-not (Test-IsWorkspaceChildPath -Path $fullPath)) {
+        throw "Refusing to clean path outside workspace: $fullPath"
+    }
+
+    if (-not (Test-Path -LiteralPath $fullPath)) {
+        return $false
+    }
+
+    Remove-Item -LiteralPath $fullPath -Recurse -Force -ErrorAction Stop
+    return $true
+}
+
+function Invoke-FastWorkspaceCleanup {
+    $removedCount = 0
+
+    $directoryTargets = @(
+        ".codex-chrome-home-scroll",
+        ".codex-chrome-home-scroll-2",
+        ".codex-tmp",
+        "frontend/www/.next",
+        "frontend/www/.turbo",
+        "frontend/www/out",
+        "frontend/www/coverage",
+        "frontend/www/playwright-report",
+        "frontend/www/test-results",
+        "frontend/www/.parcel-cache",
+        "frontend/www/.vite",
+        "frontend/cms/.next",
+        "frontend/cms/.turbo",
+        "frontend/cms/out",
+        "frontend/cms/coverage",
+        "frontend/cms/playwright-report",
+        "frontend/cms/test-results",
+        "frontend/crm/.next",
+        "frontend/crm/.turbo",
+        "frontend/crm/out",
+        "frontend/crm/coverage",
+        "frontend/crm/playwright-report",
+        "frontend/crm/test-results",
+        "frontend/usaha/.next",
+        "frontend/usaha/.turbo",
+        "frontend/usaha/out",
+        "frontend/usaha/coverage",
+        "frontend/usaha/playwright-report",
+        "frontend/usaha/test-results"
+    )
+
+    foreach ($target in $directoryTargets) {
+        try {
+            if (Remove-WorkspaceJunkItem -Path $target) {
+                $removedCount++
+            }
+        }
+        catch {
+            Write-Host "Skip cleanup target '$target': $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    }
+
+    $patternTargets = @(
+        @{ Base = "."; Patterns = @(".codex-*.log", "tmp-*.png", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/www"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/cms"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/crm"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") },
+        @{ Base = "frontend/usaha"; Patterns = @("*.tsbuildinfo", ".eslintcache", ".stylelintcache", "npm-debug.log*", "yarn-debug.log*", "yarn-error.log*", "pnpm-debug.log*") }
+    )
+
+    foreach ($target in $patternTargets) {
+        $basePath = Resolve-WorkspacePath -Path $target.Base
+        if (-not (Test-IsWorkspaceChildPath -Path $basePath) -and (([System.IO.Path]::GetFullPath($basePath)).TrimEnd('\', '/') -ne ([System.IO.Path]::GetFullPath($PSScriptRoot)).TrimEnd('\', '/'))) {
+            throw "Refusing to scan cleanup path outside workspace: $basePath"
+        }
+        if (-not (Test-Path -LiteralPath $basePath)) {
+            continue
+        }
+
+        foreach ($pattern in $target.Patterns) {
+            $items = @(Get-ChildItem -LiteralPath $basePath -Force -File -Filter $pattern -ErrorAction SilentlyContinue)
+            foreach ($item in $items) {
+                try {
+                    if (Remove-WorkspaceJunkItem -Path $item.FullName) {
+                        $removedCount++
+                    }
+                }
+                catch {
+                    Write-Host "Skip cleanup file '$($item.FullName)': $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+            }
+        }
+    }
+
+    if ($removedCount -gt 0) {
+        Write-Host "Fast workspace cleanup removed $removedCount junk item(s)."
+    }
+    else {
+        Write-Host "Fast workspace cleanup: nothing to remove."
+    }
+}
+
+if (-not $SkipCleanup) {
+    Write-StartupState -Active $true -Status "starting" -Phase "cleaning_workspace" -Message "Removing local temporary build artifacts." -ServiceNames $Services
+    Invoke-FastWorkspaceCleanup
+}
 
 function Get-LatestWriteTicks {
     param(
@@ -199,7 +343,8 @@ function Test-LocalImage {
 
         Write-Host "Local image check failed for ${ImageName}; treating it as missing so it can be rebuilt." -ForegroundColor Yellow
         return $false
-    } catch {
+    }
+    catch {
         Write-Host "Local image check threw for ${ImageName}; treating it as missing so it can be rebuilt." -ForegroundColor Yellow
         return $false
     }
@@ -340,6 +485,75 @@ function Get-ProjectContainerIds {
     return @($ids | ForEach-Object { "$_".Trim() } | Where-Object { $_ -ne "" })
 }
 
+function Start-ContainerIdsFast {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$ContainerIds
+    )
+
+    $uniqueIds = @($ContainerIds | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    if ($uniqueIds.Count -eq 0) {
+        return $false
+    }
+
+    $runningProjectContainerIds = Get-ProjectContainerIds -ProjectName $ProjectName -RunningOnly
+    $runningLookup = @{}
+    foreach ($runningId in $runningProjectContainerIds) {
+        $runningLookup[$runningId] = $true
+    }
+
+    $toStartIds = @($uniqueIds | Where-Object { -not $runningLookup.ContainsKey($_) })
+    if ($toStartIds.Count -gt 0) {
+        & docker start @toStartIds *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to start one or more stopped containers."
+        }
+        Write-Host "Started $($toStartIds.Count) existing container(s) without Compose recreate."
+    }
+    else {
+        Write-Host "Requested containers already running. Skip start/recreate."
+    }
+
+    return $true
+}
+
+function Start-ComposeServicesFast {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Services
+    )
+
+    $containerIds = New-Object 'System.Collections.Generic.List[string]'
+    $missingServices = New-Object 'System.Collections.Generic.List[string]'
+
+    foreach ($serviceName in $Services) {
+        if ([string]::IsNullOrWhiteSpace($serviceName)) {
+            continue
+        }
+
+        $serviceContainerIds = Get-ComposeServiceContainerIds -ProjectName $ProjectName -Services @($serviceName)
+        if ($serviceContainerIds.Count -eq 0) {
+            $missingServices.Add($serviceName)
+            continue
+        }
+
+        foreach ($id in $serviceContainerIds) {
+            $containerIds.Add($id)
+        }
+    }
+
+    if ($missingServices.Count -gt 0) {
+        Write-Host "Missing containers for service(s): $($missingServices -join ', '). Falling back to Compose up."
+        return $false
+    }
+
+    return Start-ContainerIdsFast -ProjectName $ProjectName -ContainerIds @($containerIds)
+}
+
 function Save-StateFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -379,7 +593,8 @@ if (Test-Path $stateFile) {
                 }
             }
         }
-    } catch {
+    }
+    catch {
         $state = @{
             services = @{}
         }
@@ -402,7 +617,8 @@ $serviceInputs = @{
 
 $composeProjectName = if ($env:COMPOSE_PROJECT_NAME) {
     $env:COMPOSE_PROJECT_NAME
-} else {
+}
+else {
     Split-Path -Leaf $PSScriptRoot
 }
 
@@ -445,7 +661,9 @@ $defaultDevServices = @(
     "www",
     "cms",
     "crm",
-    "mailhog"
+    "mailhog",
+    "pgadmin",
+    "dbgate"
 )
 
 if ($Mode -eq "prod") {
@@ -466,7 +684,8 @@ if ($Mode -eq "prod") {
 if (-not (Test-Path $EnvFile)) {
     if ($EnvFile -eq ".env.development" -and (Test-Path ".env")) {
         $EnvFile = ".env"
-    } else {
+    }
+    else {
         throw "Env file not found: $EnvFile"
     }
 }
@@ -475,7 +694,8 @@ $availableServices = @{}
 try {
     if ($composeV2Available) {
         $configuredServices = & docker compose --env-file $EnvFile config --services
-    } else {
+    }
+    else {
         $configuredServices = & docker-compose --env-file $EnvFile config --services
     }
     if ($LASTEXITCODE -eq 0) {
@@ -486,7 +706,8 @@ try {
             }
         }
     }
-} catch {
+}
+catch {
     $availableServices = @{}
 }
 
@@ -511,15 +732,16 @@ if ($requestedServices.Count -gt 0 -and $availableServices.Count -gt 0) {
 
 $selectedServices = if ($requestedServices.Count -gt 0) {
     $requestedServices
-} else {
+}
+else {
     $defaultDevServices
 }
 
 Write-StartupState -Active $true -Status "starting" -Phase "checking_images" -Message "Checking images and service inputs." -ServiceNames $selectedServices
 
 $startupServices = @($selectedServices | Where-Object {
-    $availableServices.Count -eq 0 -or $availableServices.ContainsKey($_)
-})
+        $availableServices.Count -eq 0 -or $availableServices.ContainsKey($_)
+    })
 
 $startupServiceLookup = @{}
 foreach ($serviceName in $startupServices) {
@@ -554,7 +776,8 @@ if (-not $NoBuild) {
 
         if ($state.services.ContainsKey($serviceName)) {
             $previousTicks = [int64]$state.services[$serviceName].input_ticks
-        } elseif ($imageExists -and -not $BuildAll) {
+        }
+        elseif ($imageExists -and -not $BuildAll) {
             # Bootstrap state dari image lokal yang sudah ada agar run pertama
             # tidak memaksa rebuild semua service.
             $previousTicks = [int64]$currentTicksByService[$serviceName]
@@ -599,7 +822,8 @@ if ($servicesToBuild.Count -gt 0) {
     }
 
     Save-StateFile -State $state -StateFilePath $stateFile
-} else {
+}
+else {
     Write-Host "No image rebuild needed. Reusing existing local images."
 
     foreach ($serviceName in $serviceInputs.Keys) {
@@ -621,44 +845,34 @@ if ($servicesToBuild.Count -gt 0) {
     try {
         if ($startupServices.Count -gt 0) {
             Invoke-Compose (@("--env-file", $EnvFile, "start") + $startupServices)
-        } else {
+        }
+        else {
             Invoke-Compose @("--env-file", $EnvFile, "start")
         }
-    } catch {
+    }
+    catch {
         if ($startupServices.Count -gt 0) {
             Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate") + $startupServices)
-        } else {
+        }
+        else {
             Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate")
         }
     }
-} else {
+}
+else {
     if ($startupServices.Count -gt 0) {
-        try {
-            Invoke-Compose (@("--env-file", $EnvFile, "start") + $startupServices)
-        } catch {
+        if (-not (Start-ComposeServicesFast -ProjectName $composeProjectName -Services $startupServices)) {
             Invoke-Compose (@("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate") + $startupServices)
         }
-    } else {
+    }
+    else {
         # Fastest path: gunakan docker native start agar tidak menunggu dependency
         # health checks dari compose setiap kali.
         $allProjectContainerIds = Get-ProjectContainerIds -ProjectName $composeProjectName
         if ($allProjectContainerIds.Count -gt 0) {
-            $runningProjectContainerIds = Get-ProjectContainerIds -ProjectName $composeProjectName -RunningOnly
-            $runningLookup = @{}
-            foreach ($runningId in $runningProjectContainerIds) {
-                $runningLookup[$runningId] = $true
-            }
-
-            $toStartIds = @($allProjectContainerIds | Where-Object { -not $runningLookup.ContainsKey($_) })
-            if ($toStartIds.Count -gt 0) {
-                & docker start @toStartIds *> $null
-                if ($LASTEXITCODE -ne 0) {
-                    throw "Failed to start one or more stopped containers."
-                }
-            } else {
-                Write-Host "All containers already running. Skip start/recreate."
-            }
-        } else {
+            Start-ContainerIdsFast -ProjectName $composeProjectName -ContainerIds $allProjectContainerIds *> $null
+        }
+        else {
             # Jika belum pernah ada container untuk project ini, baru lakukan up.
             Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate")
         }

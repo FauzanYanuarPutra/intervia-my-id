@@ -1,4 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const CRM_AUTH_API_URL = process.env.NEXT_PUBLIC_CRM_AUTH_API_URL || '/api';
 const MARKETPLACE_URL =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL || 'http://localhost:8081';
 
@@ -243,10 +244,17 @@ async function fetchJson<T = unknown>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(url, {
-    ...fetchOptions,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...fetchOptions,
+      headers,
+    });
+  } catch {
+    throw new Error(
+      'Service belum tersambung. Pastikan CRM, identity, dan marketplace service aktif.',
+    );
+  }
 
   const responseText = await response.text();
   let payload: unknown = null;
@@ -265,7 +273,7 @@ async function fetchJson<T = unknown>(
 
 export const authApi = {
   login: async (email: string, password: string): Promise<AuthLoginResponse> => {
-    const payload = await fetchJson<JsonRecord>(`${API_URL}/auth/login`, {
+    const payload = await fetchJson<JsonRecord>(`${CRM_AUTH_API_URL}/auth/login`, {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -293,14 +301,14 @@ export const authApi = {
   },
 
   logout: async (token: string) => {
-    return fetchJson(`${API_URL}/auth/logout`, {
+    return fetchJson(`${CRM_AUTH_API_URL}/auth/logout`, {
       method: 'POST',
       token,
     });
   },
 
   me: async (token: string): Promise<AuthMeResponse> => {
-    const payload = await fetchJson<JsonRecord>(`${API_URL}/auth/me`, {
+    const payload = await fetchJson<JsonRecord>(`${CRM_AUTH_API_URL}/auth/me`, {
       method: 'GET',
       token,
     });
@@ -317,7 +325,7 @@ export const authApi = {
   },
 
   refresh: async (refreshToken: string, sessionId: string) => {
-    return fetchJson(`${API_URL}/auth/refresh`, {
+    return fetchJson(`${CRM_AUTH_API_URL}/auth/refresh`, {
       method: 'POST',
       body: JSON.stringify({
         refresh_token: refreshToken,

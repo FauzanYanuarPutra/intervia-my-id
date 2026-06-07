@@ -14,7 +14,6 @@ import { z } from 'zod';
 
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const IS_DEV = APP_ENV === 'development';
-const DEV_OTP_ECHO = process.env.DEV_OTP_ECHO !== 'false';
 const OTP_LIMIT_PER_TARGET_PER_HOUR = Number.parseInt(
   process.env.OTP_LIMIT_PER_TARGET_PER_HOUR || '5',
   10,
@@ -109,6 +108,7 @@ export async function POST(req: NextRequest) {
     const otp = generateOTP();
     await storeOTP(type, normalizedTarget, otp);
 
+    const delivery: string = type === 'email' ? 'email' : 'sms';
     const sent =
       type === 'email'
         ? await sendOTPEmail(normalizedTarget, otp)
@@ -132,19 +132,11 @@ export async function POST(req: NextRequest) {
     const emailTransport =
       process.env.EMAIL_TRANSPORT || (IS_DEV ? 'console' : 'smtp');
 
-    if (IS_DEV && DEV_OTP_ECHO) {
-      console.log(
-        `[DEV OTP] type=${type} target=${maskTarget(type, normalizedTarget)} code=${otp}`,
-      );
-    }
-
     return NextResponse.json({
       success: true,
-      message: `OTP sent to ${type === 'email' ? 'email' : 'phone'}`,
+      message: `OTP sent to ${type === 'email' ? 'email' : 'whatsapp'}`,
       purpose,
-      ...(IS_DEV && DEV_OTP_ECHO
-        ? { devOtp: otp, delivery: type === 'email' ? emailTransport : 'sms' }
-        : {}),
+      delivery: type === 'email' ? emailTransport : delivery,
     });
   } catch (e) {
     console.error('Send OTP error:', e);

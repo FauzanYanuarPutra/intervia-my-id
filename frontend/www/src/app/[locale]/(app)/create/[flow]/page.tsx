@@ -59,19 +59,19 @@ export async function generateMetadata({
 
   return {
     title: isId
-      ? 'Buat Listing Jualan Usaha | Lajukan'
+      ? 'Tawarkan Produk, Jasa, atau Lokasi | Lajukan'
       : 'Create a Business Listing | Lajukan',
     description: isId
-      ? 'Pilih listing: produk, jasa, properti, atau rental.'
+      ? 'Pilih jenis tawaran: produk, jasa, lokasi, alat sewa, atau oper usaha.'
       : 'Choose the listing type for products, services, property, or rentals you want to offer on Lajukan. For hiring, use the talent brief.',
     alternates: { canonical },
     robots: { index: true, follow: true },
     openGraph: {
       title: isId
-        ? 'Buat Listing Jualan Usaha | Lajukan'
+        ? 'Tawarkan Produk, Jasa, atau Lokasi | Lajukan'
         : 'Create a Business Listing | Lajukan',
       description: isId
-        ? 'Pilih form jual yang paling pas.'
+        ? 'Pilih form tawaran yang paling pas.'
         : 'Enter the sell flow and choose the most relevant product, service, property, or rental listing form.',
       url: canonical,
       type: 'website',

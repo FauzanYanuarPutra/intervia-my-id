@@ -1,7 +1,16 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import JobDetailClient from './client';
-import { asString, ContentItem, extractContentItems, formatIDRFromCents } from '@/lib/content/catalog';
+import {
+  asString,
+  ContentItem,
+  extractContentItems,
+  formatIDRFromCents,
+} from '@/lib/content/catalog';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 
 const MARKETPLACE_BASE =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -41,7 +50,9 @@ async function fetchJobContent(slug: string): Promise<ContentItem | null> {
     );
 
     if (byIdRes.ok) {
-      const byIdData = (await byIdRes.json().catch(() => null)) as ContentItem | null;
+      const byIdData = (await byIdRes
+        .json()
+        .catch(() => null)) as ContentItem | null;
       if (byIdData?.id) return byIdData;
     }
   } catch {
@@ -56,15 +67,18 @@ async function fetchJobContent(slug: string): Promise<ContentItem | null> {
       offset: '0',
     });
 
-    const listRes = await fetch(`${MARKETPLACE_BASE}/v1/content?${query.toString()}`, {
-      cache: 'no-store',
-    });
+    const listRes = await fetch(
+      `${MARKETPLACE_BASE}/v1/content?${query.toString()}`,
+      {
+        cache: 'no-store',
+      },
+    );
     if (!listRes.ok) return null;
 
     const payload = await listRes.json().catch(() => []);
     const items = extractContentItems(payload);
     const exactMatch = items.find(
-      (item) => item.slug === slug || String(item.id) === slug,
+      item => item.slug === slug || String(item.id) === slug,
     );
     return exactMatch || null;
   } catch {
@@ -76,36 +90,50 @@ function splitTextBlock(text?: string): string[] {
   if (!text) return [];
   return text
     .split(/\n+/)
-    .map((part) => part.trim())
+    .map(part => part.trim())
     .filter(Boolean);
 }
 
-function mapToJobDetail(item: ContentItem): JobDetailView {
+function mapToJobDetail(
+  item: ContentItem,
+  locale: 'id' | 'en' = 'id',
+): JobDetailView {
   const meta = item.metadata || {};
-  const descriptionParts = splitTextBlock(item.body || item.summary || asString(meta.description));
+  const descriptionParts = splitTextBlock(
+    item.body || item.summary || asString(meta.description),
+  );
   const requirements = splitTextBlock(asString(meta.requirements));
   const responsibilities = splitTextBlock(asString(meta.responsibilities));
+  const salary = formatIDRFromCents(item.price_cents);
+  const salaryUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const fallbackSalaryLabel = asString(meta.salary_range);
 
   return {
     id: String(item.id),
     slug: item.slug || String(item.id),
     title: item.title || item.summary || 'Untitled Job',
     company:
-      asString(meta.company) || asString(meta.company_name) || asString(meta.organization) || 'Unknown Company',
+      asString(meta.company) ||
+      asString(meta.company_name) ||
+      asString(meta.organization) ||
+      'Unknown Company',
     companyDescription:
       asString(meta.company_description) ||
       asString(meta.about_company) ||
       descriptionParts[0] ||
       '',
-    companyWebsite: asString(meta.company_website) || asString(meta.website) || '',
+    companyWebsite:
+      asString(meta.company_website) || asString(meta.website) || '',
     companySize: asString(meta.company_size) || '',
     logo: item.cover_image || asString(meta.logo) || '',
     location: asString(meta.location) || asString(meta.city) || 'Remote',
     type: asString(meta.job_type) || asString(meta.employment_type) || 'Job',
     salary:
-      formatIDRFromCents(item.price_cents) !== '-'
-        ? formatIDRFromCents(item.price_cents)
-        : asString(meta.salary_range) || 'Negotiable',
+      salary !== '-'
+        ? formatPriceWithUnit(salary, salaryUnitLabel)
+        : fallbackSalaryLabel
+          ? formatPriceWithUnit(fallbackSalaryLabel, salaryUnitLabel)
+          : 'Negotiable',
     salaryPeriod: 'bulan',
     level: asString(meta.level) || asString(meta.seniority) || 'Any',
     category: asString(item.category) || asString(meta.category) || 'General',
@@ -115,7 +143,9 @@ function mapToJobDetail(item: ContentItem): JobDetailView {
     isUrgent: Boolean(meta.is_urgent),
     postedAt: asString(item.created_at) || new Date().toISOString(),
     deadline: asString(meta.deadline) || '',
-    description: descriptionParts.length ? descriptionParts : [item.summary || 'No description'],
+    description: descriptionParts.length
+      ? descriptionParts
+      : [item.summary || 'No description'],
     responsibilities,
     requirements,
     benefits: Array.isArray(meta.benefits)
@@ -170,7 +200,7 @@ export default async function JobDetailPage({
     notFound();
   }
 
-  const job = mapToJobDetail(item);
+  const job = mapToJobDetail(item, locale === 'en' ? 'en' : 'id');
   const jsonLd = {
     '@context': 'https://schema.org/',
     '@type': 'JobPosting',

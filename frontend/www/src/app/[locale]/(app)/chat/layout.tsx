@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAppBack } from '@/lib/navigation/useAppBack';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 
 type DiscoverUser = {
   id: string;
@@ -116,9 +117,9 @@ function buildDraftRoomId(contact: string): string {
 const CHAT_LAYOUT_LABEL_CLASS =
   'mb-1.5 block text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]';
 const CHAT_LAYOUT_INPUT_CLASS =
-  'w-full min-h-[46px] rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+  'w-full min-h-[40px] rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_LAYOUT_SEARCH_INPUT_CLASS =
-  'w-full min-h-[44px] rounded-full border-2 border-slate-300 bg-white py-2 pl-9 pr-3 text-[14px] font-semibold text-[#111b21] shadow-none outline-none transition placeholder:text-[#667781] hover:border-slate-400 focus:border-[#25d366] focus:ring-4 focus:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#111b21] dark:text-[#e9edef] dark:placeholder:text-[#8696a0] dark:hover:border-[#54656f]';
+  'w-full min-h-[38px] rounded-full border border-slate-300 bg-white py-1.5 pl-9 pr-3 text-[13px] font-semibold text-[#111b21] shadow-none outline-none transition placeholder:text-[#667781] hover:border-slate-400 focus:border-[#25d366] focus:ring-2 focus:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#111b21] dark:text-[#e9edef] dark:placeholder:text-[#8696a0] dark:hover:border-[#54656f]';
 
 export default function ChatLayout({ children }: { children: ReactNode }) {
   const params = useParams() ?? {};
@@ -784,17 +785,15 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                         }`}
                       >
                         <div className="relative h-11 w-11 shrink-0">
-                          {room.avatar || room.room_avatar ? (
-                            <img
-                              src={(room.avatar || room.room_avatar) as string}
-                              alt=""
-                              className="h-full w-full rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center rounded-full bg-[#dfe5e7] text-base font-semibold text-[#54656f] dark:bg-[#2a3942] dark:text-[#d1d7db]">
-                              {(room.name || 'U')[0].toUpperCase()}
-                            </div>
-                          )}
+                          <img
+                            src={profileAvatarSrc(
+                              (room.avatar || room.room_avatar) as
+                                | string
+                                | undefined,
+                            )}
+                            alt=""
+                            className="h-full w-full rounded-full object-cover"
+                          />
                         </div>
 
                         <div className="min-w-0 flex-1 overflow-hidden">

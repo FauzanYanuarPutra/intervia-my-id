@@ -6,13 +6,21 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useLocale } from 'next-intl';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { ContextActions } from '@/components/system/navigation/ContextActions';
 import { EmptyState } from '@/components/system/feedback/EmptyState';
 import {
   MyListingsListSkeleton,
   MyListingsSkeleton,
 } from '@/components/system/feedback/RouteSkeletons';
-import { Heart, ImageIcon, Search, Trash2, X } from 'lucide-react';
+import {
+  Clock3,
+  FileText,
+  Heart,
+  ImageIcon,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from 'lucide-react';
 import {
   PHONE_VERIFICATION_SETTINGS_PATH,
   readPhoneVerifiedStatus,
@@ -23,8 +31,10 @@ import {
   subscribeSearchCartSession,
   type SearchCartItem,
 } from '@/lib/searchCartSession';
+import CreateMarketplaceShell from '../(app)/create/CreateMarketplaceShell';
 
 type ListingStatus = 'draft' | 'active' | 'archived';
+type ListingCollectionMode = 'mine' | 'favorites' | 'history';
 
 type ListingItem = {
   id: string;
@@ -157,6 +167,12 @@ export default function MyListingsPage() {
   const currentSearch = searchParams?.toString() || '';
   const filterParam = (searchParams?.get('filter') || '').toLowerCase();
   const isFavoritesMode = filterParam === 'favorites';
+  const isHistoryMode = filterParam === 'history';
+  const collectionMode: ListingCollectionMode = isFavoritesMode
+    ? 'favorites'
+    : isHistoryMode
+      ? 'history'
+      : 'mine';
 
   const [activeStatus, setActiveStatus] = useState<ListingStatus>('draft');
   const [query, setQuery] = useState('');
@@ -199,6 +215,11 @@ export default function MyListingsPage() {
         id: 'favorites',
         href: '/my-listings?filter=favorites',
         label: locale === 'id' ? 'Favorit' : 'Favorites',
+      },
+      {
+        id: 'history',
+        href: '/my-listings?filter=history',
+        label: locale === 'id' ? 'Riwayat' : 'History',
       },
     ],
     [locale],
@@ -264,7 +285,7 @@ export default function MyListingsPage() {
       return;
     }
 
-    if (isFavoritesMode) {
+    if (isFavoritesMode || isHistoryMode) {
       setLoading(false);
       setError('');
       return;
@@ -305,6 +326,7 @@ export default function MyListingsPage() {
     authLoading,
     currentSearch,
     isFavoritesMode,
+    isHistoryMode,
     locale,
     pathname,
     router,
@@ -312,71 +334,104 @@ export default function MyListingsPage() {
   ]);
 
   if (authLoading) {
-    return <MyListingsSkeleton />;
+    return (
+      <CreateMarketplaceShell>
+        <MyListingsSkeleton />
+      </CreateMarketplaceShell>
+    );
   }
 
   const removeReference = (itemId: string) => {
     setSavedReferences(removeSearchCartItem(itemId).items);
   };
 
+  const pageTitle =
+    collectionMode === 'favorites'
+      ? locale === 'id'
+        ? 'Favorit'
+        : 'Favorites'
+      : collectionMode === 'history'
+        ? locale === 'id'
+          ? 'Riwayat dilihat'
+          : 'Viewed history'
+        : locale === 'id'
+          ? 'Postingan'
+          : 'Drafts and posts';
+  const pageDescription =
+    collectionMode === 'favorites'
+      ? locale === 'id'
+        ? 'Referensi listing yang kamu simpan.'
+        : 'Listings you saved as references.'
+      : collectionMode === 'history'
+        ? locale === 'id'
+          ? 'Listing terakhir yang kamu buka.'
+          : 'Listings you recently opened.'
+        : locale === 'id'
+          ? 'Draft, aktif, dan arsip dalam satu tempat.'
+          : 'Manage drafts, live posts, and archived listings.';
+  const HeaderIcon =
+    collectionMode === 'favorites'
+      ? Heart
+      : collectionMode === 'history'
+        ? Clock3
+        : FileText;
+  const primaryAction =
+    collectionMode !== 'mine'
+      ? {
+          label: locale === 'id' ? 'Cari' : 'Search',
+          href: '/search',
+          icon: Search,
+        }
+      : {
+          label: createLabel,
+          href: createHref,
+          icon: Plus,
+        };
+  const PrimaryActionIcon = primaryAction.icon;
+  const SecondaryActionIcon = collectionMode !== 'mine' ? FileText : Clock3;
+
   return (
-    <div className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <div className="mx-auto w-full max-w-5xl px-0 py-5 sm:px-4 sm:py-6">
-        <div className="rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:var(--app-surface-strong)] p-4 dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-2xl sm:border-x sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h1 className="text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {isFavoritesMode
-                  ? locale === 'id'
-                    ? 'Favorit'
-                    : 'Favorites'
-                  : locale === 'id'
-                    ? 'Postingan'
-                    : 'Drafts and posts'}
-              </h1>
-              <p className="mt-1 text-xs text-[color:var(--app-text)]">
-                {isFavoritesMode
-                  ? locale === 'id'
-                    ? 'Referensi dari Search.'
-                    : 'References saved from Search.'
-                  : locale === 'id'
-                    ? 'Draft, aktif, arsip.'
-                    : 'Continue unfinished drafts, check live posts, and keep moving.'}
-              </p>
+    <CreateMarketplaceShell>
+      <div className="mx-auto w-full max-w-5xl px-0 py-0 sm:px-1">
+        <div className="rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-2xl sm:border-x sm:p-4">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] bg-[color:color-mix(in_srgb,var(--app-accent)_12%,white)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-emerald-400/10">
+                <HeaderIcon className="h-4.5 w-4.5" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="truncate text-[17px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {pageTitle}
+                </h1>
+                <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                  {pageDescription}
+                </p>
+              </div>
             </div>
-            <ContextActions
-              primaryAction={
-                isFavoritesMode
-                  ? {
-                      id: 'search',
-                      label: locale === 'id' ? 'Cari' : 'Search',
-                      href: '/search',
-                    }
-                  : {
-                      id: 'new',
-                      label: createLabel,
-                      href: createHref,
-                    }
-              }
-              secondaryActions={[
-                {
-                  id: isFavoritesMode ? 'posts' : 'transactions',
-                  label: isFavoritesMode
-                    ? locale === 'id'
-                      ? 'Postingan'
-                      : 'Posts'
-                    : locale === 'id'
-                      ? 'Transaksi'
-                      : 'Open transactions',
-                  href: isFavoritesMode ? '/my-listings' : '/transactions',
-                },
-                {
-                  id: 'support',
-                  label: locale === 'id' ? 'Bantuan' : 'Get help',
-                  href: '/support',
-                },
-              ]}
-            />
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:justify-end">
+              <Link
+                href={primaryAction.href}
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] shadow-[0_14px_24px_-20px_rgba(15,23,42,0.35)]"
+              >
+                <PrimaryActionIcon className="h-3.5 w-3.5" />
+                {primaryAction.label}
+              </Link>
+              <Link
+                href={
+                  collectionMode !== 'mine' ? '/my-listings' : '/transactions'
+                }
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
+              >
+                <SecondaryActionIcon className="h-3.5 w-3.5" />
+                {collectionMode !== 'mine'
+                  ? locale === 'id'
+                    ? 'Postingan'
+                    : 'Posts'
+                  : locale === 'id'
+                    ? 'Transaksi'
+                    : 'Transactions'}
+              </Link>
+            </div>
           </div>
 
           {!phoneVerified && (
@@ -404,73 +459,80 @@ export default function MyListingsPage() {
             </div>
           )}
 
-          <div className="mt-4 grid grid-cols-2 gap-1 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
-            {collectionTabs.map(tab => {
-              const active =
-                (tab.id === 'favorites' && isFavoritesMode) ||
-                (tab.id === 'mine' && !isFavoritesMode);
-              return (
-                <Link
-                  key={tab.id}
-                  href={tab.href}
-                  className={`inline-flex min-h-[42px] items-center justify-center rounded-[14px] px-3 text-sm font-black transition ${
-                    active
-                      ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_24px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
-                      : 'text-[color:var(--app-text-soft)] hover:bg-white/70 hover:text-[color:var(--app-text)] dark:hover:bg-slate-900'
-                  }`}
-                >
-                  {tab.label}
-                </Link>
-              );
-            })}
-          </div>
+          <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(230px,320px)] lg:items-center">
+            <div className="grid grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+              {collectionTabs.map(tab => {
+                const active =
+                  (tab.id === 'favorites' && collectionMode === 'favorites') ||
+                  (tab.id === 'history' && collectionMode === 'history') ||
+                  (tab.id === 'mine' && collectionMode === 'mine');
+                return (
+                  <Link
+                    key={tab.id}
+                    href={tab.href}
+                    className={`inline-flex min-h-9 items-center justify-center rounded-[12px] px-2 text-xs font-black transition sm:text-[13px] ${
+                      active
+                        ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
+                        : 'text-[color:var(--app-text-soft)] hover:bg-white/70 hover:text-[color:var(--app-text)] dark:hover:bg-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </Link>
+                );
+              })}
+            </div>
 
-          <div className="mt-4 rounded-[18px] border-2 border-slate-300 bg-white px-3 py-2 shadow-none transition focus-within:border-[color:var(--app-accent)] focus-within:ring-4 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:focus-within:border-emerald-400">
-            <label className="flex min-h-[42px] items-center gap-2.5">
-              <Search className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
-              <input
-                type="search"
-                value={query}
-                onChange={event => setQuery(event.target.value)}
-                placeholder={
-                  isFavoritesMode
-                    ? locale === 'id'
-                      ? 'Cari favorit tersimpan'
-                      : 'Search saved favorites'
-                    : locale === 'id'
-                      ? 'Cari judul, jenis, status'
-                      : 'Search title, type, status'
-                }
-                className="w-full min-w-0 bg-transparent text-sm font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400"
-                aria-label={
-                  locale === 'id' ? 'Cari postingan' : 'Search listings'
-                }
-              />
-              {query ? (
-                <button
-                  type="button"
-                  onClick={() => setQuery('')}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[color:var(--app-text-soft)] transition hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800"
-                  aria-label={
-                    locale === 'id' ? 'Hapus pencarian' : 'Clear search'
+            <div className="ui-field-shell rounded-[14px] border border-slate-300 bg-white px-2.5 py-1 shadow-none transition focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:focus-within:border-emerald-400">
+              <label className="flex min-h-[34px] items-center gap-2">
+                <Search className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={event => setQuery(event.target.value)}
+                  placeholder={
+                    isFavoritesMode
+                      ? locale === 'id'
+                        ? 'Cari favorit'
+                        : 'Search favorites'
+                      : isHistoryMode
+                        ? locale === 'id'
+                          ? 'Cari riwayat'
+                          : 'Search history'
+                        : locale === 'id'
+                          ? 'Cari postingan'
+                          : 'Search posts'
                   }
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : null}
-            </label>
+                  className="w-full min-w-0 bg-transparent text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400"
+                  aria-label={
+                    locale === 'id' ? 'Cari postingan' : 'Search listings'
+                  }
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[color:var(--app-text-soft)] transition hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800"
+                    aria-label={
+                      locale === 'id' ? 'Hapus pencarian' : 'Clear search'
+                    }
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </label>
+            </div>
           </div>
 
-          {!isFavoritesMode ? (
-            <div className="mt-3 grid grid-cols-3 gap-1 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+          {collectionMode === 'mine' ? (
+            <div className="mt-2 grid grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55 sm:max-w-md">
               {statusTabs.map(tab => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveStatus(tab.id)}
-                  className={`min-h-[42px] rounded-[14px] px-3 text-sm font-black transition ${
+                  className={`min-h-9 rounded-[12px] px-2 text-xs font-black transition sm:text-[13px] ${
                     activeStatus === tab.id
-                      ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_24px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
+                      ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
                       : 'text-[color:var(--app-text-soft)] hover:bg-white/70 hover:text-[color:var(--app-text)] dark:hover:bg-slate-900'
                   }`}
                 >
@@ -486,10 +548,50 @@ export default function MyListingsPage() {
             </div>
           )}
 
-          {isFavoritesMode ? (
+          {collectionMode === 'history' ? (
+            <EmptyState
+              className="mt-3 px-3 py-6 sm:py-7"
+              title={
+                query
+                  ? locale === 'id'
+                    ? 'Tidak ketemu'
+                    : 'No match'
+                  : locale === 'id'
+                    ? 'Riwayat masih kosong'
+                    : 'No viewed history yet'
+              }
+              description={
+                query
+                  ? locale === 'id'
+                    ? 'Coba kata lain atau reset pencarian.'
+                    : 'Try another keyword or reset search.'
+                  : locale === 'id'
+                    ? 'Setelah kamu membuka listing dari Search atau Home, riwayatnya akan muncul di sini.'
+                    : 'After you open listings from Search or Home, your viewed history will show here.'
+              }
+              action={
+                query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
+                  >
+                    {locale === 'id' ? 'Reset cari' : 'Reset search'}
+                  </button>
+                ) : (
+                  <Link
+                    href="/search"
+                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                  >
+                    {locale === 'id' ? 'Cari listing' : 'Search listings'}
+                  </Link>
+                )
+              }
+            />
+          ) : collectionMode === 'favorites' ? (
             filteredReferences.length === 0 ? (
               <EmptyState
-                className="mt-6"
+                className="mt-3 px-3 py-6 sm:py-7"
                 title={
                   query
                     ? locale === 'id'
@@ -513,14 +615,14 @@ export default function MyListingsPage() {
                     <button
                       type="button"
                       onClick={() => setQuery('')}
-                      className="inline-flex min-h-[44px] items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-4 text-sm font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
+                      className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
                     >
                       {locale === 'id' ? 'Reset cari' : 'Reset search'}
                     </button>
                   ) : (
                     <Link
                       href="/search"
-                      className="inline-flex min-h-[44px] items-center rounded-xl bg-[color:var(--app-accent-strong)] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                      className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                     >
                       {locale === 'id' ? 'Cari listing' : 'Search listings'}
                     </Link>
@@ -611,7 +713,7 @@ export default function MyListingsPage() {
             <MyListingsListSkeleton count={3} />
           ) : filteredItems.length === 0 ? (
             <EmptyState
-              className="mt-6"
+              className="mt-3 px-3 py-6 sm:py-7"
               title={
                 query
                   ? locale === 'id'
@@ -643,14 +745,14 @@ export default function MyListingsPage() {
                   <button
                     type="button"
                     onClick={() => setQuery('')}
-                    className="inline-flex min-h-[44px] items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-4 text-sm font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
+                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
                   >
                     {locale === 'id' ? 'Reset cari' : 'Reset search'}
                   </button>
                 ) : (
                   <Link
                     href={createHref}
-                    className="inline-flex min-h-[44px] items-center rounded-xl bg-[color:var(--app-accent-strong)] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                   >
                     {createLabel}
                   </Link>
@@ -766,6 +868,6 @@ export default function MyListingsPage() {
           )}
         </div>
       </div>
-    </div>
+    </CreateMarketplaceShell>
   );
 }

@@ -1,6 +1,10 @@
-import { redirect } from 'next/navigation';
-import { buildUsahaPortalHref } from '@/lib/umkmSurface';
+import { UsahaOwnerRouteView } from '../_components/UsahaOwnerRouteView';
 
-export default async function UsahaOperationsPage() {
-  redirect(buildUsahaPortalHref('operations'));
+type PageProps = {
+  params: Promise<{ locale: string }>;
+};
+
+export default async function UsahaOperationsPage({ params }: PageProps) {
+  const { locale } = await params;
+  return <UsahaOwnerRouteView locale={locale} workspace="operations" />;
 }

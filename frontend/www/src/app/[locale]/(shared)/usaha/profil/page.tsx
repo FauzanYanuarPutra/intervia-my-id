@@ -1,7 +1,5 @@
-import { redirect } from 'next/navigation';
+import { UsahaOwnerRouteView } from '../_components/UsahaOwnerRouteView';
 import {
-  buildUsahaPortalHref,
-  readSurfaceSearchParam,
   readSurfaceStoreId,
   type SurfaceSearchParams,
 } from '@/lib/umkmSurface';
@@ -12,16 +10,18 @@ type PageProps = {
 };
 
 export default async function UsahaProfilePage({
+  params,
   searchParams,
 }: PageProps) {
   const resolvedSearchParams = await searchParams;
   const storeId = readSurfaceStoreId(resolvedSearchParams);
-  const useAssistantRoute =
-    readSurfaceSearchParam(resolvedSearchParams, 'assistant') === '1';
+  const { locale } = await params;
 
-  if (useAssistantRoute) {
-    redirect(buildUsahaPortalHref('assistant', { storeId }));
-  }
-
-  redirect(buildUsahaPortalHref('profile', { storeId }));
+  return (
+    <UsahaOwnerRouteView
+      locale={locale}
+      workspace="setup"
+      setupView={storeId ? 'detail' : 'list'}
+    />
+  );
 }

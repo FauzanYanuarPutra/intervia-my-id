@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import type { AuthSecurityResult } from '@/lib/authSecurity';
-import { errorResponse } from '@/lib/api/errorResponse';
+import { requireAuth } from '@/lib/serverAuth';
 
 export type ProtectedRouteContext = {
   token: string;
+  userId: string;
+  roles: string[];
   security: Extract<AuthSecurityResult, { ok: true }>;
 };
 
@@ -21,18 +23,15 @@ export async function withProtectedRoute(
   const security = await enforceAuthRouteSecurity(req, options);
   if (!security.ok) return security.response;
 
-  const bearerToken = req.headers.get('authorization')?.replace('Bearer ', '').trim();
-  const cookieToken = req.cookies.get('access_token')?.value?.trim();
-  const preferCookie = process.env.NODE_ENV === 'production';
-  const token = preferCookie
-    ? cookieToken || bearerToken
-    : bearerToken || cookieToken;
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.res;
 
-  if (!token) {
-    return errorResponse(401, 'Unauthorized');
-  }
-
-  return handler({ token, security });
+  return handler({
+    token: auth.ctx.token,
+    userId: auth.ctx.userId,
+    roles: auth.ctx.roles,
+    security,
+  });
 }
 
 export function buildForwardAuthHeaders(

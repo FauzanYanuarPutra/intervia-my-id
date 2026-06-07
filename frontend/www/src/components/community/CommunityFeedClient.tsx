@@ -1,18 +1,19 @@
 'use client';
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   useEffect,
   useMemo,
   useState,
+  type DragEvent,
   type FormEvent,
   type ReactNode,
 } from 'react';
 import {
   BarChart3,
   ChevronRight,
-  Clapperboard,
   Crown,
   Earth,
   ImageIcon,
@@ -29,13 +30,13 @@ import {
   ThumbsUp,
   UserCog,
   Users,
-  Video,
+  Upload,
   X,
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
-import { Header } from '@/components/layout/Header';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 import type {
   CommunityFeedItem,
@@ -55,7 +56,7 @@ type CommunityFeedClientProps = {
   isId: boolean;
 };
 
-type ComposeMode = 'post' | 'photo' | 'reel' | 'poll' | 'feeling';
+type ComposeMode = 'post' | 'photo' | 'poll' | 'feeling';
 
 type ForumThreadDetail = {
   id: string;
@@ -121,16 +122,35 @@ type CreatedThreadPayload = {
 };
 
 const COMMUNITY_MODAL_SHELL_CLASS =
-  'ui-layer-modal z-[10000px] fixed inset-0 flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4';
+  'ui-layer-modal fixed inset-0 z-[10000] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4';
 
 const COMMUNITY_MODAL_SURFACE_CLASS =
   'flex h-full w-full flex-col overflow-hidden shadow-[0_30px_80px_-40px_rgba(15,23,42,0.42)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-[24px]';
 
-const TABS: Array<{ id: CommunityFeedTab; labelId: string; labelEn: string }> =
-  [
-    { id: 'for-you', labelId: 'Untukmu', labelEn: 'For you' },
-    { id: 'community', labelId: 'Komunitas', labelEn: 'Communities' },
-    { id: 'reels', labelId: 'Reels', labelEn: 'Reels' },
+const TABS: Array<{
+  id: CommunityFeedTab;
+  labelId: string;
+  labelEn: string;
+  captionId: string;
+  captionEn: string;
+  icon: typeof Users;
+}> = [
+    {
+      id: 'for-you',
+      labelId: 'Diskusi',
+      labelEn: 'Discussions',
+      captionId: 'Pertanyaan, jawaban, dan update usaha',
+      captionEn: 'Business questions, answers, and updates',
+      icon: MessageCircle,
+    },
+    {
+      id: 'community',
+      labelId: 'Grup',
+      labelEn: 'Groups',
+      captionId: 'Ruang diskusi per topik',
+      captionEn: 'Topic-based discussion rooms',
+      icon: Users,
+    },
   ];
 
 const SEARCH_TABS: Array<{
@@ -139,27 +159,17 @@ const SEARCH_TABS: Array<{
   labelEn: string;
   icon: typeof Search;
 }> = [
-  { id: 'all', labelId: 'Semua', labelEn: 'All', icon: Search },
-  { id: 'posts', labelId: 'Postingan', labelEn: 'Posts', icon: MessageCircle },
-  { id: 'people', labelId: 'Orang', labelEn: 'People', icon: UserCog },
-  { id: 'reels', labelId: 'Reels', labelEn: 'Reels', icon: PlayCircle },
-  { id: 'groups', labelId: 'Grup', labelEn: 'Groups', icon: Users },
-];
-
-const COMMUNITY_MEDIA_FALLBACKS: Record<string, string> = {
-  '/images/company/company-1.svg':
-    'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80',
-  '/images/company/company-2.svg':
-    'https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80',
-  '/images/company/company-3.svg':
-    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80',
-};
+    { id: 'all', labelId: 'Semua', labelEn: 'All', icon: Search },
+    { id: 'posts', labelId: 'Postingan', labelEn: 'Posts', icon: MessageCircle },
+    { id: 'people', labelId: 'Orang', labelEn: 'People', icon: UserCog },
+    { id: 'groups', labelId: 'Grup', labelEn: 'Groups', icon: Users },
+  ];
 
 function resolveCommunityMediaSrc(value?: string | null): string {
   const clean = String(value || '').trim();
-  if (!clean)
-    return 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80';
-  return COMMUNITY_MEDIA_FALLBACKS[clean] || clean;
+  if (!clean) return '';
+  if (clean.startsWith('/images/company/')) return '';
+  return clean;
 }
 
 function readCommunitySearchKind(value: string | null): CommunitySearchKind {
@@ -168,7 +178,7 @@ function readCommunitySearchKind(value: string | null): CommunitySearchKind {
     return 'posts';
   if (next === 'people' || next === 'users' || next === 'orang')
     return 'people';
-  if (next === 'reels' || next === 'video') return 'reels';
+  if (next === 'reels' || next === 'reel' || next === 'video') return 'posts';
   if (
     next === 'marketplace' ||
     next === 'market' ||
@@ -182,10 +192,8 @@ function readCommunitySearchKind(value: string | null): CommunitySearchKind {
 
 function readCommunityFeedTab(value: string | null): CommunityFeedTab {
   const next = (value || '').toLowerCase();
-  if (next === 'following' || next === 'mengikuti') return 'following';
   if (next === 'community' || next === 'communities' || next === 'komunitas')
     return 'community';
-  if (next === 'reels' || next === 'video') return 'reels';
   return 'for-you';
 }
 
@@ -203,6 +211,42 @@ function compactNumber(value: number | undefined) {
   if (safe >= 1_000)
     return `${(safe / 1_000).toFixed(safe >= 10_000 ? 0 : 1)}K`;
   return safe.toString();
+}
+
+function communityDiscussionItems(items?: CommunityFeedItem[]) {
+  return (items || []).filter(item => item.kind !== 'reel');
+}
+
+function sanitizeCommunitySearchResults(
+  payload: Partial<CommunitySearchResponse>,
+): CommunitySearchResponse {
+  const posts = communityDiscussionItems(payload.posts);
+  const people = Array.isArray(payload.people) ? payload.people : [];
+  const groups = Array.isArray(payload.groups) ? payload.groups : [];
+  const counts = payload.counts;
+  const reelCount = Math.max(Number(counts?.reels || 0), 0);
+  const marketplaceCount = Math.max(Number(counts?.marketplace || 0), 0);
+  const allCount =
+    counts?.all != null
+      ? Math.max(Number(counts.all) - reelCount, 0)
+      : posts.length + people.length + groups.length + marketplaceCount;
+
+  return {
+    query: String(payload.query || ''),
+    kind: readCommunitySearchKind(String(payload.kind || 'all')),
+    posts,
+    groups,
+    people,
+    reels: [],
+    counts: {
+      all: allCount,
+      posts: Math.max(Number(counts?.posts ?? posts.length), 0),
+      people: Math.max(Number(counts?.people ?? people.length), 0),
+      reels: 0,
+      marketplace: marketplaceCount,
+      groups: Math.max(Number(counts?.groups ?? groups.length), 0),
+    },
+  };
 }
 
 function isVideoMedia(src: string) {
@@ -261,6 +305,34 @@ function groupPostLabel(group: CommunityGroup, isId: boolean) {
   return isId ? 'Semua orang' : 'Everyone';
 }
 
+function composeErrorMessage(error: unknown, isId: boolean) {
+  const message = String(error || '').trim();
+  if (!message) {
+    return isId
+      ? 'Coba cek isi postingan lalu kirim lagi.'
+      : 'Review the post and try again.';
+  }
+  if (/ensure forum user/i.test(message)) {
+    return isId
+      ? 'Akun komunitas kamu sedang disiapkan. Coba kirim ulang sebentar lagi.'
+      : 'Your community account is being prepared. Please try again shortly.';
+  }
+  if (/join this group before posting/i.test(message)) {
+    return isId
+      ? 'Join grup ini dulu sebelum posting di dalamnya.'
+      : 'Join this group before posting there.';
+  }
+  if (/forbidden|unauthorized/i.test(message)) {
+    return isId
+      ? 'Kamu belum punya akses untuk aksi ini.'
+      : 'You do not have access to do this yet.';
+  }
+  if (/title and content are required|invalid category/i.test(message)) {
+    return isId ? 'Tulis isi postingan dulu.' : 'Write the post content first.';
+  }
+  return message;
+}
+
 function communityGroupHref(
   groupOrSlug: Pick<CommunityGroup, 'slug'> | string,
 ) {
@@ -274,11 +346,8 @@ function buildLoginHref(pathname: string | null, search: string) {
 }
 
 export function readCommunityAvatar(user: ReturnType<typeof useAuth>['user']) {
-  return (
-    user?.avatarUrl ||
-    user?.avatar_url ||
-    user?.metadata?.avatar_url ||
-    '/default-avatar.svg'
+  return profileAvatarSrc(
+    user?.avatarUrl || user?.avatar_url || user?.metadata?.avatar_url,
   );
 }
 
@@ -316,10 +385,10 @@ function createdThreadToFeedItem(
     tags: thread.tags || [],
     media: mediaSrc
       ? {
-          type: isVideoMedia(mediaSrc) ? 'video' : 'image',
-          src: mediaSrc,
-          alt: thread.title,
-        }
+        type: isVideoMedia(mediaSrc) ? 'video' : 'image',
+        src: mediaSrc,
+        alt: thread.title,
+      }
       : null,
     stats: {
       reactions: Math.max(thread.voteScore || thread.likeCount || 0, 0),
@@ -426,13 +495,12 @@ export function CommunityComposer({
   const [mode, setMode] = useState<ComposeMode>('post');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [category, setCategory] = useState('');
-  const [group, setGroup] = useState('');
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [feeling, setFeeling] = useState(isId ? 'Optimis' : 'Optimistic');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draggingMedia, setDraggingMedia] = useState(false);
   const loginHref = buildLoginHref(pathname, searchParams.toString());
   const fallbackAuthor: CommunityFeedItem['author'] = {
     id: user?.id || user?.sub || 'viewer',
@@ -450,8 +518,11 @@ export function CommunityComposer({
   useEffect(() => {
     const requestedMode = searchParams.get('compose');
     if (!requestedMode) return;
-    if (!['post', 'photo', 'reel', 'poll', 'feeling'].includes(requestedMode))
+    if (requestedMode === 'reel' || requestedMode === 'video') {
+      router.replace('/reels?upload=1');
       return;
+    }
+    if (!['post', 'photo', 'poll', 'feeling'].includes(requestedMode)) return;
     let alive = true;
     queueMicrotask(() => {
       if (!alive) return;
@@ -461,7 +532,7 @@ export function CommunityComposer({
     return () => {
       alive = false;
     };
-  }, [searchParams]);
+  }, [router, searchParams]);
 
   const openComposer = (nextMode: ComposeMode) => {
     setMode(nextMode);
@@ -481,13 +552,17 @@ export function CommunityComposer({
     );
     router.replace(queryString ? `${currentPath}?${queryString}` : currentPath);
   };
-  const selectedGroupId =
-    lockedGroup?.id || group || overview?.groups?.[0]?.id || '';
+  const defaultFeedCategory =
+    overview?.categories?.find(item => item.slug === 'fyp') ||
+    overview?.categories?.find(
+      item =>
+        !(overview?.groups || []).some(group => group.categoryId === item.id),
+    ) ||
+    overview?.categories?.[0] ||
+    null;
+  const selectedGroupId = lockedGroup?.id || '';
   const selectedCategorySlug =
-    lockedGroup?.categoryId ||
-    category ||
-    overview?.categories?.[0]?.slug ||
-    '';
+    lockedGroup?.categoryId || defaultFeedCategory?.slug || 'fyp';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -513,26 +588,37 @@ export function CommunityComposer({
       (isId ? 'Diskusi komunitas baru' : 'New community discussion');
 
     if (!cleanBody) return;
+    if (lockedGroup && !lockedGroup.viewerCanPost) {
+      notify({
+        title: isId ? 'Belum bisa posting' : 'Cannot post yet',
+        description:
+          lockedGroup.viewerMembershipStatus === 'pending'
+            ? isId
+              ? 'Permintaan join kamu masih menunggu approval.'
+              : 'Your join request is still waiting for approval.'
+            : isId
+              ? 'Join grup ini dulu sebelum posting.'
+              : 'Join this group before posting.',
+        variant: 'error',
+      });
+      return;
+    }
 
     setSaving(true);
     const selectedTags = [
       mode === 'poll'
         ? overview?.trendingTags?.find(tag =>
-            /poll|survey|event|support/i.test(`${tag.slug} ${tag.name}`),
-          )?.slug || 'polling'
+          /poll|survey|event|support/i.test(`${tag.slug} ${tag.name}`),
+        )?.slug || 'polling'
         : mode === 'feeling'
           ? overview?.trendingTags?.find(tag =>
-              /growth|support|community/i.test(`${tag.slug} ${tag.name}`),
-            )?.slug || 'perasaan'
-          : mode === 'reel'
+            /growth|support|community/i.test(`${tag.slug} ${tag.name}`),
+          )?.slug || 'perasaan'
+          : mode === 'photo'
             ? overview?.trendingTags?.find(tag =>
-                /growth|video|reels/i.test(`${tag.slug} ${tag.name}`),
-              )?.slug
-            : mode === 'photo'
-              ? overview?.trendingTags?.find(tag =>
-                  /market|produk|supply/i.test(`${tag.slug} ${tag.name}`),
-                )?.slug
-              : overview?.trendingTags?.[0]?.slug,
+              /market|produk|supply/i.test(`${tag.slug} ${tag.name}`),
+            )?.slug
+            : overview?.trendingTags?.[0]?.slug,
     ].filter((item): item is string => Boolean(item));
 
     const response = await authFetch('/api/forum/threads', {
@@ -553,29 +639,10 @@ export function CommunityComposer({
     if (!response.ok) {
       notify({
         title: isId ? 'Posting gagal' : 'Post failed',
-        description: payload.error || '',
+        description: composeErrorMessage(payload.error, isId),
         variant: 'error',
       });
       return;
-    }
-
-    if (mode === 'reel' && mediaUrls.length > 0) {
-      const mediaUrl = mediaUrls.find(isVideoMedia) || mediaUrls[0];
-      await authFetch('/api/reels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: cleanTitle,
-          caption: cleanBody,
-          tag: 'Community',
-          mediaUrl,
-          videoSrc: mediaUrl,
-          sourceUrl: mediaUrl,
-          hook: isId
-            ? 'Reels dari komunitas usaha.'
-            : 'Reel from the business community.',
-        }),
-      }).catch(() => undefined);
     }
 
     notify({
@@ -628,20 +695,40 @@ export function CommunityComposer({
     setMediaUrls(current => [...current, ...payload.urls].slice(0, 6));
   };
 
+  const handleMediaDrop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setDraggingMedia(false);
+    void handleMediaUpload(event.dataTransfer.files);
+  };
+
   const actions = [
+    {
+      id: 'post' as const,
+      href: '#composer',
+      label: isId ? 'Posting' : 'Post',
+      icon: MessageCircle,
+      tone: 'text-sky-700 bg-sky-50',
+    },
     {
       id: 'photo' as const,
       href: '#composer',
-      label: isId ? 'Foto/Video' : 'Photo/Video',
+      label: isId ? 'Foto' : 'Photo',
       icon: ImageIcon,
       tone: 'text-emerald-700 bg-emerald-50',
     },
     {
-      id: 'reel' as const,
-      href: '/reels',
-      label: 'Reels',
-      icon: Clapperboard,
-      tone: 'text-rose-700 bg-rose-50',
+      id: 'poll' as const,
+      href: '#composer',
+      label: isId ? 'Polling' : 'Poll',
+      icon: BarChart3,
+      tone: 'text-amber-700 bg-amber-50',
+    },
+    {
+      id: 'feeling' as const,
+      href: '#composer',
+      label: isId ? 'Perasaan' : 'Feeling',
+      icon: Sparkles,
+      tone: 'text-teal-700 bg-teal-50',
     },
   ];
 
@@ -651,7 +738,7 @@ export function CommunityComposer({
       className="rounded-[22px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)] sm:p-3.5"
     >
       <div className="flex items-center gap-2.5">
-        <img
+        <Image
           alt="Profile"
           width={36}
           height={36}
@@ -663,7 +750,9 @@ export function CommunityComposer({
           onClick={() => openComposer('post')}
           className="flex min-h-11 flex-1 items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-xs font-semibold text-[color:var(--app-text-soft)]"
         >
-          {isId ? 'Tulis sesuatu...' : 'Write something...'}
+          {isId
+            ? 'Tanya atau bagikan update usaha...'
+            : 'Ask or share a business update...'}
         </button>
       </div>
 
@@ -715,8 +804,85 @@ export function CommunityComposer({
                 <X className="h-5 w-5" />
               </button>
             </header>
-            <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3">
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+              <label
+                onDragOver={event => {
+                  event.preventDefault();
+                  setDraggingMedia(true);
+                }}
+                onDragLeave={() => setDraggingMedia(false)}
+                onDrop={handleMediaDrop}
+                className={cn(
+                  'group relative block cursor-pointer overflow-hidden rounded-[20px] border-2 border-dashed p-4 text-center transition',
+                  draggingMedia
+                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)]'
+                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] hover:border-[color:var(--app-accent-border)] hover:bg-white',
+                )}
+              >
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="sr-only"
+                  onChange={event => {
+                    void handleMediaUpload(event.target.files);
+                    event.currentTarget.value = '';
+                  }}
+                />
+                <span className="mx-auto grid h-12 w-12 place-items-center rounded-[16px] bg-white text-[color:var(--app-accent)] shadow-sm ring-1 ring-[color:var(--app-border)]">
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Upload className="h-5 w-5" />
+                  )}
+                </span>
+                <span className="mt-3 block text-sm font-black text-[color:var(--app-text)]">
+                  {isId
+                    ? 'Tarik foto ke sini atau pilih file'
+                    : 'Drop photos here or choose files'}
+                </span>
+                <span className="mt-1 block text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                  {isId
+                    ? 'Foto ada di atas dulu, baru isi judul dan cerita di bawah.'
+                    : 'Add photos first, then fill in the discussion below.'}
+                </span>
+                {mediaUrls.length > 0 ? (
+                  <span className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {mediaUrls.map(url => (
+                      <span
+                        key={url}
+                        className="relative aspect-square overflow-hidden rounded-[14px] bg-white ring-1 ring-[color:var(--app-border)]"
+                      >
+                        <CommunityImageFrame
+                          src={url}
+                          alt="Media"
+                          className="h-full w-full"
+                        />
+                        <button
+                          type="button"
+                          onClick={event => {
+                            event.preventDefault();
+                            setMediaUrls(current =>
+                              current.filter(item => item !== url),
+                            );
+                          }}
+                          className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/62 text-white backdrop-blur"
+                          aria-label={isId ? 'Hapus media' : 'Remove media'}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </label>
+
+              <div
+                className={cn(
+                  'grid gap-2',
+                  lockedGroup && 'sm:grid-cols-[minmax(0,1fr)_190px]',
+                )}
+              >
                 <input
                   value={title}
                   onChange={event => setTitle(event.target.value)}
@@ -729,25 +895,7 @@ export function CommunityComposer({
                   <div className="flex min-h-11 items-center rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)]">
                     <span className="truncate">{lockedGroup.name}</span>
                   </div>
-                ) : (
-                  <select
-                    value={selectedGroupId}
-                    onChange={event => {
-                      const nextGroup = (overview?.groups || []).find(
-                        item => item.id === event.target.value,
-                      );
-                      setGroup(event.target.value);
-                      if (nextGroup) setCategory(nextGroup.slug);
-                    }}
-                    className="min-h-11 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent-border)]"
-                  >
-                    {(overview?.groups || []).map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                ) : null}
               </div>
               {mode === 'feeling' ? (
                 <select
@@ -778,13 +926,9 @@ export function CommunityComposer({
                     ? isId
                       ? 'Tulis pertanyaan polling dan opsi singkatnya...'
                       : 'Write your poll question and options...'
-                    : mode === 'reel'
-                      ? isId
-                        ? 'Tulis caption reels dan upload video pendek...'
-                        : 'Write a reel caption and upload a short video...'
-                      : isId
-                        ? 'Tulis pertanyaan, info, atau peluang singkat...'
-                        : 'Write a short question, update, or opportunity...'
+                    : isId
+                      ? 'Tulis pertanyaan, info, atau peluang singkat...'
+                      : 'Write a short question, update, or opportunity...'
                 }
                 className="w-full resize-none rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-sm leading-6 text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent-border)]"
               />
@@ -823,49 +967,6 @@ export function CommunityComposer({
                   </button>
                 </div>
               ) : null}
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white px-3 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  {uploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Video className="h-4 w-4" />
-                  )}
-                  {isId ? 'Tambah foto/video' : 'Add photo/video'}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,video/x-m4v"
-                    multiple
-                    className="sr-only"
-                    onChange={event =>
-                      void handleMediaUpload(event.target.files)
-                    }
-                  />
-                </label>
-                {mediaUrls.map(url => (
-                  <span
-                    key={url}
-                    className="inline-flex max-w-[180px] items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]"
-                  >
-                    {isVideoMedia(url) ? (
-                      <Video className="h-3.5 w-3.5 shrink-0" />
-                    ) : (
-                      <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-                    )}
-                    <span className="truncate">{url.split('/').pop()}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMediaUrls(current =>
-                          current.filter(item => item !== url),
-                        )
-                      }
-                      aria-label={isId ? 'Hapus media' : 'Remove media'}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -958,22 +1059,22 @@ export function CommunityPostCard({
       <div className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <img
+            <Image
               alt={item.author.name}
               width={44}
               height={44}
               className="h-10 w-10 rounded-full object-cover"
-              src={item.author.avatarUrl}
+              src={profileAvatarSrc(item.author.avatarUrl)}
             />
             <div className="min-w-0">
               <button
                 type="button"
                 onClick={openDetail}
-                className="block truncate text-left text-[0.95rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]"
+                className="block truncate text-left text-[0.95rem] font-bold leading-[1.08] tracking-[-0.02em] text-[color:var(--app-text)]"
               >
                 {item.group?.name || item.communityName}
               </button>
-              <p className="mt-0.5 flex items-center gap-1 text-xs text-[color:var(--app-text-soft)]">
+              <p className="mt-[2px] flex items-center gap-1 text-xs leading-none text-[color:var(--app-text-soft)]">
                 {item.author.name} · {timeAgo(item.createdAt, isId)}
                 <Earth className="h-3.5 w-3.5" />
               </p>
@@ -995,32 +1096,34 @@ export function CommunityPostCard({
       </div>
 
       {item.media ? (
-        <div className="relative bg-slate-950">
-          {item.media.type === 'video' ? (
-            <div className="relative">
-              <video
-                src={item.media.src}
-                className="h-[360px] w-full bg-black object-cover sm:h-[430px]"
-                controls
-                muted
-                playsInline
-                preload="metadata"
-              />
+        <MediaPreviewCarousel
+          items={[
+            {
+              src:
+                item.media.type === 'video'
+                  ? resolveCommunityMediaSrc(item.media.src)
+                  : item.media.src,
+              type: item.media.type,
+              alt: item.media.alt,
+            },
+          ]}
+          alt={item.media.alt || item.title}
+          aspectClassName="aspect-[4/3] w-full sm:aspect-[16/9]"
+          className="bg-slate-950"
+          sizes="(max-width: 640px) 100vw, 720px"
+          controls={item.media.type === 'video'}
+          lightbox
+          showCounter={false}
+          showDots={false}
+          overlay={
+            item.media.type === 'video' ? (
               <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/58 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-md">
                 <PlayCircle className="h-3.5 w-3.5" />
-                Reels
+                Video
               </span>
-            </div>
-          ) : (
-            <div className="relative h-[190px] sm:h-[240px]">
-              <CommunityImageFrame
-                src={item.media.src}
-                alt={item.media.alt}
-                className="h-full w-full"
-              />
-            </div>
-          )}
-        </div>
+            ) : null
+          }
+        />
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-4 py-2.5 text-xs text-[color:var(--app-text-soft)]">
@@ -1235,9 +1338,11 @@ export function CommunityDetailModal({
       )}
     >
       <div className="flex items-center gap-2.5">
-        <img
+        <Image
           alt={post.author?.name || 'Author'}
-          src={post.author?.avatarUrl || '/default-avatar.svg'}
+          src={profileAvatarSrc(post.author?.avatarUrl)}
+          width={32}
+          height={32}
           className="h-8 w-8 rounded-full object-cover"
         />
         <div className="min-w-0">
@@ -1312,9 +1417,11 @@ export function CommunityDetailModal({
             <div className="space-y-4">
               <article>
                 <div className="flex items-center gap-3">
-                  <img
+                  <Image
                     alt={thread.author?.name || 'Author'}
-                    src={thread.author?.avatarUrl || '/default-avatar.svg'}
+                    src={profileAvatarSrc(thread.author?.avatarUrl)}
+                    width={44}
+                    height={44}
                     className="h-11 w-11 rounded-full object-cover"
                   />
                   <div className="min-w-0">
@@ -1375,7 +1482,7 @@ export function CommunityDetailModal({
                     className={cn(
                       'inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[12px] hover:bg-slate-50',
                       thread.viewerVote === 1 &&
-                        'text-[color:var(--app-accent)]',
+                      'text-[color:var(--app-accent)]',
                     )}
                   >
                     <ThumbsUp className="h-4 w-4" />
@@ -1821,9 +1928,11 @@ function GroupLeadershipPreview({
               key={member.userId}
               className="flex min-w-0 items-center gap-2 rounded-[14px] bg-white p-2"
             >
-              <img
+              <Image
                 alt={member.name}
-                src={member.avatarUrl || '/default-avatar.svg'}
+                src={profileAvatarSrc(member.avatarUrl)}
+                width={32}
+                height={32}
                 className="h-8 w-8 rounded-full object-cover"
               />
               <div className="min-w-0 flex-1">
@@ -1923,12 +2032,12 @@ export function GroupMembersModal({
     value: CommunityGroupMember['role'];
     label: string;
   }> = [
-    ...(canPromoteAdmin
-      ? [{ value: 'owner' as const, label: isId ? 'Admin' : 'Admin' }]
-      : []),
-    { value: 'moderator', label: isId ? 'Moderator' : 'Moderator' },
-    { value: 'member', label: isId ? 'Member' : 'Member' },
-  ];
+      ...(canPromoteAdmin
+        ? [{ value: 'owner' as const, label: isId ? 'Admin' : 'Admin' }]
+        : []),
+      { value: 'moderator', label: isId ? 'Moderator' : 'Moderator' },
+      { value: 'member', label: isId ? 'Member' : 'Member' },
+    ];
 
   const updateRole = async (
     member: CommunityGroupMember,
@@ -2069,9 +2178,11 @@ export function GroupMembersModal({
                 key={member.userId}
                 className="flex items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3"
               >
-                <img
+                <Image
                   alt={member.name}
-                  src={member.avatarUrl || '/default-avatar.svg'}
+                  src={profileAvatarSrc(member.avatarUrl)}
+                  width={44}
+                  height={44}
                   className="h-11 w-11 rounded-full object-cover"
                 />
                 <div className="min-w-0 flex-1">
@@ -2307,80 +2418,120 @@ function GroupCard({
   return (
     <article
       className={cn(
-        'rounded-[20px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_16px_28px_-28px_rgba(15,23,42,0.2)]',
-        compact && 'w-[235px] min-w-[235px] max-w-[235px] shrink-0',
+        'group relative flex h-full flex-col overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white text-center shadow-[0_18px_34px_-32px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_40px_-34px_rgba(15,23,42,0.28)]',
+        compact && 'min-w-0',
       )}
     >
-      <div className="flex items-start gap-2.5">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-          <Users className="h-5 w-5" />
+      <div className="relative h-20 overflow-hidden bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_52%,#fff7ed_100%)]">
+        {group.coverUrl ? (
+          <Image
+            src={group.coverUrl}
+            alt={group.name}
+            fill
+            className="object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(16,185,129,0.28),transparent_32%),radial-gradient(circle_at_84%_12%,rgba(59,130,246,0.22),transparent_26%)]" />
+        )}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(15,23,42,0.22))]" />
+        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black text-[color:var(--app-accent)] shadow-sm">
+          {group.privacy === 'public' ? (
+            <Earth className="h-3 w-3" />
+          ) : (
+            <Lock className="h-3 w-3" />
+          )}
+          {groupPrivacyLabel(group, isId)}
         </div>
-        <div className="min-w-0 flex-1">
+      </div>
+
+      <div className="relative flex flex-1 flex-col px-3 pb-3 pt-0">
+        <Link
+          href={communityGroupHref(group)}
+          className="mx-auto -mt-8 grid h-16 w-16 place-items-center rounded-[22px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[0_18px_28px_-24px_rgba(15,23,42,0.4)] transition group-hover:scale-[1.03]"
+          aria-label={group.name}
+        >
+          <Users className="h-7 w-7" />
+        </Link>
+
+        <div className="mx-auto mt-2 max-w-[240px]">
           <Link
             href={communityGroupHref(group)}
-            className="block truncate text-sm font-black text-[color:var(--app-text)]"
+            className="line-clamp-2 min-h-[40px] text-[0.95rem] font-black leading-5 tracking-[-0.02em] text-[color:var(--app-text)]"
           >
             {group.name}
           </Link>
-          <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+          <p className="mx-auto mt-1 line-clamp-2 min-h-[32px] text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
             {group.description}
           </p>
         </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onOpenMembers(group)}
+            className="rounded-[15px] bg-slate-50 px-2 py-2 text-center transition hover:bg-emerald-50"
+          >
+            <span className="block text-sm font-black text-[color:var(--app-text)]">
+              {compactNumber(group.memberCount)}
+            </span>
+            <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
+              {isId ? 'member' : 'members'}
+            </span>
+          </button>
+          <div className="rounded-[15px] bg-slate-50 px-2 py-2 text-center">
+            <span className="block text-sm font-black text-[color:var(--app-text)]">
+              {compactNumber(group.postCount)}
+            </span>
+            <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
+              posts
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-2 flex justify-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
+            <Crown className="h-3 w-3" />
+            Admin
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-700">
+            <UserCog className="h-3 w-3" />
+            Moderator
+          </span>
+        </div>
+
+        <div className="mt-auto pt-3">
+          <button
+            type="button"
+            onClick={joinOrLeave}
+            disabled={busy || pending}
+            className={cn(
+              'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[15px] px-2 text-center text-xs font-black leading-4 transition disabled:opacity-60',
+              joined
+                ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
+                : 'bg-[color:var(--app-accent)] text-white shadow-[0_14px_24px_-18px_rgba(4,120,87,0.7)] hover:bg-[color:var(--app-accent-strong)]',
+            )}
+          >
+            {busy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : joined ? (
+              <ShieldCheck className="h-4 w-4" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            {pending
+              ? isId
+                ? 'Menunggu approve'
+                : 'Pending approval'
+              : joined
+                ? isId
+                  ? 'Sudah join'
+                  : 'Joined'
+                : isId
+                  ? 'Join grup'
+                  : 'Join group'}
+          </button>
+        </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
-        <button
-          type="button"
-          onClick={() => onOpenMembers(group)}
-          className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)]"
-        >
-          {compactNumber(group.memberCount)} {isId ? 'member' : 'members'}
-        </button>
-        <span className="rounded-full bg-slate-50 px-2 py-1">
-          {compactNumber(group.postCount)} posts
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1">
-          <ShieldCheck className="h-3 w-3" />
-          {groupPrivacyLabel(group, isId)}
-        </span>
-      </div>
-      <div className="mt-2 flex items-center gap-1.5">
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
-          <Crown className="h-3 w-3" />
-          {isId ? 'Admin' : 'Admin'}
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-700">
-          <UserCog className="h-3 w-3" />
-          {isId ? 'Moderator' : 'Moderator'}
-        </span>
-      </div>
-      <button
-        type="button"
-        onClick={joinOrLeave}
-        disabled={busy || pending}
-        className={cn(
-          'mt-3 inline-flex min-h-[34px] w-full items-center justify-center gap-2 rounded-[13px] text-xs font-semibold disabled:opacity-60',
-          joined
-            ? 'border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]'
-            : 'bg-[color:var(--app-accent)] text-white',
-        )}
-      >
-        {busy ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Plus className="h-4 w-4" />
-        )}
-        {pending
-          ? isId
-            ? 'Menunggu approve'
-            : 'Pending approval'
-          : joined
-            ? isId
-              ? 'Sudah join'
-              : 'Joined'
-            : isId
-              ? 'Join grup'
-              : 'Join group'}
-      </button>
     </article>
   );
 }
@@ -2410,32 +2561,47 @@ function GroupStrip({
     .slice(0, 8);
 
   return (
-    <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-black text-[color:var(--app-text)]">
+    <section className="rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_100%)] p-3.5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] sm:p-4">
+      {/* Bagian Header Konten */}
+      <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
+            {isId ? 'Ruang diskusi' : 'Discussion rooms'}
+          </p>
+          <h2 className="mt-0.5 text-base font-black tracking-[-0.025em] text-[color:var(--app-text)] sm:text-lg">
             {isId ? 'Grup untuk kamu' : 'Groups for you'}
           </h2>
+          <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Pilih ruang yang paling nyambung dengan usaha kamu.'
+              : 'Pick a room that matches your work.'}
+          </p>
         </div>
         <button
           type="button"
           onClick={onCreateGroup}
-          className="inline-flex min-h-[34px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-semibold text-[color:var(--app-accent)]"
+          className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent)] hover:text-white"
         >
           <Plus className="h-4 w-4" />
           {isId ? 'Buat' : 'Create'}
         </button>
       </div>
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1" data-auto-scrollbar>
+
+      {/* BAGIAN SLIDER (UBAH DARI GRID KE FLEX CAROUSEL) */}
+      <div className="mt-3 flex w-full items-stretch gap-3 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
         {groups.map(group => (
-          <GroupCard
+          <div
             key={group.id}
-            group={group}
-            isId={isId}
-            compact
-            onChanged={onChanged}
-            onOpenMembers={onOpenMembers}
-          />
+            className="w-[260px] sm:w-[300px] shrink-0 flex snap-start"
+          >
+            <GroupCard
+              group={group}
+              isId={isId}
+              compact
+              onChanged={onChanged}
+              onOpenMembers={onOpenMembers}
+            />
+          </div>
         ))}
       </div>
     </section>
@@ -2573,9 +2739,10 @@ function SearchGroupResult({
       <div className="flex gap-3">
         <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[18px] bg-[color:var(--app-accent-soft)]">
           {group.coverUrl ? (
-            <img
+            <Image
               src={group.coverUrl}
               alt={group.name}
+              fill
               className="h-full w-full object-cover"
             />
           ) : (
@@ -2658,9 +2825,11 @@ function SearchPersonResult({
 }) {
   return (
     <article className="flex items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3">
-      <img
-        src={person.avatarUrl || '/default-avatar.svg'}
+      <Image
+        src={profileAvatarSrc(person.avatarUrl)}
         alt={person.name}
+        width={48}
+        height={48}
         className="h-12 w-12 rounded-full object-cover"
       />
       <div className="min-w-0 flex-1">
@@ -2681,7 +2850,9 @@ function SearchPersonResult({
   );
 }
 
-function SearchReelResult({
+// Kept only for older payload experiments; community UI no longer renders this card.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function LegacySearchVideoResult({
   item,
   isId,
 }: {
@@ -2694,19 +2865,26 @@ function SearchReelResult({
       className="flex gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 hover:border-[color:var(--app-accent-soft)]"
     >
       <div className="relative h-[104px] w-[78px] shrink-0 overflow-hidden rounded-[16px] bg-slate-950">
-        {item.media?.type === 'video' ? (
-          <video
-            src={resolveCommunityMediaSrc(item.media.src)}
-            muted
-            playsInline
-            preload="metadata"
-            className="h-full w-full object-cover"
-          />
-        ) : item.media ? (
-          <CommunityImageFrame
-            src={item.media.src}
-            alt={item.media.alt}
-            className="h-full w-full"
+        {item.media ? (
+          <MediaPreviewCarousel
+            items={[
+              {
+                src:
+                  item.media.type === 'video'
+                    ? resolveCommunityMediaSrc(item.media.src)
+                    : item.media.src,
+                type: item.media.type,
+                alt: item.media.alt,
+              },
+            ]}
+            alt={item.media.alt || item.title}
+            aspectClassName="h-full w-full"
+            className="h-full w-full bg-slate-950"
+            sizes="78px"
+            controls={false}
+            lightbox={false}
+            showCounter={false}
+            showDots={false}
           />
         ) : (
           <div className="grid h-full w-full place-items-center text-white">
@@ -2714,7 +2892,7 @@ function SearchReelResult({
           </div>
         )}
         <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-black text-white">
-          Reels
+          Video
         </span>
       </div>
       <div className="min-w-0 flex-1 py-1">
@@ -2796,7 +2974,6 @@ function CommunitySearchPanel({
 }) {
   const showGroups = kind === 'all' || kind === 'groups';
   const showPeople = kind === 'all' || kind === 'people';
-  const showReels = kind === 'all' || kind === 'reels';
   const showMarketplace = kind === 'marketplace';
   const showPosts = kind === 'all' || kind === 'posts';
   const hasAnyResult = Boolean(
@@ -2860,16 +3037,6 @@ function CommunitySearchPanel({
         </SearchSection>
       ) : null}
 
-      {!loading && results && showReels && results.reels.length ? (
-        <SearchSection title="Reels">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {results.reels.map(item => (
-              <SearchReelResult key={item.id} item={item} isId={isId} />
-            ))}
-          </div>
-        </SearchSection>
-      ) : null}
-
       {!loading && showMarketplace ? (
         <SearchMarketplaceResult query={query} isId={isId} />
       ) : null}
@@ -2889,20 +3056,6 @@ function CommunitySearchPanel({
         </SearchSection>
       ) : null}
     </div>
-  );
-}
-
-function CommunityDesktopTopBar() {
-  return (
-    <>
-      <div className="hidden lg:block">
-        <Header />
-      </div>
-      <div
-        aria-hidden="true"
-        className="hidden h-[4.625rem] shrink-0 lg:block"
-      />
-    </>
   );
 }
 
@@ -2946,31 +3099,43 @@ function LeftRail({
           <div className="mt-3 space-y-1">
             {searchMode
               ? SEARCH_TABS.map(tab => (
-                  <SearchFilterButton
-                    key={tab.id}
-                    tab={tab}
-                    isId={isId}
-                    active={searchKind === tab.id}
-                    count={searchCountFor(searchCounts, tab.id)}
-                    onClick={() => onSearchKindChange(tab.id)}
-                  />
-                ))
-              : TABS.map(tab => (
+                <SearchFilterButton
+                  key={tab.id}
+                  tab={tab}
+                  isId={isId}
+                  active={searchKind === tab.id}
+                  count={searchCountFor(searchCounts, tab.id)}
+                  onClick={() => onSearchKindChange(tab.id)}
+                />
+              ))
+              : TABS.map(tab => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.id;
+
+                return (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => onTabChange(tab.id)}
                     className={cn(
-                      'flex min-h-[42px] w-full items-center gap-2 rounded-[14px] px-3 text-left text-sm font-semibold',
-                      activeTab === tab.id
+                      'flex min-h-[52px] w-full items-center gap-2.5 rounded-[14px] px-3 text-left',
+                      active
                         ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                         : 'text-[color:var(--app-text-soft)] hover:bg-slate-50',
                     )}
                   >
-                    <Users className="h-4 w-4" />
-                    {isId ? tab.labelId : tab.labelEn}
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black">
+                        {isId ? tab.labelId : tab.labelEn}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] font-semibold opacity-75">
+                        {isId ? tab.captionId : tab.captionEn}
+                      </span>
+                    </span>
                   </button>
-                ))}
+                );
+              })}
           </div>
         </section>
 
@@ -3131,6 +3296,24 @@ export default function CommunityFeedClient({
       ) || null
     );
   }, [overview, selectedGroupParam]);
+  const activeFeedTab = TABS.find(tab => tab.id === activeTab) || TABS[0]!;
+  const emptyFeedTitle =
+    activeTab === 'community'
+      ? isId
+        ? 'Belum ada diskusi grup yang cocok.'
+        : 'No matching group discussions yet.'
+      : isId
+        ? 'Belum ada diskusi yang cocok.'
+        : 'No matching discussions yet.';
+  const emptyFeedDescription =
+    activeTab === 'community'
+      ? isId
+        ? 'Topik dari grup bisnis akan muncul di sini.'
+        : 'Business group threads will appear here.'
+      : isId
+        ? 'Pertanyaan dan update usaha akan muncul di sini.'
+        : 'Business questions and updates will appear here.';
+
   useEffect(() => {
     let alive = true;
     const nextQuery = searchParams.get('q') || '';
@@ -3187,7 +3370,7 @@ export default function CommunityFeedClient({
       .then(response => response.json())
       .then((payload: CommunityFeedResponse) => {
         if (!alive) return;
-        setItems(payload.items || []);
+        setItems(communityDiscussionItems(payload.items));
         setOverview(payload.overview || null);
         setNextCursor(payload.nextCursor);
         setHasMore(Boolean(payload.hasMore));
@@ -3223,7 +3406,7 @@ export default function CommunityFeedClient({
       .then(response => response.json())
       .then((payload: CommunitySearchResponse) => {
         if (!alive) return;
-        setSearchResults(payload);
+        setSearchResults(sanitizeCommunitySearchResults(payload));
       })
       .catch(() => {
         if (alive) setSearchResults(null);
@@ -3260,7 +3443,9 @@ export default function CommunityFeedClient({
       const existing = new Set(current.map(item => item.id));
       return [
         ...current,
-        ...(payload.items || []).filter(item => !existing.has(item.id)),
+        ...communityDiscussionItems(payload.items).filter(
+          item => !existing.has(item.id),
+        ),
       ];
     });
     setNextCursor(payload.nextCursor ?? null);
@@ -3326,13 +3511,13 @@ export default function CommunityFeedClient({
     setOverview(current =>
       current
         ? {
-            ...current,
-            stats: {
-              ...current.stats,
-              totalThreads: current.stats.totalThreads + 1,
-              totalPosts: current.stats.totalPosts + 1,
-            },
-          }
+          ...current,
+          stats: {
+            ...current.stats,
+            totalThreads: current.stats.totalThreads + 1,
+            totalPosts: current.stats.totalPosts + 1,
+          },
+        }
         : current,
     );
   };
@@ -3345,9 +3530,8 @@ export default function CommunityFeedClient({
   };
 
   return (
-    <main className="lajukan-home-compact min-h-screen bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] px-3 pb-6 pt-3 sm:px-4 lg:h-[100svh] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <main className="lajukan-home-compact min-h-screen bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell mx-auto flex h-full flex-col lg:overflow-hidden">
-        <CommunityDesktopTopBar />
         <div className="lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1700px] flex-1 gap-4 lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_320px] 2xl:grid-cols-[280px_minmax(0,1fr)_340px]">
           <LeftRail
             isId={isId}
@@ -3365,12 +3549,17 @@ export default function CommunityFeedClient({
             className="min-w-0 space-y-3 pt-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
             data-auto-scrollbar
           >
-            <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)] sm:p-4">
+            <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-1.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)] sm:p-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <h1 className="text-[1.08rem] font-black tracking-[-0.035em] text-[color:var(--app-text)] sm:text-[1.22rem]">
-                    {isId ? 'Dari Komunitas' : 'From the Community'}
+                    {isId ? 'Komunitas Usaha' : 'Business Community'}
                   </h1>
+                  {!isSearchMode ? (
+                    <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                      {isId ? activeFeedTab.captionId : activeFeedTab.captionEn}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -3383,7 +3572,9 @@ export default function CommunityFeedClient({
                   value={query}
                   onChange={event => setQuery(event.target.value)}
                   placeholder={
-                    isId ? 'Cari komunitas...' : 'Search community...'
+                    isId
+                      ? 'Cari diskusi atau grup...'
+                      : 'Search discussions or groups...'
                   }
                   className="min-w-0 flex-1 bg-transparent text-sm text-[color:var(--app-text)] outline-none"
                 />
@@ -3416,24 +3607,34 @@ export default function CommunityFeedClient({
                   className="mt-3 flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)] pb-1.5"
                   data-auto-scrollbar
                 >
-                  {TABS.map(tab => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setActiveTab(tab.id)}
-                      className={cn(
-                        'relative shrink-0 pb-1.5 text-xs font-semibold transition',
-                        activeTab === tab.id
-                          ? 'text-[color:var(--app-accent)]'
-                          : 'text-[color:var(--app-text-soft)]',
-                      )}
-                    >
-                      {isId ? tab.labelId : tab.labelEn}
-                      {activeTab === tab.id ? (
-                        <span className="absolute inset-x-0 -bottom-[9px] h-[3px] rounded-full bg-[color:var(--app-accent)]" />
-                      ) : null}
-                    </button>
-                  ))}
+                  {TABS.map(tab => {
+                    const Icon = tab.icon;
+                    const active = activeTab === tab.id;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        className={cn(
+                          'relative flex min-h-[46px] min-w-[118px] shrink-0 flex-col justify-center rounded-[15px] border px-3 text-left transition',
+                          active
+                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                            : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)]',
+                        )}
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5 text-xs font-black">
+                          <Icon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">
+                            {isId ? tab.labelId : tab.labelEn}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 line-clamp-1 text-[10px] font-semibold leading-3 opacity-75">
+                          {isId ? tab.captionId : tab.captionEn}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -3477,14 +3678,10 @@ export default function CommunityFeedClient({
                 {!loading && items.length === 0 ? (
                   <section className="rounded-[22px] border border-[color:var(--app-border)] bg-white p-6 text-center shadow-[0_16px_30px_-28px_rgba(15,23,42,0.13)]">
                     <p className="text-sm font-semibold text-[color:var(--app-text)]">
-                      {isId
-                        ? 'Belum ada diskusi yang cocok.'
-                        : 'No matching discussions yet.'}
+                      {emptyFeedTitle}
                     </p>
                     <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                      {isId
-                        ? 'Coba kata kunci lain atau buat topik baru.'
-                        : 'Try another keyword or create a new topic.'}
+                      {emptyFeedDescription}
                     </p>
                   </section>
                 ) : null}

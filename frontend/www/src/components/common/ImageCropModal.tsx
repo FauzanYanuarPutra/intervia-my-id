@@ -84,6 +84,9 @@ export function ImageCropModal({
   ]);
 
   const maxScale = baseScale * 3;
+  const zoomPercent = Math.round(
+    ((scale - baseScale) / Math.max(maxScale - baseScale, 0.001)) * 100,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -209,68 +212,91 @@ export function ImageCropModal({
   const frameClass = shape === 'round' ? 'rounded-full' : 'rounded-2xl';
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_55%,_transparent)] p-4">
-      <div className="max-h-[80svh] w-full max-w-lg overflow-y-auto rounded-3xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
-              Crop
-            </p>
-            <h3 className="text-sm font-semibold text-[color:var(--app-text-soft)]">
-              {title}
-            </h3>
+    <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-3 sm:items-center sm:p-4">
+      <div className="max-h-[92svh] w-full max-w-[720px] overflow-hidden rounded-[30px] border border-white/15 bg-[color:var(--app-surface-strong)] shadow-[0_24px_90px_-30px_rgba(0,0,0,0.55)]">
+        <div className="border-b border-[color:var(--app-border)] px-4 pb-4 pt-3 sm:px-5">
+          <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-[color:var(--app-surface-muted)]" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                {shape === 'round' ? 'Foto profil' : 'Cover image'}
+              </p>
+              <h3 className="mt-1 truncate text-lg font-black text-[color:var(--app-text)]">
+                {title}
+              </h3>
+              <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+                Geser gambar di area crop, lalu atur zoom kalau perlu.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]/80"
+              aria-label="Close crop"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-full p-2 text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
-            aria-label="Close crop"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
-        <div className="flex flex-col items-center gap-4">
-          <div
-            className="relative"
-            style={{ width: frameSize.width, height: frameSize.height }}
-          >
-            <div
-              className={`relative h-full w-full overflow-hidden ${frameClass} bg-[color:var(--app-surface-muted)]`}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-            >
-              <img
-                ref={imageRef}
-                src={imageSrc}
-                alt="Crop preview"
-                onLoad={event => {
-                  const img = event.currentTarget;
-                  setNaturalSize({
-                    width: img.naturalWidth,
-                    height: img.naturalHeight,
-                  });
-                }}
-                className="absolute left-1/2 top-1/2 select-none"
-                style={{
-                  transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                }}
-                draggable={false}
-              />
+        <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_280px] sm:p-5">
+          <div className="space-y-3">
+            <div className="overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-black/5 p-2">
+              <div
+                className="relative mx-auto select-none touch-none"
+                style={{ width: frameSize.width, height: frameSize.height }}
+              >
+                <div
+                  className={`relative h-full w-full overflow-hidden ${frameClass} bg-[linear-gradient(135deg,rgba(15,23,42,0.06),rgba(15,23,42,0.12))]`}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  onPointerLeave={handlePointerUp}
+                  style={{ touchAction: 'none', cursor: 'grab' }}
+                >
+                  <img
+                    ref={imageRef}
+                    src={imageSrc}
+                    alt="Crop preview"
+                    onLoad={event => {
+                      const img = event.currentTarget;
+                      setNaturalSize({
+                        width: img.naturalWidth,
+                        height: img.naturalHeight,
+                      });
+                    }}
+                    className="absolute left-1/2 top-1/2 select-none"
+                    style={{
+                      transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                    }}
+                    draggable={false}
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.16),transparent_18%,transparent_82%,rgba(0,0,0,0.12))]" />
+                </div>
+
+                <div
+                  className={`pointer-events-none absolute inset-0 ${frameClass} ring-2 ring-white/75 shadow-[0_0_0_9999px_rgba(2,6,23,0.56)]`}
+                />
+              </div>
             </div>
 
-            <div
-              className={`pointer-events-none absolute inset-0 ${frameClass} ring-2 ring-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]`}
-            />
+            <p className="text-xs text-[color:var(--app-text-soft)]">
+              Tarik gambar untuk menggeser posisi crop. Slidernya buat zoom,
+              bukan untuk mengganti foto.
+            </p>
           </div>
 
-          <div className="w-full">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-[color:var(--app-text-soft)]">
-                Zoom
-              </span>
+          <div className="space-y-4 rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                  Zoom
+                </span>
+                <span className="text-xs font-black text-[color:var(--app-text)]">
+                  {Math.max(0, zoomPercent)}%
+                </span>
+              </div>
               <input
                 type="range"
                 min={baseScale}
@@ -281,29 +307,35 @@ export function ImageCropModal({
                 className="w-full accent-[color:var(--app-accent)]"
               />
             </div>
-            <p className="mt-2 text-[11px] text-[color:var(--app-text-soft)]">
-              Geser gambar untuk menentukan area crop.
-            </p>
-          </div>
-        </div>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-full border border-[color:var(--app-border-strong)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:opacity-60"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Simpan Crop
-          </button>
+            <div className="rounded-[20px] bg-white/60 p-3 text-xs leading-6 text-[color:var(--app-text)]">
+              <p className="font-bold text-[color:var(--app-text)]">Tips cepat</p>
+              <ul className="mt-2 space-y-1.5">
+                <li>• Geser gambar untuk pasin wajah atau logo di tengah.</li>
+                <li>• Zoom sedikit kalau crop terlalu longgar.</li>
+                <li>• Avatar lebih enak kalau objeknya agak di tengah.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-white/10 pt-1">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="rounded-full border border-[color:var(--app-border-strong)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-soft)] hover:bg-white/60"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:opacity-60"
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Simpan Crop
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

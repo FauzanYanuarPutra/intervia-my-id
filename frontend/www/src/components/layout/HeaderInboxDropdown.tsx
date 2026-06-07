@@ -18,6 +18,8 @@ import {
   type InboxNotification,
 } from '@/context/NotificationInboxContext';
 import { resolveLocaleFromPathname } from '@/lib/locale';
+import { notificationPresentation } from '@/lib/notifications/presentation';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 
 type HeaderInboxDropdownKind = 'chat' | 'notifications';
@@ -85,19 +87,12 @@ function roomMessage(room: InboxRoom, isId: boolean): string {
 }
 
 function roomAvatar(room: InboxRoom): string {
-  return toText(room.room_avatar ?? room.avatar);
+  return profileAvatarSrc(toText(room.room_avatar ?? room.avatar));
 }
 
 function roomUnread(room: InboxRoom): number {
   const value = Number(room.unread_count ?? 0);
   return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
-function initials(value: string): string {
-  const clean = value.trim();
-  if (!clean) return 'L';
-  const words = clean.split(/\s+/).slice(0, 2);
-  return words.map(word => word.charAt(0).toUpperCase()).join('');
 }
 
 function notificationHref(item: InboxNotification): string {
@@ -119,20 +114,6 @@ function notificationHref(item: InboxNotification): string {
   if (item.category === 'transaction') return '/transactions';
   if (item.category === 'security') return '/settings';
   return '/notifications';
-}
-
-function categoryTone(category: string): string {
-  const key = category.toLowerCase();
-  if (key === 'wallet') {
-    return 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_45%,_transparent)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]';
-  }
-  if (key === 'transaction') {
-    return 'border-teal-200 bg-teal-50 text-teal-700';
-  }
-  if (key === 'security') {
-    return 'border-rose-200 bg-rose-50 text-rose-700';
-  }
-  return 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]';
 }
 
 function EmptyState({
@@ -380,18 +361,14 @@ export function HeaderInboxDropdown({
                       onClick={() => setOpen(false)}
                       className="group flex min-h-[66px] items-center gap-3 rounded-[18px] px-2.5 py-2.5 transition hover:bg-[color:var(--app-surface-muted)]"
                     >
-                      <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-xs font-black text-[color:var(--app-accent)]">
-                        {avatar.startsWith('/') ? (
-                          <Image
-                            src={avatar}
-                            alt=""
-                            width={44}
-                            height={44}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          initials(name)
-                        )}
+                      <span className="relative inline-flex h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                        <Image
+                          src={avatar}
+                          alt=""
+                          width={44}
+                          height={44}
+                          className="h-full w-full object-cover"
+                        />
                         {unread > 0 ? (
                           <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-red-500" />
                         ) : null}
@@ -447,6 +424,13 @@ export function HeaderInboxDropdown({
             ) : (
               sortedNotifications.map(item => {
                 const href = notificationHref(item);
+                const visual = notificationPresentation({
+                  category: item.category,
+                  eventType: item.event_type,
+                  title: item.title,
+                  message: item.message,
+                });
+                const Icon = visual.Icon;
 
                 return (
                   <Link
@@ -458,26 +442,46 @@ export function HeaderInboxDropdown({
                         void notificationInbox.markRead(item.id);
                     }}
                     className={cn(
-                      'group relative flex min-h-[72px] gap-3 rounded-[18px] px-2.5 py-2.5 text-left transition hover:bg-[color:var(--app-surface-muted)]',
-                      !item.is_read && 'bg-[color:var(--app-accent-soft)]/70',
+                      'group relative flex min-h-[72px] overflow-hidden rounded-[18px] border px-2.5 py-2.5 text-left transition hover:-translate-y-0.5 hover:shadow-[0_16px_28px_-26px_rgba(15,23,42,0.28)]',
+                      item.is_read
+                        ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface)] hover:bg-[color:var(--app-surface-muted)]'
+                        : visual.surfaceClassName,
                     )}
                   >
+                    {!item.is_read ? (
+                      <span
+                        className={cn(
+                          'absolute left-0 top-0 h-full w-1 opacity-90',
+                          visual.accentClassName,
+                        )}
+                      />
+                    ) : null}
                     <span
                       className={cn(
-                        'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border',
-                        categoryTone(item.category),
+                        'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border',
+                        visual.iconClassName,
                       )}
                     >
-                      <Bell className="h-4 w-4" />
+                      <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-black text-[color:var(--app-text)]">
+                        <span
+                          className={cn(
+                            'truncate text-sm font-black',
+                            visual.titleClassName,
+                          )}
+                        >
                           {item.title ||
                             (idLocale ? 'Notifikasi baru' : 'New notification')}
                         </span>
                         {!item.is_read ? (
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-[color:var(--app-accent)]" />
+                          <span
+                            className={cn(
+                              'h-2.5 w-2.5 shrink-0 rounded-full',
+                              visual.accentClassName,
+                            )}
+                          />
                         ) : null}
                       </span>
                       <span className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
@@ -487,10 +491,13 @@ export function HeaderInboxDropdown({
                         <span
                           className={cn(
                             'truncate rounded-full border px-2 py-0.5 text-[10px] font-bold',
-                            categoryTone(item.category),
+                            visual.badgeClassName,
                           )}
                         >
-                          {item.category || item.event_type || 'update'}
+                          {visual.label ||
+                            item.category ||
+                            item.event_type ||
+                            'update'}
                         </span>
                         <span className="shrink-0 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                           {formatRelativeTime(item.created_at, idLocale)}

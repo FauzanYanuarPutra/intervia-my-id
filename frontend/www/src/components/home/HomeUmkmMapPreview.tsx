@@ -49,12 +49,6 @@ type PreparedStore = {
   ui: ReturnType<typeof buildUmkmPlacePresentation>;
 };
 
-type MapRailSection = {
-  id: string;
-  label: string;
-  items: PreparedStore[];
-};
-
 const HOME_MAP_REFRESH_INTERVAL_MS = 25000;
 
 function sortPreparedStores(items: PreparedStore[]): PreparedStore[] {
@@ -198,49 +192,11 @@ function HomeUmkmCard({ item, isId }: { item: PreparedStore; isId: boolean }) {
   );
 }
 
-function HomeMapQuickSteps({ isId }: { isId: boolean }) {
-  const steps = [
-    {
-      id: 'nearby',
-      icon: MapPinned,
-      label: isId ? 'Cari sekitar' : 'Find nearby',
-    },
-    {
-      id: 'profile',
-      icon: Store,
-      label: isId ? 'Cek profil' : 'Check profile',
-    },
-    {
-      id: 'chat',
-      icon: MessageCircle,
-      label: isId ? 'Chat/rute' : 'Chat/route',
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-3 gap-1.5">
-      {steps.map(step => {
-        const Icon = step.icon;
-        return (
-          <div
-            key={step.id}
-            className="flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text)] dark:bg-slate-900"
-          >
-            <Icon className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" />
-            <span className="truncate">{step.label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export function HomeUmkmMapPreview({ locale }: HomeUmkmMapPreviewProps) {
   const isId = locale === 'id';
   const [stores, setStores] = useState<PreviewStore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeSectionId, setActiveSectionId] = useState('featured');
 
   useEffect(() => {
     let active = true;
@@ -305,87 +261,34 @@ export function HomeUmkmMapPreview({ locale }: HomeUmkmMapPreviewProps) {
     [isId, stores],
   );
 
-  const sections = useMemo<MapRailSection[]>(() => {
-    const featured = preparedStores.slice(0, 5);
-    const retail = preparedStores
-      .filter(item => item.ui.kind === 'retail')
-      .slice(0, 5);
-    const food = preparedStores
-      .filter(item => item.ui.kind === 'food')
-      .slice(0, 5);
-    const service = preparedStores
-      .filter(item => item.ui.kind === 'service')
-      .slice(0, 5);
-    const other = preparedStores
-      .filter(item => !['retail', 'food', 'service'].includes(item.ui.kind))
-      .slice(0, 5);
-
-    return [
-      {
-        id: 'featured',
-        label: isId ? 'Pilihan' : 'Top picks',
-        items: featured,
-      },
-      { id: 'retail', label: 'Retail', items: retail },
-      { id: 'food', label: isId ? 'Makan' : 'Food', items: food },
-      { id: 'service', label: isId ? 'Jasa' : 'Service', items: service },
-      { id: 'other', label: isId ? 'Lainnya' : 'More', items: other },
-    ]
-      .filter(section => section.items.length > 0)
-      .slice(0, 3);
-  }, [isId, preparedStores]);
-
-  const activeSection =
-    sections.find(section => section.id === activeSectionId) ||
-    sections[0] ||
-    null;
-
-  useEffect(() => {
-    if (!sections.length) return;
-    if (!sections.some(section => section.id === activeSectionId)) {
-      setActiveSectionId(sections[0].id);
-    }
-  }, [activeSectionId, sections]);
-
   return (
     <section className="ui-page-section ui-home-section-shell">
       <article className="ui-home-section-content bg-transparent px-0 py-0 shadow-none">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[1.02rem] font-black tracking-[-0.035em] text-[color:var(--app-text)] sm:text-[1.12rem]">
               Lajukan Maps
-            </p>
-            <p className="mt-1 hidden text-[12px] font-semibold text-[color:var(--app-text)] sm:block">
+            </h2>
+            <p className="mt-1 text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
               {isId
-                ? 'Cari sekitar. Buka profil. Chat atau rute.'
-                : 'Find nearby. Open profile. Chat or route.'}
+                ? 'Geser untuk lihat usaha sekitar.'
+                : 'Swipe through nearby businesses.'}
             </p>
           </div>
 
           <Link
             href={UMKM_DISCOVERY_PATH}
-            className="ui-pressable inline-flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-[11px] font-semibold text-white shadow-[0_16px_30px_-22px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105 sm:min-h-[40px] sm:w-auto sm:px-3.5"
+            className="flex shrink-0 items-center justify-between gap-1 text-xs font-semibold text-[color:var(--app-accent)]"
           >
-            {isId ? 'Buka Lajukan Maps' : 'Open Lajukan Maps'}
+            {isId ? 'Lihat semua' : 'See all'}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-        </div>
-        <div className="mt-2 sm:hidden">
-          <HomeMapQuickSteps isId={isId} />
         </div>
 
         {loading ? (
           <div className="mt-2.5">
-            <div className="mb-2 flex gap-1.5 overflow-hidden">
-              {[0, 1, 2].map(item => (
-                <div
-                  key={item}
-                  className="ui-skeleton ui-skeleton-pulse h-8 w-20 shrink-0 rounded-full"
-                />
-              ))}
-            </div>
             <div className="flex gap-2 overflow-hidden">
-              {[0, 1].map(card => (
+              {[0, 1, 2].map(card => (
                 <div
                   key={card}
                   className="ui-skeleton ui-skeleton-pulse h-[228px] w-[222px] shrink-0 rounded-[20px] sm:h-[236px] sm:w-[242px] lg:h-[242px] lg:w-[256px]"
@@ -404,56 +307,21 @@ export function HomeUmkmMapPreview({ locale }: HomeUmkmMapPreviewProps) {
               href={UMKM_DISCOVERY_PATH}
               className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]"
             >
-              {isId ? 'Buka Lajukan Maps' : 'Open Lajukan Maps'}
+              {isId ? 'Lihat semua' : 'See all'}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         ) : null}
 
-        {!loading && !error && activeSection ? (
+        {!loading && !error && preparedStores.length > 0 ? (
           <div className="mt-2.5">
-            <div className="mb-2 flex max-w-full gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-              {sections.map(section => {
-                const selected = section.id === activeSection.id;
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => setActiveSectionId(section.id)}
-                    className={cn(
-                      'inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[11px] font-bold transition',
-                      selected
-                        ? 'bg-[color:var(--app-accent)] text-white shadow-[0_14px_28px_-24px_color-mix(in_srgb,var(--app-accent)_52%,transparent)]'
-                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
-                    )}
-                  >
-                    {section.label}
-                    <span
-                      className={cn(
-                        'rounded-full px-1.5 py-0.5 text-[10px]',
-                        selected
-                          ? 'bg-white/18 text-white'
-                          : 'bg-white/80 text-[color:var(--app-text-soft)] dark:bg-slate-950/50',
-                      )}
-                    >
-                      {section.items.length}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
             <HorizontalRail
               hintLabel={isId ? 'Geser' : 'Swipe'}
               minimal
               className="pb-1"
             >
-              {activeSection.items.map(item => (
-                <HomeUmkmCard
-                  key={`${activeSection.id}-${item.store.id}`}
-                  item={item}
-                  isId={isId}
-                />
+              {preparedStores.map(item => (
+                <HomeUmkmCard key={item.store.id} item={item} isId={isId} />
               ))}
             </HorizontalRail>
           </div>

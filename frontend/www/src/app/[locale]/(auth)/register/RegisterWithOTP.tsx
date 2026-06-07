@@ -43,7 +43,6 @@ export default function RegisterWithOTP() {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [otpToken, setOtpToken] = useState('');
-  const [devOtp, setDevOtp] = useState('');
   const [otpResendAt, setOtpResendAt] = useState(0);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -115,7 +114,7 @@ export default function RegisterWithOTP() {
   const shellHelperText = '';
 
   const authInputClass =
-    'w-full min-h-[50px] rounded-[14px] border border-[color:var(--app-border)] bg-white px-3.5 py-3 text-[15px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] outline-none transition-[border-color,background-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] sm:text-sm dark:bg-[color:var(--app-surface-strong)]';
+    'w-full min-h-[42px] rounded-[12px] border border-[color:var(--app-border)] bg-white px-3 py-2 text-[14px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] outline-none transition-[border-color,background-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] sm:text-[13px] dark:bg-[color:var(--app-surface-strong)]';
   const primaryButtonClass =
     'flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 py-3 text-sm font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]';
   const utilityButtonClass =
@@ -186,7 +185,6 @@ export default function RegisterWithOTP() {
   const resetOtpState = () => {
     setOtp('');
     setOtpToken('');
-    setDevOtp('');
   };
 
   const sendPhoneOtp = async () => {
@@ -229,9 +227,6 @@ export default function RegisterWithOTP() {
 
       resetOtpState();
       setOtpResendAt(Date.now() + 30_000);
-      if (typeof data?.devOtp === 'string') {
-        setDevOtp(data.devOtp);
-      }
       setStep('otp');
     } catch {
       setError(
@@ -472,12 +467,6 @@ export default function RegisterWithOTP() {
               )}
             </button>
 
-            {devOtp ? (
-              <div className="rounded-[16px] border border-[color:color-mix(in_srgb,_var(--app-warning)_22%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-warning-soft)_72%,_var(--app-surface-strong))] px-4 py-3 text-center text-xs text-[color:var(--app-warning)]">
-                Dev OTP:{' '}
-                <span className="font-mono font-semibold">{devOtp}</span>
-              </div>
-            ) : null}
           </motion.div>
         );
 

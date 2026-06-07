@@ -1,9 +1,10 @@
 'use client';
 
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
-import { Search } from 'lucide-react';
+import { ImageIcon, Search } from 'lucide-react';
 import {
   asString,
   ContentItem,
@@ -12,6 +13,10 @@ import {
   formatIDRFromCents,
   resolvePrimaryImage,
 } from '@/lib/content/catalog';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 
 type MicrogigCard = {
   id: string;
@@ -21,7 +26,7 @@ type MicrogigCard = {
   priceLabel: string;
   typeLabel: string;
   href: string;
-  image: string;
+  image?: string | null;
 };
 
 function detectLocale(pathname: string): 'id' | 'en' {
@@ -38,7 +43,10 @@ function slugify(value: string): string {
     .slice(0, 80);
 }
 
-function mapToMicrogig(item: ContentItem, locale: 'id' | 'en'): MicrogigCard | null {
+function mapToMicrogig(
+  item: ContentItem,
+  locale: 'id' | 'en',
+): MicrogigCard | null {
   const id = String(item.id || '').trim();
   if (!id) return null;
 
@@ -52,13 +60,19 @@ function mapToMicrogig(item: ContentItem, locale: 'id' | 'en'): MicrogigCard | n
     asString(meta.region) ||
     'Indonesia';
   const price = formatIDRFromCents(item.price_cents);
-  const priceLabel = price !== '-' ? price : locale === 'id' ? 'Negosiasi' : 'Negotiable';
+  const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const priceLabel =
+    price !== '-'
+      ? formatPriceWithUnit(price, priceUnitLabel)
+      : locale === 'id'
+        ? 'Negosiasi'
+        : 'Negotiable';
   const typeLabel =
     asString(item.content_type) ||
     asString(item.category) ||
     asString(meta.type) ||
     'Microgig';
-  const image = resolvePrimaryImage(item) || DEFAULT_CONTENT_IMAGE;
+  const image = resolvePrimaryImage(item) || DEFAULT_CONTENT_IMAGE || null;
 
   return {
     id,
@@ -99,12 +113,14 @@ export default function MicrogigsClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-              (locale === 'id' ? 'Gagal memuat microgigs' : 'Failed to load microgigs'),
+              (locale === 'id'
+                ? 'Gagal memuat microgigs'
+                : 'Failed to load microgigs'),
           );
         }
 
         const mapped = extractContentItems(payload)
-          .map((item) => mapToMicrogig(item, locale))
+          .map(item => mapToMicrogig(item, locale))
           .filter((item): item is MicrogigCard => Boolean(item));
 
         setItems(mapped);
@@ -124,8 +140,10 @@ export default function MicrogigsClient() {
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((item) =>
-      `${item.title} ${item.summary} ${item.location}`.toLowerCase().includes(q),
+    return items.filter(item =>
+      `${item.title} ${item.summary} ${item.location}`
+        .toLowerCase()
+        .includes(q),
     );
   }, [items, query]);
 
@@ -136,7 +154,10 @@ export default function MicrogigsClient() {
         ? 'Tugas cepat. Scope jelas.'
         : 'Quick tasks with clear scope for everyday needs.',
     placeholder: locale === 'id' ? 'Cari microgig...' : 'Search microgigs...',
-    empty: locale === 'id' ? 'Belum ada microgig tersedia.' : 'No microgigs available.',
+    empty:
+      locale === 'id'
+        ? 'Belum ada microgig tersedia.'
+        : 'No microgigs available.',
     loading: locale === 'id' ? 'Memuat...' : 'Loading...',
     retry: locale === 'id' ? 'Coba lagi' : 'Retry',
   };
@@ -149,7 +170,9 @@ export default function MicrogigsClient() {
             {text.title}
           </p>
           <h1 className="mt-2 text-3xl font-[1000] tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-            {locale === 'id' ? 'Cari pekerjaan mikro yang tepat' : 'Find the right micro task'}
+            {locale === 'id'
+              ? 'Cari pekerjaan mikro yang tepat'
+              : 'Find the right micro task'}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
             {text.subtitle}
@@ -159,7 +182,7 @@ export default function MicrogigsClient() {
             <Search className="h-4 w-4 text-[color:var(--app-text-soft)]" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={event => setQuery(event.target.value)}
               placeholder={text.placeholder}
               className="w-full bg-transparent text-sm text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text-soft)]"
             />
@@ -171,7 +194,7 @@ export default function MicrogigsClient() {
             {error}
             <button
               type="button"
-              onClick={() => setQuery((current) => current)}
+              onClick={() => setQuery(current => current)}
               className="ml-2 text-[11px] font-semibold underline"
             >
               {text.retry}
@@ -180,7 +203,10 @@ export default function MicrogigsClient() {
         ) : loading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={`micro-skel-${index}`} className="ui-panel-muted ui-skeleton-pulse h-32" />
+              <div
+                key={`micro-skel-${index}`}
+                className="ui-panel-muted ui-skeleton-pulse h-32"
+              />
             ))}
           </div>
         ) : filteredItems.length === 0 ? (
@@ -189,14 +215,26 @@ export default function MicrogigsClient() {
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((item) => (
+            {filteredItems.map(item => (
               <Link
                 key={item.id}
                 href={item.href}
                 className="ui-panel ui-card-hover flex h-full flex-col overflow-hidden p-3"
               >
-                <div className="aspect-[16/9] w-full overflow-hidden rounded-xl bg-[color:var(--app-surface-muted)]">
-                  <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
+                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl bg-[color:var(--app-surface-muted)]">
+                  {item.image ? (
+                    <Image
+                      src={item.image}
+                      alt={item.title}
+                      fill
+                      sizes="(max-width: 640px) 100vw, 33vw"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-[color:var(--app-accent)]">
+                      <ImageIcon className="h-7 w-7" />
+                    </span>
+                  )}
                 </div>
                 <div className="mt-3 flex-1">
                   <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -211,7 +249,9 @@ export default function MicrogigsClient() {
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs text-[color:var(--app-text-soft)]">
                   <span>{item.location}</span>
-                  <span className="font-semibold text-[color:var(--app-accent)]">{item.priceLabel}</span>
+                  <span className="font-semibold text-[color:var(--app-accent)]">
+                    {item.priceLabel}
+                  </span>
                 </div>
               </Link>
             ))}

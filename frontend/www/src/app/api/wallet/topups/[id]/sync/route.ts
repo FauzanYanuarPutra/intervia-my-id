@@ -26,7 +26,7 @@ export async function POST(
       async (ctx) =>
         withIdempotency(req, {
           scope: `wallet-topup-sync:${id}`,
-          actorHint: ctx.token,
+          actorHint: ctx.userId,
           forward: () =>
             fetch(`${MARKETPLACE_URL}/v1/wallet/topups/${encodeURIComponent(id)}/sync`, {
               method: 'POST',

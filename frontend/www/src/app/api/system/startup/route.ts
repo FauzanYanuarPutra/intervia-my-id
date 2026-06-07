@@ -68,9 +68,12 @@ async function probeDependencyState(): Promise<StackStartupState | null> {
 
 export async function GET() {
   const fileState = readStackStartupState();
+  // Only use live dependency probing while startup is explicitly active.
+  // This prevents the maintenance screen from reappearing forever just because
+  // one backend health endpoint is temporarily unavailable after startup.
   const state = fileState.active
-    ? fileState
-    : (await probeDependencyState()) || fileState;
+    ? (await probeDependencyState()) || fileState
+    : fileState;
 
   return NextResponse.json(state, {
     headers: {

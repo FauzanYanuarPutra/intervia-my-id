@@ -28,7 +28,7 @@ export function CreateListingTemplatePicker({
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">
-            {isId ? 'Butuh contoh?' : 'Need a starter?'}
+            {isId ? 'Perlu contoh?' : 'Need a starter?'}
           </p>
           <p className="mt-2 text-[13px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {isId

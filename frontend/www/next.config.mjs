@@ -25,7 +25,7 @@ const ContentSecurityPolicy = `
   manifest-src 'self';
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src 'self' https://fonts.gstatic.com;
-  img-src 'self' data: https:;
+  img-src 'self' data: blob: https:;
   media-src 'self' data: blob: https:;
   worker-src 'self' blob:;
   ${scriptSrc}
@@ -58,6 +58,47 @@ const CHAT_SERVICE_ORIGIN =
   process.env.INTERNAL_CHAT_SERVICE_URL ||
   process.env.INTERNAL_CHAT_URL ||
   'http://chat_service:4000';
+const DEAD_MARKETING_ROUTES = [
+  'pricing',
+  'blog',
+  'news',
+  'travel',
+  'wellness',
+  'vendor',
+  'hr',
+  'investor',
+  'analytics',
+  'charity',
+];
+
+const deadMarketingRedirects = DEAD_MARKETING_ROUTES.flatMap(route => [
+  {
+    source: `/:locale(id|en)/${route}/:slug*`,
+    destination: '/:locale/home',
+    permanent: true,
+  },
+  {
+    source: `/${route}/:slug*`,
+    destination: '/id/home',
+    permanent: true,
+  },
+]);
+const legacyRouteRedirects = [
+  { route: 'finance', destination: '/payments' },
+  { route: 'collaboration', destination: '/chat' },
+  { route: 'spatial', destination: '/umkm' },
+].flatMap(({ route, destination }) => [
+  {
+    source: `/:locale(id|en)/${route}/:slug*`,
+    destination: `/:locale${destination}`,
+    permanent: true,
+  },
+  {
+    source: `/${route}/:slug*`,
+    destination: `/id${destination}`,
+    permanent: true,
+  },
+]);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -110,15 +151,21 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    if (!IS_PROD) return [];
+    const productionRedirects = IS_PROD
+      ? [
+          {
+            source: '/:path*',
+            has: [{ type: 'header', key: 'x-forwarded-proto', value: 'http' }],
+            destination: `${WWW_ORIGIN}/:path*`,
+            permanent: true,
+          },
+        ]
+      : [];
 
     return [
-      {
-        source: '/:path*',
-        has: [{ type: 'header', key: 'x-forwarded-proto', value: 'http' }],
-        destination: `${WWW_ORIGIN}/:path*`,
-        permanent: true,
-      },
+      ...deadMarketingRedirects,
+      ...legacyRouteRedirects,
+      ...productionRedirects,
     ];
   },
   async rewrites() {
@@ -135,6 +182,15 @@ const nextConfig = {
     localPatterns: [
       {
         pathname: '/images/**',
+      },
+      {
+        pathname: '/uploads/**',
+      },
+      {
+        pathname: '/api/content/media/**',
+      },
+      {
+        pathname: '/api/chat/media/**',
       },
       { pathname: '/default-avatar.svg' },
     ],

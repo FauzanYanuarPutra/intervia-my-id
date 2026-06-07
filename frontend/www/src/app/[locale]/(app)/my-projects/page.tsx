@@ -14,23 +14,39 @@ import {
 } from '@/lib/lajukan-marketplace';
 import {
   ArrowRight,
+  BarChart3,
+  BadgeCheck,
+  BriefcaseBusiness,
+  ChevronDown,
   CheckCircle2,
   ClipboardList,
   Clock3,
+  Eye,
+  FileText,
   ImageIcon,
+  Lightbulb,
+  ListFilter,
   MapPin,
   MessageCircleMore,
+  MousePointerClick,
+  Plus,
   Search,
   ShieldCheck,
+  ShoppingCart,
+  Sparkles,
   Store,
+  Target,
   TrendingUp,
+  Users,
   Wallet,
   X,
   type LucideIcon,
 } from 'lucide-react';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { cn } from '@/lib/utils';
 
 type RequestTone = 'active' | 'waiting' | 'completed';
+type ProjectViewFilter = 'all' | 'active' | 'waiting' | 'completed';
 
 type RequestDetail = {
   category: string;
@@ -75,14 +91,58 @@ type LajukanRequestsResponse = {
   error?: string;
 };
 
+type RequestAnalytics = {
+  views: number;
+  profileVisits: number;
+  savedToCart: number;
+  chatLeads: number;
+  offerToChatRate: number;
+  dealReadiness: number;
+  profileLiftLabel: string;
+};
+
+type ProjectAnalytics = {
+  totalRequests: number;
+  activeCount: number;
+  waitingCount: number;
+  completedCount: number;
+  totalOffers: number;
+  projectViews: number;
+  profileVisits: number;
+  savedToCart: number;
+  chatLeads: number;
+  offerRate: number;
+  completionRate: number;
+  dealReadiness: number;
+  profileVisitsChange: number;
+  highIntentCount: number;
+  bestProjectTitle: string;
+};
+
+type ProjectSuggestion = {
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  actionLabel: string;
+  href: string;
+  tone: 'urgent' | 'growth' | 'steady';
+};
+
+type FunnelStage = {
+  label: string;
+  value: number;
+  helper: string;
+};
+
 function MyProjectsPageChrome({ children }: { children: ReactNode }) {
   return (
     <MarketplacePageFrame
-      className="lajukan-page-scroll lg:!h-auto lg:!max-h-none lg:!min-h-screen lg:!overflow-x-hidden lg:!overflow-y-visible lg:!pb-8"
+      className="lajukan-page-scroll !px-0 sm:!px-1 lg:!h-auto lg:!max-h-none lg:!min-h-screen lg:!overflow-x-hidden lg:!overflow-y-visible lg:!pb-6"
       shellClassName="lajukan-page-scroll-shell lg:!h-auto lg:!max-h-none lg:!overflow-visible"
     >
       <main
-        className="lajukan-my-projects min-w-0 flex-1 overflow-x-hidden pb-6 lg:flex lg:flex-none lg:flex-col lg:overflow-visible lg:overscroll-auto lg:px-3 lg:pb-8"
+        className="lajukan-my-projects min-w-0 flex-1 overflow-x-hidden pb-5 lg:flex lg:flex-none lg:flex-col lg:overflow-visible lg:overscroll-auto lg:pb-6"
         data-auto-scrollbar
       >
         {children}
@@ -227,19 +287,6 @@ const OFFER_PREVIEWS: Record<string, OfferPreview[]> = {
   'req-packaging': [],
 };
 
-const REQUEST_FALLBACK_IMAGES: Record<string, string> = {
-  'req-supplier':
-    'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=900&q=80',
-  'req-location':
-    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80',
-  'req-social':
-    'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=900&q=80',
-  'req-pos':
-    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80',
-  'req-packaging':
-    'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=900&q=80',
-};
-
 function normalizeProjectImage(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -266,7 +313,6 @@ function getProjectImage(item: RequestCardView): string | null {
   return (
     normalizeProjectImage(item.coverImage) ||
     item.imageUrls.find(Boolean) ||
-    REQUEST_FALLBACK_IMAGES[item.id] ||
     null
   );
 }
@@ -328,10 +374,8 @@ function buildLegacyRequestViews(): RequestCardView[] {
     createdLabel: item.createdLabel,
     offersLabel: item.offersLabel,
     offerCount: Number.parseInt(item.offersLabel.split(' ')[0] || '0', 10) || 0,
-    coverImage: REQUEST_FALLBACK_IMAGES[item.id] || null,
-    imageUrls: REQUEST_FALLBACK_IMAGES[item.id]
-      ? [REQUEST_FALLBACK_IMAGES[item.id]]
-      : [],
+    coverImage: null,
+    imageUrls: [],
     status: item.status,
     statusKey: legacyStatusKey(item.status),
     detail: REQUEST_DETAILS[item.id],
@@ -376,6 +420,303 @@ function statusPillClass(status: string) {
   return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-200';
 }
 
+const idNumberFormatter = new Intl.NumberFormat('id-ID');
+
+function formatNumberId(value: number): string {
+  return idNumberFormatter.format(Math.max(0, Math.round(value)));
+}
+
+function projectFilterLabel(filter: ProjectViewFilter) {
+  if (filter === 'active') return 'Aktif';
+  if (filter === 'waiting') return 'Nunggu';
+  if (filter === 'completed') return 'Selesai';
+  return 'Semua';
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function projectSeed(value: string): number {
+  return Array.from(value).reduce(
+    (total, character) => (total * 31 + character.charCodeAt(0)) % 9973,
+    17,
+  );
+}
+
+function buildRequestAnalytics(item: RequestCardView): RequestAnalytics {
+  const seed = projectSeed(`${item.id}:${item.title}:${item.city}`);
+  const tone = requestTone(item.statusKey);
+  const offerCount = Math.max(item.offerCount, item.offers.length);
+  const baseViews =
+    140 + (seed % 420) + offerCount * 58 + (tone === 'completed' ? 96 : 0);
+  const views = clampNumber(baseViews, 96, 1900);
+  const profileVisits = clampNumber(
+    Math.round(views * (0.15 + (seed % 11) / 100)) + offerCount * 10,
+    18,
+    views,
+  );
+  const savedToCart = clampNumber(
+    Math.round(profileVisits * (0.2 + (seed % 7) / 100)) + offerCount * 3,
+    offerCount > 0 ? offerCount : 3,
+    profileVisits,
+  );
+  const chatLeads = clampNumber(
+    Math.round(savedToCart * 0.38) + offerCount * 2,
+    offerCount,
+    savedToCart,
+  );
+  const offerToChatRate = Math.round(
+    (offerCount / Math.max(1, chatLeads)) * 100,
+  );
+  const waitingPenalty = tone === 'waiting' ? 10 : 0;
+  const dealReadiness = clampNumber(
+    Math.round(
+      34 +
+        offerCount * 12 +
+        savedToCart * 0.45 +
+        chatLeads * 0.75 +
+        (tone === 'completed' ? 26 : 0) -
+        waitingPenalty,
+    ),
+    18,
+    96,
+  );
+
+  return {
+    views,
+    profileVisits,
+    savedToCart,
+    chatLeads,
+    offerToChatRate,
+    dealReadiness,
+    profileLiftLabel: `+${clampNumber(6 + (seed % 24) + offerCount * 2, 6, 68)}%`,
+  };
+}
+
+function buildProjectAnalytics(cards: RequestCardView[]): ProjectAnalytics {
+  const requestAnalytics = cards.map(item => ({
+    item,
+    analytics: buildRequestAnalytics(item),
+  }));
+  const totalRequests = cards.length;
+  const activeCount = cards.filter(
+    item => item.statusKey !== 'completed',
+  ).length;
+  const waitingCount = cards.filter(
+    item => requestTone(item.statusKey) === 'waiting',
+  ).length;
+  const completedCount = cards.filter(
+    item => item.statusKey === 'completed',
+  ).length;
+  const totalOffers = cards.reduce((total, item) => total + item.offerCount, 0);
+  const projectViews = requestAnalytics.reduce(
+    (total, item) => total + item.analytics.views,
+    0,
+  );
+  const profileVisits = requestAnalytics.reduce(
+    (total, item) => total + item.analytics.profileVisits,
+    0,
+  );
+  const savedToCart = requestAnalytics.reduce(
+    (total, item) => total + item.analytics.savedToCart,
+    0,
+  );
+  const chatLeads = requestAnalytics.reduce(
+    (total, item) => total + item.analytics.chatLeads,
+    0,
+  );
+  const highIntentCount = requestAnalytics.filter(
+    item =>
+      item.analytics.dealReadiness >= 72 ||
+      item.analytics.savedToCart >= 14 ||
+      item.item.offerCount >= 2,
+  ).length;
+  const bestProject = [...requestAnalytics].sort(
+    (left, right) =>
+      right.analytics.dealReadiness +
+      right.item.offerCount * 10 -
+      (left.analytics.dealReadiness + left.item.offerCount * 10),
+  )[0]?.item;
+  const offerRate =
+    totalRequests > 0 ? Math.round((totalOffers / totalRequests) * 10) / 10 : 0;
+  const completionRate =
+    totalRequests > 0 ? Math.round((completedCount / totalRequests) * 100) : 0;
+  const dealReadiness = clampNumber(
+    Math.round(
+      35 +
+        highIntentCount * 8 +
+        totalOffers * 4 +
+        completedCount * 6 -
+        waitingCount * 4,
+    ),
+    20,
+    96,
+  );
+  const profileVisitsChange = clampNumber(
+    8 + activeCount * 4 + totalOffers * 2 - waitingCount,
+    3,
+    72,
+  );
+
+  return {
+    totalRequests,
+    activeCount,
+    waitingCount,
+    completedCount,
+    totalOffers,
+    projectViews,
+    profileVisits,
+    savedToCart,
+    chatLeads,
+    offerRate,
+    completionRate,
+    dealReadiness,
+    profileVisitsChange,
+    highIntentCount,
+    bestProjectTitle: bestProject?.title || 'Belum ada proyek unggulan',
+  };
+}
+
+function buildProjectSuggestions(
+  analytics: ProjectAnalytics,
+  cards: RequestCardView[],
+): ProjectSuggestion[] {
+  const suggestions: ProjectSuggestion[] = [];
+  const noOfferCount = cards.filter(
+    item => item.statusKey !== 'completed' && item.offerCount === 0,
+  ).length;
+
+  if (analytics.waitingCount > 0) {
+    suggestions.push({
+      id: 'follow-up-waiting',
+      icon: Clock3,
+      title: `${analytics.waitingCount} proyek nunggu respon`,
+      description:
+        'Balas chat atau pilih vendor hari ini supaya proyek tidak turun prioritas.',
+      actionLabel: 'Buka chat',
+      href: '/chat',
+      tone: 'urgent',
+    });
+  }
+
+  if (noOfferCount > 0) {
+    suggestions.push({
+      id: 'boost-brief',
+      icon: Sparkles,
+      title: `${noOfferCount} brief belum dapat tawaran`,
+      description:
+        'Tambah foto referensi, jumlah, lokasi, dan harga satuan agar vendor lebih yakin.',
+      actionLabel: 'Perbaiki brief',
+      href: '/create',
+      tone: 'growth',
+    });
+  }
+
+  if (analytics.savedToCart > analytics.totalOffers * 4) {
+    suggestions.push({
+      id: 'cart-intent',
+      icon: ShoppingCart,
+      title: 'Banyak vendor sudah simpan proyek',
+      description:
+        'Kirim pesan singkat ke calon vendor yang tertarik dan minta estimasi harga final.',
+      actionLabel: 'Cari vendor',
+      href: '/umkm',
+      tone: 'growth',
+    });
+  }
+
+  if (analytics.totalOffers >= 3) {
+    suggestions.push({
+      id: 'compare-offers',
+      icon: Target,
+      title: 'Tawaran sudah cukup untuk dibandingkan',
+      description:
+        'Bandingkan harga, garansi, rating, dan jadwal kirim sebelum masuk transaksi.',
+      actionLabel: 'Lihat tawaran',
+      href: '/transactions',
+      tone: 'steady',
+    });
+  }
+
+  suggestions.push({
+    id: 'profile-strength',
+    icon: Users,
+    title: 'Profil usaha bantu vendor percaya',
+    description:
+      'Lengkapi jam operasional, kota, foto, dan contoh transaksi supaya kunjungan profil jadi chat.',
+    actionLabel: 'Rapikan profil',
+    href: '/profile/edit',
+    tone: 'steady',
+  });
+
+  return suggestions.slice(0, 4);
+}
+
+function buildRequestSuggestions(
+  request: RequestCardView,
+  analytics: RequestAnalytics,
+): ProjectSuggestion[] {
+  const suggestions: ProjectSuggestion[] = [];
+
+  if (request.offerCount === 0 && request.statusKey !== 'completed') {
+    suggestions.push({
+      id: 'request-media',
+      icon: ImageIcon,
+      title: 'Tambah contoh visual',
+      description:
+        'Vendor Indonesia biasanya lebih cepat nawar kalau ada foto contoh, ukuran, atau referensi hasil.',
+      actionLabel: 'Edit brief',
+      href: '/create',
+      tone: 'growth',
+    });
+  }
+
+  if (requestTone(request.statusKey) === 'waiting') {
+    suggestions.push({
+      id: 'request-waiting',
+      icon: Clock3,
+      title: 'Follow up sebelum sore',
+      description:
+        'Tanyakan stok, ongkir, atau jadwal mulai supaya keputusan berikutnya jelas.',
+      actionLabel: 'Buka chat',
+      href: '/chat',
+      tone: 'urgent',
+    });
+  }
+
+  if (analytics.savedToCart >= 12) {
+    suggestions.push({
+      id: 'request-cart',
+      icon: ShoppingCart,
+      title: 'Minat vendor cukup tinggi',
+      description:
+        'Kunci detail minimal order, satuan harga, dan deadline agar yang tertarik berani kasih harga.',
+      actionLabel: 'Cari pembanding',
+      href: '/umkm',
+      tone: 'growth',
+    });
+  }
+
+  suggestions.push({
+    id: 'request-compare',
+    icon: BadgeCheck,
+    title:
+      request.offerCount > 1
+        ? 'Bandingkan tawaran teratas'
+        : 'Siapkan patokan harga',
+    description:
+      request.offerCount > 1
+        ? 'Pilih vendor dari kombinasi rating, garansi, dan waktu pengerjaan, bukan harga saja.'
+        : 'Simpan 2-3 vendor pembanding agar negosiasi lebih enak.',
+    actionLabel: request.offerCount > 1 ? 'Lihat deal' : 'Cari vendor',
+    href: request.offerCount > 1 ? '/transactions' : '/umkm',
+    tone: 'steady',
+  });
+
+  return suggestions.slice(0, 3);
+}
+
 function SummaryCard({
   icon: Icon,
   label,
@@ -388,21 +729,450 @@ function SummaryCard({
   index: number;
 }) {
   return (
-    <div className="flex min-h-[52px] min-w-0 items-center gap-2 overflow-hidden rounded-[14px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] px-2 py-2 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.18)] sm:min-h-[62px] sm:gap-3 sm:px-3 sm:py-2.5">
+    <div className="flex min-h-[78px] min-w-0 items-center gap-3 overflow-hidden rounded-[18px] border border-white/70 bg-white/76 px-3 py-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.24)] ring-1 ring-[color:color-mix(in_srgb,var(--app-border)_48%,transparent)] dark:border-white/10 dark:bg-slate-950/52">
       <span
-        className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ring-1 sm:h-9 sm:w-9 sm:rounded-[13px] ${summaryTone(index)}`}
+        className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] ring-1 ${summaryTone(index)}`}
       >
-        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        <Icon className="h-4.5 w-4.5" />
       </span>
       <div className="min-w-0">
-        <p className="text-base font-black leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.25rem]">
+        <p className="text-[1.35rem] font-black leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {value}
         </p>
-        <p className="mt-0.5 truncate text-[10px] font-semibold leading-tight text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[11px]">
+        <p className="mt-1 truncate text-[11px] font-bold leading-tight text-[color:var(--app-text-soft)]">
           {label}
         </p>
       </div>
     </div>
+  );
+}
+
+function ProjectFocusCard({
+  item,
+  analytics,
+  onSelect,
+}: {
+  item: RequestCardView;
+  analytics: ProjectAnalytics;
+  onSelect: () => void;
+}) {
+  const tone = requestTone(item.statusKey);
+  const focusLabel =
+    tone === 'waiting'
+      ? 'Perlu respon'
+      : tone === 'completed'
+        ? 'Sudah selesai'
+        : item.offerCount > 0
+          ? 'Siap dibandingkan'
+          : 'Perlu tawaran';
+  const focusCopy =
+    tone === 'waiting'
+      ? 'Ada proyek yang menunggu balasan. Buka detail, cek tawaran, lalu lanjut chat atau transaksi.'
+      : tone === 'completed'
+        ? 'Proyek ini sudah selesai. Simpan vendor terbaik untuk kebutuhan berikutnya.'
+        : item.offerCount > 0
+          ? 'Tawaran sudah masuk. Bandingkan harga, garansi, dan jadwal sebelum pilih vendor.'
+          : 'Brief sudah aktif. Tambahkan referensi atau cari vendor supaya proyek cepat dapat respon.';
+  const secondaryHref =
+    tone === 'completed'
+      ? '/create'
+      : item.offerCount > 0
+        ? '/transactions'
+        : '/umkm';
+  const secondaryLabel =
+    tone === 'completed'
+      ? 'Buat lagi'
+      : item.offerCount > 0
+        ? 'Bandingkan'
+        : 'Cari vendor';
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_36px_-34px_rgba(15,23,42,0.28)] sm:p-4">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_220px] xl:items-center">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+            <ProjectThumbnail item={item} variant="detail" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${statusPillClass(item.status)}`}
+                >
+                  {focusLabel}
+                </span>
+                <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  {item.createdLabel}
+                </span>
+              </div>
+              <h2 className="mt-2 line-clamp-2 text-xl font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {item.title}
+              </h2>
+              <p className="mt-2 line-clamp-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {focusCopy}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid min-w-0 gap-2 sm:grid-cols-3">
+            <DetailMetric
+              icon={MessageCircleMore}
+              label="Tawaran"
+              value={`${item.offerCount} masuk`}
+            />
+            <DetailMetric
+              icon={Wallet}
+              label="Budget"
+              value={item.detail.budgetLabel}
+            />
+            <DetailMetric
+              icon={Clock3}
+              label="Batas"
+              value={item.detail.deadlineLabel}
+            />
+          </div>
+        </div>
+
+        <div className="grid min-w-0 gap-2">
+          <div className="rounded-[18px] bg-[color:var(--app-surface-muted)] p-3 ring-1 ring-[color:var(--app-border)]">
+            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+              Kesiapan deal
+            </p>
+            <p className="mt-1 text-2xl font-black text-[color:var(--app-accent)]">
+              {analytics.dealReadiness}%
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+              {analytics.highIntentCount} proyek punya minat tinggi.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onSelect}
+              className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-text)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] dark:bg-white dark:text-slate-950"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Detail
+            </button>
+            <Link
+              href={secondaryHref}
+              className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-xs font-black text-[color:var(--app-text-inverse)]"
+            >
+              {secondaryLabel}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AnalyticsCard({
+  icon: Icon,
+  label,
+  value,
+  helper,
+  tone = 'growth',
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  helper: string;
+  tone?: ProjectSuggestion['tone'];
+}) {
+  const toneClass =
+    tone === 'urgent'
+      ? 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60'
+      : tone === 'steady'
+        ? 'bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-950/40 dark:text-sky-200 dark:ring-sky-900/60'
+        : 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60';
+
+  return (
+    <article className="min-w-0 overflow-hidden rounded-[15px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_12px_26px_-28px_rgba(15,23,42,0.18)]">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+            {label}
+          </p>
+          <p className="mt-1 text-[1.2rem] font-black leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.35rem]">
+            {value}
+          </p>
+        </div>
+        <span
+          className={cn(
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ring-1',
+            toneClass,
+          )}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+      </div>
+      <p className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+        {helper}
+      </p>
+    </article>
+  );
+}
+
+function ProjectFunnelPanel({ analytics }: { analytics: ProjectAnalytics }) {
+  const stages: FunnelStage[] = [
+    {
+      label: 'Dilihat',
+      value: analytics.projectViews,
+      helper: 'orang melihat brief',
+    },
+    {
+      label: 'Profil dibuka',
+      value: analytics.profileVisits,
+      helper: 'cek pemilik proyek',
+    },
+    {
+      label: 'Disimpan',
+      value: analytics.savedToCart,
+      helper: 'masuk shortlist/cart',
+    },
+    {
+      label: 'Chat',
+      value: analytics.chatLeads,
+      helper: 'calon vendor ngobrol',
+    },
+    {
+      label: 'Tawaran',
+      value: analytics.totalOffers,
+      helper: 'penawaran masuk',
+    },
+  ];
+  const maxValue = Math.max(...stages.map(stage => stage.value), 1);
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_12px_28px_-30px_rgba(15,23,42,0.18)] sm:p-3">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
+            Alur Proyek
+          </p>
+          <h2 className="mt-0.5 text-sm font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+            Dari dilihat sampai jadi tawaran
+          </h2>
+        </div>
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <BarChart3 className="h-3.5 w-3.5" />
+        </span>
+      </div>
+
+      <div className="mt-2 grid min-w-0 gap-1.5">
+        {stages.map(stage => {
+          const width = Math.max(8, Math.round((stage.value / maxValue) * 100));
+          return (
+            <div key={stage.label} className="min-w-0">
+              <div className="flex items-center justify-between gap-3 text-[11px] sm:text-xs">
+                <span className="min-w-0 truncate font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {stage.label}
+                </span>
+                <span className="shrink-0 font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {formatNumberId(stage.value)}
+                </span>
+              </div>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                <div
+                  className="h-full rounded-full bg-[linear-gradient(90deg,var(--app-accent),var(--app-accent-strong))]"
+                  style={{ width: `${width}%` }}
+                />
+              </div>
+              <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                {stage.helper}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ProjectSuggestionPanel({
+  analytics,
+  suggestions,
+}: {
+  analytics: ProjectAnalytics;
+  suggestions: ProjectSuggestion[];
+}) {
+  return (
+    <section className="min-w-0 overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_12px_28px_-30px_rgba(15,23,42,0.18)] sm:p-3">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
+            Saran Hari Ini
+          </p>
+          <h2 className="mt-0.5 text-sm font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+            Biar proyek lebih cepat jalan
+          </h2>
+        </div>
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <Lightbulb className="h-3.5 w-3.5" />
+        </span>
+      </div>
+
+      <div className="mt-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2">
+        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+          Paling siap deal
+        </p>
+        <p className="mt-1 line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          {analytics.bestProjectTitle}
+        </p>
+        <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+          Skor kesiapan {analytics.dealReadiness}%
+        </p>
+      </div>
+
+      <div className="mt-1.5 grid gap-1.5">
+        {suggestions.map(suggestion => {
+          const Icon = suggestion.icon;
+          return (
+            <Link
+              key={suggestion.id}
+              href={suggestion.href}
+              className="group min-w-0 rounded-[13px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-muted)_78%,transparent)] p-2 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)]"
+            >
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span
+                  className={cn(
+                    'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] ring-1',
+                    suggestion.tone === 'urgent'
+                      ? 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60'
+                      : suggestion.tone === 'steady'
+                        ? 'bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-950/40 dark:text-sky-200 dark:ring-sky-900/60'
+                        : 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60',
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[13px]">
+                    {suggestion.title}
+                  </h3>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                    {suggestion.description}
+                  </p>
+                  <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[color:var(--app-accent)]">
+                    {suggestion.actionLabel}
+                    <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
+                  </span>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ProjectInsightsDisclosure({
+  analytics,
+  analyticsCards,
+  suggestions,
+}: {
+  analytics: ProjectAnalytics;
+  analyticsCards: Array<{
+    icon: LucideIcon;
+    label: string;
+    value: string;
+    helper: string;
+    tone: ProjectSuggestion['tone'];
+  }>;
+  suggestions: ProjectSuggestion[];
+}) {
+  return (
+    <details
+      open
+      className="group min-w-0 overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] shadow-[0_16px_36px_-34px_rgba(15,23,42,0.24)]"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-2.5 marker:hidden sm:p-3 [&::-webkit-details-marker]:hidden">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+            <BarChart3 className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
+              Analitik & saran
+            </p>
+            <h2 className="mt-0.5 truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+              Ringkasan progres
+            </h2>
+            <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+              Funnel, minat vendor, dan langkah yang paling perlu dikerjakan.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden items-center gap-1.5 md:flex">
+            {analyticsCards.slice(0, 3).map(item => (
+              <span
+                key={item.label}
+                className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text)]"
+              >
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </div>
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] transition group-open:rotate-180">
+            <ChevronDown className="h-4 w-4" />
+          </span>
+        </div>
+      </summary>
+
+      <div className="border-t border-[color:var(--app-border)] p-2.5 pt-2 sm:p-3 sm:pt-2.5">
+        <div className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 md:hidden">
+          {analyticsCards.map(item => (
+            <div
+              key={item.label}
+              className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-2"
+            >
+              <p className="truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
+                {item.label}
+              </p>
+              <p className="mt-0.5 truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden min-w-0 gap-2 md:grid md:grid-cols-2 xl:grid-cols-4">
+          {analyticsCards.map(item => (
+            <AnalyticsCard
+              key={item.label}
+              icon={item.icon}
+              label={item.label}
+              value={item.value}
+              helper={item.helper}
+              tone={item.tone}
+            />
+          ))}
+        </div>
+
+        <div className="mt-2 grid min-w-0 gap-1.5 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
+          <ProjectFunnelPanel analytics={analytics} />
+          <ProjectSuggestionPanel
+            analytics={analytics}
+            suggestions={suggestions}
+          />
+        </div>
+
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-2">
+          <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+            Butuh analitik lebih lengkap? Buka halaman khusus analytics usaha.
+          </p>
+          <Link
+            href="/usaha/analytics"
+            className="inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-black text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)]"
+          >
+            Buka analitik
+          </Link>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -443,7 +1213,7 @@ function ProjectThumbnail({
   const sizeClass =
     variant === 'detail'
       ? 'h-16 w-16 rounded-[16px] sm:h-20 sm:w-20'
-      : 'h-14 w-14 rounded-[14px] sm:h-16 sm:w-16';
+      : 'h-12 w-12 rounded-[13px] sm:h-14 sm:w-14';
 
   return (
     <div
@@ -481,43 +1251,55 @@ function RequestListCard({
   onSelect: () => void;
 }) {
   const completed = item.statusKey === 'completed';
+  const tone = requestTone(item.statusKey);
+  const nextAction =
+    tone === 'waiting'
+      ? 'Balas vendor'
+      : completed
+        ? 'Lihat riwayat'
+        : item.offerCount > 0
+          ? 'Bandingkan'
+          : 'Cari vendor';
 
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        'group w-full min-w-0 overflow-hidden rounded-[18px] border px-2.5 py-2 text-left transition sm:px-3 sm:py-2.5',
+        'group w-full min-w-0 overflow-hidden rounded-[22px] border p-3 text-left transition sm:p-3.5',
         selected
-          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong))] shadow-[0_18px_34px_-28px_color-mix(in_srgb,var(--app-accent)_38%,transparent)]'
-          : 'border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] shadow-[0_14px_28px_-30px_rgba(15,23,42,0.2)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
+          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong))] shadow-[0_20px_44px_-34px_color-mix(in_srgb,var(--app-accent)_48%,transparent)]'
+          : 'border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_97%,transparent)] shadow-[0_14px_32px_-34px_rgba(15,23,42,0.22)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
       )}
     >
-      <div className="flex items-start gap-2 sm:gap-3">
+      <div className="flex items-start gap-3">
         <ProjectThumbnail item={item} />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span
-              className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold sm:px-2 sm:text-[10px] ${statusPillClass(item.status)}`}
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black ${statusPillClass(item.status)}`}
             >
               {displayStatusLabel(item.status)}
             </span>
-            <span className="truncate text-[10px] text-[color:var(--app-text-soft)] sm:text-[11px]">
+            <span className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
               {item.createdLabel}
             </span>
           </div>
-          <h3 className="mt-1.5 line-clamp-2 text-[0.85rem] font-black leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[0.92rem] sm:leading-5">
+          <h3 className="mt-1.5 line-clamp-2 text-base font-black leading-5 tracking-[-0.01em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {item.title}
           </h3>
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-[color:var(--app-text-soft)] sm:mt-2 sm:text-[12px]">
-            <MapPin className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
+          <p className="mt-1.5 line-clamp-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+            {item.detail.description}
+          </p>
+          <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-[color:var(--app-text-soft)]">
+            <MapPin className="h-3 w-3 shrink-0" />
             <span className="truncate">{item.city}</span>
           </div>
         </div>
-        <div className="shrink-0 rounded-[13px] bg-[color:var(--app-surface-muted)] px-2 py-1 text-center ring-1 ring-[color:var(--app-border)] transition group-hover:ring-[color:var(--app-accent-border)]">
+        <div className="shrink-0 rounded-[16px] bg-[color:var(--app-surface-muted)] px-2.5 py-2 text-center ring-1 ring-[color:var(--app-border)] transition group-hover:ring-[color:var(--app-accent-border)]">
           <p
             className={cn(
-              'text-base font-black leading-none sm:text-lg',
+              'text-lg font-black leading-none',
               completed
                 ? 'text-[color:var(--app-text)]'
                 : 'text-[color:var(--app-accent)]',
@@ -525,11 +1307,39 @@ function RequestListCard({
           >
             {item.offerCount}
           </p>
-          <p className="mt-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[10px]">
+          <p className="mt-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
             tawaran
           </p>
         </div>
-        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] transition group-hover:bg-[color:var(--app-accent)] group-hover:text-[color:var(--app-text-inverse)] xl:inline-flex">
+      </div>
+
+      <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="min-w-0 rounded-[15px] bg-[color:var(--app-surface-muted)] px-3 py-2 ring-1 ring-[color:var(--app-border)]">
+          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+            <Wallet className="h-3.5 w-3.5" />
+            Budget
+          </div>
+          <p className="mt-1 line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            {item.detail.budgetLabel}
+          </p>
+        </div>
+        <div className="min-w-0 rounded-[15px] bg-[color:var(--app-surface-muted)] px-3 py-2 ring-1 ring-[color:var(--app-border)]">
+          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+            <Clock3 className="h-3.5 w-3.5" />
+            Deadline
+          </div>
+          <p className="mt-1 line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            {item.detail.deadlineLabel}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:var(--app-border)] pt-3">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-black text-[color:var(--app-accent)]">
+          <FileText className="h-3.5 w-3.5" />
+          {nextAction}
+        </span>
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] transition group-hover:bg-[color:var(--app-accent)] group-hover:text-[color:var(--app-text-inverse)]">
           <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </div>
@@ -548,7 +1358,7 @@ function OfferCard({ offer }: { offer: OfferPreview }) {
           {offer.ratingLabel} - {offer.reviewLabel}
         </p>
       </div>
-      <div className="mt-2 grid min-w-0 grid-cols-2 gap-2 text-[10px] sm:mt-3 sm:text-[11px]">
+      <div className="mt-2 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 sm:mt-3 sm:text-[11px]">
         <div className="min-w-0">
           <p className="font-bold text-[color:var(--app-text-soft)]">Harga</p>
           <p className="mt-0.5 line-clamp-2 break-words font-semibold leading-snug text-[color:var(--app-text)] sm:mt-1">
@@ -598,6 +1408,8 @@ function RequestDetailDialog({
   const detail = request.detail;
   const offers = request.offers || [];
   const hasOffers = offers.length > 0;
+  const analytics = buildRequestAnalytics(request);
+  const suggestions = buildRequestSuggestions(request, analytics);
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-3 sm:p-5">
@@ -654,7 +1466,7 @@ function RequestDetailDialog({
         </div>
 
         <div className="min-w-0 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4">
-          <div className="grid min-w-0 grid-cols-2 gap-1.5">
+          <div className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2">
             <Link
               href="/chat"
               className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-[12px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-[12px] font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] sm:min-h-[42px] sm:text-xs"
@@ -675,7 +1487,7 @@ function RequestDetailDialog({
             </Link>
           </div>
 
-          <div className="mt-3 grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
+          <div className="mt-3 grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-4">
             <DetailMetric icon={Store} label="Butuh" value={detail.needType} />
             <DetailMetric
               icon={TrendingUp}
@@ -694,6 +1506,29 @@ function RequestDetailDialog({
             />
           </div>
 
+          <div className="mt-3 grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-4">
+            <DetailMetric
+              icon={Eye}
+              label="Dilihat"
+              value={`${formatNumberId(analytics.views)}x`}
+            />
+            <DetailMetric
+              icon={Users}
+              label="Profil"
+              value={`${formatNumberId(analytics.profileVisits)} visit`}
+            />
+            <DetailMetric
+              icon={ShoppingCart}
+              label="Disimpan"
+              value={`${formatNumberId(analytics.savedToCart)} cart`}
+            />
+            <DetailMetric
+              icon={Target}
+              label="Siap deal"
+              value={`${analytics.dealReadiness}%`}
+            />
+          </div>
+
           <div className="mt-3 min-w-0 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
             <p className="text-[13px] leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
               {detail.description}
@@ -702,6 +1537,45 @@ function RequestDetailDialog({
               {detail.category} - {detail.locationLabel}
             </p>
           </div>
+
+          <section className="mt-3 min-w-0 overflow-hidden rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-muted)] p-2.5 sm:p-3">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                  Analitik singkat
+                </h3>
+                <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)] sm:text-xs">
+                  Profil naik {analytics.profileLiftLabel}; chat ke tawaran{' '}
+                  {analytics.offerToChatRate}%.
+                </p>
+              </div>
+              <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-accent)] sm:px-2.5 sm:py-1 sm:text-xs">
+                {analytics.chatLeads} chat
+              </span>
+            </div>
+            <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-3">
+              {suggestions.map(suggestion => {
+                const Icon = suggestion.icon;
+                return (
+                  <Link
+                    key={suggestion.id}
+                    href={suggestion.href}
+                    className="min-w-0 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 transition hover:border-[color:var(--app-accent-border)]"
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <h4 className="mt-2 line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {suggestion.title}
+                    </h4>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                      {suggestion.description}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
 
           <section className="mt-3 min-w-0 overflow-hidden rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-muted)] p-2.5 sm:p-3">
             <div className="flex min-w-0 items-center justify-between gap-3">
@@ -754,6 +1628,7 @@ export default function MyProjectsPage() {
   const [requestsData, setRequestsData] =
     useState<LajukanRequestsPayload | null>(null);
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
+  const [projectFilter, setProjectFilter] = useState<ProjectViewFilter>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -802,10 +1677,43 @@ export default function MyProjectsPage() {
     () => requestCards.filter(item => item.statusKey !== 'completed'),
     [requestCards],
   );
+  const waitingRequests = useMemo(
+    () =>
+      activeRequests.filter(item => requestTone(item.statusKey) === 'waiting'),
+    [activeRequests],
+  );
   const completedRequests = useMemo(
     () => requestCards.filter(item => item.statusKey === 'completed'),
     [requestCards],
   );
+  const prioritizedRequests = useMemo(
+    () => [
+      ...waitingRequests,
+      ...activeRequests.filter(
+        item => requestTone(item.statusKey) !== 'waiting',
+      ),
+      ...completedRequests,
+    ],
+    [activeRequests, completedRequests, waitingRequests],
+  );
+  const visibleRequests = useMemo(() => {
+    if (projectFilter === 'active') {
+      return activeRequests.filter(
+        item => requestTone(item.statusKey) === 'active',
+      );
+    }
+    if (projectFilter === 'waiting') return waitingRequests;
+    if (projectFilter === 'completed') return completedRequests;
+    return prioritizedRequests;
+  }, [
+    activeRequests,
+    completedRequests,
+    prioritizedRequests,
+    projectFilter,
+    waitingRequests,
+  ]);
+  const focusRequest =
+    waitingRequests[0] || activeRequests[0] || prioritizedRequests[0] || null;
 
   const detailRequest = detailRequestId
     ? requestCards.find(item => item.id === detailRequestId) || null
@@ -814,6 +1722,66 @@ export default function MyProjectsPage() {
     () => requestCards.reduce((total, item) => total + item.offerCount, 0),
     [requestCards],
   );
+  const projectAnalytics = useMemo(
+    () => buildProjectAnalytics(requestCards),
+    [requestCards],
+  );
+  const projectSuggestions = useMemo(
+    () => buildProjectSuggestions(projectAnalytics, requestCards),
+    [projectAnalytics, requestCards],
+  );
+  const analyticsCards = useMemo(
+    () => [
+      {
+        icon: Eye,
+        label: 'Dilihat',
+        value: formatNumberId(projectAnalytics.projectViews),
+        helper: `${projectAnalytics.profileVisitsChange}% lebih ramai dari minggu lalu`,
+        tone: 'growth' as const,
+      },
+      {
+        icon: Users,
+        label: 'Kunjungan profil',
+        value: formatNumberId(projectAnalytics.profileVisits),
+        helper: 'Orang yang cek profil sebelum chat atau nawar',
+        tone: 'steady' as const,
+      },
+      {
+        icon: ShoppingCart,
+        label: 'Disimpan / cart',
+        value: formatNumberId(projectAnalytics.savedToCart),
+        helper: 'Vendor dan calon mitra yang menyimpan proyek',
+        tone: 'growth' as const,
+      },
+      {
+        icon: MousePointerClick,
+        label: 'Chat prospek',
+        value: formatNumberId(projectAnalytics.chatLeads),
+        helper: `${projectAnalytics.offerRate} tawaran rata-rata per proyek`,
+        tone:
+          projectAnalytics.waitingCount > 0
+            ? ('urgent' as const)
+            : ('steady' as const),
+      },
+    ],
+    [projectAnalytics],
+  );
+
+  const handleSelectRequest = (item: RequestCardView) => {
+    setDetailRequestId(item.id);
+    const analytics = buildRequestAnalytics(item);
+    void trackLajukanEvent('project.detail_opened', {
+      entityType: 'project_request',
+      entityId: item.id,
+      properties: {
+        status: item.statusKey,
+        offer_count: item.offerCount,
+        profile_visits: analytics.profileVisits,
+        saved_to_cart: analytics.savedToCart,
+        deal_readiness: analytics.dealReadiness,
+      },
+    });
+  };
 
   useEffect(() => {
     if (!detailRequestId || !detailRequest) {
@@ -863,6 +1831,46 @@ export default function MyProjectsPage() {
     ],
     [activeRequests, completedRequests.length, requestsData, totalOfferCount],
   );
+  const projectFilterOptions = useMemo(
+    () => [
+      {
+        key: 'all' as const,
+        label: 'Semua',
+        count: requestCards.length,
+        icon: ListFilter,
+      },
+      {
+        key: 'active' as const,
+        label: 'Aktif',
+        count: activeRequests.filter(
+          item => requestTone(item.statusKey) === 'active',
+        ).length,
+        icon: BriefcaseBusiness,
+      },
+      {
+        key: 'waiting' as const,
+        label: 'Nunggu',
+        count:
+          requestsData?.counts.waiting ??
+          activeRequests.filter(
+            item => requestTone(item.statusKey) === 'waiting',
+          ).length,
+        icon: Clock3,
+      },
+      {
+        key: 'completed' as const,
+        label: 'Selesai',
+        count: requestsData?.counts.completed ?? completedRequests.length,
+        icon: CheckCircle2,
+      },
+    ],
+    [
+      activeRequests,
+      completedRequests.length,
+      requestCards.length,
+      requestsData,
+    ],
+  );
 
   if (authLoading) {
     return (
@@ -875,17 +1883,21 @@ export default function MyProjectsPage() {
   if (!user) {
     return (
       <MyProjectsPageChrome>
-        <div className="py-6">
-          <div className="mx-auto max-w-xl rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 text-center shadow-[var(--app-shadow)]">
-            <h2 className="text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <div className="mx-auto grid min-h-[68svh] w-full max-w-xl place-items-center px-4 py-8">
+          <div className="w-full rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-6 text-center shadow-[0_24px_56px_-42px_rgba(15,23,42,0.42)]">
+            <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <ShieldCheck className="h-6 w-6" />
+            </span>
+            <h2 className="mt-4 text-2xl font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Masuk dulu
             </h2>
-            <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
-              Masuk buat lanjut.
+            <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
+              Proyek, tawaran vendor, dan chat transaksi hanya bisa dibuka
+              setelah masuk.
             </p>
             <Link
               href="/login"
-              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-semibold text-[color:var(--app-text-inverse)]"
+              className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-6 text-sm font-black text-[color:var(--app-text-inverse)]"
             >
               Masuk
             </Link>
@@ -898,19 +1910,24 @@ export default function MyProjectsPage() {
   if (requestCards.length === 0) {
     return (
       <MyProjectsPageChrome>
-        <div className="py-6">
-          <div className="mx-auto max-w-xl rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 text-center shadow-[var(--app-shadow)]">
-            <h2 className="text-xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <div className="mx-auto grid min-h-[68svh] w-full max-w-2xl place-items-center px-4 py-8">
+          <div className="w-full rounded-[30px] border border-[color:var(--app-border)] bg-[linear-gradient(135deg,var(--app-surface-strong),color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong)))] p-6 text-center shadow-[0_24px_56px_-42px_rgba(15,23,42,0.42)]">
+            <span className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-[22px] bg-white/70 text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-950/50">
+              <ClipboardList className="h-7 w-7" />
+            </span>
+            <h2 className="mt-4 text-2xl font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Belum ada kebutuhan
             </h2>
-            <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
-              Tulis kebutuhan, vendor nanti nawar.
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[color:var(--app-text-soft)]">
+              Tulis kebutuhan usaha sekali, nanti vendor bisa kirim tawaran dan
+              lanjut chat dari halaman ini.
             </p>
             <Link
               href="/create"
-              className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-semibold text-[color:var(--app-text-inverse)]"
+              className="mt-5 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-6 text-sm font-black text-[color:var(--app-text-inverse)]"
             >
-              Buat Baru
+              <Plus className="h-4 w-4" />
+              Buat kebutuhan pertama
             </Link>
           </div>
         </div>
@@ -920,108 +1937,141 @@ export default function MyProjectsPage() {
 
   return (
     <MyProjectsPageChrome>
-      <div className="mx-auto grid w-full min-w-0 max-w-[1700px] gap-2 overflow-x-hidden px-1 sm:px-2 lg:min-h-0 lg:gap-3 lg:px-0">
-        <section className="min-w-0 overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[linear-gradient(135deg,var(--app-surface-strong)_0%,color-mix(in_srgb,var(--app-accent-soft)_20%,var(--app-surface-strong))_100%)] p-3 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.24)] sm:p-4">
-          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
-                <ClipboardList className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
-                  Kebutuhan
-                </p>
-                <h1 className="mt-0.5 text-[1.18rem] font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.55rem]">
-                  Proyek Saya
-                </h1>
-                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
-                  Klik kartu untuk lihat detail.
-                </p>
+      <div className="mx-auto grid w-full min-w-0 max-w-[1480px] gap-4 overflow-x-hidden px-3 py-3 sm:px-4 lg:px-5">
+        <section className="min-w-0 overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-surface-strong)_94%,white)_0%,color-mix(in_srgb,var(--app-info-soft)_28%,var(--app-surface-strong))_54%,color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong))_100%)] p-4 shadow-[0_22px_48px_-42px_rgba(15,23,42,0.36)] sm:p-5">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/74 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)] ring-1 ring-[color:color-mix(in_srgb,var(--app-accent-border)_72%,transparent)] dark:bg-slate-950/54">
+                <ClipboardList className="h-3.5 w-3.5" />
+                Workspace Proyek
+              </div>
+              <h1 className="mt-3 text-[1.65rem] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[2.15rem]">
+                Semua kebutuhan usaha, tawaran, dan chat proyek dalam satu
+                tempat.
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[color:var(--app-text-soft)] sm:text-[15px]">
+                Mulai dari brief, tunggu vendor masuk, pilih penawaran, lalu
+                lanjut transaksi tanpa harus cari-cari lagi.
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <Link
+                  href="/create"
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-black text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_-26px_color-mix(in_srgb,var(--app-accent)_58%,transparent)]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Buat kebutuhan baru
+                </Link>
+                <Link
+                  href="/chat"
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white/76 px-5 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] dark:bg-slate-950/56 dark:text-[color:var(--app-text-inverse)]"
+                >
+                  <MessageCircleMore className="h-4 w-4" />
+                  Buka chat
+                </Link>
               </div>
             </div>
 
-            <div className="grid w-full min-w-0 grid-cols-1 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:gap-2">
-              <Link
-                href="/create"
-                className="inline-flex min-h-[34px] items-center justify-center gap-1.5 rounded-[12px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-[12px] font-semibold text-[color:var(--app-text-inverse)] sm:min-h-[38px] sm:gap-2 sm:px-4 sm:text-sm"
-              >
-                <span>Buat Baru</span>
-                <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid min-w-0 grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2 xl:grid-cols-4">
-          {summaryCards.map((item, index) => (
-            <SummaryCard
-              key={item.label}
-              icon={item.icon}
-              label={item.label}
-              value={item.value}
-              index={index}
-            />
-          ))}
-        </section>
-
-        <section className="min-w-0 overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_16px_36px_-34px_rgba(15,23,42,0.22)] sm:p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                <Store className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
-                  Kebutuhan
-                </h2>
-                <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)] sm:text-xs">
-                  {requestCards.length} item
-                </p>
-              </div>
-            </div>
-            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-accent)] sm:px-2.5 sm:py-1 sm:text-xs">
-              {activeRequests.length} aktif
-            </span>
-          </div>
-
-          <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {activeRequests.length === 0 ? (
-              <div className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 text-sm text-[color:var(--app-text-soft)] sm:col-span-2 lg:col-span-3 2xl:col-span-4">
-                Belum ada yang aktif.
-              </div>
-            ) : (
-              activeRequests.map(item => (
-                <RequestListCard
-                  key={item.id}
-                  item={item}
-                  selected={item.id === detailRequestId}
-                  onSelect={() => setDetailRequestId(item.id)}
+            <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-2">
+              {summaryCards.map((item, index) => (
+                <SummaryCard
+                  key={item.label}
+                  icon={item.icon}
+                  label={item.label}
+                  value={item.value}
+                  index={index}
                 />
-              ))
-            )}
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_390px] lg:items-start">
+          <div className="grid min-w-0 gap-4">
+            {focusRequest ? (
+              <ProjectFocusCard
+                item={focusRequest}
+                analytics={projectAnalytics}
+                onSelect={() => handleSelectRequest(focusRequest)}
+              />
+            ) : null}
+
+            <section className="min-w-0 overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_36px_-34px_rgba(15,23,42,0.28)] sm:p-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start">
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+                    <Store className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      Daftar proyek
+                    </h2>
+                    <p className="mt-0.5 text-sm text-[color:var(--app-text-soft)]">
+                      {requestCards.length} proyek,{' '}
+                      {projectAnalytics.highIntentCount} minat tinggi
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex min-w-0 gap-1.5 overflow-x-auto rounded-full bg-[color:var(--app-surface-muted)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {projectFilterOptions.map(option => {
+                    const Icon = option.icon;
+                    const active = projectFilter === option.key;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setProjectFilter(option.key)}
+                        className={cn(
+                          'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-black transition',
+                          active
+                            ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] shadow-sm ring-1 ring-[color:var(--app-accent-border)]'
+                            : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-strong)] hover:text-[color:var(--app-text)]',
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {option.label}
+                        <span className="rounded-full bg-[color:color-mix(in_srgb,var(--app-text-soft)_12%,transparent)] px-1.5 py-0.5 text-[10px]">
+                          {option.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2 xl:grid-cols-2">
+                {visibleRequests.length > 0 ? (
+                  visibleRequests.map(item => (
+                    <RequestListCard
+                      key={item.id}
+                      item={item}
+                      selected={item.id === detailRequestId}
+                      onSelect={() => handleSelectRequest(item)}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-sm text-[color:var(--app-text-soft)] md:col-span-2">
+                    <p className="font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      Belum ada proyek{' '}
+                      {projectFilterLabel(projectFilter).toLowerCase()}.
+                    </p>
+                    <p className="mt-1">
+                      Buat kebutuhan baru atau pindah ke filter lain.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
 
-          {completedRequests.length > 0 ? (
-            <details
-              className="mt-2 min-w-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2"
-              open={activeRequests.length === 0}
-            >
-              <summary className="cursor-pointer px-1 py-0.5 text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] sm:text-xs">
-                Selesai ({completedRequests.length})
-              </summary>
-              <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {completedRequests.map(item => (
-                  <RequestListCard
-                    key={item.id}
-                    item={item}
-                    selected={item.id === detailRequestId}
-                    onSelect={() => setDetailRequestId(item.id)}
-                  />
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </section>
+          <aside className="grid min-w-0 gap-4 lg:sticky lg:top-24">
+            <ProjectInsightsDisclosure
+              analytics={projectAnalytics}
+              analyticsCards={analyticsCards}
+              suggestions={projectSuggestions}
+            />
+          </aside>
+        </div>
       </div>
 
       <RequestDetailDialog

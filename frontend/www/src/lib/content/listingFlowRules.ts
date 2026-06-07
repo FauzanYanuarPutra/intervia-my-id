@@ -36,6 +36,7 @@ const UPSERT_LISTING_KEYS = [
   'body',
   'pricing_mode',
   'price_cents',
+  'price_unit',
   'original_price_cents',
   'promo_label',
   'promo_start_at',
@@ -171,6 +172,7 @@ const UpsertListingSchema = z
     description: z.string().optional(),
     pricing_mode: z.string().optional(),
     price_cents: z.union([z.number(), z.string()]).optional(),
+    price_unit: z.string().optional(),
     original_price_cents: z.union([z.number(), z.string()]).optional(),
     promo_label: z.string().optional(),
     promo_start_at: z.string().optional(),
@@ -951,6 +953,16 @@ export function validateListingPayload(
     issues.push(
       'original_price_cents must be greater than or equal to price_cents',
     );
+  }
+
+  const priceUnit = normalizeText(payload.price_unit, 40)?.toLowerCase();
+  if (priceUnit) {
+    payload.price_unit = priceUnit.replace(/[^a-z0-9_-]+/g, '_');
+  } else {
+    delete payload.price_unit;
+  }
+  if (payload.pricing_mode === 'request') {
+    delete payload.price_unit;
   }
 
   const currency = normalizeText(payload.currency, 8)?.toUpperCase();

@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PropertyCard } from '@/components/ui-kit';
-import { Header } from '@/components/layout/Header';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   Search,
@@ -15,6 +14,10 @@ import {
   ChevronLeft,
   Home as HomeIcon,
 } from 'lucide-react';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 
 interface Property {
   id: string;
@@ -44,6 +47,7 @@ type ContentItem = {
   category?: string;
   cover_image?: string;
   price_cents?: number | null;
+  price_unit?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -78,7 +82,10 @@ function resolveStatusType(item: ContentItem): 'sale' | 'rent' {
   return raw.includes('rent') || raw.includes('sewa') ? 'rent' : 'sale';
 }
 
-function mapContentToProperty(item: ContentItem): Property {
+function mapContentToProperty(
+  item: ContentItem,
+  locale: 'id' | 'en',
+): Property {
   const metadata = item.metadata ?? {};
   const location =
     asString(metadata.location) ||
@@ -88,15 +95,25 @@ function mapContentToProperty(item: ContentItem): Property {
     'Indonesia';
   const statusType = resolveStatusType(item);
   const bedrooms = Number(metadata.bedrooms ?? metadata.kamar_tidur ?? 0) || 0;
-  const bathrooms = Number(metadata.bathrooms ?? metadata.kamar_mandi ?? 0) || 0;
-  const area = Number(metadata.area ?? metadata.luas ?? metadata.land_area ?? 0) || 0;
+  const bathrooms =
+    Number(metadata.bathrooms ?? metadata.kamar_mandi ?? 0) || 0;
+  const area =
+    Number(metadata.area ?? metadata.luas ?? metadata.land_area ?? 0) || 0;
+  const price = formatCurrencyIDRFromCents(item.price_cents);
+  const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const fallbackPriceLabel = asString(metadata.price_label);
 
   return {
     id: item.id,
     title: item.title || item.summary || 'Property Listing',
     image: item.cover_image || asString(metadata.image) || '',
     location,
-    price: formatCurrencyIDRFromCents(item.price_cents),
+    price:
+      price !== 'Hubungi agen'
+        ? formatPriceWithUnit(price, priceUnitLabel)
+        : fallbackPriceLabel
+          ? formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
+          : price,
     statusType,
     bedrooms,
     bathrooms,
@@ -126,7 +143,8 @@ function matchesFilters(property: Property, filters: Filters): boolean {
   const matchLocation =
     locationFilter.length === 0 ||
     property.location.toLowerCase().includes(locationFilter);
-  const matchType = filters.type === 'All' || property.statusType === filters.type;
+  const matchType =
+    filters.type === 'All' || property.statusType === filters.type;
   return matchSearch && matchLocation && matchType;
 }
 
@@ -159,6 +177,7 @@ export default function PropertyClient() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const locale = pathname.startsWith('/en') ? 'en' : 'id';
   const fallbackHomePath = pathname.startsWith('/en') ? '/en/home' : '/id/home';
 
   const initialSearch = searchParams.get('q') ?? '';
@@ -190,11 +209,14 @@ export default function PropertyClient() {
   // Keep URL query in sync with applied filters.
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
-    if (appliedFilters.search.trim()) params.set('q', appliedFilters.search.trim());
+    if (appliedFilters.search.trim())
+      params.set('q', appliedFilters.search.trim());
     else params.delete('q');
-    if (appliedFilters.location.trim()) params.set('location', appliedFilters.location.trim());
+    if (appliedFilters.location.trim())
+      params.set('location', appliedFilters.location.trim());
     else params.delete('location');
-    if (appliedFilters.type !== 'All') params.set('status', appliedFilters.type);
+    if (appliedFilters.type !== 'All')
+      params.set('status', appliedFilters.type);
     else params.delete('status');
 
     const nextQuery = params.toString();
@@ -208,7 +230,11 @@ export default function PropertyClient() {
 
   const loadData = useCallback(
     async (reset = false) => {
-      if (!reset && (!hasMore || loadingMore || loadingInitial || autoLoadLockRef.current)) return;
+      if (
+        !reset &&
+        (!hasMore || loadingMore || loadingInitial || autoLoadLockRef.current)
+      )
+        return;
 
       const currentPage = reset ? 1 : page;
       const offset = (currentPage - 1) * PROPERTIES_PER_LOAD;
@@ -249,14 +275,14 @@ export default function PropertyClient() {
 
         const serverItems = extractContentItems(payload);
         const fromApi = serverItems
-          .map((item) => mapContentToProperty(item))
-          .filter((property) => matchesFilters(property, appliedFilters));
+          .map(item => mapContentToProperty(item, locale))
+          .filter(property => matchesFilters(property, appliedFilters));
 
         const batch = fromApi;
         const hasMoreNext = serverItems.length === PROPERTIES_PER_LOAD;
         setLoadError(null);
 
-        setItems((prev) => (reset ? batch : [...prev, ...batch]));
+        setItems(prev => (reset ? batch : [...prev, ...batch]));
         setHasMore(hasMoreNext);
         setPage(reset ? 2 : currentPage + 1);
       } catch (err) {
@@ -269,7 +295,7 @@ export default function PropertyClient() {
         setLoadingMore(false);
       }
     },
-    [appliedFilters, hasMore, loadingInitial, loadingMore, page],
+    [appliedFilters, hasMore, loadingInitial, loadingMore, locale, page],
   );
 
   const executeSearch = useCallback(() => {
@@ -278,7 +304,7 @@ export default function PropertyClient() {
       location: tempLocation.trim(),
       type: tempType,
     };
-    setAppliedFilters((prev) =>
+    setAppliedFilters(prev =>
       prev.search === next.search &&
       prev.location === next.location &&
       prev.type === next.type
@@ -303,8 +329,13 @@ export default function PropertyClient() {
     if (!target) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !loadingMore && !loadingInitial) {
+      entries => {
+        if (
+          entries[0]?.isIntersecting &&
+          hasMore &&
+          !loadingMore &&
+          !loadingInitial
+        ) {
           loadData(false);
         }
       },
@@ -327,7 +358,7 @@ export default function PropertyClient() {
     if (key === 'location') setTempLocation('');
     if (key === 'type') setTempType('All');
 
-    setAppliedFilters((prev) => ({
+    setAppliedFilters(prev => ({
       ...prev,
       [key]: key === 'type' ? 'All' : '',
     }));
@@ -335,9 +366,6 @@ export default function PropertyClient() {
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <div className="hidden lg:block">
-        <Header />
-      </div>
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
         <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
           <div className="flex flex-col gap-2 md:flex-row">
@@ -359,8 +387,8 @@ export default function PropertyClient() {
                   placeholder="Cari villa, apartemen, lokasi..."
                   className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={tempSearch}
-                  onChange={(e) => setTempSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
+                  onChange={e => setTempSearch(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && executeSearch()}
                 />
               </div>
             </div>
@@ -371,15 +399,15 @@ export default function PropertyClient() {
                 placeholder="Filter lokasi"
                 className="min-w-[150px] flex-1 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] md:w-44"
                 value={tempLocation}
-                onChange={(e) => setTempLocation(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && executeSearch()}
+                onChange={e => setTempLocation(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && executeSearch()}
               />
 
               <select
                 title="Filter Status"
                 className="min-w-[150px] flex-1 cursor-pointer appearance-none rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] md:w-44"
                 value={tempType}
-                onChange={(e) => setTempType(e.target.value as Filters['type'])}
+                onChange={e => setTempType(e.target.value as Filters['type'])}
               >
                 <option value="All">Semua Status</option>
                 <option value="sale">DIJUAL</option>
@@ -397,7 +425,9 @@ export default function PropertyClient() {
               appliedFilters.location.trim() ||
               appliedFilters.type !== 'All'
             ) ? (
-              <span className="text-xs text-[color:var(--app-text-soft)] italic">Tidak Ada</span>
+              <span className="text-xs text-[color:var(--app-text-soft)] italic">
+                Tidak Ada
+              </span>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {appliedFilters.search && (
@@ -428,7 +458,9 @@ export default function PropertyClient() {
             )}
           </div>
 
-          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">Auto-apply filter aktif</p>
+          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">
+            Auto-apply filter aktif
+          </p>
         </div>
       </header>
 
@@ -484,7 +516,9 @@ export default function PropertyClient() {
                   Memuat data berikutnya...
                 </div>
               ) : hasMore ? (
-                <span className="text-xs italic text-[color:var(--app-text-soft)]">Scroll untuk muat otomatis</span>
+                <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                  Scroll untuk muat otomatis
+                </span>
               ) : (
                 <div className="w-full border-t border-[color:var(--app-border)] pt-4 text-center text-xs font-medium italic text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
                   Semua properti sudah dimuat

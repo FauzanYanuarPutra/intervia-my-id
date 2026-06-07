@@ -1,5 +1,6 @@
-import { notFound, redirect } from 'next/navigation';
-import { buildUsahaPortalHref, type UsahaRouteId } from '@/lib/umkmSurface';
+import { notFound } from 'next/navigation';
+import type { UmkmManageWorkspaceId } from '@/lib/super-app/umkm-manage-profiles';
+import { UsahaOwnerRouteView } from '../../../_components/UsahaOwnerRouteView';
 
 type PageProps = {
   params: Promise<{
@@ -9,27 +10,39 @@ type PageProps = {
   }>;
 };
 
-const WORKSPACE_ROUTE_MAP: Record<string, UsahaRouteId> = {
-  analytics: 'analytics',
-  asisten: 'assistant',
-  dashboard: 'dashboard',
-  katalog: 'catalog',
-  operasional: 'operations',
-  order: 'order',
-  profil: 'profile',
-  qr: 'qr',
-  tim: 'team',
+type WorkspaceRoute = {
+  workspace: UmkmManageWorkspaceId;
+  setupView?: 'list' | 'create' | 'detail';
+};
+
+const WORKSPACE_ROUTE_MAP: Record<string, WorkspaceRoute> = {
+  analytics: { workspace: 'overview' },
+  asisten: { workspace: 'setup', setupView: 'detail' },
+  dashboard: { workspace: 'overview' },
+  katalog: { workspace: 'catalog' },
+  operasional: { workspace: 'operations' },
+  order: { workspace: 'orders' },
+  profil: { workspace: 'setup', setupView: 'detail' },
+  qr: { workspace: 'operations' },
+  tim: { workspace: 'team' },
 };
 
 export default async function UsahaStoreWorkspacePage({
   params,
 }: PageProps) {
-  const { storeId, workspace } = await params;
+  const { locale, storeId, workspace } = await params;
   const route = WORKSPACE_ROUTE_MAP[workspace];
 
   if (!route) {
     notFound();
   }
 
-  redirect(buildUsahaPortalHref(route, { storeId }));
+  return (
+    <UsahaOwnerRouteView
+      locale={locale}
+      workspace={route.workspace}
+      setupView={route.setupView}
+      forcedStoreId={storeId}
+    />
+  );
 }

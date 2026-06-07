@@ -7,12 +7,15 @@ import { divIcon, latLngBounds, type DivIcon, type LatLngBoundsExpression } from
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import type { LatLng } from '@/lib/super-app/maps';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
+import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
+import { LajukanImage } from '@/components/common/LajukanImage';
 import type { UmkmMapRouteSummary, UmkmMapStore, UmkmMapTheme } from './UmkmStoreMap';
 
 type UmkmStoreMapClientProps = {
   stores: UmkmMapStore[];
   selectedStoreId?: string | null;
   onSelectStore?: (storeId: string) => void;
+  isId?: boolean;
   viewerLocation?: LatLng | null;
   className?: string;
   interactive?: boolean;
@@ -46,6 +49,7 @@ const MARKER_CLICK_FOCUS_STEP = 2;
 const MARKER_FOCUS_DURATION = 0.45;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
+const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
 
 type MarkerFocusTarget = {
   lat: number;
@@ -414,6 +418,7 @@ function StorePreviewCard({
   compact = false,
   selectable = false,
   onClick,
+  isId,
 }: {
   store: UmkmMapStore;
   ui: StorePresentation['ui'];
@@ -421,116 +426,165 @@ function StorePreviewCard({
   compact?: boolean;
   selectable?: boolean;
   onClick?: () => void;
+  isId: boolean;
 }) {
-  const Container = onClick ? 'button' : 'div';
-  const cardClass = `w-full border text-left transition ${
-    compact ? 'rounded-2xl p-2.5' : 'rounded-[20px] p-3'
-  } ${
+  const cardClass = `w-full rounded-2xl border p-2 text-left transition ${
     active
       ? 'border-emerald-500 bg-emerald-50/90 text-emerald-950'
-      : 'border-slate-200 bg-white text-slate-800 hover:border-emerald-300 hover:bg-emerald-50/50'
+      : 'border-slate-200 bg-white text-slate-800'
   }`;
 
-  if (compact) {
-    return (
-      <Container
-        {...(onClick
-          ? {
-              type: 'button' as const,
-              onClick,
-            }
-          : {})}
-        className={cardClass}
-      >
-        <div className="flex items-center gap-2">
-          <img
-            src={ui.coverImage || ui.gallery[0]}
-            alt={store.name}
-            className="h-10 w-10 rounded-lg border border-slate-200 object-cover shrink-0"
-          />
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-[12px] font-semibold text-slate-900">
-                {store.name}
-              </p>
-
-              <span className="flex items-center gap-1 text-[10px] font-medium text-amber-600">
-                <Star className="h-3 w-3 fill-current" />
-                {ui.ratingLabel}
-              </span>
-            </div>
-
-            <div className="mt-0.5">
-              <StoreKindChip ui={ui} compact />
-            </div>
-          </div>
-        </div>
-      </Container>
-    );
-  }
-
   return (
-    <Container
-      {...(onClick
-        ? {
-            type: 'button' as const,
-            onClick,
-          }
-        : {})}
-      className={cardClass}
-    >
-      <div className="flex items-start gap-3">
-        <img
+    <div className={cardClass}>
+      <div className="flex min-w-0 items-center gap-2">
+        <LajukanImage
           src={ui.coverImage || ui.gallery[0]}
           alt={store.name}
-          className="h-16 w-16 shrink-0 rounded-2xl border border-slate-200 object-cover"
+          width={48}
+          height={48}
+          className={`${compact ? 'h-10 w-10 rounded-xl' : 'h-12 w-12 rounded-2xl'} shrink-0 border border-slate-200 object-cover`}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black text-slate-900">{store.name}</p>
-              <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
-                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{store.city}</span>
-              </div>
-            </div>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">
-              <Star className="h-3.5 w-3.5 fill-current" />
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <p className="line-clamp-2 text-[12px] font-black leading-tight text-slate-950">
+              {store.name}
+            </p>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+              <Star className="h-3 w-3 fill-current" />
               {ui.ratingLabel}
             </span>
           </div>
-
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <StoreKindChip ui={ui} />
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600">
-              {ui.categoryLabel}
-            </span>
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600">
-              {ui.locationModeLabel}
-            </span>
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10.5px] font-semibold text-slate-500">
+            <StoreKindChip ui={ui} compact />
+            <span className="truncate">{store.city}</span>
           </div>
-
-          <p className="mt-2 text-[11px] leading-5 text-slate-500">{ui.addressLine}</p>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {ui.serviceBadges.slice(0, 2).map((badge) => (
-          <span
-            key={badge}
-            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-600"
-          >
-            {badge}
-          </span>
-        ))}
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        <a
+          href={buildUmkmStorefrontPath(store.slug)}
+          className="inline-flex min-h-[30px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[10.5px] font-black text-white transition hover:bg-emerald-700"
+        >
+          {isId ? 'Detail' : 'Details'}
+        </a>
         {selectable ? (
-          <span className="ml-auto inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-700">
-            {active ? 'Selected' : 'Click to select'}
+          <button
+            type="button"
+            onClick={onClick}
+            disabled={!onClick}
+            className={`inline-flex min-h-[30px] items-center justify-center rounded-full border px-2 text-[10.5px] font-black transition ${
+              active
+                ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
+            }`}
+          >
+            {active ? (isId ? 'Terpilih' : 'Selected') : isId ? 'Pilih' : 'Select'}
+          </button>
+        ) : (
+          <a
+            href={ui.googleMapsPlaceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-[30px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[10.5px] font-black text-slate-700 transition hover:border-slate-300"
+          >
+            {isId ? 'Rute' : 'Route'}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StorePopupSummary({
+  store,
+  ui,
+  active = false,
+  selectable = false,
+  onSelect,
+  isId,
+}: {
+  store: UmkmMapStore;
+  ui: StorePresentation['ui'];
+  active?: boolean;
+  selectable?: boolean;
+  onSelect?: () => void;
+  isId: boolean;
+}) {
+  return (
+    <div className="w-[min(72vw,255px)] space-y-2">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <p className="line-clamp-2 text-[13px] font-black leading-tight text-slate-950">
+            {store.name}
+          </p>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">
+            <Star className="h-3.5 w-3.5 fill-current" />
+            {ui.ratingLabel}
           </span>
+        </div>
+
+        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+          <StoreKindChip ui={ui} compact />
+          <span className="inline-flex min-h-[22px] items-center rounded-full bg-slate-100 px-2 text-[10.5px] font-bold text-slate-600">
+            {store.city}
+          </span>
+          <span
+            className={`inline-flex min-h-[22px] items-center rounded-full px-2 text-[10.5px] font-bold ${
+              ui.openNow !== false
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {ui.openNow !== false
+              ? isId
+                ? 'Buka'
+                : 'Open'
+              : isId
+                ? 'Tutup'
+                : 'Closed'}
+          </span>
+        </div>
+
+        <p className="mt-1.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-slate-500">
+          <MapPin className="h-3.5 w-3.5 shrink-0" />
+          <span className="line-clamp-1">{ui.addressLine || store.address}</span>
+        </p>
+      </div>
+
+      <div
+        className={`grid gap-1.5 ${selectable ? 'grid-cols-3' : 'grid-cols-2'}`}
+      >
+        <a
+          href={buildUmkmStorefrontPath(store.slug)}
+          className="inline-flex min-h-[32px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[11px] font-black text-white transition hover:bg-emerald-700"
+        >
+          {isId ? 'Detail' : 'Details'}
+        </a>
+        <a
+          href={ui.googleMapsPlaceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-[32px] items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 text-[11px] font-black text-slate-700 transition hover:border-slate-300"
+        >
+          {isId ? 'Rute' : 'Route'}
+          <ExternalLink className="h-3 w-3" />
+        </a>
+        {selectable ? (
+          <button
+            type="button"
+            onClick={onSelect}
+            className={`inline-flex min-h-[32px] items-center justify-center rounded-full border px-2 text-[11px] font-black transition ${
+              active
+                ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
+            }`}
+          >
+            {active ? (isId ? 'Dipilih' : 'Selected') : isId ? 'Pilih' : 'Select'}
+          </button>
         ) : null}
       </div>
-    </Container>
+    </div>
   );
 }
 
@@ -933,11 +987,13 @@ function StoreMarkersLayer({
   selectedStoreId,
   onSelectStore,
   onMarkerFocus,
+  isId,
 }: {
   storePresentations: StorePresentation[];
   selectedStoreId?: string | null;
   onSelectStore?: (storeId: string) => void;
   onMarkerFocus?: (target: Omit<MarkerFocusTarget, 'nonce'>) => void;
+  isId: boolean;
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -1037,45 +1093,22 @@ function StoreMarkersLayer({
               <Tooltip direction="top" offset={[0, -8]}>
                 {store.name}
               </Tooltip>
-              <Popup className="umkm-store-map-popup" maxWidth={320}>
-                <div className="space-y-3">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
-                    Location details
-                  </p>
-                  <StorePreviewCard
-                    store={store}
-                    ui={ui}
-                    active={active}
-                    selectable={Boolean(onSelectStore)}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {onSelectStore ? (
-                      <button
-                        type="button"
-                        onClick={() => {
+              <Popup className="umkm-store-map-popup" maxWidth={270}>
+                <StorePopupSummary
+                  store={store}
+                  ui={ui}
+                  active={active}
+                  selectable={Boolean(onSelectStore)}
+                  isId={isId}
+                  onSelect={
+                    onSelectStore
+                      ? () => {
                           focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
                           onSelectStore(store.id);
-                        }}
-                        className={`inline-flex min-h-[34px] items-center rounded-full border px-3 text-[11px] font-bold transition ${
-                          active
-                            ? 'border-emerald-500 bg-emerald-600 text-white'
-                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400'
-                        }`}
-                      >
-                        {active ? 'Selected outlet' : 'Select outlet'}
-                      </button>
-                    ) : null}
-                    <a
-                      href={ui.googleMapsPlaceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 transition hover:border-slate-300"
-                    >
-                      Open map
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </div>
-                </div>
+                        }
+                      : undefined
+                  }
+                />
               </Popup>
             </Marker>
           );
@@ -1083,6 +1116,12 @@ function StoreMarkersLayer({
 
         const { cluster } = layer;
         const allowPicker = cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM;
+        const visibleClusterItems = cluster.items.slice(
+          0,
+          CLUSTER_POPUP_VISIBLE_LIMIT,
+        );
+        const hiddenClusterCount =
+          cluster.items.length - visibleClusterItems.length;
 
         return (
           <Marker
@@ -1100,39 +1139,36 @@ function StoreMarkersLayer({
           >
             <Tooltip direction="top" offset={[0, -8]}>
               {allowPicker
-                ? `${cluster.items.length} locations here`
-                : `${cluster.items.length} locations nearby. Click to zoom in.`}
+                ? isId
+                  ? `${cluster.items.length} usaha di titik ini`
+                  : `${cluster.items.length} businesses here`
+                : isId
+                  ? `${cluster.items.length} usaha dekat sini. Klik untuk zoom.`
+                  : `${cluster.items.length} locations nearby. Click to zoom in.`}
             </Tooltip>
 
             {allowPicker ? (
-              <Popup className="umkm-store-map-popup" maxWidth={320}>
-                <div className="space-y-3">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
-                    {cluster.tight ? 'Shared location' : 'Locations in this area'}
-                  </p>
-                  <div className="space-y-2">
-                    {cluster.items.map(({ store, ui }) => {
+              <Popup className="umkm-store-map-popup" maxWidth={300}>
+                <div className="w-[min(76vw,280px)] space-y-2.5">
+                  <div>
+                    <p className="text-[13px] font-black leading-tight text-slate-950">
+                      {cluster.tight
+                        ? isId
+                          ? `${cluster.items.length} usaha di titik ini`
+                          : `${cluster.items.length} businesses here`
+                        : isId
+                          ? `${cluster.items.length} usaha dekat sini`
+                          : `${cluster.items.length} nearby businesses`}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                      {isId
+                        ? 'Pilih satu untuk lihat detail, chat, atau rute.'
+                        : 'Pick one for details, chat, or route.'}
+                    </p>
+                  </div>
+                  <div className="max-h-[284px] space-y-2 overflow-y-auto pr-1">
+                    {visibleClusterItems.map(({ store, ui }) => {
                       const active = selectedStoreId === store.id;
-
-                      if (onSelectStore) {
-                        return (
-                          <div
-                            key={store.id}
-                          >
-                            <StorePreviewCard
-                              store={store}
-                              ui={ui}
-                              active={active}
-                              compact
-                              selectable
-                              onClick={() => {
-                                focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
-                                onSelectStore(store.id);
-                              }}
-                            />
-                          </div>
-                        );
-                      }
 
                       return (
                         <StorePreviewCard
@@ -1141,10 +1177,27 @@ function StoreMarkersLayer({
                           ui={ui}
                           active={active}
                           compact
+                          selectable={Boolean(onSelectStore)}
+                          isId={isId}
+                          onClick={
+                            onSelectStore
+                              ? () => {
+                                  focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
+                                  onSelectStore(store.id);
+                                }
+                              : undefined
+                          }
                         />
                       );
                     })}
                   </div>
+                  {hiddenClusterCount > 0 ? (
+                    <p className="rounded-2xl bg-slate-50 px-3 py-2 text-[11px] font-semibold leading-4 text-slate-500">
+                      {isId
+                        ? `+${hiddenClusterCount} usaha lagi. Gunakan daftar di bawah peta atau zoom sedikit.`
+                        : `+${hiddenClusterCount} more businesses. Use the list below the map or zoom in.`}
+                    </p>
+                  ) : null}
                 </div>
               </Popup>
             ) : null}
@@ -1159,6 +1212,7 @@ export function UmkmStoreMapClient({
   stores,
   selectedStoreId,
   onSelectStore,
+  isId = true,
   viewerLocation,
   className,
   interactive = true,
@@ -1188,9 +1242,9 @@ export function UmkmStoreMapClient({
     () =>
       validStores.map(store => ({
         store,
-        ui: buildUmkmPlacePresentation(store, true, validViewerLocation),
+        ui: buildUmkmPlacePresentation(store, isId, validViewerLocation),
       })),
-    [validStores, validViewerLocation],
+    [isId, validStores, validViewerLocation],
   );
 
   const defaultCenter = useMemo<[number, number]>(() => {
@@ -1337,7 +1391,7 @@ export function UmkmStoreMapClient({
           icon={buildViewerMarkerIcon()}
         >
           <Tooltip direction="top" offset={[0, -8]}>
-            Your location
+            {isId ? 'Lokasi kamu' : 'Your location'}
           </Tooltip>
         </Marker>
       ) : null}
@@ -1347,6 +1401,7 @@ export function UmkmStoreMapClient({
         selectedStoreId={selectedStoreId}
         onSelectStore={onSelectStore}
         onMarkerFocus={handleMarkerFocus}
+        isId={isId}
       />
 
       {routePositions ? (

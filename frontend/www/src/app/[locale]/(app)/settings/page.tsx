@@ -1,7 +1,16 @@
 'use client';
 
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import {
+  type ComponentType,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { Link } from '@/i18n/navigation';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -16,15 +25,37 @@ import {
 } from '@/lib/accountVault';
 import { mapCommonAuthError } from '@/lib/authErrors';
 import { validatePasswordStrength } from '@/lib/passwordPolicy';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import {
+  AlertTriangle,
+  BadgeCheck,
+  BellRing,
+  BriefcaseBusiness,
+  ChevronRight,
+  Database,
+  Download,
+  Eye,
+  Globe2,
   Laptop,
+  LockKeyhole,
   LogOut,
+  Megaphone,
+  MessageCircle,
+  Moon,
+  Palette,
   Plus,
   RefreshCcw,
+  Search,
   ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
+  Store,
   Trash2,
+  UserCog,
   UserRound,
   Users,
+  WalletCards,
+  Zap,
 } from 'lucide-react';
 import { SocialDistributionSettings } from './SocialDistributionSettings';
 
@@ -40,12 +71,80 @@ type UserSession = {
   isCurrent?: boolean;
 };
 
-function detectLocale(pathname: string): 'id' | 'en' {
-  return pathname.startsWith('/id') ? 'id' : 'en';
+type SettingsCategoryKey =
+  | 'ringkas'
+  | 'akun'
+  | 'bisnis'
+  | 'notifikasi'
+  | 'privasi'
+  | 'tampilan'
+  | 'keamanan'
+  | 'data';
+
+type SettingsIcon = ComponentType<{ className?: string }>;
+
+type LocalPreferenceKey =
+  | 'businessProfileOpen'
+  | 'acceptChat'
+  | 'escrowRequired'
+  | 'autoInvoice'
+  | 'orderAlerts'
+  | 'chatAlerts'
+  | 'weeklyReport'
+  | 'promoTips'
+  | 'profileVisible'
+  | 'showPhone'
+  | 'showLocation'
+  | 'allowSearchIndex'
+  | 'communityMentions'
+  | 'whatsappNotify'
+  | 'emailNotify';
+
+type LocalPreferences = Record<LocalPreferenceKey, boolean>;
+
+const DEFAULT_LOCAL_PREFERENCES: LocalPreferences = {
+  businessProfileOpen: true,
+  acceptChat: true,
+  escrowRequired: true,
+  autoInvoice: true,
+  orderAlerts: true,
+  chatAlerts: true,
+  weeklyReport: true,
+  promoTips: false,
+  profileVisible: true,
+  showPhone: false,
+  showLocation: true,
+  allowSearchIndex: true,
+  communityMentions: true,
+  whatsappNotify: true,
+  emailNotify: true,
+};
+
+const LOCAL_PREFERENCES_STORAGE_KEY = 'lajukan.settings.preferences.v1';
+
+function readLocalPreferences(): LocalPreferences {
+  if (typeof window === 'undefined') return DEFAULT_LOCAL_PREFERENCES;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_PREFERENCES_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return DEFAULT_LOCAL_PREFERENCES;
+    }
+
+    const next = { ...DEFAULT_LOCAL_PREFERENCES };
+    for (const key of Object.keys(next) as LocalPreferenceKey[]) {
+      if (typeof parsed[key] === 'boolean') {
+        next[key] = parsed[key];
+      }
+    }
+    return next;
+  } catch {
+    return DEFAULT_LOCAL_PREFERENCES;
+  }
 }
 
-function getAccountInitial(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || 'A';
+function detectLocale(pathname: string): 'id' | 'en' {
+  return pathname.startsWith('/id') ? 'id' : 'en';
 }
 
 function formatSessionTime(
@@ -63,27 +162,6 @@ function formatSessionTime(
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
-}
-
-function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
-  return (
-    <div className="space-y-1">
-      <h2 className="text-base font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-        {title}
-      </h2>
-      {description ? (
-        <p className="text-xs text-[color:var(--app-text-soft)]">
-          {description}
-        </p>
-      ) : null}
-    </div>
-  );
 }
 
 function SettingRow({
@@ -113,9 +191,9 @@ function SettingRow({
 }
 
 const SETTINGS_CONTROL_CLASS =
-  'min-h-[46px] w-full rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-sm font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400 dark:disabled:border-slate-800 dark:disabled:bg-slate-900/70';
+  'min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400 dark:disabled:border-slate-800 dark:disabled:bg-slate-900/70';
 const SETTINGS_SELECT_CLASS = `${SETTINGS_CONTROL_CLASS} appearance-none pr-9`;
-const SETTINGS_TEXTAREA_CLASS = `${SETTINGS_CONTROL_CLASS} min-h-[92px] resize-y py-3 leading-6`;
+const SETTINGS_TEXTAREA_CLASS = `${SETTINGS_CONTROL_CLASS} min-h-[84px] resize-y py-2.5 leading-5`;
 
 function Toggle({
   id,
@@ -141,6 +219,126 @@ function Toggle({
       <span className="h-6 w-11 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] transition peer-checked:border-[color:var(--app-accent-border)] peer-checked:bg-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]" />
       <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-[color:var(--app-text-inverse)] transition peer-checked:translate-x-5" />
     </label>
+  );
+}
+
+function SettingsPanel({
+  id,
+  icon: Icon,
+  title,
+  description,
+  action,
+  children,
+}: {
+  id?: string;
+  icon: SettingsIcon;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] sm:p-4"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <Icon className="h-4.5 w-4.5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {title}
+            </h2>
+            {description ? (
+              <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                {description}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function PreferenceRow({
+  icon: Icon,
+  title,
+  description,
+  children,
+  danger = false,
+}: {
+  icon: SettingsIcon;
+  title: string;
+  description?: string;
+  children?: ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2.5 dark:border-[color:var(--app-border-strong)]">
+      <span
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${
+          danger
+            ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
+            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]'
+        }`}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block truncate text-sm font-black ${
+            danger
+              ? 'text-[color:var(--app-danger)]'
+              : 'text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
+          }`}
+        >
+          {title}
+        </span>
+        {description ? (
+          <span className="mt-0.5 block line-clamp-2 text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
+            {description}
+          </span>
+        ) : null}
+      </span>
+      {children ? <span className="shrink-0">{children}</span> : null}
+    </div>
+  );
+}
+
+function QuickLinkCard({
+  href,
+  icon: Icon,
+  label,
+  description,
+}: {
+  href: string;
+  icon: SettingsIcon;
+  label: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex min-w-0 items-center gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] dark:border-[color:var(--app-border-strong)]"
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] transition group-hover:bg-white">
+        <Icon className="h-4.5 w-4.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          {label}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+          {description}
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[color:var(--app-accent)]" />
+    </Link>
   );
 }
 
@@ -175,6 +373,7 @@ function mapPasswordPolicyError(
 export default function SettingsPage() {
   const pathname = usePathname();
   const locale = detectLocale(pathname || '');
+  const isId = locale === 'id';
   const { confirm } = useDialog();
   const { authFetch, logout, refreshUser, user } = useAuth();
   const {
@@ -212,6 +411,17 @@ export default function SettingsPage() {
   const [sessionsState, setSessionsState] = useState<ActionState>('idle');
   const [sessionsMessage, setSessionsMessage] = useState<string | null>(null);
   const [sessionActionId, setSessionActionId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] =
+    useState<SettingsCategoryKey>('ringkas');
+  const [localPreferences, setLocalPreferences] =
+    useState<LocalPreferences>(readLocalPreferences);
+
+  const updateLocalPreference = useCallback(
+    (key: LocalPreferenceKey, value: boolean) => {
+      setLocalPreferences(prev => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const text = {
     title: locale === 'id' ? 'Pengaturan' : 'Settings',
@@ -396,9 +606,121 @@ export default function SettingsPage() {
     signOut: locale === 'id' ? 'Keluar' : 'Sign out',
   };
 
+  const categories = useMemo(
+    () =>
+      [
+        {
+          key: 'ringkas',
+          label: isId ? 'Ringkas' : 'Overview',
+          description: isId ? 'Yang sering dipakai' : 'Frequently used',
+          icon: SlidersHorizontal,
+        },
+        {
+          key: 'akun',
+          label: isId ? 'Akun' : 'Account',
+          description: isId
+            ? 'Profil & akun tersimpan'
+            : 'Profile and saved accounts',
+          icon: UserCog,
+        },
+        {
+          key: 'bisnis',
+          label: isId ? 'Bisnis' : 'Business',
+          description: isId ? 'Toko, chat, transaksi' : 'Store, chat, deals',
+          icon: BriefcaseBusiness,
+        },
+        {
+          key: 'notifikasi',
+          label: isId ? 'Notifikasi' : 'Notifications',
+          description: isId ? 'Chat, order, laporan' : 'Chat, orders, reports',
+          icon: BellRing,
+        },
+        {
+          key: 'privasi',
+          label: isId ? 'Privasi' : 'Privacy',
+          description: isId
+            ? 'Nomor, lokasi, pencarian'
+            : 'Phone, location, search',
+          icon: Eye,
+        },
+        {
+          key: 'tampilan',
+          label: isId ? 'Tampilan' : 'Display',
+          description: isId
+            ? 'Tema, font, aksesibilitas'
+            : 'Theme, font, accessibility',
+          icon: Palette,
+        },
+        {
+          key: 'keamanan',
+          label: isId ? 'Keamanan' : 'Security',
+          description: isId ? 'Password & perangkat' : 'Password and devices',
+          icon: LockKeyhole,
+        },
+        {
+          key: 'data',
+          label: isId ? 'Data' : 'Data',
+          description: isId ? 'Export & hapus akun' : 'Export and deletion',
+          icon: Database,
+        },
+      ] satisfies Array<{
+        key: SettingsCategoryKey;
+        label: string;
+        description: string;
+        icon: SettingsIcon;
+      }>,
+    [isId],
+  );
+
+  const quickLinks = useMemo(
+    () => [
+      {
+        href: '/profile/edit',
+        icon: UserCog,
+        label: isId ? 'Edit profil' : 'Edit profile',
+        description: isId
+          ? 'Nama, foto, bio, kontak'
+          : 'Name, photo, bio, contact',
+      },
+      {
+        href: '/usaha',
+        icon: Store,
+        label: isId ? 'Kelola usaha' : 'Manage business',
+        description: isId ? 'Toko, katalog, order' : 'Store, catalog, orders',
+      },
+      {
+        href: '/payments',
+        icon: WalletCards,
+        label: isId ? 'Saldo & pembayaran' : 'Balance and payments',
+        description: isId
+          ? 'Wallet, invoice, payout'
+          : 'Wallet, invoices, payouts',
+      },
+      {
+        href: '/notifications',
+        icon: BellRing,
+        label: isId ? 'Pusat notifikasi' : 'Notification center',
+        description: isId ? 'Inbox semua update' : 'Inbox for all updates',
+      },
+    ],
+    [isId],
+  );
+
   useEffect(() => {
     setSavedAccounts(user ? saveAccountSnapshot(user) : readSavedAccounts());
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        LOCAL_PREFERENCES_STORAGE_KEY,
+        JSON.stringify(localPreferences),
+      );
+    } catch {
+      // Preference persistence is best-effort on this device.
+    }
+  }, [localPreferences]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -667,305 +989,725 @@ export default function SettingsPage() {
   };
 
   return (
-    <section className="page-shell py-4 sm:py-8">
-      <div className="ui-page-stack page-rhythm">
-        <div className="ui-panel ui-feed-section ui-hero-panel rounded-none border-x-0 p-5 sm:rounded-[var(--app-radius)] sm:border-x sm:p-6">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
-            {locale === 'id' ? 'Pengaturan' : 'Settings'}
-          </p>
-          <h1 className="mt-2 text-2xl font-[1000] tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
-            {text.title}
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-            {text.subtitle}
-          </p>
-        </div>
-
-        <div className="ui-page-section grid gap-3 sm:gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-3 sm:space-y-5">
-            <div className="ui-panel ui-feed-section rounded-none border-x-0 p-5 sm:rounded-[var(--app-radius)] sm:border-x">
-              <SectionHeader
-                title={text.appearance}
-                description={text.appearanceDesc}
-              />
-              <div className="mt-4 space-y-3">
-                <SettingRow
-                  label={text.themeMode}
-                  description={text.themeModeDesc}
-                >
-                  <select
-                    value={colorScheme}
-                    onChange={event =>
-                      setColorScheme(event.target.value as typeof colorScheme)
-                    }
-                    className={SETTINGS_SELECT_CLASS}
-                  >
-                    <option value="system">
-                      {locale === 'id' ? 'Otomatis' : 'System'}
-                    </option>
-                    <option value="light">
-                      {locale === 'id' ? 'Terang' : 'Light'}
-                    </option>
-                    <option value="dark">
-                      {locale === 'id' ? 'Gelap' : 'Dark'}
-                    </option>
-                  </select>
-                </SettingRow>
-                <SettingRow
-                  label={text.themePreset}
-                  description={text.themePresetDesc}
-                >
-                  <select
-                    value={themePreset}
-                    onChange={event =>
-                      setThemePreset(event.target.value as typeof themePreset)
-                    }
-                    className={SETTINGS_SELECT_CLASS}
-                  >
-                    <option value="default">Lajukan</option>
-                    <option value="mono">
-                      {locale === 'id' ? 'Mono' : 'Mono'}
-                    </option>
-                    <option value="ocean">
-                      {locale === 'id' ? 'Ocean' : 'Ocean'}
-                    </option>
-                    <option value="sunset">
-                      {locale === 'id' ? 'Sunset' : 'Sunset'}
-                    </option>
-                    <option value="orchid">
-                      {locale === 'id' ? 'Orchid' : 'Orchid'}
-                    </option>
-                  </select>
-                </SettingRow>
-                <SettingRow
-                  label={text.colorVision}
-                  description={text.colorVisionDesc}
-                >
-                  <select
-                    value={colorVision}
-                    onChange={event =>
-                      setColorVision(event.target.value as typeof colorVision)
-                    }
-                    className={SETTINGS_SELECT_CLASS}
-                  >
-                    <option value="none">
-                      {locale === 'id' ? 'Normal' : 'Normal'}
-                    </option>
-                    <option value="high-contrast">
-                      {locale === 'id' ? 'Kontras Tinggi' : 'High Contrast'}
-                    </option>
-                    <option value="colorblind">
-                      {locale === 'id' ? 'Colorblind' : 'Colorblind'}
-                    </option>
-                  </select>
-                </SettingRow>
-                <SettingRow label={text.density} description={text.densityDesc}>
-                  <select
-                    value={density}
-                    onChange={event =>
-                      setDensity(event.target.value as typeof density)
-                    }
-                    className={SETTINGS_SELECT_CLASS}
-                  >
-                    <option value="compact">
-                      {locale === 'id' ? 'Ringkas' : 'Compact'}
-                    </option>
-                    <option value="comfortable">
-                      {locale === 'id' ? 'Lega' : 'Comfortable'}
-                    </option>
-                  </select>
-                </SettingRow>
+    <section className="min-h-screen bg-[color:var(--app-surface-muted)] px-2 py-2 pb-[calc(5.5rem+env(safe-area-inset-bottom))] dark:bg-[color:var(--app-surface)] sm:px-4 sm:py-5 lg:pb-8">
+      <div className="mx-auto w-full max-w-[1180px]">
+        <header className="overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[18px] bg-[color:var(--app-surface-muted)] ring-1 ring-[color:var(--app-border)]">
+                <Image
+                  src={profileAvatarSrc(user?.avatarUrl || user?.avatar_url)}
+                  alt=""
+                  fill
+                  sizes="56px"
+                  className="object-cover"
+                />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                  {isId ? 'Pusat pengaturan' : 'Settings center'}
+                </p>
+                <h1 className="mt-0.5 truncate text-[1.45rem] font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                  {text.title}
+                </h1>
+                <p className="mt-1 line-clamp-2 max-w-2xl text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
+                  {isId
+                    ? 'Atur akun, usaha, notifikasi, privasi, tampilan, dan keamanan dari satu tempat.'
+                    : 'Manage account, business, notifications, privacy, display, and security in one place.'}
+                </p>
               </div>
             </div>
 
-            <div className="ui-panel ui-feed-section rounded-none border-x-0 p-5 sm:rounded-[var(--app-radius)] sm:border-x">
-              <SectionHeader
-                title={text.typography}
-                description={text.typographyDesc}
-              />
-              <div className="mt-4 space-y-3">
-                <SettingRow label={text.fontSize}>
-                  <select
-                    value={fontSize}
-                    onChange={event =>
-                      setFontSize(event.target.value as typeof fontSize)
-                    }
-                    className={SETTINGS_SELECT_CLASS}
-                  >
-                    <option value="sm">
-                      {locale === 'id' ? 'Kecil' : 'Small'}
-                    </option>
-                    <option value="md">
-                      {locale === 'id' ? 'Sedang' : 'Medium'}
-                    </option>
-                    <option value="lg">
-                      {locale === 'id' ? 'Besar' : 'Large'}
-                    </option>
-                  </select>
-                </SettingRow>
-                <SettingRow label={text.fontFamily}>
-                  <select
-                    value={fontFamily}
-                    onChange={event =>
-                      setFontFamily(event.target.value as typeof fontFamily)
-                    }
-                    className={SETTINGS_SELECT_CLASS}
-                  >
-                    <option value="inter">Inter</option>
-                    <option value="system">
-                      {locale === 'id' ? 'System' : 'System'}
-                    </option>
-                    <option value="georgia">Georgia</option>
-                  </select>
-                </SettingRow>
-              </div>
+            <div className="grid grid-cols-3 gap-1.5 lg:w-[360px]">
+              {[
+                {
+                  label: isId ? 'Akun' : 'Account',
+                  value: user?.hasPassword
+                    ? isId
+                      ? 'Aman'
+                      : 'Secure'
+                    : isId
+                      ? 'OTP'
+                      : 'OTP',
+                },
+                {
+                  label: isId ? 'Sesi' : 'Sessions',
+                  value:
+                    sessionsState === 'loading'
+                      ? '...'
+                      : String(Math.max(1, sessions.length || 1)),
+                },
+                {
+                  label: isId ? 'Channel' : 'Channels',
+                  value: isId ? 'Siap' : 'Ready',
+                },
+              ].map(item => (
+                <div
+                  key={item.label}
+                  className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2.5 py-2 text-center dark:border-[color:var(--app-border-strong)]"
+                >
+                  <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {item.value}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                    {item.label}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
+        </header>
 
-          <div className="space-y-3 sm:space-y-5">
-            <div className="ui-panel ui-feed-section rounded-none border-x-0 p-5 sm:rounded-[var(--app-radius)] sm:border-x">
-              <SectionHeader
-                title={text.accessibility}
-                description={text.accessibilityDesc}
-              />
-              <div className="mt-4 space-y-3">
-                <SettingRow
-                  label={text.reduceMotion}
-                  description={text.reduceMotionDesc}
-                >
-                  <Toggle
-                    id="reduce-motion"
-                    checked={reduceMotion}
-                    onChange={setReduceMotion}
-                  />
-                </SettingRow>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[290px_minmax(0,1fr)]">
+          <aside className="lg:sticky lg:top-[calc(72px+env(safe-area-inset-top))] lg:self-start">
+            <div className="overflow-x-auto pb-1 lg:overflow-visible lg:pb-0">
+              <div className="flex gap-1.5 lg:grid">
+                {categories.map(item => {
+                  const Icon = item.icon;
+                  const active = activeCategory === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setActiveCategory(item.key)}
+                      className={`flex min-w-[154px] items-center gap-2 rounded-[15px] border px-3 py-2 text-left transition lg:min-w-0 ${
+                        active
+                          ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-sm'
+                          : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]'
+                      }`}
+                    >
+                      <span
+                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${
+                          active
+                            ? 'bg-white text-[color:var(--app-accent)]'
+                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-black">
+                          {item.label}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                          {item.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <SocialDistributionSettings locale={locale} />
+            <div className="mt-3 hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:var(--app-border-strong)] lg:block">
+              <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {isId ? 'Bantuan cepat' : 'Quick help'}
+              </p>
+              <p className="mt-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Pilih kategori. Simpan yang penting saja, sisanya bisa dibuka nanti.'
+                  : 'Pick a category. Save what matters now and return later.'}
+              </p>
+              <Link
+                href="/support"
+                className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)]"
+              >
+                {isId ? 'Buka bantuan' : 'Open help'}
+              </Link>
+            </div>
+          </aside>
 
-            <div className="ui-panel ui-feed-section rounded-none border-x-0 p-5 sm:rounded-[var(--app-radius)] sm:border-x">
-              <SectionHeader
-                title={text.account}
-                description={text.accountDesc}
-              />
-              <div className="mt-4 grid gap-4">
-                <div className="ui-panel-muted ui-feed-tile p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                      <Users className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {text.savedAccounts}
-                        </p>
-                        <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-text-soft)]">
-                          {savedAccounts.length}/{MAX_SAVED_ACCOUNTS}{' '}
-                          {text.savedAccountLimit}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                        {text.savedAccountsDesc}
-                      </p>
-                    </div>
+          <main className="min-w-0 space-y-3">
+            {activeCategory === 'ringkas' ? (
+              <>
+                <SettingsPanel
+                  icon={Zap}
+                  title={isId ? 'Yang sering dipakai' : 'Frequently used'}
+                  description={
+                    isId
+                      ? 'Shortcut paling umum seperti Facebook: profil, usaha, pembayaran, dan notifikasi.'
+                      : 'Common shortcuts: profile, business, payments, and notifications.'
+                  }
+                >
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {quickLinks.map(item => (
+                      <QuickLinkCard key={item.href} {...item} />
+                    ))}
                   </div>
+                </SettingsPanel>
 
-                  <div className="mt-3 rounded-[14px] border border-[color:color-mix(in_srgb,_var(--app-accent-border)_45%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_55%,_var(--app-surface))] px-3 py-2 text-xs font-medium text-[color:var(--app-text)]">
-                    <span className="inline-flex items-center gap-1.5">
-                      <ShieldCheck className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-                      {text.savedAccountsSecure}
-                    </span>
+                <SettingsPanel
+                  icon={BadgeCheck}
+                  title={isId ? 'Status akun kamu' : 'Your account status'}
+                  description={
+                    isId
+                      ? 'Ringkasan ini bantu pelaku usaha tahu apa yang perlu dibereskan.'
+                      : 'This summary helps business users see what needs attention.'
+                  }
+                >
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {[
+                      {
+                        icon: ShieldCheck,
+                        label: isId ? 'Login' : 'Login',
+                        desc: user?.hasPassword
+                          ? isId
+                            ? 'Password sudah dibuat'
+                            : 'Password is set'
+                          : isId
+                            ? 'Masih mengandalkan OTP'
+                            : 'Still using OTP',
+                      },
+                      {
+                        icon: Smartphone,
+                        label: isId ? 'Perangkat' : 'Devices',
+                        desc:
+                          sessions.length > 0
+                            ? `${sessions.length} ${isId ? 'sesi tercatat' : 'recorded sessions'}`
+                            : isId
+                              ? 'Belum ada sesi lain'
+                              : 'No other sessions',
+                      },
+                      {
+                        icon: Store,
+                        label: isId ? 'Usaha' : 'Business',
+                        desc: localPreferences.businessProfileOpen
+                          ? isId
+                            ? 'Profil usaha aktif'
+                            : 'Business profile active'
+                          : isId
+                            ? 'Profil usaha disembunyikan'
+                            : 'Business profile hidden',
+                      },
+                    ].map(item => {
+                      const Icon = item.icon;
+                      return (
+                        <div
+                          key={item.label}
+                          className="rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 dark:border-[color:var(--app-border-strong)]"
+                        >
+                          <span className="grid h-9 w-9 place-items-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <p className="mt-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {item.label}
+                          </p>
+                          <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                            {item.desc}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
+                </SettingsPanel>
+              </>
+            ) : null}
 
-                  <div className="mt-3 space-y-2">
-                    {savedAccounts.length > 0 ? (
-                      savedAccounts.map(account => {
-                        const isCurrent = account.id === user?.id;
-
-                        return (
-                          <div
-                            key={account.id}
-                            className="grid gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-sm font-black text-[color:var(--app-text-inverse)]">
-                                {getAccountInitial(account.displayName)}
-                              </span>
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
-                                  {account.displayName}
-                                </p>
-                                <p className="truncate text-xs text-[color:var(--app-text-soft)]">
-                                  {formatSavedAccountIdentifier(account)}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                              {isCurrent ? (
-                                <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)]">
-                                  <UserRound className="h-3.5 w-3.5" />
-                                  {text.currentAccount}
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSwitchAccount(account)}
-                                  className="ui-button-secondary min-h-[34px] px-3 text-xs font-semibold"
-                                >
-                                  {text.switchAccount}
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRemoveSavedAccount(account)
-                                }
-                                className="inline-flex min-h-[34px] items-center justify-center rounded-full border border-[color:var(--app-border)] px-3 text-xs font-semibold text-[color:var(--app-danger)] transition hover:bg-[color:var(--app-danger-soft)]"
-                              >
-                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                                {text.removeShortcut}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-3 text-xs text-[color:var(--app-text-soft)]">
-                        {text.noSavedAccounts}
-                      </p>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddAnotherAccount}
-                    className="ui-button-secondary mt-3 w-full px-4 text-xs font-semibold"
-                  >
-                    <Plus className="mr-1.5 h-4 w-4" />
-                    {text.addAnotherAccount}
-                  </button>
+            {activeCategory === 'akun' ? (
+              <SettingsPanel
+                icon={Users}
+                title={text.savedAccounts}
+                description={text.savedAccountsDesc}
+                action={
+                  <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1 text-[10px] font-black text-[color:var(--app-text-soft)]">
+                    {savedAccounts.length}/{MAX_SAVED_ACCOUNTS}
+                  </span>
+                }
+              >
+                <div className="rounded-[14px] border border-[color:color-mix(in_srgb,_var(--app-accent-border)_45%,_var(--app-border))] bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_55%,_var(--app-surface))] px-3 py-2 text-xs font-semibold text-[color:var(--app-text)]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                    {text.savedAccountsSecure}
+                  </span>
                 </div>
 
-                <div className="ui-panel-muted ui-feed-tile p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface)] text-[color:var(--app-accent)]">
-                      <Laptop className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {text.sessionsTitle}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                        {text.sessionsDesc}
-                      </p>
-                    </div>
+                <div className="mt-3 space-y-2">
+                  {savedAccounts.length > 0 ? (
+                    savedAccounts.map(account => {
+                      const isCurrent = account.id === user?.id;
+                      return (
+                        <div
+                          key={account.id}
+                          className="grid gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-2.5 dark:border-[color:var(--app-border-strong)] sm:grid-cols-[minmax(0,1fr)_auto]"
+                        >
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                              <Image
+                                src={profileAvatarSrc(account.avatarUrl)}
+                                alt=""
+                                fill
+                                sizes="44px"
+                                className="object-cover"
+                              />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                {account.displayName}
+                              </p>
+                              <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                                {formatSavedAccountIdentifier(account)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                            {isCurrent ? (
+                              <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)]">
+                                <UserRound className="h-3.5 w-3.5" />
+                                {text.currentAccount}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSwitchAccount(account)}
+                                className="ui-button-secondary min-h-[34px] px-3 text-xs font-semibold"
+                              >
+                                {text.switchAccount}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSavedAccount(account)}
+                              className="inline-flex min-h-[34px] items-center justify-center rounded-full border border-[color:var(--app-border)] px-3 text-xs font-semibold text-[color:var(--app-danger)] transition hover:bg-[color:var(--app-danger-soft)]"
+                            >
+                              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                              {text.removeShortcut}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-3 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                      {text.noSavedAccounts}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddAnotherAccount}
+                  className="ui-button-secondary mt-3 w-full px-4 text-xs font-semibold"
+                >
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  {text.addAnotherAccount}
+                </button>
+              </SettingsPanel>
+            ) : null}
+
+            {activeCategory === 'bisnis' ? (
+              <>
+                <SettingsPanel
+                  icon={BriefcaseBusiness}
+                  title={isId ? 'Preferensi usaha' : 'Business preferences'}
+                  description={
+                    isId
+                      ? 'Pengaturan yang paling sering dicari pemilik UMKM: visibilitas, chat, transaksi, dan invoice.'
+                      : 'Common business controls: visibility, chat, transactions, and invoices.'
+                  }
+                >
+                  <div className="space-y-2">
+                    {[
+                      {
+                        key: 'businessProfileOpen' as const,
+                        icon: Store,
+                        title: isId
+                          ? 'Profil usaha tampil di pencarian'
+                          : 'Business profile appears in search',
+                        desc: isId
+                          ? 'Buyer bisa menemukan toko, jasa, dan katalog kamu.'
+                          : 'Buyers can find your store, services, and catalog.',
+                      },
+                      {
+                        key: 'acceptChat' as const,
+                        icon: MessageCircle,
+                        title: isId
+                          ? 'Terima chat calon pembeli'
+                          : 'Accept buyer chats',
+                        desc: isId
+                          ? 'Chat masuk dari listing, toko, dan profil publik.'
+                          : 'Chats can come from listings, stores, and public profile.',
+                      },
+                      {
+                        key: 'escrowRequired' as const,
+                        icon: ShieldCheck,
+                        title: isId
+                          ? 'Sarankan pembayaran aman'
+                          : 'Recommend protected payments',
+                        desc: isId
+                          ? 'Tampilkan opsi escrow saat transaksi jasa atau project.'
+                          : 'Show escrow options for services and projects.',
+                      },
+                      {
+                        key: 'autoInvoice' as const,
+                        icon: WalletCards,
+                        title: isId
+                          ? 'Buat invoice otomatis'
+                          : 'Auto-create invoices',
+                        desc: isId
+                          ? 'Invoice disiapkan setelah deal di chat.'
+                          : 'Invoices are prepared after a chat deal.',
+                      },
+                    ].map(item => (
+                      <PreferenceRow
+                        key={item.key}
+                        icon={item.icon}
+                        title={item.title}
+                        description={item.desc}
+                      >
+                        <Toggle
+                          id={`business-${item.key}`}
+                          checked={localPreferences[item.key]}
+                          onChange={value =>
+                            updateLocalPreference(item.key, value)
+                          }
+                        />
+                      </PreferenceRow>
+                    ))}
+                  </div>
+                </SettingsPanel>
+                <SocialDistributionSettings locale={locale} />
+              </>
+            ) : null}
+
+            {activeCategory === 'notifikasi' ? (
+              <SettingsPanel
+                icon={BellRing}
+                title={isId ? 'Notifikasi' : 'Notifications'}
+                description={
+                  isId
+                    ? 'Dibuat seperti aplikasi yang familiar: cukup pilih update apa yang penting.'
+                    : 'Pick the updates that matter most.'
+                }
+              >
+                <div className="space-y-2">
+                  {[
+                    {
+                      key: 'orderAlerts' as const,
+                      icon: WalletCards,
+                      title: isId
+                        ? 'Order dan pembayaran'
+                        : 'Orders and payments',
+                      desc: isId
+                        ? 'Top up, invoice, escrow, payout, refund.'
+                        : 'Top ups, invoices, escrow, payouts, refunds.',
+                    },
+                    {
+                      key: 'chatAlerts' as const,
+                      icon: MessageCircle,
+                      title: isId ? 'Chat dan penawaran' : 'Chats and offers',
+                      desc: isId
+                        ? 'Pesan buyer, negosiasi, dan follow up.'
+                        : 'Buyer messages, negotiation, and follow ups.',
+                    },
+                    {
+                      key: 'weeklyReport' as const,
+                      icon: Download,
+                      title: isId ? 'Ringkasan mingguan' : 'Weekly summary',
+                      desc: isId
+                        ? 'Performa listing, toko, dan transaksi.'
+                        : 'Listing, store, and transaction performance.',
+                    },
+                    {
+                      key: 'promoTips' as const,
+                      icon: Megaphone,
+                      title: isId
+                        ? 'Tips promo dan edukasi'
+                        : 'Promotion tips and learning',
+                      desc: isId
+                        ? 'Ide konten, campaign, dan peluang usaha.'
+                        : 'Content ideas, campaigns, and business opportunities.',
+                    },
+                  ].map(item => (
+                    <PreferenceRow
+                      key={item.key}
+                      icon={item.icon}
+                      title={item.title}
+                      description={item.desc}
+                    >
+                      <Toggle
+                        id={`notify-${item.key}`}
+                        checked={localPreferences[item.key]}
+                        onChange={value =>
+                          updateLocalPreference(item.key, value)
+                        }
+                      />
+                    </PreferenceRow>
+                  ))}
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <PreferenceRow
+                    icon={Smartphone}
+                    title="WhatsApp"
+                    description={
+                      isId
+                        ? 'Untuk update penting transaksi dan chat.'
+                        : 'For important transaction and chat updates.'
+                    }
+                  >
+                    <Toggle
+                      id="channel-whatsapp"
+                      checked={localPreferences.whatsappNotify}
+                      onChange={value =>
+                        updateLocalPreference('whatsappNotify', value)
+                      }
+                    />
+                  </PreferenceRow>
+                  <PreferenceRow
+                    icon={Globe2}
+                    title="Email"
+                    description={
+                      isId
+                        ? 'Untuk laporan dan dokumen akun.'
+                        : 'For reports and account documents.'
+                    }
+                  >
+                    <Toggle
+                      id="channel-email"
+                      checked={localPreferences.emailNotify}
+                      onChange={value =>
+                        updateLocalPreference('emailNotify', value)
+                      }
+                    />
+                  </PreferenceRow>
+                </div>
+              </SettingsPanel>
+            ) : null}
+
+            {activeCategory === 'privasi' ? (
+              <SettingsPanel
+                icon={Eye}
+                title={
+                  isId ? 'Privasi dan visibilitas' : 'Privacy and visibility'
+                }
+                description={
+                  isId
+                    ? 'Kontrol apa yang terlihat oleh buyer, komunitas, dan mesin pencari Lajukan.'
+                    : 'Control what buyers, community members, and Lajukan search can see.'
+                }
+              >
+                <div className="space-y-2">
+                  {[
+                    {
+                      key: 'profileVisible' as const,
+                      icon: Eye,
+                      title: isId
+                        ? 'Profil publik aktif'
+                        : 'Public profile active',
+                      desc: isId
+                        ? 'Orang bisa melihat profil dan etalase kamu.'
+                        : 'People can view your profile and showcase.',
+                    },
+                    {
+                      key: 'showPhone' as const,
+                      icon: Smartphone,
+                      title: isId ? 'Tampilkan nomor HP' : 'Show phone number',
+                      desc: isId
+                        ? 'Nomor hanya ditampilkan kalau kamu izinkan.'
+                        : 'Your number is shown only when allowed.',
+                    },
+                    {
+                      key: 'showLocation' as const,
+                      icon: Globe2,
+                      title: isId
+                        ? 'Tampilkan lokasi usaha'
+                        : 'Show business location',
+                      desc: isId
+                        ? 'Bantu buyer lokal menemukan usaha kamu.'
+                        : 'Help local buyers find your business.',
+                    },
+                    {
+                      key: 'allowSearchIndex' as const,
+                      icon: Search,
+                      title: isId
+                        ? 'Muncul di pencarian Lajukan'
+                        : 'Appear in Lajukan search',
+                      desc: isId
+                        ? 'Produk, jasa, dan profil bisa muncul di hasil cari.'
+                        : 'Products, services, and profile can appear in search.',
+                    },
+                    {
+                      key: 'communityMentions' as const,
+                      icon: MessageCircle,
+                      title: isId
+                        ? 'Izinkan mention komunitas'
+                        : 'Allow community mentions',
+                      desc: isId
+                        ? 'Member bisa mention akun kamu di diskusi.'
+                        : 'Members can mention your account in discussions.',
+                    },
+                  ].map(item => (
+                    <PreferenceRow
+                      key={item.key}
+                      icon={item.icon}
+                      title={item.title}
+                      description={item.desc}
+                    >
+                      <Toggle
+                        id={`privacy-${item.key}`}
+                        checked={localPreferences[item.key]}
+                        onChange={value =>
+                          updateLocalPreference(item.key, value)
+                        }
+                      />
+                    </PreferenceRow>
+                  ))}
+                </div>
+              </SettingsPanel>
+            ) : null}
+
+            {activeCategory === 'tampilan' ? (
+              <div className="space-y-3">
+                <SettingsPanel
+                  icon={Palette}
+                  title={text.appearance}
+                  description={text.appearanceDesc}
+                >
+                  <div className="space-y-2">
+                    <SettingRow
+                      label={text.themeMode}
+                      description={text.themeModeDesc}
+                    >
+                      <select
+                        value={colorScheme}
+                        onChange={event =>
+                          setColorScheme(
+                            event.target.value as typeof colorScheme,
+                          )
+                        }
+                        className={SETTINGS_SELECT_CLASS}
+                      >
+                        <option value="system">
+                          {isId ? 'Otomatis' : 'System'}
+                        </option>
+                        <option value="light">
+                          {isId ? 'Terang' : 'Light'}
+                        </option>
+                        <option value="dark">{isId ? 'Gelap' : 'Dark'}</option>
+                      </select>
+                    </SettingRow>
+                    <SettingRow
+                      label={text.themePreset}
+                      description={text.themePresetDesc}
+                    >
+                      <select
+                        value={themePreset}
+                        onChange={event =>
+                          setThemePreset(
+                            event.target.value as typeof themePreset,
+                          )
+                        }
+                        className={SETTINGS_SELECT_CLASS}
+                      >
+                        <option value="default">Lajukan</option>
+                        <option value="mono">Mono</option>
+                        <option value="ocean">Ocean</option>
+                        <option value="sunset">Sunset</option>
+                        <option value="orchid">Orchid</option>
+                      </select>
+                    </SettingRow>
+                    <SettingRow
+                      label={text.colorVision}
+                      description={text.colorVisionDesc}
+                    >
+                      <select
+                        value={colorVision}
+                        onChange={event =>
+                          setColorVision(
+                            event.target.value as typeof colorVision,
+                          )
+                        }
+                        className={SETTINGS_SELECT_CLASS}
+                      >
+                        <option value="none">Normal</option>
+                        <option value="high-contrast">
+                          {isId ? 'Kontras Tinggi' : 'High Contrast'}
+                        </option>
+                        <option value="colorblind">Colorblind</option>
+                      </select>
+                    </SettingRow>
+                  </div>
+                </SettingsPanel>
+
+                <SettingsPanel
+                  icon={Moon}
+                  title={text.typography}
+                  description={text.typographyDesc}
+                >
+                  <div className="space-y-2">
+                    <SettingRow
+                      label={text.density}
+                      description={text.densityDesc}
+                    >
+                      <select
+                        value={density}
+                        onChange={event =>
+                          setDensity(event.target.value as typeof density)
+                        }
+                        className={SETTINGS_SELECT_CLASS}
+                      >
+                        <option value="compact">
+                          {isId ? 'Ringkas' : 'Compact'}
+                        </option>
+                        <option value="comfortable">
+                          {isId ? 'Lega' : 'Comfortable'}
+                        </option>
+                      </select>
+                    </SettingRow>
+                    <SettingRow label={text.fontSize}>
+                      <select
+                        value={fontSize}
+                        onChange={event =>
+                          setFontSize(event.target.value as typeof fontSize)
+                        }
+                        className={SETTINGS_SELECT_CLASS}
+                      >
+                        <option value="sm">{isId ? 'Kecil' : 'Small'}</option>
+                        <option value="md">{isId ? 'Sedang' : 'Medium'}</option>
+                        <option value="lg">{isId ? 'Besar' : 'Large'}</option>
+                      </select>
+                    </SettingRow>
+                    <SettingRow label={text.fontFamily}>
+                      <select
+                        value={fontFamily}
+                        onChange={event =>
+                          setFontFamily(event.target.value as typeof fontFamily)
+                        }
+                        className={SETTINGS_SELECT_CLASS}
+                      >
+                        <option value="inter">Inter</option>
+                        <option value="system">System</option>
+                        <option value="georgia">Georgia</option>
+                      </select>
+                    </SettingRow>
+                    <PreferenceRow
+                      icon={SlidersHorizontal}
+                      title={text.reduceMotion}
+                      description={text.reduceMotionDesc}
+                    >
+                      <Toggle
+                        id="reduce-motion"
+                        checked={reduceMotion}
+                        onChange={setReduceMotion}
+                      />
+                    </PreferenceRow>
+                  </div>
+                </SettingsPanel>
+              </div>
+            ) : null}
+
+            {activeCategory === 'keamanan' ? (
+              <div className="space-y-3">
+                <SettingsPanel
+                  icon={Laptop}
+                  title={text.sessionsTitle}
+                  description={text.sessionsDesc}
+                  action={
                     <button
                       type="button"
                       onClick={() => void loadSessions()}
                       disabled={sessionsState === 'loading'}
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-accent)] disabled:opacity-60"
                       aria-label={text.refreshSessions}
                     >
                       <RefreshCcw
@@ -974,21 +1716,21 @@ export default function SettingsPage() {
                         }`}
                       />
                     </button>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
+                  }
+                >
+                  <div className="space-y-2">
                     {sessions.length > 0 ? (
                       sessions.map(session => (
                         <div
                           key={session.id}
-                          className="grid gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                          className="grid gap-2 rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3 dark:border-[color:var(--app-border-strong)] sm:grid-cols-[minmax(0,1fr)_auto]"
                         >
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
+                              <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                 {session.deviceName ||
                                   session.deviceType ||
-                                  (locale === 'id' ? 'Perangkat' : 'Device')}
+                                  (isId ? 'Perangkat' : 'Device')}
                               </p>
                               {session.isCurrent ? (
                                 <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
@@ -996,7 +1738,7 @@ export default function SettingsPage() {
                                 </span>
                               ) : null}
                             </div>
-                            <p className="mt-1 truncate text-xs text-[color:var(--app-text-soft)]">
+                            <p className="mt-1 truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
                               {session.location || 'Unknown'} -{' '}
                               {formatSessionTime(
                                 session.lastActiveAt || session.createdAt,
@@ -1011,7 +1753,7 @@ export default function SettingsPage() {
                                 void handleRevokeSession(session.id)
                               }
                               disabled={sessionActionId === session.id}
-                              className="ui-button-secondary min-h-[34px] px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                              className="ui-button-secondary min-h-[34px] px-3 text-xs font-semibold disabled:opacity-70"
                             >
                               {sessionActionId === session.id
                                 ? '...'
@@ -1021,7 +1763,7 @@ export default function SettingsPage() {
                         </div>
                       ))
                     ) : (
-                      <p className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-3 text-xs text-[color:var(--app-text-soft)]">
+                      <p className="rounded-[14px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-3 text-xs font-semibold text-[color:var(--app-text-soft)]">
                         {sessionsState === 'loading'
                           ? `${text.refreshSessions}...`
                           : text.sessionsEmpty}
@@ -1033,7 +1775,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => void handleRevokeOtherSessions()}
                     disabled={sessionActionId === 'all'}
-                    className="ui-button-secondary mt-3 w-full px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                    className="ui-button-secondary mt-3 w-full px-4 text-xs font-semibold disabled:opacity-70"
                   >
                     <LogOut className="mr-1.5 h-4 w-4" />
                     {sessionActionId === 'all'
@@ -1041,20 +1783,18 @@ export default function SettingsPage() {
                       : text.revokeOtherDevices}
                   </button>
                   {sessionsMessage ? (
-                    <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
+                    <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       {sessionsMessage}
                     </p>
                   ) : null}
-                </div>
+                </SettingsPanel>
 
-                <div className="ui-panel-muted ui-feed-tile p-4">
-                  <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {text.passwordCard}
-                  </p>
-                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                    {text.passwordDesc}
-                  </p>
-                  <div className="mt-3 space-y-2">
+                <SettingsPanel
+                  icon={LockKeyhole}
+                  title={text.passwordCard}
+                  description={text.passwordDesc}
+                >
+                  <div className="grid gap-2 sm:grid-cols-3">
                     <input
                       type="password"
                       value={currentPassword}
@@ -1089,7 +1829,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={handlePasswordSave}
                     disabled={passwordState === 'loading'}
-                    className="ui-button-secondary mt-3 px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                    className="ui-button-secondary mt-3 px-4 text-xs font-semibold disabled:opacity-70"
                   >
                     {passwordState === 'loading'
                       ? '...'
@@ -1098,47 +1838,59 @@ export default function SettingsPage() {
                         : text.createPassword}
                   </button>
                   {passwordMessage ? (
-                    <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
+                    <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       {passwordMessage}
                     </p>
                   ) : null}
-                </div>
+                </SettingsPanel>
+              </div>
+            ) : null}
 
-                <div className="ui-panel-muted ui-feed-tile p-4">
-                  <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {text.exportData}
-                  </p>
-                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                    {text.exportDesc}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleExport}
-                    disabled={exportState === 'loading'}
-                    className="ui-button-secondary mt-3 px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+            {activeCategory === 'data' ? (
+              <div className="space-y-3">
+                <SettingsPanel
+                  icon={Database}
+                  title={text.exportData}
+                  description={text.exportDesc}
+                >
+                  <PreferenceRow
+                    icon={Download}
+                    title={
+                      isId ? 'Unduh arsip akun' : 'Download account archive'
+                    }
+                    description={
+                      isId
+                        ? 'Data profil, postingan, transaksi, dan preferensi akan disiapkan.'
+                        : 'Profile, posts, transactions, and preferences will be prepared.'
+                    }
                   >
-                    {exportState === 'loading' ? '...' : text.exportCta}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleExport}
+                      disabled={exportState === 'loading'}
+                      className="ui-button-secondary min-h-[34px] px-3 text-xs font-semibold disabled:opacity-70"
+                    >
+                      {exportState === 'loading' ? '...' : text.exportCta}
+                    </button>
+                  </PreferenceRow>
                   {exportMessage ? (
-                    <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
+                    <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       {exportMessage}
                     </p>
                   ) : null}
-                </div>
+                </SettingsPanel>
 
-                <div className="ui-panel-muted ui-feed-tile p-4">
-                  <p className="text-sm font-semibold text-[color:var(--app-danger)]">
-                    {text.deleteAccount}
-                  </p>
-                  <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                    {text.deleteDesc}
-                  </p>
+                <SettingsPanel
+                  icon={AlertTriangle}
+                  title={text.deleteAccount}
+                  description={text.deleteDesc}
+                >
                   {!user?.hasPassword ? (
-                    <p className="mt-2 text-xs text-[color:var(--app-warning)]">
+                    <p className="mb-3 rounded-[14px] bg-[color:var(--app-warning-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--app-warning)]">
                       {text.deleteSetupFirst}
                     </p>
                   ) : null}
-                  <div className="mt-3 space-y-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     <input
                       type="password"
                       value={deletePassword}
@@ -1153,36 +1905,37 @@ export default function SettingsPage() {
                       onChange={event => setDeleteReason(event.target.value)}
                       placeholder={text.deleteReason}
                       rows={3}
-                      className={SETTINGS_TEXTAREA_CLASS}
+                      className={`${SETTINGS_TEXTAREA_CLASS} sm:row-span-2`}
                       disabled={!user?.hasPassword}
                       aria-label={text.deleteReason}
                     />
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={deleteState === 'loading' || !user?.hasPassword}
+                      className="ui-button-danger px-4 text-xs font-semibold disabled:opacity-70"
+                    >
+                      {deleteState === 'loading' ? '...' : text.deleteCta}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    disabled={deleteState === 'loading' || !user?.hasPassword}
-                    className="ui-button-danger mt-3 px-4 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {deleteState === 'loading' ? '...' : text.deleteCta}
-                  </button>
                   {deleteMessage ? (
-                    <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
+                    <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       {deleteMessage}
                     </p>
                   ) : null}
-                </div>
+                </SettingsPanel>
 
                 <button
                   type="button"
                   onClick={() => logout()}
                   className="ui-button-secondary w-full px-4 text-xs font-semibold sm:w-auto"
                 >
+                  <LogOut className="mr-1.5 h-4 w-4" />
                   {text.signOut}
                 </button>
               </div>
-            </div>
-          </div>
+            ) : null}
+          </main>
         </div>
       </div>
     </section>

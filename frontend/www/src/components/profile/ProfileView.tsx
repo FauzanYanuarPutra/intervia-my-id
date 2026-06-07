@@ -8,25 +8,19 @@ import {
   Mail,
   Phone,
   MapPin,
-  Edit2,
-  Shield,
   LogOut,
   Camera,
   Briefcase,
-  Star,
-  Heart,
-  Eye,
   Settings,
-  Plus,
-  Award,
-  Clock,
-  DollarSign,
   CheckCircle,
   ArrowRight,
+  Plus,
+  Star,
 } from 'lucide-react';
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { useRouter } from '@/i18n/navigation';
 import { Link } from '@/i18n/navigation';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 
 export default function ProfileView() {
   const { user, logout } = useAuth();
@@ -61,7 +55,6 @@ export default function ProfileView() {
 
   // Check if user is freelancer (will come from API metadata)
   const isFreelancer = false; // TODO: Check user.metadata?.roles?.includes('freelancer')
-  const freelancerProfile = null; // TODO: user.metadata?.freelancer_profile
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)] main-with-bottom-nav">
@@ -78,7 +71,7 @@ export default function ProfileView() {
             <div className="relative shrink-0">
               <div className="relative w-20 h-20 sm:w-24 sm:h-24">
                 <Image
-                  src={user.avatarUrl || '/default-avatar.svg'}
+                  src={profileAvatarSrc(user.avatarUrl)}
                   alt={user.username || 'User'}
                   width={96}
                   height={96}
@@ -165,7 +158,7 @@ export default function ProfileView() {
                   </p>
                 </div>
                 <Link
-                  href="/profile/freelancer/create"
+                  href="/profile/edit?focus=talent"
                   className="shrink-0 h-9 px-4 bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] rounded-lg text-xs font-semibold flex items-center gap-1.5 active:scale-95 lg:hover:bg-[color:var(--app-accent-strong)] transition-all shadow-md shadow-[var(--app-shadow)]"
                 >
                   <span className="hidden sm:inline">Get Started</span>
@@ -189,11 +182,10 @@ export default function ProfileView() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
-                  activeTab === tab.id
-                    ? 'text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]'
-                    : 'text-[color:var(--app-text)] hover:text-[color:var(--app-text)] dark:hover:text-[color:var(--app-text-soft)]'
-                }`}
+                className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${activeTab === tab.id
+                  ? 'text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]'
+                  : 'text-[color:var(--app-text)] hover:text-[color:var(--app-text)] dark:hover:text-[color:var(--app-text-soft)]'
+                  }`}
               >
                 {tab.label}
                 {activeTab === tab.id && (
@@ -215,30 +207,30 @@ export default function ProfileView() {
                   <h3 className="text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] mb-3">
                     Quick Actions
                   </h3>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <Link
-                      href="/jobs/create"
+                      href="/home"
                       className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[color:var(--app-accent-soft)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)] border-2 border-[color:var(--app-accent-border)] dark:border-[color:var(--app-accent-border)] active:scale-95 transition-transform"
                     >
                       <div className="p-2 bg-[color:var(--app-accent)] rounded-lg shadow">
                         <Briefcase className="w-4 h-4 text-[color:var(--app-text-inverse)]" />
                       </div>
                       <span className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] text-center">
-                        Post Job
+                        Explore
                       </span>
                     </Link>
                     <Link
-                      href="/property/create"
+                      href="/home"
                       className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[color:var(--app-info-soft)] dark:bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] border-2 border-[color:var(--app-info-border)] dark:border-[color:var(--app-info-border)] active:scale-95 transition-transform"
                     >
                       <div className="p-2 bg-[color:var(--app-info)] rounded-lg shadow">
                         <MapPin className="w-4 h-4 text-[color:var(--app-text-inverse)]" />
                       </div>
                       <span className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] text-center">
-                        List Property
+                        Home
                       </span>
                     </Link>
-                    <Link
+                    {/* <Link
                       href="/my-listings"
                       className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[color:var(--app-accent-soft)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)] border-2 border-[color:var(--app-accent-border)] dark:border-[color:var(--app-accent-border)] active:scale-95 transition-transform"
                     >
@@ -250,7 +242,7 @@ export default function ProfileView() {
                       </span>
                     </Link>
                     <Link
-                      href="/my-applications"
+                      href="/dashboard"
                       className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[color:var(--app-warning-soft)] dark:bg-[color:color-mix(in_srgb,_var(--app-warning)_20%,_transparent)] border-2 border-[color:var(--app-warning-border)] dark:border-[color:var(--app-warning-border)] active:scale-95 transition-transform"
                     >
                       <div className="p-2 bg-[color:var(--app-warning)] rounded-lg shadow">
@@ -259,7 +251,7 @@ export default function ProfileView() {
                       <span className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] text-center">
                         Applications
                       </span>
-                    </Link>
+                    </Link> */}
                   </div>
                 </div>
 
@@ -331,11 +323,11 @@ export default function ProfileView() {
                   Start posting jobs or listing properties
                 </p>
                 <Link
-                  href="/jobs/create"
+                  href="/home"
                   className="inline-flex items-center gap-1.5 h-9 px-4 bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] rounded-lg text-xs font-semibold active:scale-95 transition-transform"
                 >
                   <Plus className="w-4 h-4" />
-                  Create Listing
+                  Home
                 </Link>
               </div>
             )}

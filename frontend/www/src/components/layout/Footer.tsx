@@ -102,6 +102,14 @@ export function Footer() {
       label: locale === 'id' ? 'Komunitas' : 'Community',
     },
     {
+      href: '/learn',
+      label: 'Learn',
+    },
+    {
+      href: '/education',
+      label: 'Education',
+    },
+    {
       href: '/payments',
       label: locale === 'id' ? 'Pembayaran' : 'Payments',
     },

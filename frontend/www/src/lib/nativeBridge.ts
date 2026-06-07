@@ -4,7 +4,8 @@ type NativePermissionsBridge = {
 
 type NativePermissionPayload =
   | { action: 'openSettings' }
-  | { action: 'requestPermissions'; permissions: string[] };
+  | { action: 'requestPermissions'; permissions: string[] }
+  | { action: 'openReelsStudio'; source?: string };
 
 function getBridge(): NativePermissionsBridge | null {
   if (typeof window === 'undefined') return null;
@@ -43,5 +44,17 @@ export function requestNativePermissions(permissions: string[]): void {
     bridge.postMessage(JSON.stringify(payload));
   } catch {
     // Ignore bridge errors to avoid breaking web UX.
+  }
+}
+
+export function openNativeReelsStudio(source = 'reels'): boolean {
+  const bridge = getBridge();
+  if (!bridge) return false;
+  const payload: NativePermissionPayload = { action: 'openReelsStudio', source };
+  try {
+    bridge.postMessage(JSON.stringify(payload));
+    return true;
+  } catch {
+    return false;
   }
 }

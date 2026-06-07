@@ -15,6 +15,8 @@ use uuid::Uuid;
 use crate::config::AppState;
 use crate::routes::verification::{derive_verification_state, public_verification_payload};
 
+const DEFAULT_PROFILE_AVATAR: &str = "/default-avatar.svg";
+
 #[allow(dead_code)]
 #[derive(Debug, Deserialize, Clone)]
 struct AccessClaims {
@@ -172,7 +174,7 @@ pub async fn get_user_by_phone(
             u.phone,
             up.username::text AS username,
             up.full_name,
-            up.metadata->>'avatar_url' AS avatar_url
+            $2::text AS avatar_url
         FROM users u
         LEFT JOIN user_profiles up ON up.user_id = u.id
         WHERE u.deleted_at IS NULL
@@ -181,6 +183,7 @@ pub async fn get_user_by_phone(
         "#,
     )
     .bind(normalized_phone)
+    .bind(DEFAULT_PROFILE_AVATAR)
     .fetch_optional(&state.db)
     .await
     {
@@ -231,7 +234,7 @@ pub async fn get_user_by_email(
             u.phone,
             up.username::text AS username,
             up.full_name,
-            up.metadata->>'avatar_url' AS avatar_url
+            $2::text AS avatar_url
         FROM users u
         LEFT JOIN user_profiles up ON up.user_id = u.id
         WHERE u.deleted_at IS NULL
@@ -240,6 +243,7 @@ pub async fn get_user_by_email(
         "#,
     )
     .bind(email)
+    .bind(DEFAULT_PROFILE_AVATAR)
     .fetch_optional(&state.db)
     .await
     {
@@ -289,7 +293,7 @@ pub async fn discover_users(
             CASE WHEN $6 THEN u.phone ELSE NULL END AS phone,
             up.username::text AS username,
             up.full_name,
-            up.metadata->>'avatar_url' AS avatar_url,
+            '/default-avatar.svg'::text AS avatar_url,
             up.location,
             up.bio,
             COALESCE(
@@ -414,7 +418,7 @@ pub async fn get_public_user_profile(
             u.phone,
             up.username::text AS username,
             up.full_name,
-            up.metadata->>'avatar_url' AS avatar_url,
+            '/default-avatar.svg'::text AS avatar_url,
             up.bio,
             up.location,
             COALESCE(

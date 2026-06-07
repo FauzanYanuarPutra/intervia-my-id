@@ -10,7 +10,13 @@ type LajukanImageProps = Omit<ImageProps, 'src'> & {
 };
 
 function shouldBypassOptimizer(src: ImageProps['src'] | null | undefined) {
-  return typeof src === 'string' && /^(https?:)?\/\/|^data:|^blob:/i.test(src);
+  return (
+    typeof src === 'string' &&
+    (/^(https?:)?\/\/|^data:|^blob:/i.test(src) ||
+      src.startsWith('/uploads/') ||
+      src.startsWith('/api/content/media/') ||
+      src.startsWith('/api/chat/media/'))
+  );
 }
 
 function imageKey(src: ImageProps['src'] | null | undefined) {
@@ -39,15 +45,16 @@ function FallbackImage({
     <div
       role="img"
       aria-label={alt || 'Gambar tidak tersedia'}
+      aria-hidden={alt ? undefined : 'true'}
       style={style}
       className={cn(
-        'flex items-center justify-center bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-300',
+        'flex items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#e5eef7_0%,#f3f7fb_48%,#edf7f7_100%)] text-slate-500 dark:bg-[linear-gradient(135deg,#111827_0%,#1f2937_48%,#0f172a_100%)] dark:text-slate-300',
         fill && 'absolute inset-0 h-full w-full',
         !fill && 'min-h-16 min-w-16',
         className,
       )}
     >
-      <span className="inline-flex h-14 w-14 items-center justify-center rounded-[18px] bg-white/72 shadow-sm ring-1 ring-black/5 dark:bg-slate-950/62 dark:ring-white/10 sm:h-16 sm:w-16">
+      <span className="inline-flex h-14 w-14 items-center justify-center rounded-[18px] bg-white/75 shadow-sm ring-1 ring-black/5 dark:bg-slate-950/62 dark:ring-white/10 sm:h-16 sm:w-16">
         <ImageOff className="h-8 w-8 sm:h-9 sm:w-9" />
       </span>
     </div>

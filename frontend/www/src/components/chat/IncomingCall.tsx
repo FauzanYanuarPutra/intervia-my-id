@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Phone, Video, X } from 'lucide-react';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { soundManager } from '@/lib/soundManager';
 
 interface IncomingCallProps {
@@ -51,19 +52,11 @@ export function IncomingCall({
         <div className="text-center space-y-6">
           {/* Avatar */}
           <div className="flex justify-center">
-            {callerAvatar ? (
-              <img
-                src={callerAvatar}
-                alt={callerName}
-                className="w-24 h-24 rounded-full object-cover border-4 border-[color:var(--app-accent-border)]"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-full bg-[color:var(--app-accent)] flex items-center justify-center border-4 border-[color:var(--app-accent-border)]">
-                <span className="text-3xl font-bold text-[color:var(--app-text-inverse)]">
-                  {callerName.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
+            <img
+              src={profileAvatarSrc(callerAvatar)}
+              alt={callerName}
+              className="w-24 h-24 rounded-full object-cover border-4 border-[color:var(--app-accent-border)]"
+            />
           </div>
 
           {/* Caller name */}

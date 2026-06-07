@@ -464,14 +464,14 @@ function buildRiskReasons(
 
 function MetricCard(props: { label: string; value: string; note: string }) {
   return (
-    <Card className="rounded-[28px]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--color-text)]">
+    <Card className="rounded-[22px] [&>div]:p-3 sm:[&>div]:p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--color-text)] sm:text-[11px]">
         {props.label}
       </p>
-      <p className="mt-3 text-3xl font-semibold text-[color:var(--color-text)]">
+      <p className="mt-2 text-2xl font-semibold text-[color:var(--color-text)] sm:text-3xl">
         {props.value}
       </p>
-      <p className="mt-2 text-sm text-[color:var(--color-text)]">
+      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--color-text)] sm:text-sm">
         {props.note}
       </p>
     </Card>
@@ -1532,14 +1532,14 @@ export default function CrmCommandCenter() {
     <div className="dashboard-shell">
       <div className="pointer-events-none absolute left-6 top-6 h-44 w-44 rounded-full bg-[color:color-mix(in_srgb,_var(--color-primary)_22%,_transparent)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-4 right-8 h-56 w-56 rounded-full bg-[color:color-mix(in_srgb,_var(--color-primary-strong)_18%,_transparent)] blur-3xl" />
-      <div className="relative z-10 mx-auto grid min-h-screen max-w-[1500px] gap-6 p-4 lg:grid-cols-[280px_1fr] lg:p-6">
-        <aside className="glass-panel rounded-[32px] p-5">
+      <div className="relative z-10 mx-auto grid min-h-[100dvh] max-w-[1500px] gap-3 p-2 sm:p-4 lg:grid-cols-[270px_minmax(0,1fr)] lg:gap-4 lg:p-5">
+        <aside className="glass-panel rounded-[24px] p-3 sm:p-4 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:overflow-y-auto lg:rounded-[28px]">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
                 Lajukan
               </p>
-              <h1 className="mt-2 text-2xl font-semibold text-[color:var(--color-text)]">
+              <h1 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[color:var(--color-text)] sm:text-2xl">
                 CRM Command
               </h1>
             </div>
@@ -1552,11 +1552,11 @@ export default function CrmCommandCenter() {
               {stepUpFresh ? "OTP fresh" : "OTP needed"}
             </span>
           </div>
-          <p className="mt-3 text-sm text-[color:var(--color-text)]">
+          <p className="mt-2 text-sm leading-5 text-[color:var(--color-text)]">
             CRM bukan cuma catatan lead. Ini command center untuk growth,
             support, trust, dan anti-fraud dari seluruh WWW.
           </p>
-          <div className="mt-6 space-y-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 lg:block lg:space-y-2">
             {[
               ["command", "Command", "lihat aliran sistem"],
               ["pipeline", "Pipeline", "listing, demand, closing"],
@@ -1567,7 +1567,7 @@ export default function CrmCommandCenter() {
                 key={item[0]}
                 type="button"
                 onClick={() => setTab(item[0] as TabId)}
-                className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
                   tab === item[0]
                     ? "border-[color:var(--color-primary-border)] bg-[color:var(--color-primary-soft)]"
                     : "border-[color:var(--color-border)] bg-[color:color-mix(in_srgb,_var(--color-surface-muted)_72%,_transparent)]"
@@ -1582,7 +1582,7 @@ export default function CrmCommandCenter() {
               </button>
             ))}
           </div>
-          <div className="mt-6 rounded-[28px] border border-[color:var(--color-border)] bg-[color:color-mix(in_srgb,_var(--color-surface-muted)_80%,_transparent)] p-4">
+          <div className="mt-4 rounded-[22px] border border-[color:var(--color-border)] bg-[color:color-mix(in_srgb,_var(--color-surface-muted)_80%,_transparent)] p-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--color-text)]">
               Operator
             </p>
@@ -1595,7 +1595,7 @@ export default function CrmCommandCenter() {
                 ? formatDate(new Date(stepUpVerifiedAt).toISOString())
                 : "belum ada"}
             </p>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <a href={wwwUrl} className="flex-1">
                 <Button variant="secondary" className="w-full">
                   Buka WWW
@@ -1610,7 +1610,7 @@ export default function CrmCommandCenter() {
               </Button>
             </div>
           </div>
-          <div className="mt-6 space-y-3 text-sm text-[color:var(--color-text)]">
+          <div className="mt-4 hidden space-y-2 text-sm leading-5 text-[color:var(--color-text)] lg:block">
             <p className="font-semibold">Guard rails CRM</p>
             <p>
               Approval order berisiko dan perubahan trust profile selalu minta
@@ -1627,14 +1627,14 @@ export default function CrmCommandCenter() {
           </div>
         </aside>
 
-        <main className="space-y-6">
-          <div className="glass-panel rounded-[32px] p-5">
+        <main className="min-w-0 space-y-3 lg:space-y-4">
+          <div className="glass-panel rounded-[24px] p-4 lg:rounded-[28px] lg:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[color:var(--color-primary)]">
                   Operational CRM
                 </p>
-                <h2 className="mt-2 text-3xl font-semibold text-[color:var(--color-text)]">
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.035em] text-[color:var(--color-text)] sm:text-3xl">
                   Growth, support, dan risk saling terhubung
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm text-[color:var(--color-text)]">
@@ -1652,7 +1652,7 @@ export default function CrmCommandCenter() {
                 {bootError}
               </div>
             ) : null}
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
               {metrics.map((metric) => (
                 <MetricCard
                   key={metric.label}
@@ -1665,12 +1665,12 @@ export default function CrmCommandCenter() {
           </div>
 
           {tab === "command" ? (
-            <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
               <Card className="rounded-[32px]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--color-primary)]">
                   Kenapa CRM dibutuhkan
                 </p>
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {signalMap.map((signal) => (
                     <div
                       key={signal.title}
@@ -1790,7 +1790,7 @@ export default function CrmCommandCenter() {
             </div>
           ) : null}
           {tab === "pipeline" ? (
-            <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+            <div className="grid gap-3 xl:grid-cols-[1.25fr_0.75fr]">
               <Card className="rounded-[32px]">
                 <div className="flex items-center justify-between gap-3">
                   <div>

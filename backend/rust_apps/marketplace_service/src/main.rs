@@ -23,7 +23,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha512};
-use sqlx::{postgres::PgPoolOptions, FromRow, PgPool};
+use sqlx::{postgres::PgPoolOptions, FromRow, PgPool, Postgres};
 use std::{
     collections::{HashMap, HashSet},
     env,
@@ -36,6 +36,9 @@ use tokio::time::{sleep, Duration};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
+
+mod order_engine;
+use order_engine::{create_order, get_order, list_orders, transition_order};
 
 #[derive(Clone)]
 struct AppState {
@@ -64,10 +67,27 @@ const MAX_DELIVERY_TITLE_LEN: usize = 180;
 const MAX_DELIVERY_ATTACHMENT_LABEL_LEN: usize = 120;
 const MAX_DELIVERY_REFERENCE_LEN: usize = 2_000;
 const EVIDENCE_HASH_SHA256_LEN: usize = 64;
+const MAX_EVENT_BATCH_SIZE: usize = 25;
+const MAX_EVENT_NAME_LEN: usize = 120;
+const MAX_EVENT_STRING_LEN: usize = 512;
+const MAX_EVENT_PAGE_LEN: usize = 1_024;
+const MAX_EVENT_PROPERTIES_BYTES: usize = 32 * 1024;
+const MAX_LEARNING_TITLE_LEN: usize = 160;
+const MAX_LEARNING_SUMMARY_LEN: usize = 500;
+const MAX_LEARNING_DESCRIPTION_LEN: usize = 20_000;
+const MAX_LEARNING_TAGS: usize = 12;
+const MAX_LEARNING_TAG_LEN: usize = 36;
 const MIN_TOPUP_CENTS_DEV: i64 = 1_000;
 const MAX_TOPUP_CENTS_DEV: i64 = 100_000_000_000;
 const MIN_TOPUP_CENTS_LIVE: i64 = 10_000;
 const MAX_TOPUP_CENTS_LIVE: i64 = 5_000_000_000_000;
+const REWARD_COIN_VALUE_CENTS: i64 = 10_000;
+const REWARD_COIN_MAX_PAYMENT_BPS: i64 = 2_500;
+const REWARD_COIN_MIN_CASH_PAYMENT_CENTS: i64 = 100_000;
+const MIN_WITHDRAWAL_CENTS_DEV: i64 = 1_000;
+const MAX_WITHDRAWAL_CENTS_DEV: i64 = 100_000_000_000;
+const MIN_WITHDRAWAL_CENTS_LIVE: i64 = 10_000;
+const MAX_WITHDRAWAL_CENTS_LIVE: i64 = 5_000_000_000_000;
 const WALLET_MAX_FETCH_LIMIT: i64 = 200;
 const NOTIFICATION_WS_CHANNEL_CAP: usize = 2048;
 const NOTIFICATION_MAX_FETCH_LIMIT: i64 = 200;
@@ -148,6 +168,7 @@ struct UpsertContentRequest {
     body: Option<String>,
     pricing_mode: Option<String>,
     price_cents: Option<i64>,
+    price_unit: Option<String>,
     original_price_cents: Option<i64>,
     promo_label: Option<String>,
     promo_start_at: Option<DateTime<Utc>>,
@@ -159,6 +180,302 @@ struct UpsertContentRequest {
     metadata: Option<Value>,
     content_status: Option<String>,
     slug: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TrackEventRequest {
+    event_id: Option<Uuid>,
+    event_name: String,
+    occurred_at: Option<DateTime<Utc>>,
+    anonymous_id: Option<String>,
+    session_id: Option<String>,
+    tenant_id: Option<String>,
+    locale: Option<String>,
+    source: Option<String>,
+    page: Option<String>,
+    entity_type: Option<String>,
+    entity_id: Option<String>,
+    properties: Option<Value>,
+    context: Option<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum CollectEventsRequest {
+    Batch { events: Vec<TrackEventRequest> },
+    Single(TrackEventRequest),
+}
+
+#[derive(Debug)]
+struct NormalizedEvent {
+    event_id: Uuid,
+    event_name: String,
+    occurred_at: DateTime<Utc>,
+    anonymous_id: Option<String>,
+    session_id: Option<String>,
+    tenant_id: String,
+    locale: Option<String>,
+    source: String,
+    page: Option<String>,
+    entity_type: Option<String>,
+    entity_id: Option<String>,
+    properties: Value,
+    context: Value,
+}
+
+#[derive(Debug, Serialize)]
+struct CollectEventsResponse {
+    accepted: usize,
+}
+
+#[derive(Debug)]
+struct AiDecisionSeed {
+    decision_type: &'static str,
+    score: f64,
+    recommendation: &'static str,
+    reason_codes: Vec<&'static str>,
+    guardrail_risk_level: &'static str,
+    allowed_actions: Vec<&'static str>,
+}
+
+#[derive(Debug)]
+struct FraudSignalSeed {
+    signal_type: &'static str,
+    risk_score: i32,
+    severity: &'static str,
+    reason_codes: Vec<&'static str>,
+}
+
+#[derive(Debug)]
+struct CrmLeadSignal {
+    source: &'static str,
+    name: String,
+    message: String,
+    entity_key: String,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct AiOsMetricBucketRow {
+    key: String,
+    value: i64,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ListLearningCoursesQuery {
+    q: Option<String>,
+    category: Option<String>,
+    format: Option<String>,
+    level: Option<String>,
+    creator_user_id: Option<Uuid>,
+    mine: Option<bool>,
+    status: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct UpsertLearningCourseRequest {
+    title: Option<String>,
+    slug: Option<String>,
+    summary: Option<String>,
+    description: Option<String>,
+    level: Option<String>,
+    price_cents: Option<i64>,
+    currency: Option<String>,
+    visibility: Option<String>,
+    status: Option<String>,
+    thumbnail_url: Option<String>,
+    estimated_minutes: Option<i32>,
+    category: Option<String>,
+    primary_format: Option<String>,
+    trailer_url: Option<String>,
+    tags: Option<Vec<String>>,
+    metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateLearningModuleRequest {
+    title: Option<String>,
+    position: Option<i32>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateLearningLessonRequest {
+    module_id: Option<Uuid>,
+    module_title: Option<String>,
+    title: Option<String>,
+    lesson_type: Option<String>,
+    content_ref: Option<String>,
+    duration_seconds: Option<i32>,
+    is_preview: Option<bool>,
+    position: Option<i32>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct LearningCourseRow {
+    id: Uuid,
+    creator_user_id: Uuid,
+    slug: String,
+    title: String,
+    summary: Option<String>,
+    description: Option<String>,
+    level: String,
+    price_cents: i64,
+    currency: String,
+    visibility: String,
+    status: String,
+    thumbnail_url: Option<String>,
+    estimated_minutes: i32,
+    category: String,
+    primary_format: String,
+    trailer_url: Option<String>,
+    tags: Vec<String>,
+    metadata: Value,
+    published_at: Option<DateTime<Utc>>,
+    view_count: i64,
+    enrollment_count: i64,
+    rating_avg: f32,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct LearningModuleRow {
+    id: Uuid,
+    course_id: Uuid,
+    title: String,
+    position: i32,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct LearningLessonRow {
+    id: Uuid,
+    module_id: Uuid,
+    title: String,
+    lesson_type: String,
+    content_ref: Option<String>,
+    duration_seconds: i32,
+    is_preview: bool,
+    position: i32,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct LearningCourseDetail {
+    course: LearningCourseRow,
+    modules: Vec<LearningModuleRow>,
+    lessons: Vec<LearningLessonRow>,
+}
+
+#[derive(Debug, Serialize)]
+struct ListLearningCoursesResponse {
+    items: Vec<LearningCourseRow>,
+    limit: i64,
+    offset: i64,
+    has_more: bool,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct RewardBalanceRow {
+    user_id: Uuid,
+    coin_balance: i64,
+    xp_balance: i64,
+    voucher_count: i32,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct DailyLoginRewardRow {
+    id: Uuid,
+    user_id: Uuid,
+    reward_date: chrono::NaiveDate,
+    week_start: chrono::NaiveDate,
+    streak_day: i32,
+    coin_amount: i32,
+    xp_amount: i32,
+    voucher_code: Option<String>,
+    claimed_at: DateTime<Utc>,
+    metadata: Value,
+}
+
+#[derive(Debug, FromRow)]
+struct RewardWeekAnchor {
+    today: chrono::NaiveDate,
+    week_start: chrono::NaiveDate,
+    next_reset_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+struct DailyLoginRewardWeekClaimRow {
+    reward_date: chrono::NaiveDate,
+    streak_day: i32,
+    coin_amount: i32,
+    xp_amount: i32,
+    voucher_code: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DailyLoginRewardScheduleItem {
+    day: i32,
+    coin_amount: i32,
+    xp_amount: i32,
+    voucher: bool,
+    claimed: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct WeeklyLoginRewardProgress {
+    today: chrono::NaiveDate,
+    week_start: chrono::NaiveDate,
+    week_end: chrono::NaiveDate,
+    next_reset_at: DateTime<Utc>,
+    claimed_dates: Vec<chrono::NaiveDate>,
+    claimed_days: Vec<i32>,
+    days_claimed: i32,
+    days_remaining: i32,
+    next_streak_day: i32,
+    voucher_unlocked: bool,
+    weekly_coin_total: i32,
+    weekly_xp_total: i32,
+    schedule: Vec<DailyLoginRewardScheduleItem>,
+}
+
+#[derive(Debug, Serialize)]
+struct DailyLoginRewardResponse {
+    claimed: bool,
+    reward: DailyLoginRewardRow,
+    balance: RewardBalanceRow,
+    weekly: WeeklyLoginRewardProgress,
+}
+
+#[derive(Debug, Serialize)]
+struct RewardCoinPaymentRules {
+    coin_value_cents: i64,
+    max_discount_bps: i64,
+    max_discount_ratio: f64,
+    min_cash_payment_cents: i64,
+    currency: String,
+}
+
+#[derive(Debug)]
+struct RewardCoinApplication {
+    coin_amount: i64,
+    discount_cents: i64,
+    already_applied: bool,
+}
+
+#[derive(Debug)]
+enum RewardCoinPaymentError {
+    InsufficientCoins,
+    Database(sqlx::Error),
+}
+
+impl From<sqlx::Error> for RewardCoinPaymentError {
+    fn from(value: sqlx::Error) -> Self {
+        RewardCoinPaymentError::Database(value)
+    }
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -196,6 +513,7 @@ struct ContentRow {
     summary: Option<String>,
     body: String,
     price_cents: Option<i64>,
+    price_unit: Option<String>,
     currency: Option<String>,
     tags: Option<Vec<String>>,
     cover_image: Option<String>,
@@ -262,9 +580,11 @@ struct ContentResponse {
     summary: Option<String>,
     body: String,
     price_cents: Option<i64>,
+    price_unit: Option<String>,
     currency: Option<String>,
     tags: Option<Vec<String>>,
     cover_image: Option<String>,
+    image_urls: Vec<String>,
     category: Option<String>,
     content_status: String,
     status: String,
@@ -293,6 +613,8 @@ impl ContentResponse {
         let cover_image = clean_response_image_url(value.cover_image.clone())
             .or_else(|| image_urls.first().cloned());
         let metadata = attach_response_image_urls(value.metadata, &image_urls);
+        let price_unit = value.price_unit.or_else(|| metadata_price_unit(&metadata));
+        let metadata = attach_price_unit_metadata(metadata, price_unit.as_deref());
 
         Self {
             id: value.id,
@@ -304,9 +626,11 @@ impl ContentResponse {
             summary: value.summary,
             body: value.body,
             price_cents: value.price_cents,
+            price_unit,
             currency: value.currency,
             tags: value.tags,
             cover_image,
+            image_urls,
             category: value.category,
             status: value.content_status.clone(),
             content_status: value.content_status,
@@ -1124,6 +1448,29 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/v1/content/{id}/reviews", get(list_reviews))
         .route("/v1/content/{id}/offers", post(create_offer))
+        .route("/v1/events", post(collect_events))
+        .route("/v1/ai-os/overview", get(get_ai_os_overview))
+        .route(
+            "/v1/learning/courses",
+            get(list_learning_courses).post(create_learning_course),
+        )
+        .route(
+            "/v1/learning/courses/{course_ref}",
+            get(get_learning_course).patch(update_learning_course),
+        )
+        .route(
+            "/v1/learning/courses/{course_id}/modules",
+            post(create_learning_module),
+        )
+        .route(
+            "/v1/learning/courses/{course_id}/lessons",
+            post(create_learning_lesson),
+        )
+        .route("/v1/rewards/balance", get(get_reward_balance))
+        .route(
+            "/v1/rewards/daily-login/claim",
+            post(claim_daily_login_reward),
+        )
         .route("/v1/lajukan/summary", get(get_lajukan_summary))
         .route("/v1/lajukan/requests", get(list_lajukan_requests))
         .route(
@@ -1138,6 +1485,9 @@ async fn main() -> anyhow::Result<()> {
             "/v1/umkm/stores/{store_ref}/products",
             get(list_umkm_products).post(create_umkm_product),
         )
+        .route("/v1/orders", get(list_orders).post(create_order))
+        .route("/v1/orders/{id}", get(get_order))
+        .route("/v1/orders/{id}/transition", put(transition_order))
         .route("/v1/transactions", get(list_transactions))
         .route("/v1/transactions/{id}", get(get_transaction))
         .route(
@@ -1165,6 +1515,14 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/wallet/topups",
             get(list_wallet_topups).post(create_wallet_topup),
+        )
+        .route(
+            "/v1/wallet/withdrawals",
+            get(list_wallet_withdrawals).post(create_wallet_withdrawal),
+        )
+        .route(
+            "/v1/wallet/withdrawals/{id}/cancel",
+            post(cancel_wallet_withdrawal),
         )
         .route(
             "/v1/wallet/topups/{id}/settle-dev",
@@ -1242,6 +1600,1619 @@ async fn main() -> anyhow::Result<()> {
 
 async fn health() -> impl IntoResponse {
     Json(json!({"status":"ok","service":"marketplace_service"}))
+}
+
+async fn collect_events(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CollectEventsRequest>,
+) -> impl IntoResponse {
+    let raw_events = match payload {
+        CollectEventsRequest::Single(event) => vec![event],
+        CollectEventsRequest::Batch { events } => events,
+    };
+
+    if raw_events.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "events must not be empty"})),
+        );
+    }
+
+    if raw_events.len() > MAX_EVENT_BATCH_SIZE {
+        return (
+            StatusCode::PAYLOAD_TOO_LARGE,
+            Json(json!({"error": "too many events in one request"})),
+        );
+    }
+
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    let mut events = Vec::with_capacity(raw_events.len());
+
+    for event in raw_events {
+        match normalize_event_payload(event, &headers) {
+            Ok(normalized) => events.push(normalized),
+            Err(message) => {
+                return (StatusCode::BAD_REQUEST, Json(json!({"error": message})));
+            }
+        }
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("collect_events begin transaction error: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to collect events"})),
+            );
+        }
+    };
+
+    let mut accepted = 0usize;
+
+    for event in events {
+        let insert_result = sqlx::query(
+            r#"
+            INSERT INTO event_log (
+                event_id,
+                event_name,
+                occurred_at,
+                actor_user_id,
+                anonymous_id,
+                session_id,
+                tenant_id,
+                locale,
+                source,
+                page,
+                entity_type,
+                entity_id,
+                properties,
+                context
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            ON CONFLICT (event_id) DO NOTHING
+            "#,
+        )
+        .bind(event.event_id)
+        .bind(&event.event_name)
+        .bind(event.occurred_at)
+        .bind(actor_user_id)
+        .bind(&event.anonymous_id)
+        .bind(&event.session_id)
+        .bind(&event.tenant_id)
+        .bind(&event.locale)
+        .bind(&event.source)
+        .bind(&event.page)
+        .bind(&event.entity_type)
+        .bind(&event.entity_id)
+        .bind(&event.properties)
+        .bind(&event.context)
+        .execute(&mut *tx)
+        .await;
+
+        let result = match insert_result {
+            Ok(result) => result,
+            Err(error) => {
+                tracing::error!("collect_events insert event error: {:?}", error);
+                let _ = tx.rollback().await;
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Failed to collect events"})),
+                );
+            }
+        };
+
+        if result.rows_affected() == 0 {
+            continue;
+        }
+
+        accepted += 1;
+
+        let workflow_key = automation_workflow_for_event(&event.event_name);
+        if let Some(workflow_key) = workflow_key {
+            let dedupe_key = automation_dedupe_key(workflow_key, actor_user_id, &event);
+            if let Err(error) = sqlx::query(
+                r#"
+                INSERT INTO automation_jobs (
+                    workflow_key,
+                    dedupe_key,
+                    trigger_event_id,
+                    actor_user_id,
+                    entity_type,
+                    entity_id,
+                    payload
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT DO NOTHING
+                "#,
+            )
+            .bind(workflow_key)
+            .bind(dedupe_key)
+            .bind(event.event_id)
+            .bind(actor_user_id)
+            .bind(&event.entity_type)
+            .bind(&event.entity_id)
+            .bind(json!({
+                "event_name": event.event_name,
+                "page": event.page,
+                "source": event.source,
+                "properties": event.properties
+            }))
+            .execute(&mut *tx)
+            .await
+            {
+                tracing::warn!("collect_events automation job insert error: {:?}", error);
+            }
+        }
+
+        if let Err(error) =
+            write_ai_os_event_side_effects(&mut tx, actor_user_id, &event, workflow_key).await
+        {
+            tracing::warn!("collect_events ai-os side effect error: {:?}", error);
+        }
+    }
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("collect_events commit error: {:?}", error);
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": "Failed to collect events"})),
+        );
+    }
+
+    (
+        StatusCode::ACCEPTED,
+        Json(json!(CollectEventsResponse { accepted })),
+    )
+}
+
+async fn get_ai_os_overview(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(claims) => claims,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    if !has_agent_access(&claims) {
+        return err(StatusCode::FORBIDDEN, "agent access required").into_response();
+    }
+
+    let events_24h = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM event_log WHERE occurred_at >= NOW() - interval '24 hours'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let events_7d = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM event_log WHERE occurred_at >= NOW() - interval '7 days'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let active_users_24h = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(DISTINCT COALESCE(actor_user_id::TEXT, anonymous_id, session_id))
+        FROM event_log
+        WHERE occurred_at >= NOW() - interval '24 hours'
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let decisions_24h = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM ai_decision_log WHERE created_at >= NOW() - interval '24 hours'",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let automation_pending = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM automation_jobs WHERE status IN ('pending', 'retry')",
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let fraud_open =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM fraud_signals WHERE status = 'open'")
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(0);
+    let open_fraud_cases =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM fraud_cases WHERE status = 'open'")
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(0);
+    let recommendation_impressions_24h = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)
+        FROM recommendation_impressions
+        WHERE created_at >= NOW() - interval '24 hours'
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let recommendation_feedback_24h = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)
+        FROM recommendation_feedback
+        WHERE created_at >= NOW() - interval '24 hours'
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let ai_os_leads_open = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)
+        FROM crm_leads
+        WHERE metadata->>'ai_os' = 'true'
+          AND stage NOT IN ('won', 'lost')
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+    let stale_ai_os_leads = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)
+        FROM crm_leads
+        WHERE metadata->>'ai_os' = 'true'
+          AND stage NOT IN ('won', 'lost')
+          AND updated_at < NOW() - interval '24 hours'
+        "#,
+    )
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(0);
+
+    let top_events = sqlx::query_as::<_, AiOsMetricBucketRow>(
+        r#"
+        SELECT event_name AS key, COUNT(*) AS value
+        FROM event_log
+        WHERE occurred_at >= NOW() - interval '24 hours'
+        GROUP BY event_name
+        ORDER BY value DESC, key ASC
+        LIMIT 12
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+    let lifecycle = sqlx::query_as::<_, AiOsMetricBucketRow>(
+        r#"
+        SELECT lifecycle_stage AS key, COUNT(*) AS value
+        FROM user_feature_snapshots
+        GROUP BY lifecycle_stage
+        ORDER BY value DESC, key ASC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+    let automation_by_workflow = sqlx::query_as::<_, AiOsMetricBucketRow>(
+        r#"
+        SELECT workflow_key AS key, COUNT(*) AS value
+        FROM automation_jobs
+        WHERE created_at >= NOW() - interval '7 days'
+        GROUP BY workflow_key
+        ORDER BY value DESC, key ASC
+        LIMIT 12
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+    let fraud_by_severity = sqlx::query_as::<_, AiOsMetricBucketRow>(
+        r#"
+        SELECT severity AS key, COUNT(*) AS value
+        FROM fraud_signals
+        WHERE created_at >= NOW() - interval '7 days'
+        GROUP BY severity
+        ORDER BY value DESC, key ASC
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+    let decision_by_type = sqlx::query_as::<_, AiOsMetricBucketRow>(
+        r#"
+        SELECT decision_type AS key, COUNT(*) AS value
+        FROM ai_decision_log
+        WHERE created_at >= NOW() - interval '7 days'
+        GROUP BY decision_type
+        ORDER BY value DESC, key ASC
+        LIMIT 12
+        "#,
+    )
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    Json(json!({
+        "generated_at": Utc::now(),
+        "policy_version": "ai-os-foundation-v1",
+        "model_version": "heuristic-v1",
+        "north_star": {
+            "events_24h": events_24h,
+            "events_7d": events_7d,
+            "active_users_24h": active_users_24h,
+            "decisions_24h": decisions_24h,
+            "automation_pending": automation_pending,
+            "fraud_open": fraud_open,
+            "open_fraud_cases": open_fraud_cases,
+            "recommendation_impressions_24h": recommendation_impressions_24h,
+            "recommendation_feedback_24h": recommendation_feedback_24h,
+            "ai_os_leads_open": ai_os_leads_open,
+            "stale_ai_os_leads": stale_ai_os_leads
+        },
+        "funnel": lifecycle,
+        "top_events": top_events,
+        "automation_by_workflow": automation_by_workflow,
+        "fraud_by_severity": fraud_by_severity,
+        "decision_by_type": decision_by_type,
+        "guardrails": [
+            "frontend events are signals, not source of truth",
+            "AI decisions are logged before automation",
+            "money, wallet, role, ownership, and KYC state stay in domain services",
+            "fraud cases are explainable through reason_codes"
+        ]
+    }))
+    .into_response()
+}
+
+async fn list_learning_courses(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListLearningCoursesQuery>,
+) -> impl IntoResponse {
+    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let actor_user_id = claims
+        .as_ref()
+        .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
+    let is_agent = claims.as_ref().is_some_and(has_agent_access);
+    let mine = query.mine.unwrap_or(false);
+
+    if mine && actor_user_id.is_none() {
+        return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+    }
+
+    let q = clean_text(query.q);
+    let category = clean_text(query.category).map(|value| value.to_lowercase());
+    let format = query
+        .format
+        .map(|value| normalize_learning_format(Some(value)));
+    let level = query
+        .level
+        .map(|value| normalize_learning_level(Some(value)));
+    let status = if mine || is_agent {
+        query
+            .status
+            .map(|value| normalize_learning_status(Some(value)))
+    } else {
+        None
+    };
+    let limit = query.limit.unwrap_or(24).clamp(1, 80);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let mut rows = match sqlx::query_as::<_, LearningCourseRow>(
+        r#"
+        SELECT
+            id,
+            creator_user_id,
+            slug,
+            title,
+            summary,
+            description,
+            level,
+            price_cents,
+            currency,
+            visibility,
+            status,
+            thumbnail_url,
+            estimated_minutes,
+            category,
+            primary_format,
+            trailer_url,
+            tags,
+            metadata,
+            published_at,
+            view_count,
+            enrollment_count,
+            rating_avg,
+            created_at,
+            updated_at
+        FROM learning_courses
+        WHERE ($1::text IS NULL OR title ILIKE '%' || $1 || '%' OR COALESCE(summary, '') ILIKE '%' || $1 || '%' OR array_to_string(tags, ' ') ILIKE '%' || $1 || '%')
+          AND ($2::text IS NULL OR category = $2)
+          AND ($3::text IS NULL OR primary_format = $3)
+          AND ($4::text IS NULL OR level = $4)
+          AND ($5::uuid IS NULL OR creator_user_id = $5)
+          AND ($6::text IS NULL OR status = $6)
+          AND (
+              CASE
+                  WHEN $7::bool THEN creator_user_id = $8
+                  ELSE ((status = 'published' AND visibility = 'public') OR $9::bool OR creator_user_id = $8)
+              END
+          )
+        ORDER BY
+            CASE WHEN status = 'published' THEN 0 ELSE 1 END,
+            COALESCE(published_at, updated_at) DESC,
+            updated_at DESC
+        LIMIT $10
+        OFFSET $11
+        "#,
+    )
+    .bind(q)
+    .bind(category)
+    .bind(format)
+    .bind(level)
+    .bind(query.creator_user_id)
+    .bind(status)
+    .bind(mine)
+    .bind(actor_user_id)
+    .bind(is_agent)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("list_learning_courses error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load courses")
+                .into_response();
+        }
+    };
+
+    let has_more = rows.len() as i64 > limit;
+    rows.truncate(limit as usize);
+
+    Json(ListLearningCoursesResponse {
+        items: rows,
+        limit,
+        offset,
+        has_more,
+    })
+    .into_response()
+}
+
+async fn fetch_learning_course_by_ref(
+    db: &PgPool,
+    course_ref: &str,
+) -> Result<Option<LearningCourseRow>, sqlx::Error> {
+    let course_id = Uuid::parse_str(course_ref).ok();
+    sqlx::query_as::<_, LearningCourseRow>(
+        r#"
+        SELECT
+            id,
+            creator_user_id,
+            slug,
+            title,
+            summary,
+            description,
+            level,
+            price_cents,
+            currency,
+            visibility,
+            status,
+            thumbnail_url,
+            estimated_minutes,
+            category,
+            primary_format,
+            trailer_url,
+            tags,
+            metadata,
+            published_at,
+            view_count,
+            enrollment_count,
+            rating_avg,
+            created_at,
+            updated_at
+        FROM learning_courses
+        WHERE ($1::uuid IS NOT NULL AND id = $1) OR slug = $2
+        LIMIT 1
+        "#,
+    )
+    .bind(course_id)
+    .bind(course_ref)
+    .fetch_optional(db)
+    .await
+}
+
+fn can_access_learning_course(
+    course: &LearningCourseRow,
+    actor_user_id: Option<Uuid>,
+    is_agent: bool,
+) -> bool {
+    is_agent
+        || actor_user_id == Some(course.creator_user_id)
+        || (course.status == "published" && course.visibility == "public")
+}
+
+fn can_manage_learning_course(
+    course: &LearningCourseRow,
+    actor_user_id: Option<Uuid>,
+    is_agent: bool,
+) -> bool {
+    is_agent || actor_user_id == Some(course.creator_user_id)
+}
+
+async fn get_learning_course(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(course_ref): Path<String>,
+) -> impl IntoResponse {
+    let claims = auth_claims_from_headers(&headers, &state.jwt_secret);
+    let actor_user_id = claims
+        .as_ref()
+        .and_then(|claims| Uuid::parse_str(&claims.sub).ok());
+    let is_agent = claims.as_ref().is_some_and(has_agent_access);
+
+    let course = match fetch_learning_course_by_ref(&state.db, &course_ref).await {
+        Ok(Some(course)) => course,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "course not found").into_response(),
+        Err(error) => {
+            tracing::error!("get_learning_course error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load course").into_response();
+        }
+    };
+
+    if !can_access_learning_course(&course, actor_user_id, is_agent) {
+        return err(StatusCode::NOT_FOUND, "course not found").into_response();
+    }
+
+    let modules = match sqlx::query_as::<_, LearningModuleRow>(
+        r#"
+        SELECT id, course_id, title, position, created_at
+        FROM learning_modules
+        WHERE course_id = $1
+        ORDER BY position ASC, created_at ASC
+        "#,
+    )
+    .bind(course.id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("get_learning_course modules error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load course").into_response();
+        }
+    };
+
+    let lessons = match sqlx::query_as::<_, LearningLessonRow>(
+        r#"
+        SELECT
+            ll.id,
+            ll.module_id,
+            ll.title,
+            ll.lesson_type,
+            ll.content_ref,
+            ll.duration_seconds,
+            ll.is_preview,
+            ll.position,
+            ll.created_at,
+            ll.updated_at
+        FROM learning_lessons ll
+        JOIN learning_modules lm ON lm.id = ll.module_id
+        WHERE lm.course_id = $1
+        ORDER BY lm.position ASC, ll.position ASC, ll.created_at ASC
+        "#,
+    )
+    .bind(course.id)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("get_learning_course lessons error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load course").into_response();
+        }
+    };
+
+    if course.status == "published" && course.visibility == "public" {
+        let _ =
+            sqlx::query("UPDATE learning_courses SET view_count = view_count + 1 WHERE id = $1")
+                .bind(course.id)
+                .execute(&state.db)
+                .await;
+    }
+
+    Json(LearningCourseDetail {
+        course,
+        modules,
+        lessons,
+    })
+    .into_response()
+}
+
+async fn create_learning_course(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<UpsertLearningCourseRequest>,
+) -> impl IntoResponse {
+    let creator_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let title = match clean_text_limited(payload.title, MAX_LEARNING_TITLE_LEN) {
+        Ok(Some(value)) if value.len() >= 4 => value,
+        Ok(_) => return err(StatusCode::BAD_REQUEST, "title is required").into_response(),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "title is too long").into_response(),
+    };
+    let summary = match clean_text_limited(payload.summary, MAX_LEARNING_SUMMARY_LEN) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "summary is too long").into_response(),
+    };
+    let description = match clean_text_limited(payload.description, MAX_LEARNING_DESCRIPTION_LEN) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "description is too long").into_response(),
+    };
+    let slug_base = clean_text(payload.slug).unwrap_or_else(|| title.clone());
+    let slug = make_slug(&slug_base);
+    let level = normalize_learning_level(payload.level);
+    let visibility = normalize_learning_visibility(payload.visibility);
+    let status = normalize_learning_status(payload.status);
+    let primary_format = normalize_learning_format(payload.primary_format);
+    let category = clean_text(payload.category)
+        .map(|value| make_slug(&value))
+        .unwrap_or_else(|| "business".to_string());
+    let currency = normalize_currency(payload.currency).unwrap_or_else(|| "IDR".to_string());
+    if !is_valid_currency(&currency) {
+        return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3").into_response();
+    }
+    let price_cents = payload.price_cents.unwrap_or(0).max(0);
+    let estimated_minutes = payload.estimated_minutes.unwrap_or(0).max(0);
+    let thumbnail_url = clean_text(payload.thumbnail_url);
+    let trailer_url = clean_text(payload.trailer_url);
+    let tags = normalize_learning_tags(payload.tags);
+    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    if !metadata.is_object() || !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata must be a small object").into_response();
+    }
+    let published_at = if status == "published" {
+        Some(Utc::now())
+    } else {
+        None
+    };
+
+    match sqlx::query_as::<_, LearningCourseRow>(
+        r#"
+        INSERT INTO learning_courses (
+            creator_user_id,
+            slug,
+            title,
+            summary,
+            description,
+            level,
+            price_cents,
+            currency,
+            visibility,
+            status,
+            thumbnail_url,
+            estimated_minutes,
+            category,
+            primary_format,
+            trailer_url,
+            tags,
+            metadata,
+            published_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        RETURNING
+            id,
+            creator_user_id,
+            slug,
+            title,
+            summary,
+            description,
+            level,
+            price_cents,
+            currency,
+            visibility,
+            status,
+            thumbnail_url,
+            estimated_minutes,
+            category,
+            primary_format,
+            trailer_url,
+            tags,
+            metadata,
+            published_at,
+            view_count,
+            enrollment_count,
+            rating_avg,
+            created_at,
+            updated_at
+        "#,
+    )
+    .bind(creator_user_id)
+    .bind(slug)
+    .bind(title)
+    .bind(summary)
+    .bind(description)
+    .bind(level)
+    .bind(price_cents)
+    .bind(currency)
+    .bind(visibility)
+    .bind(status)
+    .bind(thumbnail_url)
+    .bind(estimated_minutes)
+    .bind(category)
+    .bind(primary_format)
+    .bind(trailer_url)
+    .bind(tags)
+    .bind(metadata)
+    .bind(published_at)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(course) => (StatusCode::CREATED, Json(json!({ "course": course }))).into_response(),
+        Err(sqlx::Error::Database(db_error))
+            if db_error.constraint() == Some("learning_courses_slug_key") =>
+        {
+            err(StatusCode::CONFLICT, "slug already exists").into_response()
+        }
+        Err(error) => {
+            tracing::error!("create_learning_course error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create course").into_response()
+        }
+    }
+}
+
+async fn update_learning_course(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(course_ref): Path<String>,
+    Json(payload): Json<UpsertLearningCourseRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(claims) => claims,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let actor_user_id = Uuid::parse_str(&claims.sub).ok();
+    let is_agent = has_agent_access(&claims);
+
+    let existing = match fetch_learning_course_by_ref(&state.db, &course_ref).await {
+        Ok(Some(course)) => course,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "course not found").into_response(),
+        Err(error) => {
+            tracing::error!("update_learning_course load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load course").into_response();
+        }
+    };
+
+    if !can_manage_learning_course(&existing, actor_user_id, is_agent) {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let title = match clean_text_limited(payload.title, MAX_LEARNING_TITLE_LEN) {
+        Ok(Some(value)) if value.len() >= 4 => value,
+        Ok(Some(_)) => return err(StatusCode::BAD_REQUEST, "title is too short").into_response(),
+        Ok(None) => existing.title.clone(),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "title is too long").into_response(),
+    };
+    let slug = payload
+        .slug
+        .and_then(|value| clean_text(Some(value)))
+        .map(|value| make_slug(&value))
+        .unwrap_or_else(|| existing.slug.clone());
+    let summary = match clean_text_limited(payload.summary, MAX_LEARNING_SUMMARY_LEN) {
+        Ok(value) => value.or_else(|| existing.summary.clone()),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "summary is too long").into_response(),
+    };
+    let description = match clean_text_limited(payload.description, MAX_LEARNING_DESCRIPTION_LEN) {
+        Ok(value) => value.or_else(|| existing.description.clone()),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "description is too long").into_response(),
+    };
+    let level = payload
+        .level
+        .map(|value| normalize_learning_level(Some(value)))
+        .unwrap_or_else(|| existing.level.clone());
+    let visibility = payload
+        .visibility
+        .map(|value| normalize_learning_visibility(Some(value)))
+        .unwrap_or_else(|| existing.visibility.clone());
+    let status = payload
+        .status
+        .map(|value| normalize_learning_status(Some(value)))
+        .unwrap_or_else(|| existing.status.clone());
+    let primary_format = payload
+        .primary_format
+        .map(|value| normalize_learning_format(Some(value)))
+        .unwrap_or_else(|| existing.primary_format.clone());
+    let category = payload
+        .category
+        .and_then(|value| clean_text(Some(value)))
+        .map(|value| make_slug(&value))
+        .unwrap_or_else(|| existing.category.clone());
+    let currency = payload
+        .currency
+        .and_then(|value| normalize_currency(Some(value)))
+        .unwrap_or_else(|| existing.currency.clone());
+    if !is_valid_currency(&currency) {
+        return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3").into_response();
+    }
+    let price_cents = payload.price_cents.unwrap_or(existing.price_cents).max(0);
+    let estimated_minutes = payload
+        .estimated_minutes
+        .unwrap_or(existing.estimated_minutes)
+        .max(0);
+    let thumbnail_url = clean_text(payload.thumbnail_url).or(existing.thumbnail_url.clone());
+    let trailer_url = clean_text(payload.trailer_url).or(existing.trailer_url.clone());
+    let tags = if payload.tags.is_some() {
+        normalize_learning_tags(payload.tags)
+    } else {
+        existing.tags.clone()
+    };
+    let metadata = match payload.metadata {
+        Some(value) => {
+            if !value.is_object() || !metadata_within_limit(&value) {
+                return err(StatusCode::BAD_REQUEST, "metadata must be a small object")
+                    .into_response();
+            }
+            value
+        }
+        None => existing.metadata.clone(),
+    };
+    let published_at = if status == "published" {
+        existing.published_at.or_else(|| Some(Utc::now()))
+    } else {
+        None
+    };
+
+    match sqlx::query_as::<_, LearningCourseRow>(
+        r#"
+        UPDATE learning_courses
+        SET
+            slug = $2,
+            title = $3,
+            summary = $4,
+            description = $5,
+            level = $6,
+            price_cents = $7,
+            currency = $8,
+            visibility = $9,
+            status = $10,
+            thumbnail_url = $11,
+            estimated_minutes = $12,
+            category = $13,
+            primary_format = $14,
+            trailer_url = $15,
+            tags = $16,
+            metadata = $17,
+            published_at = $18,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id,
+            creator_user_id,
+            slug,
+            title,
+            summary,
+            description,
+            level,
+            price_cents,
+            currency,
+            visibility,
+            status,
+            thumbnail_url,
+            estimated_minutes,
+            category,
+            primary_format,
+            trailer_url,
+            tags,
+            metadata,
+            published_at,
+            view_count,
+            enrollment_count,
+            rating_avg,
+            created_at,
+            updated_at
+        "#,
+    )
+    .bind(existing.id)
+    .bind(slug)
+    .bind(title)
+    .bind(summary)
+    .bind(description)
+    .bind(level)
+    .bind(price_cents)
+    .bind(currency)
+    .bind(visibility)
+    .bind(status)
+    .bind(thumbnail_url)
+    .bind(estimated_minutes)
+    .bind(category)
+    .bind(primary_format)
+    .bind(trailer_url)
+    .bind(tags)
+    .bind(metadata)
+    .bind(published_at)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(course) => Json(json!({ "course": course })).into_response(),
+        Err(sqlx::Error::Database(db_error))
+            if db_error.constraint() == Some("learning_courses_slug_key") =>
+        {
+            err(StatusCode::CONFLICT, "slug already exists").into_response()
+        }
+        Err(error) => {
+            tracing::error!("update_learning_course error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update course").into_response()
+        }
+    }
+}
+
+async fn create_learning_module(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(course_id): Path<Uuid>,
+    Json(payload): Json<CreateLearningModuleRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(claims) => claims,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let actor_user_id = Uuid::parse_str(&claims.sub).ok();
+    let is_agent = has_agent_access(&claims);
+
+    let course = match fetch_learning_course_by_ref(&state.db, &course_id.to_string()).await {
+        Ok(Some(course)) => course,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "course not found").into_response(),
+        Err(error) => {
+            tracing::error!("create_learning_module course error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load course").into_response();
+        }
+    };
+
+    if !can_manage_learning_course(&course, actor_user_id, is_agent) {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let title = match clean_text_limited(payload.title, MAX_LEARNING_TITLE_LEN) {
+        Ok(Some(value)) if value.len() >= 2 => value,
+        Ok(_) => return err(StatusCode::BAD_REQUEST, "title is required").into_response(),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "title is too long").into_response(),
+    };
+    let position = match payload.position {
+        Some(value) if value > 0 => value,
+        _ => sqlx::query_scalar::<_, i32>(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM learning_modules WHERE course_id = $1",
+        )
+        .bind(course.id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(1),
+    };
+
+    match sqlx::query_as::<_, LearningModuleRow>(
+        r#"
+        INSERT INTO learning_modules (course_id, title, position)
+        VALUES ($1, $2, $3)
+        RETURNING id, course_id, title, position, created_at
+        "#,
+    )
+    .bind(course.id)
+    .bind(title)
+    .bind(position)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(module) => (StatusCode::CREATED, Json(json!({ "module": module }))).into_response(),
+        Err(error) => {
+            tracing::error!("create_learning_module error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create module").into_response()
+        }
+    }
+}
+
+async fn create_learning_lesson(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(course_id): Path<Uuid>,
+    Json(payload): Json<CreateLearningLessonRequest>,
+) -> impl IntoResponse {
+    let claims = match auth_claims_from_headers(&headers, &state.jwt_secret) {
+        Some(claims) => claims,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let actor_user_id = Uuid::parse_str(&claims.sub).ok();
+    let is_agent = has_agent_access(&claims);
+
+    let course = match fetch_learning_course_by_ref(&state.db, &course_id.to_string()).await {
+        Ok(Some(course)) => course,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "course not found").into_response(),
+        Err(error) => {
+            tracing::error!("create_learning_lesson course error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load course").into_response();
+        }
+    };
+
+    if !can_manage_learning_course(&course, actor_user_id, is_agent) {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let module_id = if let Some(module_id) = payload.module_id {
+        let exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM learning_modules WHERE id = $1 AND course_id = $2)",
+        )
+        .bind(module_id)
+        .bind(course.id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(false);
+
+        if !exists {
+            return err(StatusCode::BAD_REQUEST, "module does not belong to course")
+                .into_response();
+        }
+        module_id
+    } else {
+        let module_title =
+            clean_text(payload.module_title).unwrap_or_else(|| "Mulai di sini".to_string());
+        let position = sqlx::query_scalar::<_, i32>(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM learning_modules WHERE course_id = $1",
+        )
+        .bind(course.id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(1);
+        match sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO learning_modules (course_id, title, position)
+            VALUES ($1, $2, $3)
+            RETURNING id
+            "#,
+        )
+        .bind(course.id)
+        .bind(module_title)
+        .bind(position)
+        .fetch_one(&state.db)
+        .await
+        {
+            Ok(id) => id,
+            Err(error) => {
+                tracing::error!("create_learning_lesson implicit module error: {:?}", error);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create module")
+                    .into_response();
+            }
+        }
+    };
+
+    let title = match clean_text_limited(payload.title, MAX_LEARNING_TITLE_LEN) {
+        Ok(Some(value)) if value.len() >= 2 => value,
+        Ok(_) => return err(StatusCode::BAD_REQUEST, "title is required").into_response(),
+        Err(_) => return err(StatusCode::BAD_REQUEST, "title is too long").into_response(),
+    };
+    let lesson_type = normalize_lesson_type(payload.lesson_type);
+    let content_ref = clean_text(payload.content_ref);
+    let duration_seconds = payload.duration_seconds.unwrap_or(0).max(0);
+    let is_preview = payload.is_preview.unwrap_or(false);
+    let position = match payload.position {
+        Some(value) if value > 0 => value,
+        _ => sqlx::query_scalar::<_, i32>(
+            "SELECT COALESCE(MAX(position), 0) + 1 FROM learning_lessons WHERE module_id = $1",
+        )
+        .bind(module_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(1),
+    };
+
+    match sqlx::query_as::<_, LearningLessonRow>(
+        r#"
+        INSERT INTO learning_lessons (
+            module_id,
+            title,
+            lesson_type,
+            content_ref,
+            duration_seconds,
+            is_preview,
+            position
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING
+            id,
+            module_id,
+            title,
+            lesson_type,
+            content_ref,
+            duration_seconds,
+            is_preview,
+            position,
+            created_at,
+            updated_at
+        "#,
+    )
+    .bind(module_id)
+    .bind(title)
+    .bind(lesson_type)
+    .bind(content_ref)
+    .bind(duration_seconds)
+    .bind(is_preview)
+    .bind(position)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(lesson) => (StatusCode::CREATED, Json(json!({ "lesson": lesson }))).into_response(),
+        Err(error) => {
+            tracing::error!("create_learning_lesson error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to create lesson").into_response()
+        }
+    }
+}
+
+async fn get_or_create_reward_balance(
+    db: &PgPool,
+    user_id: Uuid,
+) -> Result<RewardBalanceRow, sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO user_reward_balances (user_id)
+        VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+        "#,
+    )
+    .bind(user_id)
+    .execute(db)
+    .await?;
+
+    sqlx::query_as::<_, RewardBalanceRow>(
+        r#"
+        SELECT user_id, coin_balance, xp_balance, voucher_count, updated_at
+        FROM user_reward_balances
+        WHERE user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(db)
+    .await
+}
+
+fn daily_login_coin_amount(streak_day: i32) -> i32 {
+    10 + (streak_day * 5)
+}
+
+fn daily_login_xp_amount(streak_day: i32) -> i32 {
+    20 + (streak_day * 10)
+}
+
+async fn load_weekly_reward_progress(
+    db: &PgPool,
+    user_id: Uuid,
+) -> Result<WeeklyLoginRewardProgress, sqlx::Error> {
+    let anchor = sqlx::query_as::<_, RewardWeekAnchor>(
+        r#"
+        SELECT
+            CURRENT_DATE AS today,
+            date_trunc('week', CURRENT_DATE::timestamp)::date AS week_start,
+            (date_trunc('week', NOW()) + interval '7 days') AS next_reset_at
+        "#,
+    )
+    .fetch_one(db)
+    .await?;
+
+    let claims = sqlx::query_as::<_, DailyLoginRewardWeekClaimRow>(
+        r#"
+        SELECT reward_date, streak_day, coin_amount, xp_amount, voucher_code
+        FROM daily_login_rewards
+        WHERE user_id = $1 AND week_start = $2
+        ORDER BY reward_date ASC
+        "#,
+    )
+    .bind(user_id)
+    .bind(anchor.week_start)
+    .fetch_all(db)
+    .await?;
+
+    let claimed_dates = claims
+        .iter()
+        .map(|claim| claim.reward_date)
+        .collect::<Vec<_>>();
+    let mut claimed_days = claims
+        .iter()
+        .map(|claim| claim.streak_day.clamp(1, 7))
+        .collect::<Vec<_>>();
+    claimed_days.sort_unstable();
+    claimed_days.dedup();
+
+    let claimed_day_set = claimed_days.iter().copied().collect::<HashSet<_>>();
+    let days_claimed = (claimed_days.len() as i32).clamp(0, 7);
+    let next_streak_day = (days_claimed + 1).clamp(1, 7);
+    let weekly_coin_total = claims.iter().map(|claim| claim.coin_amount).sum();
+    let weekly_xp_total = claims.iter().map(|claim| claim.xp_amount).sum();
+    let voucher_unlocked = claims.iter().any(|claim| claim.voucher_code.is_some());
+    let schedule = (1..=7)
+        .map(|day| DailyLoginRewardScheduleItem {
+            day,
+            coin_amount: daily_login_coin_amount(day),
+            xp_amount: daily_login_xp_amount(day),
+            voucher: day == 7,
+            claimed: claimed_day_set.contains(&day),
+        })
+        .collect::<Vec<_>>();
+
+    Ok(WeeklyLoginRewardProgress {
+        today: anchor.today,
+        week_start: anchor.week_start,
+        week_end: anchor.week_start + ChronoDuration::days(6),
+        next_reset_at: anchor.next_reset_at,
+        claimed_dates,
+        claimed_days,
+        days_claimed,
+        days_remaining: (7 - days_claimed).clamp(0, 7),
+        next_streak_day,
+        voucher_unlocked,
+        weekly_coin_total,
+        weekly_xp_total,
+        schedule,
+    })
+}
+
+async fn build_daily_login_reward_response(
+    db: &PgPool,
+    user_id: Uuid,
+    claimed: bool,
+    reward: DailyLoginRewardRow,
+    balance: RewardBalanceRow,
+) -> Result<DailyLoginRewardResponse, sqlx::Error> {
+    let weekly = load_weekly_reward_progress(db, user_id).await?;
+    Ok(DailyLoginRewardResponse {
+        claimed,
+        reward,
+        balance,
+        weekly,
+    })
+}
+
+fn reward_coin_payment_rules() -> RewardCoinPaymentRules {
+    RewardCoinPaymentRules {
+        coin_value_cents: REWARD_COIN_VALUE_CENTS,
+        max_discount_bps: REWARD_COIN_MAX_PAYMENT_BPS,
+        max_discount_ratio: REWARD_COIN_MAX_PAYMENT_BPS as f64 / 10_000.0,
+        min_cash_payment_cents: REWARD_COIN_MIN_CASH_PAYMENT_CENTS,
+        currency: "IDR".to_string(),
+    }
+}
+
+fn weekly_claimed_today(weekly: &WeeklyLoginRewardProgress) -> bool {
+    weekly
+        .claimed_dates
+        .iter()
+        .any(|date| *date == weekly.today)
+}
+
+fn reward_coin_max_discount_cents(amount_cents: i64) -> i64 {
+    if amount_cents <= REWARD_COIN_MIN_CASH_PAYMENT_CENTS {
+        return 0;
+    }
+    let ratio_cap = amount_cents.saturating_mul(REWARD_COIN_MAX_PAYMENT_BPS) / 10_000;
+    let cash_cap = amount_cents - REWARD_COIN_MIN_CASH_PAYMENT_CENTS;
+    ratio_cap.min(cash_cap).max(0)
+}
+
+async fn get_reward_balance(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    match get_or_create_reward_balance(&state.db, user_id).await {
+        Ok(balance) => match load_weekly_reward_progress(&state.db, user_id).await {
+            Ok(weekly) => {
+                let claimed_today = weekly_claimed_today(&weekly);
+                Json(json!({
+                    "balance": balance,
+                    "weekly": weekly,
+                    "claimed_today": claimed_today,
+                    "can_claim_today": !claimed_today,
+                    "payment": reward_coin_payment_rules()
+                }))
+                .into_response()
+            }
+            Err(error) => {
+                tracing::error!("get_reward_balance weekly error: {:?}", error);
+                err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to load reward progress",
+                )
+                .into_response()
+            }
+        },
+        Err(error) => {
+            tracing::error!("get_reward_balance error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load reward balance",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn claim_daily_login_reward(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    if let Ok(Some(reward)) = sqlx::query_as::<_, DailyLoginRewardRow>(
+        r#"
+        SELECT id, user_id, reward_date, week_start, streak_day, coin_amount, xp_amount, voucher_code, claimed_at, metadata
+        FROM daily_login_rewards
+        WHERE user_id = $1 AND reward_date = CURRENT_DATE
+        LIMIT 1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db)
+    .await
+    {
+        return match get_or_create_reward_balance(&state.db, user_id).await {
+            Ok(balance) => match build_daily_login_reward_response(
+                &state.db,
+                user_id,
+                false,
+                reward,
+                balance,
+            )
+            .await
+            {
+                Ok(payload) => {
+                    let claimed_today = weekly_claimed_today(&payload.weekly);
+                    Json(json!({
+                        "claimed": payload.claimed,
+                        "reward": payload.reward,
+                        "balance": payload.balance,
+                        "weekly": payload.weekly,
+                        "claimed_today": claimed_today,
+                        "can_claim_today": !claimed_today,
+                        "payment": reward_coin_payment_rules()
+                    }))
+                    .into_response()
+                }
+                Err(error) => {
+                    tracing::error!("claim_daily_login_reward weekly error: {:?}", error);
+                    err(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to load reward progress",
+                    )
+                    .into_response()
+                }
+            },
+            Err(error) => {
+                tracing::error!("claim_daily_login_reward balance error: {:?}", error);
+                err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load reward balance")
+                    .into_response()
+            }
+        };
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("claim_daily_login_reward begin error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to claim reward")
+                .into_response();
+        }
+    };
+
+    let week_claims = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)
+        FROM daily_login_rewards
+        WHERE user_id = $1
+          AND week_start = date_trunc('week', CURRENT_DATE::timestamp)::date
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(0);
+
+    let streak_day = (week_claims + 1).clamp(1, 7) as i32;
+    let coin_amount = daily_login_coin_amount(streak_day);
+    let xp_amount = daily_login_xp_amount(streak_day);
+    let voucher_code = if streak_day >= 7 {
+        Some(format!(
+            "MINGGUAN-{}-{}",
+            user_id
+                .simple()
+                .to_string()
+                .chars()
+                .take(8)
+                .collect::<String>(),
+            Utc::now().format("%Y%m%d")
+        ))
+    } else {
+        None
+    };
+    let metadata = json!({
+        "source": "daily_login",
+        "reset": "weekly",
+        "benefit": if voucher_code.is_some() { "weekly_voucher" } else { "coin_xp" }
+    });
+
+    let reward = match sqlx::query_as::<_, DailyLoginRewardRow>(
+        r#"
+        INSERT INTO daily_login_rewards (
+            user_id,
+            reward_date,
+            week_start,
+            streak_day,
+            coin_amount,
+            xp_amount,
+            voucher_code,
+            metadata
+        )
+        VALUES (
+            $1,
+            CURRENT_DATE,
+            date_trunc('week', CURRENT_DATE::timestamp)::date,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6
+        )
+        ON CONFLICT (user_id, reward_date) DO NOTHING
+        RETURNING id, user_id, reward_date, week_start, streak_day, coin_amount, xp_amount, voucher_code, claimed_at, metadata
+        "#,
+    )
+    .bind(user_id)
+    .bind(streak_day)
+    .bind(coin_amount)
+    .bind(xp_amount)
+    .bind(&voucher_code)
+    .bind(metadata)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(reward)) => reward,
+        Ok(None) => {
+            let _ = tx.rollback().await;
+            let reward = match sqlx::query_as::<_, DailyLoginRewardRow>(
+                r#"
+                SELECT id, user_id, reward_date, week_start, streak_day, coin_amount, xp_amount, voucher_code, claimed_at, metadata
+                FROM daily_login_rewards
+                WHERE user_id = $1 AND reward_date = CURRENT_DATE
+                LIMIT 1
+                "#,
+            )
+            .bind(user_id)
+            .fetch_one(&state.db)
+            .await
+            {
+                Ok(reward) => reward,
+                Err(error) => {
+                    tracing::error!("claim_daily_login_reward race fetch error: {:?}", error);
+                    return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to claim reward")
+                        .into_response();
+                }
+            };
+            return match get_or_create_reward_balance(&state.db, user_id).await {
+                Ok(balance) => match build_daily_login_reward_response(
+                    &state.db,
+                    user_id,
+                    false,
+                    reward,
+                    balance,
+                )
+                .await
+                {
+                    Ok(payload) => {
+                        let claimed_today = weekly_claimed_today(&payload.weekly);
+                        Json(json!({
+                            "claimed": payload.claimed,
+                            "reward": payload.reward,
+                            "balance": payload.balance,
+                            "weekly": payload.weekly,
+                            "claimed_today": claimed_today,
+                            "can_claim_today": !claimed_today,
+                            "payment": reward_coin_payment_rules()
+                        }))
+                        .into_response()
+                    }
+                    Err(error) => {
+                        tracing::error!(
+                            "claim_daily_login_reward race weekly error: {:?}",
+                            error
+                        );
+                        err(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "failed to load reward progress",
+                        )
+                        .into_response()
+                    }
+                },
+                Err(error) => {
+                    tracing::error!("claim_daily_login_reward race balance error: {:?}", error);
+                    err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load reward balance")
+                        .into_response()
+                }
+            };
+        }
+        Err(error) => {
+            tracing::error!("claim_daily_login_reward insert error: {:?}", error);
+            let _ = tx.rollback().await;
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to claim reward")
+                .into_response();
+        }
+    };
+
+    let voucher_increment: i32 = if reward.voucher_code.is_some() { 1 } else { 0 };
+    let balance = match sqlx::query_as::<_, RewardBalanceRow>(
+        r#"
+        INSERT INTO user_reward_balances (user_id, coin_balance, xp_balance, voucher_count)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id) DO UPDATE
+        SET
+            coin_balance = user_reward_balances.coin_balance + EXCLUDED.coin_balance,
+            xp_balance = user_reward_balances.xp_balance + EXCLUDED.xp_balance,
+            voucher_count = user_reward_balances.voucher_count + EXCLUDED.voucher_count,
+            updated_at = NOW()
+        RETURNING user_id, coin_balance, xp_balance, voucher_count, updated_at
+        "#,
+    )
+    .bind(user_id)
+    .bind(reward.coin_amount as i64)
+    .bind(reward.xp_amount as i64)
+    .bind(voucher_increment)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(balance) => balance,
+        Err(error) => {
+            tracing::error!("claim_daily_login_reward balance update error: {:?}", error);
+            let _ = tx.rollback().await;
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to update reward balance",
+            )
+            .into_response();
+        }
+    };
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("claim_daily_login_reward commit error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to claim reward").into_response();
+    }
+
+    match build_daily_login_reward_response(&state.db, user_id, true, reward, balance).await {
+        Ok(payload) => {
+            let claimed_today = weekly_claimed_today(&payload.weekly);
+            Json(json!({
+                "claimed": payload.claimed,
+                "reward": payload.reward,
+                "balance": payload.balance,
+                "weekly": payload.weekly,
+                "claimed_today": claimed_today,
+                "can_claim_today": !claimed_today,
+                "payment": reward_coin_payment_rules()
+            }))
+            .into_response()
+        }
+        Err(error) => {
+            tracing::error!("claim_daily_login_reward final weekly error: {:?}", error);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load reward progress",
+            )
+            .into_response()
+        }
+    }
 }
 
 async fn root() -> impl IntoResponse {
@@ -1706,6 +3677,25 @@ fn is_valid_topup_status(value: &str) -> bool {
     )
 }
 
+fn normalize_withdrawal_status(value: Option<String>) -> Option<String> {
+    clean_text(value).map(|v| match v.to_lowercase().as_str() {
+        "pending" | "pending_review" | "review" => "pending_review".to_string(),
+        "processing" | "process" => "processing".to_string(),
+        "completed" | "paid" | "success" => "completed".to_string(),
+        "cancelled" | "canceled" => "cancelled".to_string(),
+        "failed" => "failed".to_string(),
+        "rejected" | "declined" => "rejected".to_string(),
+        other => other.to_string(),
+    })
+}
+
+fn is_valid_withdrawal_status(value: &str) -> bool {
+    matches!(
+        value,
+        "pending_review" | "processing" | "completed" | "cancelled" | "failed" | "rejected"
+    )
+}
+
 fn normalize_payment_method(value: Option<String>) -> Option<String> {
     clean_text(value).map(|v| v.to_lowercase())
 }
@@ -1716,6 +3706,55 @@ fn topup_amount_range(environment: &str) -> (i64, i64) {
     } else {
         (MIN_TOPUP_CENTS_DEV, MAX_TOPUP_CENTS_DEV)
     }
+}
+
+fn withdrawal_amount_range(environment: &str) -> (i64, i64) {
+    if environment == "live" {
+        (MIN_WITHDRAWAL_CENTS_LIVE, MAX_WITHDRAWAL_CENTS_LIVE)
+    } else {
+        (MIN_WITHDRAWAL_CENTS_DEV, MAX_WITHDRAWAL_CENTS_DEV)
+    }
+}
+
+fn normalize_bank_code(value: Option<String>) -> Option<String> {
+    clean_text(value)
+        .map(|v| {
+            v.to_lowercase()
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-')
+                .take(32)
+                .collect::<String>()
+        })
+        .filter(|v| !v.is_empty())
+}
+
+fn normalize_bank_account_number(value: Option<String>) -> Option<String> {
+    clean_text(value)
+        .map(|v| v.chars().filter(|c| c.is_ascii_digit()).collect::<String>())
+        .filter(|v| !v.is_empty())
+}
+
+fn mask_bank_account_number(account_number: &str) -> String {
+    let last4 = account_number
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<String>();
+    format!("****{}", last4)
+}
+
+fn hash_bank_account_number(secret: &str, bank_code: &str, account_number: &str) -> String {
+    let mut hasher = Sha512::new();
+    hasher.update(secret.as_bytes());
+    hasher.update(b":wallet-withdrawal:");
+    hasher.update(bank_code.as_bytes());
+    hasher.update(b":");
+    hasher.update(account_number.as_bytes());
+    let digest = hasher.finalize();
+    digest.iter().map(|byte| format!("{:02x}", byte)).collect()
 }
 
 fn parse_env_i64(key: &str) -> Option<i64> {
@@ -2252,6 +4291,165 @@ fn is_valid_pricing_mode(value: &str) -> bool {
     matches!(value, "fixed" | "request")
 }
 
+fn normalize_price_unit(value: Option<String>) -> Option<String> {
+    let raw = clean_text(value)?;
+    normalize_price_unit_text(&raw)
+}
+
+fn normalize_price_unit_text(value: &str) -> Option<String> {
+    let normalized = value.trim().to_lowercase().replace(['_', '-', '/'], " ");
+    let compact = normalized.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.is_empty() {
+        return None;
+    }
+
+    let mapped = if compact.contains("pcs")
+        || compact.contains("piece")
+        || compact.contains("buah")
+        || compact.contains("item")
+    {
+        "pcs"
+    } else if compact.contains("unit") {
+        "unit"
+    } else if compact.contains("paket")
+        || compact.contains("pack")
+        || compact.contains("package")
+        || compact.contains("bundle")
+    {
+        "pack"
+    } else if compact.contains("bal") || compact.contains("bale") {
+        "bal"
+    } else if compact.contains("karton") || compact.contains("carton") {
+        "carton"
+    } else if compact.contains("box") || compact.contains("dus") {
+        "box"
+    } else if compact.contains("kg") || compact.contains("kilogram") {
+        "kg"
+    } else if compact.contains("gram") {
+        "gram"
+    } else if compact.contains("liter") || compact.contains("litre") || compact.contains("ltr") {
+        "liter"
+    } else if compact.contains("m2")
+        || compact.contains("sqm")
+        || compact.contains("square meter")
+        || compact.contains("luas")
+    {
+        "sqm"
+    } else if compact.contains("jam") || compact.contains("hour") || compact.contains("hourly") {
+        "hour"
+    } else if compact.contains("hari")
+        || compact.contains("day")
+        || compact.contains("daily")
+        || compact.contains("harian")
+    {
+        "day"
+    } else if compact.contains("minggu")
+        || compact.contains("week")
+        || compact.contains("weekly")
+        || compact.contains("mingguan")
+    {
+        "week"
+    } else if compact.contains("bulan")
+        || compact.contains("month")
+        || compact.contains("monthly")
+        || compact.contains("bulanan")
+    {
+        "month"
+    } else if compact.contains("tahun")
+        || compact.contains("year")
+        || compact.contains("annual")
+        || compact.contains("tahunan")
+    {
+        "year"
+    } else if compact.contains("sesi") || compact.contains("session") || compact.contains("meeting")
+    {
+        "session"
+    } else if compact.contains("proyek") || compact.contains("project") || compact.contains("brief")
+    {
+        "project"
+    } else if compact.contains("pengiriman")
+        || compact.contains("shipment")
+        || compact.contains("delivery")
+        || compact.contains("kirim")
+    {
+        "shipment"
+    } else if compact.contains("event") || compact.contains("acara") {
+        "event"
+    } else if compact.contains("deal")
+        || compact.contains("handover")
+        || compact.contains("oper usaha")
+        || compact.contains("transfer")
+    {
+        "deal"
+    } else {
+        ""
+    };
+
+    let candidate = if mapped.is_empty() {
+        make_slug(&compact).replace('-', "_")
+    } else {
+        mapped.to_string()
+    };
+    let trimmed = candidate.trim_matches('_').to_string();
+    if trimmed.is_empty() || trimmed.len() > 40 {
+        None
+    } else {
+        Some(trimmed)
+    }
+}
+
+fn metadata_price_unit(metadata: &Value) -> Option<String> {
+    [
+        ["price_unit"].as_slice(),
+        ["unit"].as_slice(),
+        ["unit_label"].as_slice(),
+        ["price_basis"].as_slice(),
+        ["rate_type"].as_slice(),
+        ["rental_rate_type"].as_slice(),
+        ["rental_period"].as_slice(),
+        ["lease_term"].as_slice(),
+        ["compensation_period"].as_slice(),
+        ["salary_period"].as_slice(),
+        ["minimum_order"].as_slice(),
+    ]
+    .iter()
+    .find_map(|path| {
+        json_text_at(metadata, path).and_then(|value| normalize_price_unit_text(&value))
+    })
+}
+
+fn infer_price_unit(content_type: &str, metadata: &Value) -> Option<String> {
+    metadata_price_unit(metadata).or_else(|| {
+        match content_type {
+            "property" => Some("month"),
+            "tool_rental" => Some("day"),
+            "job" => Some("month"),
+            "freelancer" => Some("project"),
+            "service" => Some("project"),
+            "business_transfer" => Some("deal"),
+            "product" => Some("pcs"),
+            _ => None,
+        }
+        .map(str::to_string)
+    })
+}
+
+fn attach_price_unit_metadata(metadata: Value, price_unit: Option<&str>) -> Value {
+    let mut map = match metadata {
+        Value::Object(map) => map,
+        other => return other,
+    };
+    match price_unit {
+        Some(unit) if !unit.trim().is_empty() => {
+            map.insert("price_unit".to_string(), Value::String(unit.to_string()));
+        }
+        _ => {
+            map.remove("price_unit");
+        }
+    }
+    Value::Object(map)
+}
+
 fn is_valid_content_type(value: &str) -> bool {
     matches!(
         value,
@@ -2317,7 +4515,7 @@ fn collect_metadata_image_urls(metadata: &Value) -> Vec<String> {
         let Some(cleaned) = clean_text(Some(raw.to_string())) else {
             return;
         };
-        if !is_likely_image_url(&cleaned) {
+        if !is_likely_image_url(&cleaned) || is_frontend_static_image_url(&cleaned) {
             return;
         }
         let dedup_key = cleaned.to_lowercase();
@@ -2330,19 +4528,98 @@ fn collect_metadata_image_urls(metadata: &Value) -> Vec<String> {
         return urls;
     };
 
-    for key in ["image_urls", "images", "gallery", "gallery_images"] {
-        if let Some(Value::Array(items)) = map.get(key) {
-            for item in items {
-                if let Some(raw) = item.as_str() {
-                    push_candidate(raw);
+    fn collect_from_value(value: &Value, push_candidate: &mut impl FnMut(&str)) {
+        match value {
+            Value::String(raw) => push_candidate(raw),
+            Value::Array(items) => {
+                for item in items {
+                    collect_from_value(item, push_candidate);
                 }
             }
+            Value::Object(record) => {
+                for key in [
+                    "url",
+                    "src",
+                    "image",
+                    "image_url",
+                    "imageUrl",
+                    "cover_image",
+                    "coverImage",
+                    "thumbnail",
+                    "thumbnail_url",
+                    "thumbnailUrl",
+                    "media_url",
+                    "mediaUrl",
+                    "photo_url",
+                    "photoUrl",
+                ] {
+                    if let Some(value) = record.get(key) {
+                        collect_from_value(value, push_candidate);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
-    for key in ["cover_image", "image", "thumbnail"] {
-        if let Some(Value::String(raw)) = map.get(key) {
-            push_candidate(raw);
+    for key in [
+        "cover_image",
+        "coverImage",
+        "cover_image_url",
+        "coverImageUrl",
+        "image",
+        "image_url",
+        "imageUrl",
+        "thumbnail",
+        "thumbnail_url",
+        "thumbnailUrl",
+        "photo",
+        "photo_url",
+        "photoUrl",
+        "media_url",
+        "mediaUrl",
+        "banner",
+        "banner_url",
+        "bannerUrl",
+        "logo",
+        "logo_url",
+        "logoUrl",
+        "avatar",
+        "avatar_url",
+        "avatarUrl",
+    ] {
+        if let Some(value) = map.get(key) {
+            collect_from_value(value, &mut push_candidate);
+        }
+    }
+
+    for key in [
+        "image_urls",
+        "imageUrls",
+        "images",
+        "gallery",
+        "gallery_images",
+        "galleryImages",
+        "media_urls",
+        "mediaUrls",
+        "media",
+        "media_gallery",
+        "mediaGallery",
+        "photos",
+        "photo_urls",
+        "photoUrls",
+        "attachments",
+        "detail_images",
+        "detailImages",
+        "portfolio_images",
+        "portfolioImages",
+        "property_images",
+        "propertyImages",
+        "listing_images",
+        "listingImages",
+    ] {
+        if let Some(value) = map.get(key) {
+            collect_from_value(value, &mut push_candidate);
         }
     }
 
@@ -2351,9 +4628,11 @@ fn collect_metadata_image_urls(metadata: &Value) -> Vec<String> {
 
 fn is_frontend_static_image_url(value: &str) -> bool {
     let lowered = value.trim().to_lowercase();
-    lowered.starts_with("/images/")
-        || lowered.starts_with("/default-avatar")
-        || lowered.contains("/images/umkm/")
+    lowered.starts_with("/default-avatar")
+        || lowered.contains("picsum.photos")
+        || lowered.contains("loremflickr.com")
+        || lowered.contains("placehold.co")
+        || lowered.contains("via.placeholder.com")
         || lowered.contains("placeholder")
         || lowered.contains("no-image")
         || lowered.contains("noimage")
@@ -2367,68 +4646,9 @@ fn clean_response_image_url(value: Option<String>) -> Option<String> {
     Some(cleaned)
 }
 
-fn public_market_image_for_content(
-    content_type: &str,
-    category: Option<&str>,
-    metadata: &Value,
-) -> String {
-    let mut tokens = vec![content_type.to_lowercase()];
-    if let Some(category) = category {
-        tokens.push(category.to_lowercase());
-    }
-    for path in [
-        ["sector"].as_slice(),
-        ["sub_sector"].as_slice(),
-        ["business_category"].as_slice(),
-        ["property_type"].as_slice(),
-    ] {
-        if let Some(value) = json_text_at(metadata, path) {
-            tokens.push(value.to_lowercase());
-        }
-    }
-    let token_text = tokens.join(" ");
-
-    let photo_id = if token_text.contains("coffee") || token_text.contains("kopi") {
-        "1495474472287-4d71bcdd2085"
-    } else if token_text.contains("food")
-        || token_text.contains("kuliner")
-        || token_text.contains("restaurant")
-        || token_text.contains("business_transfer")
-    {
-        "1555396273-367ea4eb4db5"
-    } else if token_text.contains("property")
-        || token_text.contains("realestate")
-        || token_text.contains("location")
-    {
-        "1486406146926-c627a92ad1ab"
-    } else if token_text.contains("tool")
-        || token_text.contains("rental")
-        || token_text.contains("machine")
-        || token_text.contains("mesin")
-    {
-        "1581091226825-a6a2a5aee158"
-    } else if token_text.contains("service")
-        || token_text.contains("creative")
-        || token_text.contains("consulting")
-    {
-        "1556761175-b413da4baf72"
-    } else if token_text.contains("talent")
-        || token_text.contains("freelancer")
-        || token_text.contains("job")
-    {
-        "1521737604893-d14cc237f11d"
-    } else if token_text.contains("product") || token_text.contains("retail") {
-        "1542838132-92c53300491e"
-    } else {
-        "1556742049-0cfed4f6a45d"
-    };
-
-    format!("https://images.unsplash.com/photo-{photo_id}?auto=format&fit=crop&w=900&q=80")
-}
-
 fn response_image_urls_for_content(
-    content_type: &str,
-    category: Option<&str>,
+    _content_type: &str,
+    _category: Option<&str>,
     metadata: &Value,
     cover_image: Option<&str>,
 ) -> Vec<String> {
@@ -2449,14 +4669,6 @@ fn response_image_urls_for_content(
         push(Some(url));
     }
 
-    if urls.is_empty() {
-        urls.push(public_market_image_for_content(
-            content_type,
-            category,
-            metadata,
-        ));
-    }
-
     urls
 }
 
@@ -2465,6 +4677,11 @@ fn attach_response_image_urls(metadata: Value, image_urls: &[String]) -> Value {
         Value::Object(map) => map,
         _ => serde_json::Map::new(),
     };
+    if image_urls.is_empty() {
+        map.remove("image_urls");
+        map.remove("cover_image");
+        return Value::Object(map);
+    }
     map.insert(
         "image_urls".to_string(),
         Value::Array(image_urls.iter().cloned().map(Value::String).collect()),
@@ -2603,7 +4820,8 @@ fn validate_content_media_requirements(
     cover_image: Option<&str>,
     metadata: &Value,
 ) -> Result<(), &'static str> {
-    if cover_image.is_some_and(|url| !is_likely_image_url(url)) {
+    if cover_image.is_some_and(|url| !is_likely_image_url(url) || is_frontend_static_image_url(url))
+    {
         return Err("cover_image must be a valid image URL");
     }
 
@@ -2873,6 +5091,7 @@ fn build_listing_snapshot(content: &ContentRow) -> Value {
             .unwrap_or(""),
         "pricing_mode": content.pricing_mode,
         "price_cents": content.price_cents,
+        "price_unit": content.price_unit,
         "original_price_cents": content.original_price_cents,
         "promo_label": content.promo_label,
         "promo_start_at": content.promo_start_at,
@@ -2981,6 +5200,939 @@ fn user_id_from_token_string(token: &str, jwt_secret: &str) -> Option<Uuid> {
     )
     .ok()
     .and_then(|decoded| Uuid::parse_str(&decoded.claims.sub).ok())
+}
+
+fn header_str(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn hash_for_event_context(raw: &str) -> String {
+    format!("{:x}", Sha512::digest(raw.as_bytes()))
+}
+
+fn normalize_event_string(raw: Option<String>, max_len: usize) -> Option<String> {
+    raw.map(|value| value.trim().chars().take(max_len).collect::<String>())
+        .filter(|value| !value.is_empty())
+}
+
+fn is_valid_event_name(name: &str) -> bool {
+    let trimmed = name.trim();
+    if trimmed.is_empty() || trimmed.len() > MAX_EVENT_NAME_LEN {
+        return false;
+    }
+
+    trimmed
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+}
+
+fn normalize_event_payload(
+    event: TrackEventRequest,
+    headers: &HeaderMap,
+) -> Result<NormalizedEvent, String> {
+    let event_name = event.event_name.trim().to_lowercase();
+    if !is_valid_event_name(&event_name) {
+        return Err("Invalid event_name".to_string());
+    }
+
+    let properties = event.properties.unwrap_or_else(|| json!({}));
+    if !properties.is_object() {
+        return Err("properties must be an object".to_string());
+    }
+    if serde_json::to_vec(&properties)
+        .map(|bytes| bytes.len() > MAX_EVENT_PROPERTIES_BYTES)
+        .unwrap_or(true)
+    {
+        return Err("properties is too large".to_string());
+    }
+
+    let mut context = event.context.unwrap_or_else(|| json!({}));
+    if !context.is_object() {
+        context = json!({});
+    }
+
+    if let Some(obj) = context.as_object_mut() {
+        if let Some(ip) = header_str(headers, "x-forwarded-for")
+            .or_else(|| header_str(headers, "x-real-ip"))
+            .and_then(|value| value.split(',').next().map(|v| v.trim().to_string()))
+            .filter(|value| !value.is_empty())
+        {
+            obj.insert("ip_hash".to_string(), json!(hash_for_event_context(&ip)));
+        }
+        if let Some(user_agent) = header_str(headers, "user-agent") {
+            obj.insert(
+                "user_agent_hash".to_string(),
+                json!(hash_for_event_context(&user_agent)),
+            );
+        }
+        if let Some(request_id) = header_str(headers, "x-request-id") {
+            obj.insert("request_id".to_string(), json!(request_id));
+        }
+    }
+
+    Ok(NormalizedEvent {
+        event_id: event.event_id.unwrap_or_else(Uuid::new_v4),
+        event_name,
+        occurred_at: event.occurred_at.unwrap_or_else(Utc::now),
+        anonymous_id: normalize_event_string(event.anonymous_id, MAX_EVENT_STRING_LEN),
+        session_id: normalize_event_string(event.session_id, MAX_EVENT_STRING_LEN),
+        tenant_id: normalize_event_string(event.tenant_id, MAX_EVENT_STRING_LEN)
+            .unwrap_or_else(|| "default".to_string()),
+        locale: normalize_event_string(event.locale, 32),
+        source: normalize_event_string(event.source, 80).unwrap_or_else(|| "web".to_string()),
+        page: normalize_event_string(event.page, MAX_EVENT_PAGE_LEN),
+        entity_type: normalize_event_string(event.entity_type, 80),
+        entity_id: normalize_event_string(event.entity_id, MAX_EVENT_STRING_LEN),
+        properties,
+        context,
+    })
+}
+
+fn automation_workflow_for_event(event_name: &str) -> Option<&'static str> {
+    match event_name {
+        "search.submitted" => Some("search_followup_v1"),
+        "chat.opened" => Some("chat_sla_watch_v1"),
+        "payment.failed" => Some("payment_recovery_v1"),
+        "kyc.rejected" => Some("kyc_retry_guidance_v1"),
+        "listing.created" => Some("listing_quality_check_v1"),
+        _ => None,
+    }
+}
+
+fn automation_dedupe_key(
+    workflow_key: &str,
+    actor_user_id: Option<Uuid>,
+    event: &NormalizedEvent,
+) -> String {
+    let identity = actor_user_id
+        .map(|id| id.to_string())
+        .or_else(|| event.anonymous_id.clone())
+        .or_else(|| event.session_id.clone())
+        .unwrap_or_else(|| "anonymous".to_string());
+    let entity = event
+        .entity_id
+        .clone()
+        .or_else(|| event.page.clone())
+        .unwrap_or_else(|| event.event_name.clone());
+    let hour_bucket = event.occurred_at.format("%Y%m%d%H").to_string();
+    format!("{workflow_key}:{identity}:{entity}:{hour_bucket}")
+}
+
+fn event_property_text(event: &NormalizedEvent, keys: &[&str]) -> Option<String> {
+    for key in keys {
+        if let Some(value) = json_text_at(&event.properties, &[*key]) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn event_entity_key(event: &NormalizedEvent) -> String {
+    match (&event.entity_type, &event.entity_id) {
+        (Some(entity_type), Some(entity_id)) => format!("{entity_type}:{entity_id}"),
+        _ => event_property_text(event, &["query", "q", "intent", "surface"])
+            .or_else(|| event.page.clone())
+            .unwrap_or_else(|| event.event_name.clone()),
+    }
+}
+
+fn ai_decision_seed_for_event(
+    event: &NormalizedEvent,
+    workflow_key: Option<&str>,
+) -> Option<AiDecisionSeed> {
+    match event.event_name.as_str() {
+        "search.submitted" => Some(AiDecisionSeed {
+            decision_type: "recommendation",
+            score: 0.72,
+            recommendation: "rank_search_results_and_watch_for_abandonment",
+            reason_codes: vec!["intent_detected", "search_surface", "lead_possible"],
+            guardrail_risk_level: "low",
+            allowed_actions: vec!["rank", "recommend", "schedule_followup"],
+        }),
+        "chat.opened" | "chat.message_sent" => Some(AiDecisionSeed {
+            decision_type: "crm_automation",
+            score: 0.76,
+            recommendation: "monitor_seller_response_sla",
+            reason_codes: vec!["conversation_started", "sla_watch"],
+            guardrail_risk_level: "low",
+            allowed_actions: vec!["notify", "summarize", "schedule_followup"],
+        }),
+        "payment.failed" => Some(AiDecisionSeed {
+            decision_type: "payment_recovery",
+            score: 0.82,
+            recommendation: "show_retry_guide_and_alternate_payment_method",
+            reason_codes: vec!["payment_dropoff", "conversion_risk"],
+            guardrail_risk_level: "medium",
+            allowed_actions: vec!["notify", "recommend", "support_handoff"],
+        }),
+        "listing.create_started" | "listing.created" => Some(AiDecisionSeed {
+            decision_type: "listing_quality",
+            score: 0.68,
+            recommendation: "score_listing_quality_and_recover_abandoned_draft",
+            reason_codes: vec!["supply_created", "catalog_quality"],
+            guardrail_risk_level: "low",
+            allowed_actions: vec!["score", "recommend", "schedule_followup"],
+        }),
+        "maps.route_clicked" | "maps.profile_opened" => Some(AiDecisionSeed {
+            decision_type: "local_intent",
+            score: 0.74,
+            recommendation: "promote_nearby_businesses_and_capture_local_lead",
+            reason_codes: vec!["local_intent", "high_intent_action"],
+            guardrail_risk_level: "low",
+            allowed_actions: vec!["rank", "recommend", "crm_handoff"],
+        }),
+        _ => workflow_key.map(|_key| AiDecisionSeed {
+            decision_type: "automation",
+            score: 0.6,
+            recommendation: "run_automation_workflow",
+            reason_codes: vec!["workflow_triggered"],
+            guardrail_risk_level: "low",
+            allowed_actions: vec!["schedule_followup"],
+        }),
+    }
+}
+
+fn fraud_signal_seed_for_event(event: &NormalizedEvent) -> Option<FraudSignalSeed> {
+    match event.event_name.as_str() {
+        "auth.login_failed" => Some(FraudSignalSeed {
+            signal_type: "auth_velocity",
+            risk_score: 42,
+            severity: "info",
+            reason_codes: vec!["login_failed"],
+        }),
+        "auth.otp_requested" => Some(FraudSignalSeed {
+            signal_type: "otp_velocity",
+            risk_score: 36,
+            severity: "info",
+            reason_codes: vec!["otp_requested"],
+        }),
+        "payment.failed" => Some(FraudSignalSeed {
+            signal_type: "payment_failure",
+            risk_score: 56,
+            severity: "warning",
+            reason_codes: vec!["payment_failed"],
+        }),
+        "dispute.opened" | "transaction.dispute_opened" => Some(FraudSignalSeed {
+            signal_type: "transaction_dispute",
+            risk_score: 70,
+            severity: "high",
+            reason_codes: vec!["dispute_opened", "manual_review_candidate"],
+        }),
+        "moderation_flagged" | "community.moderation_flagged" => Some(FraudSignalSeed {
+            signal_type: "community_moderation",
+            risk_score: 62,
+            severity: "warning",
+            reason_codes: vec!["moderation_flag"],
+        }),
+        _ => None,
+    }
+}
+
+fn crm_lead_signal_for_event(event: &NormalizedEvent) -> Option<CrmLeadSignal> {
+    let query = event_property_text(event, &["query", "q", "search", "intent"]);
+    let entity_key = event_entity_key(event);
+
+    match event.event_name.as_str() {
+        "search.submitted" => Some(CrmLeadSignal {
+            source: "search_intent",
+            name: query
+                .as_ref()
+                .map(|q| format!("Search intent: {q}"))
+                .unwrap_or_else(|| "Search intent".to_string()),
+            message: "User searched and may need guided supplier/request follow-up.".to_string(),
+            entity_key,
+        }),
+        "search.result_clicked" => Some(CrmLeadSignal {
+            source: "search_click",
+            name: "Search result clicked".to_string(),
+            message: "User clicked a result; monitor whether chat or transaction follows."
+                .to_string(),
+            entity_key,
+        }),
+        "chat.opened" | "chat.message_sent" => Some(CrmLeadSignal {
+            source: "chat_intent",
+            name: "Chat lead".to_string(),
+            message: "Conversation started; track seller response SLA and conversion.".to_string(),
+            entity_key,
+        }),
+        "maps.route_clicked" | "maps.profile_opened" => Some(CrmLeadSignal {
+            source: "local_intent",
+            name: "Local business intent".to_string(),
+            message: "User opened a local business route/profile; capture local demand."
+                .to_string(),
+            entity_key,
+        }),
+        "payment.failed" => Some(CrmLeadSignal {
+            source: "payment_recovery",
+            name: "Payment recovery opportunity".to_string(),
+            message: "Payment failed; recover conversion through support or retry guidance."
+                .to_string(),
+            entity_key,
+        }),
+        _ => None,
+    }
+}
+
+fn is_recommendation_impression_event(event: &NormalizedEvent) -> bool {
+    matches!(
+        event.event_name.as_str(),
+        "recommendation.impression" | "home.card_impressed" | "search.result_impressed"
+    ) || event.event_name == "reels.viewed"
+}
+
+fn is_recommendation_feedback_event(event: &NormalizedEvent) -> bool {
+    matches!(
+        event.event_name.as_str(),
+        "recommendation.clicked"
+            | "recommendation.hidden"
+            | "recommendation.converted"
+            | "recommendation.reported"
+            | "home.card_clicked"
+            | "search.result_clicked"
+            | "reels.cta_clicked"
+    )
+}
+
+async fn update_user_feature_snapshot_for_event(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    actor_user_id: Option<Uuid>,
+    event: &NormalizedEvent,
+) -> Result<(), sqlx::Error> {
+    if actor_user_id.is_none() && event.anonymous_id.is_none() {
+        return Ok(());
+    }
+
+    let lifecycle_stage = match event.event_name.as_str() {
+        name if name.starts_with("auth.") => "registered",
+        "search.submitted" | "search.result_clicked" => "intent_detected",
+        "chat.opened" | "chat.message_sent" => "qualified_lead",
+        name if name.starts_with("payment.") || name.starts_with("transaction.") => "transaction",
+        "listing.created" | "listing.published" => "seller_active",
+        _ => {
+            if actor_user_id.is_some() {
+                "registered"
+            } else {
+                "anonymous"
+            }
+        }
+    };
+
+    let intent_tag = event_property_text(event, &["query", "q", "intent", "category"])
+        .or_else(|| event.entity_type.clone())
+        .unwrap_or_else(|| event.event_name.clone())
+        .chars()
+        .take(MAX_TAG_LEN)
+        .collect::<String>();
+    let risk_score = fraud_signal_seed_for_event(event)
+        .map(|signal| signal.risk_score)
+        .unwrap_or(0);
+
+    if actor_user_id.is_some() {
+        sqlx::query(
+            r#"
+            INSERT INTO user_feature_snapshots (
+                actor_user_id,
+                anonymous_id,
+                lifecycle_stage,
+                intent_tags,
+                last_seen_at,
+                session_count_30d,
+                search_count_7d,
+                chat_count_7d,
+                transaction_count_30d,
+                risk_score,
+                retention_score,
+                feature_json
+            )
+            VALUES (
+                $1,
+                $2,
+                $3,
+                ARRAY[$4]::TEXT[],
+                $5,
+                1,
+                CASE WHEN $6 THEN 1 ELSE 0 END,
+                CASE WHEN $7 THEN 1 ELSE 0 END,
+                CASE WHEN $8 THEN 1 ELSE 0 END,
+                $9,
+                50,
+                $10
+            )
+            ON CONFLICT (actor_user_id) WHERE actor_user_id IS NOT NULL
+            DO UPDATE SET
+                lifecycle_stage = EXCLUDED.lifecycle_stage,
+                intent_tags = (
+                    SELECT ARRAY(
+                        SELECT DISTINCT tag
+                        FROM unnest(user_feature_snapshots.intent_tags || EXCLUDED.intent_tags) AS tag
+                        WHERE tag IS NOT NULL AND length(trim(tag)) > 0
+                        LIMIT 20
+                    )
+                ),
+                last_seen_at = EXCLUDED.last_seen_at,
+                search_count_7d = user_feature_snapshots.search_count_7d + EXCLUDED.search_count_7d,
+                chat_count_7d = user_feature_snapshots.chat_count_7d + EXCLUDED.chat_count_7d,
+                transaction_count_30d = user_feature_snapshots.transaction_count_30d + EXCLUDED.transaction_count_30d,
+                risk_score = GREATEST(user_feature_snapshots.risk_score, EXCLUDED.risk_score),
+                feature_json = user_feature_snapshots.feature_json || EXCLUDED.feature_json,
+                updated_at = NOW()
+            "#,
+        )
+        .bind(actor_user_id)
+        .bind(&event.anonymous_id)
+        .bind(lifecycle_stage)
+        .bind(intent_tag)
+        .bind(event.occurred_at)
+        .bind(event.event_name.starts_with("search."))
+        .bind(event.event_name.starts_with("chat."))
+        .bind(
+            event.event_name.starts_with("transaction.") || event.event_name.starts_with("payment."),
+        )
+        .bind(risk_score)
+        .bind(json!({
+            "last_event": event.event_name,
+            "last_page": event.page,
+            "last_entity_type": event.entity_type,
+            "last_entity_id": event.entity_id
+        }))
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    if actor_user_id.is_none() {
+        sqlx::query(
+            r#"
+            INSERT INTO user_feature_snapshots (
+                anonymous_id,
+                lifecycle_stage,
+                intent_tags,
+                last_seen_at,
+                session_count_30d,
+                search_count_7d,
+                chat_count_7d,
+                transaction_count_30d,
+                risk_score,
+                retention_score,
+                feature_json
+            )
+            VALUES (
+                $1,
+                $2,
+                ARRAY[$3]::TEXT[],
+                $4,
+                1,
+                CASE WHEN $5 THEN 1 ELSE 0 END,
+                CASE WHEN $6 THEN 1 ELSE 0 END,
+                CASE WHEN $7 THEN 1 ELSE 0 END,
+                $8,
+                50,
+                $9
+            )
+            ON CONFLICT (anonymous_id) WHERE actor_user_id IS NULL AND anonymous_id IS NOT NULL
+            DO UPDATE SET
+                lifecycle_stage = EXCLUDED.lifecycle_stage,
+                intent_tags = (
+                    SELECT ARRAY(
+                        SELECT DISTINCT tag
+                        FROM unnest(user_feature_snapshots.intent_tags || EXCLUDED.intent_tags) AS tag
+                        WHERE tag IS NOT NULL AND length(trim(tag)) > 0
+                        LIMIT 20
+                    )
+                ),
+                last_seen_at = EXCLUDED.last_seen_at,
+                search_count_7d = user_feature_snapshots.search_count_7d + EXCLUDED.search_count_7d,
+                chat_count_7d = user_feature_snapshots.chat_count_7d + EXCLUDED.chat_count_7d,
+                transaction_count_30d = user_feature_snapshots.transaction_count_30d + EXCLUDED.transaction_count_30d,
+                risk_score = GREATEST(user_feature_snapshots.risk_score, EXCLUDED.risk_score),
+                feature_json = user_feature_snapshots.feature_json || EXCLUDED.feature_json,
+                updated_at = NOW()
+            "#,
+        )
+        .bind(&event.anonymous_id)
+        .bind(lifecycle_stage)
+        .bind(event_property_text(event, &["query", "q", "intent", "category"]).unwrap_or_else(|| event.event_name.clone()))
+        .bind(event.occurred_at)
+        .bind(event.event_name.starts_with("search."))
+        .bind(event.event_name.starts_with("chat."))
+        .bind(event.event_name.starts_with("transaction.") || event.event_name.starts_with("payment."))
+        .bind(risk_score)
+        .bind(json!({
+            "last_event": event.event_name,
+            "last_page": event.page,
+            "last_entity_type": event.entity_type,
+            "last_entity_id": event.entity_id
+        }))
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn update_entity_feature_snapshot_for_event(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    event: &NormalizedEvent,
+) -> Result<(), sqlx::Error> {
+    let (entity_type, entity_id) = match (&event.entity_type, &event.entity_id) {
+        (Some(entity_type), Some(entity_id)) => (entity_type, entity_id),
+        _ => return Ok(()),
+    };
+
+    let conversion_delta = if matches!(
+        event.event_name.as_str(),
+        "chat.opened" | "chat.message_sent" | "payment.succeeded" | "transaction.created"
+    ) {
+        4
+    } else {
+        0
+    };
+    let risk_delta = fraud_signal_seed_for_event(event)
+        .map(|signal| signal.risk_score / 4)
+        .unwrap_or(0);
+
+    sqlx::query(
+        r#"
+        INSERT INTO entity_feature_snapshots (
+            entity_type,
+            entity_id,
+            trust_score,
+            response_speed_score,
+            conversion_score,
+            freshness_score,
+            risk_score,
+            feature_json
+        )
+        VALUES ($1, $2, 50, 50, $3, 70, $4, $5)
+        ON CONFLICT (entity_type, entity_id)
+        DO UPDATE SET
+            conversion_score = LEAST(100, entity_feature_snapshots.conversion_score + EXCLUDED.conversion_score),
+            freshness_score = 70,
+            risk_score = GREATEST(entity_feature_snapshots.risk_score, EXCLUDED.risk_score),
+            feature_json = entity_feature_snapshots.feature_json || EXCLUDED.feature_json,
+            updated_at = NOW()
+        "#,
+    )
+    .bind(entity_type)
+    .bind(entity_id)
+    .bind(conversion_delta)
+    .bind(risk_delta)
+    .bind(json!({
+        "last_event": event.event_name,
+        "last_page": event.page
+    }))
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(())
+}
+
+async fn upsert_crm_lead_from_event(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    actor_user_id: Option<Uuid>,
+    event: &NormalizedEvent,
+    signal: CrmLeadSignal,
+) -> Result<(), sqlx::Error> {
+    let existing_id = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        SELECT id
+        FROM crm_leads
+        WHERE source = $1
+          AND (
+            ($2::uuid IS NOT NULL AND requester_user_id = $2) OR
+            ($2::uuid IS NULL AND metadata->>'anonymous_id' = COALESCE($3, ''))
+          )
+          AND metadata->>'ai_os_entity_key' = $4
+          AND created_at >= NOW() - interval '24 hours'
+        ORDER BY updated_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(signal.source)
+    .bind(actor_user_id)
+    .bind(&event.anonymous_id)
+    .bind(&signal.entity_key)
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    let lead_id = if let Some(id) = existing_id {
+        sqlx::query(
+            r#"
+            UPDATE crm_leads
+            SET updated_at = NOW(),
+                metadata = metadata || $2
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .bind(json!({
+            "last_event_id": event.event_id,
+            "last_event_name": event.event_name,
+            "last_page": event.page
+        }))
+        .execute(&mut **tx)
+        .await?;
+        id
+    } else {
+        sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO crm_leads (
+                requester_user_id,
+                name,
+                stage,
+                source,
+                metadata
+            )
+            VALUES ($1, $2, 'lead', $3, $4)
+            RETURNING id
+            "#,
+        )
+        .bind(actor_user_id)
+        .bind(&signal.name)
+        .bind(signal.source)
+        .bind(json!({
+            "ai_os": true,
+            "ai_os_entity_key": signal.entity_key,
+            "anonymous_id": event.anonymous_id,
+            "session_id": event.session_id,
+            "event_id": event.event_id,
+            "event_name": event.event_name,
+            "entity_type": event.entity_type,
+            "entity_id": event.entity_id,
+            "page": event.page,
+            "properties": event.properties
+        }))
+        .fetch_one(&mut **tx)
+        .await?
+    };
+
+    sqlx::query(
+        r#"
+        INSERT INTO crm_activities (
+            lead_id,
+            actor_user_id,
+            actor_role,
+            action,
+            message,
+            metadata
+        )
+        VALUES ($1, $2, 'system', $3, $4, $5)
+        "#,
+    )
+    .bind(lead_id)
+    .bind(actor_user_id)
+    .bind(format!("ai_os.{}", event.event_name))
+    .bind(signal.message)
+    .bind(json!({
+        "event_id": event.event_id,
+        "source": signal.source,
+        "page": event.page,
+        "entity_type": event.entity_type,
+        "entity_id": event.entity_id
+    }))
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(())
+}
+
+async fn write_ai_os_event_side_effects(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    actor_user_id: Option<Uuid>,
+    event: &NormalizedEvent,
+    workflow_key: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    update_user_feature_snapshot_for_event(tx, actor_user_id, event).await?;
+    update_entity_feature_snapshot_for_event(tx, event).await?;
+
+    if let Some(seed) = ai_decision_seed_for_event(event, workflow_key) {
+        sqlx::query(
+            r#"
+            INSERT INTO ai_decision_log (
+                decision_type,
+                actor_user_id,
+                entity_type,
+                entity_id,
+                model_version,
+                policy_version,
+                score,
+                recommendation,
+                reason_codes,
+                input_ref,
+                output,
+                guardrail_result
+            )
+            VALUES ($1, $2, $3, $4, 'heuristic-v1', 'ai-os-foundation-v1', $5, $6, $7, $8, $9, $10)
+            "#,
+        )
+        .bind(seed.decision_type)
+        .bind(actor_user_id)
+        .bind(&event.entity_type)
+        .bind(&event.entity_id)
+        .bind(seed.score)
+        .bind(seed.recommendation)
+        .bind(seed.reason_codes)
+        .bind(json!({
+            "event_id": event.event_id,
+            "event_name": event.event_name,
+            "page": event.page,
+            "properties": event.properties
+        }))
+        .bind(json!({
+            "recommendation": seed.recommendation,
+            "workflow_key": workflow_key,
+            "allowed_actions": seed.allowed_actions
+        }))
+        .bind(json!({
+            "risk_level": seed.guardrail_risk_level,
+            "requires_auth": false,
+            "allowed_actions": seed.allowed_actions,
+            "ai_never_mutates_money": true
+        }))
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    if let Some(signal) = fraud_signal_seed_for_event(event) {
+        sqlx::query(
+            r#"
+            INSERT INTO fraud_signals (
+                signal_type,
+                actor_user_id,
+                entity_type,
+                entity_id,
+                risk_score,
+                severity,
+                reason_codes,
+                metadata
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(signal.signal_type)
+        .bind(actor_user_id)
+        .bind(&event.entity_type)
+        .bind(&event.entity_id)
+        .bind(signal.risk_score)
+        .bind(signal.severity)
+        .bind(&signal.reason_codes)
+        .bind(json!({
+            "event_id": event.event_id,
+            "event_name": event.event_name,
+            "page": event.page,
+            "context": event.context
+        }))
+        .execute(&mut **tx)
+        .await?;
+
+        if signal.risk_score >= 70 {
+            sqlx::query(
+                r#"
+                INSERT INTO fraud_cases (
+                    case_type,
+                    actor_user_id,
+                    entity_type,
+                    entity_id,
+                    risk_score,
+                    severity,
+                    reason_codes,
+                    metadata
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                "#,
+            )
+            .bind(signal.signal_type)
+            .bind(actor_user_id)
+            .bind(&event.entity_type)
+            .bind(&event.entity_id)
+            .bind(signal.risk_score)
+            .bind(signal.severity)
+            .bind(&signal.reason_codes)
+            .bind(json!({
+                "event_id": event.event_id,
+                "event_name": event.event_name,
+                "page": event.page
+            }))
+            .execute(&mut **tx)
+            .await?;
+        }
+    }
+
+    if is_recommendation_impression_event(event) {
+        if let (Some(entity_type), Some(entity_id)) = (&event.entity_type, &event.entity_id) {
+            let surface = event_property_text(event, &["surface", "section"])
+                .or_else(|| event.page.clone())
+                .unwrap_or_else(|| "unknown".to_string());
+            let rank_position = event
+                .properties
+                .get("rank")
+                .and_then(|value| value.as_i64())
+                .map(|value| value as i32);
+
+            sqlx::query(
+                r#"
+                INSERT INTO recommendation_impressions (
+                    event_id,
+                    actor_user_id,
+                    anonymous_id,
+                    surface,
+                    entity_type,
+                    entity_id,
+                    rank_position,
+                    strategy,
+                    model_version,
+                    metadata
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'ai-os-foundation', 'heuristic-v1', $8)
+                "#,
+            )
+            .bind(event.event_id)
+            .bind(actor_user_id)
+            .bind(&event.anonymous_id)
+            .bind(surface)
+            .bind(entity_type)
+            .bind(entity_id)
+            .bind(rank_position)
+            .bind(json!({
+                "event_name": event.event_name,
+                "page": event.page,
+                "properties": event.properties
+            }))
+            .execute(&mut **tx)
+            .await?;
+        }
+    }
+
+    if is_recommendation_feedback_event(event) {
+        let feedback_type = event
+            .event_name
+            .split('.')
+            .next_back()
+            .unwrap_or("clicked")
+            .to_string();
+        let surface =
+            event_property_text(event, &["surface", "section"]).or_else(|| event.page.clone());
+        sqlx::query(
+            r#"
+            INSERT INTO recommendation_feedback (
+                event_id,
+                actor_user_id,
+                anonymous_id,
+                feedback_type,
+                surface,
+                entity_type,
+                entity_id,
+                metadata
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(event.event_id)
+        .bind(actor_user_id)
+        .bind(&event.anonymous_id)
+        .bind(feedback_type)
+        .bind(surface)
+        .bind(&event.entity_type)
+        .bind(&event.entity_id)
+        .bind(json!({
+            "event_name": event.event_name,
+            "page": event.page,
+            "properties": event.properties
+        }))
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    if let Some(signal) = crm_lead_signal_for_event(event) {
+        upsert_crm_lead_from_event(tx, actor_user_id, event, signal).await?;
+    }
+
+    Ok(())
+}
+
+fn normalize_learning_level(value: Option<String>) -> String {
+    match clean_text(value)
+        .unwrap_or_else(|| "beginner".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "intermediate" | "menengah" => "intermediate".to_string(),
+        "advanced" | "lanjutan" | "expert" => "advanced".to_string(),
+        _ => "beginner".to_string(),
+    }
+}
+
+fn normalize_learning_format(value: Option<String>) -> String {
+    match clean_text(value)
+        .unwrap_or_else(|| "mixed".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "video" => "video".to_string(),
+        "reading" | "article" | "read" => "reading".to_string(),
+        "course" | "kelas" => "course".to_string(),
+        _ => "mixed".to_string(),
+    }
+}
+
+fn normalize_learning_visibility(value: Option<String>) -> String {
+    match clean_text(value)
+        .unwrap_or_else(|| "public".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "private" => "private".to_string(),
+        "unlisted" => "unlisted".to_string(),
+        _ => "public".to_string(),
+    }
+}
+
+fn normalize_learning_status(value: Option<String>) -> String {
+    match clean_text(value)
+        .unwrap_or_else(|| "draft".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "published" | "publish" => "published".to_string(),
+        "archived" | "archive" => "archived".to_string(),
+        _ => "draft".to_string(),
+    }
+}
+
+fn normalize_lesson_type(value: Option<String>) -> String {
+    match clean_text(value)
+        .unwrap_or_else(|| "reading".to_string())
+        .to_lowercase()
+        .as_str()
+    {
+        "video" => "video".to_string(),
+        "quiz" => "quiz".to_string(),
+        "assignment" | "task" => "assignment".to_string(),
+        _ => "reading".to_string(),
+    }
+}
+
+fn normalize_learning_tags(value: Option<Vec<String>>) -> Vec<String> {
+    let mut tags = value
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|tag| clean_text(Some(tag)))
+        .map(|tag| {
+            tag.to_lowercase()
+                .chars()
+                .take(MAX_LEARNING_TAG_LEN)
+                .collect()
+        })
+        .filter(|tag: &String| !tag.is_empty())
+        .take(MAX_LEARNING_TAGS)
+        .collect::<Vec<String>>();
+    tags.sort();
+    tags.dedup();
+    tags
 }
 
 fn parse_transaction_wallet_environment(transaction_meta: &Value) -> String {
@@ -4471,7 +7623,7 @@ async fn list_content(
     let rows = sqlx::query_as::<_, ContentRow>(
         r#"
         SELECT
-            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
             metadata, created_at, updated_at
@@ -4680,7 +7832,21 @@ async fn create_content(
         return err(StatusCode::BAD_REQUEST, "body is too long").into_response();
     }
 
-    let slug = clean_text(payload.slug).unwrap_or_else(|| make_slug(&title));
+    let slug = match clean_text(payload.slug) {
+        Some(slug) => slug,
+        None => match generate_unique_slug(&state.db, &title).await {
+            Ok(slug) => slug,
+            Err(e) => {
+                tracing::error!("generate_unique_slug error: {:?}", e);
+
+                return err(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "failed to generate slug",
+                )
+                .into_response();
+            }
+        },
+    };
     let category = Some(content_type.clone());
 
     let currency = normalize_currency(payload.currency).unwrap_or_else(|| "IDR".to_string());
@@ -4761,6 +7927,13 @@ async fn create_content(
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
+    let price_unit = if price_cents.is_some() {
+        normalize_price_unit(payload.price_unit)
+            .or_else(|| infer_price_unit(&content_type, &metadata))
+    } else {
+        None
+    };
+    let metadata = attach_price_unit_metadata(metadata, price_unit.as_deref());
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
@@ -4793,14 +7966,14 @@ async fn create_content(
         r#"
         INSERT INTO content_items (
             owner_id, content_type, slug, title, summary, body, pricing_mode, price_cents,
-            original_price_cents, promo_label, promo_start_at, promo_end_at, currency,
+            price_unit, original_price_cents, promo_label, promo_start_at, promo_end_at, currency,
             tags, cover_image, category, content_status, metadata
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
         )
         RETURNING
-            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
             metadata, created_at, updated_at
@@ -4814,6 +7987,7 @@ async fn create_content(
     .bind(body)
     .bind(pricing_mode)
     .bind(price_cents)
+    .bind(price_unit)
     .bind(original_price_cents)
     .bind(promo_label)
     .bind(promo_start_at)
@@ -4852,6 +8026,63 @@ async fn create_content(
                 "failed to create content",
             )
             .into_response()
+        }
+    }
+}
+
+async fn generate_unique_slug(
+    db: &PgPool,
+    title: &str,
+) -> Result<String, sqlx::Error> {
+    let base = make_slug(title);
+
+    let exists: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM content_items
+            WHERE slug = $1
+        )
+        "#,
+    )
+    .bind(&base)
+    .fetch_one(db)
+    .await?;
+
+    if !exists {
+        return Ok(base);
+    }
+
+    let mut counter: i32 = 2;
+
+    loop {
+        let candidate = format!("{}-{}", base, counter);
+
+        let exists: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM content_items
+                WHERE slug = $1
+            )
+            "#,
+        )
+        .bind(&candidate)
+        .fetch_one(db)
+        .await?;
+
+        if !exists {
+            return Ok(candidate);
+        }
+
+        counter += 1;
+
+        if counter > 10_000 {
+            return Ok(format!(
+                "{}-{}",
+                base,
+                chrono::Utc::now().timestamp()
+            ));
         }
     }
 }
@@ -5023,6 +8254,15 @@ async fn update_content(
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
+    let price_unit = if price_cents.is_some() {
+        normalize_price_unit(payload.price_unit)
+            .or_else(|| metadata_price_unit(&metadata))
+            .or_else(|| existing.price_unit.clone())
+            .or_else(|| infer_price_unit(&content_type, &metadata))
+    } else {
+        None
+    };
+    let metadata = attach_price_unit_metadata(metadata, price_unit.as_deref());
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
@@ -5057,20 +8297,21 @@ async fn update_content(
             body = $6,
             pricing_mode = $7,
             price_cents = $8,
-            original_price_cents = $9,
-            promo_label = $10,
-            promo_start_at = $11,
-            promo_end_at = $12,
-            currency = $13,
-            tags = $14,
-            cover_image = $15,
-            category = $16,
-            content_status = $17,
-            metadata = $18,
+            price_unit = $9,
+            original_price_cents = $10,
+            promo_label = $11,
+            promo_start_at = $12,
+            promo_end_at = $13,
+            currency = $14,
+            tags = $15,
+            cover_image = $16,
+            category = $17,
+            content_status = $18,
+            metadata = $19,
             updated_at = NOW()
         WHERE id = $1
         RETURNING
-            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
             metadata, created_at, updated_at
@@ -5084,6 +8325,7 @@ async fn update_content(
     .bind(body)
     .bind(pricing_mode)
     .bind(price_cents)
+    .bind(price_unit)
     .bind(original_price_cents)
     .bind(promo_label)
     .bind(promo_start_at)
@@ -5335,6 +8577,30 @@ struct WalletLedgerRow {
     created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, FromRow, Clone)]
+struct WalletWithdrawalRow {
+    id: Uuid,
+    user_id: Uuid,
+    account_id: Uuid,
+    environment: String,
+    amount_cents: i64,
+    fee_cents: i64,
+    net_amount_cents: i64,
+    currency: String,
+    bank_code: String,
+    bank_name: String,
+    bank_account_name: String,
+    bank_account_number_masked: String,
+    status: String,
+    note: Option<String>,
+    metadata: Value,
+    requested_at: DateTime<Utc>,
+    processed_at: Option<DateTime<Utc>>,
+    cancelled_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Serialize)]
 struct WalletAccountResponse {
     id: Uuid,
@@ -5466,6 +8732,55 @@ struct WalletBalancesResponse {
     generated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize)]
+struct WalletWithdrawalResponse {
+    id: Uuid,
+    account_id: Uuid,
+    environment: String,
+    amount_cents: i64,
+    fee_cents: i64,
+    net_amount_cents: i64,
+    currency: String,
+    bank_code: String,
+    bank_name: String,
+    bank_account_name: String,
+    bank_account_number_masked: String,
+    status: String,
+    note: Option<String>,
+    metadata: Value,
+    requested_at: DateTime<Utc>,
+    processed_at: Option<DateTime<Utc>>,
+    cancelled_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<WalletWithdrawalRow> for WalletWithdrawalResponse {
+    fn from(value: WalletWithdrawalRow) -> Self {
+        Self {
+            id: value.id,
+            account_id: value.account_id,
+            environment: value.environment,
+            amount_cents: value.amount_cents,
+            fee_cents: value.fee_cents,
+            net_amount_cents: value.net_amount_cents,
+            currency: value.currency,
+            bank_code: value.bank_code,
+            bank_name: value.bank_name,
+            bank_account_name: value.bank_account_name,
+            bank_account_number_masked: value.bank_account_number_masked,
+            status: value.status,
+            note: value.note,
+            metadata: value.metadata,
+            requested_at: value.requested_at,
+            processed_at: value.processed_at,
+            cancelled_at: value.cancelled_at,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, FromRow, Clone)]
 struct UserNotificationRow {
     id: Uuid,
@@ -5542,6 +8857,14 @@ struct ListWalletLedgerQuery {
 }
 
 #[derive(Debug, Deserialize, Default)]
+struct ListWalletWithdrawalsQuery {
+    environment: Option<String>,
+    status: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize, Default)]
 struct CreateWalletTopupRequest {
     amount_cents: Option<i64>,
     currency: Option<String>,
@@ -5551,6 +8874,19 @@ struct CreateWalletTopupRequest {
     description: Option<String>,
     metadata: Option<Value>,
     auto_settle: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct CreateWalletWithdrawalRequest {
+    amount_cents: Option<i64>,
+    currency: Option<String>,
+    environment: Option<String>,
+    bank_code: Option<String>,
+    bank_name: Option<String>,
+    bank_account_name: Option<String>,
+    bank_account_number: Option<String>,
+    note: Option<String>,
+    metadata: Option<Value>,
 }
 
 async fn create_offer(
@@ -6262,11 +9598,20 @@ struct ResolveDisputeRequest {
     deposit_amount_cents: Option<i64>,
 }
 
+#[derive(Debug, Deserialize, Default)]
+struct FundTransactionRequest {
+    use_coins: Option<bool>,
+    coin_amount: Option<i64>,
+    coin_discount_cents: Option<i64>,
+}
+
 async fn fund_transaction(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<Uuid>,
+    payload: Option<Json<FundTransactionRequest>>,
 ) -> impl IntoResponse {
+    let payload = payload.map(|Json(value)| value).unwrap_or_default();
     let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
         Some(id) => id,
         None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
@@ -6342,6 +9687,49 @@ async fn fund_transaction(
     }
 
     let wallet_environment = parse_transaction_wallet_environment(&txn.transaction_meta);
+    let requested_coin_amount = if payload.use_coins.unwrap_or(false) {
+        payload
+            .coin_amount
+            .or_else(|| {
+                payload
+                    .coin_discount_cents
+                    .map(|value| value / REWARD_COIN_VALUE_CENTS)
+            })
+            .unwrap_or(0)
+            .max(0)
+    } else {
+        0
+    };
+    let reward_coin_application = match apply_reward_coins_to_wallet_tx(
+        &mut tx,
+        user_id,
+        &txn,
+        wallet_environment.as_str(),
+        requested_coin_amount,
+    )
+    .await
+    {
+        Ok(application) => application,
+        Err(RewardCoinPaymentError::InsufficientCoins) => {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({
+                    "error": "reward coin balance is insufficient",
+                    "code": "insufficient_reward_coin_balance"
+                })),
+            )
+                .into_response();
+        }
+        Err(RewardCoinPaymentError::Database(db_err)) => {
+            tracing::error!("fund_transaction reward coin error: {:?}", db_err);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to apply reward coins",
+            )
+            .into_response();
+        }
+    };
+
     if let Err(e) = hold_transaction_funds_tx(&mut tx, &txn, wallet_environment.as_str()).await {
         match e {
             WalletTransitionError::InsufficientFunds => {
@@ -6386,7 +9774,17 @@ async fn fund_transaction(
                 "payment_provider": "wallet",
                 "payment_method": "wallet_balance",
                 "wallet_environment": wallet_environment.as_str(),
-                "source": "wallet_balance"
+                "source": "wallet_balance",
+                "reward_coin_amount": reward_coin_application.coin_amount,
+                "reward_coin_discount_cents": reward_coin_application.discount_cents,
+                "reward_coin_already_applied": reward_coin_application.already_applied
+            },
+            "reward": {
+                "coin_amount": reward_coin_application.coin_amount,
+                "coin_value_cents": REWARD_COIN_VALUE_CENTS,
+                "discount_cents": reward_coin_application.discount_cents,
+                "applied": reward_coin_application.discount_cents > 0,
+                "already_applied": reward_coin_application.already_applied
             }
         }),
     );
@@ -7655,6 +11053,509 @@ async fn list_wallet_ledger(
             err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load ledger").into_response()
         }
     }
+}
+
+async fn list_wallet_withdrawals(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListWalletWithdrawalsQuery>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let environment = normalize_wallet_environment(query.environment);
+    if let Some(ref env_name) = environment {
+        if !is_valid_wallet_environment(env_name) {
+            return err(StatusCode::BAD_REQUEST, "invalid environment").into_response();
+        }
+    }
+
+    let status = normalize_withdrawal_status(query.status);
+    if let Some(ref status_name) = status {
+        if !is_valid_withdrawal_status(status_name) {
+            return err(StatusCode::BAD_REQUEST, "invalid withdrawal status").into_response();
+        }
+    }
+
+    let limit = query.limit.unwrap_or(20).clamp(1, WALLET_MAX_FETCH_LIMIT);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let rows = sqlx::query_as::<_, WalletWithdrawalRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, bank_code, bank_name, bank_account_name, bank_account_number_masked,
+            status, note, metadata, requested_at, processed_at, cancelled_at, created_at, updated_at
+        FROM wallet_withdrawals
+        WHERE user_id = $1
+          AND ($2::text IS NULL OR environment = $2)
+          AND ($3::text IS NULL OR status = $3)
+        ORDER BY created_at DESC
+        LIMIT $4 OFFSET $5
+        "#,
+    )
+    .bind(user_id)
+    .bind(environment)
+    .bind(status)
+    .bind(limit + 1)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await;
+
+    match rows {
+        Ok(rows) => {
+            let has_more = rows.len() as i64 > limit;
+            let mut items = rows;
+            if has_more {
+                items.truncate(limit as usize);
+            }
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "items": items.into_iter().map(WalletWithdrawalResponse::from).collect::<Vec<_>>(),
+                    "limit": limit,
+                    "offset": offset,
+                    "has_more": has_more
+                })),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("list_wallet_withdrawals query error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load withdrawals",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn create_wallet_withdrawal(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateWalletWithdrawalRequest>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let environment = normalize_wallet_environment(payload.environment)
+        .unwrap_or_else(wallet_default_environment);
+    if !is_valid_wallet_environment(&environment) {
+        return err(StatusCode::BAD_REQUEST, "invalid environment").into_response();
+    }
+    if environment == "live" {
+        if !wallet_live_enabled() {
+            return err(StatusCode::FORBIDDEN, "live withdrawal is disabled").into_response();
+        }
+        let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
+        let allow_non_prod_live = parse_env_bool("WALLET_ALLOW_LIVE_IN_NON_PROD", false);
+        if !allow_non_prod_live && !app_env.eq_ignore_ascii_case("production") {
+            return err(
+                StatusCode::FORBIDDEN,
+                "live withdrawal is blocked outside production",
+            )
+            .into_response();
+        }
+    }
+
+    let amount_cents = payload.amount_cents.unwrap_or(0);
+    let (min_amount, max_amount) = withdrawal_amount_range(&environment);
+    if amount_cents < min_amount || amount_cents > max_amount {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "amount_cents is outside allowed range for withdrawal",
+        )
+        .into_response();
+    }
+
+    let currency = normalize_currency(payload.currency).unwrap_or_else(|| "IDR".to_string());
+    if !is_valid_currency(&currency) {
+        return err(StatusCode::BAD_REQUEST, "currency must be ISO-4217 alpha-3").into_response();
+    }
+    if currency == "IDR" && amount_cents % 100 != 0 {
+        return err(
+            StatusCode::BAD_REQUEST,
+            "for IDR withdrawal, amount_cents must be in full rupiah (multiple of 100)",
+        )
+        .into_response();
+    }
+
+    let bank_code = match normalize_bank_code(payload.bank_code) {
+        Some(value) if value.len() >= 2 => value,
+        _ => return err(StatusCode::BAD_REQUEST, "bank_code is required").into_response(),
+    };
+    let bank_name = match clean_text_limited(payload.bank_name, 80) {
+        Ok(Some(value)) => value,
+        _ => return err(StatusCode::BAD_REQUEST, "bank_name is required").into_response(),
+    };
+    let bank_account_name = match clean_text_limited(payload.bank_account_name, 100) {
+        Ok(Some(value)) if value.len() >= 3 => value,
+        _ => return err(StatusCode::BAD_REQUEST, "bank_account_name is required").into_response(),
+    };
+    let bank_account_number = match normalize_bank_account_number(payload.bank_account_number) {
+        Some(value) if (6..=34).contains(&value.len()) => value,
+        _ => {
+            return err(
+                StatusCode::BAD_REQUEST,
+                "bank_account_number must be 6-34 digits",
+            )
+            .into_response()
+        }
+    };
+
+    let note = match clean_text_limited(payload.note, 500) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "note is too long").into_response(),
+    };
+    let metadata = payload.metadata.unwrap_or_else(|| json!({}));
+    if !metadata_within_limit(&metadata) {
+        return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("create_wallet_withdrawal begin error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create withdrawal",
+            )
+            .into_response();
+        }
+    };
+
+    let locked_account = match lock_wallet_account_tx(&mut tx, user_id, &environment, &currency)
+        .await
+    {
+        Ok(account) => account,
+        Err(e) => {
+            tracing::error!("create_wallet_withdrawal account error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load wallet").into_response();
+        }
+    };
+
+    if locked_account.status != "active" {
+        return err(StatusCode::FORBIDDEN, "wallet account is not active").into_response();
+    }
+    if locked_account.available_balance_cents < amount_cents {
+        return err(StatusCode::BAD_REQUEST, "insufficient available balance").into_response();
+    }
+
+    let fee_cents = 0i64;
+    let net_amount_cents = amount_cents - fee_cents;
+    let masked_number = mask_bank_account_number(&bank_account_number);
+    let account_hash =
+        hash_bank_account_number(&state.jwt_secret, &bank_code, &bank_account_number);
+
+    let withdrawal = match sqlx::query_as::<_, WalletWithdrawalRow>(
+        r#"
+        INSERT INTO wallet_withdrawals (
+            user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, bank_code, bank_name, bank_account_name, bank_account_number_masked,
+            bank_account_number_hash, status, note, metadata, requested_at, created_at, updated_at
+        )
+        VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11,
+            $12, 'pending_review', $13, $14, NOW(), NOW(), NOW()
+        )
+        RETURNING
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, bank_code, bank_name, bank_account_name, bank_account_number_masked,
+            status, note, metadata, requested_at, processed_at, cancelled_at, created_at, updated_at
+        "#,
+    )
+    .bind(user_id)
+    .bind(locked_account.id)
+    .bind(environment.as_str())
+    .bind(amount_cents)
+    .bind(fee_cents)
+    .bind(net_amount_cents)
+    .bind(currency.as_str())
+    .bind(bank_code.as_str())
+    .bind(bank_name.as_str())
+    .bind(bank_account_name.as_str())
+    .bind(masked_number.as_str())
+    .bind(account_hash.as_str())
+    .bind(note.as_deref())
+    .bind(metadata.clone())
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("create_wallet_withdrawal insert error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to create withdrawal",
+            )
+            .into_response();
+        }
+    };
+
+    let updated_account = match sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            held_balance_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(locked_account.id)
+    .bind(locked_account.available_balance_cents - amount_cents)
+    .bind(locked_account.held_balance_cents + amount_cents)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("create_wallet_withdrawal account update error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to reserve withdrawal",
+            )
+            .into_response();
+        }
+    };
+
+    if let Err(e) = insert_wallet_ledger_entry_tx(
+        &mut tx,
+        user_id,
+        &updated_account,
+        "debit",
+        amount_cents,
+        updated_account.available_balance_cents,
+        "withdrawal_request",
+        "wallet_withdrawal",
+        withdrawal.id,
+        format!("Withdrawal requested to {}", withdrawal.bank_name),
+        json!({
+            "withdrawal_id": withdrawal.id.to_string(),
+            "bank_code": withdrawal.bank_code.as_str(),
+            "bank_account_number_masked": withdrawal.bank_account_number_masked.as_str(),
+            "flow": "withdrawal_hold",
+            "environment": withdrawal.environment.as_str()
+        }),
+    )
+    .await
+    {
+        tracing::error!("create_wallet_withdrawal ledger error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record withdrawal",
+        )
+        .into_response();
+    }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("create_wallet_withdrawal commit error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to create withdrawal",
+        )
+        .into_response();
+    }
+
+    (
+        StatusCode::CREATED,
+        Json(json!({
+            "withdrawal": WalletWithdrawalResponse::from(withdrawal),
+            "account": WalletAccountResponse::from(updated_account)
+        })),
+    )
+        .into_response()
+}
+
+async fn cancel_wallet_withdrawal(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            tracing::error!("cancel_wallet_withdrawal begin error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to cancel withdrawal",
+            )
+            .into_response();
+        }
+    };
+
+    let withdrawal = match sqlx::query_as::<_, WalletWithdrawalRow>(
+        r#"
+        SELECT
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, bank_code, bank_name, bank_account_name, bank_account_number_masked,
+            status, note, metadata, requested_at, processed_at, cancelled_at, created_at, updated_at
+        FROM wallet_withdrawals
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "withdrawal not found").into_response(),
+        Err(e) => {
+            tracing::error!("cancel_wallet_withdrawal query error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to cancel withdrawal",
+            )
+            .into_response();
+        }
+    };
+
+    if withdrawal.status != "pending_review" {
+        return err(
+            StatusCode::CONFLICT,
+            "only pending withdrawal can be cancelled",
+        )
+        .into_response();
+    }
+
+    let locked_account = match lock_wallet_account_tx(
+        &mut tx,
+        user_id,
+        &withdrawal.environment,
+        &withdrawal.currency,
+    )
+    .await
+    {
+        Ok(account) => account,
+        Err(e) => {
+            tracing::error!("cancel_wallet_withdrawal account error: {:?}", e);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load wallet").into_response();
+        }
+    };
+    if locked_account.id != withdrawal.account_id {
+        return err(StatusCode::CONFLICT, "wallet account mismatch").into_response();
+    }
+    if locked_account.held_balance_cents < withdrawal.amount_cents {
+        return err(StatusCode::CONFLICT, "held balance is insufficient").into_response();
+    }
+
+    let updated_account = match sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            held_balance_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(locked_account.id)
+    .bind(locked_account.available_balance_cents + withdrawal.amount_cents)
+    .bind(locked_account.held_balance_cents - withdrawal.amount_cents)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("cancel_wallet_withdrawal account update error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to release withdrawal",
+            )
+            .into_response();
+        }
+    };
+
+    let updated_withdrawal = match sqlx::query_as::<_, WalletWithdrawalRow>(
+        r#"
+        UPDATE wallet_withdrawals
+        SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW()
+        WHERE id = $1 AND user_id = $2
+        RETURNING
+            id, user_id, account_id, environment, amount_cents, fee_cents, net_amount_cents,
+            currency, bank_code, bank_name, bank_account_name, bank_account_number_masked,
+            status, note, metadata, requested_at, processed_at, cancelled_at, created_at, updated_at
+        "#,
+    )
+    .bind(withdrawal.id)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(row) => row,
+        Err(e) => {
+            tracing::error!("cancel_wallet_withdrawal update error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to cancel withdrawal",
+            )
+            .into_response();
+        }
+    };
+
+    if let Err(e) = insert_wallet_ledger_entry_tx(
+        &mut tx,
+        user_id,
+        &updated_account,
+        "credit",
+        withdrawal.amount_cents,
+        updated_account.available_balance_cents,
+        "withdrawal_cancel",
+        "wallet_withdrawal",
+        withdrawal.id,
+        format!("Withdrawal cancelled from {}", withdrawal.bank_name),
+        json!({
+            "withdrawal_id": withdrawal.id.to_string(),
+            "flow": "withdrawal_release",
+            "environment": withdrawal.environment.as_str()
+        }),
+    )
+    .await
+    {
+        tracing::error!("cancel_wallet_withdrawal ledger error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to record cancellation",
+        )
+        .into_response();
+    }
+
+    if let Err(e) = tx.commit().await {
+        tracing::error!("cancel_wallet_withdrawal commit error: {:?}", e);
+        return err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to cancel withdrawal",
+        )
+        .into_response();
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "withdrawal": WalletWithdrawalResponse::from(updated_withdrawal),
+            "account": WalletAccountResponse::from(updated_account)
+        })),
+    )
+        .into_response()
 }
 
 async fn list_notifications(
@@ -9962,6 +13863,168 @@ async fn insert_wallet_ledger_entry_tx(
     Ok(())
 }
 
+fn parse_reward_coin_amount_from_payment_payload(payment_payload: &Value) -> i64 {
+    [
+        &["client_metadata", "reward_coin_amount"][..],
+        &["client_metadata", "coin_amount"][..],
+        &["client_metadata", "coins_used"][..],
+        &["reward_coin_amount"][..],
+        &["coin_amount"][..],
+        &["coins_used"][..],
+    ]
+    .iter()
+    .find_map(|path| json_i64_at(payment_payload, path))
+    .unwrap_or(0)
+    .max(0)
+}
+
+async fn apply_reward_coins_to_wallet_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+    txn: &TransactionRow,
+    environment: &str,
+    requested_coin_amount: i64,
+) -> Result<RewardCoinApplication, RewardCoinPaymentError> {
+    let requested_coin_amount = requested_coin_amount.max(0);
+    if requested_coin_amount <= 0 || !txn.currency.eq_ignore_ascii_case("IDR") {
+        return Ok(RewardCoinApplication {
+            coin_amount: 0,
+            discount_cents: 0,
+            already_applied: false,
+        });
+    }
+
+    let existing_discount_cents = sqlx::query_scalar::<_, Option<i64>>(
+        r#"
+        SELECT COALESCE(SUM(amount_cents), 0)
+        FROM wallet_ledger_entries
+        WHERE user_id = $1
+          AND reference_type = 'transaction'
+          AND reference_id = $2
+          AND entry_type = 'adjustment'
+          AND status = 'posted'
+          AND metadata ->> 'source' = 'reward_coin'
+        "#,
+    )
+    .bind(user_id)
+    .bind(txn.id)
+    .fetch_one(&mut **tx)
+    .await?
+    .unwrap_or(0);
+
+    if existing_discount_cents > 0 {
+        return Ok(RewardCoinApplication {
+            coin_amount: existing_discount_cents / REWARD_COIN_VALUE_CENTS,
+            discount_cents: existing_discount_cents,
+            already_applied: true,
+        });
+    }
+
+    let max_discount_cents = reward_coin_max_discount_cents(txn.amount_cents);
+    let max_coin_amount = max_discount_cents / REWARD_COIN_VALUE_CENTS;
+    let coin_amount = requested_coin_amount.min(max_coin_amount);
+    if coin_amount <= 0 {
+        return Ok(RewardCoinApplication {
+            coin_amount: 0,
+            discount_cents: 0,
+            already_applied: false,
+        });
+    }
+
+    sqlx::query(
+        r#"
+        INSERT INTO user_reward_balances (user_id)
+        VALUES ($1)
+        ON CONFLICT (user_id) DO NOTHING
+        "#,
+    )
+    .bind(user_id)
+    .execute(&mut **tx)
+    .await?;
+
+    let reward_balance = sqlx::query_as::<_, RewardBalanceRow>(
+        r#"
+        SELECT user_id, coin_balance, xp_balance, voucher_count, updated_at
+        FROM user_reward_balances
+        WHERE user_id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    if reward_balance.coin_balance < coin_amount {
+        return Err(RewardCoinPaymentError::InsufficientCoins);
+    }
+
+    let discount_cents = coin_amount.saturating_mul(REWARD_COIN_VALUE_CENTS);
+    sqlx::query(
+        r#"
+        UPDATE user_reward_balances
+        SET coin_balance = coin_balance - $2,
+            updated_at = NOW()
+        WHERE user_id = $1
+        "#,
+    )
+    .bind(user_id)
+    .bind(coin_amount)
+    .execute(&mut **tx)
+    .await?;
+
+    let locked_account =
+        lock_wallet_account_tx(tx, user_id, environment, txn.currency.as_str()).await?;
+    let next_available = locked_account.available_balance_cents + discount_cents;
+    let next_total_topup = locked_account.total_topup_cents + discount_cents;
+
+    let updated_account = sqlx::query_as::<_, WalletAccountRow>(
+        r#"
+        UPDATE wallet_accounts
+        SET
+            available_balance_cents = $2,
+            total_topup_cents = $3,
+            updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, user_id, environment, currency, available_balance_cents, held_balance_cents,
+            total_topup_cents, total_spend_cents, status, metadata, created_at, updated_at
+        "#,
+    )
+    .bind(locked_account.id)
+    .bind(next_available)
+    .bind(next_total_topup)
+    .fetch_one(&mut **tx)
+    .await?;
+
+    insert_wallet_ledger_entry_tx(
+        tx,
+        user_id,
+        &updated_account,
+        "credit",
+        discount_cents,
+        updated_account.available_balance_cents,
+        "adjustment",
+        "transaction",
+        txn.id,
+        format!("Reward coin credit for transaction {}", txn.id),
+        json!({
+            "source": "reward_coin",
+            "transaction_id": txn.id,
+            "coin_amount": coin_amount,
+            "coin_value_cents": REWARD_COIN_VALUE_CENTS,
+            "discount_cents": discount_cents,
+            "environment": environment
+        }),
+    )
+    .await?;
+
+    Ok(RewardCoinApplication {
+        coin_amount,
+        discount_cents,
+        already_applied: false,
+    })
+}
+
 async fn hold_transaction_funds_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     txn: &TransactionRow,
@@ -10083,6 +14146,26 @@ async fn sync_linked_transaction_after_topup_paid_tx(
         return Ok(None);
     }
 
+    let requested_coin_amount =
+        parse_reward_coin_amount_from_payment_payload(&topup.payment_payload);
+    let reward_coin_application = match apply_reward_coins_to_wallet_tx(
+        tx,
+        topup.user_id,
+        &txn,
+        wallet_environment.as_str(),
+        requested_coin_amount,
+    )
+    .await
+    {
+        Ok(application) => application,
+        Err(RewardCoinPaymentError::InsufficientCoins) => RewardCoinApplication {
+            coin_amount: 0,
+            discount_cents: 0,
+            already_applied: false,
+        },
+        Err(RewardCoinPaymentError::Database(db_err)) => return Err(db_err),
+    };
+
     let (payment_status, protection_status) =
         match hold_transaction_funds_tx(tx, &txn, wallet_environment.as_str()).await {
             Ok(_) => ("paid".to_string(), "funds_held".to_string()),
@@ -10108,7 +14191,17 @@ async fn sync_linked_transaction_after_topup_paid_tx(
                 "payment_provider": topup.payment_provider.as_str(),
                 "payment_method": topup.payment_method.as_deref(),
                 "wallet_environment": topup.environment.as_str(),
-                "external_reference": topup.external_reference.as_deref()
+                "external_reference": topup.external_reference.as_deref(),
+                "reward_coin_amount": reward_coin_application.coin_amount,
+                "reward_coin_discount_cents": reward_coin_application.discount_cents,
+                "reward_coin_already_applied": reward_coin_application.already_applied
+            },
+            "reward": {
+                "coin_amount": reward_coin_application.coin_amount,
+                "coin_value_cents": REWARD_COIN_VALUE_CENTS,
+                "discount_cents": reward_coin_application.discount_cents,
+                "applied": reward_coin_application.discount_cents > 0,
+                "already_applied": reward_coin_application.already_applied
             }
         }),
     );
@@ -10157,24 +14250,12 @@ async fn release_transaction_funds_tx(
     let seller_account =
         lock_wallet_account_tx(tx, txn.seller_id, environment, txn.currency.as_str()).await?;
 
-    let (next_buyer_available, next_buyer_held) =
-        if buyer_account.held_balance_cents >= txn.amount_cents {
-            (
-                buyer_account.available_balance_cents,
-                buyer_account.held_balance_cents - txn.amount_cents,
-            )
-        } else if buyer_account.available_balance_cents >= txn.amount_cents {
-            (
-                buyer_account.available_balance_cents - txn.amount_cents,
-                buyer_account.held_balance_cents,
-            )
-        } else {
-            return Err(WalletTransitionError::InsufficientFunds);
-        };
-
-    if next_buyer_held < 0 {
+    if buyer_account.held_balance_cents < txn.amount_cents {
         return Err(WalletTransitionError::InvalidHeldBalance);
     }
+
+    let next_buyer_available = buyer_account.available_balance_cents;
+    let next_buyer_held = buyer_account.held_balance_cents - txn.amount_cents;
 
     let updated_buyer = sqlx::query_as::<_, WalletAccountRow>(
         r#"
@@ -14447,7 +18528,7 @@ async fn find_content(db: &PgPool, id_or_slug: &str) -> Result<Option<ContentRow
     sqlx::query_as::<_, ContentRow>(
         r#"
         SELECT
-            id, owner_id, content_type, slug, title, summary, body, price_cents,
+            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
             metadata, created_at, updated_at
@@ -14727,6 +18808,55 @@ mod tests {
         assert_eq!(
             image_urls[0].as_str(),
             Some("/api/content/media/laju-chat/content/example.jpeg")
+        );
+    }
+
+    #[test]
+    fn metadata_image_collection_reads_common_db_aliases() {
+        let metadata = json!({
+            "image_url": "https://cdn.example.com/primary.jpg",
+            "media_urls": ["https://cdn.example.com/gallery.webp"],
+            "attachments": [
+                {"url": "/uploads/content/brief.png"},
+                {"src": "/uploads/content/readme.txt"}
+            ],
+            "coverImage": "https://cdn.example.com/primary.jpg"
+        });
+        let image_urls = collect_metadata_image_urls(&metadata);
+        assert_eq!(image_urls.len(), 3);
+        assert_eq!(image_urls[0], "https://cdn.example.com/primary.jpg");
+        assert_eq!(image_urls[2], "/uploads/content/brief.png");
+    }
+
+    #[test]
+    fn response_image_urls_do_not_invent_public_fallback_images() {
+        let image_urls =
+            response_image_urls_for_content("product", Some("product"), &json!({}), None);
+        assert!(
+            image_urls.is_empty(),
+            "content responses must only expose media saved in cover_image or metadata"
+        );
+    }
+
+    #[test]
+    fn response_image_urls_reject_placeholder_media_but_allow_saved_category_assets() {
+        let placeholder_urls = response_image_urls_for_content(
+            "product",
+            Some("product"),
+            &json!({"image_urls": ["https://picsum.photos/seed/example/1280/960"]}),
+            Some("https://loremflickr.com/1280/960/shop"),
+        );
+        assert!(placeholder_urls.is_empty());
+
+        let category_asset_urls = response_image_urls_for_content(
+            "product",
+            Some("product"),
+            &json!({"image_urls": ["/images/umkm/content-product.svg"]}),
+            Some("/images/umkm/content-product.svg"),
+        );
+        assert_eq!(
+            category_asset_urls,
+            vec!["/images/umkm/content-product.svg"]
         );
     }
 

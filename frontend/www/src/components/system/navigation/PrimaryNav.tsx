@@ -9,6 +9,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import {
+  LEGACY_UMKM_DISCOVERY_PATH,
+  LEGACY_UMKM_OWNER_PATH,
+  UMKM_DISCOVERY_PATH,
+  UMKM_OWNER_PATH,
+} from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 
 export type PrimaryNavItem = {
@@ -25,13 +31,19 @@ function normalizePathname(pathname: string): string {
 }
 
 function matchesRoute(pathname: string, matcher: string) {
-  if (matcher === '/') return pathname === '/';
-  return pathname === matcher || pathname.startsWith(`${matcher}/`);
+  const exact = matcher.endsWith('$');
+  const route = exact ? matcher.slice(0, -1) || '/' : matcher;
+  if (route === '/') return pathname === '/';
+  if (exact) return pathname === route;
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
 
-export function isPrimaryNavItemActive(item: PrimaryNavItem, pathname: string): boolean {
+export function isPrimaryNavItemActive(
+  item: PrimaryNavItem,
+  pathname: string,
+): boolean {
   const cleanPath = normalizePathname(pathname);
-  return item.matchers.some((matcher) => matchesRoute(cleanPath, matcher));
+  return item.matchers.some(matcher => matchesRoute(cleanPath, matcher));
 }
 
 export function resolveActivePrimaryNavKey(
@@ -44,7 +56,7 @@ export function resolveActivePrimaryNavKey(
   for (const item of items) {
     for (const matcher of item.matchers) {
       if (!matchesRoute(cleanPath, matcher)) continue;
-      const score = matcher.length;
+      const score = matcher.endsWith('$') ? matcher.length - 1 : matcher.length;
       if (!winner || score > winner.score) {
         winner = { key: item.key, score };
       }
@@ -85,15 +97,10 @@ export function buildPrimaryNavItems(
       icon: LayoutGrid,
       matchers: [
         '/kategori',
-        '/umkm',
+        UMKM_DISCOVERY_PATH,
+        `${LEGACY_UMKM_DISCOVERY_PATH}$`,
         '/search',
-        '/jobs',
-        '/freelancers',
-        '/marketplace',
-        '/property',
         '/microgigs',
-        '/super-app',
-        '/usaha',
         '/toko',
       ],
     },
@@ -102,14 +109,14 @@ export function buildPrimaryNavItems(
       label: text.create,
       href: createHref,
       icon: PlusCircle,
-      matchers: ['/create', '/register', '/jobs/create', '/property/create', '/profile/freelancer/create'],
+      matchers: ['/create', '/register'],
     },
     {
       key: 'umkm',
       label: text.umkm,
       href: requestHref,
       icon: ClipboardList,
-      matchers: ['/my-projects', '/projects'],
+      matchers: ['/my-projects'],
     },
     {
       key: 'account',
@@ -117,7 +124,20 @@ export function buildPrimaryNavItems(
       href: accountHref,
       icon: User,
       matchers: isAuthenticated
-        ? ['/profile', '/settings', '/dashboard', '/my-listings', '/transactions', '/payments', '/chat', '/notifications', '/my-projects', '/my-applications', '/projects']
+        ? [
+            '/profile$',
+            '/profile/edit',
+            '/settings',
+            '/dashboard',
+            '/my-listings',
+            '/transactions',
+            '/payments',
+            '/chat',
+            '/notifications',
+            '/my-projects',
+            UMKM_OWNER_PATH,
+            LEGACY_UMKM_OWNER_PATH,
+          ]
         : ['/login', '/forgot-password', '/reset-password'],
     },
   ];
@@ -133,8 +153,11 @@ export function PrimaryNav({ items, pathname, className }: PrimaryNavProps) {
   const activeKey = resolveActivePrimaryNavKey(items, pathname);
 
   return (
-    <nav className={cn('flex items-center gap-1', className)} aria-label="Primary navigation">
-      {items.map((item) => {
+    <nav
+      className={cn('flex items-center gap-1', className)}
+      aria-label="Primary navigation"
+    >
+      {items.map(item => {
         const Icon = item.icon;
         const active = activeKey === item.key;
 

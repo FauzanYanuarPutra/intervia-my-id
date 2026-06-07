@@ -46,11 +46,11 @@ use cookie::time::Duration as CookieDuration;
 const MAX_LOGIN_ATTEMPTS: i16 = 5;
 const LOCKOUT_DURATION_MINUTES: i64 = 15;
 const ACCESS_TOKEN_EXP_HOURS: i64 = 1; // short lived
-const REFRESH_TOKEN_EXP_DAYS: i64 = 30; // long lived
 const CACHE_TTL_SECONDS: u64 = 600; // 10 minutes roles cache (u64 to match redis set_ex expectation)
 const REFRESH_TOKEN_LENGTH: usize = 64; // chars for opaque token
 const REFRESH_TOKEN_MIN_BYTES: usize = 32;
 const RESET_PROOF_AUDIENCE: &str = "identity-reset";
+const DEFAULT_PROFILE_AVATAR: &str = "/default-avatar.svg";
 // **SECURITY:** Penundaan untuk mitigasi timing attack pada kegagalan login.
 const FAILED_LOGIN_DELAY_MS: u64 = 200;
 // ----------------------------------------------------------------
@@ -481,7 +481,7 @@ async fn rotate_refresh_token(
     let now = Utc::now();
     let new_token = generate_opaque_refresh_token().await;
     let new_hash = hash_refresh_token(&new_token).await?;
-    let new_expires = now + chrono::Duration::days(REFRESH_TOKEN_EXP_DAYS);
+    let new_expires = now + chrono::Duration::days(state.config.refresh_token_exp_days);
 
     let mut tx = state.db.begin().await?;
     sqlx::query("UPDATE sessions SET revoked = true WHERE id = $1")
@@ -848,7 +848,7 @@ pub async fn register(
                 .into_response();
         }
     };
-    let expires_at = Utc::now() + Duration::days(REFRESH_TOKEN_EXP_DAYS);
+    let expires_at = Utc::now() + Duration::days(state.config.refresh_token_exp_days);
     let session_id =
         match store_refresh_session(&state, user_id, &refresh_hash, expires_at, None).await {
             Ok(id) => id,
@@ -1108,7 +1108,7 @@ pub async fn login(
     let refresh_hash = hash_refresh_token(&refresh_opaque)
         .await
         .expect("Hash failed");
-    let expires_at = Utc::now() + Duration::days(REFRESH_TOKEN_EXP_DAYS);
+    let expires_at = Utc::now() + Duration::days(state.config.refresh_token_exp_days);
 
     let sid: Uuid =
         match store_refresh_session(&state, user_data.id, &refresh_hash, expires_at, None).await {
@@ -1366,7 +1366,7 @@ pub async fn login_phone(
     let refresh_hash = hash_refresh_token(&refresh_opaque)
         .await
         .expect("Hash failed");
-    let expires_at = Utc::now() + Duration::days(REFRESH_TOKEN_EXP_DAYS);
+    let expires_at = Utc::now() + Duration::days(state.config.refresh_token_exp_days);
 
     let sid: Uuid =
         match store_refresh_session(&state, user_data.id, &refresh_hash, expires_at, None).await {
@@ -1469,12 +1469,7 @@ pub async fn oauth_google(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string);
-    let avatar_url = payload
-        .avatar_url
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string);
+    let avatar_url = Some(DEFAULT_PROFILE_AVATAR.to_string());
 
     if provider_user_id.is_empty() || email.len() < 5 || !email.contains('@') {
         return (
@@ -1657,7 +1652,7 @@ pub async fn oauth_google(
                 .into_response();
         }
     };
-    let expires_at = Utc::now() + Duration::days(REFRESH_TOKEN_EXP_DAYS);
+    let expires_at = Utc::now() + Duration::days(state.config.refresh_token_exp_days);
     let session_id =
         match store_refresh_session(&state, user_id, &refresh_hash, expires_at, None).await {
             Ok(id) => id,

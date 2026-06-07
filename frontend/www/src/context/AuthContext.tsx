@@ -12,7 +12,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { buildLoginPath, isProtectedRoutePath } from '@/lib/authRoutes';
 import { saveAccountSnapshot } from '@/lib/accountVault';
 import { getLocaleFromPathname, isSupportedLocale } from '@/lib/locale';
-
 const IS_DEV = process.env.NODE_ENV === 'development';
 const LOCALE_COOKIE = 'NEXT_LOCALE';
 
@@ -31,19 +30,23 @@ export type User = {
   permissions: string[];
   avatarUrl?: string;
   avatar_url?: string;
+  sub?: string;
+  name?: string;
   username?: string;
   emailVerified?: boolean;
   phone?: string;
   phoneVerified?: boolean;
   hasPassword?: boolean;
   has_password?: boolean;
+  bio?: string | null;
+  location?: string | null;
   fullName?: string;
   full_name?: string;
   metadata?: {
     avatar_url?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type AuthCtx = {
@@ -60,7 +63,7 @@ type AuthCtx = {
     phone: string,
     options?: { silent?: boolean; redirectTo?: string; phoneOtpToken?: string },
   ) => Promise<void>;
-  register: (data: any) => Promise<Record<string, unknown>>;
+  register: (data: Record<string, unknown>) => Promise<Record<string, unknown>>;
   logout: (options?: { redirectTo?: string }) => Promise<void>;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   refreshUser: () => Promise<void>;
@@ -77,25 +80,11 @@ function readNonEmptyString(value: unknown): string | undefined {
 function normalizeUserPayload(payload: unknown): User {
   if (!payload || typeof payload !== 'object') return payload as User;
 
-  const base = payload as Record<string, any>;
+  const base = payload as Record<string, unknown>;
   const metadata =
     base.metadata && typeof base.metadata === 'object'
-      ? (base.metadata as Record<string, any>)
+      ? (base.metadata as Record<string, unknown>)
       : undefined;
-
-  const normalizedAvatar =
-    readNonEmptyString(base.avatarUrl) ||
-    readNonEmptyString(base.avatar_url) ||
-    readNonEmptyString(metadata?.avatar_url);
-
-  if (normalizedAvatar) {
-    base.avatarUrl = normalizedAvatar;
-    base.avatar_url = normalizedAvatar;
-    if (metadata) {
-      metadata.avatar_url = normalizedAvatar;
-      base.metadata = metadata;
-    }
-  }
 
   const normalizedHasPassword =
     typeof base.hasPassword === 'boolean'
@@ -449,33 +438,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (payload: any): Promise<Record<string, unknown>> => {
+  const register = async (
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       credentials: 'include',
     });
-    const data = await res.json().catch(() => ({}));
+    const data = (await res.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
     if (!res.ok) {
-      throw new Error((data as any)?.error || 'Register failed');
+      throw new Error(readNonEmptyString(data.error) || 'Register failed');
     }
+
+    const accessToken = readNonEmptyString(data.access_token);
+    const refreshToken = readNonEmptyString(data.refresh_token);
+    const sessionId = readNonEmptyString(data.session_id);
 
     if (IS_DEV) {
-      if ((data as any)?.access_token) {
-        localStorage.setItem('access_token', (data as any).access_token);
-      }
-      if ((data as any)?.refresh_token) {
-        localStorage.setItem('refresh_token', (data as any).refresh_token);
-      }
-      if ((data as any)?.session_id) {
-        localStorage.setItem('session_id', (data as any).session_id);
-      }
+      if (accessToken) localStorage.setItem('access_token', accessToken);
+      if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
+      if (sessionId) localStorage.setItem('session_id', sessionId);
     }
 
-    if ((data as any)?.access_token) {
-      setAccessToken((data as any).access_token);
-      await fetchMe((data as any).access_token);
+    if (accessToken) {
+      setAccessToken(accessToken);
+      await fetchMe(accessToken);
     } else {
       const token = await refresh();
       if (token) {
@@ -490,9 +482,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const res = await fetch('/api/auth/logout', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >;
 
-      if ((data as any).shouldClearLocalAuth || IS_DEV) {
+      if (data.shouldClearLocalAuth === true || IS_DEV) {
         hardResetAuth();
       }
     } catch {

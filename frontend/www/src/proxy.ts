@@ -35,6 +35,40 @@ const CORS_ALLOWED_ORIGINS = new Set([
     .map(v => v.trim())
     .filter(Boolean),
 ]);
+const DEAD_ROUTE_SEGMENTS = new Set([
+  'pricing',
+  'blog',
+  'news',
+  'travel',
+  'wellness',
+  'vendor',
+  'hr',
+  'investor',
+  'analytics',
+  'charity',
+]);
+const CANONICAL_INDEX_REDIRECTS: Record<string, string> = {
+  '/jobs': '/search?type=job&q=lowongan',
+  '/freelancers': '/search?type=freelancer&q=umkm',
+  '/marketplace': '/search?type=product&q=supplier',
+  '/property': '/search?type=property&q=lokasi%20jualan',
+};
+const LEGACY_EXACT_REDIRECTS: Record<string, string> = {
+  '/help': '/support',
+  '/forum': '/community',
+  '/projects': '/my-projects',
+  '/my-applications': '/dashboard',
+  '/property/create': '/create/jual/properti',
+  '/jobs/create': '/create/butuh/lowongan',
+  '/profile/freelancer/create': '/profile/edit?focus=talent',
+  '/company/create': '/usaha/onboarding',
+  '/super-app': '/home',
+};
+const LEGACY_PREFIX_REDIRECTS: Record<string, string> = {
+  '/finance': '/payments',
+  '/collaboration': '/chat',
+  '/spatial': '/umkm',
+};
 const scriptSrc = IS_DEV
   ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:"
   : "script-src 'self' 'unsafe-inline' blob:";
@@ -43,7 +77,7 @@ const CONTENT_SECURITY_POLICY = [
   "frame-ancestors 'none'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: https:",
+  "img-src 'self' data: blob: https:",
   "media-src 'self' data: blob: https:",
   scriptSrc,
   [
@@ -187,6 +221,15 @@ function applySecurityHeaders(res: NextResponse) {
   return res;
 }
 
+function applyNoIndexHeader(res: NextResponse) {
+  res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  return res;
+}
+
+function shouldNoIndexRoute(routePath: string) {
+  return isAuthRoutePath(routePath) || isProtectedRoutePath(routePath);
+}
+
 function firstForwardedValue(value: string | null) {
   return value?.split(',')[0]?.trim().toLowerCase() || '';
 }
@@ -197,7 +240,9 @@ function httpsRedirectResponse(req: NextRequest) {
   const forwardedProto = firstForwardedValue(
     req.headers.get('x-forwarded-proto'),
   );
-  const forwardedHost = firstForwardedValue(req.headers.get('x-forwarded-host'));
+  const forwardedHost = firstForwardedValue(
+    req.headers.get('x-forwarded-host'),
+  );
   const host = forwardedHost || req.nextUrl.host.toLowerCase();
 
   if (forwardedProto !== 'http' || !PUBLIC_HTTPS_HOSTS.has(host)) return null;
@@ -248,6 +293,203 @@ function redirectToHome(req: NextRequest, locale: Locale) {
   );
 }
 
+function redirectToLocalizedTarget(
+  req: NextRequest,
+  locale: Locale,
+  target: string,
+  status = 308,
+) {
+  const url = req.nextUrl.clone();
+  const [pathname, query = ''] = target.split('?');
+  url.pathname = localizeInternalPath(pathname, locale);
+  url.search = query ? `?${query}` : '';
+  return applyLocaleCookies(
+    applySecurityHeaders(NextResponse.redirect(url, status)),
+    locale,
+  );
+}
+
+function buildCanonicalSearchTarget(
+  req: NextRequest,
+  type: string,
+  fallbackQuery: string,
+): string {
+  const params = new URLSearchParams(req.nextUrl.searchParams);
+  const query =
+    params.get('q')?.trim() || params.get('category')?.trim() || fallbackQuery;
+
+  params.delete('category');
+  params.set('type', type);
+  params.set('q', query);
+
+  return `/search?${params.toString()}`;
+}
+
+function getCanonicalIndexTarget(
+  req: NextRequest,
+  routePath: string,
+): string | null {
+  if (routePath === '/jobs') {
+    return buildCanonicalSearchTarget(req, 'job', 'lowongan');
+  }
+  if (routePath === '/freelancers') {
+    return buildCanonicalSearchTarget(req, 'freelancer', 'umkm');
+  }
+  if (routePath === '/marketplace') {
+    return buildCanonicalSearchTarget(req, 'product', 'supplier');
+  }
+  if (routePath === '/property') {
+    return buildCanonicalSearchTarget(req, 'property', 'lokasi jualan');
+  }
+  return null;
+}
+
+function getCanonicalDetailTarget(routePath: string): string | null {
+  const segments = routePath.split('/').filter(Boolean);
+  const [section, slug] = segments;
+
+  if (!slug || segments.length !== 2) return null;
+
+  if (section === 'listing') {
+    return `/content/${slug}`;
+  }
+  if (section === 'freelancers') {
+    return `/profile/${slug}`;
+  }
+  if (section === 'umkm') {
+    return `/toko/${slug}`;
+  }
+
+  return null;
+}
+
+function appendCurrentSearchToTarget(
+  req: NextRequest,
+  target: string,
+  omitKeys: string[] = [],
+): string {
+  const [pathname, queryString = ''] = target.split('?');
+  const params = new URLSearchParams(queryString);
+  req.nextUrl.searchParams.forEach((value, key) => {
+    if (!params.has(key)) params.set(key, value);
+  });
+  for (const key of omitKeys) {
+    params.delete(key);
+  }
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+function getLegacyUmkmManageTarget(
+  req: NextRequest,
+  routePath: string,
+): string | null {
+  if (
+    routePath !== '/super-app/umkm/manage' &&
+    !routePath.startsWith('/super-app/umkm/manage/')
+  ) {
+    return null;
+  }
+
+  const segments = routePath.split('/').filter(Boolean);
+  const section = segments[3] || '';
+  const detail = segments[4] || '';
+
+  if (!section) return appendCurrentSearchToTarget(req, '/usaha');
+  if (section === 'catalog') {
+    return appendCurrentSearchToTarget(req, '/usaha/katalog');
+  }
+  if (section === 'operations') {
+    return appendCurrentSearchToTarget(req, '/usaha/operasional');
+  }
+  if (section === 'orders') {
+    return appendCurrentSearchToTarget(req, '/usaha/order');
+  }
+  if (section === 'team') {
+    return appendCurrentSearchToTarget(req, '/usaha/tim');
+  }
+  if (section === 'setup' && detail === 'new') {
+    return appendCurrentSearchToTarget(req, '/usaha/onboarding');
+  }
+  if (section === 'setup' && detail) {
+    return appendCurrentSearchToTarget(
+      req,
+      `/usaha/toko/${encodeURIComponent(detail)}/profil`,
+    );
+  }
+  if (section === 'setup') {
+    const target =
+      req.nextUrl.searchParams.get('assistant') === '1'
+        ? '/usaha/asisten'
+        : '/usaha/profil';
+    return appendCurrentSearchToTarget(req, target);
+  }
+
+  return appendCurrentSearchToTarget(req, '/usaha');
+}
+
+function getLegacySuperAppTarget(
+  req: NextRequest,
+  routePath: string,
+): string | null {
+  if (routePath !== '/super-app' && !routePath.startsWith('/super-app/')) {
+    return null;
+  }
+
+  if (
+    routePath === '/super-app/umkm/manage' ||
+    routePath.startsWith('/super-app/umkm/manage/')
+  ) {
+    return null;
+  }
+
+  const segments = routePath.split('/').filter(Boolean);
+  const service = segments[1] || '';
+  const detail = segments[2] || '';
+
+  if (service === 'tracker' && detail) {
+    return `/transactions/${encodeURIComponent(detail)}`;
+  }
+
+  if (service === 'umkm' && detail && detail !== 'scan') {
+    return appendCurrentSearchToTarget(
+      req,
+      `/toko/${encodeURIComponent(detail)}`,
+    );
+  }
+
+  if (service === 'umkm' && detail === 'scan') {
+    return appendCurrentSearchToTarget(req, '/toko/scan');
+  }
+
+  if (service === 'umkm') {
+    return appendCurrentSearchToTarget(req, '/umkm');
+  }
+
+  const serviceTargets: Record<string, string> = {
+    car: '/search?type=product&q=grosir%20usaha',
+    driver: '/search?type=service&q=kurir%20pickup%20usaha',
+    food: '/umkm?q=kuliner',
+    mart: '/search?type=product&q=bahan%20baku%20kemasan',
+    ride: '/search?type=service&q=kurir%20pickup%20usaha',
+    send: '/search?type=service&q=jasa%20pengiriman%20usaha',
+    services: '/search?type=service&q=jasa%20operasional%20umkm',
+  };
+
+  return serviceTargets[service]
+    ? appendCurrentSearchToTarget(req, serviceTargets[service])
+    : '/home';
+}
+
+function matchPrefixRedirect(
+  routePath: string,
+  redirects: Record<string, string>,
+) {
+  return Object.entries(redirects).find(
+    ([source]) => routePath === source || routePath.startsWith(`${source}/`),
+  );
+}
+
 function redirectToLogin(
   req: NextRequest,
   locale: Locale,
@@ -264,9 +506,7 @@ function redirectToLogin(
   url.pathname = `/${locale}/login`;
 
   if (
-    !AUTH_ROUTE_PATHS.includes(
-      routePath as (typeof AUTH_ROUTE_PATHS)[number],
-    )
+    !AUTH_ROUTE_PATHS.includes(routePath as (typeof AUTH_ROUTE_PATHS)[number])
   ) {
     const fullPath = req.nextUrl.pathname + req.nextUrl.search;
     url.searchParams.set('callbackUrl', fullPath);
@@ -285,15 +525,13 @@ function redirectToLogin(
 
   return syncAuthPresenceCookie(
     req,
-    applyLocaleCookies(applySecurityHeaders(res), locale),
+    applyNoIndexHeader(applyLocaleCookies(applySecurityHeaders(res), locale)),
     false,
   );
 }
 
 /* ---------------- AUTH ENGINE ---------------- */
-async function getUserRole(
-  req: NextRequest,
-): Promise<{
+async function getUserRole(req: NextRequest): Promise<{
   role: Role;
   valid: boolean;
   reason?: string;
@@ -410,23 +648,32 @@ export async function proxy(req: NextRequest) {
     const isMutation = MUTATION_METHODS.has(req.method.toUpperCase());
 
     if (isMutation && secFetchSite === 'cross-site') {
-      return applySecurityHeaders(
-        NextResponse.json(
-          { error: 'Cross-site request blocked by security policy.' },
-          { status: 403 },
+      return applyNoIndexHeader(
+        applySecurityHeaders(
+          NextResponse.json(
+            { error: 'Cross-site request blocked by security policy.' },
+            { status: 403 },
+          ),
         ),
       );
     }
 
     if (isMutation && origin && !isAllowedOrigin) {
-      return applySecurityHeaders(
-        NextResponse.json({ error: 'Origin is not allowed.' }, { status: 403 }),
+      return applyNoIndexHeader(
+        applySecurityHeaders(
+          NextResponse.json(
+            { error: 'Origin is not allowed.' },
+            { status: 403 },
+          ),
+        ),
       );
     }
 
     const isPreflight = req.method === 'OPTIONS';
     if (isPreflight && origin && !isAllowedOrigin) {
-      return applySecurityHeaders(new NextResponse(null, { status: 403 }));
+      return applyNoIndexHeader(
+        applySecurityHeaders(new NextResponse(null, { status: 403 })),
+      );
     }
 
     const response = isPreflight
@@ -449,10 +696,13 @@ export async function proxy(req: NextRequest) {
     );
     response.headers.set('Access-Control-Max-Age', '600');
 
-    return applySecurityHeaders(response);
+    return applyNoIndexHeader(applySecurityHeaders(response));
   }
 
-  if (pathname === '/security.txt' || pathname === '/.well-known/security.txt') {
+  if (
+    pathname === '/security.txt' ||
+    pathname === '/.well-known/security.txt'
+  ) {
     return applySecurityHeaders(NextResponse.next());
   }
 
@@ -497,6 +747,58 @@ export async function proxy(req: NextRequest) {
 
   // 4. Route auth checks
   const routePath = '/' + segments.slice(2).join('/');
+  const routeSegment = segments[2] || '';
+  if (DEAD_ROUTE_SEGMENTS.has(routeSegment)) {
+    return redirectToLocalizedTarget(req, locale, '/home');
+  }
+
+  const canonicalTarget =
+    getCanonicalIndexTarget(req, routePath) ||
+    CANONICAL_INDEX_REDIRECTS[routePath];
+  if (canonicalTarget) {
+    return redirectToLocalizedTarget(req, locale, canonicalTarget);
+  }
+
+  const canonicalDetailTarget = getCanonicalDetailTarget(routePath);
+  if (canonicalDetailTarget) {
+    return redirectToLocalizedTarget(
+      req,
+      locale,
+      appendCurrentSearchToTarget(req, canonicalDetailTarget),
+    );
+  }
+
+  const legacyUmkmManageTarget = getLegacyUmkmManageTarget(req, routePath);
+  if (legacyUmkmManageTarget) {
+    return redirectToLocalizedTarget(req, locale, legacyUmkmManageTarget);
+  }
+
+  if (routePath === '/forum') {
+    return redirectToLocalizedTarget(
+      req,
+      locale,
+      appendCurrentSearchToTarget(req, '/community'),
+    );
+  }
+
+  const exactLegacyTarget = LEGACY_EXACT_REDIRECTS[routePath];
+  if (exactLegacyTarget) {
+    return redirectToLocalizedTarget(req, locale, exactLegacyTarget);
+  }
+
+  const legacySuperAppTarget = getLegacySuperAppTarget(req, routePath);
+  if (legacySuperAppTarget) {
+    return redirectToLocalizedTarget(req, locale, legacySuperAppTarget);
+  }
+
+  const prefixLegacyRedirect = matchPrefixRedirect(
+    routePath,
+    LEGACY_PREFIX_REDIRECTS,
+  );
+  if (prefixLegacyRedirect) {
+    return redirectToLocalizedTarget(req, locale, prefixLegacyRedirect[1]);
+  }
+
   const legacyCommunityGroup = searchParams.get('group')?.trim();
   if (routePath === '/community' && legacyCommunityGroup) {
     const url = req.nextUrl.clone();
@@ -512,12 +814,13 @@ export async function proxy(req: NextRequest) {
   const route = findRouteConfig(routePath, routes);
   const auth = await getUserRole(req);
   const hasSessionMarker = auth.valid || auth.recoverable;
-  const finalizeLocalizedResponse = (res: NextResponse) =>
-    syncAuthPresenceCookie(
-      req,
-      applyLocaleCookies(applySecurityHeaders(res), locale),
-      hasSessionMarker,
-    );
+  const finalizeLocalizedResponse = (res: NextResponse) => {
+    const response = applyLocaleCookies(applySecurityHeaders(res), locale);
+    if (shouldNoIndexRoute(routePath)) {
+      applyNoIndexHeader(response);
+    }
+    return syncAuthPresenceCookie(req, response, hasSessionMarker);
+  };
 
   if (isAuthRoutePath(routePath)) {
     if (auth.valid) {

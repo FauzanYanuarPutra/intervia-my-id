@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS experiment_assignments;
+DROP TABLE IF EXISTS fraud_cases;
+DROP TABLE IF EXISTS entity_feature_snapshots;
+DROP TABLE IF EXISTS user_feature_snapshots;
+DROP TABLE IF EXISTS recommendation_feedback;
+DROP TABLE IF EXISTS recommendation_impressions;
+DROP TABLE IF EXISTS automation_jobs;
+DROP TABLE IF EXISTS fraud_signals;
+DROP TABLE IF EXISTS ai_decision_log;
+DROP TABLE IF EXISTS event_log;

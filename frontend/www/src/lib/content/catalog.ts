@@ -35,7 +35,13 @@ export type ContentItem = {
   content_status?: string | null;
   status?: string | null;
   cover_image?: string | null;
+  image_url?: string | null;
+  image_urls?: unknown;
+  images?: unknown;
+  gallery?: unknown;
+  gallery_images?: unknown;
   price_cents?: number | null;
+  price_unit?: string | null;
   pricing_mode?: string | null;
   original_price_cents?: number | null;
   promo_label?: string | null;
@@ -62,21 +68,7 @@ export type ContentItem = {
   updated_at?: string;
 };
 
-const PUBLIC_CONTENT_IMAGES: Record<ContentImageTopic, string> = {
-  listing:
-    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=900&q=80',
-  property:
-    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80',
-  job: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80',
-  talent:
-    'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80',
-  service:
-    'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=900&q=80',
-  product:
-    'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=900&q=80',
-};
-
-export const DEFAULT_CONTENT_IMAGE = PUBLIC_CONTENT_IMAGES.listing;
+export const DEFAULT_CONTENT_IMAGE = '';
 
 function topicByToken(token: string): ContentImageTopic {
   const normalized = (token || '').trim().toLowerCase();
@@ -116,21 +108,18 @@ export function topicalImageForTopic(
   topic: ContentImageTopic,
   seed?: string,
 ): string {
+  void topic;
   void seed;
-  return PUBLIC_CONTENT_IMAGES[topic] || PUBLIC_CONTENT_IMAGES.listing;
+  return DEFAULT_CONTENT_IMAGE;
 }
 
 export function backupImageForTopic(
   topic: ContentImageTopic,
   seed?: string,
 ): string {
+  void topic;
   void seed;
-  return PUBLIC_CONTENT_IMAGES[topic] || PUBLIC_CONTENT_IMAGES.listing;
-}
-
-function seededImage(topic: string, itemId?: string): string {
-  const mappedTopic = topicByToken(topic);
-  return topicalImageForTopic(mappedTopic, itemId);
+  return DEFAULT_CONTENT_IMAGE;
 }
 
 export function normalizeContentMediaUrl(raw?: string): string {
@@ -190,15 +179,16 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function isPlaceholderLikeImage(url?: string): boolean {
+export function isPlaceholderLikeContentImage(url?: string): boolean {
   if (!url) return true;
   const value = url.trim().toLowerCase();
   if (!value) return true;
   return (
-    value.includes('loremflickr.com') ||
-    value.includes('picsum.photos') ||
+    value.includes('/images/umkm/content-') ||
     value.includes('i.pravatar.cc') ||
     value.includes('api.dicebear.com') ||
+    value.includes('picsum.photos') ||
+    value.includes('loremflickr.com') ||
     value.includes('placehold.co') ||
     value.includes('via.placeholder.com') ||
     value.includes('placeholder') ||
@@ -295,8 +285,16 @@ function extractImageArray(value: unknown): string[] {
       asString(record.src),
       asString(record.image),
       asString(record.image_url),
+      asString(record.imageUrl),
       asString(record.cover_image),
+      asString(record.coverImage),
       asString(record.thumbnail),
+      asString(record.thumbnail_url),
+      asString(record.thumbnailUrl),
+      asString(record.media_url),
+      asString(record.mediaUrl),
+      asString(record.photo_url),
+      asString(record.photoUrl),
     ].filter((candidate): candidate is string => Boolean(candidate));
   });
 }
@@ -305,30 +303,64 @@ export function parseImages(item: ContentItem): string[] {
   const metadata = item.metadata ?? {};
   const orderedCandidates = [
     item.cover_image,
+    item.image_url,
+    ...extractImageArray(item.image_urls),
+    ...extractImageArray(item.images),
+    ...extractImageArray(item.gallery),
+    ...extractImageArray(item.gallery_images),
     ...extractImageArray(metadata.image_urls),
+    ...extractImageArray(metadata.imageUrls),
     ...extractImageArray(metadata.images),
     ...extractImageArray(metadata.gallery),
     ...extractImageArray(metadata.gallery_images),
+    ...extractImageArray(metadata.galleryImages),
+    ...extractImageArray(metadata.media_urls),
+    ...extractImageArray(metadata.mediaUrls),
+    ...extractImageArray(metadata.media),
     ...extractImageArray(metadata.photos),
+    ...extractImageArray(metadata.photo_urls),
+    ...extractImageArray(metadata.attachments),
     ...extractImageArray(metadata.detail_images),
+    ...extractImageArray(metadata.detailImages),
     ...extractImageArray(metadata.portfolio_images),
+    ...extractImageArray(metadata.portfolioImages),
     ...extractImageArray(metadata.property_images),
+    ...extractImageArray(metadata.propertyImages),
     ...extractImageArray(metadata.listing_images),
+    ...extractImageArray(metadata.listingImages),
     ...extractImageArray(metadata.media_gallery),
+    ...extractImageArray(metadata.mediaGallery),
     asString(metadata.cover_image),
+    asString(metadata.coverImage),
+    asString(metadata.cover_image_url),
+    asString(metadata.coverImageUrl),
     asString(metadata.image),
+    asString(metadata.image_url),
+    asString(metadata.imageUrl),
     asString(metadata.thumbnail),
+    asString(metadata.thumbnail_url),
+    asString(metadata.thumbnailUrl),
+    asString(metadata.media_url),
+    asString(metadata.mediaUrl),
+    asString(metadata.photo),
+    asString(metadata.photo_url),
+    asString(metadata.photoUrl),
     asString(metadata.logo),
+    asString(metadata.logo_url),
+    asString(metadata.logoUrl),
     asString(metadata.avatar),
     asString(metadata.avatar_url),
+    asString(metadata.avatarUrl),
     asString(metadata.banner),
+    asString(metadata.banner_url),
+    asString(metadata.bannerUrl),
   ];
   const seen = new Set<string>();
   const normalizedImages = orderedCandidates
     .map(entry => asString(entry))
     .filter((entry): entry is string => Boolean(entry))
     .map(entry => normalizeContentMediaUrl(entry))
-    .filter(entry => !isPlaceholderLikeImage(entry))
+    .filter(entry => !isPlaceholderLikeContentImage(entry))
     .filter(entry => {
       const key = entry.toLowerCase();
       if (seen.has(key)) return false;
@@ -342,16 +374,26 @@ export function parseImages(item: ContentItem): string[] {
 
   const extraMetaCandidates = [
     asString(metadata.image),
+    asString(metadata.image_url),
+    asString(metadata.imageUrl),
     asString(metadata.thumbnail),
+    asString(metadata.thumbnail_url),
+    asString(metadata.thumbnailUrl),
     asString(metadata.logo),
+    asString(metadata.logo_url),
+    asString(metadata.logoUrl),
     asString(metadata.avatar),
     asString(metadata.avatar_url),
+    asString(metadata.avatarUrl),
     asString(metadata.banner),
+    asString(metadata.banner_url),
+    asString(metadata.bannerUrl),
     asString(metadata.cover_image),
+    asString(metadata.coverImage),
   ]
     .filter((entry): entry is string => Boolean(entry))
     .map(entry => normalizeContentMediaUrl(entry))
-    .filter(entry => !isPlaceholderLikeImage(entry));
+    .filter(entry => !isPlaceholderLikeContentImage(entry));
 
   if (extraMetaCandidates.length > 0) {
     return extraMetaCandidates;
@@ -360,7 +402,7 @@ export function parseImages(item: ContentItem): string[] {
   if (
     item.cover_image &&
     item.cover_image.trim() &&
-    !isPlaceholderLikeImage(item.cover_image)
+    !isPlaceholderLikeContentImage(item.cover_image)
   ) {
     return [normalizeContentMediaUrl(item.cover_image)];
   }
@@ -368,9 +410,8 @@ export function parseImages(item: ContentItem): string[] {
 }
 
 export function defaultImageForContent(item: ContentItem): string {
-  const inferredType = inferContentType(item);
-  const itemId = asString(item.id) || asString(item.slug) || '0';
-  return seededImage(inferredType, itemId);
+  void item;
+  return DEFAULT_CONTENT_IMAGE;
 }
 
 export function resolvePrimaryImage(item: ContentItem): string {
@@ -382,5 +423,5 @@ export function resolvePrimaryImage(item: ContentItem): string {
 export function resolveImageGallery(item: ContentItem): string[] {
   const images = parseImages(item);
   if (images.length > 0) return images;
-  return [defaultImageForContent(item)];
+  return [];
 }

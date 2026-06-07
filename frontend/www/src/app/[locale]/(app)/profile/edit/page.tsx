@@ -18,14 +18,9 @@ import {
   normalizeProfileMediaList,
   normalizeProfileMediaUrl,
 } from '@/lib/profile/profileMedia';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import {
-  ArrowLeft,
-  Globe2,
-  Loader2,
-  Save,
-  Upload,
-} from 'lucide-react';
+import { ArrowLeft, Globe2, Loader2, Save, Upload } from 'lucide-react';
 
 type UserDetail = {
   id: string;
@@ -142,7 +137,6 @@ export default function EditProfilePage() {
   const [phoneOtpResendAt, setPhoneOtpResendAt] = useState(0);
   const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
   const [confirmingPhoneOtp, setConfirmingPhoneOtp] = useState(false);
-  const [devPhoneOtp, setDevPhoneOtp] = useState('');
   const [location, setLocation] = useState('');
   const [bio, setBio] = useState('');
   const [roles, setRoles] = useState('');
@@ -230,7 +224,6 @@ export default function EditProfilePage() {
         setPhoneOtp('');
         setPhoneOtpMessage(null);
         setPhoneOtpError(null);
-        setDevPhoneOtp('');
         setLocation(asString(data.location));
         setBio(asString(data.bio));
         setRoles(joinList(toStringList(meta.roles)));
@@ -368,10 +361,7 @@ export default function EditProfilePage() {
     if (!authLoading) void load();
   }, [authFetch, authLoading, user?.id]);
 
-  const locale = useMemo(
-    () => resolveLocaleFromPathname(pathname),
-    [pathname],
-  );
+  const locale = useMemo(() => resolveLocaleFromPathname(pathname), [pathname]);
 
   const publicProfilePath = useMemo(
     () =>
@@ -431,14 +421,14 @@ export default function EditProfilePage() {
       phoneDigits === verifiedPhoneDigits,
     [phoneDigits, phoneVerified, verifiedPhoneDigits],
   );
-  const phoneNeedsVerification = phoneDigits.length >= 8 && !phoneVerificationReady;
+  const phoneNeedsVerification =
+    phoneDigits.length >= 8 && !phoneVerificationReady;
 
   useEffect(() => {
     if (phoneDigits === verifiedPhoneDigits) return;
     setPhoneOtp('');
     setPhoneOtpMessage(null);
     setPhoneOtpError(null);
-    setDevPhoneOtp('');
   }, [phoneDigits, verifiedPhoneDigits]);
 
   const focusSections = useMemo(
@@ -470,7 +460,11 @@ export default function EditProfilePage() {
     if (typeof window === 'undefined') return;
     const url = new URL(window.location.href);
     url.searchParams.set('focus', focus);
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(
+      {},
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
   };
 
   useEffect(() => {
@@ -491,10 +485,12 @@ export default function EditProfilePage() {
   }, [focusSections, searchParams]);
 
   const activeFocusSection =
-    focusSections.find(section => section.key === activeFocus) || focusSections[0];
+    focusSections.find(section => section.key === activeFocus) ||
+    focusSections[0];
 
-  const inputClass = 'ui-control w-full px-3 text-sm';
-  const textareaClass = 'ui-control w-full px-3 py-2 text-sm';
+  const inputClass = 'ui-control ui-data-control w-full px-3 text-sm';
+  const textareaClass =
+    'ui-control ui-data-control ui-data-textarea w-full px-3 py-2 text-sm';
 
   const isFocusVisible = (
     focus: 'identity' | 'talent' | 'seller' | 'buyer' | 'media',
@@ -538,7 +534,6 @@ export default function EditProfilePage() {
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
-        devOtp?: string;
         error?: string;
       };
       if (!res.ok) {
@@ -547,7 +542,6 @@ export default function EditProfilePage() {
 
       setPhoneOtp('');
       setPhoneOtpResendAt(Date.now() + 30_000);
-      setDevPhoneOtp(typeof data.devOtp === 'string' ? data.devOtp : '');
       setPhoneOtpMessage(
         'OTP telepon sudah dikirim. Masukkan 6 digit kode untuk verifikasi.',
       );
@@ -617,7 +611,6 @@ export default function EditProfilePage() {
       setVerifiedPhoneDigits(phoneDigits);
       setPhoneVerified(true);
       setPhoneOtp('');
-      setDevPhoneOtp('');
       setPhoneOtpMessage('Nomor telepon berhasil diverifikasi.');
       await refreshUser();
     } catch (err) {
@@ -1181,7 +1174,10 @@ export default function EditProfilePage() {
         </section>
 
         <div className="grid gap-4">
-          <section id="profile-edit-identity" className={sectionCardClass('identity')}>
+          <section
+            id="profile-edit-identity"
+            className={sectionCardClass('identity')}
+          >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Informasi Dasar
             </h2>
@@ -1241,7 +1237,8 @@ export default function EditProfilePage() {
                     Verifikasi nomor telepon
                   </p>
                   <p className="text-xs text-[color:var(--app-text-soft)]">
-                    Dipakai untuk membuka transaksi dan memperjelas identitas akun.
+                    Dipakai untuk membuka transaksi dan memperjelas identitas
+                    akun.
                   </p>
                 </div>
                 <span
@@ -1271,7 +1268,9 @@ export default function EditProfilePage() {
                       placeholder="OTP 6 digit"
                       value={phoneOtp}
                       onChange={e =>
-                        setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        setPhoneOtp(
+                          e.target.value.replace(/\D/g, '').slice(0, 6),
+                        )
                       }
                     />
                     <button
@@ -1313,11 +1312,6 @@ export default function EditProfilePage() {
                   {phoneOtpError ? (
                     <p className="text-xs ui-warning-text">{phoneOtpError}</p>
                   ) : null}
-                  {devPhoneOtp ? (
-                    <p className="text-xs text-[color:var(--app-text-soft)]">
-                      Dev OTP: <span className="font-mono font-semibold">{devPhoneOtp}</span>
-                    </p>
-                  ) : null}
                 </div>
               ) : phoneVerificationReady ? (
                 <p className="mt-3 text-xs text-[color:var(--app-success)]">
@@ -1337,7 +1331,10 @@ export default function EditProfilePage() {
             />
           </section>
 
-          <section id="profile-edit-talent" className={sectionCardClass('talent')}>
+          <section
+            id="profile-edit-talent"
+            className={sectionCardClass('talent')}
+          >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Talent / Freelancer
             </h2>
@@ -1676,7 +1673,10 @@ export default function EditProfilePage() {
             )}
           </section>
 
-          <section id="profile-edit-seller" className={sectionCardClass('seller')}>
+          <section
+            id="profile-edit-seller"
+            className={sectionCardClass('seller')}
+          >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Provider / Seller
             </h2>
@@ -1730,7 +1730,10 @@ export default function EditProfilePage() {
             />
           </section>
 
-          <section id="profile-edit-buyer" className={sectionCardClass('buyer')}>
+          <section
+            id="profile-edit-buyer"
+            className={sectionCardClass('buyer')}
+          >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Buyer Preferences
             </h2>
@@ -1777,7 +1780,10 @@ export default function EditProfilePage() {
             </div>
           </section>
 
-          <section id="profile-edit-media" className={sectionCardClass('media')}>
+          <section
+            id="profile-edit-media"
+            className={sectionCardClass('media')}
+          >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Media Upload
             </h2>
@@ -1792,18 +1798,12 @@ export default function EditProfilePage() {
                 </label>
                 <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                   <div className="h-16 w-16 overflow-hidden rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]">
-                    {avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={avatarUrl}
-                        alt="Avatar preview"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-[color:var(--app-text-soft)]">
-                        No foto
-                      </div>
-                    )}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={profileAvatarSrc(avatarUrl)}
+                      alt="Avatar preview"
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="ui-button-secondary ui-button-compact inline-flex w-full cursor-pointer items-center justify-center gap-2 text-xs font-semibold sm:w-auto">

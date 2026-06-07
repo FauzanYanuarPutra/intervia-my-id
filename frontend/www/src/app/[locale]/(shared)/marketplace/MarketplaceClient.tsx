@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductCard } from '@/components/ui-kit';
-import { Header } from '@/components/layout/Header';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   ChevronLeft,
@@ -22,6 +27,10 @@ import {
   formatIDRFromCents,
   matchAnyFilter,
 } from '@/lib/content/catalog';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 
 type ProductItem = {
   id: string;
@@ -51,10 +60,16 @@ type Filters = {
 
 const PAGE_SIZE = 16;
 
-function mapContentToProduct(item: ContentItem): ProductItem {
+function mapContentToProduct(
+  item: ContentItem,
+  locale: 'id' | 'en',
+): ProductItem {
   const meta = item.metadata || {};
   const id = String(item.id);
   const slug = item.slug || id;
+  const price = formatIDRFromCents(item.price_cents);
+  const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const fallbackPriceLabel = asString(meta.price_label);
 
   return {
     id,
@@ -62,16 +77,24 @@ function mapContentToProduct(item: ContentItem): ProductItem {
     image: item.cover_image || asString(meta.image) || asString(meta.thumbnail),
     title: item.title || item.summary || 'Untitled Product',
     price:
-      formatIDRFromCents(item.price_cents) !== '-'
-        ? formatIDRFromCents(item.price_cents)
-        : asString(meta.price_label) || 'Negotiable',
+      price !== '-'
+        ? formatPriceWithUnit(price, priceUnitLabel)
+        : fallbackPriceLabel
+          ? formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
+          : 'Negotiable',
     priceValue: Number.isFinite(item.price_cents as number)
       ? Math.max(0, Math.floor((item.price_cents as number) / 100))
       : 0,
     location:
-      asString(meta.location) || asString(meta.city) || asString(meta.region) || 'Indonesia',
+      asString(meta.location) ||
+      asString(meta.city) ||
+      asString(meta.region) ||
+      'Indonesia',
     category:
-      asString(item.category) || asString(meta.category) || asString(item.content_type) || 'General',
+      asString(item.category) ||
+      asString(meta.category) ||
+      asString(item.content_type) ||
+      'General',
     brand: asString(meta.brand) || 'Unknown',
     condition: asString(meta.condition) || 'n/a',
     inStock:
@@ -83,7 +106,8 @@ function mapContentToProduct(item: ContentItem): ProductItem {
 }
 
 function isMarketplaceType(item: ContentItem): boolean {
-  const typeText = `${item.content_type || ''} ${item.category || ''}`.toLowerCase();
+  const typeText =
+    `${item.content_type || ''} ${item.category || ''}`.toLowerCase();
   return (
     typeText.includes('product') ||
     typeText.includes('market') ||
@@ -139,6 +163,7 @@ function matchesFilters(item: ProductItem, filters: Filters): boolean {
 export default function MarketplaceClient() {
   const router = useRouter();
   const pathname = usePathname();
+  const locale = pathname.startsWith('/en') ? 'en' : 'id';
   const searchParams = useSearchParams();
   const autoLoadTargetRef = useRef<HTMLDivElement>(null);
   const autoLoadLockRef = useRef(false);
@@ -177,15 +202,20 @@ export default function MarketplaceClient() {
     const params = new URLSearchParams(searchParams.toString());
     if (filters.search.trim()) params.set('q', filters.search.trim());
     else params.delete('q');
-    if (filters.category.trim()) params.set('category', filters.category.trim());
+    if (filters.category.trim())
+      params.set('category', filters.category.trim());
     else params.delete('category');
-    if (filters.location.trim()) params.set('location', filters.location.trim());
+    if (filters.location.trim())
+      params.set('location', filters.location.trim());
     else params.delete('location');
-    if (filters.minPrice.trim()) params.set('min_price', filters.minPrice.trim());
+    if (filters.minPrice.trim())
+      params.set('min_price', filters.minPrice.trim());
     else params.delete('min_price');
-    if (filters.maxPrice.trim()) params.set('max_price', filters.maxPrice.trim());
+    if (filters.maxPrice.trim())
+      params.set('max_price', filters.maxPrice.trim());
     else params.delete('max_price');
-    if (filters.condition.trim()) params.set('condition', filters.condition.trim());
+    if (filters.condition.trim())
+      params.set('condition', filters.condition.trim());
     else params.delete('condition');
     if (filters.inStockOnly) params.set('in_stock', '1');
     else params.delete('in_stock');
@@ -195,13 +225,19 @@ export default function MarketplaceClient() {
     const next = params.toString();
     const current = searchParams.toString();
     if (next !== current) {
-      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+      router.replace(next ? `${pathname}?${next}` : pathname, {
+        scroll: false,
+      });
     }
   }, [filters, pathname, router, searchParams]);
 
   const loadData = useCallback(
     async (reset: boolean) => {
-      if (!reset && (!hasMore || loadingInitial || loadingMore || autoLoadLockRef.current)) return;
+      if (
+        !reset &&
+        (!hasMore || loadingInitial || loadingMore || autoLoadLockRef.current)
+      )
+        return;
 
       const currentPage = reset ? 1 : page;
       const offset = (currentPage - 1) * PAGE_SIZE;
@@ -220,8 +256,10 @@ export default function MarketplaceClient() {
         params.set('limit', String(PAGE_SIZE));
         params.set('offset', String(offset));
         if (filters.search.trim()) params.set('q', filters.search.trim());
-        if (filters.category.trim()) params.set('category', filters.category.trim());
-        if (filters.location.trim()) params.set('location', filters.location.trim());
+        if (filters.category.trim())
+          params.set('category', filters.category.trim());
+        if (filters.location.trim())
+          params.set('location', filters.location.trim());
 
         const response = await fetch(`/api/content?${params.toString()}`, {
           cache: 'no-store',
@@ -236,13 +274,13 @@ export default function MarketplaceClient() {
         }
 
         const serverItems = extractContentItems(payload);
-        const contentItems = serverItems.filter((entry) => {
+        const contentItems = serverItems.filter(entry => {
           if (!isMarketplaceType(entry)) return false;
           return matchAnyFilter(entry, filters.search);
         });
         let mapped = contentItems
-          .map(mapContentToProduct)
-          .filter((entry) => matchesFilters(entry, filters));
+          .map(item => mapContentToProduct(item, locale))
+          .filter(entry => matchesFilters(entry, filters));
 
         if (filters.sortBy === 'price_low') {
           mapped = [...mapped].sort((a, b) => a.priceValue - b.priceValue);
@@ -250,7 +288,7 @@ export default function MarketplaceClient() {
           mapped = [...mapped].sort((a, b) => b.priceValue - a.priceValue);
         }
 
-        setItems((prev) => (reset ? mapped : [...prev, ...mapped]));
+        setItems(prev => (reset ? mapped : [...prev, ...mapped]));
         setHasMore(serverItems.length === PAGE_SIZE);
         setPage(reset ? 2 : currentPage + 1);
       } catch (error) {
@@ -266,7 +304,7 @@ export default function MarketplaceClient() {
         setLoadingMore(false);
       }
     },
-    [filters, hasMore, loadingInitial, loadingMore, page],
+    [filters, hasMore, loadingInitial, loadingMore, locale, page],
   );
 
   useEffect(() => {
@@ -285,7 +323,7 @@ export default function MarketplaceClient() {
       sortBy: nextDraft.sortBy,
     };
 
-    setFilters((prev) =>
+    setFilters(prev =>
       prev.search === next.search &&
       prev.category === next.category &&
       prev.location === next.location &&
@@ -311,8 +349,13 @@ export default function MarketplaceClient() {
     if (!target) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !loadingInitial && !loadingMore) {
+      entries => {
+        if (
+          entries[0]?.isIntersecting &&
+          hasMore &&
+          !loadingInitial &&
+          !loadingMore
+        ) {
           loadData(false);
         }
       },
@@ -340,27 +383,29 @@ export default function MarketplaceClient() {
 
   const hasActiveFilters = Boolean(
     filters.search.trim() ||
-      filters.category.trim() ||
-      filters.location.trim() ||
-      filters.minPrice.trim() ||
-      filters.maxPrice.trim() ||
-      filters.condition.trim() ||
-      filters.inStockOnly ||
-      filters.sortBy !== 'latest',
+    filters.category.trim() ||
+    filters.location.trim() ||
+    filters.minPrice.trim() ||
+    filters.maxPrice.trim() ||
+    filters.condition.trim() ||
+    filters.inStockOnly ||
+    filters.sortBy !== 'latest',
   );
 
   const categoryOptions = useMemo(
     () =>
-      [...new Set(items.map((item) => item.category.trim()).filter(Boolean))]
+      [...new Set(items.map(item => item.category.trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b))
         .slice(0, 20),
     [items],
   );
 
   const avgPrice = useMemo(() => {
-    const priced = items.filter((item) => item.priceValue > 0);
+    const priced = items.filter(item => item.priceValue > 0);
     if (priced.length === 0) return '-';
-    const avg = Math.round(priced.reduce((sum, item) => sum + item.priceValue, 0) / priced.length);
+    const avg = Math.round(
+      priced.reduce((sum, item) => sum + item.priceValue, 0) / priced.length,
+    );
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
@@ -370,9 +415,6 @@ export default function MarketplaceClient() {
 
   return (
     <div className="lajukan-market-page lajukan-market-marketplace min-h-screen bg-[color:var(--app-surface-muted)] pb-6 dark:bg-[color:var(--app-surface-strong)] lg:pb-0">
-      <div className="hidden lg:block">
-        <Header />
-      </div>
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
         <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
           <div className="flex flex-col gap-2 md:flex-row">
@@ -394,10 +436,15 @@ export default function MarketplaceClient() {
                   placeholder="Search products and services"
                   className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={draftFilters.search}
-                  onChange={(event) =>
-                    setDraftFilters((prev) => ({ ...prev, search: event.target.value }))
+                  onChange={event =>
+                    setDraftFilters(prev => ({
+                      ...prev,
+                      search: event.target.value,
+                    }))
                   }
-                  onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                  onKeyDown={event =>
+                    event.key === 'Enter' && commitFilters(draftFilters)
+                  }
                 />
               </div>
             </div>
@@ -405,13 +452,16 @@ export default function MarketplaceClient() {
             <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] md:max-w-xl md:grid md:grid-cols-2 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden">
               <select
                 value={draftFilters.category}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, category: event.target.value }))
+                onChange={event =>
+                  setDraftFilters(prev => ({
+                    ...prev,
+                    category: event.target.value,
+                  }))
                 }
                 className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               >
                 <option value="">All categories</option>
-                {categoryOptions.map((category) => (
+                {categoryOptions.map(category => (
                   <option key={category} value={category}>
                     {category}
                   </option>
@@ -421,10 +471,15 @@ export default function MarketplaceClient() {
                 type="text"
                 placeholder="Location filter"
                 value={draftFilters.location}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, location: event.target.value }))
+                onChange={event =>
+                  setDraftFilters(prev => ({
+                    ...prev,
+                    location: event.target.value,
+                  }))
                 }
-                onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                onKeyDown={event =>
+                  event.key === 'Enter' && commitFilters(draftFilters)
+                }
                 className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
             </div>
@@ -436,8 +491,11 @@ export default function MarketplaceClient() {
               min={0}
               placeholder="Min price"
               value={draftFilters.minPrice}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({ ...prev, minPrice: event.target.value }))
+              onChange={event =>
+                setDraftFilters(prev => ({
+                  ...prev,
+                  minPrice: event.target.value,
+                }))
               }
               className="min-w-[132px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             />
@@ -446,15 +504,21 @@ export default function MarketplaceClient() {
               min={0}
               placeholder="Max price"
               value={draftFilters.maxPrice}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({ ...prev, maxPrice: event.target.value }))
+              onChange={event =>
+                setDraftFilters(prev => ({
+                  ...prev,
+                  maxPrice: event.target.value,
+                }))
               }
               className="min-w-[132px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             />
             <select
               value={draftFilters.condition}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({ ...prev, condition: event.target.value }))
+              onChange={event =>
+                setDraftFilters(prev => ({
+                  ...prev,
+                  condition: event.target.value,
+                }))
               }
               className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             >
@@ -467,8 +531,8 @@ export default function MarketplaceClient() {
             </select>
             <select
               value={draftFilters.sortBy}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({
+              onChange={event =>
+                setDraftFilters(prev => ({
                   ...prev,
                   sortBy: event.target.value as Filters['sortBy'],
                 }))
@@ -483,8 +547,8 @@ export default function MarketplaceClient() {
               <input
                 type="checkbox"
                 checked={draftFilters.inStockOnly}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({
+                onChange={event =>
+                  setDraftFilters(prev => ({
                     ...prev,
                     inStockOnly: event.target.checked,
                   }))
@@ -500,7 +564,9 @@ export default function MarketplaceClient() {
               <Filter className="h-3 w-3" /> Filters:
             </span>
             {!hasActiveFilters ? (
-              <span className="text-xs italic text-[color:var(--app-text-soft)]">None</span>
+              <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                None
+              </span>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 {filters.search ? (
@@ -548,7 +614,9 @@ export default function MarketplaceClient() {
             )}
           </div>
 
-          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">Auto-apply filter aktif</p>
+          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">
+            Auto-apply filter aktif
+          </p>
         </div>
       </header>
 
@@ -557,18 +625,28 @@ export default function MarketplaceClient() {
       <main className="mx-auto max-w-[1500px] px-2 pb-5 sm:px-3">
         <section className="mb-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="font-semibold text-[color:var(--app-text)]">Loaded Items</p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{items.length}</p>
+            <p className="font-semibold text-[color:var(--app-text)]">
+              Loaded Items
+            </p>
+            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {items.length}
+            </p>
           </div>
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="font-semibold text-[color:var(--app-text)]">Avg Price</p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{avgPrice}</p>
+            <p className="font-semibold text-[color:var(--app-text)]">
+              Avg Price
+            </p>
+            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {avgPrice}
+            </p>
           </div>
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="font-semibold text-[color:var(--app-text)]">In-stock Ratio</p>
+            <p className="font-semibold text-[color:var(--app-text)]">
+              In-stock Ratio
+            </p>
             <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length > 0
-                ? `${Math.round((items.filter((item) => item.inStock).length / items.length) * 100)}%`
+                ? `${Math.round((items.filter(item => item.inStock).length / items.length) * 100)}%`
                 : '-'}
             </p>
           </div>
@@ -622,7 +700,10 @@ export default function MarketplaceClient() {
                     layout
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: (index % PAGE_SIZE) * 0.02 }}
+                    transition={{
+                      duration: 0.25,
+                      delay: (index % PAGE_SIZE) * 0.02,
+                    }}
                   >
                     <div className="space-y-2">
                       <ProductCard {...item} />
@@ -659,16 +740,22 @@ export default function MarketplaceClient() {
                   Memuat data berikutnya...
                 </div>
               ) : hasMore ? (
-                <span className="text-xs italic text-[color:var(--app-text-soft)]">Scroll untuk muat otomatis</span>
+                <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                  Scroll untuk muat otomatis
+                </span>
               ) : (
-                <span className="text-xs italic text-[color:var(--app-text-soft)]">All catalog items loaded</span>
+                <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                  All catalog items loaded
+                </span>
               )}
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center py-8 text-center">
             <ShoppingBag className="mb-3 h-12 w-12 text-[color:var(--app-text-soft)]" />
-            <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">No marketplace items found</h2>
+            <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">
+              No marketplace items found
+            </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text)]">
               Try different keywords or category filters.
             </p>

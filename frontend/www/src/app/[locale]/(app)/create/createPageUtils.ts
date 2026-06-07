@@ -33,6 +33,7 @@ export interface ContentItem {
   summary?: string | null;
   body?: string | null;
   price_cents?: number | null;
+  price_unit?: string | null;
   tags?: string[] | null;
   cover_image?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -56,12 +57,7 @@ export const DOC_ACCEPT =
   '.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip';
 export const DOC_MAX_FILES = 8;
 export const DOC_MAX_BYTES = 20 * 1024 * 1024;
-export const DEFAULT_STEP_LABELS_ID = [
-  'Info dasar',
-  'Detail',
-  'Foto',
-  'Promo',
-];
+export const DEFAULT_STEP_LABELS_ID = ['Info dasar', 'Detail', 'Foto', 'Promo'];
 export const DEFAULT_STEP_LABELS_EN = [
   'Basic info',
   'Details',
@@ -192,7 +188,9 @@ export function formatListingIssueForUi(issue: string, locale: string): string {
       ? 'Isi harga oper usaha dulu. Boleh tulis nego di detail.'
       : 'Add the business transfer asking price first. You can mention negotiation in the details.';
   }
-  if (normalized === 'business_transfer listing cannot use request pricing_mode') {
+  if (
+    normalized === 'business_transfer listing cannot use request pricing_mode'
+  ) {
     return isId
       ? 'Oper usaha perlu harga acuan, bukan mode minta harga.'
       : 'Business transfers need a reference asking price, not request pricing.';

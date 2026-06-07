@@ -35,13 +35,13 @@ const DEFAULT_STEPS: Step[] = [
     id: 'first-action',
     title: 'Post or request',
     desc: 'Create a listing or request to start matching.',
-    href: '/marketplace',
+    href: '/search?type=product&q=supplier',
   },
   {
     id: 'trust',
     title: 'Build trust score',
     desc: 'Complete your first transaction and get rated.',
-    href: '/collaboration',
+    href: '/transactions',
   },
 ];
 

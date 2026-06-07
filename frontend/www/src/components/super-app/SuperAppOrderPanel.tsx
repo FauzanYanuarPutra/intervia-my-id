@@ -2967,7 +2967,7 @@ export function SuperAppOrderPanel({
               <DriverIdentityCard
                 name={driverLabel}
                 subtitle={isId ? 'Driver terverifikasi dengan tracking aktif' : 'Verified driver with live tracking'}
-                ratingLabel="4.8"
+                ratingLabel={isId ? 'Belum ada rating' : 'No ratings yet'}
                 etaLabel={`ETA ${etaMinutes ?? '--'} ${isId ? 'mnt' : 'min'}`}
                 vehicleLabel={isId ? 'Kendaraan sesuai opsi yang kamu pilih' : 'Vehicle aligned with your selected option'}
                 tone="accent"

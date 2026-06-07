@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { JobCard } from '@/components/ui-kit';
-import { Header } from '@/components/layout/Header';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   ChevronLeft,
@@ -21,6 +26,10 @@ import {
   formatIDRFromCents,
   matchAnyFilter,
 } from '@/lib/content/catalog';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 
 type JobCardItem = {
   id: string;
@@ -43,10 +52,13 @@ type Filters = {
 
 const PAGE_SIZE = 12;
 
-function mapContentToJob(item: ContentItem): JobCardItem {
+function mapContentToJob(item: ContentItem, locale: 'id' | 'en'): JobCardItem {
   const meta = item.metadata || {};
   const id = String(item.id);
   const slug = item.slug || id;
+  const salary = formatIDRFromCents(item.price_cents);
+  const salaryUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const fallbackSalaryLabel = asString(meta.salary_range);
 
   return {
     id,
@@ -60,22 +72,34 @@ function mapContentToJob(item: ContentItem): JobCardItem {
     logo: item.cover_image || asString(meta.logo),
     href: `/jobs/${slug}`,
     location:
-      asString(meta.location) || asString(meta.city) || asString(meta.region) || 'Remote',
+      asString(meta.location) ||
+      asString(meta.city) ||
+      asString(meta.region) ||
+      'Remote',
     type:
-      asString(meta.job_type) || asString(meta.employment_type) || asString(item.category) || 'Job',
+      asString(meta.job_type) ||
+      asString(meta.employment_type) ||
+      asString(item.category) ||
+      'Job',
     salary:
-      formatIDRFromCents(item.price_cents) !== '-'
-        ? formatIDRFromCents(item.price_cents)
-        : asString(meta.salary_range) || 'Negotiable',
+      salary !== '-'
+        ? formatPriceWithUnit(salary, salaryUnitLabel)
+        : fallbackSalaryLabel
+          ? formatPriceWithUnit(fallbackSalaryLabel, salaryUnitLabel)
+          : 'Negotiable',
     level:
-      asString(meta.level) || asString(meta.seniority) || asString(meta.experience_level) || 'Any',
+      asString(meta.level) ||
+      asString(meta.seniority) ||
+      asString(meta.experience_level) ||
+      'Any',
   };
 }
 
 function matchesFilters(item: JobCardItem, filters: Filters): boolean {
   const q = filters.search.trim().toLowerCase();
   if (q) {
-    const haystack = `${item.title} ${item.company} ${item.location} ${item.type} ${item.level}`.toLowerCase();
+    const haystack =
+      `${item.title} ${item.company} ${item.location} ${item.type} ${item.level}`.toLowerCase();
     if (!haystack.includes(q)) return false;
   }
 
@@ -87,7 +111,9 @@ function matchesFilters(item: JobCardItem, filters: Filters): boolean {
   }
 
   if (filters.level.trim()) {
-    const levelMatch = item.level.toLowerCase().includes(filters.level.trim().toLowerCase());
+    const levelMatch = item.level
+      .toLowerCase()
+      .includes(filters.level.trim().toLowerCase());
     if (!levelMatch) return false;
   }
 
@@ -100,6 +126,7 @@ export default function JobsClient() {
   const searchParams = useSearchParams();
   const autoLoadTargetRef = useRef<HTMLDivElement>(null);
   const autoLoadLockRef = useRef(false);
+  const locale = pathname.startsWith('/en') ? 'en' : 'id';
   const fallbackHomePath = pathname.startsWith('/en') ? '/en/home' : '/id/home';
 
   const initialFilters = useMemo<Filters>(
@@ -127,7 +154,8 @@ export default function JobsClient() {
     const params = new URLSearchParams(searchParams.toString());
     if (filters.search.trim()) params.set('q', filters.search.trim());
     else params.delete('q');
-    if (filters.location.trim()) params.set('location', filters.location.trim());
+    if (filters.location.trim())
+      params.set('location', filters.location.trim());
     else params.delete('location');
     if (filters.level.trim()) params.set('level', filters.level.trim());
     else params.delete('level');
@@ -143,7 +171,11 @@ export default function JobsClient() {
 
   const loadJobs = useCallback(
     async (reset: boolean) => {
-      if (!reset && (!hasMore || loadingInitial || loadingMore || autoLoadLockRef.current)) return;
+      if (
+        !reset &&
+        (!hasMore || loadingInitial || loadingMore || autoLoadLockRef.current)
+      )
+        return;
 
       const currentPage = reset ? 1 : page;
       const offset = (currentPage - 1) * PAGE_SIZE;
@@ -162,7 +194,8 @@ export default function JobsClient() {
         params.set('limit', String(PAGE_SIZE));
         params.set('offset', String(offset));
         if (filters.search.trim()) params.set('q', filters.search.trim());
-        if (filters.location.trim()) params.set('location', filters.location.trim());
+        if (filters.location.trim())
+          params.set('location', filters.location.trim());
         if (filters.level.trim()) params.set('level', filters.level.trim());
 
         const response = await fetch(`/api/content?${params.toString()}`, {
@@ -178,19 +211,28 @@ export default function JobsClient() {
         }
 
         const serverItems = extractContentItems(payload);
-        const rawItems = serverItems.filter((entry) => {
+        const rawItems = serverItems.filter(entry => {
           if (!matchAnyFilter(entry, filters.search)) return false;
-          const typeText = `${entry.content_type || ''} ${entry.category || ''}`.toLowerCase();
-          return typeText.includes('job') || typeText.includes('career') || typeText.includes('loker');
+          const typeText =
+            `${entry.content_type || ''} ${entry.category || ''}`.toLowerCase();
+          return (
+            typeText.includes('job') ||
+            typeText.includes('career') ||
+            typeText.includes('loker')
+          );
         });
-        const mapped = rawItems.map(mapContentToJob).filter((entry) => matchesFilters(entry, filters));
+        const mapped = rawItems
+          .map(item => mapContentToJob(item, locale))
+          .filter(entry => matchesFilters(entry, filters));
 
-        setItems((prev) => (reset ? mapped : [...prev, ...mapped]));
+        setItems(prev => (reset ? mapped : [...prev, ...mapped]));
         setHasMore(serverItems.length === PAGE_SIZE);
         setPage(reset ? 2 : currentPage + 1);
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'Failed to load job listings';
+          error instanceof Error
+            ? error.message
+            : 'Failed to load job listings';
         setLoadError(message);
         if (reset) setItems([]);
       } finally {
@@ -199,7 +241,7 @@ export default function JobsClient() {
         setLoadingMore(false);
       }
     },
-    [filters, hasMore, loadingInitial, loadingMore, page],
+    [filters, hasMore, loadingInitial, loadingMore, locale, page],
   );
 
   useEffect(() => {
@@ -212,7 +254,7 @@ export default function JobsClient() {
       location: nextDraft.location.trim(),
       level: nextDraft.level.trim(),
     };
-    setFilters((prev) =>
+    setFilters(prev =>
       prev.search === next.search &&
       prev.location === next.location &&
       prev.level === next.level
@@ -233,8 +275,13 @@ export default function JobsClient() {
     if (!target) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !loadingInitial && !loadingMore) {
+      entries => {
+        if (
+          entries[0]?.isIntersecting &&
+          hasMore &&
+          !loadingInitial &&
+          !loadingMore
+        ) {
           loadJobs(false);
         }
       },
@@ -257,9 +304,6 @@ export default function JobsClient() {
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <div className="hidden lg:block">
-        <Header />
-      </div>
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
         <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
           <div className="flex flex-col gap-2 md:flex-row">
@@ -281,10 +325,15 @@ export default function JobsClient() {
                   placeholder="Search jobs, company, or keyword"
                   className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={draftFilters.search}
-                  onChange={(event) =>
-                    setDraftFilters((prev) => ({ ...prev, search: event.target.value }))
+                  onChange={event =>
+                    setDraftFilters(prev => ({
+                      ...prev,
+                      search: event.target.value,
+                    }))
                   }
-                  onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                  onKeyDown={event =>
+                    event.key === 'Enter' && commitFilters(draftFilters)
+                  }
                 />
               </div>
             </div>
@@ -294,20 +343,30 @@ export default function JobsClient() {
                 type="text"
                 placeholder="Location filter"
                 value={draftFilters.location}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, location: event.target.value }))
+                onChange={event =>
+                  setDraftFilters(prev => ({
+                    ...prev,
+                    location: event.target.value,
+                  }))
                 }
-                onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                onKeyDown={event =>
+                  event.key === 'Enter' && commitFilters(draftFilters)
+                }
                 className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
               <input
                 type="text"
                 placeholder="Level filter (senior, mid, junior)"
                 value={draftFilters.level}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, level: event.target.value }))
+                onChange={event =>
+                  setDraftFilters(prev => ({
+                    ...prev,
+                    level: event.target.value,
+                  }))
                 }
-                onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                onKeyDown={event =>
+                  event.key === 'Enter' && commitFilters(draftFilters)
+                }
                 className="min-w-[180px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
             </div>
@@ -319,7 +378,9 @@ export default function JobsClient() {
             </span>
 
             {!hasActiveFilters ? (
-              <span className="text-xs italic text-[color:var(--app-text-soft)]">None</span>
+              <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                None
+              </span>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 {filters.search && (
@@ -347,7 +408,9 @@ export default function JobsClient() {
             )}
           </div>
 
-          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">Auto-apply filter aktif</p>
+          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">
+            Auto-apply filter aktif
+          </p>
         </div>
       </header>
 
@@ -388,7 +451,10 @@ export default function JobsClient() {
                     layout
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: (index % PAGE_SIZE) * 0.03 }}
+                    transition={{
+                      duration: 0.25,
+                      delay: (index % PAGE_SIZE) * 0.03,
+                    }}
                   >
                     <JobCard {...job} />
                   </motion.div>
@@ -406,15 +472,21 @@ export default function JobsClient() {
                   Memuat data berikutnya...
                 </div>
               ) : hasMore ? (
-                <span className="text-xs italic text-[color:var(--app-text-soft)]">Scroll untuk muat otomatis</span>
+                <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                  Scroll untuk muat otomatis
+                </span>
               ) : (
-                <span className="text-xs italic text-[color:var(--app-text-soft)]">All job listings loaded</span>
+                <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                  All job listings loaded
+                </span>
               )}
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center py-8 text-center">
-            <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">No jobs found</h2>
+            <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">
+              No jobs found
+            </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text)]">
               Try adjusting your filters or search keyword.
             </p>

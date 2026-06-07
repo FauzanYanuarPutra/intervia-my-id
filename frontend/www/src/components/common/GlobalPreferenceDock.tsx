@@ -33,7 +33,7 @@ export function GlobalPreferenceDock() {
   };
 
   return (
-    <div className="ui-layer-sticky pointer-events-none fixed right-3 flex flex-col items-end gap-2 bottom-[calc(env(safe-area-inset-bottom)+5.8rem)] md:bottom-5 md:right-5">
+    <div className="ui-layer-sticky pointer-events-none fixed right-3 flex flex-col items-end gap-2 bottom-[calc(env(safe-area-inset-bottom)+5.8rem)] md:bottom-[calc(env(safe-area-inset-bottom)+5.8rem)] md:right-5 lg:bottom-5">
       <div
         className={cn(
           'flex origin-bottom-right items-center gap-1.5 rounded-full border border-[color:var(--app-border)]',

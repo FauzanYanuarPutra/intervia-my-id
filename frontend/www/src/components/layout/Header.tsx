@@ -13,16 +13,19 @@ import {
   Heart,
   Home,
   LayoutGrid,
+  Languages,
   LogOut,
   MapPinned,
   Menu,
   MessageCircle,
+  Moon,
   Package,
   Plus,
   Search as SearchIcon,
   Settings,
   ShoppingBag,
   Store,
+  Sun,
   UserRound,
   Users,
   Wallet,
@@ -37,8 +40,10 @@ import {
   localizeHref,
 } from '@/components/navigation/LocalizedAnchor';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { LanguageSwitcherButton } from '@/components/modal/LanguageModal/LanguageSwitcherButton';
+import { useLanguageModal } from '@/components/modal/LanguageModal/LanguageModalContext';
 import { useChatInbox } from '@/context/ChatInboxContext';
 import LajuloLogo from '@/components/logo/LajuloLogo';
 import { HeaderInboxDropdown } from '@/components/layout/HeaderInboxDropdown';
@@ -48,6 +53,7 @@ import {
   resolveActivePrimaryNavKey,
 } from '@/components/system/navigation/PrimaryNav';
 import { resolveLocaleFromPathname } from '@/lib/locale';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import {
   UMKM_DISCOVERY_PATH,
   LEGACY_UMKM_OWNER_PATH,
@@ -62,8 +68,11 @@ function normalizePathname(pathname: string): string {
 }
 
 function matchesRoute(pathname: string, matcher: string) {
-  if (matcher === '/') return pathname === '/';
-  return pathname === matcher || pathname.startsWith(`${matcher}/`);
+  const exact = matcher.endsWith('$');
+  const route = exact ? matcher.slice(0, -1) || '/' : matcher;
+  if (route === '/') return pathname === '/';
+  if (exact) return pathname === route;
+  return pathname === route || pathname.startsWith(`${route}/`);
 }
 
 function hrefPath(href: string): string {
@@ -83,6 +92,8 @@ export function Header() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, logout, isAuthenticated } = useAuth();
+  const { isDark, isReady, setColorScheme } = useTheme();
+  const { open: openLanguageModal, currentLocale } = useLanguageModal();
   const { totalUnread } = useChatInbox();
   const activeSearchQuery = searchParams.get('q') || '';
 
@@ -138,6 +149,10 @@ export function Header() {
     business: locale === 'id' ? 'Belanja & Usaha' : 'Shopping and Business',
     professional: locale === 'id' ? 'Profesional' : 'Professional',
     createSection: locale === 'id' ? 'Buat' : 'Create',
+    preferences: locale === 'id' ? 'Tampilan' : 'Display',
+    language: locale === 'id' ? 'Bahasa' : 'Language',
+    dark: locale === 'id' ? 'Gelap' : 'Dark',
+    light: locale === 'id' ? 'Terang' : 'Light',
   } as const;
 
   const coreDrawerItems = useMemo(
@@ -162,104 +177,104 @@ export function Header() {
 
     return isAuthenticated
       ? [
-          {
-            href: accountHref,
-            label: localeKey === 'id' ? 'Akun' : 'Account',
-            caption:
-              localeKey === 'id'
-                ? 'Identitas, rating, aktivitas'
-                : 'Identity, rating, activity',
-            icon: UserRound,
-            matchers: ['/profile'],
-          },
-          {
-            href: '/my-listings',
-            label: localeKey === 'id' ? 'Postingan' : 'Posts',
-            caption:
-              localeKey === 'id'
-                ? 'Listing aktif dan draft'
-                : 'Active listings and drafts',
-            icon: ShoppingBag,
-            matchers: ['/my-listings'],
-          },
-          {
-            href: '/my-listings?filter=favorites',
-            label: localeKey === 'id' ? 'Favorit' : 'Favorites',
-            caption:
-              localeKey === 'id' ? 'Simpan referensi' : 'Saved references',
-            icon: Heart,
-            matchers: ['/my-listings'],
-          },
-          {
-            href: '/payments',
-            label: localeKey === 'id' ? 'Saldo' : 'Balance',
-            caption:
-              localeKey === 'id'
-                ? 'Top up dan pembayaran'
-                : 'Top up and payments',
-            icon: Wallet,
-            matchers: ['/payments'],
-          },
-          {
-            href: manageHref,
-            label: drawerSurfaceCopy.owner,
-            caption:
-              localeKey === 'id'
-                ? 'Toko, katalog, order'
-                : 'Store, catalog, orders',
-            icon: MapPinned,
-            matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
-          },
-          {
-            href: '/transactions',
-            label: localeKey === 'id' ? 'Transaksi' : 'Transactions',
-            caption:
-              localeKey === 'id'
-                ? 'Deal, escrow, riwayat'
-                : 'Deals, escrow, history',
-            icon: Store,
-            matchers: ['/transactions'],
-          },
-          {
-            href: '/settings',
-            label: localeKey === 'id' ? 'Pengaturan' : 'Settings',
-            caption:
-              localeKey === 'id'
-                ? 'Bahasa, keamanan, akun'
-                : 'Language, security, account',
-            icon: Settings,
-            matchers: ['/settings'],
-          },
-        ]
+        {
+          href: accountHref,
+          label: localeKey === 'id' ? 'Akun' : 'Account',
+          caption:
+            localeKey === 'id'
+              ? 'Identitas, rating, aktivitas'
+              : 'Identity, rating, activity',
+          icon: UserRound,
+          matchers: ['/profile$', '/profile/edit'],
+        },
+        {
+          href: '/my-listings',
+          label: localeKey === 'id' ? 'Postingan' : 'Posts',
+          caption:
+            localeKey === 'id'
+              ? 'Listing aktif dan draft'
+              : 'Active listings and drafts',
+          icon: ShoppingBag,
+          matchers: ['/my-listings'],
+        },
+        {
+          href: '/my-listings?filter=favorites',
+          label: localeKey === 'id' ? 'Favorit' : 'Favorites',
+          caption:
+            localeKey === 'id' ? 'Simpan referensi' : 'Saved references',
+          icon: Heart,
+          matchers: ['/my-listings'],
+        },
+        {
+          href: '/payments',
+          label: localeKey === 'id' ? 'Saldo' : 'Balance',
+          caption:
+            localeKey === 'id'
+              ? 'Top up dan pembayaran'
+              : 'Top up and payments',
+          icon: Wallet,
+          matchers: ['/payments'],
+        },
+        {
+          href: manageHref,
+          label: drawerSurfaceCopy.owner,
+          caption:
+            localeKey === 'id'
+              ? 'Toko, katalog, order'
+              : 'Store, catalog, orders',
+          icon: MapPinned,
+          matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
+        },
+        {
+          href: '/transactions',
+          label: localeKey === 'id' ? 'Transaksi' : 'Transactions',
+          caption:
+            localeKey === 'id'
+              ? 'Deal, escrow, riwayat'
+              : 'Deals, escrow, history',
+          icon: Store,
+          matchers: ['/transactions'],
+        },
+        {
+          href: '/settings',
+          label: localeKey === 'id' ? 'Pengaturan' : 'Settings',
+          caption:
+            localeKey === 'id'
+              ? 'Bahasa, keamanan, akun'
+              : 'Language, security, account',
+          icon: Settings,
+          matchers: ['/settings'],
+        },
+      ]
       : [
-          {
-            href: '/login',
-            label: localeKey === 'id' ? 'Masuk' : 'Login',
-            caption:
-              localeKey === 'id'
-                ? 'Akses chat dan transaksi'
-                : 'Access chats and transactions',
-            icon: UserRound,
-            matchers: ['/login'],
-          },
-          {
-            href: '/register',
-            label: localeKey === 'id' ? 'Daftar' : 'Register',
-            caption:
-              localeKey === 'id'
-                ? 'Buat akun Lajukan'
-                : 'Create a Lajukan account',
-            icon: Plus,
-            matchers: ['/register'],
-          },
-          {
-            href: '/support',
-            label: localeKey === 'id' ? 'Bantuan' : 'Get help',
-            caption: localeKey === 'id' ? 'Pusat bantuan' : 'Help center',
-            icon: CircleHelp,
-            matchers: ['/support'],
-          },
-        ];
+        {
+          href: '/login',
+          label: localeKey === 'id' ? 'Masuk' : 'Login',
+          caption:
+            localeKey === 'id'
+              ? 'Akses chat dan transaksi'
+              : 'Access chats and transactions',
+          icon: UserRound,
+          matchers: ['/login'],
+        },
+        {
+          href: '/register',
+          label: localeKey === 'id' ? 'Daftar' : 'Register',
+          caption:
+            localeKey === 'id'
+              ? 'Buat akun Lajukan'
+              : 'Create a Lajukan account',
+          icon: Plus,
+          matchers: ['/register'],
+        },
+        {
+          href: '/support',
+          label: localeKey === 'id' ? 'Bantuan' : 'Get help',
+          caption: localeKey === 'id' ? 'Pusat bantuan' : 'Help center',
+          icon: CircleHelp,
+          matchers: ['/support'],
+        },
+      ];
   }, [accountHref, isAuthenticated, localeKey, manageHref]);
 
   const menuGroups = useMemo<
@@ -352,7 +367,7 @@ export function Header() {
                 ? 'Produk dan bahan usaha'
                 : 'Products and supplies',
             icon: ShoppingBag,
-            matchers: ['/search', '/marketplace'],
+            matchers: ['/search'],
           },
           {
             href: '/search?type=service',
@@ -372,17 +387,17 @@ export function Header() {
                 ? 'Usaha lokal sekitar'
                 : 'Nearby local businesses',
             icon: MapPinned,
-            matchers: [UMKM_DISCOVERY_PATH, '/super-app/umkm'],
+            matchers: [UMKM_DISCOVERY_PATH],
           },
           {
-            href: '/marketplace',
+            href: '/search?type=product&q=supplier',
             label: 'Marketplace',
             caption:
               localeKey === 'id'
                 ? 'Produk siap pilih'
                 : 'Ready-to-browse products',
             icon: Store,
-            matchers: ['/marketplace'],
+            matchers: ['/search'],
           },
         ],
       },
@@ -391,34 +406,34 @@ export function Header() {
         title: localeKey === 'id' ? 'Profesional' : 'Professional',
         items: [
           {
-            href: '/jobs',
+            href: '/search?type=job&q=lowongan',
             label: localeKey === 'id' ? 'Loker' : 'Jobs',
             caption:
               localeKey === 'id'
                 ? 'Cari kerja dan kandidat'
                 : 'Jobs and candidates',
             icon: BriefcaseBusiness,
-            matchers: ['/jobs'],
+            matchers: ['/search'],
           },
           {
-            href: '/freelancers',
+            href: '/search?type=freelancer&q=umkm',
             label: 'Talent',
             caption:
               localeKey === 'id'
                 ? 'Freelancer dan skill'
                 : 'Freelancers and skills',
             icon: UserRound,
-            matchers: ['/freelancers'],
+            matchers: ['/search'],
           },
           {
-            href: '/property',
+            href: '/search?type=property&q=lokasi%20jualan',
             label: localeKey === 'id' ? 'Lokasi' : 'Property',
             caption:
               localeKey === 'id'
                 ? 'Ruko, tempat, booth'
                 : 'Shops, places, booths',
             icon: Building2,
-            matchers: ['/property'],
+            matchers: ['/search'],
           },
           {
             href: guarded('/my-projects'),
@@ -426,7 +441,7 @@ export function Header() {
             caption:
               localeKey === 'id' ? 'Brief dan penawaran' : 'Briefs and offers',
             icon: ClipboardList,
-            matchers: ['/my-projects', '/projects'],
+            matchers: ['/my-projects'],
           },
         ],
       },
@@ -458,28 +473,28 @@ export function Header() {
     return [
       {
         href: createHref,
-        label: localeKey === 'id' ? 'Posting' : 'Post',
+        label: localeKey === 'id' ? 'Buat Posting' : 'Create Post',
         caption:
-          localeKey === 'id' ? 'Mulai dari template' : 'Start from template',
+          localeKey === 'id' ? 'Tawarkan atau cari' : 'Choose offer or need',
         icon: Plus,
         matchers: ['/create'],
       },
       {
         href: createNeedHref,
-        label: localeKey === 'id' ? 'Permintaan' : 'Request',
+        label: localeKey === 'id' ? 'Cari Kebutuhan' : 'Need Something',
         caption:
           localeKey === 'id'
-            ? 'Butuh barang, jasa, talent'
+            ? 'Supplier, jasa, talent'
             : 'Need goods, services, talent',
         icon: ClipboardList,
         matchers: ['/create/butuh', '/create/need'],
       },
       {
         href: createSellHref,
-        label: localeKey === 'id' ? 'Penawaran' : 'Offer',
+        label: localeKey === 'id' ? 'Tawarkan' : 'Want to Sell',
         caption:
           localeKey === 'id'
-            ? 'Jual produk atau jasa'
+            ? 'Produk, jasa, lokasi'
             : 'Sell products or services',
         icon: ShoppingBag,
         matchers: ['/create/jual', '/create/sell'],
@@ -543,6 +558,16 @@ export function Header() {
     setMenuSearch('');
   }, []);
 
+  const openLanguageFromDrawer = useCallback(() => {
+    setMobileOpen(false);
+    setMenuSearch('');
+    openLanguageModal();
+  }, [openLanguageModal]);
+
+  const toggleDrawerTheme = useCallback(() => {
+    setColorScheme(isDark ? 'light' : 'dark');
+  }, [isDark, setColorScheme]);
+
   const setGlobalSearch = (value: string) => {
     setGlobalSearchDraft({
       source: activeSearchQuery,
@@ -597,18 +622,15 @@ export function Header() {
     const body = document.body;
     const html = document.documentElement;
     const prevBodyOverflow = body.style.overflow;
-    const prevBodyTouchAction = body.style.touchAction;
     const prevHtmlOverflow = html.style.overflow;
     const prevHtmlOverscroll = html.style.overscrollBehavior;
 
     body.style.overflow = 'hidden';
-    body.style.touchAction = 'none';
     html.style.overflow = 'hidden';
     html.style.overscrollBehavior = 'none';
 
     return () => {
       body.style.overflow = prevBodyOverflow;
-      body.style.touchAction = prevBodyTouchAction;
       html.style.overflow = prevHtmlOverflow;
       html.style.overscrollBehavior = prevHtmlOverscroll;
     };
@@ -623,18 +645,22 @@ export function Header() {
     items: DrawerItem[],
     options?: { compact?: boolean },
   ) => (
-    <section className="rounded-[18px] border border-[color:var(--app-border)]/75 bg-[color:var(--app-surface-muted)] p-2.5 dark:border-[color:var(--app-border-strong)]">
-      <p className="px-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
-        {title}
-      </p>
-      <div
-        className={cn(
-          'mt-2 grid gap-2',
-          options?.compact
-            ? 'grid-cols-2 lg:grid-cols-1'
-            : 'grid-cols-2 lg:grid-cols-3',
-        )}
-      >
+    <section
+      className={cn(
+        'rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.3)] dark:border-[color:var(--app-border-strong)]',
+        options?.compact &&
+        'border-[color:color-mix(in_srgb,var(--app-accent-border)_64%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_42%,var(--app-surface-strong))]',
+      )}
+    >
+      <div className="flex items-center justify-between gap-3 px-1 pb-2">
+        <p className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+          {title}
+        </p>
+        <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]">
+          {items.length}
+        </span>
+      </div>
+      <div className="grid gap-1.5">
         {items.map(item => {
           const Icon = item.icon;
           const active = (
@@ -648,33 +674,40 @@ export function Header() {
               onClick={closeAll}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'ui-pressable ui-pressable-card flex min-h-[48px] items-center gap-2 rounded-[14px] border bg-[color:var(--app-surface-strong)] px-2.5 py-2 transition',
+                'ui-pressable group flex min-h-[58px] min-w-0 items-center gap-3 rounded-[16px] border px-2.5 py-2 text-left transition',
                 active
-                  ? 'border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]'
-                  : 'border-[color:var(--app-border)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)]',
+                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[0_14px_28px_-26px_rgba(15,118,110,0.55)]'
+                  : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface)]',
               )}
             >
               <span
                 className={cn(
-                  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border',
                   active
-                    ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                    : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+                    ? 'border-[color:color-mix(in_srgb,var(--app-accent-border)_72%,transparent)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]'
+                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] group-hover:text-[color:var(--app-accent)]',
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4.5 w-4.5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-black leading-4">
+                <span className="block truncate text-sm font-black leading-tight">
                   {item.label}
                 </span>
                 {item.caption ? (
-                  <span className="mt-0.5 hidden truncate text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)] xl:block">
+                  <span className="mt-0.5 block truncate text-[11px] font-semibold leading-tight text-[color:var(--app-text-soft)]">
                     {item.caption}
                   </span>
                 ) : null}
               </span>
-              <ChevronRight className="hidden h-4 w-4 shrink-0 opacity-60 xl:block" />
+              <ChevronRight
+                className={cn(
+                  'h-4 w-4 shrink-0 transition group-hover:translate-x-0.5',
+                  active
+                    ? 'text-[color:var(--app-accent)]'
+                    : 'text-[color:var(--app-text-soft)]',
+                )}
+              />
             </Link>
           );
         })}
@@ -685,177 +718,250 @@ export function Header() {
   const mobileDrawerLayer =
     typeof document !== 'undefined' && mobileOpen
       ? createPortal(
-          <>
-            <button
-              type="button"
-              aria-label="Close mobile menu overlay"
-              onClick={() => setMobileOpen(false)}
-              className="ui-layer-popover fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_45%,_transparent)] backdrop-blur-sm"
-            />
-            <aside className="ui-layer-drawer fixed right-0 top-0 flex h-[100svh] max-h-[100svh] w-[min(94vw,390px)] flex-col bg-[color:var(--app-surface-strong)] shadow-2xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] lg:right-4 lg:top-[calc(62px+env(safe-area-inset-top))] lg:h-[min(82svh,720px)] lg:w-[min(760px,calc(100vw-2rem))] lg:rounded-[22px] lg:border">
-              <div className="flex items-center justify-between border-b border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] px-3 py-2.5 dark:border-[color:var(--app-border-strong)] sm:px-4">
-                <div>
-                  <p className="text-sm font-black text-[color:var(--app-text)]">
-                    {text.menu}
-                  </p>
-                  <p className="mt-0.5 hidden text-xs text-[color:var(--app-text-soft)] sm:block">
-                    {locale === 'id'
-                      ? 'Semua pintasan Lajukan'
-                      : 'All Lajukan shortcuts'}
-                  </p>
+        <>
+          <button
+            type="button"
+            aria-label="Close mobile menu overlay"
+            onClick={() => setMobileOpen(false)}
+            className="ui-layer-popover fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_45%,_transparent)] backdrop-blur-sm"
+          />
+          <aside className="ui-layer-drawer fixed inset-y-0 right-0 flex h-[100dvh] max-h-[100dvh] w-[min(94vw,400px)] flex-col bg-[color:var(--app-surface-strong)] shadow-[0_28px_80px_-36px_rgba(15,23,42,0.48)] ring-1 ring-black/[0.05] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-white/10 lg:inset-y-4 lg:right-4 lg:h-[calc(100dvh-2rem)] lg:w-[min(440px,calc(100vw-2rem))] lg:rounded-[26px] lg:border">
+            <div className="shrink-0 border-b border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,var(--app-surface-muted))] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.875rem)] dark:border-[color:var(--app-border-strong)]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-[17px] font-black text-[color:var(--app-text)]">
+                      {locale === 'id' ? 'Menu Lajukan' : 'Lajukan Menu'}
+                    </p>
+                    <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                      {locale === 'id'
+                        ? 'Akun, transaksi, komunitas'
+                        : 'Account, commerce, community'}
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMobileOpen(false)}
                   aria-label="Close menu"
-                  className="ui-pressable inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
+                  className="ui-pressable inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] shadow-[0_12px_28px_-24px_rgba(15,23,42,0.45)] hover:bg-[color:var(--app-surface-muted)]"
                 >
                   <X className="h-4.5 w-4.5" />
                 </button>
               </div>
+            </div>
 
-              <form
-                onSubmit={event => event.preventDefault()}
-                className="px-3 pt-2.5 sm:px-4"
-              >
-                <label className="ui-navbar-search-field">
-                  <SearchIcon className="ui-navbar-search-icon" />
-                  <input
-                    data-testid="app-menu-search-input"
-                    type="search"
-                    value={menuSearch}
-                    onChange={event => setMenuSearch(event.target.value)}
-                    placeholder={text.searchMenu}
-                    className="ui-navbar-search-input"
-                  />
-                </label>
-              </form>
+            <form
+              onSubmit={event => event.preventDefault()}
+              className="px-4 pt-3"
+            >
+              <label className="ui-navbar-search-field ui-field-shell bg-[color:var(--app-surface-muted)] shadow-inner shadow-black/[0.02]">
+                <SearchIcon className="ui-navbar-search-icon" />
+                <input
+                  data-testid="app-menu-search-input"
+                  type="search"
+                  value={menuSearch}
+                  onChange={event => setMenuSearch(event.target.value)}
+                  placeholder={text.searchMenu}
+                  className="ui-navbar-search-input"
+                />
+              </label>
+            </form>
 
-              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-4">
-                {!isAuthenticated ? (
-                  <div className="ui-panel-muted rounded-[18px] border border-[color:var(--app-border)]/80 p-2.5">
-                    <p className="text-sm font-semibold text-[color:var(--app-text)]">
-                      {text.account}
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 pb-5">
+              <div className="rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-accent-border)_58%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_34%,var(--app-surface-strong))] p-3 shadow-[0_20px_48px_-36px_rgba(15,118,110,0.42)] dark:border-[color:var(--app-border-strong)]">
+                {isAuthenticated ? (
+                  <div>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Image
+                        src={profileAvatarSrc(user?.avatarUrl)}
+                        alt="Profile avatar"
+                        width={52}
+                        height={52}
+                        className="h-[52px] w-[52px] shrink-0 rounded-full border-2 border-[color:var(--app-surface-strong)] object-cover shadow-[0_14px_28px_-24px_rgba(15,23,42,0.55)]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[15px] font-black text-[color:var(--app-text)]">
+                          {user?.username || user?.fullName || 'User'}
+                        </p>
+                        <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                          {user?.email ||
+                            (locale === 'id'
+                              ? 'Akun aktif'
+                              : 'Active account')}
+                        </p>
+                      </div>
+                      <Link
+                        href="/profile"
+                        onClick={closeAll}
+                        className="ui-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]"
+                        aria-label={
+                          locale === 'id' ? 'Buka profil' : 'Open profile'
+                        }
+                      >
+                        <UserRound className="h-4 w-4" />
+                      </Link>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-1.5">
+                      <Link
+                        href="/payments"
+                        onClick={closeAll}
+                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                      >
+                        <Wallet className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                        {locale === 'id' ? 'Saldo' : 'Balance'}
+                      </Link>
+                      <Link
+                        href="/transactions"
+                        onClick={closeAll}
+                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                      >
+                        <Store className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                        {locale === 'id' ? 'Transaksi' : 'Deals'}
+                      </Link>
+                      <Link
+                        href={manageHref}
+                        onClick={closeAll}
+                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                      >
+                        <MapPinned className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                        {locale === 'id' ? 'Usaha' : 'Business'}
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-[15px] font-black text-[color:var(--app-text)]">
+                      {locale === 'id' ? 'Masuk ke akun' : 'Sign in'}
                     </p>
-                    <p className="mt-1 hidden text-xs text-[color:var(--app-text-soft)] sm:block">
+                    <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       {locale === 'id'
-                        ? 'Masuk biar chat, draft, transaksi nyambung.'
-                        : 'Sign in so your chats, drafts, and transactions stay in sync.'}
+                        ? 'Chat, transaksi, dan draft jadi tersimpan.'
+                        : 'Keep chats, transactions, and drafts saved.'}
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <Link
                         href="/login"
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-semibold text-[color:var(--app-text)]"
+                        className="ui-pressable inline-flex min-h-10 items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-text)]"
                       >
                         {text.login}
                       </Link>
                       <Link
                         href="/register"
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-sm font-semibold text-[color:var(--app-text-inverse)]"
+                        className="ui-pressable inline-flex min-h-10 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-black text-[color:var(--app-text-inverse)]"
                       >
                         {text.register}
                       </Link>
                     </div>
                   </div>
-                ) : null}
-
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-                  <div className="space-y-3">
-                    {visibleMenuGroups.map(group => (
-                      <div key={group.id}>
-                        {renderDrawerGroup(group.title, group.items)}
-                      </div>
-                    ))}
-                    {visibleMenuGroups.length === 0 &&
-                    visibleCreateDrawerItems.length === 0 ? (
-                      <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-center text-sm font-semibold text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? 'Menu tidak ditemukan.'
-                          : 'No menu found.'}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="space-y-3 lg:sticky lg:top-0 lg:self-start">
-                    {visibleCreateDrawerItems.length > 0
-                      ? renderDrawerGroup(
-                          text.createSection,
-                          visibleCreateDrawerItems,
-                          { compact: true },
-                        )
-                      : null}
-                  </div>
-                </div>
+                )}
               </div>
 
-              <div className="space-y-2 border-t border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] p-2.5 dark:border-[color:var(--app-border-strong)] sm:p-3">
-                {isAuthenticated ? (
-                  <div className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 dark:border-[color:var(--app-border-strong)]">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Image
-                        src={user?.avatarUrl || '/default-avatar.svg'}
-                        alt="Profile avatar"
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 shrink-0 rounded-full object-cover"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-[color:var(--app-text)]">
-                          {user?.username || user?.fullName || 'User'}
-                        </p>
-                        <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
-                          {user?.email ||
-                            (locale === 'id' ? 'Akun aktif' : 'Active account')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <Link
-                        href="/profile"
-                        onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-text)]"
-                      >
-                        <UserRound className="h-4 w-4" />
-                        {locale === 'id' ? 'Profil' : 'Profile'}
-                      </Link>
-                      <Link
-                        href="/settings"
-                        onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-text)]"
-                      >
-                        <Settings className="h-4 w-4" />
-                        {locale === 'id' ? 'Pengaturan' : 'Settings'}
-                      </Link>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closeAll();
-                        void logout();
-                      }}
-                      className="ui-pressable mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-danger-border)_58%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_8%,_transparent)] px-3 text-sm font-black text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      {text.logout}
-                    </button>
+              <section className="rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)]">
+                <p className="px-1 pb-2 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                  {text.preferences}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={openLanguageFromDrawer}
+                    className="ui-pressable inline-flex min-h-12 items-center gap-2 rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)]"
+                  >
+                    <Languages className="h-4 w-4 text-[color:var(--app-accent)]" />
+                    <span className="min-w-0">
+                      <span className="block truncate">{text.language}</span>
+                      <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        {currentLocale?.toUpperCase() ||
+                          localeKey.toUpperCase()}
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleDrawerTheme}
+                    disabled={!isReady}
+                    className="ui-pressable inline-flex min-h-12 items-center gap-2 rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)] disabled:opacity-50"
+                  >
+                    {isDark ? (
+                      <Sun className="h-4 w-4 text-[color:var(--app-accent)]" />
+                    ) : (
+                      <Moon className="h-4 w-4 text-[color:var(--app-accent)]" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block truncate">
+                        {isDark ? text.light : text.dark}
+                      </span>
+                      <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Mode' : 'Mode'}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </section>
+
+              <div className="space-y-3">
+                {visibleCreateDrawerItems.length > 0
+                  ? renderDrawerGroup(
+                    text.createSection,
+                    visibleCreateDrawerItems,
+                    { compact: true },
+                  )
+                  : null}
+                {visibleMenuGroups.map(group => (
+                  <div key={group.id}>
+                    {renderDrawerGroup(group.title, group.items)}
+                  </div>
+                ))}
+                {visibleMenuGroups.length === 0 &&
+                  visibleCreateDrawerItems.length === 0 ? (
+                  <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-center text-sm font-semibold text-[color:var(--app-text-soft)]">
+                    {locale === 'id'
+                      ? 'Menu tidak ditemukan.'
+                      : 'No menu found.'}
                   </div>
                 ) : null}
+              </div>
+            </div>
+
+            <div className="shrink-0 border-t border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-muted)_62%,var(--app-surface-strong))] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-[color:var(--app-border-strong)]">
+              <div className="grid grid-cols-2 gap-2">
                 <Link
                   href="/support"
                   onClick={closeAll}
-                  className="ui-pressable inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-semibold text-[color:var(--app-text)]"
+                  className="ui-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-text)]"
                 >
                   <CircleHelp className="h-4 w-4" />
                   {text.support}
                 </Link>
+                <Link
+                  href="/settings"
+                  onClick={closeAll}
+                  className="ui-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-text)]"
+                >
+                  <Settings className="h-4 w-4" />
+                  {locale === 'id' ? 'Setelan' : 'Settings'}
+                </Link>
               </div>
-
-              <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
-            </aside>
-          </>,
-          document.body,
-        )
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeAll();
+                    void logout();
+                  }}
+                  className="ui-pressable mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_58%,_transparent)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {text.logout}
+                </button>
+              ) : null}
+            </div>
+          </aside>
+        </>,
+        document.body,
+      )
       : null;
 
   return (
@@ -995,7 +1101,10 @@ export function Header() {
                   aria-expanded={profileOpen}
                   className={cn(
                     'ui-pressable inline-flex h-10 items-center gap-0 rounded-full border px-1.5 transition xl:gap-2 xl:px-2 xl:pr-3',
-                    matchesRoute(cleanPath, '/profile') ||
+                    matchesRoute(cleanPath, '/profile$') ||
+                      matchesRoute(cleanPath, '/profile/edit') ||
+                      matchesRoute(cleanPath, '/usaha') ||
+                      matchesRoute(cleanPath, LEGACY_UMKM_OWNER_PATH) ||
                       matchesRoute(cleanPath, '/settings') ||
                       matchesRoute(cleanPath, '/transactions') ||
                       matchesRoute(cleanPath, '/payments')
@@ -1005,7 +1114,7 @@ export function Header() {
                   data-tour="www-profile"
                 >
                   <Image
-                    src={user?.avatarUrl || '/default-avatar.svg'}
+                    src={profileAvatarSrc(user?.avatarUrl)}
                     alt="Profile avatar"
                     width={28}
                     height={28}
@@ -1019,29 +1128,54 @@ export function Header() {
                 {profileOpen ? (
                   <div
                     role="menu"
-                    className="ui-layer-popover absolute right-0 mt-2 w-64 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-lg"
+                    className="ui-layer-popover absolute right-0 mt-2 w-[min(21rem,calc(100vw-1.5rem))] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_24px_70px_-38px_rgba(15,23,42,0.45)]"
                   >
-                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2">
-                      <p className="truncate text-sm font-semibold text-[color:var(--app-text)]">
-                        {user?.username || user?.fullName || 'User'}
-                      </p>
-                      <p className="truncate text-xs text-[color:var(--app-text-soft)]">
-                        {user?.email || '-'}
-                      </p>
+                    <div className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-muted))] p-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Image
+                          src={profileAvatarSrc(user?.avatarUrl)}
+                          alt="Profile avatar"
+                          width={44}
+                          height={44}
+                          className="h-11 w-11 shrink-0 rounded-full border-2 border-[color:var(--app-surface-strong)] object-cover shadow-[0_14px_28px_-24px_rgba(15,23,42,0.55)]"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+                            {user?.username || user?.fullName || 'User'}
+                          </p>
+                          <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                            {user?.email ||
+                              (locale === 'id'
+                                ? 'Akun aktif'
+                                : 'Active account')}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-1">
+                    <div className="mt-2 grid gap-1">
                       {accountDrawerItems.map(item => {
+                        const itemPath = hrefPath(item.href);
+                        const itemFilter = new URLSearchParams(
+                          item.href.split('?')[1] || '',
+                        ).get('filter');
+                        const currentFilter = searchParams.get('filter');
                         const active =
-                          item.matchers?.some(matcher =>
-                            matchesRoute(cleanPath, matcher),
-                          ) ?? false;
+                          itemPath === '/my-listings'
+                            ? cleanPath === '/my-listings' &&
+                            (itemFilter
+                              ? currentFilter === itemFilter
+                              : !currentFilter)
+                            : (item.matchers?.some(matcher =>
+                              matchesRoute(cleanPath, matcher),
+                            ) ?? false);
+                        const ItemIcon = item.icon;
 
                         return (
                           <Link
                             key={item.href}
                             href={item.href}
                             className={cn(
-                              'ui-pressable flex min-h-[44px] items-center rounded-xl px-3 text-sm font-medium transition',
+                              'ui-pressable group flex min-h-[46px] items-center gap-2.5 rounded-[15px] px-2.5 text-sm font-semibold transition',
                               active
                                 ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                                 : 'text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
@@ -1050,24 +1184,50 @@ export function Header() {
                             role="menuitem"
                             aria-current={active ? 'page' : undefined}
                           >
-                            {item.label}
+                            <span
+                              className={cn(
+                                'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ring-1 transition',
+                                active
+                                  ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] ring-[color:var(--app-accent-border)]'
+                                  : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] ring-[color:var(--app-border)] group-hover:text-[color:var(--app-accent)]',
+                              )}
+                            >
+                              <ItemIcon className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate">
+                                {item.label}
+                              </span>
+                              {item.caption ? (
+                                <span className="block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                                  {item.caption}
+                                </span>
+                              ) : null}
+                            </span>
+                            {active ? (
+                              <span className="h-2 w-2 min-w-2 min-h-3 max-w-2 max-h-2 shrink-0 rounded-full bg-[color:var(--app-accent)]" />
+                            ) : null}
                           </Link>
                         );
                       })}
                     </div>
-                    <div className="flex items-center gap-2 px-1 py-1">
+                    <div className="my-2 border-t border-[color:var(--app-border)]" />
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-1 py-1">
                       <LanguageSwitcherButton />
                       <ThemeToggle />
                     </div>
                     <div className="my-1 border-t border-[color:var(--app-border)]" />
                     <button
                       type="button"
-                      className="ui-pressable flex min-h-[44px] w-full items-center rounded-xl px-3 text-left text-sm font-medium text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
+                      className="ui-pressable flex min-h-[44px] w-full items-center gap-2.5 rounded-[15px] px-3 text-left text-sm font-semibold text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
                       onClick={async () => {
                         await logout();
                         setProfileOpen(false);
                       }}
                     >
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]">
+                        <LogOut className="h-4 w-4" />
+                      </span>
                       {text.logout}
                     </button>
                   </div>

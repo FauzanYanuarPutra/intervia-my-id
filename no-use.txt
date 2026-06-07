@@ -1,0 +1,146 @@
+Lajukan route hygiene - 2026-05-28
+
+Prinsip:
+- Satu kebutuhan user punya satu pintu utama.
+- Route lama tidak dikompilasi sebagai page kosong kalau cuma redirect.
+- Link lama tetap aman via frontend/www/src/proxy.ts.
+- Page yang masih punya nilai SEO, trust, transaksi, belajar, komunitas, atau operasional tetap dipertahankan.
+
+Ditambah:
+- frontend/www/src/proxy.ts
+  - Tambah canonical detail redirect:
+    - /:locale/listing/:id -> /:locale/content/:id
+    - /:locale/freelancers/:slug -> /:locale/profile/:slug
+    - /:locale/umkm/:slug -> /:locale/toko/:slug
+- no-use.txt
+  - File catatan route yang dipertahankan, ditambah, dihapus, dan diarahkan.
+
+Dihapus dari route build karena cuma redirect wrapper:
+- frontend/www/src/app/[locale]/company/create/page.tsx
+  - Canonical: /:locale/usaha/onboarding
+- frontend/www/src/app/[locale]/jobs/create/page.tsx
+  - Canonical: /:locale/create/butuh/lowongan
+- frontend/www/src/app/[locale]/property/create/page.tsx
+  - Canonical: /:locale/create/jual/properti
+- frontend/www/src/app/[locale]/profile/freelancer/create/page.tsx
+  - Canonical: /:locale/profile/edit?focus=talent
+- frontend/www/src/app/[locale]/projects/page.tsx
+  - Canonical: /:locale/my-projects
+- frontend/www/src/app/[locale]/my-applications/page.tsx
+  - Canonical: /:locale/dashboard
+- frontend/www/src/app/[locale]/(shared)/jobs/page.tsx
+  - Canonical: /:locale/search?type=job&q=lowongan
+- frontend/www/src/app/[locale]/(shared)/freelancers/page.tsx
+  - Canonical: /:locale/search?type=freelancer&q=umkm
+- frontend/www/src/app/[locale]/(shared)/freelancers/[slug]/page.tsx
+  - Canonical: /:locale/profile/:slug
+- frontend/www/src/app/[locale]/(shared)/marketplace/page.tsx
+  - Canonical: /:locale/search?type=product&q=supplier
+- frontend/www/src/app/[locale]/(shared)/property/page.tsx
+  - Canonical: /:locale/search?type=property&q=lokasi%20jualan
+- frontend/www/src/app/[locale]/(shared)/forum/page.tsx
+  - Canonical: /:locale/community
+- frontend/www/src/app/[locale]/(shared)/listing/[id]/page.tsx
+  - Canonical: /:locale/content/:id
+- frontend/www/src/app/[locale]/(shared)/umkm/[slug]/page.tsx
+  - Canonical: /:locale/toko/:slug
+- frontend/www/src/app/[locale]/(shared)/super-app/page.tsx
+  - Canonical: /:locale/home
+- frontend/www/src/app/[locale]/(shared)/super-app/[service]/page.tsx
+  - Canonical: /:locale/search, /:locale/umkm, atau /:locale/home sesuai service
+- frontend/www/src/app/[locale]/(shared)/super-app/driver/page.tsx
+  - Canonical: /:locale/search?type=service&q=kurir%20pickup%20usaha
+- frontend/www/src/app/[locale]/(shared)/super-app/tracker/[orderId]/page.tsx
+  - Canonical: /:locale/transactions/:orderId
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/page.tsx
+  - Canonical: /:locale/umkm
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/[slug]/page.tsx
+  - Canonical: /:locale/toko/:slug
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/scan/page.tsx
+  - Canonical: /:locale/toko/scan
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/page.tsx
+  - Canonical: /:locale/usaha
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/catalog/page.tsx
+  - Canonical: /:locale/usaha/katalog
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/operations/page.tsx
+  - Canonical: /:locale/usaha/operasional
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/orders/page.tsx
+  - Canonical: /:locale/usaha/order
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/team/page.tsx
+  - Canonical: /:locale/usaha/tim
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/setup/page.tsx
+  - Canonical: /:locale/usaha/profil atau /:locale/usaha/asisten
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/setup/new/page.tsx
+  - Canonical: /:locale/usaha/onboarding
+- frontend/www/src/app/[locale]/(shared)/super-app/umkm/manage/setup/[storeId]/page.tsx
+  - Canonical: /:locale/usaha/toko/:storeId/profil
+
+Dibersihkan:
+- frontend/www/src/lib/authRoutes.ts
+  - Hapus protected route legacy yang sudah diarahkan di proxy:
+    - /my-applications
+    - /jobs/create
+    - /property/create
+    - /company/create
+    - /profile/freelancer/create
+- frontend/www/src/lib/routes.ts
+  - Hapus route registry untuk page yang sudah tidak menjadi pintu utama:
+    - /marketplace
+    - /freelancers
+    - /super-app
+    - /my-applications
+    - /jobs/create
+    - /property/create
+    - /profile/freelancer/create
+- frontend/www/src/components/profile/ProfileView.tsx
+  - Link create freelancer diganti ke /profile/edit?focus=talent.
+- frontend/www/src/app/[locale]/(app)/create/CreatePostingClient.tsx
+  - CTA company create diganti ke /usaha/onboarding.
+- frontend/www/src/components/layout/* dan frontend/www/src/components/system/*
+  - Matcher mobile/header dibersihkan dari route legacy yang sekarang lewat proxy.
+
+Dipertahankan dan perlu dimaksimalkan:
+- /home
+- /search
+- /kategori
+- /create
+- /create/[flow]
+- /create/[flow]/[listing]
+- /content/[id]
+- /toko/[slug]
+- /umkm
+- /community
+- /community/groups/[slug]
+- /reels
+- /learn
+- /learn/[slug]
+- /education
+- /my-projects
+- /my-listings
+- /transactions
+- /transactions/[id]
+- /chat
+- /profile
+- /profile/edit
+- /dashboard
+- /payments
+- /usaha
+- /usaha/*
+- /support
+- /trust
+- /about
+- /contact
+- /privacy
+- /terms
+- /cookie-policy
+
+Masih dipertahankan sementara:
+- /jobs/[slug]
+  - Masih punya SEO JobPosting dan detail lowongan.
+  - Bisa digabung ke /content/[id] kalau content detail sudah punya schema job penuh.
+- /property/[slug]
+  - Masih punya detail lokasi/properti.
+  - Bisa digabung ke /content/[id] kalau content detail sudah cukup kuat untuk lokasi usaha.
+- /microgigs
+  - Masih cocok untuk paket kerja kecil/operasional cepat.
+  - Jangan taruh sebagai menu utama kalau terasa terlalu ramai.

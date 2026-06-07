@@ -1,18 +1,10 @@
-import { redirect } from 'next/navigation';
-import {
-  readSurfaceStoreId,
-  type SurfaceSearchParams,
-} from '@/lib/umkmSurface';
-import { resolveUsahaOwnerGatewayTarget } from '@/lib/server/usahaOwnerGateway';
+import { UsahaOwnerRouteView } from './_components/UsahaOwnerRouteView';
 
 type PageProps = {
-  searchParams: Promise<SurfaceSearchParams>;
+  params: Promise<{ locale: string }>;
 };
 
-export default async function UsahaPage({ searchParams }: PageProps) {
-  const storeId = readSurfaceStoreId(await searchParams);
-  const target = await resolveUsahaOwnerGatewayTarget({
-    preferredStoreId: storeId,
-  });
-  redirect(target.href);
+export default async function UsahaPage({ params }: PageProps) {
+  const { locale } = await params;
+  return <UsahaOwnerRouteView locale={locale} />;
 }

@@ -101,10 +101,6 @@ struct AccessClaims {
     full_name: Option<String>,
     #[serde(default)]
     display_name: Option<String>,
-    #[serde(default)]
-    picture: Option<String>,
-    #[serde(default)]
-    avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +110,6 @@ struct AuthActor {
     email: Option<String>,
     username: Option<String>,
     name: Option<String>,
-    avatar_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, FromRow, Clone)]
@@ -164,6 +159,7 @@ struct ThreadRow {
     title: String,
     slug: String,
     category_id: String,
+    group_id: Option<String>,
     author_id: String,
     created_at: DateTime<Utc>,
     last_activity_at: DateTime<Utc>,
@@ -202,6 +198,7 @@ struct EnrichedThread {
     title: String,
     slug: String,
     category_id: String,
+    group_id: Option<String>,
     author_id: String,
     created_at: DateTime<Utc>,
     last_activity_at: DateTime<Utc>,
@@ -431,6 +428,12 @@ struct CreateReelRequest {
     hook: Option<String>,
     tone: Option<String>,
     icon_key: Option<String>,
+    filter_preset: Option<String>,
+    capture_mode: Option<String>,
+    live_status: Option<String>,
+    live_title: Option<String>,
+    live_scheduled_at: Option<String>,
+    metadata: Option<Value>,
     store_id: Option<String>,
     store_slug: Option<String>,
     store_name: Option<String>,
@@ -444,6 +447,13 @@ struct CreateReelRequest {
 struct ReelEventRequest {
     event: Option<String>,
     metadata: Option<Value>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct ReelActionRequest {
+    action: Option<String>,
+    active: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -709,6 +719,12 @@ struct ReelRow {
     media_url: String,
     media_type: String,
     hook: String,
+    filter_preset: String,
+    capture_mode: String,
+    live_status: String,
+    live_title: Option<String>,
+    live_scheduled_at: Option<DateTime<Utc>>,
+    metadata: Value,
     store_id: String,
     store_slug: String,
     store_name: String,
@@ -724,7 +740,6 @@ struct ReelCommentRow {
     parent_comment_id: Option<String>,
     author_user_id: String,
     author_name: String,
-    author_avatar_url: Option<String>,
     body: String,
     reply_count: i32,
     created_at: DateTime<Utc>,
@@ -754,6 +769,12 @@ struct LajukanReel {
     tone: String,
     icon_key: String,
     media_type: String,
+    filter_preset: String,
+    capture_mode: String,
+    live_status: String,
+    live_title: Option<String>,
+    live_scheduled_at: Option<DateTime<Utc>>,
+    metadata: Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -776,6 +797,14 @@ struct ReelsPageResponse {
     items: Vec<LajukanReel>,
     next_cursor: Option<i64>,
     has_more: bool,
+}
+
+#[derive(Debug, Serialize, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ReelViewerState {
+    liked: bool,
+    saved: bool,
+    followed: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -806,6 +835,11 @@ struct ReelFeedItem {
     title: String,
     caption: String,
     hook: String,
+    filter_preset: String,
+    capture_mode: String,
+    live_status: String,
+    live_title: Option<String>,
+    live_scheduled_at: Option<DateTime<Utc>>,
     store: ReelFeedStore,
 }
 
@@ -932,7 +966,12 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/v1/reels", get(list_reels).post(create_reel))
         .route("/v1/reels/feed", get(list_reels_feed))
-        .route("/v1/reels/{reel_id}", get(get_reel))
+        .route(
+            "/v1/reels/{reel_id}",
+            get(get_reel).patch(update_reel).delete(delete_reel),
+        )
+        .route("/v1/reels/{reel_id}/me", get(get_reel_viewer_state))
+        .route("/v1/reels/{reel_id}/actions", post(set_reel_action))
         .route("/v1/reels/{reel_id}/events", post(record_reel_event))
         .route(
             "/v1/reels/{reel_id}/comments",
@@ -1047,6 +1086,50 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
     .execute(db)
     .await?;
 
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS lajukan_reel_user_actions (
+          id text PRIMARY KEY,
+          reel_id text NOT NULL REFERENCES lajukan_reels(id) ON DELETE CASCADE,
+          actor_user_id text NOT NULL REFERENCES lajukan_forum_users(id) ON DELETE CASCADE,
+          target_user_id text NULL,
+          action text NOT NULL CHECK (action IN ('like', 'save', 'follow')),
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+        "#,
+    )
+    .execute(db)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE UNIQUE INDEX IF NOT EXISTS lajukan_reel_user_actions_unique_idx
+          ON lajukan_reel_user_actions (reel_id, actor_user_id, action)
+        "#,
+    )
+    .execute(db)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE UNIQUE INDEX IF NOT EXISTS lajukan_reel_user_follows_unique_idx
+          ON lajukan_reel_user_actions (actor_user_id, target_user_id, action)
+          WHERE action = 'follow' AND target_user_id IS NOT NULL
+        "#,
+    )
+    .execute(db)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE INDEX IF NOT EXISTS lajukan_reel_user_actions_actor_idx
+          ON lajukan_reel_user_actions (actor_user_id, action, updated_at DESC)
+        "#,
+    )
+    .execute(db)
+    .await?;
+
     Ok(())
 }
 
@@ -1096,7 +1179,6 @@ fn optional_actor(headers: &HeaderMap, state: &AppState) -> Option<AuthActor> {
         email: claims.email,
         username: claims.username,
         name: claims.name.or(claims.full_name).or(claims.display_name),
-        avatar_url: claims.picture.or(claims.avatar_url),
     })
 }
 
@@ -1249,6 +1331,27 @@ fn safe_username(value: &str, fallback: &str) -> String {
     };
 
     source.chars().take(24).collect()
+}
+
+fn forum_username(actor: &AuthActor, display_name: &str) -> String {
+    let base = safe_username(
+        actor
+            .username
+            .as_deref()
+            .or(actor.email.as_deref())
+            .unwrap_or(display_name),
+        &actor.user_id,
+    );
+    let suffix = clean_auth_id(&actor.user_id)
+        .chars()
+        .take(10)
+        .collect::<String>();
+    let prefix = base.chars().take(22).collect::<String>();
+    if suffix.is_empty() {
+        prefix
+    } else {
+        format!("{prefix}_{suffix}")
+    }
 }
 
 fn create_id(prefix: &str) -> String {
@@ -1452,6 +1555,73 @@ fn normalize_media_type(value: Option<String>, media_url: &str) -> String {
     }
 }
 
+fn normalize_reel_filter_preset(value: Option<String>) -> String {
+    let preset = value
+        .unwrap_or_else(|| "natural".to_string())
+        .trim()
+        .to_ascii_lowercase();
+    match preset.as_str() {
+        "natural" | "warm" | "fresh" | "cinema" | "mono" | "pop" => preset,
+        _ => "natural".to_string(),
+    }
+}
+
+fn normalize_reel_capture_mode(value: Option<String>) -> String {
+    let mode = value
+        .unwrap_or_else(|| "upload".to_string())
+        .trim()
+        .to_ascii_lowercase();
+    match mode.as_str() {
+        "camera" | "live" | "upload" => mode,
+        _ => "upload".to_string(),
+    }
+}
+
+fn normalize_reel_live_status(value: Option<String>, capture_mode: &str) -> String {
+    if capture_mode != "live" {
+        return "none".to_string();
+    }
+
+    let status = value
+        .unwrap_or_else(|| "scheduled".to_string())
+        .trim()
+        .to_ascii_lowercase();
+    match status.as_str() {
+        "scheduled" | "live" | "ended" => status,
+        _ => "scheduled".to_string(),
+    }
+}
+
+fn sanitize_reel_live_title(value: Option<String>) -> Option<String> {
+    clean_optional(value).map(|item| {
+        item.chars()
+            .filter(|ch| !ch.is_control())
+            .take(120)
+            .collect::<String>()
+    })
+}
+
+fn parse_reel_live_scheduled_at(value: Option<String>) -> Option<DateTime<Utc>> {
+    let value = clean_optional(value)?;
+    DateTime::parse_from_rfc3339(&value)
+        .ok()
+        .map(|date| date.with_timezone(&Utc))
+}
+
+fn sanitize_reel_metadata(value: Option<Value>) -> Value {
+    match value {
+        Some(Value::Object(map)) => {
+            let metadata = Value::Object(map);
+            if metadata.to_string().len() <= 4096 {
+                metadata
+            } else {
+                json!({})
+            }
+        }
+        _ => json!({}),
+    }
+}
+
 fn compact_metric(value: i64) -> String {
     let mut scaled = value.max(0) as f64;
     let suffixes = ["", "K", "M", "B", "T"];
@@ -1568,30 +1738,71 @@ fn content_type_for_filename(name: &str) -> &'static str {
     }
 }
 
-fn is_allowed_image_type(content_type: &str) -> bool {
-    matches!(
-        content_type,
-        "image/jpeg" | "image/jpg" | "image/png" | "image/webp" | "image/gif"
-    )
+fn is_allowed_image_type(content_type: &str, file_name: Option<&str>) -> bool {
+    let ct = content_type.to_ascii_lowercase();
+
+    if ct.starts_with("image/") {
+        return true;
+    }
+
+    if let Some(name) = file_name {
+        let lower = name.to_ascii_lowercase();
+
+        return lower.ends_with(".jpg")
+            || lower.ends_with(".jpeg")
+            || lower.ends_with(".png")
+            || lower.ends_with(".gif")
+            || lower.ends_with(".webp")
+            || lower.ends_with(".bmp")
+            || lower.ends_with(".heic")
+            || lower.ends_with(".heif")
+            || lower.ends_with(".avif");
+    }
+
+    false
 }
 
-fn is_allowed_video_type(content_type: &str) -> bool {
-    matches!(
-        content_type,
-        "video/mp4" | "video/webm" | "video/quicktime" | "video/x-m4v"
-    )
+fn is_allowed_video_type(content_type: &str, file_name: Option<&str>) -> bool {
+    let ct = content_type.to_ascii_lowercase();
+
+    if ct.starts_with("video/") {
+        return true;
+    }
+
+    if let Some(name) = file_name {
+        let lower = name.to_ascii_lowercase();
+
+        return lower.ends_with(".mp4")
+            || lower.ends_with(".mov")
+            || lower.ends_with(".m4v")
+            || lower.ends_with(".webm")
+            || lower.ends_with(".avi")
+            || lower.ends_with(".mkv")
+            || lower.ends_with(".3gp");
+    }
+
+    false
 }
 
-fn is_allowed_media_type(content_type: &str, allow_video: bool) -> bool {
-    is_allowed_image_type(content_type) || (allow_video && is_allowed_video_type(content_type))
+fn is_allowed_media_type(
+    content_type: &str,
+    allow_video: bool,
+    file_name: Option<&str>,
+) -> bool {
+    is_allowed_image_type(content_type, file_name)
+        || (allow_video && is_allowed_video_type(content_type, file_name))
 }
 
 fn is_video_url(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
+
     lower.ends_with(".mp4")
         || lower.ends_with(".webm")
         || lower.ends_with(".mov")
         || lower.ends_with(".m4v")
+        || lower.ends_with(".avi")
+        || lower.ends_with(".mkv")
+        || lower.ends_with(".3gp")
 }
 
 fn safety_check(text: &str, allow_external_links: bool) -> ApiResult<()> {
@@ -1632,11 +1843,8 @@ async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUse
         .or_else(|| actor.username.clone())
         .or_else(|| actor.email.clone())
         .unwrap_or_else(|| format!("User {}", actor.user_id));
-    let username = safe_username(actor.username.as_deref().unwrap_or(&name), &actor.user_id);
-    let avatar_url = actor
-        .avatar_url
-        .clone()
-        .unwrap_or_else(|| "/default-avatar.svg".to_string());
+    let username = forum_username(actor, &name);
+    let avatar_url = "/default-avatar.svg".to_string();
 
     sqlx::query_as::<_, ForumUser>(
         r#"
@@ -1961,7 +2169,7 @@ async fn fetch_groups(
             $1::text IS NOT NULL AND (
               viewer_member.status = 'active' OR
               viewer_member.role IN ('owner', 'moderator') OR
-              g.posting_permission = 'public'
+              (g.privacy = 'public' AND g.posting_permission = 'public')
             )
           ), false) AS viewer_can_post,
           COALESCE((
@@ -1972,7 +2180,7 @@ async fn fetch_groups(
           ON active_members.group_id = g.id AND active_members.status = 'active'
         LEFT JOIN lajukan_group_members viewer_member
           ON viewer_member.group_id = g.id AND viewer_member.user_id = $1
-        LEFT JOIN lajukan_forum_threads t ON t.category_id = g.category_id
+        LEFT JOIN lajukan_forum_threads t ON t.group_id = g.id
         WHERE g.status = 'active'
           AND ($2::text IS NULL OR g.privacy <> 'hidden' OR viewer_member.status = 'active')
           AND (
@@ -2031,7 +2239,7 @@ async fn fetch_group(
             $1::text IS NOT NULL AND (
               viewer_member.status = 'active' OR
               viewer_member.role IN ('owner', 'moderator') OR
-              g.posting_permission = 'public'
+              (g.privacy = 'public' AND g.posting_permission = 'public')
             )
           ), false) AS viewer_can_post,
           COALESCE((
@@ -2042,7 +2250,7 @@ async fn fetch_group(
           ON active_members.group_id = g.id AND active_members.status = 'active'
         LEFT JOIN lajukan_group_members viewer_member
           ON viewer_member.group_id = g.id AND viewer_member.user_id = $1
-        LEFT JOIN lajukan_forum_threads t ON t.category_id = g.category_id
+        LEFT JOIN lajukan_forum_threads t ON t.group_id = g.id
         WHERE g.status = 'active'
           AND (g.id = $2 OR g.slug = $2)
           AND (g.privacy <> 'hidden' OR viewer_member.status = 'active')
@@ -2061,58 +2269,11 @@ async fn fetch_group(
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Group not found"))
 }
 
-async fn fetch_group_by_category(
-    db: &PgPool,
-    viewer_id: Option<&str>,
-    category_id: &str,
-) -> ApiResult<Option<ForumGroup>> {
-    sqlx::query_as::<_, ForumGroup>(
-        r#"
-        SELECT
-          g.id,
-          g.category_id,
-          g.name,
-          g.slug,
-          g.description,
-          g.privacy,
-          g.posting_permission,
-          g.membership_permission,
-          g.cover_url,
-          g.rules,
-          COUNT(DISTINCT active_members.user_id)::int AS member_count,
-          COUNT(DISTINCT t.id)::int AS post_count,
-          viewer_member.role AS viewer_role,
-          viewer_member.status AS viewer_membership_status,
-          COALESCE((
-            $1::text IS NOT NULL AND (
-              viewer_member.status = 'active' OR
-              viewer_member.role IN ('owner', 'moderator') OR
-              g.posting_permission = 'public'
-            )
-          ), false) AS viewer_can_post,
-          COALESCE((
-            viewer_member.role IN ('owner', 'moderator')
-          ), false) AS viewer_can_manage
-        FROM lajukan_groups g
-        LEFT JOIN lajukan_group_members active_members
-          ON active_members.group_id = g.id AND active_members.status = 'active'
-        LEFT JOIN lajukan_group_members viewer_member
-          ON viewer_member.group_id = g.id AND viewer_member.user_id = $1
-        LEFT JOIN lajukan_forum_threads t ON t.category_id = g.category_id
-        WHERE g.category_id = $2 AND g.status = 'active'
-        GROUP BY g.id, viewer_member.role, viewer_member.status
-        LIMIT 1
-        "#,
-    )
-    .bind(viewer_id)
-    .bind(category_id)
-    .fetch_optional(db)
-    .await
-    .map_err(internal_error)
-}
-
 fn can_post_to_group(group: &ForumGroup, actor: &AuthActor) -> bool {
-    if is_moderator(actor) || group.posting_permission == "public" {
+    if is_moderator(actor) {
+        return true;
+    }
+    if group.privacy == "public" && group.posting_permission == "public" {
         return true;
     }
     matches!(
@@ -2123,6 +2284,20 @@ fn can_post_to_group(group: &ForumGroup, actor: &AuthActor) -> bool {
 
 fn can_manage_group(group: &ForumGroup, actor: &AuthActor) -> bool {
     is_moderator(actor)
+        || matches!(
+            group.viewer_role.as_deref(),
+            Some("owner") | Some("moderator")
+        )
+}
+
+fn can_view_group_content(group: &ForumGroup, actor: Option<&AuthActor>) -> bool {
+    if group.privacy == "public" {
+        return true;
+    }
+    if actor.is_some_and(is_moderator) {
+        return true;
+    }
+    group.viewer_membership_status.as_deref() == Some("active")
         || matches!(
             group.viewer_role.as_deref(),
             Some("owner") | Some("moderator")
@@ -2173,6 +2348,12 @@ async fn get_group(
     let actor = optional_actor(&headers, &state);
     let viewer_id = actor.as_ref().map(forum_user_id);
     let group = fetch_group(&state.db, viewer_id.as_deref(), &group_id).await?;
+    if !can_view_group_content(&group, actor.as_ref()) {
+        return Err(ApiError::new(
+            StatusCode::FORBIDDEN,
+            "Join this group to view it",
+        ));
+    }
     Ok(Json(DataResponse { data: group }))
 }
 
@@ -2745,6 +2926,9 @@ async fn list_threads(
         FROM lajukan_forum_threads t
         JOIN lajukan_forum_categories c ON c.id = t.category_id
         JOIN lajukan_forum_users u ON u.id = t.author_id
+        LEFT JOIN lajukan_groups g ON g.id = t.group_id
+        LEFT JOIN lajukan_group_members viewer_member
+          ON viewer_member.group_id = g.id AND viewer_member.user_id = $5
         LEFT JOIN LATERAL (
           SELECT content
           FROM lajukan_forum_posts p
@@ -2764,12 +2948,25 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
+          AND (
+            t.group_id IS NULL OR
+            (
+              g.status = 'active' AND (
+                g.privacy = 'public' OR
+                viewer_member.status = 'active' OR
+                viewer_member.role IN ('owner', 'moderator') OR
+                $6::boolean
+              )
+            )
+          )
         "#,
     )
     .bind(category.as_deref())
     .bind(tag.as_deref())
     .bind(status.as_deref())
     .bind(q.as_deref())
+    .bind(viewer_id.as_deref())
+    .bind(actor.as_ref().is_some_and(is_moderator))
     .fetch_one(&state.db)
     .await
     .map_err(internal_error)?;
@@ -2777,7 +2974,7 @@ async fn list_threads(
     let rows = sqlx::query_as::<_, ThreadRow>(
         r#"
         SELECT
-          t.id, t.title, t.slug, t.category_id, t.author_id,
+          t.id, t.title, t.slug, t.category_id, t.group_id, t.author_id,
           t.created_at, t.last_activity_at, t.views, t.reply_count,
           t.like_count, t.bookmark_count, t.is_pinned, t.is_locked,
           t.is_solved, t.solution_post_id, t.status, t.image_urls,
@@ -2788,6 +2985,9 @@ async fn list_threads(
         FROM lajukan_forum_threads t
         JOIN lajukan_forum_categories c ON c.id = t.category_id
         JOIN lajukan_forum_users u ON u.id = t.author_id
+        LEFT JOIN lajukan_groups g ON g.id = t.group_id
+        LEFT JOIN lajukan_group_members viewer_member
+          ON viewer_member.group_id = g.id AND viewer_member.user_id = $5
         LEFT JOIN lajukan_forum_thread_tags tt ON tt.thread_id = t.id
         LEFT JOIN LATERAL (
           SELECT content
@@ -2808,21 +3008,34 @@ async fn list_threads(
             lower(c.name) LIKE '%' || lower($4) || '%' OR
             lower(coalesce(root.content, '')) LIKE '%' || lower($4) || '%'
           )
+          AND (
+            t.group_id IS NULL OR
+            (
+              g.status = 'active' AND (
+                g.privacy = 'public' OR
+                viewer_member.status = 'active' OR
+                viewer_member.role IN ('owner', 'moderator') OR
+                $6::boolean
+              )
+            )
+          )
         GROUP BY t.id
         ORDER BY
           t.is_pinned DESC,
-          CASE WHEN $5 = 'top' THEN (t.reply_count * 2 + t.views + t.like_count * 8) END DESC NULLS LAST,
-          CASE WHEN $5 IN ('new', 'latest') THEN t.created_at END DESC NULLS LAST,
-          CASE WHEN $5 = 'active' THEN t.last_activity_at END DESC NULLS LAST,
+          CASE WHEN $7 = 'top' THEN (t.reply_count * 2 + t.views + t.like_count * 8) END DESC NULLS LAST,
+          CASE WHEN $7 IN ('new', 'latest') THEN t.created_at END DESC NULLS LAST,
+          CASE WHEN $7 = 'active' THEN t.last_activity_at END DESC NULLS LAST,
           (t.reply_count * 2 + t.views + t.like_count * 8) DESC,
           t.last_activity_at DESC
-        LIMIT $6 OFFSET $7
+        LIMIT $8 OFFSET $9
         "#,
     )
     .bind(category.as_deref())
     .bind(tag.as_deref())
     .bind(status.as_deref())
     .bind(q.as_deref())
+    .bind(viewer_id.as_deref())
+    .bind(actor.as_ref().is_some_and(is_moderator))
     .bind(sort)
     .bind(page_size)
     .bind(offset)
@@ -2878,21 +3091,15 @@ async fn create_thread(
             .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid group category"))?;
         (category, Some(group))
     } else {
-        let category_input = payload.category.unwrap_or_default();
-        let category = find_category(&state.db, &category_input)
-            .await?
-            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid category"))?;
-        let group = fetch_group_by_category(&state.db, viewer_id, &category.id).await?;
-        if let Some(group) = group.as_ref() {
-            if !can_post_to_group(group, &actor) {
-                return Err(ApiError::new(
-                    StatusCode::FORBIDDEN,
-                    "Join this group before posting",
-                ));
-            }
-        }
-        (category, group)
+        let category_input = clean_optional(payload.category).unwrap_or_else(|| "fyp".to_string());
+        let category = if let Some(category) = find_category(&state.db, &category_input).await? {
+            category
+        } else {
+            find_default_feed_category(&state.db).await?
+        };
+        (category, None)
     };
+    let group_id = group.as_ref().map(|item| item.id.clone());
     let tags = normalize_tags(payload.tags);
 
     let thread_id = create_id("th");
@@ -2903,17 +3110,18 @@ async fn create_thread(
     sqlx::query(
         r#"
         INSERT INTO lajukan_forum_threads
-          (id, title, slug, category_id, author_id, created_at, last_activity_at,
+          (id, title, slug, category_id, group_id, author_id, created_at, last_activity_at,
            views, reply_count, like_count, bookmark_count, is_pinned, is_locked,
            is_solved, solution_post_id, status, image_urls)
         VALUES
-          ($1, $2, $3, $4, $5, now(), now(), 0, 0, 0, 0, false, false, false, NULL, 'open', $6)
+          ($1, $2, $3, $4, $5, $6, now(), now(), 0, 0, 0, 0, false, false, false, NULL, 'open', $7)
         "#,
     )
     .bind(&thread_id)
     .bind(&title)
     .bind(&slug)
     .bind(&category.id)
+    .bind(&group_id)
     .bind(&forum_user.id)
     .bind(&image_urls)
     .execute(&mut *tx)
@@ -2986,6 +3194,29 @@ async fn find_category(db: &PgPool, input: &str) -> ApiResult<Option<ForumCatego
     .fetch_optional(db)
     .await
     .map_err(internal_error)
+}
+
+async fn find_default_feed_category(db: &PgPool) -> ApiResult<ForumCategory> {
+    if let Some(category) = find_category(db, "fyp").await? {
+        return Ok(category);
+    }
+
+    sqlx::query_as::<_, ForumCategory>(
+        r#"
+        SELECT id, name, slug, description, icon, color, parent_id,
+               position AS "order", thread_count, post_count
+        FROM lajukan_forum_categories
+        WHERE NOT EXISTS (
+          SELECT 1 FROM lajukan_groups g WHERE g.category_id = lajukan_forum_categories.id
+        )
+        ORDER BY position ASC, name ASC
+        LIMIT 1
+        "#,
+    )
+    .fetch_optional(db)
+    .await
+    .map_err(internal_error)?
+    .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid category"))
 }
 
 fn normalize_tags(tags: Vec<String>) -> Vec<String> {
@@ -3075,7 +3306,7 @@ async fn get_thread(
         SET views = views + 1
         WHERE id = $1
         RETURNING
-          id, title, slug, category_id, author_id, created_at, last_activity_at, views,
+          id, title, slug, category_id, group_id, author_id, created_at, last_activity_at, views,
           reply_count, like_count, bookmark_count, is_pinned, is_locked, is_solved,
           solution_post_id, status, image_urls,
           COALESCE((
@@ -3091,6 +3322,16 @@ async fn get_thread(
     .map_err(internal_error)?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Thread not found"))?;
 
+    if let Some(group_id) = row.group_id.as_deref() {
+        let group = fetch_group(&state.db, viewer_id.as_deref(), group_id).await?;
+        if !can_view_group_content(&group, actor.as_ref()) {
+            return Err(ApiError::new(
+                StatusCode::FORBIDDEN,
+                "Join this group to view this post",
+            ));
+        }
+    }
+
     let mut enriched = enrich_threads(&state.db, vec![row], viewer_id.as_deref()).await?;
     Ok(Json(enriched.remove(0)))
 }
@@ -3099,7 +3340,7 @@ async fn get_thread_row(db: &PgPool, thread_id: &str) -> ApiResult<ThreadRow> {
     sqlx::query_as::<_, ThreadRow>(
         r#"
         SELECT
-          t.id, t.title, t.slug, t.category_id, t.author_id, t.created_at,
+          t.id, t.title, t.slug, t.category_id, t.group_id, t.author_id, t.created_at,
           t.last_activity_at, t.views, t.reply_count, t.like_count,
           t.bookmark_count, t.is_pinned, t.is_locked, t.is_solved,
           t.solution_post_id, t.status, t.image_urls,
@@ -3914,7 +4155,7 @@ async fn get_overview(State(state): State<Arc<AppState>>) -> ApiResult<Json<Valu
     let featured_rows = sqlx::query_as::<_, ThreadRow>(
         r#"
         SELECT
-          t.id, t.title, t.slug, t.category_id, t.author_id, t.created_at,
+          t.id, t.title, t.slug, t.category_id, t.group_id, t.author_id, t.created_at,
           t.last_activity_at, t.views, t.reply_count, t.like_count,
           t.bookmark_count, t.is_pinned, t.is_locked, t.is_solved,
           t.solution_post_id, t.status, t.image_urls,
@@ -3923,7 +4164,9 @@ async fn get_overview(State(state): State<Arc<AppState>>) -> ApiResult<Json<Valu
             '{}'
           ) AS tag_slugs
         FROM lajukan_forum_threads t
+        LEFT JOIN lajukan_groups g ON g.id = t.group_id
         LEFT JOIN lajukan_forum_thread_tags tt ON tt.thread_id = t.id
+        WHERE t.group_id IS NULL OR (g.status = 'active' AND g.privacy = 'public')
         GROUP BY t.id
         ORDER BY (t.reply_count * 2 + t.views + t.like_count * 8) DESC, t.last_activity_at DESC
         LIMIT 6
@@ -3956,7 +4199,7 @@ async fn search_forum(
     let rows = sqlx::query_as::<_, ThreadRow>(
         r#"
         SELECT
-          t.id, t.title, t.slug, t.category_id, t.author_id, t.created_at,
+          t.id, t.title, t.slug, t.category_id, t.group_id, t.author_id, t.created_at,
           t.last_activity_at, t.views, t.reply_count, t.like_count,
           t.bookmark_count, t.is_pinned, t.is_locked, t.is_solved,
           t.solution_post_id, t.status, t.image_urls,
@@ -3967,6 +4210,7 @@ async fn search_forum(
         FROM lajukan_forum_threads t
         JOIN lajukan_forum_users u ON u.id = t.author_id
         JOIN lajukan_forum_categories c ON c.id = t.category_id
+        LEFT JOIN lajukan_groups g ON g.id = t.group_id
         LEFT JOIN lajukan_forum_thread_tags tt ON tt.thread_id = t.id
         LEFT JOIN LATERAL (
           SELECT content
@@ -3975,10 +4219,13 @@ async fn search_forum(
           ORDER BY p.created_at ASC
           LIMIT 1
         ) root ON true
-        WHERE lower(t.title) LIKE '%' || lower($1) || '%'
-           OR lower(u.name) LIKE '%' || lower($1) || '%'
-           OR lower(c.name) LIKE '%' || lower($1) || '%'
-           OR lower(coalesce(root.content, '')) LIKE '%' || lower($1) || '%'
+        WHERE (
+             lower(t.title) LIKE '%' || lower($1) || '%'
+          OR lower(u.name) LIKE '%' || lower($1) || '%'
+          OR lower(c.name) LIKE '%' || lower($1) || '%'
+          OR lower(coalesce(root.content, '')) LIKE '%' || lower($1) || '%'
+        )
+          AND (t.group_id IS NULL OR (g.status = 'active' AND g.privacy = 'public'))
         GROUP BY t.id
         ORDER BY t.last_activity_at DESC
         LIMIT 20
@@ -4059,7 +4306,11 @@ async fn handle_media_upload(
             .content_type()
             .map(str::to_string)
             .unwrap_or_else(|| "application/octet-stream".to_string());
-        if !is_allowed_media_type(&content_type, allow_video) {
+        if !is_allowed_media_type(
+            &content_type,
+            allow_video,
+            file_name.as_deref(),
+        ) {
             continue;
         }
 
@@ -4067,7 +4318,7 @@ async fn handle_media_upload(
             .bytes()
             .await
             .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "Invalid media payload"))?;
-        let max_bytes = if is_allowed_video_type(&content_type) {
+        let max_bytes = if is_allowed_video_type(&content_type, file_name.as_deref()) {
             MAX_VIDEO_FILE_BYTES
         } else {
             MAX_FILE_BYTES
@@ -4153,6 +4404,7 @@ async fn list_reels(
           product_name, product_price, product_href,
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
+          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
           published_at
         FROM lajukan_reels
@@ -4220,6 +4472,7 @@ async fn list_reels_feed(
           product_name, product_price, product_href,
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
+          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
           published_at
         FROM lajukan_reels
@@ -4331,6 +4584,12 @@ async fn create_reel(
     let media_type = normalize_media_type(payload.media_type, &media_url);
     let tone = normalize_reel_tone(payload.tone);
     let icon_key = normalize_reel_icon(payload.icon_key);
+    let filter_preset = normalize_reel_filter_preset(payload.filter_preset);
+    let capture_mode = normalize_reel_capture_mode(payload.capture_mode);
+    let live_status = normalize_reel_live_status(payload.live_status, &capture_mode);
+    let live_title = sanitize_reel_live_title(payload.live_title);
+    let live_scheduled_at = parse_reel_live_scheduled_at(payload.live_scheduled_at);
+    let metadata = sanitize_reel_metadata(payload.metadata);
     let creator = sanitize_title(payload.creator.or(Some(forum_user.name.clone())), 80);
     let product_name = clean_optional(payload.product_name).map(|value| {
         value
@@ -4382,6 +4641,7 @@ async fn create_reel(
             product_name, product_price, product_href,
             video_src, source_url, likes_count, comments_count, shares_count,
             tone, icon_key, media_url, media_type, hook,
+            filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
             store_id, store_slug, store_name, store_city, store_phone, storefront_path,
             status, published_at, created_at, updated_at
           )
@@ -4392,6 +4652,7 @@ async fn create_reel(
             $10, $11, 0, 0, 0,
             $12, $13, $14, $15, $16,
             $17, $18, $19, $20, $21, $22,
+            $23, $24, $25, $26, $27, $28,
             'published', now(), now(), now()
           )
         RETURNING
@@ -4399,6 +4660,7 @@ async fn create_reel(
           product_name, product_price, product_href,
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
+          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
           published_at
         "#,
@@ -4419,6 +4681,12 @@ async fn create_reel(
     .bind(&media_url)
     .bind(&media_type)
     .bind(&hook)
+    .bind(&filter_preset)
+    .bind(&capture_mode)
+    .bind(&live_status)
+    .bind(&live_title)
+    .bind(&live_scheduled_at)
+    .bind(&metadata)
     .bind(&store_id)
     .bind(&store_slug)
     .bind(&store_name)
@@ -4435,12 +4703,454 @@ async fn create_reel(
         "reel.create",
         "reel",
         &reel_id,
-        json!({"storeSlug": store_slug, "mediaType": media_type}),
+        json!({
+            "storeSlug": store_slug,
+            "mediaType": media_type,
+            "captureMode": capture_mode,
+            "filterPreset": filter_preset,
+            "liveStatus": live_status
+        }),
     )
     .await?;
     tx.commit().await.map_err(internal_error)?;
 
     Ok((StatusCode::CREATED, Json(json!({ "reel": map_reel(row) }))))
+}
+
+async fn update_reel(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(reel_id): Path<String>,
+    Json(payload): Json<CreateReelRequest>,
+) -> ApiResult<Json<Value>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "reel:update", 180, 60).await?;
+    let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    let existing = get_reel_row(&state.db, &reel_id).await?;
+    if existing.creator_user_id.as_deref() != Some(actor.user_id.as_str()) && !is_moderator(&actor)
+    {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
+    }
+
+    let mut title = existing.title;
+    let mut caption = existing.caption;
+    let mut tag = existing.tag;
+    let mut product_name = existing.product_name;
+    let mut product_price = existing.product_price;
+    let mut product_href = existing.product_href;
+    let mut video_src = existing.video_src;
+    let mut source_url = existing.source_url;
+    let mut media_url = existing.media_url;
+    let mut media_type = existing.media_type;
+    let mut hook = existing.hook;
+    let mut tone = existing.tone;
+    let mut icon_key = existing.icon_key;
+    let mut filter_preset = existing.filter_preset;
+    let mut capture_mode = existing.capture_mode;
+    let mut live_status = existing.live_status;
+    let mut live_title = existing.live_title;
+    let mut live_scheduled_at = existing.live_scheduled_at;
+    let mut metadata = existing.metadata;
+    let mut store_id = existing.store_id;
+    let mut store_slug = existing.store_slug;
+    let mut store_name = existing.store_name;
+    let mut store_city = existing.store_city;
+    let mut store_phone = existing.store_phone;
+    let mut storefront_path = existing.storefront_path;
+
+    if payload.title.is_some() {
+        title = sanitize_title(payload.title, MAX_REEL_TITLE_LEN);
+        if title.is_empty() {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid title"));
+        }
+        safety_check(&title, false)?;
+    }
+    if payload.caption.is_some() {
+        caption = sanitize_body(payload.caption, MAX_REEL_CAPTION_LEN);
+        if caption.is_empty() {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid caption"));
+        }
+        safety_check(&caption, false)?;
+    }
+    if payload.tag.is_some() {
+        tag = sanitize_title(payload.tag, 48);
+        if tag.is_empty() {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid tag"));
+        }
+        safety_check(&tag, false)?;
+    }
+
+    if let Some(value) = payload.product_name {
+        product_name = clean_optional(Some(value)).map(|item| {
+            item.chars()
+                .filter(|ch| !ch.is_control())
+                .take(90)
+                .collect::<String>()
+        });
+    }
+    if let Some(value) = payload.product_price {
+        product_price = clean_optional(Some(value)).map(|item| {
+            item.chars()
+                .filter(|ch| !ch.is_control())
+                .take(60)
+                .collect::<String>()
+        });
+    }
+    if payload.product_href.is_some() {
+        product_href = sanitize_public_url(payload.product_href, true);
+    }
+    if let Some(value) = payload.media_url {
+        media_url = sanitize_public_url(Some(value), true)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid mediaUrl"))?;
+        video_src = media_url.clone();
+        source_url = media_url.clone();
+    }
+    if payload.video_src.is_some() {
+        video_src = sanitize_public_url(payload.video_src, true)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid videoSrc"))?;
+    }
+    if payload.source_url.is_some() {
+        source_url = sanitize_public_url(payload.source_url, true)
+            .ok_or_else(|| ApiError::new(StatusCode::BAD_REQUEST, "Invalid sourceUrl"))?;
+    }
+    if payload.media_type.is_some() {
+        media_type = normalize_media_type(payload.media_type, &media_url);
+    }
+    if payload.hook.is_some() {
+        hook = sanitize_body(payload.hook, 160);
+    }
+    if payload.tone.is_some() {
+        tone = normalize_reel_tone(payload.tone);
+    }
+    if payload.icon_key.is_some() {
+        icon_key = normalize_reel_icon(payload.icon_key);
+    }
+    if payload.filter_preset.is_some() {
+        filter_preset = normalize_reel_filter_preset(payload.filter_preset);
+    }
+    if payload.capture_mode.is_some() {
+        capture_mode = normalize_reel_capture_mode(payload.capture_mode);
+        live_status = normalize_reel_live_status(Some(live_status), &capture_mode);
+    }
+    if payload.live_status.is_some() {
+        live_status = normalize_reel_live_status(payload.live_status, &capture_mode);
+    }
+    if payload.live_title.is_some() {
+        live_title = sanitize_reel_live_title(payload.live_title);
+    }
+    if payload.live_scheduled_at.is_some() {
+        live_scheduled_at = parse_reel_live_scheduled_at(payload.live_scheduled_at);
+    }
+    if payload.metadata.is_some() {
+        metadata = sanitize_reel_metadata(payload.metadata);
+    }
+    if let Some(value) = payload.store_name {
+        store_name = sanitize_title(Some(value), 90);
+        if store_name.is_empty() {
+            store_name = title.clone();
+        }
+    }
+    if let Some(value) = payload.store_slug {
+        let next_slug = build_slug(&value);
+        if !next_slug.is_empty() {
+            store_slug = next_slug;
+        }
+    }
+    if let Some(value) = payload.store_id {
+        store_id = clean_auth_id(&value);
+    }
+    if payload.store_city.is_some() {
+        store_city = sanitize_title(payload.store_city, 64);
+    }
+    if let Some(value) = payload.store_phone {
+        store_phone = clean_optional(Some(value)).map(|item| {
+            item.chars()
+                .filter(|ch| ch.is_ascii_digit() || matches!(ch, '+' | '-' | ' ' | '(' | ')'))
+                .take(32)
+                .collect::<String>()
+        });
+    }
+    if payload.storefront_path.is_some() {
+        storefront_path = sanitize_public_url(payload.storefront_path, true)
+            .unwrap_or_else(|| format!("/toko/{store_slug}"));
+    }
+
+    let mut tx = state.db.begin().await.map_err(internal_error)?;
+    let row = sqlx::query_as::<_, ReelRow>(
+        r#"
+        UPDATE lajukan_reels
+        SET
+          title = $2, caption = $3, tag = $4,
+          product_name = $5, product_price = $6, product_href = $7,
+          video_src = $8, source_url = $9,
+          tone = $10, icon_key = $11, media_url = $12, media_type = $13, hook = $14,
+          filter_preset = $15, capture_mode = $16, live_status = $17,
+          live_title = $18, live_scheduled_at = $19, metadata = $20,
+          store_id = $21, store_slug = $22, store_name = $23, store_city = $24,
+          store_phone = $25, storefront_path = $26, updated_at = now()
+        WHERE id = $1 AND status = 'published'
+        RETURNING
+          id, creator_user_id, creator, title, caption, tag,
+          product_name, product_price, product_href,
+          video_src, source_url, likes_count, comments_count, shares_count,
+          tone, icon_key, media_url, media_type, hook,
+          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
+          store_id, store_slug, store_name, store_city, store_phone, storefront_path,
+          published_at
+        "#,
+    )
+    .bind(&reel_id)
+    .bind(&title)
+    .bind(&caption)
+    .bind(&tag)
+    .bind(&product_name)
+    .bind(&product_price)
+    .bind(&product_href)
+    .bind(&video_src)
+    .bind(&source_url)
+    .bind(&tone)
+    .bind(&icon_key)
+    .bind(&media_url)
+    .bind(&media_type)
+    .bind(&hook)
+    .bind(&filter_preset)
+    .bind(&capture_mode)
+    .bind(&live_status)
+    .bind(&live_title)
+    .bind(&live_scheduled_at)
+    .bind(&metadata)
+    .bind(&store_id)
+    .bind(&store_slug)
+    .bind(&store_name)
+    .bind(&store_city)
+    .bind(&store_phone)
+    .bind(&storefront_path)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(internal_error)?
+    .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Reel not found"))?;
+
+    record_audit(
+        &mut tx,
+        &forum_user.id,
+        "reel.update",
+        "reel",
+        &reel_id,
+        json!({}),
+    )
+    .await?;
+    tx.commit().await.map_err(internal_error)?;
+
+    Ok(Json(json!({ "reel": map_reel(row) })))
+}
+
+async fn delete_reel(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(reel_id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "reel:delete", 120, 40).await?;
+    let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    let existing = get_reel_row(&state.db, &reel_id).await?;
+    if existing.creator_user_id.as_deref() != Some(actor.user_id.as_str()) && !is_moderator(&actor)
+    {
+        return Err(ApiError::new(StatusCode::FORBIDDEN, "Forbidden"));
+    }
+
+    let mut tx = state.db.begin().await.map_err(internal_error)?;
+    sqlx::query(
+        r#"
+        UPDATE lajukan_reels
+        SET status = 'archived', updated_at = now()
+        WHERE id = $1 AND status = 'published'
+        "#,
+    )
+    .bind(&reel_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(internal_error)?;
+    record_audit(
+        &mut tx,
+        &forum_user.id,
+        "reel.delete",
+        "reel",
+        &reel_id,
+        json!({}),
+    )
+    .await?;
+    tx.commit().await.map_err(internal_error)?;
+
+    Ok(Json(json!({ "ok": true })))
+}
+
+async fn get_reel_viewer_state(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(reel_id): Path<String>,
+) -> ApiResult<Json<ReelViewerState>> {
+    let reel = get_reel_row(&state.db, &reel_id).await?;
+    let Some(actor) = optional_actor(&headers, &state) else {
+        return Ok(Json(ReelViewerState::default()));
+    };
+    let actor_user_id = forum_user_id(&actor);
+    let viewer_state = fetch_reel_viewer_state(
+        &state.db,
+        &reel_id,
+        &actor_user_id,
+        reel.creator_user_id.as_deref(),
+    )
+    .await?;
+
+    Ok(Json(viewer_state))
+}
+
+async fn set_reel_action(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(reel_id): Path<String>,
+    Json(payload): Json<ReelActionRequest>,
+) -> ApiResult<Json<Value>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "reel:action", 300, 120).await?;
+    let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    let reel = get_reel_row(&state.db, &reel_id).await?;
+    let action = normalize_reel_action(payload.action)?;
+    let active = payload.active.unwrap_or(true);
+
+    let target_user_id = if action == "follow" {
+        let target = reel
+            .creator_user_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                ApiError::new(
+                    StatusCode::BAD_REQUEST,
+                    "Creator reels belum bisa diikuti dari data ini",
+                )
+            })?;
+        if target == actor.user_id {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Tidak perlu follow akun sendiri",
+            ));
+        }
+        Some(target.to_string())
+    } else {
+        None
+    };
+
+    let mut tx = state.db.begin().await.map_err(internal_error)?;
+    let changed = if active {
+        let inserted: i64 = sqlx::query_scalar(
+            r#"
+            WITH inserted AS (
+              INSERT INTO lajukan_reel_user_actions
+                (id, reel_id, actor_user_id, target_user_id, action, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, now(), now())
+              ON CONFLICT DO NOTHING
+              RETURNING 1
+            )
+            SELECT COUNT(*)::bigint FROM inserted
+            "#,
+        )
+        .bind(create_id("ra"))
+        .bind(&reel_id)
+        .bind(&forum_user.id)
+        .bind(target_user_id.as_deref())
+        .bind(&action)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(internal_error)?;
+        inserted > 0
+    } else if action == "follow" {
+        let Some(target) = target_user_id.as_deref() else {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid follow target",
+            ));
+        };
+        sqlx::query(
+            r#"
+            DELETE FROM lajukan_reel_user_actions
+            WHERE actor_user_id = $1 AND action = 'follow' AND target_user_id = $2
+            "#,
+        )
+        .bind(&forum_user.id)
+        .bind(target)
+        .execute(&mut *tx)
+        .await
+        .map_err(internal_error)?
+        .rows_affected()
+            > 0
+    } else {
+        sqlx::query(
+            r#"
+            DELETE FROM lajukan_reel_user_actions
+            WHERE reel_id = $1 AND actor_user_id = $2 AND action = $3
+            "#,
+        )
+        .bind(&reel_id)
+        .bind(&forum_user.id)
+        .bind(&action)
+        .execute(&mut *tx)
+        .await
+        .map_err(internal_error)?
+        .rows_affected()
+            > 0
+    };
+
+    if changed && action == "like" {
+        if active {
+            sqlx::query(
+                "UPDATE lajukan_reels SET likes_count = likes_count + 1, updated_at = now() WHERE id = $1",
+            )
+            .bind(&reel_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(internal_error)?;
+        } else {
+            sqlx::query(
+                "UPDATE lajukan_reels SET likes_count = GREATEST(likes_count - 1, 0), updated_at = now() WHERE id = $1",
+            )
+            .bind(&reel_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(internal_error)?;
+        }
+    }
+
+    record_audit(
+        &mut tx,
+        &forum_user.id,
+        if active {
+            "reel.action.set"
+        } else {
+            "reel.action.unset"
+        },
+        "reel",
+        &reel_id,
+        json!({"action": action, "changed": changed}),
+    )
+    .await?;
+    tx.commit().await.map_err(internal_error)?;
+
+    let reel = get_reel_row(&state.db, &reel_id).await?;
+    let viewer_state = fetch_reel_viewer_state(
+        &state.db,
+        &reel_id,
+        &forum_user.id,
+        reel.creator_user_id.as_deref(),
+    )
+    .await?;
+
+    Ok(Json(json!({
+        "ok": true,
+        "changed": changed,
+        "reel": map_reel(reel),
+        "actionState": viewer_state,
+    })))
 }
 
 async fn record_reel_event(
@@ -4459,6 +5169,12 @@ async fn record_reel_event(
         "view" | "watch" | "like" | "share" | "comment" | "open_store" | "open_product"
     ) {
         return Err(ApiError::new(StatusCode::BAD_REQUEST, "Invalid reel event"));
+    }
+    if matches!(event.as_str(), "like" | "comment") {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Use dedicated reel action or comment endpoint",
+        ));
     }
 
     let actor = optional_actor(&headers, &state);
@@ -4497,22 +5213,8 @@ async fn record_reel_event(
     .map_err(internal_error)?;
 
     match event.as_str() {
-        "like" => {
-            sqlx::query("UPDATE lajukan_reels SET likes_count = likes_count + 1, updated_at = now() WHERE id = $1")
-                .bind(&reel_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(internal_error)?;
-        }
         "share" => {
             sqlx::query("UPDATE lajukan_reels SET shares_count = shares_count + 1, updated_at = now() WHERE id = $1")
-                .bind(&reel_id)
-                .execute(&mut *tx)
-                .await
-                .map_err(internal_error)?;
-        }
-        "comment" => {
-            sqlx::query("UPDATE lajukan_reels SET comments_count = comments_count + 1, updated_at = now() WHERE id = $1")
                 .bind(&reel_id)
                 .execute(&mut *tx)
                 .await
@@ -4539,7 +5241,7 @@ async fn list_reel_comments(
     let mut rows = sqlx::query_as::<_, ReelCommentRow>(
         r#"
         SELECT
-          id, reel_id, author_user_id, author_name, author_avatar_url,
+          id, reel_id, author_user_id, author_name,
           parent_comment_id, body, reply_count, created_at
         FROM lajukan_reel_comments
         WHERE reel_id = $1 AND status = 'published'
@@ -4613,7 +5315,7 @@ async fn create_reel_comment(
           )
         VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', now(), now())
         RETURNING
-          id, reel_id, author_user_id, author_name, author_avatar_url,
+          id, reel_id, author_user_id, author_name,
           parent_comment_id, body, reply_count, created_at
         "#,
     )
@@ -4653,6 +5355,7 @@ async fn create_reel_comment(
           product_name, product_price, product_href,
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
+          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
           published_at
         "#,
@@ -4727,6 +5430,7 @@ async fn get_reel_row(db: &PgPool, reel_id: &str) -> ApiResult<ReelRow> {
           product_name, product_price, product_href,
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
+          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path,
           published_at
         FROM lajukan_reels
@@ -4738,6 +5442,53 @@ async fn get_reel_row(db: &PgPool, reel_id: &str) -> ApiResult<ReelRow> {
     .await
     .map_err(internal_error)?
     .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Reel not found"))
+}
+
+fn normalize_reel_action(value: Option<String>) -> ApiResult<String> {
+    let action = value.unwrap_or_default().trim().to_ascii_lowercase();
+    if matches!(action.as_str(), "like" | "save" | "follow") {
+        Ok(action)
+    } else {
+        Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid reel action",
+        ))
+    }
+}
+
+async fn fetch_reel_viewer_state(
+    db: &PgPool,
+    reel_id: &str,
+    actor_user_id: &str,
+    creator_user_id: Option<&str>,
+) -> ApiResult<ReelViewerState> {
+    let actions = sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT action
+        FROM lajukan_reel_user_actions
+        WHERE actor_user_id = $1
+          AND (
+            reel_id = $2
+            OR (
+              $3::text IS NOT NULL
+              AND action = 'follow'
+              AND target_user_id = $3
+            )
+          )
+        "#,
+    )
+    .bind(actor_user_id)
+    .bind(reel_id)
+    .bind(creator_user_id)
+    .fetch_all(db)
+    .await
+    .map_err(internal_error)?;
+
+    Ok(ReelViewerState {
+        liked: actions.iter().any(|action| action == "like"),
+        saved: actions.iter().any(|action| action == "save"),
+        followed: actions.iter().any(|action| action == "follow"),
+    })
 }
 
 fn map_reel(row: ReelRow) -> LajukanReel {
@@ -4763,6 +5514,12 @@ fn map_reel(row: ReelRow) -> LajukanReel {
         tone: row.tone,
         icon_key: row.icon_key,
         media_type: row.media_type,
+        filter_preset: row.filter_preset,
+        capture_mode: row.capture_mode,
+        live_status: row.live_status,
+        live_title: row.live_title,
+        live_scheduled_at: row.live_scheduled_at,
+        metadata: row.metadata,
     }
 }
 
@@ -4773,7 +5530,7 @@ fn map_reel_comment(row: ReelCommentRow) -> ReelComment {
         parent_comment_id: row.parent_comment_id,
         author_user_id: row.author_user_id,
         author_name: row.author_name,
-        author_avatar_url: row.author_avatar_url,
+        author_avatar_url: Some("/default-avatar.svg".to_string()),
         body: row.body,
         reply_count: row.reply_count,
         created_at: row.created_at,
@@ -4792,6 +5549,11 @@ fn map_reel_feed_item(row: ReelRow) -> ReelFeedItem {
         } else {
             row.hook
         },
+        filter_preset: row.filter_preset,
+        capture_mode: row.capture_mode,
+        live_status: row.live_status,
+        live_title: row.live_title,
+        live_scheduled_at: row.live_scheduled_at,
         store: ReelFeedStore {
             id: row.store_id,
             slug: row.store_slug,
@@ -4837,7 +5599,7 @@ async fn get_community_feed(
     let mut rows = sqlx::query_as::<_, ThreadRow>(
         r#"
         SELECT
-          t.id, t.title, t.slug, t.category_id, t.author_id, t.created_at,
+          t.id, t.title, t.slug, t.category_id, t.group_id, t.author_id, t.created_at,
           t.last_activity_at, t.views, t.reply_count, t.like_count,
           t.bookmark_count, t.is_pinned, t.is_locked, t.is_solved,
           t.solution_post_id, t.status, t.image_urls,
@@ -4848,6 +5610,9 @@ async fn get_community_feed(
         FROM lajukan_forum_threads t
         JOIN lajukan_forum_categories c ON c.id = t.category_id
         JOIN lajukan_forum_users u ON u.id = t.author_id
+        LEFT JOIN lajukan_groups g ON g.id = t.group_id
+        LEFT JOIN lajukan_group_members viewer_member
+          ON viewer_member.group_id = g.id AND viewer_member.user_id = $5
         LEFT JOIN lajukan_forum_thread_tags tt ON tt.thread_id = t.id
         LEFT JOIN LATERAL (
           SELECT content
@@ -4868,20 +5633,33 @@ async fn get_community_feed(
             lower(coalesce(root.content, '')) LIKE '%' || lower($3) || '%'
           )
           AND ($4::text IS NULL OR c.slug ILIKE '%community%' OR c.name ILIKE '%community%' OR c.name ILIKE '%komunitas%')
+          AND (
+            t.group_id IS NULL OR
+            (
+              g.status = 'active' AND (
+                g.privacy = 'public' OR
+                viewer_member.status = 'active' OR
+                viewer_member.role IN ('owner', 'moderator') OR
+                $6::boolean
+              )
+            )
+          )
         GROUP BY t.id
         ORDER BY
-          CASE WHEN t.id = $5 THEN 0 ELSE 1 END,
+          CASE WHEN t.id = $7 THEN 0 ELSE 1 END,
           t.created_at DESC,
           t.is_pinned DESC,
           t.last_activity_at DESC,
           (t.reply_count * 2 + t.views + t.like_count * 8) DESC
-        LIMIT $6 OFFSET $7
+        LIMIT $8 OFFSET $9
         "#,
     )
     .bind(category.as_deref())
     .bind(tag.as_deref())
     .bind(q.as_deref())
     .bind(if tab == "community" { Some("community") } else { None })
+    .bind(viewer_id.as_deref())
+    .bind(actor.as_ref().is_some_and(is_moderator))
     .bind(requested_thread.as_deref())
     .bind(limit)
     .bind(cursor)
@@ -4951,7 +5729,7 @@ async fn search_community(
         let rows = sqlx::query_as::<_, ThreadRow>(
             r#"
             SELECT
-              t.id, t.title, t.slug, t.category_id, t.author_id, t.created_at,
+          t.id, t.title, t.slug, t.category_id, t.group_id, t.author_id, t.created_at,
               t.last_activity_at, t.views, t.reply_count, t.like_count,
               t.bookmark_count, t.is_pinned, t.is_locked, t.is_solved,
               t.solution_post_id, t.status, t.image_urls,
@@ -4962,6 +5740,9 @@ async fn search_community(
             FROM lajukan_forum_threads t
             JOIN lajukan_forum_categories c ON c.id = t.category_id
             JOIN lajukan_forum_users u ON u.id = t.author_id
+            LEFT JOIN lajukan_groups g ON g.id = t.group_id
+            LEFT JOIN lajukan_group_members viewer_member
+              ON viewer_member.group_id = g.id AND viewer_member.user_id = $2
             LEFT JOIN lajukan_forum_thread_tags tt ON tt.thread_id = t.id
             LEFT JOIN LATERAL (
               SELECT content
@@ -4979,12 +5760,25 @@ async fn search_community(
                 lower(c.slug) LIKE '%' || lower($1) || '%' OR
                 lower(coalesce(root.content, '')) LIKE '%' || lower($1) || '%'
               )
+              AND (
+                t.group_id IS NULL OR
+                (
+                  g.status = 'active' AND (
+                    g.privacy = 'public' OR
+                    viewer_member.status = 'active' OR
+                    viewer_member.role IN ('owner', 'moderator') OR
+                    $3::boolean
+                  )
+                )
+              )
             GROUP BY t.id
             ORDER BY t.created_at DESC, t.last_activity_at DESC
-            LIMIT $2
+            LIMIT $4
             "#,
         )
         .bind(&q)
+        .bind(viewer_id.as_deref())
+        .bind(actor.as_ref().is_some_and(is_moderator))
         .bind(limit)
         .fetch_all(&state.db)
         .await
@@ -5063,6 +5857,7 @@ async fn build_reel_community_items(
           product_name, product_price, product_href,
           video_src, source_url, likes_count, comments_count, shares_count,
           tone, icon_key, media_url, media_type, hook,
+          filter_preset, capture_mode, live_status, live_title, live_scheduled_at, metadata,
           store_id, store_slug, store_name, store_city, store_phone, storefront_path
         FROM lajukan_reels
         WHERE status = 'published'
@@ -5138,12 +5933,12 @@ async fn build_feed_items(
     viewer_id: Option<&str>,
 ) -> ApiResult<Vec<CommunityFeedItem>> {
     let thread_ids = rows.iter().map(|row| row.id.clone()).collect::<Vec<_>>();
-    let category_ids = rows
+    let group_ids = rows
         .iter()
-        .map(|row| row.category_id.clone())
+        .filter_map(|row| row.group_id.clone())
         .collect::<Vec<_>>();
     let roots = fetch_root_posts_for_threads(db, &thread_ids).await?;
-    let groups = fetch_groups_for_categories(db, viewer_id, &category_ids).await?;
+    let groups = fetch_groups_for_ids(db, viewer_id, &group_ids).await?;
     let enriched = enrich_threads(db, rows, viewer_id).await?;
 
     Ok(enriched
@@ -5161,7 +5956,11 @@ async fn build_feed_items(
                 .or_else(|| root.and_then(|post| post.image_urls.first().cloned()));
             let author = thread.author.clone().unwrap_or_else(system_user);
             let category = thread.category.clone();
-            let group = groups.get(&thread.category_id).cloned();
+            let group = thread
+                .group_id
+                .as_ref()
+                .and_then(|group_id| groups.get(group_id))
+                .cloned();
             CommunityFeedItem {
                 id: format!("discussion-{}", thread.id),
                 kind: "discussion".to_string(),
@@ -5359,6 +6158,7 @@ async fn enrich_threads(
                 title: row.title,
                 slug: row.slug,
                 category_id: row.category_id.clone(),
+                group_id: row.group_id.clone(),
                 author_id: row.author_id.clone(),
                 created_at: row.created_at,
                 last_activity_at: row.last_activity_at,
@@ -5485,12 +6285,12 @@ async fn fetch_categories_map(
     Ok(rows.into_iter().map(|row| (row.id.clone(), row)).collect())
 }
 
-async fn fetch_groups_for_categories(
+async fn fetch_groups_for_ids(
     db: &PgPool,
     viewer_id: Option<&str>,
-    category_ids: &[String],
+    group_ids: &[String],
 ) -> ApiResult<HashMap<String, ForumGroup>> {
-    if category_ids.is_empty() {
+    if group_ids.is_empty() {
         return Ok(HashMap::new());
     }
     let rows = sqlx::query_as::<_, ForumGroup>(
@@ -5514,7 +6314,7 @@ async fn fetch_groups_for_categories(
             $1::text IS NOT NULL AND (
               viewer_member.status = 'active' OR
               viewer_member.role IN ('owner', 'moderator') OR
-              g.posting_permission = 'public'
+              (g.privacy = 'public' AND g.posting_permission = 'public')
             )
           ), false) AS viewer_can_post,
           COALESCE((
@@ -5525,20 +6325,22 @@ async fn fetch_groups_for_categories(
           ON active_members.group_id = g.id AND active_members.status = 'active'
         LEFT JOIN lajukan_group_members viewer_member
           ON viewer_member.group_id = g.id AND viewer_member.user_id = $1
-        LEFT JOIN lajukan_forum_threads t ON t.category_id = g.category_id
-        WHERE g.category_id = ANY($2) AND g.status = 'active'
+        LEFT JOIN lajukan_forum_threads t ON t.group_id = g.id
+        WHERE g.id = ANY($2) AND g.status = 'active'
+          AND (
+            g.privacy = 'public' OR
+            viewer_member.status = 'active' OR
+            viewer_member.role IN ('owner', 'moderator')
+          )
         GROUP BY g.id, viewer_member.role, viewer_member.status
         "#,
     )
     .bind(viewer_id)
-    .bind(category_ids)
+    .bind(group_ids)
     .fetch_all(db)
     .await
     .map_err(internal_error)?;
-    Ok(rows
-        .into_iter()
-        .map(|row| (row.category_id.clone(), row))
-        .collect())
+    Ok(rows.into_iter().map(|row| (row.id.clone(), row)).collect())
 }
 
 async fn fetch_tags_map(db: &PgPool, tag_slugs: &[String]) -> ApiResult<HashMap<String, ForumTag>> {
@@ -5686,7 +6488,7 @@ fn map_feed_author(user: &ForumUser) -> CommunityFeedAuthor {
         id: user.id.clone(),
         name: user.name.clone(),
         title: user.title.clone(),
-        avatar_url: user.avatar_url.clone(),
+        avatar_url: "/default-avatar.svg".to_string(),
         reputation: user.reputation,
     }
 }

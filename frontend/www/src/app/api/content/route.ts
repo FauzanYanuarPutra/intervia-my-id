@@ -5,6 +5,7 @@ import {
   shouldIncludeOwnerProfiles,
 } from '@/lib/content/ownerProfiles';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
+import { DEFAULT_PROFILE_AVATAR } from '@/lib/profile/avatar';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -28,6 +29,16 @@ type SearchType =
   | 'business_transfer'
   | 'umkm';
 type SearchContentType = Exclude<SearchType, 'all' | 'umkm'>;
+
+function defaultPriceUnitForContentType(type: SearchContentType): string {
+  if (type === 'property') return 'month';
+  if (type === 'tool_rental') return 'day';
+  if (type === 'job') return 'month';
+  if (type === 'freelancer') return 'hour';
+  if (type === 'service') return 'project';
+  if (type === 'business_transfer') return 'deal';
+  return 'pcs';
+}
 
 type DiscoverUser = {
   id: string;
@@ -150,14 +161,28 @@ function normalizeSearchType(value: string | null): SearchType {
 }
 
 function isDiscoverableTalentUser(user: DiscoverUser): boolean {
+  const displayName =
+    asString(user.full_name) || asString(user.username) || asString(user.email);
+  const roles = collectUserRoles(user);
+  const hasTalentRole = roles.some(role =>
+    /freelancer|talent|creator|admin|sales|marketing|designer|developer|operator|driver|host|cs|support|consultant/.test(
+      role,
+    ),
+  );
+  const hasTalentProfile = hasValue(user.freelancer_profile);
+  const hasWorkSignal =
+    hasTalentProfile ||
+    hasTalentRole ||
+    hasValue(user.hourly_rate) ||
+    hasValue(user.level);
+  const hasProfileBasics = Boolean(
+    displayName && asString(user.headline) && asString(user.location),
+  );
+
   return Boolean(
-    asString(user.full_name) ||
-    asString(user.username) ||
-    asString(user.headline) ||
-    asString(user.location) ||
-    (Array.isArray(user.roles) && user.roles.length > 0) ||
-    hasValue(user.freelancer_profile) ||
-    hasValue(user.hourly_rate),
+    displayName &&
+    hasWorkSignal &&
+    (hasTalentProfile || hasProfileBasics || hasValue(user.hourly_rate)),
   );
 }
 
@@ -307,6 +332,7 @@ function buildPersonSearchRecord({
   summary,
   priceCents,
   priceLabel,
+  priceUnit,
   searchKind,
   profile,
 }: {
@@ -317,6 +343,7 @@ function buildPersonSearchRecord({
   summary: string;
   priceCents: number | null;
   priceLabel?: string;
+  priceUnit?: string;
   searchKind: string;
   profile?: ContentRecord | null;
 }): ContentRecord {
@@ -347,8 +374,9 @@ function buildPersonSearchRecord({
     category: contentType,
     content_status: 'active',
     status: 'active',
-    cover_image: asString(user.avatar_url) || null,
+    cover_image: DEFAULT_PROFILE_AVATAR,
     price_cents: priceCents,
+    price_unit: priceUnit || defaultPriceUnitForContentType(contentType),
     currency: 'IDR',
     created_at: createdAt,
     updated_at: createdAt,
@@ -356,7 +384,7 @@ function buildPersonSearchRecord({
       id: user.id,
       username: user.username || null,
       full_name: user.full_name || displayName,
-      avatar_url: user.avatar_url || null,
+      avatar_url: DEFAULT_PROFILE_AVATAR,
       location: user.location || userLocation,
       headline: asString(user.headline) || asString(profile?.headline) || null,
       roles: collectUserRoles(user),
@@ -371,6 +399,7 @@ function buildPersonSearchRecord({
       search_kind: searchKind,
       search_domain: contentType,
       search_price_label: priceLabel || undefined,
+      price_unit: priceUnit || defaultPriceUnitForContentType(contentType),
       public_path: publicPath,
       display_name: displayName,
       location: userLocation,
@@ -438,6 +467,12 @@ function buildProviderSearchRecord(user: DiscoverUser): ContentRecord | null {
     summary,
     priceCents,
     priceLabel: priceCents ? compactIdr(priceCents) : undefined,
+    priceUnit:
+      asString(profile.price_unit) ||
+      asString(profile.rate_period) ||
+      (priceCents && toCentsFromMajor(user.hourly_rate) === priceCents
+        ? 'hour'
+        : 'project'),
     searchKind: 'provider_profile',
     profile,
   });
@@ -907,10 +942,11 @@ function mapUserToFreelancerContent(
     category: 'freelancer',
     content_status: 'active',
     status: 'active',
-    cover_image: user.avatar_url || null,
+    cover_image: DEFAULT_PROFILE_AVATAR,
     owner_id: user.id,
     price_cents:
       hourlyRate != null ? Math.max(0, Math.round(hourlyRate * 100)) : 0,
+    price_unit: 'hour',
     currency: 'IDR',
     rating: rating ?? undefined,
     seller_stats: {
@@ -921,7 +957,7 @@ function mapUserToFreelancerContent(
       id: user.id,
       username: user.username || null,
       full_name: user.full_name || displayName,
-      avatar_url: user.avatar_url || null,
+      avatar_url: DEFAULT_PROFILE_AVATAR,
       location: user.location || null,
       headline: user.headline || null,
       roles: Array.isArray(user.roles) ? user.roles : [],
@@ -942,7 +978,7 @@ function mapUserToFreelancerContent(
       username: user.username || null,
       email: user.email || null,
       phone: user.phone || null,
-      avatar_url: user.avatar_url || null,
+      avatar_url: DEFAULT_PROFILE_AVATAR,
       location: user.location || null,
       headline: user.headline || null,
       roles: Array.isArray(user.roles) ? user.roles : [],
@@ -950,6 +986,7 @@ function mapUserToFreelancerContent(
       rating: rating ?? null,
       completed_jobs: completedJobs ?? null,
       hourly_rate: hourlyRate ?? null,
+      price_unit: 'hour',
     },
   };
 }

@@ -26,7 +26,7 @@ export async function POST(
       async (ctx) =>
         withIdempotency(req, {
           scope: `wallet-topup-cancel:${id}`,
-          actorHint: ctx.token,
+          actorHint: ctx.userId,
           forward: () =>
             fetch(`${MARKETPLACE_URL}/v1/wallet/topups/${encodeURIComponent(id)}/cancel`, {
               method: 'POST',

@@ -76,6 +76,7 @@ export function CreatePageHeader({
   const isCompact = uiVariant === 'compact';
   const isQuickMode = supportsSimpleMode && listingMode === 'simple';
   const stepProgress = Math.round((currentStep / totalSteps) * 100);
+  const steps = Array.from({ length: totalSteps }, (_, index) => index + 1);
   const showModeSwitch = supportsSimpleMode && !hideModeSwitch;
   const readinessLabel =
     publishBlockersCount > 0
@@ -176,8 +177,7 @@ export function CreatePageHeader({
         </div>
 
         <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {Array.from({ length: totalSteps }).map((_, idx) => {
-            const step = idx + 1;
+          {steps.map(step => {
             const active = currentStep === step;
             const done = currentStep > step;
             const clickable = step < currentStep;
@@ -211,11 +211,23 @@ export function CreatePageHeader({
           })}
         </div>
 
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white dark:bg-slate-900">
-          <div
-            className="h-full rounded-full bg-[color:var(--app-accent)] transition-[width] duration-300"
-            style={{ width: `${stepProgress}%` }}
-          />
+        <div className="mt-3 grid grid-cols-4 gap-1.5" aria-hidden="true">
+          {steps.map(step => {
+            const active = currentStep === step;
+            const done = currentStep > step;
+            return (
+              <div
+                key={`meter-${step}`}
+                className={`h-2 rounded-full transition ${
+                  active
+                    ? 'bg-[color:var(--app-accent)] shadow-[0_8px_18px_-12px_color-mix(in_srgb,var(--app-accent)_70%,transparent)]'
+                    : done
+                      ? 'bg-[color:color-mix(in_srgb,var(--app-accent)_70%,white_30%)]'
+                      : 'bg-white/80 ring-1 ring-[color:var(--app-border)] dark:bg-slate-900'
+                }`}
+              />
+            );
+          })}
         </div>
       </div>
 

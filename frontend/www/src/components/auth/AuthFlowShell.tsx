@@ -71,12 +71,6 @@ export default function AuthFlowShell({
         </div>
 
         <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_22px_54px_-42px_rgba(15,23,42,0.42)] sm:p-5">
-          {badge ? (
-            <p className="inline-flex rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
-              {badge}
-            </p>
-          ) : null}
-
           <div className={badge ? 'mt-2' : ''}>
             <h1 className="text-[1.48rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.62rem]">
               {title}
@@ -96,11 +90,10 @@ export default function AuthFlowShell({
                   {Array.from({ length: safeTotalSteps }).map((_, index) => (
                     <span
                       key={index}
-                      className={`h-2 rounded-full transition-all ${
-                        index + 1 <= safeStep
+                      className={`h-2 rounded-full transition-all ${index + 1 <= safeStep
                           ? 'w-6 bg-[color:var(--app-accent)]'
                           : 'w-2 bg-[color:var(--app-surface-muted)]'
-                      }`}
+                        }`}
                     />
                   ))}
                 </div>

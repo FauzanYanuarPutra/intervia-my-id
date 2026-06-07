@@ -34,6 +34,7 @@ const MAX_METADATA_DEPTH: usize = 6;
 const MAX_METADATA_ARRAY_ITEMS: usize = 64;
 const MAX_METADATA_OBJECT_KEYS: usize = 80;
 const MAX_STRING_LEN: usize = 500;
+const DEFAULT_PROFILE_AVATAR: &str = "/default-avatar.svg";
 
 // ============================================================
 // Types
@@ -544,8 +545,7 @@ pub async fn update_me_profile(
     let phone = normalize_optional_text(payload.phone);
     let location = normalize_optional_text(payload.location);
     let bio = normalize_optional_text(payload.bio);
-    let avatar_url =
-        normalize_optional_text(payload.avatar_url).and_then(|value| normalize_http_url(&value));
+    let avatar_url = Some(DEFAULT_PROFILE_AVATAR.to_string());
     let cover_image =
         normalize_optional_text(payload.cover_image).and_then(|value| normalize_http_url(&value));
     let roles = normalize_roles(payload.roles);

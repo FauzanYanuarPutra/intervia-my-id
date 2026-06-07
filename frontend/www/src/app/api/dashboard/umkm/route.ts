@@ -64,12 +64,16 @@ function normalizeStatus(value: unknown): string {
 }
 
 function normalizeListingStatus(listing: GenericRecord): string {
-  return normalizeStatus(listing.content_status || listing.status || 'draft') || 'draft';
+  return (
+    normalizeStatus(listing.content_status || listing.status || 'draft') ||
+    'draft'
+  );
 }
 
 function normalizeListingType(listing: GenericRecord): string {
-  const contentType = asString(listing.content_type || listing.type || listing.category || 'listing')
-    .toLowerCase();
+  const contentType = asString(
+    listing.content_type || listing.type || listing.category || 'listing',
+  ).toLowerCase();
   return contentType || 'listing';
 }
 
@@ -95,7 +99,11 @@ function toTimestamp(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function isWithinRange(timestamp: number, minExclusive: number, maxInclusive: number): boolean {
+function isWithinRange(
+  timestamp: number,
+  minExclusive: number,
+  maxInclusive: number,
+): boolean {
   if (!timestamp) return false;
   return timestamp > minExclusive && timestamp <= maxInclusive;
 }
@@ -103,7 +111,8 @@ function isWithinRange(timestamp: number, minExclusive: number, maxInclusive: nu
 function getNestedNumber(input: unknown, path: string[]): number {
   let cursor: unknown = input;
   for (const segment of path) {
-    if (!cursor || typeof cursor !== 'object' || Array.isArray(cursor)) return 0;
+    if (!cursor || typeof cursor !== 'object' || Array.isArray(cursor))
+      return 0;
     cursor = (cursor as GenericRecord)[segment];
   }
   return asInt(cursor);
@@ -136,7 +145,9 @@ function readListingClicks(listing: GenericRecord): number {
 }
 
 function readListingPriceCents(listing: GenericRecord): number {
-  const direct = asInt(listing.price_cents || listing.value_cents || listing.price);
+  const direct = asInt(
+    listing.price_cents || listing.value_cents || listing.price,
+  );
   if (direct > 0) {
     if (listing.price_cents || listing.value_cents) return direct;
     return direct * 100;
@@ -156,7 +167,12 @@ function readTransactionAmountCents(transaction: GenericRecord): number {
       transaction.value_cents ||
       transaction.amount,
   );
-  if (transaction.amount_cents || transaction.amount_final_cents || transaction.amount_estimate_cents || transaction.value_cents) {
+  if (
+    transaction.amount_cents ||
+    transaction.amount_final_cents ||
+    transaction.amount_estimate_cents ||
+    transaction.value_cents
+  ) {
     return direct;
   }
   return direct > 0 ? direct * 100 : 0;
@@ -182,7 +198,14 @@ function isCompletedTransaction(status: string): boolean {
 }
 
 function isCancelledTransaction(status: string): boolean {
-  return new Set(['cancelled', 'canceled', 'failed', 'expired', 'refunded', 'rejected']).has(status);
+  return new Set([
+    'cancelled',
+    'canceled',
+    'failed',
+    'expired',
+    'refunded',
+    'rejected',
+  ]).has(status);
 }
 
 function isDisputeTransaction(status: string): boolean {
@@ -226,7 +249,11 @@ function percent(value: number): number {
 }
 
 function formatListingTitle(listing: GenericRecord): string {
-  return asString(listing.title || listing.name || listing.slug || 'Untitled listing') || 'Untitled listing';
+  return (
+    asString(
+      listing.title || listing.name || listing.slug || 'Untitled listing',
+    ) || 'Untitled listing'
+  );
 }
 
 function normalizeIso(value: unknown): string {
@@ -250,22 +277,34 @@ export async function GET(req: NextRequest) {
   const contentQuery = new URLSearchParams({ limit: '300', offset: '0' });
   if (ownerId) contentQuery.set('owner_id', ownerId);
 
-  const [contentResult, transactionResult, inboxResult, supportResult] = await Promise.all([
-    fetchFromUpstream(`${MARKETPLACE_URL}/v1/content?${contentQuery.toString()}`, token),
-    fetchFromUpstream(`${MARKETPLACE_URL}/v1/transactions?limit=400&offset=0`, token),
-    fetchFromUpstream(`${CHAT_URL}/api/v1/inbox?limit=120`, token),
-    fetchFromUpstream(`${MARKETPLACE_URL}/v1/support/tickets?limit=200&offset=0`, token),
-  ]);
+  const [contentResult, transactionResult, inboxResult, supportResult] =
+    await Promise.all([
+      fetchFromUpstream(
+        `${MARKETPLACE_URL}/v1/content?${contentQuery.toString()}`,
+        token,
+      ),
+      fetchFromUpstream(
+        `${MARKETPLACE_URL}/v1/transactions?limit=400&offset=0`,
+        token,
+      ),
+      fetchFromUpstream(`${CHAT_URL}/api/v1/inbox?limit=120`, token),
+      fetchFromUpstream(
+        `${MARKETPLACE_URL}/v1/support/tickets?limit=200&offset=0`,
+        token,
+      ),
+    ]);
 
   const rawListings = readList(contentResult.payload);
   const listings = ownerId
-    ? rawListings.filter((item) => asString(item.owner_id) === ownerId)
+    ? rawListings.filter(item => asString(item.owner_id) === ownerId)
     : rawListings;
 
-  const listingIds = new Set(listings.map((item) => asString(item.id)).filter(Boolean));
+  const listingIds = new Set(
+    listings.map(item => asString(item.id)).filter(Boolean),
+  );
 
   const rawTransactions = readList(transactionResult.payload);
-  const salesTransactions = rawTransactions.filter((item) => {
+  const salesTransactions = rawTransactions.filter(item => {
     const contentId = asString(item.content_id);
     if (contentId && listingIds.has(contentId)) return true;
     if (ownerId && asString(item.seller_id) === ownerId) return true;
@@ -296,8 +335,12 @@ export async function GET(req: NextRequest) {
   const uniqueCustomers = new Set<string>();
 
   for (const transaction of salesTransactions) {
-    const status = normalizeStatus(transaction.status || 'pending') || 'pending';
-    transactionStatusBreakdown.set(status, (transactionStatusBreakdown.get(status) || 0) + 1);
+    const status =
+      normalizeStatus(transaction.status || 'pending') || 'pending';
+    transactionStatusBreakdown.set(
+      status,
+      (transactionStatusBreakdown.get(status) || 0) + 1,
+    );
 
     const buyerId = asString(transaction.buyer_id);
     if (buyerId) uniqueCustomers.add(buyerId);
@@ -325,21 +368,27 @@ export async function GET(req: NextRequest) {
       accumulator.buyers.set(buyerId, previous + 1);
     }
 
-    const txTimestamp = toTimestamp(transaction.updated_at || transaction.created_at);
+    const txTimestamp = toTimestamp(
+      transaction.updated_at || transaction.created_at,
+    );
     const currentTimestamp = toTimestamp(accumulator.last_order_at);
     if (txTimestamp > currentTimestamp) {
-      accumulator.last_order_at = normalizeIso(transaction.updated_at || transaction.created_at);
+      accumulator.last_order_at = normalizeIso(
+        transaction.updated_at || transaction.created_at,
+      );
     }
   }
 
   const listingAnalytics = listings
-    .map((listing) => {
+    .map(listing => {
       const listingId = asString(listing.id);
       const metrics = listingMetrics.get(listingId);
       const ordersTotal = metrics?.orders_total || 0;
       const grossCents = metrics?.gross_cents || 0;
       const revenueCents = metrics?.revenue_cents || 0;
-      const repeatCustomers = Array.from(metrics?.buyers.values() || []).filter((count) => count > 1).length;
+      const repeatCustomers = Array.from(metrics?.buyers.values() || []).filter(
+        count => count > 1,
+      ).length;
       const completed = metrics?.orders_completed || 0;
 
       return {
@@ -362,21 +411,31 @@ export async function GET(req: NextRequest) {
         dispute_count: metrics?.dispute_count || 0,
         gross_cents: grossCents,
         revenue_cents: revenueCents,
-        avg_order_cents: ordersTotal > 0 ? Math.round(grossCents / ordersTotal) : 0,
-        conversion_rate: percent(ordersTotal > 0 ? (completed / ordersTotal) * 100 : 0),
+        avg_order_cents:
+          ordersTotal > 0 ? Math.round(grossCents / ordersTotal) : 0,
+        conversion_rate: percent(
+          ordersTotal > 0 ? (completed / ordersTotal) * 100 : 0,
+        ),
         repeat_customers: repeatCustomers,
         last_order_at: metrics?.last_order_at || null,
       };
     })
     .sort((left, right) => {
-      if (right.revenue_cents !== left.revenue_cents) return right.revenue_cents - left.revenue_cents;
-      if (right.orders_total !== left.orders_total) return right.orders_total - left.orders_total;
+      if (right.revenue_cents !== left.revenue_cents)
+        return right.revenue_cents - left.revenue_cents;
+      if (right.orders_total !== left.orders_total)
+        return right.orders_total - left.orders_total;
       return toTimestamp(right.updated_at) - toTimestamp(left.updated_at);
     });
 
   const sectorMap = new Map<
     string,
-    { listings: number; orders: number; completed: number; revenue_cents: number }
+    {
+      listings: number;
+      orders: number;
+      completed: number;
+      revenue_cents: number;
+    }
   >();
 
   for (const listing of listingAnalytics) {
@@ -400,10 +459,13 @@ export async function GET(req: NextRequest) {
       listings: value.listings,
       orders: value.orders,
       revenue_cents: value.revenue_cents,
-      conversion_rate: percent(value.orders > 0 ? (value.completed / value.orders) * 100 : 0),
+      conversion_rate: percent(
+        value.orders > 0 ? (value.completed / value.orders) * 100 : 0,
+      ),
     }))
     .sort((left, right) => {
-      if (right.revenue_cents !== left.revenue_cents) return right.revenue_cents - left.revenue_cents;
+      if (right.revenue_cents !== left.revenue_cents)
+        return right.revenue_cents - left.revenue_cents;
       return right.orders - left.orders;
     });
 
@@ -412,31 +474,43 @@ export async function GET(req: NextRequest) {
   const oneWeekAgo = now - sevenDaysMs;
   const twoWeeksAgo = now - sevenDaysMs * 2;
 
-  const weeklySalesTransactions = salesTransactions.filter((tx) =>
+  const weeklySalesTransactions = salesTransactions.filter(tx =>
     isWithinRange(toTimestamp(tx.created_at || tx.updated_at), oneWeekAgo, now),
   ).length;
-  const previousWeekSalesTransactions = salesTransactions.filter((tx) =>
-    isWithinRange(toTimestamp(tx.created_at || tx.updated_at), twoWeeksAgo, oneWeekAgo),
+  const previousWeekSalesTransactions = salesTransactions.filter(tx =>
+    isWithinRange(
+      toTimestamp(tx.created_at || tx.updated_at),
+      twoWeeksAgo,
+      oneWeekAgo,
+    ),
   ).length;
 
-  const weeklyListingsCreated = listings.filter((listing) =>
-    isWithinRange(toTimestamp(listing.created_at || listing.updated_at), oneWeekAgo, now),
+  const weeklyListingsCreated = listings.filter(listing =>
+    isWithinRange(
+      toTimestamp(listing.created_at || listing.updated_at),
+      oneWeekAgo,
+      now,
+    ),
   ).length;
-  const previousWeekListingsCreated = listings.filter((listing) =>
-    isWithinRange(toTimestamp(listing.created_at || listing.updated_at), twoWeeksAgo, oneWeekAgo),
+  const previousWeekListingsCreated = listings.filter(listing =>
+    isWithinRange(
+      toTimestamp(listing.created_at || listing.updated_at),
+      twoWeeksAgo,
+      oneWeekAgo,
+    ),
   ).length;
 
   const totalSalesTransactions = salesTransactions.length;
-  const activeSalesTransactions = salesTransactions.filter((tx) =>
+  const activeSalesTransactions = salesTransactions.filter(tx =>
     isActiveTransaction(normalizeStatus(tx.status)),
   ).length;
-  const completedSalesTransactions = salesTransactions.filter((tx) =>
+  const completedSalesTransactions = salesTransactions.filter(tx =>
     isCompletedTransaction(normalizeStatus(tx.status)),
   ).length;
-  const disputedSalesTransactions = salesTransactions.filter((tx) =>
+  const disputedSalesTransactions = salesTransactions.filter(tx =>
     isDisputeTransaction(normalizeStatus(tx.status)),
   ).length;
-  const cancelledSalesTransactions = salesTransactions.filter((tx) =>
+  const cancelledSalesTransactions = salesTransactions.filter(tx =>
     isCancelledTransaction(normalizeStatus(tx.status)),
   ).length;
 
@@ -452,26 +526,43 @@ export async function GET(req: NextRequest) {
     return sum + readTransactionAmountCents(tx);
   }, 0);
 
-  const unreadMessages = inboxRooms.reduce((sum, room) => sum + readRoomUnreadCount(room), 0);
-  const openSupportTickets = supportTickets.filter((ticket) =>
+  const unreadMessages = inboxRooms.reduce(
+    (sum, room) => sum + readRoomUnreadCount(room),
+    0,
+  );
+  const openSupportTickets = supportTickets.filter(ticket =>
     isOpenSupportTicket(normalizeStatus(ticket.status)),
   ).length;
 
   const byType = {
-    umkm_listings: listingAnalytics.filter((item) => {
+    umkm_listings: listingAnalytics.filter(item => {
       const sector = item.sector.toLowerCase();
-      return sector.includes('umkm') || sector.includes('kuliner') || sector.includes('retail');
+      return (
+        sector.includes('umkm') ||
+        sector.includes('kuliner') ||
+        sector.includes('retail')
+      );
     }).length,
-    service_listings: listingAnalytics.filter((item) => item.content_type === 'service').length,
-    product_listings: listingAnalytics.filter((item) => item.content_type === 'product').length,
-    project_listings: listingAnalytics.filter((item) => item.content_type === 'project').length,
+    service_listings: listingAnalytics.filter(
+      item => item.content_type === 'service',
+    ).length,
+    product_listings: listingAnalytics.filter(
+      item => item.content_type === 'product',
+    ).length,
+    project_listings: listingAnalytics.filter(
+      item => item.content_type === 'project',
+    ).length,
   };
 
   const summary = {
     total_listings: listingAnalytics.length,
-    active_listings: listingAnalytics.filter((item) => item.status === 'active').length,
-    draft_listings: listingAnalytics.filter((item) => item.status === 'draft').length,
-    archived_listings: listingAnalytics.filter((item) => item.status === 'archived').length,
+    active_listings: listingAnalytics.filter(item => item.status === 'active')
+      .length,
+    draft_listings: listingAnalytics.filter(item => item.status === 'draft')
+      .length,
+    archived_listings: listingAnalytics.filter(
+      item => item.status === 'archived',
+    ).length,
     ...byType,
     total_sales_transactions: totalSalesTransactions,
     active_sales_transactions: activeSalesTransactions,
@@ -483,7 +574,9 @@ export async function GET(req: NextRequest) {
     gross_sales_cents: grossSalesCents,
     settled_sales_cents: settledSalesCents,
     avg_order_cents:
-      totalSalesTransactions > 0 ? Math.round(grossSalesCents / totalSalesTransactions) : 0,
+      totalSalesTransactions > 0
+        ? Math.round(grossSalesCents / totalSalesTransactions)
+        : 0,
     unique_customers: uniqueCustomers.size,
     conversion_rate: percent(
       totalSalesTransactions > 0
@@ -497,7 +590,7 @@ export async function GET(req: NextRequest) {
   };
 
   const recentActivities = [
-    ...listingAnalytics.slice(0, 4).map((item) => ({
+    ...listingAnalytics.slice(0, 4).map(item => ({
       id: `listing:${item.listing_id}`,
       type: 'listing',
       title: item.title,
@@ -507,13 +600,21 @@ export async function GET(req: NextRequest) {
     })),
     ...salesTransactions
       .slice()
-      .sort((left, right) => toTimestamp(right.updated_at || right.created_at) - toTimestamp(left.updated_at || left.created_at))
+      .sort(
+        (left, right) =>
+          toTimestamp(right.updated_at || right.created_at) -
+          toTimestamp(left.updated_at || left.created_at),
+      )
       .slice(0, 4)
-      .map((transaction) => ({
+      .map(transaction => ({
         id: `txn:${asString(transaction.id)}`,
         type: 'transaction',
         title: `Transaksi ${normalizeStatus(transaction.status) || 'pending'}`,
-        description: asString(transaction.offer_message || transaction.response_message || 'Pantau progres transaksi terbaru'),
+        description: asString(
+          transaction.offer_message ||
+            transaction.response_message ||
+            'Pantau progres transaksi terbaru',
+        ),
         at: normalizeIso(transaction.updated_at || transaction.created_at),
         href: '/transactions',
       })),
@@ -564,7 +665,8 @@ export async function GET(req: NextRequest) {
       id: 'activate-listing',
       level: 'medium',
       title: 'Belum ada listing aktif',
-      description: 'Aktifkan minimal satu listing agar dashboard mulai merekam performa real-time.',
+      description:
+        'Aktifkan minimal satu listing agar dashboard mulai merekam performa real-time.',
       href: '/create?mode=quick',
     });
   }
@@ -574,8 +676,9 @@ export async function GET(req: NextRequest) {
       id: 'maintain-growth',
       level: 'low',
       title: 'Performa stabil, lanjut optimasi',
-      description: 'Pertahankan respons chat, tambah listing baru, dan review sektor dengan revenue tertinggi.',
-      href: '/analytics',
+      description:
+        'Pertahankan respons chat, tambah listing baru, dan review sektor dengan revenue tertinggi.',
+      href: '/dashboard',
     });
   }
 
@@ -584,7 +687,9 @@ export async function GET(req: NextRequest) {
     summary,
     listing_analytics: listingAnalytics,
     sector_analytics: sectorAnalytics,
-    transaction_status_breakdown: Array.from(transactionStatusBreakdown.entries())
+    transaction_status_breakdown: Array.from(
+      transactionStatusBreakdown.entries(),
+    )
       .map(([status, count]) => ({ status, count }))
       .sort((left, right) => right.count - left.count),
     recent_activities: recentActivities,

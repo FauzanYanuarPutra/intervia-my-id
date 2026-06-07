@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LAJUKAN_SYSTEM_PROMPT } from '@/lib/aiSystemPrompt';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
+import { requireAuth } from '@/lib/serverAuth';
 
 const INTERNAL_AI_URL = process.env.INTERNAL_AI_URL || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
@@ -118,12 +119,19 @@ async function fetchDatabaseContext(query: string): Promise<string> {
     // Build context from database results
     const context = data
       .slice(0, 5)
-      .map((item: any, idx: number) => {
-        const title = item.title || '';
-        const type = item.type || '';
-        const summary = item.summary || '';
-        const sector = item.metadata?.sector || '';
-        const tags = Array.isArray(item.tags) ? item.tags.slice(0, 3).join(', ') : '';
+      .map((item: Record<string, unknown>, idx: number) => {
+        const metadata =
+          item.metadata && typeof item.metadata === 'object'
+            ? (item.metadata as Record<string, unknown>)
+            : {};
+        const title = typeof item.title === 'string' ? item.title : '';
+        const type = typeof item.type === 'string' ? item.type : '';
+        const summary = typeof item.summary === 'string' ? item.summary : '';
+        const sector =
+          typeof metadata.sector === 'string' ? metadata.sector : '';
+        const tags = Array.isArray(item.tags)
+          ? item.tags.slice(0, 3).map(String).join(', ')
+          : '';
         
         return `${idx + 1}. [${type}] ${title}${summary ? ` - ${summary.slice(0, 80)}` : ''}${sector ? ` (Sector: ${sector})` : ''}${tags ? ` [Tags: ${tags}]` : ''}`;
       })
@@ -200,9 +208,12 @@ const CHAT_RATE_LIMIT_MAX = 30; // 30 requests per minute
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAuth(req);
+    if (!auth.ok) return auth.res;
+
     const ip = getClientIp(req.headers);
     const rate = await enforceRateLimit(
-      `rl:ai:chat:${ip}`,
+      `rl:ai:chat:${auth.ctx.userId}:${ip}`,
       CHAT_RATE_LIMIT_MAX,
       CHAT_RATE_LIMIT_WINDOW_SEC,
     );

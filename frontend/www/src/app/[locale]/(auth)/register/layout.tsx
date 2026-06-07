@@ -26,7 +26,7 @@ export async function generateMetadata({
   const description =
     messages.register?.description ||
     (locale === 'id'
-      ? 'Daftar pakai nomor HP. Mulai cari, jual, kelola usaha.'
+      ? 'Daftar pakai nomor HP. Mulai cari kebutuhan, tawarkan produk, dan kelola usaha.'
       : 'Create a new account on Lajukan and start accessing freelance projects, jobs, properties, and top opportunities across Indonesia.');
 
   const canonicalUrl = `https://www.lajukan.com/${locale}/register`;
@@ -35,8 +35,13 @@ export async function generateMetadata({
     title,
     description,
     robots: {
-      index: true,
-      follow: true,
+      index: false,
+      follow: false,
+      googleBot: {
+        index: false,
+        follow: false,
+        noarchive: true,
+      },
     },
     alternates: {
       canonical: canonicalUrl,

@@ -25,3 +25,21 @@ export async function GET(req: NextRequest, context: RouteContext) {
     },
   );
 }
+
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  const { reelId } = await context.params;
+  return proxyCommunityBackend(
+    req,
+    `/v1/reels/${encodeURIComponent(reelId)}`,
+    { method: 'PATCH', includeSearch: false },
+  );
+}
+
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const { reelId } = await context.params;
+  return proxyCommunityBackend(
+    req,
+    `/v1/reels/${encodeURIComponent(reelId)}`,
+    { method: 'DELETE', includeSearch: false },
+  );
+}

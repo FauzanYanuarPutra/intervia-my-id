@@ -9,7 +9,11 @@ import { IdentityVerificationPanel } from '@/components/profile/IdentityVerifica
 import { LocalizedLink } from '@/components/ui-kit';
 import { readIdentityVerification } from '@/lib/identityVerification';
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
+import {
+  buildPublicProfileHref,
+  normalizePublicProfileHandleInput,
+} from '@/lib/profile/publicProfileLink';
 import {
   getProfileContentTabDefinition,
   getProfileContentTabLabel,
@@ -41,7 +45,6 @@ import {
   ShieldCheck,
   Sparkles,
   Store,
-  Trophy,
   Upload,
   User2,
   UserMinus,
@@ -180,7 +183,7 @@ type HubTab =
   | 'reels'
   | 'komunitas'
   | 'trust';
-type SocialModalTab = 'followers' | 'following' | 'suggestions';
+type SocialModalTab = 'followers' | 'following';
 
 type DiscoverUser = {
   id?: string;
@@ -201,25 +204,59 @@ type SocialUser = {
   id: string;
   name: string;
   handle: string;
+  href: string;
   avatarUrl: string;
   subtitle: string;
   meta: string;
 };
 
 const PAGE_CLASS =
-  'min-h-screen overflow-x-hidden bg-[color:var(--app-surface-muted)] pb-[calc(6rem+env(safe-area-inset-bottom))] pt-0 dark:bg-[color:var(--app-surface)] sm:pb-10 sm:pt-3';
+  'min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f5fbf7_0%,#eef7f1_34%,#f8fafc_100%)] pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-0 dark:bg-[linear-gradient(180deg,#07120f_0%,#07111d_44%,#020617_100%)] sm:pb-8 sm:pt-2';
 const CARD_CLASS =
-  'rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm dark:border-[color:var(--app-border-strong)]';
+  'rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,white_4%)] shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,black_6%)]';
 const MUTED_ROW_CLASS =
-  'rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]';
+  'rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]';
+type SectionTone =
+  | 'plain'
+  | 'profile'
+  | 'activity'
+  | 'insight'
+  | 'market'
+  | 'work'
+  | 'social'
+  | 'trust';
+
+const SECTION_TONE_CLASS: Record<SectionTone, string> = {
+  plain: '',
+  profile:
+    'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_58%,#ecfdf5_100%)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_62%,#10251e_100%)]',
+  activity:
+    'border-sky-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_58%,#eff6ff_100%)] dark:border-sky-900/70 dark:bg-[linear-gradient(135deg,#07111d_0%,#0b1726_62%,#102033_100%)]',
+  insight:
+    'border-teal-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f6fffd_56%,#ccfbf1_100%)] dark:border-teal-900/70 dark:bg-[linear-gradient(135deg,#071311_0%,#0b1f1c_62%,#102823_100%)]',
+  market:
+    'border-lime-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#fbfff4_58%,#ecfccb_100%)] dark:border-lime-900/70 dark:bg-[linear-gradient(135deg,#0d1207_0%,#18240d_62%,#1f2c12_100%)]',
+  work: 'border-amber-200/85 bg-[linear-gradient(135deg,#ffffff_0%,#fffdf5_56%,#fef3c7_100%)] dark:border-amber-900/70 dark:bg-[linear-gradient(135deg,#151007_0%,#241a09_62%,#2b210f_100%)]',
+  social:
+    'border-rose-200/75 bg-[linear-gradient(135deg,#ffffff_0%,#fff7fb_58%,#ffe4e6_100%)] dark:border-rose-900/70 dark:bg-[linear-gradient(135deg,#16090f_0%,#25101a_62%,#2b1320_100%)]',
+  trust:
+    'border-orange-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#fff8ed_54%,#ecfdf5_100%)] dark:border-orange-900/70 dark:bg-[linear-gradient(135deg,#160f07_0%,#1f170b_56%,#092017_100%)]',
+};
+
+const STAT_TONE_CLASSES = [
+  'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_62%,#ecfdf5_100%)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_100%)]',
+  'border-sky-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_62%,#e0f2fe_100%)] dark:border-sky-900/70 dark:bg-[linear-gradient(135deg,#07111d_0%,#0b1726_100%)]',
+  'border-amber-200/85 bg-[linear-gradient(135deg,#ffffff_0%,#fffdf5_62%,#fef3c7_100%)] dark:border-amber-900/70 dark:bg-[linear-gradient(135deg,#151007_0%,#241a09_100%)]',
+  'border-rose-200/75 bg-[linear-gradient(135deg,#ffffff_0%,#fff7fb_62%,#ffe4e6_100%)] dark:border-rose-900/70 dark:bg-[linear-gradient(135deg,#16090f_0%,#25101a_100%)]',
+];
 const PRIMARY_ACTION_CLASS =
-  'inline-flex min-h-[40px] max-w-full items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)] shadow-[var(--app-shadow)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65';
+  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-strong)] px-3.5 text-xs font-black text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(4,120,87,0.65)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65 sm:min-h-[44px] sm:px-4';
 const SECONDARY_ACTION_CLASS =
-  'inline-flex min-h-[40px] max-w-full items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-sm font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]';
+  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] sm:min-h-[44px] sm:px-4';
 const TONAL_ACTION_CLASS =
-  'inline-flex min-h-[38px] max-w-full items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-semibold text-[color:var(--app-accent)] transition hover:brightness-105';
+  'inline-flex min-h-[40px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)] transition hover:brightness-105 sm:min-h-[42px] sm:px-3.5';
 const INPUT_CLASS =
-  'w-full rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]';
+  'w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-2.5 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]';
 const REELS_PROFILE_STORAGE_KEY = 'lajukan.reels.preference.v1';
 const PROFILE_SOCIAL_STORAGE_KEY = 'lajukan.profile.following.v1';
 
@@ -227,22 +264,24 @@ function SectionBlock({
   title,
   subtitle,
   action,
+  tone = 'plain',
   children,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  tone?: SectionTone;
   children: ReactNode;
 }) {
   return (
-    <section className={cn(CARD_CLASS, 'p-4 sm:p-5')}>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <section className={cn(CARD_CLASS, SECTION_TONE_CLASS[tone], 'p-3 sm:p-4')}>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h2 className="text-[15px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
             {title}
           </h2>
           {subtitle ? (
-            <p className="mt-1 text-sm leading-5 text-[color:var(--app-text-soft)]">
+            <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]">
               {subtitle}
             </p>
           ) : null}
@@ -256,7 +295,7 @@ function SectionBlock({
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
+    <div className="h-1.5 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface)]">
       <div
         className="h-full rounded-full bg-[color:var(--app-accent-strong)] transition-all"
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
@@ -277,13 +316,13 @@ function IconPill({
   return (
     <span
       className={cn(
-        'inline-flex min-h-[34px] max-w-full items-center gap-2 rounded-full border px-3 text-xs font-medium',
+        'inline-flex min-h-[30px] max-w-full items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold sm:min-h-[32px] sm:px-3 sm:text-xs',
         muted
           ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]'
           : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
       )}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <Icon className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
       <span className="min-w-0 truncate">{children}</span>
     </span>
   );
@@ -311,10 +350,6 @@ function asSocialRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function avatarInitial(name: string) {
-  return (name.trim().charAt(0) || 'L').toUpperCase();
-}
-
 function mapDiscoverUserToSocialUser(
   item: DiscoverUser,
   isId: boolean,
@@ -322,17 +357,17 @@ function mapDiscoverUserToSocialUser(
   const id = readSocialText(item.id);
   if (!id) return null;
 
+  const username = readSocialText(item.username);
   const name =
     readSocialText(item.full_name) ||
     readSocialText(item.fullName) ||
-    readSocialText(item.username) ||
+    username ||
     (isId ? 'Pengguna Lajukan' : 'Lajukan user');
-  const handle = readSocialText(item.username) || id.slice(0, 8);
   const subtitle =
     readSocialText(item.headline) ||
     readSocialText(item.bio) ||
     readSocialText(item.location) ||
-    (isId ? 'Aktif di Lajukan' : 'Active on Lajukan');
+    (isId ? 'Profil Lajukan' : 'Lajukan profile');
   const meta = [
     readSocialText(item.location),
     item.rating ? `${item.rating.toFixed(1)} rating` : '',
@@ -346,9 +381,11 @@ function mapDiscoverUserToSocialUser(
   return {
     id,
     name,
-    handle,
-    avatarUrl:
+    handle: username,
+    href: buildSocialUserProfileHref({ id, username, name }),
+    avatarUrl: profileAvatarSrc(
       readSocialText(item.avatar_url) || readSocialText(item.avatarUrl),
+    ),
     subtitle,
     meta,
   };
@@ -369,10 +406,11 @@ function mapRecordToSocialUser(
         readSocialText(record.full_name) ||
         readSocialText(record.fullName) ||
         readSocialText(record.name),
-      avatar_url:
+      avatar_url: profileAvatarSrc(
         readSocialText(record.avatar_url) ||
-        readSocialText(record.avatarUrl) ||
-        readSocialText(record.avatar),
+          readSocialText(record.avatarUrl) ||
+          readSocialText(record.avatar),
+      ),
       location: readSocialText(record.location),
       headline:
         readSocialText(record.headline) || readSocialText(record.subtitle),
@@ -405,6 +443,22 @@ function mergeSocialUsers(...groups: SocialUser[][]): SocialUser[] {
   return result;
 }
 
+function buildSocialUserProfileHref({
+  id,
+  username,
+  name,
+}: {
+  id: string;
+  username: string;
+  name: string;
+}): string {
+  const slugBase =
+    normalizePublicProfileHandleInput(username) ||
+    normalizePublicProfileHandleInput(name) ||
+    'member';
+  return `/profile/${slugBase}--${encodeURIComponent(id)}`;
+}
+
 function SocialUserRow({
   item,
   isId,
@@ -417,38 +471,36 @@ function SocialUserRow({
   onToggle: (id: string) => void;
 }) {
   return (
-    <div className={cn(MUTED_ROW_CLASS, 'flex min-w-0 items-center gap-3 p-3')}>
+    <div
+      className={cn(
+        MUTED_ROW_CLASS,
+        'flex min-w-0 items-center gap-3 p-3 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
+      )}
+    >
       <LocalizedLink
-        href={`/profile/${encodeURIComponent(item.handle || item.id)}`}
-        className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]"
+        href={item.href}
+        className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-border)]"
       >
-        {item.avatarUrl ? (
-          <Image
-            src={item.avatarUrl}
-            alt={item.name}
-            fill
-            sizes="44px"
-            className="object-cover"
-            unoptimized
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center text-sm font-black">
-            {avatarInitial(item.name)}
-          </span>
-        )}
+        <Image
+          src={profileAvatarSrc(item.avatarUrl)}
+          alt={item.name}
+          fill
+          sizes="48px"
+          className="object-cover"
+          unoptimized
+        />
       </LocalizedLink>
 
-      <LocalizedLink
-        href={`/profile/${encodeURIComponent(item.handle || item.id)}`}
-        className="min-w-0 flex-1"
-      >
-        <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <LocalizedLink href={item.href} className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {item.name}
         </p>
-        <p className="mt-0.5 truncate text-xs text-[color:var(--app-text-soft)]">
-          @{item.handle}
-        </p>
-        <p className="mt-1 line-clamp-1 text-xs text-[color:var(--app-text-soft)]">
+        {item.handle ? (
+          <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+            @{item.handle}
+          </p>
+        ) : null}
+        <p className="mt-0.5 line-clamp-1 text-[11px] text-[color:var(--app-text-soft)]">
           {item.meta || item.subtitle}
         </p>
       </LocalizedLink>
@@ -457,7 +509,7 @@ function SocialUserRow({
         type="button"
         onClick={() => onToggle(item.id)}
         className={cn(
-          'inline-flex min-h-[36px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition',
+          'inline-flex min-h-[36px] shrink-0 items-center justify-center gap-1 rounded-full px-3 text-[11px] font-black transition sm:text-xs',
           following
             ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-rose-200 hover:text-rose-600'
             : 'bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] hover:brightness-105',
@@ -476,30 +528,36 @@ function SocialUserRow({
 
 function StatStrip({ items }: { items: StatItem[] }) {
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-      {items.map(item => {
+    <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:grid-cols-4">
+      {items.map((item, index) => {
         const Icon = item.icon;
         return (
           <div
             key={item.label}
-            className={cn(MUTED_ROW_CLASS, 'min-w-0 px-3 py-3')}
+            className={cn(
+              CARD_CLASS,
+              STAT_TONE_CLASSES[index % STAT_TONE_CLASSES.length],
+              'min-w-0 p-3',
+            )}
           >
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-muted)]">
-                <Icon className="h-4 w-4" />
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-white/90 text-[color:var(--app-accent)] shadow-sm ring-1 ring-white/80 dark:bg-white/10 dark:ring-white/10">
+                <Icon className="h-[18px] w-[18px]" />
               </span>
-              {item.hint ? (
-                <span className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
-                  {item.hint}
+              <span className="min-w-0">
+                <span className="block truncate text-xl font-black leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {item.value}
                 </span>
-              ) : null}
+                <span className="mt-0.5 block truncate text-[11px] font-bold text-[color:var(--app-text-soft)] sm:text-xs">
+                  {item.label}
+                </span>
+              </span>
             </div>
-            <p className="mt-3 truncate text-xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              {item.value}
-            </p>
-            <p className="mt-1 truncate text-xs text-[color:var(--app-text-soft)]">
-              {item.label}
-            </p>
+            {item.hint ? (
+              <p className="mt-2 truncate rounded-full bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] dark:bg-white/10">
+                {item.hint}
+              </p>
+            ) : null}
           </div>
         );
       })}
@@ -517,14 +575,14 @@ function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
-      <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+    <div className="rounded-[12px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+      <p className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
         {title}
       </p>
-      <p className="mx-auto mt-1 max-w-md text-sm leading-5 text-[color:var(--app-text-soft)]">
+      <p className="mx-auto mt-1 max-w-md text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
         {description}
       </p>
-      {action ? <div className="mt-3">{action}</div> : null}
+      {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );
 }
@@ -545,10 +603,10 @@ function ProfileTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold transition',
+        'inline-flex min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-black transition sm:min-h-[36px] sm:px-3.5',
         active
-          ? 'bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] shadow-[var(--app-shadow)]'
-          : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)]',
+          ? 'bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] shadow-[0_14px_24px_-20px_rgba(4,120,87,0.7)]'
+          : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)] dark:ring-[color:var(--app-border-strong)]',
       )}
       aria-pressed={active}
     >
@@ -570,19 +628,19 @@ function EntryList({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {items.slice(0, 4).map(item => (
         <div
           key={`${item.title}-${item.subtitle || ''}-${item.meta || ''}`}
-          className={cn(MUTED_ROW_CLASS, 'p-3')}
+          className={cn(MUTED_ROW_CLASS, 'p-2.5')}
         >
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-2.5">
             <div className="min-w-0">
-              <p className="break-words text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              <p className="break-words text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                 {item.title}
               </p>
               {item.subtitle || item.meta ? (
-                <p className="mt-1 break-words text-xs leading-5 text-[color:var(--app-text-soft)]">
+                <p className="mt-0.5 break-words text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
                   {[item.subtitle, item.meta].filter(Boolean).join(' - ')}
                 </p>
               ) : null}
@@ -592,10 +650,10 @@ function EntryList({
                 href={item.url}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-muted)]"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-muted)]"
                 aria-label="Buka link"
               >
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="h-3.5 w-3.5" />
               </a>
             ) : null}
           </div>
@@ -637,27 +695,27 @@ function ActivityActionCard({
       href={href}
       className={cn(
         MUTED_ROW_CLASS,
-        'group flex min-h-[132px] min-w-0 flex-col justify-between p-3 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
+        'group flex min-h-[108px] min-w-0 flex-col justify-between p-2.5 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)] sm:min-h-[116px]',
       )}
     >
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-          <Icon className="h-5 w-5" />
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <p className="line-clamp-1 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <p className="line-clamp-1 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {title}
           </p>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+          <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
             {description}
           </p>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-muted)]">
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-muted)]">
           {metric}
         </span>
-        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-black text-[color:var(--app-accent)]">
+        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-black text-[color:var(--app-accent)]">
           {actionLabel}
           <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
         </span>
@@ -678,19 +736,19 @@ function ActivityMetricCard({
   icon: LucideIcon;
 }) {
   return (
-    <div className={cn(MUTED_ROW_CLASS, 'min-w-0 p-3')}>
+    <div className={cn(MUTED_ROW_CLASS, 'min-w-0 p-2.5')}>
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-muted)]">
-          <Icon className="h-4 w-4" />
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-muted)]">
+          <Icon className="h-3.5 w-3.5" />
         </span>
-        <span className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+        <span className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
           {hint}
         </span>
       </div>
-      <p className="mt-3 truncate text-xl font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <p className="mt-2 truncate text-lg font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
         {value}
       </p>
-      <p className="mt-1 truncate text-xs text-[color:var(--app-text-soft)]">
+      <p className="mt-1 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
         {label}
       </p>
     </div>
@@ -713,17 +771,17 @@ function ActivityTimelineRow({
       href={href}
       className={cn(
         MUTED_ROW_CLASS,
-        'group flex min-w-0 items-center gap-3 p-3 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
+        'group flex min-w-0 items-center gap-2.5 p-2.5 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
       )}
     >
-      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-        <Icon className="h-4.5 w-4.5" />
+      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+        <Icon className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <span className="block truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {title}
         </span>
-        <span className="mt-0.5 block truncate text-xs text-[color:var(--app-text-soft)]">
+        <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
           {description}
         </span>
       </span>
@@ -791,51 +849,90 @@ function ProfileGameProgress({
         : 'Upload first listing'
       : reelsSignalCount === 0
         ? isId
-          ? 'Upload reels singkat'
+          ? 'Buat Reels singkat'
           : 'Upload a short reel'
         : isId
           ? 'Balas chat dan transaksi'
           : 'Reply to chats and deals';
 
   return (
-    <section className="relative overflow-hidden rounded-[16px] border border-emerald-200/70 bg-[linear-gradient(145deg,#052e1f_0%,#047857_72%,#16a34a_100%)] p-3 text-white shadow-[0_18px_34px_-30px_rgba(4,120,87,0.52)] dark:border-emerald-900/70 dark:bg-[linear-gradient(145deg,#030b07_0%,#064e3b_62%,#111827_100%)]">
-      <div className="absolute inset-x-0 top-0 h-px bg-white/35" />
-      <div className="relative flex min-w-0 items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center gap-1 rounded-[15px] border border-white/20 bg-white/14">
-          <Trophy className="h-4 w-4 text-amber-200" />
-          <span className="text-sm font-black leading-none">{level}</span>
-        </div>
+    <section className="relative overflow-hidden rounded-[20px] border border-emerald-200/85 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_48%,#ecfdf5_100%)] p-3.5 text-[color:var(--app-text)] shadow-[0_18px_38px_-34px_rgba(15,23,42,0.3)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_58%,#10251e_100%)] sm:p-4">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-emerald-600 text-white shadow-[0_14px_24px_-20px_rgba(4,120,87,0.9)]">
+          <BadgeCheck className="h-5 w-5" />
+        </span>
+
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <p className="truncate text-sm font-black leading-5">
-              {isId ? 'Level profil' : 'Profile level'}
-            </p>
-            <span className="shrink-0 rounded-full bg-amber-300/22 px-2 py-0.5 text-[10px] font-black text-amber-100">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-black text-emerald-800 ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-100 dark:ring-white/10">
               {rank}
             </span>
-          </div>
-          <div className="mt-1 flex items-center gap-2">
-            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-emerald-950/35">
-              <div
-                className="h-full rounded-full bg-[linear-gradient(90deg,#fde68a,#bbf7d0,#ffffff)]"
-                style={{ width: `${xpPercent}%` }}
-              />
-            </div>
-            <span className="shrink-0 text-[10px] font-bold text-emerald-50/88">
-              {xp}/{xpGoal}
+            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text-soft)] ring-1 ring-emerald-100 dark:bg-white/10 dark:ring-white/10">
+              Level {level}
             </span>
           </div>
-          <div className="mt-2 flex min-w-0 items-center gap-2 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-emerald-50">
-            <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-200" />
-            <span className="min-w-0 truncate">
-              {isId ? 'Quest: ' : 'Quest: '}
-              {quest}
-            </span>
-          </div>
+          <h3 className="mt-2 text-base font-black leading-5 sm:text-[17px]">
+            {isId ? 'Profil makin siap dipakai' : 'Profile is getting ready'}
+          </h3>
+          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Fokus ke satu misi berikutnya. Tidak perlu isi semuanya sekaligus.'
+              : 'Focus on the next mission. No need to complete everything at once.'}
+          </p>
         </div>
-        <span className="hidden shrink-0 rounded-[13px] bg-white/12 px-2.5 py-1.5 text-[11px] font-bold text-emerald-50 sm:inline-flex">
-          {streak}x
-        </span>
+      </div>
+
+      <div className="mt-3 rounded-[16px] border border-emerald-100 bg-white/78 p-3 dark:border-white/10 dark:bg-white/[0.06]">
+        <div className="flex items-center justify-between gap-3">
+          <span className="min-w-0 truncate text-xs font-black text-[color:var(--app-text)] dark:text-white">
+            {isId ? `Misi: ${quest}` : `Mission: ${quest}`}
+          </span>
+          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/15">
+            {xp}/{xpGoal} XP
+          </span>
+        </div>
+        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-emerald-100 dark:bg-white/12">
+          <div
+            className="h-full rounded-full bg-[linear-gradient(90deg,#047857,#22c55e,#facc15)]"
+            style={{ width: `${xpPercent}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {[
+          {
+            label: isId ? 'Kelengkapan' : 'Ready',
+            value: `${setupPercent}%`,
+            icon: Sparkles,
+          },
+          {
+            label: isId ? 'Listing' : 'Listings',
+            value: listingsCount.toLocaleString(),
+            icon: BriefcaseBusiness,
+          },
+          {
+            label: isId ? 'Aktif' : 'Active',
+            value: `${streak}x`,
+            icon: Repeat2,
+          },
+        ].map(item => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.label}
+              className="min-w-0 rounded-[15px] border border-emerald-100 bg-white/72 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.06]"
+            >
+              <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-200" />
+              <p className="mt-1 truncate text-sm font-black leading-4 text-[color:var(--app-text)] dark:text-white">
+                {item.value}
+              </p>
+              <p className="truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
+                {item.label}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -846,9 +943,6 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   const [activeHubTab, setActiveHubTab] = useState<HubTab>('ringkas');
   const [quickEditOpen, setQuickEditOpen] = useState(false);
   const [socialModal, setSocialModal] = useState<SocialModalTab | null>(null);
-  const [socialUsers, setSocialUsers] = useState<SocialUser[]>([]);
-  const [socialLoading, setSocialLoading] = useState(false);
-  const [socialError, setSocialError] = useState<string | null>(null);
   const [followedIds, setFollowedIds] = useState<string[]>([]);
   const [reelsSignalCount, setReelsSignalCount] = useState(0);
   const [reelsPreferenceTags, setReelsPreferenceTags] = useState<string[]>([]);
@@ -957,17 +1051,22 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      const raw = window.localStorage.getItem(followingStorageKey);
-      const parsed = raw ? JSON.parse(raw) : [];
-      setFollowedIds(
-        Array.isArray(parsed)
-          ? parsed.map(item => String(item)).filter(Boolean)
-          : [],
-      );
-    } catch {
-      setFollowedIds([]);
-    }
+
+    const timeout = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem(followingStorageKey);
+        const parsed = raw ? JSON.parse(raw) : [];
+        setFollowedIds(
+          Array.isArray(parsed)
+            ? parsed.map(item => String(item)).filter(Boolean)
+            : [],
+        );
+      } catch {
+        setFollowedIds([]);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [followingStorageKey]);
 
   const persistFollowedIds = useCallback(
@@ -1000,55 +1099,6 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     [followedIds, persistFollowedIds, user.id],
   );
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadSocialUsers() {
-      setSocialLoading(true);
-      setSocialError(null);
-      try {
-        const res = await fetch('/api/users/discover?limit=18', {
-          cache: 'no-store',
-          credentials: 'include',
-        });
-        const payload = (await res.json().catch(() => ({}))) as {
-          data?: DiscoverUser[];
-          error?: string;
-        };
-        if (!res.ok) {
-          throw new Error(
-            payload.error ||
-              (isId ? 'Gagal memuat koneksi.' : 'Failed to load connections.'),
-          );
-        }
-        const users = Array.isArray(payload.data)
-          ? payload.data
-              .map(item => mapDiscoverUserToSocialUser(item, isId))
-              .filter((item): item is SocialUser => Boolean(item))
-              .filter(item => item.id !== user.id)
-          : [];
-        if (active) setSocialUsers(users);
-      } catch (error) {
-        if (!active) return;
-        setSocialError(
-          error instanceof Error
-            ? error.message
-            : isId
-              ? 'Gagal memuat koneksi.'
-              : 'Failed to load connections.',
-        );
-      } finally {
-        if (active) setSocialLoading(false);
-      }
-    }
-
-    void loadSocialUsers();
-
-    return () => {
-      active = false;
-    };
-  }, [isId, user.id]);
-
   const copy = useMemo(
     () =>
       isId
@@ -1072,10 +1122,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             quickMoves: 'Satset dari profil',
             footprint: 'Jejak terbaru',
             signalMap: 'Sinyal minat',
-            uploadReel: 'Upload reels',
+            uploadReel: 'Buat Reels',
             reelsAction: 'Reels',
-            reelsDesc:
-              'Upload, like, komentar, share/repost, dan simpan reels.',
+            reelsDesc: 'Buka Reels untuk upload, like, komentar, dan simpan.',
             communityAction: 'Komunitas',
             communityDesc:
               'Posting diskusi, foto/video, polling, dan ikut grup.',
@@ -1094,7 +1143,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             manage: 'Kelola',
             noActivity: 'Belum ada jejak aktivitas',
             noActivityDesc:
-              'Upload reels, posting komunitas, atau buat listing. Nanti aktivitas penting tampil di sini.',
+              'Buat Reels, posting komunitas, atau buat listing. Nanti aktivitas penting tampil di sini.',
             completeProfile: 'Lengkapi profil',
             mainData: 'Data utama',
             publicProfile: 'Profil publik',
@@ -1113,14 +1162,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             social: 'Koneksi',
             followers: 'Pengikut',
             following: 'Mengikuti',
-            suggestions: 'Saran',
-            findPeople: 'Cari koneksi',
+            findPeople: 'Cari orang',
             socialTitle: 'Koneksi profil',
             socialSubtitle:
-              'Follow orang yang relevan, lalu cek pengikut dan yang kamu ikuti dari satu tempat.',
+              'Pengikut dan akun yang kamu ikuti akan tampil di sini saat sudah ada data.',
+            emptyConnections: 'Belum ada koneksi',
             emptyFollowers: 'Belum ada pengikut yang tercatat.',
             emptyFollowing: 'Belum mengikuti siapa pun.',
-            emptySuggestions: 'Belum ada saran koneksi.',
             editFull: 'Edit lengkap',
             close: 'Tutup',
             save: 'Simpan',
@@ -1145,9 +1193,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             quickMoves: 'Fast moves',
             footprint: 'Latest footprint',
             signalMap: 'Interest signals',
-            uploadReel: 'Upload reels',
+            uploadReel: 'Create Reels',
             reelsAction: 'Reels',
-            reelsDesc: 'Upload, like, comment, share/repost, and save reels.',
+            reelsDesc: 'Open Reels to upload, like, comment, and save.',
             communityAction: 'Community',
             communityDesc:
               'Post discussions, photos/videos, polls, and join groups.',
@@ -1187,14 +1235,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             social: 'Connections',
             followers: 'Followers',
             following: 'Following',
-            suggestions: 'Suggestions',
             findPeople: 'Find people',
             socialTitle: 'Profile connections',
             socialSubtitle:
-              'Follow relevant people, then review followers and following in one place.',
+              'Followers and accounts you follow will appear here once data exists.',
+            emptyConnections: 'No connections yet',
             emptyFollowers: 'No recorded followers yet.',
             emptyFollowing: 'Not following anyone yet.',
-            emptySuggestions: 'No connection suggestions yet.',
             editFull: 'Full edit',
             close: 'Close',
             save: 'Save',
@@ -1257,18 +1304,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       ),
     [isId, metadataRecord, metadataSocial, profileSocial],
   );
-  const suggestedSocialUsers = useMemo(
-    () =>
-      socialUsers.filter(item => !followedIds.includes(item.id)).slice(0, 12),
-    [followedIds, socialUsers],
-  );
   const followingUsers = useMemo(
-    () =>
-      mergeSocialUsers(
-        metadataFollowingUsers,
-        socialUsers.filter(item => followedIds.includes(item.id)),
-      ),
-    [followedIds, metadataFollowingUsers, socialUsers],
+    () => metadataFollowingUsers,
+    [metadataFollowingUsers],
   );
   const followerUsers = metadataFollowerUsers;
   const followerCount = Math.max(
@@ -1280,29 +1318,16 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   );
   const followingCount = Math.max(
     followingUsers.length,
-    followedIds.length,
     readSocialNumber(metadataRecord?.following_count),
     readSocialNumber(metadataSocial?.following_count),
     readSocialNumber(profileSocial?.following_count),
   );
   const socialModalUsers =
-    socialModal === 'followers'
-      ? followerUsers
-      : socialModal === 'following'
-        ? followingUsers
-        : suggestedSocialUsers;
+    socialModal === 'followers' ? followerUsers : followingUsers;
   const socialModalTitle =
-    socialModal === 'followers'
-      ? copy.followers
-      : socialModal === 'following'
-        ? copy.following
-        : copy.suggestions;
+    socialModal === 'followers' ? copy.followers : copy.following;
   const socialModalEmpty =
-    socialModal === 'followers'
-      ? copy.emptyFollowers
-      : socialModal === 'following'
-        ? copy.emptyFollowing
-        : copy.emptySuggestions;
+    socialModal === 'followers' ? copy.emptyFollowers : copy.emptyFollowing;
 
   const publicProfilePath = useMemo(
     () =>
@@ -1374,7 +1399,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         key: 'upload-reels',
         title: copy.uploadReel,
         description: copy.reelsDesc,
-        href: '/community?compose=reel',
+        href: '/reels',
         icon: Clapperboard,
         metric:
           reelsSignalCount > 0
@@ -1426,7 +1451,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         key: 'umkm',
         title: copy.storeAction,
         description: copy.storeDesc,
-        href: '/usaha',
+        href: '/home',
         icon: Store,
         metric: isId ? 'Toko + order' : 'Store + orders',
         actionLabel: copy.manage,
@@ -1554,7 +1579,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
   const hubTabs: Array<{ key: HubTab; label: string; icon: LucideIcon }> = [
     { key: 'ringkas', label: copy.overview, icon: Sparkles },
+    { key: 'aktivitas', label: copy.activity, icon: BarChart3 },
     { key: 'etalase', label: copy.showcase, icon: BriefcaseBusiness },
+    { key: 'cv', label: copy.cv, icon: ClipboardList },
     { key: 'reels', label: 'Reels', icon: Clapperboard },
     { key: 'komunitas', label: copy.communityAction, icon: Users },
     { key: 'trust', label: copy.trust, icon: ShieldCheck },
@@ -1572,9 +1599,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   return (
     <div className={PAGE_CLASS}>
       <div className="page-shell overflow-x-hidden">
-        <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-3 px-2 sm:gap-4 sm:px-0">
-          <section className={cn(CARD_CLASS, 'overflow-hidden')}>
-            <div className="relative h-28 bg-[color:var(--app-surface-muted)] sm:h-40 lg:h-44">
+        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-3 px-1 sm:gap-4 sm:px-2 lg:px-0">
+          <section className={cn(CARD_CLASS, 'overflow-hidden rounded-[24px]')}>
+            <div className="relative h-32 bg-[color:var(--app-surface-muted)] sm:h-40 lg:h-44">
               {effectiveCoverUrl ? (
                 <Image
                   src={effectiveCoverUrl}
@@ -1590,7 +1617,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02)_0%,rgba(15,23,42,0.18)_48%,rgba(15,23,42,0.58)_100%)]" />
               <label
                 htmlFor="profile-cover-upload"
-                className="absolute right-3 top-3 inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-full bg-white/95 px-3 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-slate-100"
+                className="absolute right-2 top-2 inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-slate-100 sm:right-3 sm:top-3 sm:min-h-[34px] sm:px-3"
                 title={isId ? 'Ganti sampul' : 'Change cover'}
               >
                 {coverUploading ? (
@@ -1612,12 +1639,12 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               />
             </div>
 
-            <div className="px-3 pb-3 sm:px-5 sm:pb-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-start">
-                  <div className="relative -mt-10 h-20 w-20 shrink-0 overflow-hidden rounded-full border-4 border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:-mt-12 sm:h-24 sm:w-24">
+            <div className="px-3 pb-4 sm:px-4 sm:pb-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start lg:flex-1">
+                  <div className="relative -mt-10 h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-[0_18px_34px_-24px_rgba(15,23,42,0.55)] sm:-mt-12 sm:h-24 sm:w-24">
                     <Image
-                      src={effectiveAvatarUrl}
+                      src={profileAvatarSrc(effectiveAvatarUrl)}
                       alt={displayName}
                       fill
                       sizes="96px"
@@ -1626,7 +1653,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     />
                     <label
                       htmlFor="profile-avatar-upload"
-                      className="absolute bottom-0.5 right-0.5 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] shadow"
+                      className="absolute bottom-1 right-1 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] shadow ring-1 ring-[color:var(--app-border)]"
                       title={isId ? 'Ganti foto' : 'Change photo'}
                     >
                       {avatarUploading ? (
@@ -1645,27 +1672,27 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     />
                   </div>
 
-                  <div className="min-w-0 pt-0 sm:pt-2 lg:pt-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="min-w-0 break-words text-xl font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl">
+                  <div className="min-w-0 flex-1 pt-0 sm:pt-1 lg:pt-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <h1 className="min-w-0 max-w-full break-words text-2xl font-black leading-tight text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
                         {displayName}
                       </h1>
-                      <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-xs font-semibold text-[color:var(--app-accent)]">
+                      <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--app-accent)] sm:text-xs">
                         <span className="min-w-0 truncate">
                           @{publicHandle || 'profil'}
                         </span>
                       </span>
                       {trustReady ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-success-soft)] px-2.5 py-1 text-xs font-semibold text-[color:var(--app-success)]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-success-soft)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--app-success)] sm:text-xs">
                           <BadgeCheck className="h-3.5 w-3.5" />
                           {isId ? 'Trusted' : 'Trusted'}
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1.5 max-w-2xl break-words text-sm font-medium leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                    <p className="mt-1.5 max-w-2xl break-words text-sm font-semibold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-[15px]">
                       {headlineValue}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
+                    <div className="mt-1.5 flex flex-wrap gap-1">
                       {locationValue ? (
                         <IconPill icon={MapPin} muted>
                           {locationValue}
@@ -1677,19 +1704,19 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         </IconPill>
                       ) : null}
                     </div>
-                    <div className="mt-3 grid max-w-[420px] grid-cols-3 gap-1.5">
+                    <div className="mt-3 grid max-w-[320px] grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => setSocialModal('followers')}
                         className={cn(
                           MUTED_ROW_CLASS,
-                          'min-w-0 px-2.5 py-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
+                          'min-w-0 px-3 py-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
                         )}
                       >
-                        <span className="block truncate text-base font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        <span className="block truncate text-sm font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                           {followerCount.toLocaleString(locale)}
                         </span>
-                        <span className="mt-1 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                        <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
                           {copy.followers}
                         </span>
                       </button>
@@ -1698,36 +1725,21 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         onClick={() => setSocialModal('following')}
                         className={cn(
                           MUTED_ROW_CLASS,
-                          'min-w-0 px-2.5 py-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
+                          'min-w-0 px-3 py-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
                         )}
                       >
-                        <span className="block truncate text-base font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        <span className="block truncate text-sm font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                           {followingCount.toLocaleString(locale)}
                         </span>
-                        <span className="mt-1 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                        <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
                           {copy.following}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSocialModal('suggestions')}
-                        className={cn(
-                          MUTED_ROW_CLASS,
-                          'min-w-0 px-2.5 py-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
-                        )}
-                      >
-                        <span className="block truncate text-base font-black leading-none text-[color:var(--app-accent)]">
-                          {suggestedSocialUsers.length.toLocaleString(locale)}
-                        </span>
-                        <span className="mt-1 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                          {copy.suggestions}
                         </span>
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid w-full shrink-0 gap-2 sm:min-w-[360px] sm:grid-cols-2 xl:w-auto xl:grid-cols-4">
+                <div className="grid w-full shrink-0 grid-cols-2 gap-2 lg:w-[330px] xl:w-[370px]">
                   <button
                     type="button"
                     onClick={() => setQuickEditOpen(true)}
@@ -1745,34 +1757,31 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     <ExternalLink className="h-4 w-4" />
                     {copy.openPublic}
                   </a>
-                  <LocalizedLink
-                    href="/create/jual"
-                    className={TONAL_ACTION_CLASS}
-                  >
+                  <LocalizedLink href="/home" className={TONAL_ACTION_CLASS}>
                     <Upload className="h-4 w-4" />
                     {copy.listingAction}
                   </LocalizedLink>
-                  <LocalizedLink
-                    href="/community?compose=reel"
+                  {/* <LocalizedLink
+                    href="/reels"
                     className={SECONDARY_ACTION_CLASS}
                   >
                     <Clapperboard className="h-4 w-4" />
                     {copy.uploadReel}
-                  </LocalizedLink>
+                  </LocalizedLink> */}
                 </div>
               </div>
             </div>
           </section>
 
           {saveMessage ? (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 py-3 text-sm font-medium text-[color:var(--app-accent)]">
+            <div className="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--app-accent)]">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>{saveMessage}</span>
             </div>
           ) : null}
 
           {profileError ? (
-            <div className="rounded-lg bg-[color:var(--app-warning-soft)] px-4 py-3 text-sm font-medium text-[color:var(--app-warning)]">
+            <div className="rounded-lg bg-[color:var(--app-warning-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--app-warning)]">
               {profileError}
             </div>
           ) : null}
@@ -1791,10 +1800,10 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           <div
             className={cn(
               CARD_CLASS,
-              'sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto px-3 py-2 sm:top-[calc(60px+env(safe-area-inset-top))]',
+              'sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto px-2 py-1.5 sm:top-[calc(60px+env(safe-area-inset-top))] sm:px-2.5',
             )}
           >
-            <div className="flex min-w-max gap-2">
+            <div className="flex min-w-max gap-1.5 sm:gap-2">
               {hubTabs.map(item => (
                 <ProfileTabButton
                   key={item.key}
@@ -1807,12 +1816,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <main className="min-w-0 space-y-4">
+          <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+            <main className="min-w-0 space-y-2.5">
               {activeHubTab === 'ringkas' ? (
                 <>
                   <SectionBlock
                     title={copy.mainData}
+                    tone="profile"
                     action={
                       <LocalizedLink
                         href="/profile/edit?focus=identity"
@@ -1823,20 +1833,20 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       </LocalizedLink>
                     }
                   >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className={cn(MUTED_ROW_CLASS, 'p-3')}>
-                        <p className="text-xs font-semibold text-[color:var(--app-text-soft)]">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className={cn(MUTED_ROW_CLASS, 'p-2.5')}>
+                        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
                           {isId ? 'Ringkasan' : 'Summary'}
                         </p>
-                        <p className="mt-1 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        <p className="mt-1 text-[13px] font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {summaryValue}
                         </p>
                       </div>
-                      <div className={cn(MUTED_ROW_CLASS, 'p-3')}>
-                        <p className="text-xs font-semibold text-[color:var(--app-text-soft)]">
+                      <div className={cn(MUTED_ROW_CLASS, 'p-2.5')}>
+                        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
                           {isId ? 'Kontak' : 'Contact'}
                         </p>
-                        <div className="mt-2 space-y-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                        <div className="mt-1.5 space-y-1.5 text-[13px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                           <div className="flex min-w-0 items-center gap-2">
                             <Mail className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
                             <span className="min-w-0 truncate">
@@ -1867,6 +1877,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   <SectionBlock
                     title={copy.activityTitle}
                     subtitle={copy.activitySubtitle}
+                    tone="activity"
                     action={
                       <LocalizedLink
                         href="/community?compose=post"
@@ -1894,6 +1905,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
                   <SectionBlock
                     title={copy.signalMap}
+                    tone="insight"
                     subtitle={
                       isId
                         ? 'Yang pernah kamu buka, like, save, share, listing, dan deal.'
@@ -1912,12 +1924,12 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       ))}
                     </div>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-3 text-xs font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface)]">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface)]">
                         <Repeat2 className="h-3.5 w-3.5" />
                         {isId ? 'Share / repost reels' : 'Share / repost reels'}
                       </span>
-                      <span className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-3 text-xs font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface)]">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface)]">
                         <MessageSquareText className="h-3.5 w-3.5" />
                         {isId ? 'Komentar komunitas' : 'Community comments'}
                       </span>
@@ -1925,7 +1937,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         ? reelsPreferenceTags.map(tag => (
                             <span
                               key={tag}
-                              className="inline-flex min-h-[32px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-semibold text-[color:var(--app-accent)]"
+                              className="inline-flex min-h-[30px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 text-[11px] font-semibold text-[color:var(--app-accent)]"
                             >
                               #{tag}
                             </span>
@@ -1936,6 +1948,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
                   <SectionBlock
                     title={copy.footprint}
+                    tone="social"
                     subtitle={
                       isId
                         ? 'Ringkas saja, biar orang langsung tahu aktivitas pentingmu.'
@@ -1949,7 +1962,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         action={
                           <div className="flex flex-wrap justify-center gap-2">
                             <LocalizedLink
-                              href="/community?compose=reel"
+                              href="/reels"
                               className={TONAL_ACTION_CLASS}
                             >
                               <Clapperboard className="h-4 w-4" />
@@ -1987,9 +2000,10 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   <SectionBlock
                     title={copy.reelsAction}
                     subtitle={copy.reelsDesc}
+                    tone="activity"
                     action={
                       <LocalizedLink
-                        href="/community?compose=reel"
+                        href="/reels"
                         className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--app-accent)]"
                       >
                         {copy.uploadReel}
@@ -2017,9 +2031,10 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {activityMetrics
                         .filter(item =>
-                          [copy.reelsAction, isId ? 'Interaksi reels' : 'Reels interactions'].includes(
-                            item.label,
-                          ),
+                          [
+                            copy.reelsAction,
+                            isId ? 'Interaksi reels' : 'Reels interactions',
+                          ].includes(item.label),
                         )
                         .map(item => (
                           <ActivityMetricCard
@@ -2032,7 +2047,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         ))}
                       <ActivityMetricCard
                         label={isId ? 'Minat terbaca' : 'Known interests'}
-                        value={reelsPreferenceTags.length.toLocaleString(locale)}
+                        value={reelsPreferenceTags.length.toLocaleString(
+                          locale,
+                        )}
                         hint={isId ? 'tag reels' : 'reels tags'}
                         icon={Heart}
                       />
@@ -2058,6 +2075,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   <SectionBlock
                     title={copy.communityAction}
                     subtitle={copy.communityDesc}
+                    tone="social"
                     action={
                       <LocalizedLink
                         href="/community?compose=post"
@@ -2099,6 +2117,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
                   <SectionBlock
                     title={copy.footprint}
+                    tone="social"
                     subtitle={
                       isId
                         ? 'Postingan dan diskusi penting akan muncul di sini.'
@@ -2140,6 +2159,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 <>
                   <SectionBlock
                     title={copy.listings}
+                    tone="market"
                     subtitle={
                       isId
                         ? 'Produk, jasa, talent, jobs, dan kebutuhan aktif.'
@@ -2213,17 +2233,17 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         {filteredListings.slice(0, 6).map(item => (
                           <div
                             key={item.id}
-                            className={cn(MUTED_ROW_CLASS, 'p-3')}
+                            className={cn(MUTED_ROW_CLASS, 'p-2.5')}
                           >
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start justify-between gap-2.5">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                   {item.title ||
                                     (isId
                                       ? 'Listing tanpa judul'
                                       : 'Untitled listing')}
                                 </p>
-                                <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                                   {getProfileContentTabLabel(
                                     classifyListing(item),
                                     locale,
@@ -2243,6 +2263,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
                   <SectionBlock
                     title={copy.transactions}
+                    tone="trust"
                     subtitle={
                       isId
                         ? 'Riwayat paling baru, cukup yang penting.'
@@ -2274,17 +2295,17 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         {txPreview.map(item => (
                           <div
                             key={item.id}
-                            className={cn(MUTED_ROW_CLASS, 'p-3')}
+                            className={cn(MUTED_ROW_CLASS, 'p-2.5')}
                           >
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center justify-between gap-2.5">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                   {formatMoneyFromCents(
                                     item.amount_cents,
                                     item.currency || 'IDR',
                                   )}
                                 </p>
-                                <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                                   {formatDate(item.created_at)}
                                 </p>
                               </div>
@@ -2304,6 +2325,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 <>
                   <SectionBlock
                     title={copy.professional}
+                    tone="work"
                     subtitle={
                       isId
                         ? 'Dibaca seperti LinkedIn/Upwork, tapi tetap pendek.'
@@ -2319,27 +2341,27 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       </LocalizedLink>
                     }
                   >
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div>
-                        <p className="text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                        <p className="text-[13px] font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
                           {summaryValue}
                         </p>
                       </div>
 
                       <div>
-                        <p className="mb-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        <p className="mb-1.5 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {copy.skills}
                         </p>
                         {professionalData.skills.length === 0 ? (
-                          <p className="text-sm text-[color:var(--app-text-soft)]">
+                          <p className="text-xs font-semibold text-[color:var(--app-text-soft)]">
                             {isId ? 'Belum ada skill.' : 'No skills yet.'}
                           </p>
                         ) : (
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-1.5">
                             {professionalData.skills.slice(0, 12).map(skill => (
                               <span
                                 key={skill}
-                                className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-accent)]"
+                                className="rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] sm:text-xs"
                               >
                                 {skill}
                               </span>
@@ -2348,9 +2370,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         )}
                       </div>
 
-                      <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="grid gap-2.5 lg:grid-cols-2">
                         <div>
-                          <p className="mb-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          <p className="mb-1.5 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                             {copy.experience}
                           </p>
                           <EntryList
@@ -2363,7 +2385,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                           />
                         </div>
                         <div>
-                          <p className="mb-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          <p className="mb-1.5 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                             {copy.education}
                           </p>
                           <EntryList
@@ -2384,15 +2406,16 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
                   <SectionBlock
                     title={copy.quickApply}
+                    tone="work"
                     subtitle={
                       isId
                         ? 'Simpan data lamaran biar daftar kerja lebih cepat.'
                         : 'Save application data for faster job apply.'
                     }
                   >
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                      <label className="block min-w-0 space-y-2">
-                        <span className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                      <label className="block min-w-0 space-y-1.5">
+                        <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {copy.uploadCv}
                         </span>
                         <input
@@ -2434,13 +2457,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       </button>
                     </div>
                     {qaMessage ? (
-                      <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
+                      <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
                         {qaMessage}
                       </p>
                     ) : null}
                   </SectionBlock>
 
-                  <SectionBlock title={copy.links}>
+                  <SectionBlock title={copy.links} tone="social">
                     {professionalData.links.length === 0 ? (
                       <EmptyState
                         title={isId ? 'Belum ada link' : 'No links yet'}
@@ -2460,7 +2483,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                             rel="noreferrer noopener"
                             className={cn(
                               MUTED_ROW_CLASS,
-                              'flex min-h-[48px] items-center justify-between gap-3 px-3 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]',
+                              'flex min-h-[42px] items-center justify-between gap-2.5 px-2.5 text-[13px] font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]',
                             )}
                           >
                             <span className="min-w-0 truncate">
@@ -2483,25 +2506,31 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               ) : null}
             </main>
 
-            <aside className="min-w-0 space-y-4 lg:sticky lg:top-[calc(112px+env(safe-area-inset-top))] lg:self-start">
-              <section className={cn(CARD_CLASS, 'p-4')}>
-                <div className="flex items-start justify-between gap-3">
+            <aside className="min-w-0 space-y-2.5 lg:sticky lg:top-[calc(102px+env(safe-area-inset-top))] lg:self-start">
+              <section
+                className={cn(
+                  CARD_CLASS,
+                  SECTION_TONE_CLASS.profile,
+                  'p-2.5 sm:p-3',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2.5">
                   <div>
-                    <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <p className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {copy.completeProfile}
                     </p>
-                    <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                    <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                       {setupPercent}% {isId ? 'siap' : 'ready'}
                     </p>
                   </div>
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                    <Sparkles className="h-5 w-5" />
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                    <Sparkles className="h-4 w-4" />
                   </span>
                 </div>
-                <div className="mt-4">
+                <div className="mt-2.5">
                   <ProgressBar value={setupPercent} />
                 </div>
-                <div className="mt-4 grid gap-2">
+                <div className="mt-2.5 grid gap-1.5">
                   <button
                     type="button"
                     onClick={() => setQuickEditOpen(true)}
@@ -2521,28 +2550,34 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 </div>
               </section>
 
-              <section className={cn(CARD_CLASS, 'p-4')}>
-                <div className="flex items-start justify-between gap-3">
+              <section
+                className={cn(
+                  CARD_CLASS,
+                  SECTION_TONE_CLASS.social,
+                  'p-2.5 sm:p-3',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2.5">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <p className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {copy.social}
                     </p>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                    <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
                       {copy.socialSubtitle}
                     </p>
                   </div>
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                    <Users className="h-5 w-5" />
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                    <Users className="h-4 w-4" />
                   </span>
                 </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-2.5 grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setSocialModal('followers')}
-                    className={cn(MUTED_ROW_CLASS, 'px-3 py-2 text-left')}
+                    className={cn(MUTED_ROW_CLASS, 'px-2.5 py-1.5 text-left')}
                   >
-                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <span className="block text-base font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {followerCount.toLocaleString(locale)}
                     </span>
                     <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -2552,9 +2587,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   <button
                     type="button"
                     onClick={() => setSocialModal('following')}
-                    className={cn(MUTED_ROW_CLASS, 'px-3 py-2 text-left')}
+                    className={cn(MUTED_ROW_CLASS, 'px-2.5 py-1.5 text-left')}
                   >
-                    <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <span className="block text-base font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {followingCount.toLocaleString(locale)}
                     </span>
                     <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -2563,31 +2598,40 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   </button>
                 </div>
 
-                <div className="mt-3 space-y-2">
-                  {suggestedSocialUsers.slice(0, 3).map(item => (
+                <div className="mt-2.5 space-y-1.5">
+                  {followingUsers.slice(0, 3).map(item => (
                     <SocialUserRow
                       key={item.id}
                       item={item}
                       isId={isId}
-                      following={followedIds.includes(item.id)}
+                      following
                       onToggle={toggleFollow}
                     />
                   ))}
-                  {socialLoading ? (
-                    <p className="rounded-[14px] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
-                      {isId ? 'Memuat koneksi...' : 'Loading connections...'}
-                    </p>
+                  {followingUsers.length === 0 ? (
+                    <div className="rounded-[12px] border border-dashed border-[color:var(--app-border)] bg-white/70 px-3 py-3 text-center dark:border-white/10 dark:bg-white/[0.06]">
+                      <span className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                        <Users className="h-4 w-4" />
+                      </span>
+                      <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        {copy.emptyConnections}
+                      </p>
+                      <p className="mt-0.5 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+                        {isId
+                          ? 'Belum ada data pengikut atau akun yang kamu ikuti.'
+                          : 'No follower or following data is available yet.'}
+                      </p>
+                    </div>
                   ) : null}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSocialModal('suggestions')}
-                  className={cn(TONAL_ACTION_CLASS, 'mt-3 w-full')}
+                <LocalizedLink
+                  href="/search?type=people"
+                  className={cn(TONAL_ACTION_CLASS, 'mt-2.5 w-full')}
                 >
                   <UserPlus className="h-4 w-4" />
                   {copy.findPeople}
-                </button>
+                </LocalizedLink>
               </section>
             </aside>
           </div>
@@ -2619,7 +2663,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         }
       >
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-1.5 rounded-[16px] bg-[color:var(--app-surface-muted)] p-1">
+          <div className="grid grid-cols-2 gap-1.5 rounded-[16px] bg-[color:var(--app-surface-muted)] p-1">
             {[
               {
                 key: 'followers' as const,
@@ -2630,11 +2674,6 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 key: 'following' as const,
                 label: copy.following,
                 value: followingCount,
-              },
-              {
-                key: 'suggestions' as const,
-                label: copy.suggestions,
-                value: suggestedSocialUsers.length,
               },
             ].map(item => (
               <button
@@ -2658,44 +2697,26 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             ))}
           </div>
 
-          {socialError ? (
-            <div className="rounded-[14px] bg-[color:var(--app-warning-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--app-warning)]">
-              {socialError}
-            </div>
-          ) : null}
-
-          {socialLoading ? (
-            <div className="space-y-2">
-              {[0, 1, 2].map(item => (
-                <div
-                  key={item}
-                  className="h-[72px] animate-pulse rounded-[14px] bg-[color:var(--app-surface-muted)]"
-                />
-              ))}
-            </div>
-          ) : socialModalUsers.length === 0 ? (
+          {socialModalUsers.length === 0 ? (
             <EmptyState
               title={socialModalEmpty}
               description={
                 socialModal === 'followers'
                   ? isId
-                    ? 'Begitu backend social graph tersedia, detail pengikut tampil di sini.'
-                    : 'Once the backend social graph is available, follower details will appear here.'
+                    ? 'Detail pengikut akan tampil setelah data koneksi tersedia.'
+                    : 'Follower details will appear once connection data is available.'
                   : isId
                     ? 'Mulai follow orang yang relevan biar koneksimu kebaca.'
                     : 'Start following relevant people so your network becomes useful.'
               }
               action={
-                socialModal !== 'suggestions' ? (
-                  <button
-                    type="button"
-                    onClick={() => setSocialModal('suggestions')}
-                    className={TONAL_ACTION_CLASS}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    {copy.findPeople}
-                  </button>
-                ) : null
+                <LocalizedLink
+                  href="/search?type=people"
+                  className={TONAL_ACTION_CLASS}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {copy.findPeople}
+                </LocalizedLink>
               }
             />
           ) : (
@@ -2705,7 +2726,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   key={item.id}
                   item={item}
                   isId={isId}
-                  following={followedIds.includes(item.id)}
+                  following={
+                    socialModal === 'following' || followedIds.includes(item.id)
+                  }
                   onToggle={toggleFollow}
                 />
               ))}
@@ -2750,9 +2773,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           <label className="block space-y-1.5">
-            <span className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+            <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId ? 'Nama tampil' : 'Display name'}
             </span>
             <input
@@ -2766,7 +2789,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+            <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId ? 'URL profil publik' : 'Public profile URL'}
             </span>
             <input
@@ -2780,9 +2803,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             </p>
           </label>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1.5">
-              <span className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                 {isId ? 'Nomor telepon' : 'Phone'}
               </span>
               <input
@@ -2794,7 +2817,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             </label>
 
             <label className="block space-y-1.5">
-              <span className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                 {isId ? 'Lokasi' : 'Location'}
               </span>
               <input
@@ -2807,13 +2830,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+            <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId ? 'Ringkasan singkat' : 'Short summary'}
             </span>
             <textarea
               value={bioInput}
               onChange={event => onBioChange(event.target.value)}
-              rows={4}
+              rows={3}
               className={INPUT_CLASS}
               placeholder={
                 isId

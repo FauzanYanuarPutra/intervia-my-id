@@ -2,10 +2,19 @@ import { Link } from '@/i18n/navigation';
 import { UMKM_DISCOVERY_PATH, buildUsahaPath } from '@/lib/umkmSurface';
 import {
   ArrowRight,
+  BookOpen,
+  BriefcaseBusiness,
+  Building2,
+  Clapperboard,
+  GraduationCap,
+  Handshake,
   ReceiptText,
   Search,
   ShieldCheck,
+  Sparkles,
   Store,
+  UserRound,
+  Users,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -92,7 +101,9 @@ function FinanceCard({
       href={href}
       className="ui-feed-tile rounded-[22px] border border-[color:var(--app-border)]/80 bg-[color:var(--app-surface-strong)] px-3 py-3 transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[var(--app-shadow)]"
     >
-      <span className={`inline-flex h-9 w-9 items-center justify-center rounded-[16px] border ${tone}`}>
+      <span
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-[16px] border ${tone}`}
+      >
         <Icon className="h-4 w-4" />
       </span>
       <p className="mt-2.5 text-[12px] font-semibold leading-tight text-[color:var(--app-text)]">
@@ -101,6 +112,49 @@ function FinanceCard({
       <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
         {hint}
       </p>
+    </Link>
+  );
+}
+
+function DirectoryCard({
+  href,
+  title,
+  hint,
+  cta,
+  icon: Icon,
+  tone,
+}: {
+  href: string;
+  title: string;
+  hint: string;
+  cta: string;
+  icon: LucideIcon;
+  tone: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-[22px] border border-[color:var(--app-border)]/80 bg-[color:var(--app-surface-strong)] p-3 transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[var(--app-shadow)]"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border ${tone}`}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="line-clamp-2 text-[13px] font-black leading-tight text-[color:var(--app-text)]">
+            {title}
+          </p>
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+            {hint}
+          </p>
+        </div>
+      </div>
+      <span className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-accent)] transition group-hover:translate-x-0.5">
+        {cta}
+        <ArrowRight className="h-3.5 w-3.5" />
+      </span>
     </Link>
   );
 }
@@ -115,24 +169,21 @@ export default async function LainnyaPage({ params }: PageProps) {
       title: isId ? 'Saldo & isi ulang' : 'Balance and top-up',
       hint: isId ? 'Cek saldo dan isi ulang.' : 'Check balance and top up.',
       icon: Wallet,
-      tone:
-        'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+      tone: 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
     },
     {
       href: '/transactions',
       title: isId ? 'Transaksi' : 'Transactions',
       hint: isId ? 'Lihat order dan dana.' : 'Review orders and funds.',
       icon: ReceiptText,
-      tone:
-        'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
+      tone: 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
     },
     {
       href: '/support',
       title: isId ? 'Bantuan' : 'Support',
       hint: isId ? 'Kalau pembayaran bermasalah.' : 'When payments need help.',
       icon: ShieldCheck,
-      tone:
-        'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
+      tone: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
     },
   ];
 
@@ -155,11 +206,119 @@ export default async function LainnyaPage({ params }: PageProps) {
     },
   ];
 
+  const valueRoutes = [
+    {
+      href: '/learn',
+      title: isId ? 'Learn' : 'Learn',
+      hint: isId
+        ? 'Video, bacaan, dan course dari creator.'
+        : 'Videos, readings, and creator courses.',
+      icon: BookOpen,
+      cta: isId ? 'Buka' : 'Open',
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40',
+    },
+    {
+      href: '/education',
+      title: isId ? 'Education' : 'Education',
+      hint: isId
+        ? 'Jalur belajar, trust, dan operasional.'
+        : 'Learning paths, trust, and operations.',
+      icon: GraduationCap,
+      cta: isId ? 'Buka' : 'Open',
+      tone: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/40',
+    },
+    {
+      href: '/community',
+      title: isId ? 'Komunitas' : 'Community',
+      hint: isId
+        ? 'Grup, diskusi, dan posting usaha.'
+        : 'Groups, discussions, and business posts.',
+      icon: Users,
+      cta: isId ? 'Buka' : 'Open',
+      tone: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40',
+    },
+    {
+      href: '/reels',
+      title: 'Reels',
+      hint: isId
+        ? 'Video singkat bisnis dan produk.'
+        : 'Short business and product videos.',
+      icon: Clapperboard,
+      cta: isId ? 'Buka' : 'Open',
+      tone: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40',
+    },
+    {
+      href: '/microgigs',
+      title: 'Microgigs',
+      hint: isId
+        ? 'Tugas cepat dengan scope jelas.'
+        : 'Quick tasks with clear scope.',
+      icon: Handshake,
+      cta: isId ? 'Buka' : 'Open',
+      tone: 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900 dark:bg-teal-950/40',
+    },
+    {
+      href: '/crm',
+      title: 'CRM',
+      hint: isId
+        ? 'Follow-up lead dan aktivitas usaha.'
+        : 'Lead follow-up and business activities.',
+      icon: Sparkles,
+      cta: isId ? 'Buka' : 'Open',
+      tone: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/40',
+    },
+  ];
+
+  const canonicalSearchRoutes = [
+    {
+      href: '/search?type=job&q=lowongan',
+      title: isId ? 'Loker' : 'Jobs',
+      hint: isId
+        ? 'Lowongan, kurir, admin, dan operator.'
+        : 'Jobs, couriers, admins, and operators.',
+      icon: BriefcaseBusiness,
+      cta: isId ? 'Cari' : 'Search',
+      tone: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900',
+    },
+    {
+      href: '/search?type=freelancer&q=umkm',
+      title: 'Talent',
+      hint: isId
+        ? 'Freelancer dan profil skill.'
+        : 'Freelancers and skill profiles.',
+      icon: UserRound,
+      cta: isId ? 'Cari' : 'Search',
+      tone: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40',
+    },
+    {
+      href: '/search?type=property&q=lokasi%20jualan',
+      title: isId ? 'Lokasi' : 'Locations',
+      hint: isId
+        ? 'Ruko, booth, dapur, gudang.'
+        : 'Shops, booths, kitchens, warehouses.',
+      icon: Building2,
+      cta: isId ? 'Cari' : 'Search',
+      tone: 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40',
+    },
+    {
+      href: '/search?type=product&q=supplier',
+      title: 'Marketplace',
+      hint: isId
+        ? 'Supplier dan produk siap pilih.'
+        : 'Suppliers and ready-to-browse products.',
+      icon: Store,
+      cta: isId ? 'Cari' : 'Search',
+      tone: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40',
+    },
+  ];
+
   const featuredPaths = [
     {
       eyebrow: isId ? 'Cari kebutuhan' : 'Search',
       title: isId ? 'Supplier, stok, lokasi' : 'Suppliers, stock, locations',
-      hint: isId ? 'Mulai dari supplier atau kebutuhan usaha.' : 'Start from suppliers or a business need.',
+      hint: isId
+        ? 'Mulai dari supplier atau kebutuhan usaha.'
+        : 'Start from suppliers or a business need.',
       meta: isId ? 'Cari cepat' : 'Search fast',
       href: '/search',
       cta: isId ? 'Cari' : 'Open search',
@@ -169,7 +328,9 @@ export default async function LainnyaPage({ params }: PageProps) {
     {
       eyebrow: isId ? 'Kelola usaha' : 'Manage',
       title: isId ? 'Masuk ke usaha aktif' : 'Open the active business',
-      hint: isId ? 'Produk, order, operasional, tim.' : 'Products, orders, operations, and team.',
+      hint: isId
+        ? 'Produk, order, operasional, tim.'
+        : 'Products, orders, operations, and team.',
       meta: isId ? 'Satu pintu' : 'One doorway',
       href: buildUsahaPath('home'),
       cta: isId ? 'Kelola' : 'Open business control',
@@ -178,8 +339,12 @@ export default async function LainnyaPage({ params }: PageProps) {
     },
     {
       eyebrow: isId ? 'Pembayaran' : 'Finance',
-      title: isId ? 'Saldo, transaksi, bantuan' : 'Balance, transactions, support',
-      hint: isId ? 'Kalau uang sudah mulai jalan.' : 'When money starts moving.',
+      title: isId
+        ? 'Saldo, transaksi, bantuan'
+        : 'Balance, transactions, support',
+      hint: isId
+        ? 'Kalau uang sudah mulai jalan.'
+        : 'When money starts moving.',
       meta: isId ? 'Keuangan' : 'Finance',
       href: '/payments',
       cta: isId ? 'Keuangan' : 'Open finance',
@@ -222,7 +387,7 @@ export default async function LainnyaPage({ params }: PageProps) {
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                {quickRoutes.map((item) => (
+                {quickRoutes.map(item => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -236,7 +401,7 @@ export default async function LainnyaPage({ params }: PageProps) {
             </div>
 
             <div className="grid gap-2.5 sm:grid-cols-3 xl:grid-cols-1">
-              {featuredPaths.map((item) => (
+              {featuredPaths.map(item => (
                 <DecisionPathCard
                   key={item.title}
                   eyebrow={item.eyebrow}
@@ -260,12 +425,10 @@ export default async function LainnyaPage({ params }: PageProps) {
                 {isId ? 'Shortcut' : 'Shortcuts'}
               </p>
               <h2 className="mt-1.5 text-base font-black text-[color:var(--app-text)]">
-                {isId
-                  ? 'Yang sering dipakai'
-                  : 'The four most-used buttons'}
+                {isId ? 'Yang sering dipakai' : 'The four most-used buttons'}
               </h2>
               <div className="mt-3 flex flex-wrap gap-2">
-                {quickRoutes.map((item) => (
+                {quickRoutes.map(item => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -288,7 +451,7 @@ export default async function LainnyaPage({ params }: PageProps) {
                 </span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                {financeRoutes.map((route) => (
+                {financeRoutes.map(route => (
                   <FinanceCard
                     key={route.href}
                     href={route.href}
@@ -300,6 +463,54 @@ export default async function LainnyaPage({ params }: PageProps) {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+              {isId ? 'Halaman bernilai' : 'Useful pages'}
+            </p>
+            <h2 className="text-base font-black text-[color:var(--app-text)]">
+              {isId
+                ? 'Yang disimpan karena membantu user'
+                : 'Kept because they help users'}
+            </h2>
+            <p className="max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Halaman ini bukan jalur utama, tapi tetap berguna untuk belajar, komunitas, konten, dan operasional.'
+                : 'These are not the main route, but they still help with learning, community, content, and operations.'}
+            </p>
+          </div>
+
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+            {valueRoutes.map(route => (
+              <DirectoryCard key={route.href} {...route} />
+            ))}
+          </div>
+        </section>
+
+        <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+              {isId ? 'Jalur kanonis' : 'Canonical routes'}
+            </p>
+            <h2 className="text-base font-black text-[color:var(--app-text)]">
+              {isId
+                ? 'Halaman lama diarahkan ke pencarian'
+                : 'Older pages now point to search'}
+            </h2>
+            <p className="max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Loker, talent, lokasi, dan marketplace sekarang masuk ke hasil pencarian yang sama agar tidak ada halaman kosong/duplikat.'
+                : 'Jobs, talent, locations, and marketplace now land in search so duplicate empty pages do not linger.'}
+            </p>
+          </div>
+
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+            {canonicalSearchRoutes.map(route => (
+              <DirectoryCard key={route.href} {...route} />
+            ))}
           </div>
         </section>
       </div>

@@ -115,14 +115,6 @@ function readTextArray(value: unknown): string[] {
   return [];
 }
 
-function hashSeed(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-  return hash;
-}
-
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/[^\d+]/g, '');
   if (!digits) return '';
@@ -311,10 +303,7 @@ function getKindMeta(kind: UmkmPlaceKind, isId: boolean): {
 function inferPriceLabel(place: UmkmPlaceLike, isId: boolean): string {
   const explicit = readMetaText(place, 'price_band');
   if (explicit) return explicit;
-  const seed = hashSeed(`${place.slug || place.name || 'umkm'}-price`);
-  if (seed % 3 === 0) return isId ? 'Ramah kantong' : 'Budget';
-  if (seed % 3 === 1) return isId ? 'Menengah' : 'Mid range';
-  return isId ? 'Premium' : 'Premium';
+  return isId ? 'Harga belum tersedia' : 'Price unavailable';
 }
 
 function formatCount(value: number): string {
@@ -636,24 +625,15 @@ export function buildUmkmPlacePresentation(
   const businessCategory = getUmkmPlaceBusinessCategory(place);
   const kind = getUmkmPlaceKind(place);
   const kindMeta = getKindMeta(kind, isId);
-  const seed = place.slug || place.id || place.name || 'umkm';
-  const ratingNumber = Number(
-    (
-      readMetaNumber(place, 'rating_avg', 'rating_average') ??
-      4.3 + (hashSeed(`${seed}-rating`) % 7) / 10
-    ).toFixed(1),
-  );
-  const ratingCount = Math.max(
-    18,
-    Math.round(
-      readMetaNumber(place, 'rating_count', 'review_count') ??
-        42 + (hashSeed(`${seed}-reviews`) % 540),
-    ),
-  );
-  const responseMinutes = Math.max(
-    2,
-    Math.round(readMetaNumber(place, 'response_time_minutes') ?? 3 + (hashSeed(`${seed}-response`) % 7)),
-  );
+  const rawRating = readMetaNumber(place, 'rating_avg', 'rating_average');
+  const rawRatingCount = readMetaNumber(place, 'rating_count', 'review_count');
+  const rawResponseMinutes = readMetaNumber(place, 'response_time_minutes');
+  const ratingNumber =
+    rawRating === null ? 0 : Number(Math.max(0, rawRating).toFixed(1));
+  const ratingCount =
+    rawRatingCount === null ? 0 : Math.max(0, Math.round(rawRatingCount));
+  const responseMinutes =
+    rawResponseMinutes === null ? 0 : Math.max(0, Math.round(rawResponseMinutes));
   const presenceStatus = getManagedPresenceStatus(place, isId);
   const categoryLabel =
     businessCategory
@@ -687,7 +667,12 @@ export function buildUmkmPlacePresentation(
     shortKindLabel: kindMeta.shortKindLabel,
     markerTone: kindMeta.markerTone,
     ratingNumber,
-    ratingLabel: ratingNumber.toFixed(1),
+    ratingLabel:
+      rawRating === null
+        ? isId
+          ? 'Belum ada rating'
+          : 'No ratings yet'
+        : ratingNumber.toFixed(1),
     ratingCount,
     reviewCountLabel: formatCount(ratingCount),
     responseMinutes,
@@ -697,7 +682,9 @@ export function buildUmkmPlacePresentation(
     statusLabel: presenceStatus.statusLabel,
     statusTone: presenceStatus.statusTone,
     coverImage: getCoverImage(place),
-    gallery: getGalleryImages(place, kind),
+    gallery: getGalleryImages(place, kind)
+      .map(image => image.trim())
+      .filter(Boolean),
     distanceLabel,
     priceLabel: inferPriceLabel(place, isId),
     serviceBadges: getServiceBadges(place, isId, presenceStatus),

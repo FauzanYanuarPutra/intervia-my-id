@@ -1,10 +1,15 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FreelancerCard } from '@/components/ui-kit';
-import { Header } from '@/components/layout/Header';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import {
   ChevronLeft,
@@ -22,7 +27,8 @@ import {
   extractContentItems,
   matchAnyFilter,
 } from '@/lib/content/catalog';
-import { localAvatarForSeed } from '@/lib/media/localSeedMedia';
+import { normalizePriceUnit } from '@/lib/content/priceUnit';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import {
   buildPublicProfileHref,
   buildPublicProfileHrefFromContent,
@@ -96,7 +102,17 @@ function roleToLabel(raw: string | null | undefined): string {
   if (!source) return 'Member';
   return source
     .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (token) => token.toUpperCase());
+    .replace(/\b\w/g, token => token.toUpperCase());
+}
+
+function priceUnitToFreelancerPeriod(
+  unit: unknown,
+): 'hr' | 'day' | 'project' | undefined {
+  const normalized = normalizePriceUnit(unit);
+  if (normalized === 'hour') return 'hr';
+  if (normalized === 'day') return 'day';
+  if (normalized === 'project' || normalized === 'session') return 'project';
+  return undefined;
 }
 
 function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
@@ -104,14 +120,13 @@ function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
   const id = String(item.id);
   const sellerStats = item.seller_stats || {};
 
-  const rating =
-    asNumber(sellerStats.rating) ||
-    asNumber(item.rating) ||
-    0;
+  const rating = asNumber(sellerStats.rating) || asNumber(item.rating) || 0;
   const hourlyRate =
     asNumber(meta.hourly_rate) ||
     asNumber(meta.rate) ||
-    (Number.isFinite(item.price_cents) ? Math.floor((item.price_cents as number) / 100) : 0);
+    (Number.isFinite(item.price_cents)
+      ? Math.floor((item.price_cents as number) / 100)
+      : 0);
   const level = roleToLabel(
     asString(meta.level) ||
       asString(meta.profile_level) ||
@@ -130,17 +145,25 @@ function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
       }),
     skills: (asString(meta.skills) || '')
       .split(/[,\n]/)
-      .map((entry) => entry.trim())
+      .map(entry => entry.trim())
       .filter(Boolean)
       .slice(0, 5),
-    workMode: asString(meta.work_mode) || asString(meta.delivery_mode) || 'remote',
+    workMode:
+      asString(meta.work_mode) || asString(meta.delivery_mode) || 'remote',
     level,
     rating: rating > 0 ? rating.toFixed(1) : undefined,
     user: {
       id,
-      name: item.title || asString(meta.name) || asString(meta.full_name) || 'Freelancer',
+      name:
+        item.title ||
+        asString(meta.name) ||
+        asString(meta.full_name) ||
+        'Freelancer',
       tagline:
-        asString(meta.tagline) || item.summary || asString(meta.profession) || 'Professional',
+        asString(meta.tagline) ||
+        item.summary ||
+        asString(meta.profession) ||
+        'Professional',
       following: asNumber(meta.following) || 0,
       followers: asNumber(meta.followers) || 0,
       projectsCompleted:
@@ -152,13 +175,23 @@ function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
       verified: Boolean(meta.verified),
       premium: Boolean(meta.premium),
       location:
-        asString(meta.location) || asString(meta.city) || asString(meta.region) || 'Remote',
+        asString(meta.location) ||
+        asString(meta.city) ||
+        asString(meta.region) ||
+        'Remote',
       avatar: {
-        src: item.cover_image || asString(meta.avatar) || asString(meta.avatar_url),
+        src: profileAvatarSrc(
+          item.cover_image ||
+            asString(meta.avatar) ||
+            asString(meta.avatar_url),
+        ),
         alt: asString(meta.name) || 'Avatar',
       },
       coverImage: {
-        src: asString(meta.cover_image) || item.cover_image || asString(meta.banner),
+        src:
+          asString(meta.cover_image) ||
+          item.cover_image ||
+          asString(meta.banner),
         alt: 'Cover',
       },
     },
@@ -166,8 +199,14 @@ function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
       rate: hourlyRate,
       currency: asString(item.currency) || asString(meta.currency) || 'IDR',
       period:
+        priceUnitToFreelancerPeriod(item.price_unit) ||
+        priceUnitToFreelancerPeriod(meta.price_unit) ||
         (asString(meta.rate_period) as 'hr' | 'day' | 'project' | undefined) ||
-        (asString(meta.pricing_period) as 'hr' | 'day' | 'project' | undefined) ||
+        (asString(meta.pricing_period) as
+          | 'hr'
+          | 'day'
+          | 'project'
+          | undefined) ||
         'hr',
     },
   };
@@ -181,7 +220,8 @@ function mapDiscoverUserToFreelancer(user: DiscoverUser): FreelancerCardItem {
       ? user.rating
       : pseudoStatFromId(id, 42, 49) / 10; // 4.2 - 4.9
   const projects =
-    typeof user.completed_jobs === 'number' && Number.isFinite(user.completed_jobs)
+    typeof user.completed_jobs === 'number' &&
+    Number.isFinite(user.completed_jobs)
       ? user.completed_jobs
       : pseudoStatFromId(id, 2, 18);
   const followers = pseudoStatFromId(id, 10, 180);
@@ -193,10 +233,7 @@ function mapDiscoverUserToFreelancer(user: DiscoverUser): FreelancerCardItem {
   const roleFromList =
     Array.isArray(user.roles) && user.roles.length > 0 ? user.roles[0] : null;
   const level = roleToLabel(user.level || roleFromList);
-  const avatar =
-    user.avatar_url ||
-    localAvatarForSeed(id) ||
-    undefined;
+  const avatar = profileAvatarSrc(user.avatar_url);
 
   return {
     id,
@@ -265,7 +302,11 @@ function matchesFilters(item: FreelancerCardItem, filters: Filters): boolean {
   }
 
   if (filters.workMode.trim()) {
-    if (!item.workMode.toLowerCase().includes(filters.workMode.trim().toLowerCase())) {
+    if (
+      !item.workMode
+        .toLowerCase()
+        .includes(filters.workMode.trim().toLowerCase())
+    ) {
       return false;
     }
   }
@@ -320,7 +361,8 @@ export default function FreelancerClient() {
     const params = new URLSearchParams(searchParams.toString());
     if (filters.search.trim()) params.set('q', filters.search.trim());
     else params.delete('q');
-    if (filters.location.trim()) params.set('location', filters.location.trim());
+    if (filters.location.trim())
+      params.set('location', filters.location.trim());
     else params.delete('location');
     if (filters.rating.trim()) params.set('rating', filters.rating.trim());
     else params.delete('rating');
@@ -328,7 +370,8 @@ export default function FreelancerClient() {
     else params.delete('min_rate');
     if (filters.maxRate.trim()) params.set('max_rate', filters.maxRate.trim());
     else params.delete('max_rate');
-    if (filters.workMode.trim()) params.set('work_mode', filters.workMode.trim());
+    if (filters.workMode.trim())
+      params.set('work_mode', filters.workMode.trim());
     else params.delete('work_mode');
     if (filters.verifiedOnly) params.set('verified', '1');
     else params.delete('verified');
@@ -340,13 +383,19 @@ export default function FreelancerClient() {
     const next = params.toString();
     const current = searchParams.toString();
     if (next !== current) {
-      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false });
+      router.replace(next ? `${pathname}?${next}` : pathname, {
+        scroll: false,
+      });
     }
   }, [filters, pathname, router, searchParams]);
 
   const loadData = useCallback(
     async (reset: boolean) => {
-      if (!reset && (!hasMore || loadingInitial || loadingMore || autoLoadLockRef.current)) return;
+      if (
+        !reset &&
+        (!hasMore || loadingInitial || loadingMore || autoLoadLockRef.current)
+      )
+        return;
 
       const currentPage = reset ? 1 : page;
       const offset = (currentPage - 1) * PAGE_SIZE;
@@ -365,7 +414,8 @@ export default function FreelancerClient() {
         params.set('limit', String(PAGE_SIZE));
         params.set('offset', String(offset));
         if (filters.search.trim()) params.set('q', filters.search.trim());
-        if (filters.location.trim()) params.set('location', filters.location.trim());
+        if (filters.location.trim())
+          params.set('location', filters.location.trim());
         if (filters.rating.trim()) params.set('rating', filters.rating.trim());
 
         const response = await fetch(`/api/content?${params.toString()}`, {
@@ -385,9 +435,10 @@ export default function FreelancerClient() {
           typeof (payload as { has_more?: unknown }).has_more === 'boolean'
             ? Boolean((payload as { has_more?: boolean }).has_more)
             : null;
-        const contentItems = serverItems.filter((entry) => {
+        const contentItems = serverItems.filter(entry => {
           if (!matchAnyFilter(entry, filters.search)) return false;
-          const typeText = `${entry.content_type || ''} ${entry.category || ''}`.toLowerCase();
+          const typeText =
+            `${entry.content_type || ''} ${entry.category || ''}`.toLowerCase();
           return (
             typeText.includes('freelancer') ||
             typeText.includes('talent') ||
@@ -397,29 +448,36 @@ export default function FreelancerClient() {
 
         let mapped = contentItems
           .map(mapContentToFreelancer)
-          .filter((entry) => matchesFilters(entry, filters));
+          .filter(entry => matchesFilters(entry, filters));
 
-        let nextHasMore = payloadHasMore ?? (serverItems.length === PAGE_SIZE);
+        let nextHasMore = payloadHasMore ?? serverItems.length === PAGE_SIZE;
 
         if (mapped.length === 0) {
           const userParams = new URLSearchParams({ limit: String(PAGE_SIZE) });
           if (filters.search.trim()) userParams.set('q', filters.search.trim());
 
-          const userRes = await fetch(`/api/users/discover?${userParams.toString()}`, {
-            cache: 'no-store',
-            credentials: 'include',
-          });
+          const userRes = await fetch(
+            `/api/users/discover?${userParams.toString()}`,
+            {
+              cache: 'no-store',
+              credentials: 'include',
+            },
+          );
           const userPayload = (await userRes.json().catch(() => ({}))) as {
             data?: DiscoverUser[];
             error?: string;
           };
 
           if (!userRes.ok && userRes.status !== 401) {
-            throw new Error(userPayload.error || `Failed to load users (${userRes.status})`);
+            throw new Error(
+              userPayload.error || `Failed to load users (${userRes.status})`,
+            );
           }
 
           const users = Array.isArray(userPayload.data) ? userPayload.data : [];
-          mapped = users.map(mapDiscoverUserToFreelancer).filter((entry) => matchesFilters(entry, filters));
+          mapped = users
+            .map(mapDiscoverUserToFreelancer)
+            .filter(entry => matchesFilters(entry, filters));
           nextHasMore = false;
         }
 
@@ -431,7 +489,7 @@ export default function FreelancerClient() {
           mapped = [...mapped].sort((a, b) => b.pricing.rate - a.pricing.rate);
         }
 
-        setItems((prev) => (reset ? mapped : [...prev, ...mapped]));
+        setItems(prev => (reset ? mapped : [...prev, ...mapped]));
         setHasMore(nextHasMore);
         setPage(reset ? 2 : currentPage + 1);
       } catch (error) {
@@ -467,7 +525,7 @@ export default function FreelancerClient() {
       sortBy: nextDraft.sortBy,
     };
 
-    setFilters((prev) =>
+    setFilters(prev =>
       prev.search === next.search &&
       prev.location === next.location &&
       prev.rating === next.rating &&
@@ -494,8 +552,13 @@ export default function FreelancerClient() {
     if (!target) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !loadingInitial && !loadingMore) {
+      entries => {
+        if (
+          entries[0]?.isIntersecting &&
+          hasMore &&
+          !loadingInitial &&
+          !loadingMore
+        ) {
           loadData(false);
         }
       },
@@ -524,32 +587,27 @@ export default function FreelancerClient() {
 
   const hasActiveFilters = Boolean(
     filters.search.trim() ||
-      filters.location.trim() ||
-      filters.rating.trim() ||
-      filters.minRate.trim() ||
-      filters.maxRate.trim() ||
-      filters.workMode.trim() ||
-      filters.verifiedOnly ||
-      filters.premiumOnly ||
-      filters.sortBy !== 'latest',
+    filters.location.trim() ||
+    filters.rating.trim() ||
+    filters.minRate.trim() ||
+    filters.maxRate.trim() ||
+    filters.workMode.trim() ||
+    filters.verifiedOnly ||
+    filters.premiumOnly ||
+    filters.sortBy !== 'latest',
   );
 
   const topSkills = useMemo(() => {
-    const pool = items.flatMap((item) => item.skills).filter(Boolean);
+    const pool = items.flatMap(item => item.skills).filter(Boolean);
     const counter = new Map<string, number>();
     for (const skill of pool) {
       counter.set(skill, (counter.get(skill) || 0) + 1);
     }
-    return [...counter.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
+    return [...counter.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   }, [items]);
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <div className="hidden lg:block">
-        <Header />
-      </div>
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
         <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
           <div className="flex flex-col gap-2 md:flex-row">
@@ -571,10 +629,15 @@ export default function FreelancerClient() {
                   placeholder="Search freelancer, skill, or tagline"
                   className="w-full rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] py-2.5 pl-11 pr-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
                   value={draftFilters.search}
-                  onChange={(event) =>
-                    setDraftFilters((prev) => ({ ...prev, search: event.target.value }))
+                  onChange={event =>
+                    setDraftFilters(prev => ({
+                      ...prev,
+                      search: event.target.value,
+                    }))
                   }
-                  onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                  onKeyDown={event =>
+                    event.key === 'Enter' && commitFilters(draftFilters)
+                  }
                 />
               </div>
             </div>
@@ -584,10 +647,15 @@ export default function FreelancerClient() {
                 type="text"
                 placeholder="Location filter"
                 value={draftFilters.location}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, location: event.target.value }))
+                onChange={event =>
+                  setDraftFilters(prev => ({
+                    ...prev,
+                    location: event.target.value,
+                  }))
                 }
-                onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                onKeyDown={event =>
+                  event.key === 'Enter' && commitFilters(draftFilters)
+                }
                 className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
               <input
@@ -597,10 +665,15 @@ export default function FreelancerClient() {
                 step={0.1}
                 placeholder="Minimum rating (0-5)"
                 value={draftFilters.rating}
-                onChange={(event) =>
-                  setDraftFilters((prev) => ({ ...prev, rating: event.target.value }))
+                onChange={event =>
+                  setDraftFilters(prev => ({
+                    ...prev,
+                    rating: event.target.value,
+                  }))
                 }
-                onKeyDown={(event) => event.key === 'Enter' && commitFilters(draftFilters)}
+                onKeyDown={event =>
+                  event.key === 'Enter' && commitFilters(draftFilters)
+                }
                 className="min-w-[180px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
               />
             </div>
@@ -612,8 +685,11 @@ export default function FreelancerClient() {
               min={0}
               placeholder="Min rate"
               value={draftFilters.minRate}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({ ...prev, minRate: event.target.value }))
+              onChange={event =>
+                setDraftFilters(prev => ({
+                  ...prev,
+                  minRate: event.target.value,
+                }))
               }
               className="min-w-[132px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             />
@@ -622,15 +698,21 @@ export default function FreelancerClient() {
               min={0}
               placeholder="Max rate"
               value={draftFilters.maxRate}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({ ...prev, maxRate: event.target.value }))
+              onChange={event =>
+                setDraftFilters(prev => ({
+                  ...prev,
+                  maxRate: event.target.value,
+                }))
               }
               className="min-w-[132px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             />
             <select
               value={draftFilters.workMode}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({ ...prev, workMode: event.target.value }))
+              onChange={event =>
+                setDraftFilters(prev => ({
+                  ...prev,
+                  workMode: event.target.value,
+                }))
               }
               className="min-w-[150px] rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color:var(--app-accent)] focus:border-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             >
@@ -641,8 +723,8 @@ export default function FreelancerClient() {
             </select>
             <select
               value={draftFilters.sortBy}
-              onChange={(event) =>
-                setDraftFilters((prev) => ({
+              onChange={event =>
+                setDraftFilters(prev => ({
                   ...prev,
                   sortBy: event.target.value as Filters['sortBy'],
                 }))
@@ -659,8 +741,8 @@ export default function FreelancerClient() {
                 <input
                   type="checkbox"
                   checked={draftFilters.verifiedOnly}
-                  onChange={(event) =>
-                    setDraftFilters((prev) => ({
+                  onChange={event =>
+                    setDraftFilters(prev => ({
                       ...prev,
                       verifiedOnly: event.target.checked,
                     }))
@@ -673,8 +755,8 @@ export default function FreelancerClient() {
                 <input
                   type="checkbox"
                   checked={draftFilters.premiumOnly}
-                  onChange={(event) =>
-                    setDraftFilters((prev) => ({
+                  onChange={event =>
+                    setDraftFilters(prev => ({
                       ...prev,
                       premiumOnly: event.target.checked,
                     }))
@@ -692,7 +774,9 @@ export default function FreelancerClient() {
             </span>
 
             {!hasActiveFilters ? (
-              <span className="text-xs italic text-[color:var(--app-text-soft)]">None</span>
+              <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                None
+              </span>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 {filters.search ? (
@@ -745,7 +829,9 @@ export default function FreelancerClient() {
             )}
           </div>
 
-          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">Auto-apply filter aktif</p>
+          <p className="hidden text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:block">
+            Auto-apply filter aktif
+          </p>
         </div>
       </header>
 
@@ -754,22 +840,33 @@ export default function FreelancerClient() {
       <main className="mx-auto max-w-[1500px] px-2 pb-5 sm:px-3">
         <section className="mb-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="font-semibold text-[color:var(--app-text)]">Loaded Talents</p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">{items.length}</p>
+            <p className="font-semibold text-[color:var(--app-text)]">
+              Loaded Talents
+            </p>
+            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {items.length}
+            </p>
           </div>
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="font-semibold text-[color:var(--app-text)]">Avg Rating</p>
+            <p className="font-semibold text-[color:var(--app-text)]">
+              Avg Rating
+            </p>
             <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length > 0
-                ? (items.reduce((sum, item) => sum + item.user.rating, 0) / items.length).toFixed(1)
+                ? (
+                    items.reduce((sum, item) => sum + item.user.rating, 0) /
+                    items.length
+                  ).toFixed(1)
                 : '-'}
             </p>
           </div>
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 text-xs dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="font-semibold text-[color:var(--app-text)]">Verified Ratio</p>
+            <p className="font-semibold text-[color:var(--app-text)]">
+              Verified Ratio
+            </p>
             <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length > 0
-                ? `${Math.round((items.filter((item) => item.user.verified).length / items.length) * 100)}%`
+                ? `${Math.round((items.filter(item => item.user.verified).length / items.length) * 100)}%`
                 : '-'}
             </p>
           </div>
@@ -777,7 +874,9 @@ export default function FreelancerClient() {
 
         {topSkills.length > 0 && (
           <section className="mb-4 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-            <p className="text-xs font-semibold text-[color:var(--app-text)]">Top Skills in Results</p>
+            <p className="text-xs font-semibold text-[color:var(--app-text)]">
+              Top Skills in Results
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {topSkills.map(([skill, count]) => (
                 <span
@@ -825,7 +924,10 @@ export default function FreelancerClient() {
                     layout
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: (index % PAGE_SIZE) * 0.03 }}
+                    transition={{
+                      duration: 0.25,
+                      delay: (index % PAGE_SIZE) * 0.03,
+                    }}
                   >
                     <div className="space-y-2">
                       <FreelancerCard {...entry} />
@@ -833,7 +935,7 @@ export default function FreelancerClient() {
                         <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
                           {entry.workMode}
                         </span>
-                        {entry.skills.slice(0, 2).map((skill) => (
+                        {entry.skills.slice(0, 2).map(skill => (
                           <span
                             key={`${entry.id}-${skill}`}
                             className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-accent)]"
@@ -858,16 +960,22 @@ export default function FreelancerClient() {
                   Memuat data berikutnya...
                 </div>
               ) : hasMore ? (
-                <span className="text-xs italic text-[color:var(--app-text-soft)]">Scroll untuk muat otomatis</span>
+                <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                  Scroll untuk muat otomatis
+                </span>
               ) : (
-                <span className="text-xs italic text-[color:var(--app-text-soft)]">All freelancers loaded</span>
+                <span className="text-xs italic text-[color:var(--app-text-soft)]">
+                  All freelancers loaded
+                </span>
               )}
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center py-8 text-center">
             <UserSearch className="mb-3 h-12 w-12 text-[color:var(--app-text-soft)]" />
-            <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">No freelancer found</h2>
+            <h2 className="text-xl font-bold dark:text-[color:var(--app-text-inverse)]">
+              No freelancer found
+            </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text)]">
               Try adjusting your filters or search keyword.
             </p>

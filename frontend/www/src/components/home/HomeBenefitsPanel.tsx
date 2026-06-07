@@ -9,7 +9,14 @@ import {
   resolvePrimaryImage,
 } from '@/lib/content/catalog';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
-import { ArrowRight, BadgePercent, Gift, Sparkles, Trophy } from 'lucide-react';
+import {
+  ArrowRight,
+  BadgePercent,
+  Gift,
+  ImageIcon,
+  Sparkles,
+  Trophy,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type HomeBenefitsPanelProps = {
@@ -22,7 +29,7 @@ type PromotionCard = {
   title: string;
   promoLabel: string;
   supportLabel: string;
-  image: string;
+  image?: string | null;
   priceLabel: string;
   offerType: 'discount' | 'loyalty_card' | 'raffle' | 'other';
 };
@@ -247,14 +254,20 @@ export function HomeBenefitsPanel({ locale }: HomeBenefitsPanelProps) {
                 className="ui-panel ui-card-hover group overflow-hidden rounded-3xl"
               >
                 <div className="relative h-40 w-full overflow-hidden bg-[color:var(--app-surface-muted)]">
-                  <Image
-                    src={card.image}
-                    alt={card.title}
-                    fill
-                    className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    unoptimized
-                  />
+                  {card.image ? (
+                    <Image
+                      src={card.image}
+                      alt={card.title}
+                      fill
+                      className="object-cover transition duration-300 group-hover:scale-[1.03]"
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-[color:var(--app-accent)]">
+                      <ImageIcon className="h-8 w-8" />
+                    </span>
+                  )}
                 </div>
                 <div className="p-4">
                   <div className="flex flex-wrap items-center gap-2">

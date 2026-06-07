@@ -21,12 +21,14 @@ import {
   readTransactionVerification,
   type TransactionVerificationState,
 } from '@/lib/identityVerification';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import {
   AlertTriangle,
   BadgeDollarSign,
   Ban,
   CheckCircle2,
   Clock4,
+  Coins,
   Copy,
   CreditCard,
   ExternalLink,
@@ -85,6 +87,29 @@ type WalletBalancesResponse = {
   live_enabled: boolean;
   provider_default: string;
   generated_at: string;
+};
+
+type RewardBalanceResponse = {
+  balance?: {
+    coin_balance?: number;
+    xp_balance?: number;
+    voucher_count?: number;
+  };
+  weekly?: {
+    days_claimed?: number;
+    days_remaining?: number;
+    next_reset_at?: string;
+  };
+  claimed_today?: boolean;
+  can_claim_today?: boolean;
+  payment?: {
+    coin_value_cents?: number;
+    max_discount_bps?: number;
+    max_discount_ratio?: number;
+    min_cash_payment_cents?: number;
+    currency?: string;
+  };
+  error?: string;
 };
 
 type PaymentOption = {
@@ -630,18 +655,6 @@ function resolveCounterparty(
   return { id, name, avatar, role };
 }
 
-function initialsFromName(value: string): string {
-  const parts = String(value || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const initials = parts
-    .slice(0, 2)
-    .map(part => part.charAt(0).toUpperCase())
-    .join('');
-  return initials || 'LA';
-}
-
 type WalletTopupListResponse = {
   error?: string;
   items?: WalletTopupLite[];
@@ -651,6 +664,19 @@ function readTopupLinkedTransactionId(topup: WalletTopupLite | null): string {
   const payload = asObject(topup?.payment_payload);
   const clientMeta = asObject(payload.client_metadata);
   return asString(clientMeta.transaction_id || payload.transaction_id);
+}
+
+function readTopupOriginalTransactionAmount(
+  topup: WalletTopupLite | null,
+): number {
+  const payload = asObject(topup?.payment_payload);
+  const clientMeta = asObject(payload.client_metadata);
+  return Number(
+    clientMeta.original_amount_cents ||
+      clientMeta.transaction_amount_cents ||
+      payload.original_amount_cents ||
+      0,
+  );
 }
 
 function formatDateTime(value: string): string {
@@ -1177,6 +1203,13 @@ export default function TransactionsPage() {
   const [walletBalanceError, setWalletBalanceError] = useState<string | null>(
     null,
   );
+  const [rewardBalance, setRewardBalance] =
+    useState<RewardBalanceResponse | null>(null);
+  const [loadingRewardBalance, setLoadingRewardBalance] = useState(false);
+  const [rewardBalanceError, setRewardBalanceError] = useState<string | null>(
+    null,
+  );
+  const [useCoinsForPayment, setUseCoinsForPayment] = useState(true);
   const [latestCheckoutUrl, setLatestCheckoutUrl] = useState<string | null>(
     null,
   );
@@ -1325,6 +1358,41 @@ export default function TransactionsPage() {
     }
   }, [authFetch, locale]);
 
+  const loadRewardBalance = useCallback(async () => {
+    setLoadingRewardBalance(true);
+    setRewardBalanceError(null);
+
+    try {
+      const res = await authFetch('/api/rewards/balance', {
+        cache: 'no-store',
+      });
+      const payload = (await res.json().catch(() => ({}))) as
+        | RewardBalanceResponse
+        | { error?: string };
+
+      if (!res.ok) {
+        throw new Error(
+          payload.error ||
+            (locale === 'id'
+              ? 'Gagal memuat saldo koin.'
+              : 'Failed to load coin balance.'),
+        );
+      }
+
+      setRewardBalance(payload as RewardBalanceResponse);
+    } catch (error) {
+      setRewardBalanceError(
+        error instanceof Error
+          ? error.message
+          : locale === 'id'
+            ? 'Gagal memuat saldo koin.'
+            : 'Failed to load coin balance.',
+      );
+    } finally {
+      setLoadingRewardBalance(false);
+    }
+  }, [authFetch, locale]);
+
   useEffect(() => {
     void loadTransactions();
   }, [loadTransactions]);
@@ -1367,6 +1435,9 @@ export default function TransactionsPage() {
     setPaymentInfo(null);
     setWalletBalances(null);
     setWalletBalanceError(null);
+    setRewardBalance(null);
+    setRewardBalanceError(null);
+    setUseCoinsForPayment(true);
     setLatestCheckoutUrl(null);
     setLatestTopup(null);
     paymentOptionAutoResolvedForTxnRef.current = null;
@@ -1433,7 +1504,8 @@ export default function TransactionsPage() {
   useEffect(() => {
     if (!paymentTxn) return;
     void loadWalletBalances();
-  }, [loadWalletBalances, paymentTxn]);
+    void loadRewardBalance();
+  }, [loadRewardBalance, loadWalletBalances, paymentTxn]);
 
   const formatPrice = useCallback((cents: number, currency: string) => {
     const amount = cents / 100;
@@ -1474,12 +1546,64 @@ export default function TransactionsPage() {
   const walletAvailableBalanceCents = Number(
     paymentWalletAccount?.available_balance_cents || 0,
   );
+  const rewardCoinBalance = Number(rewardBalance?.balance?.coin_balance || 0);
+  const rewardCoinValueCents = Number(
+    rewardBalance?.payment?.coin_value_cents || 10_000,
+  );
+  const rewardCoinMaxDiscountBps = Number(
+    rewardBalance?.payment?.max_discount_bps || 2_500,
+  );
+  const rewardCoinMinCashPaymentCents = Number(
+    rewardBalance?.payment?.min_cash_payment_cents || 100_000,
+  );
+  const rewardCoinCurrency = asString(
+    rewardBalance?.payment?.currency || 'IDR',
+  ).toUpperCase();
+  const canUseRewardCoinsForTxn = Boolean(
+    paymentTxn &&
+    paymentCurrency === rewardCoinCurrency &&
+    rewardCoinBalance > 0 &&
+    rewardCoinValueCents > 0,
+  );
+  const maxRewardCoinDiscountCents = paymentTxn
+    ? Math.max(
+        0,
+        Math.min(
+          Math.floor(
+            (Number(paymentTxn.amount_cents || 0) * rewardCoinMaxDiscountBps) /
+              10_000,
+          ),
+          Math.max(
+            0,
+            Number(paymentTxn.amount_cents || 0) -
+              rewardCoinMinCashPaymentCents,
+          ),
+        ),
+      )
+    : 0;
+  const rewardCoinsApplied =
+    useCoinsForPayment && canUseRewardCoinsForTxn
+      ? Math.max(
+          0,
+          Math.min(
+            rewardCoinBalance,
+            Math.floor(maxRewardCoinDiscountCents / rewardCoinValueCents),
+          ),
+        )
+      : 0;
+  const rewardCoinDiscountCents = rewardCoinsApplied * rewardCoinValueCents;
+  const paymentDueAfterCoinsCents = Math.max(
+    0,
+    Number(paymentTxn?.amount_cents || 0) - rewardCoinDiscountCents,
+  );
+  const walletEffectiveBalanceCents =
+    walletAvailableBalanceCents + rewardCoinDiscountCents;
   const walletShortfallCents = Math.max(
     0,
-    Number(paymentTxn?.amount_cents || 0) - walletAvailableBalanceCents,
+    Number(paymentTxn?.amount_cents || 0) - walletEffectiveBalanceCents,
   );
   const canPayWithWalletBalance = Boolean(
-    paymentTxn && walletAvailableBalanceCents >= paymentTxn.amount_cents,
+    paymentTxn && walletEffectiveBalanceCents >= paymentTxn.amount_cents,
   );
 
   const walletBalanceOption = useMemo<PaymentOption>(() => {
@@ -1489,6 +1613,10 @@ export default function TransactionsPage() {
     const amountLabel = paymentTxn
       ? formatPrice(paymentTxn.amount_cents, paymentCurrency)
       : '-';
+    const coinDiscountLabel =
+      rewardCoinDiscountCents > 0
+        ? formatPrice(rewardCoinDiscountCents, paymentCurrency)
+        : '';
     const shortfallLabel =
       paymentTxn && walletShortfallCents > 0
         ? formatPrice(walletShortfallCents, paymentCurrency)
@@ -1504,6 +1632,15 @@ export default function TransactionsPage() {
         locale === 'id'
           ? 'Memeriksa saldo wallet yang tersedia untuk transaksi ini.'
           : 'Checking your available wallet balance for this transaction.';
+    } else if (
+      paymentTxn &&
+      rewardCoinDiscountCents > 0 &&
+      canPayWithWalletBalance
+    ) {
+      description =
+        locale === 'id'
+          ? `Saldo cukup setelah koin memotong ${coinDiscountLabel}. Dana langsung diamankan.`
+          : `Balance is sufficient after coins cover ${coinDiscountLabel}. Funds are held instantly.`;
     } else if (paymentTxn && canPayWithWalletBalance) {
       description =
         locale === 'id'
@@ -1533,6 +1670,7 @@ export default function TransactionsPage() {
     locale,
     paymentCurrency,
     paymentTxn,
+    rewardCoinDiscountCents,
     walletAvailableBalanceCents,
     walletShortfallCents,
   ]);
@@ -2465,6 +2603,13 @@ export default function TransactionsPage() {
     paymentTxn && walletShortfallCents > 0
       ? formatPrice(walletShortfallCents, paymentCurrency)
       : '';
+  const rewardCoinDiscountSummary =
+    paymentTxn && rewardCoinDiscountCents > 0
+      ? formatPrice(rewardCoinDiscountCents, paymentCurrency)
+      : '';
+  const paymentDueAfterCoinsSummary = paymentTxn
+    ? formatPrice(paymentDueAfterCoinsCents, paymentCurrency)
+    : '-';
   const paymentActionDisabled =
     submittingPayment ||
     syncingTopupStatus ||
@@ -2528,7 +2673,14 @@ export default function TransactionsPage() {
         const matched = items.find(item => {
           if (!item || typeof item !== 'object') return false;
           if (readTopupLinkedTransactionId(item) !== txn.id) return false;
-          if (Number(item.amount_cents || 0) !== txn.amount_cents) return false;
+          const topupAmount = Number(item.amount_cents || 0);
+          const originalAmount = readTopupOriginalTransactionAmount(item);
+          if (
+            topupAmount !== txn.amount_cents &&
+            originalAmount !== txn.amount_cents
+          ) {
+            return false;
+          }
           const itemCurrency = asString(
             item.currency || txnCurrency,
           ).toUpperCase();
@@ -2595,6 +2747,9 @@ export default function TransactionsPage() {
     setPaymentInfo(null);
     setWalletBalanceError(null);
     setWalletBalances(null);
+    setRewardBalanceError(null);
+    setRewardBalance(null);
+    setUseCoinsForPayment(true);
     setLatestCheckoutUrl(null);
     setLatestTopup(null);
     paymentOptionAutoResolvedForTxnRef.current = null;
@@ -2648,6 +2803,7 @@ export default function TransactionsPage() {
           setPaymentInfo('Pembayaran terkonfirmasi. Dana masuk proteksi.');
           await loadTransactions();
           await loadWalletBalances();
+          await loadRewardBalance();
           return;
         }
 
@@ -2673,6 +2829,7 @@ export default function TransactionsPage() {
     [
       authFetch,
       latestTopup?.id,
+      loadRewardBalance,
       loadTransactions,
       loadWalletBalances,
       syncingTopupStatus,
@@ -2723,10 +2880,17 @@ export default function TransactionsPage() {
         const res = await authFetch(`/api/transactions/${paymentTxn.id}/fund`, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             'X-Idempotency-Key': createIdempotencyKey(
-              `txn-fund-${paymentTxn.id}`,
+              `txn-fund-${paymentTxn.id}-${rewardCoinsApplied}`,
             ),
           },
+          body: JSON.stringify({
+            payment_method: 'wallet_balance',
+            use_coins: rewardCoinsApplied > 0,
+            coin_amount: rewardCoinsApplied,
+            coin_discount_cents: rewardCoinDiscountCents,
+          }),
         });
         const payload = (await res.json().catch(() => ({}))) as Transaction & {
           error?: string;
@@ -2757,10 +2921,15 @@ export default function TransactionsPage() {
         setLatestTopup(null);
         setPaymentInfo(
           locale === 'id'
-            ? 'Pembayaran wallet berhasil. Dana masuk escrow.'
-            : 'Wallet balance payment succeeded. Funds are now held for this transaction.',
+            ? rewardCoinsApplied > 0
+              ? `Pembayaran berhasil. ${rewardCoinsApplied} koin dipakai dan dana masuk escrow.`
+              : 'Pembayaran wallet berhasil. Dana masuk escrow.'
+            : rewardCoinsApplied > 0
+              ? `Payment succeeded. ${rewardCoinsApplied} coins were used and funds are now held.`
+              : 'Wallet balance payment succeeded. Funds are now held for this transaction.',
         );
         await loadWalletBalances();
+        await loadRewardBalance();
         return;
       }
 
@@ -2770,11 +2939,11 @@ export default function TransactionsPage() {
         headers: {
           'Content-Type': 'application/json',
           'X-Idempotency-Key': createIdempotencyKey(
-            `txn-topup-${paymentTxn.id}`,
+            `txn-topup-${paymentTxn.id}-${selectedOption.id}-${rewardCoinsApplied}-${paymentDueAfterCoinsCents}`,
           ),
         },
         body: JSON.stringify({
-          amount_cents: paymentTxn.amount_cents,
+          amount_cents: paymentDueAfterCoinsCents,
           currency: (paymentTxn.currency || 'IDR').toUpperCase(),
           environment,
           payment_provider: selectedOption.provider,
@@ -2784,6 +2953,11 @@ export default function TransactionsPage() {
             transaction_id: paymentTxn.id,
             source: 'transactions_modal',
             payment_option: selectedOption.id,
+            original_amount_cents: paymentTxn.amount_cents,
+            payment_due_after_reward_cents: paymentDueAfterCoinsCents,
+            reward_coin_amount: rewardCoinsApplied,
+            reward_coin_discount_cents: rewardCoinDiscountCents,
+            reward_coin_value_cents: rewardCoinValueCents,
           },
           auto_settle:
             environment === 'development' && selectedOption.provider === 'mock',
@@ -2803,9 +2977,14 @@ export default function TransactionsPage() {
       setLatestTopup(topup || null);
 
       if (topup?.status === 'paid') {
-        setPaymentInfo('Pembayaran terkonfirmasi. Dana ditahan aman.');
+        setPaymentInfo(
+          rewardCoinsApplied > 0
+            ? `Pembayaran terkonfirmasi. ${rewardCoinsApplied} koin dipakai dan dana ditahan aman.`
+            : 'Pembayaran terkonfirmasi. Dana ditahan aman.',
+        );
         await loadTransactions();
         await loadWalletBalances();
+        await loadRewardBalance();
         return;
       }
 
@@ -3198,18 +3377,14 @@ export default function TransactionsPage() {
 
                         <div className="mt-2 flex min-w-0 items-center gap-2">
                           <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[11px] font-black text-[color:var(--app-accent)]">
-                            {counterparty.avatar ? (
-                              <Image
-                                src={counterparty.avatar}
-                                alt={counterparty.name}
-                                fill
-                                unoptimized
-                                sizes="32px"
-                                className="object-cover"
-                              />
-                            ) : (
-                              initialsFromName(counterparty.name)
-                            )}
+                            <Image
+                              src={profileAvatarSrc(counterparty.avatar)}
+                              alt={counterparty.name}
+                              fill
+                              unoptimized
+                              sizes="32px"
+                              className="object-cover"
+                            />
                           </span>
                           <span className="min-w-0">
                             <span className="block truncate text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -3433,18 +3608,14 @@ export default function TransactionsPage() {
                       </p>
                       <div className="mt-3 flex items-center gap-2">
                         <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-xs font-black text-[color:var(--app-accent)]">
-                          {counterparty.avatar ? (
-                            <Image
-                              src={counterparty.avatar}
-                              alt={counterparty.name}
-                              fill
-                              unoptimized
-                              sizes="40px"
-                              className="object-cover"
-                            />
-                          ) : (
-                            initialsFromName(counterparty.name)
-                          )}
+                          <Image
+                            src={profileAvatarSrc(counterparty.avatar)}
+                            alt={counterparty.name}
+                            fill
+                            unoptimized
+                            sizes="40px"
+                            className="object-cover"
+                          />
                         </span>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">
@@ -4284,6 +4455,103 @@ export default function TransactionsPage() {
                   ? 'Dana aman dulu. Seller menerima setelah transaksi selesai.'
                   : 'Funds are protected first. Seller receives them after the transaction is completed.'}
               </p>
+              {rewardCoinDiscountCents > 0 ? (
+                <div className="mt-3 grid gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs font-semibold text-amber-800 sm:grid-cols-2">
+                  <span>
+                    {locale === 'id' ? 'Koin dipakai' : 'Coins used'}:{' '}
+                    <b>{rewardCoinsApplied}</b>
+                  </span>
+                  <span>
+                    {locale === 'id' ? 'Sisa bayar' : 'Amount due'}:{' '}
+                    <b>{paymentDueAfterCoinsSummary}</b>
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-[22px] border border-amber-200 bg-[linear-gradient(135deg,#fffdf2,#ffffff_58%,#ecfdf5)] p-3 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)]">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                  <Coins className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-[color:var(--app-text)]">
+                        {locale === 'id'
+                          ? 'Pakai Koin Lajukan'
+                          : 'Use Lajukan Coins'}
+                      </p>
+                      <p className="mt-0.5 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                        {loadingRewardBalance
+                          ? locale === 'id'
+                            ? 'Mengecek saldo koin...'
+                            : 'Checking coin balance...'
+                          : locale === 'id'
+                            ? `${rewardCoinBalance} koin tersedia. Maksimal 25% nilai transaksi.`
+                            : `${rewardCoinBalance} coins available. Max 25% of this transaction.`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setUseCoinsForPayment(value => !value)}
+                      disabled={
+                        !canUseRewardCoinsForTxn || loadingRewardBalance
+                      }
+                      className={`inline-flex h-9 min-w-[76px] items-center justify-center rounded-full px-3 text-xs font-black transition ${
+                        useCoinsForPayment && rewardCoinsApplied > 0
+                          ? 'bg-[color:var(--app-accent)] text-white'
+                          : 'border border-amber-200 bg-white text-amber-700'
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      {useCoinsForPayment && rewardCoinsApplied > 0
+                        ? locale === 'id'
+                          ? 'Aktif'
+                          : 'On'
+                        : locale === 'id'
+                          ? 'Pakai'
+                          : 'Use'}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-amber-100 bg-white/82 px-3 py-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Potongan' : 'Discount'}
+                      </p>
+                      <p className="mt-1 text-sm font-black text-[color:var(--app-text)]">
+                        {rewardCoinDiscountCents > 0
+                          ? rewardCoinDiscountSummary
+                          : '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-100 bg-white/82 px-3 py-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Koin' : 'Coins'}
+                      </p>
+                      <p className="mt-1 text-sm font-black text-[color:var(--app-text)]">
+                        {rewardCoinsApplied > 0
+                          ? `${rewardCoinsApplied}`
+                          : rewardCoinBalance}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-amber-100 bg-white/82 px-3 py-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Sisa bayar' : 'Due'}
+                      </p>
+                      <p className="mt-1 text-sm font-black text-[color:var(--app-text)]">
+                        {paymentDueAfterCoinsSummary}
+                      </p>
+                    </div>
+                  </div>
+
+                  {rewardBalanceError ? (
+                    <p className="mt-2 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                      {rewardBalanceError}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             </div>
 
             <div>
@@ -4327,11 +4595,19 @@ export default function TransactionsPage() {
                 <p className="mt-2 text-xs font-semibold leading-5 text-[color:var(--app-text)]">
                   {selectedPaymentUsesWalletBalance
                     ? locale === 'id'
-                      ? 'Kalau saldo cukup, dana langsung diamankan.'
-                      : 'If the balance is sufficient, funds are held directly from wallet balance without creating a new top-up instruction.'
+                      ? rewardCoinsApplied > 0
+                        ? 'Koin jadi kredit transaksi dulu, lalu dana langsung diamankan.'
+                        : 'Kalau saldo cukup, dana langsung diamankan.'
+                      : rewardCoinsApplied > 0
+                        ? 'Coins become transaction credit first, then funds are held directly.'
+                        : 'If the balance is sufficient, funds are held directly from wallet balance without creating a new top-up instruction.'
                     : locale === 'id'
-                      ? 'Klik lanjut. Instruksi bayar akan muncul di sini.'
-                      : 'Click "Continue to payment" to open the payment instruction.'}
+                      ? rewardCoinsApplied > 0
+                        ? 'Klik lanjut. Instruksi bayar hanya untuk sisa setelah koin.'
+                        : 'Klik lanjut. Instruksi bayar akan muncul di sini.'
+                      : rewardCoinsApplied > 0
+                        ? 'Continue. The payment instruction only covers the amount after coins.'
+                        : 'Click "Continue to payment" to open the payment instruction.'}
                 </p>
               </div>
             ) : null}
@@ -4371,8 +4647,12 @@ export default function TransactionsPage() {
                           : 'Loading the latest wallet balance for this transaction.'
                         : canPayWithWalletBalance
                           ? locale === 'id'
-                            ? 'Saldo cukup. Bisa langsung bayar.'
-                            : 'Your wallet balance is sufficient. Funds will move directly into transaction escrow.'
+                            ? rewardCoinsApplied > 0
+                              ? `Saldo + koin cukup. Koin memotong ${rewardCoinDiscountSummary}.`
+                              : 'Saldo cukup. Bisa langsung bayar.'
+                            : rewardCoinsApplied > 0
+                              ? `Wallet + coins are sufficient. Coins cover ${rewardCoinDiscountSummary}.`
+                              : 'Your wallet balance is sufficient. Funds will move directly into transaction escrow.'
                           : locale === 'id'
                             ? `Saldo kurang ${walletShortfallSummary}. Pilih QRIS atau bank transfer.`
                             : `Your balance is short by ${walletShortfallSummary}. You can still choose QRIS, virtual account, or another method.`}

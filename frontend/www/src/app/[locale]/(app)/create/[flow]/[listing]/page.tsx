@@ -129,18 +129,18 @@ export async function generateMetadata({
   const title =
     intent === 'demand'
       ? isId
-        ? `Buat Brief ${labels.needId} | Lajukan`
+        ? `Cari ${labels.needId} | Lajukan`
         : `Create a ${labels.needEn} brief | Lajukan`
       : isId
-        ? `Buat Listing ${labels.id} | Lajukan`
+        ? `Tawarkan ${labels.id} | Lajukan`
         : `Create a ${labels.en} listing | Lajukan`;
   const description =
     intent === 'demand'
       ? isId
-        ? `Buat brief ${labels.needId}. Isi kebutuhan, area, budget.`
+        ? `Tulis kebutuhan ${labels.needId}: detail, area, budget, dan target waktu.`
         : `Create a ${labels.needEn} brief with requirements, area, budget, and business goals on Lajukan.`
       : isId
-        ? `Buat listing ${labels.id}. Isi yang penting dulu.`
+        ? `Tawarkan ${labels.id}. Isi info penting dulu supaya calon pembeli cepat paham.`
         : `Create a ${labels.en} listing with structured details so buyers, tenants, or partners can understand the offer faster on Lajukan.`;
 
   return {

@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import { Header } from '@/components/layout/Header';
 import { LajukanImage } from '@/components/common/LajukanImage';
 import {
   CommunityComposer,
@@ -24,6 +23,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/system/feedback/ToastProvider';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 import type {
   CommunityFeedItem,
@@ -141,7 +141,7 @@ function MemberRow({
     <article className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3">
       <LajukanImage
         alt={member.name}
-        src={member.avatarUrl || '/default-avatar.svg'}
+        src={profileAvatarSrc(member.avatarUrl)}
         width={44}
         height={44}
         className="h-11 w-11 rounded-full object-cover"
@@ -413,11 +413,7 @@ export default function CommunityGroupDetailClient({
 
   if (loadingGroup) {
     return (
-      <main className="lajukan-home-compact min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 pb-6 pt-3 sm:px-4 lg:h-[100svh] lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
-        <div className="hidden lg:block">
-          <Header />
-        </div>
-        <div className="hidden h-[4.625rem] lg:block" />
+      <main className="lajukan-home-compact min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
         <div className="mx-auto w-full max-w-[980px] pt-2">
           <CommunityFeedSkeleton />
         </div>
@@ -427,11 +423,7 @@ export default function CommunityGroupDetailClient({
 
   if (notFound || !group) {
     return (
-      <main className="lajukan-home-compact min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 pb-6 pt-3 sm:px-4 lg:px-0">
-        <div className="hidden lg:block">
-          <Header />
-        </div>
-        <div className="hidden h-[4.625rem] lg:block" />
+      <main className="lajukan-home-compact min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:px-0">
         <section className="mx-auto mt-4 max-w-lg rounded-[24px] border border-[color:var(--app-border)] bg-white p-6 text-center shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)]">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-slate-50 text-[color:var(--app-text-soft)]">
             <Users className="h-7 w-7" />
@@ -464,13 +456,8 @@ export default function CommunityGroupDetailClient({
   ];
 
   return (
-    <main className="lajukan-home-compact min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 pb-6 pt-3 sm:px-4 lg:h-[100svh] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
-      <div className="hidden lg:block">
-        <Header />
-      </div>
-      <div className="hidden h-[4.625rem] shrink-0 lg:block" />
-
-      <div className="sticky top-0 z-30 -mx-3 mb-3 border-b border-[color:var(--app-border)] bg-white/94 px-3 py-2 backdrop-blur-xl lg:hidden">
+    <main className="lajukan-home-compact min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+      <div className="sticky top-0 z-30 -mx-1 mb-3 border-b border-[color:var(--app-border)] bg-white/94 px-1 py-2 backdrop-blur-xl lg:hidden">
         <div className="flex items-center gap-2">
           <Link
             href="/community"

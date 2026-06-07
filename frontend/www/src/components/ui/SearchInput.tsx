@@ -98,24 +98,24 @@ export function SearchInput({
     variant === 'navbar'
       ? compact
         ? 'min-h-[40px]'
-        : 'min-h-[44px]'
+        : 'min-h-[40px]'
       : compact
-        ? 'min-h-[46px]'
-        : 'min-h-[52px]';
+        ? 'min-h-[40px]'
+        : 'min-h-[44px]';
   const fieldSizeClassName =
     variant === 'navbar'
       ? compact
         ? 'min-h-[34px]'
-        : 'min-h-[38px]'
+        : 'min-h-[36px]'
       : compact
-        ? 'min-h-[36px]'
-        : 'min-h-[40px]';
+        ? 'min-h-[34px]'
+        : 'min-h-[36px]';
 
   return (
     <form
       onSubmit={onSubmit}
       className={cn(
-        'ui-search-form flex w-full min-w-0',
+        'ui-search-form ui-field-shell flex w-full min-w-0',
         layoutClassName,
         variantClassName,
         formSizeClassName,
@@ -135,7 +135,13 @@ export function SearchInput({
           fieldClassName,
         )}
       >
-        <Search className={cn('h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]', iconClassName)} aria-hidden="true" />
+        <Search
+          className={cn(
+            'h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]',
+            iconClassName,
+          )}
+          aria-hidden="true"
+        />
         <input
           id={inputId}
           aria-label={inputAriaLabel}

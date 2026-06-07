@@ -90,6 +90,34 @@ type WalletLedgerEntry = {
   created_at: string;
 };
 
+type WalletWithdrawal = {
+  id: string;
+  account_id: string;
+  environment: 'development' | 'live';
+  amount_cents: number;
+  fee_cents: number;
+  net_amount_cents: number;
+  currency: string;
+  bank_code: string;
+  bank_name: string;
+  bank_account_name: string;
+  bank_account_number_masked: string;
+  status:
+    | 'pending_review'
+    | 'processing'
+    | 'completed'
+    | 'cancelled'
+    | 'failed'
+    | 'rejected';
+  note?: string | null;
+  metadata?: Record<string, unknown>;
+  requested_at: string;
+  processed_at?: string | null;
+  cancelled_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type PaginatedResponse<T> = {
   items: T[];
   limit: number;
@@ -103,6 +131,8 @@ type PaymentMethodOption = {
   hint: string;
   image?: string;
 };
+
+type PaymentActionPanel = 'topup' | 'withdraw' | 'history';
 
 const MIDTRANS_METHOD_OPTIONS: PaymentMethodOption[] = [
   {
@@ -174,12 +204,21 @@ const MIDTRANS_METHOD_OPTIONS: PaymentMethodOption[] = [
 ];
 
 const TOPUP_PRESETS_IDR = [20_000, 50_000, 100_000, 200_000, 500_000] as const;
+const BANK_OPTIONS = [
+  { code: 'bca', name: 'BCA' },
+  { code: 'mandiri', name: 'Mandiri' },
+  { code: 'bni', name: 'BNI' },
+  { code: 'bri', name: 'BRI' },
+  { code: 'cimb', name: 'CIMB Niaga' },
+  { code: 'permata', name: 'Permata' },
+  { code: 'other', name: 'Bank lain' },
+] as const;
 const PAYMENT_FIELD_LABEL_CLASS =
   'text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)]';
 const PAYMENT_AMOUNT_FIELD_CLASS =
-  'mt-1.5 flex min-h-[54px] items-center gap-2 rounded-[16px] border-2 border-slate-300 bg-white px-3.5 py-2.5 shadow-none transition hover:border-slate-400 focus-within:border-[color:var(--app-accent)] focus-within:ring-4 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600 dark:focus-within:border-emerald-400';
+  'ui-field-shell mt-1.5 flex min-h-[42px] items-center gap-2 rounded-[12px] border border-slate-300 bg-white px-3 py-1.5 shadow-none transition hover:border-slate-400 focus-within:border-[color:var(--app-accent)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600 dark:focus-within:border-emerald-400';
 const PAYMENT_AMOUNT_INPUT_CLASS =
-  'w-full min-w-0 bg-transparent text-[1.1rem] font-black tracking-[-0.03em] text-[color:var(--app-text)] outline-none placeholder:text-slate-400 min-[420px]:text-[1.25rem]';
+  'w-full min-w-0 bg-transparent text-[1rem] font-black tracking-normal text-[color:var(--app-text)] outline-none placeholder:text-slate-400 min-[420px]:text-[1.08rem]';
 
 function moneyFromCents(cents: number, currency: string): string {
   const value = Number(cents || 0);
@@ -235,6 +274,26 @@ function topupStatusLabel(status: WalletTopup['status']): string {
   if (status === 'failed') return 'Gagal';
   if (status === 'cancelled') return 'Dibatalkan';
   if (status === 'expired') return 'Kedaluwarsa';
+  return status;
+}
+
+function withdrawalStatusClass(status: WalletWithdrawal['status']): string {
+  if (status === 'completed')
+    return 'bg-[color:color-mix(in_srgb,_var(--app-accent)_15%,_transparent)] text-[color:var(--app-accent)] border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)]';
+  if (status === 'pending_review' || status === 'processing')
+    return 'bg-[color:color-mix(in_srgb,_var(--app-warning)_15%,_transparent)] text-[color:var(--app-warning)] border-[color:color-mix(in_srgb,_var(--app-warning-border)_30%,_transparent)]';
+  if (status === 'failed' || status === 'rejected')
+    return 'bg-[color:color-mix(in_srgb,_var(--app-danger)_15%,_transparent)] text-[color:var(--app-danger)] border-[color:color-mix(in_srgb,_var(--app-danger-border)_30%,_transparent)]';
+  return 'bg-[color:color-mix(in_srgb,_var(--app-surface)_20%,_transparent)] text-[color:var(--app-text-soft)] border-[color:color-mix(in_srgb,_var(--app-border-strong)_30%,_transparent)]';
+}
+
+function withdrawalStatusLabel(status: WalletWithdrawal['status']): string {
+  if (status === 'pending_review') return 'Dicek';
+  if (status === 'processing') return 'Diproses';
+  if (status === 'completed') return 'Selesai';
+  if (status === 'cancelled') return 'Dibatalkan';
+  if (status === 'failed') return 'Gagal';
+  if (status === 'rejected') return 'Ditolak';
   return status;
 }
 
@@ -477,6 +536,8 @@ export default function PaymentsPage() {
   const [selectedEnvironment, setSelectedEnvironment] = useState<
     'development' | 'live'
   >('development');
+  const [activeActionPanel, setActiveActionPanel] =
+    useState<PaymentActionPanel>('topup');
 
   const [topups, setTopups] = useState<WalletTopup[]>([]);
   const [topupsLoading, setTopupsLoading] = useState(false);
@@ -484,12 +545,21 @@ export default function PaymentsPage() {
   const [ledger, setLedger] = useState<WalletLedgerEntry[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
+  const [withdrawals, setWithdrawals] = useState<WalletWithdrawal[]>([]);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
+  const [withdrawalsError, setWithdrawalsError] = useState<string | null>(null);
 
   const [amountMajor, setAmountMajor] = useState('100000');
   const [currency, setCurrency] = useState('IDR');
   const [paymentMethod, setPaymentMethod] = useState('qris');
   const [description, setDescription] = useState('');
   const [submittingTopup, setSubmittingTopup] = useState(false);
+  const [withdrawAmountMajor, setWithdrawAmountMajor] = useState('50000');
+  const [withdrawBankCode, setWithdrawBankCode] = useState('bca');
+  const [withdrawBankName, setWithdrawBankName] = useState('BCA');
+  const [withdrawAccountName, setWithdrawAccountName] = useState('');
+  const [withdrawAccountNumber, setWithdrawAccountNumber] = useState('');
+  const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [latestTopup, setLatestTopup] = useState<WalletTopup | null>(null);
@@ -497,6 +567,9 @@ export default function PaymentsPage() {
 
   const [settlingId, setSettlingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancellingWithdrawalId, setCancellingWithdrawalId] = useState<
+    string | null
+  >(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const prefillAppliedRef = useRef(false);
@@ -670,6 +743,21 @@ export default function PaymentsPage() {
     return null;
   }, [actionableInstruction]);
   const recentTopups = useMemo(() => topups.slice(0, 3), [topups]);
+  const pendingWithdrawals = useMemo(
+    () =>
+      withdrawals.filter(item =>
+        ['pending_review', 'processing'].includes(item.status),
+      ),
+    [withdrawals],
+  );
+  const pendingWithdrawalTotalCents = useMemo(
+    () => pendingWithdrawals.reduce((sum, item) => sum + item.amount_cents, 0),
+    [pendingWithdrawals],
+  );
+  const recentWithdrawals = useMemo(
+    () => withdrawals.slice(0, 4),
+    [withdrawals],
+  );
   const detailInstruction = useMemo(
     () => extractPaymentInstructionView(detailTopup),
     [detailTopup],
@@ -881,6 +969,57 @@ export default function PaymentsPage() {
     [authFetch, user?.id],
   );
 
+  const loadWithdrawals = useCallback(
+    async (
+      environment: 'development' | 'live',
+      options?: { silent?: boolean },
+    ) => {
+      if (!user?.id) return;
+      if (!options?.silent) {
+        setWithdrawalsLoading(true);
+        setWithdrawalsError(null);
+      }
+      try {
+        const params = new URLSearchParams({
+          environment,
+          limit: '20',
+          offset: '0',
+        });
+        const res = await authFetch(
+          `/api/wallet/withdrawals?${params.toString()}`,
+          {
+            cache: 'no-store',
+          },
+        );
+        const payload = (await res.json().catch(() => ({}))) as
+          | PaginatedResponse<WalletWithdrawal>
+          | { error?: string };
+        if (!res.ok) {
+          throw new Error(
+            (payload as { error?: string }).error || 'Gagal memuat tarik dana.',
+          );
+        }
+        setWithdrawals(
+          Array.isArray((payload as PaginatedResponse<WalletWithdrawal>).items)
+            ? (payload as PaginatedResponse<WalletWithdrawal>).items
+            : [],
+        );
+      } catch (error) {
+        if (!options?.silent) {
+          setWithdrawalsError(
+            error instanceof Error ? error.message : 'Gagal memuat tarik dana.',
+          );
+          setWithdrawals([]);
+        }
+      } finally {
+        if (!options?.silent) {
+          setWithdrawalsLoading(false);
+        }
+      }
+    },
+    [authFetch, user?.id],
+  );
+
   const refreshLists = useCallback(
     async (
       environment: 'development' | 'live',
@@ -889,9 +1028,10 @@ export default function PaymentsPage() {
       await Promise.all([
         loadTopups(environment, options),
         loadLedger(environment, options),
+        loadWithdrawals(environment, options),
       ]);
     },
-    [loadLedger, loadTopups],
+    [loadLedger, loadTopups, loadWithdrawals],
   );
 
   useEffect(() => {
@@ -1056,6 +1196,145 @@ export default function PaymentsPage() {
     selectedEnvironment,
   ]);
 
+  const submitWithdrawal = useCallback(async () => {
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    const majorRaw = Number(
+      String(withdrawAmountMajor || '')
+        .replace(/,/g, '')
+        .trim(),
+    );
+    if (!Number.isFinite(majorRaw) || majorRaw <= 0) {
+      setSubmitError('Nominal tarik dana belum benar.');
+      return;
+    }
+    const amountCents = Math.round(majorRaw * 100);
+    const available = selectedAccount?.available_balance_cents || 0;
+    if (amountCents > available) {
+      setSubmitError('Saldo tersedia belum cukup untuk nominal ini.');
+      return;
+    }
+    const accountNumber = withdrawAccountNumber.replace(/\D/g, '');
+    if (accountNumber.length < 6) {
+      setSubmitError('Nomor rekening belum benar.');
+      return;
+    }
+    if (withdrawAccountName.trim().length < 3) {
+      setSubmitError('Nama pemilik rekening wajib diisi.');
+      return;
+    }
+
+    setSubmittingWithdrawal(true);
+    try {
+      const body = {
+        amount_cents: amountCents,
+        currency: selectedAccount?.currency || selectedCurrency,
+        environment: selectedEnvironment,
+        bank_code: withdrawBankCode.trim().toLowerCase(),
+        bank_name: withdrawBankName.trim(),
+        bank_account_name: withdrawAccountName.trim(),
+        bank_account_number: accountNumber,
+        metadata: {
+          source: 'payments_page',
+        },
+      };
+
+      const res = await authFetch('/api/wallet/withdrawals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': createIdempotencyKey('wallet-withdrawal'),
+        },
+        body: JSON.stringify(body),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        withdrawal?: WalletWithdrawal;
+      };
+
+      if (!res.ok) {
+        throw new Error(payload.error || 'Gagal mengajukan tarik dana.');
+      }
+
+      setSubmitSuccess(
+        'Tarik dana diajukan. Saldo ditahan dulu sampai diproses.',
+      );
+      setWithdrawAmountMajor('50000');
+      setWithdrawAccountNumber('');
+      await Promise.all([
+        loadBalances({ silent: true, preserveSelection: true }),
+        refreshLists(selectedEnvironment, { silent: true }),
+      ]);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : 'Gagal mengajukan tarik dana.',
+      );
+    } finally {
+      setSubmittingWithdrawal(false);
+    }
+  }, [
+    authFetch,
+    loadBalances,
+    refreshLists,
+    selectedAccount?.available_balance_cents,
+    selectedAccount?.currency,
+    selectedCurrency,
+    selectedEnvironment,
+    withdrawAccountName,
+    withdrawAccountNumber,
+    withdrawAmountMajor,
+    withdrawBankCode,
+    withdrawBankName,
+  ]);
+
+  const cancelWithdrawal = useCallback(
+    async (withdrawalId: string) => {
+      if (!withdrawalId || cancellingWithdrawalId) return;
+      setCancellingWithdrawalId(withdrawalId);
+      setSubmitError(null);
+      try {
+        const res = await authFetch(
+          `/api/wallet/withdrawals/${encodeURIComponent(withdrawalId)}/cancel`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Idempotency-Key': createIdempotencyKey(
+                'wallet-withdrawal-cancel',
+              ),
+            },
+          },
+        );
+        const payload = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!res.ok) {
+          throw new Error(payload.error || 'Gagal membatalkan tarik dana.');
+        }
+        setSubmitSuccess('Tarik dana dibatalkan. Saldo kembali tersedia.');
+        await Promise.all([
+          loadBalances({ silent: true, preserveSelection: true }),
+          refreshLists(selectedEnvironment, { silent: true }),
+        ]);
+      } catch (error) {
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : 'Gagal membatalkan tarik dana.',
+        );
+      } finally {
+        setCancellingWithdrawalId(null);
+      }
+    },
+    [
+      authFetch,
+      cancellingWithdrawalId,
+      loadBalances,
+      refreshLists,
+      selectedEnvironment,
+    ],
+  );
+
   const settleDevTopup = useCallback(
     async (topupId: string) => {
       if (!topupId || settlingId) return;
@@ -1206,7 +1485,7 @@ export default function PaymentsPage() {
   }
 
   return (
-    <section className="ui-page-stack mx-auto w-full max-w-[var(--app-max-width)] px-0 py-3 sm:p-6">
+    <section className="ui-page-stack mx-auto w-full max-w-6xl px-0 py-3 sm:px-5 sm:py-5">
       {redirectBanner || transactionPrefillBanner ? (
         <div className="ui-feed-section border-0 bg-transparent p-0">
           {redirectBanner ? (
@@ -1227,56 +1506,63 @@ export default function PaymentsPage() {
       ) : null}
 
       <div className="ui-feed-section hidden border-0 bg-transparent p-0 sm:block">
-        <div className="rounded-[1.5rem] bg-[linear-gradient(155deg,#0f1f17_0%,#128a45_52%,#0f766e_100%)] p-4 text-white shadow-[0_22px_52px_rgba(15,23,42,0.18)]">
+        <div className="rounded-[1.25rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 text-[color:var(--app-text)] shadow-[0_16px_38px_rgba(15,23,42,0.08)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-100/90">
-                Isi saldo cepat
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                Payments
               </p>
-              <h1 className="mt-2 text-[1.6rem] font-black tracking-[-0.05em] sm:text-[2.25rem]">
-                Pilih nominal, pilih metode, bayar.
+              <h1 className="mt-2 text-[1.55rem] font-black tracking-normal sm:text-[2rem]">
+                Saldo dan pembayaran.
               </h1>
-              <p className="mt-2 text-sm text-emerald-50/88">
-                Flow-nya saya ringkas jadi tiga langkah saja. Yang penting
-                kelihatan dulu, sisanya baru dibuka kalau memang perlu.
+              <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
+                {loadingBalances
+                  ? 'Memuat saldo...'
+                  : `${moneyFromCents(
+                      selectedAccount?.available_balance_cents || 0,
+                      selectedAccount?.currency || 'IDR',
+                    )} tersedia`}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:min-w-[31rem]">
-              <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
-                  1. Dompet
+              <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                  Dompet
                 </p>
-                <p className="mt-1 text-sm font-bold text-white">
+                <p className="mt-1 text-sm font-bold text-[color:var(--app-text)]">
                   {selectedEnvironment === 'live'
                     ? 'Saldo utama'
                     : 'Mode coba dulu'}
                 </p>
-                <p className="mt-1 text-[11px] text-emerald-50/80">
-                  Pilih tujuan saldo sebelum bikin tagihan.
+                <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                  {selectedAccount?.currency || selectedCurrency}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
-                  2. Nominal
+              <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                  Tarik pending
                 </p>
-                <p className="mt-1 text-sm font-bold text-white">
-                  {normalizedAmountMajor > 0
-                    ? moneyFromCents(estimatedTopupCents, selectedCurrency)
-                    : 'Isi nominal'}
+                <p className="mt-1 text-sm font-bold text-[color:var(--app-text)]">
+                  {pendingWithdrawals.length
+                    ? `${pendingWithdrawals.length} proses`
+                    : 'Ke rekening'}
                 </p>
-                <p className="mt-1 text-[11px] text-emerald-50/80">
-                  Bisa pilih preset atau ketik sendiri.
+                <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                  {moneyFromCents(
+                    pendingWithdrawalTotalCents,
+                    selectedAccount?.currency || 'IDR',
+                  )}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
-                  3. Bayar
+              <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                  Metode
                 </p>
-                <p className="mt-1 text-sm font-bold text-white">
+                <p className="mt-1 text-sm font-bold text-[color:var(--app-text)]">
                   {paymentMethodDisplayLabel(paymentMethod)}
                 </p>
-                <p className="mt-1 text-[11px] text-emerald-50/80">
-                  {paymentMethodNextStep(paymentMethod)}
+                <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                  {paymentMethodGroupLabel(paymentMethod)}
                 </p>
               </div>
             </div>
@@ -1287,40 +1573,40 @@ export default function PaymentsPage() {
               {Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-[1rem] border border-white/12 bg-white/10 p-3"
+                  className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3"
                 >
-                  <Skeleton className="h-3 w-24 bg-white/20" />
-                  <Skeleton className="mt-2 h-7 w-28 bg-white/20" />
+                  <Skeleton className="h-3 w-24 bg-[color:var(--app-surface-muted)]" />
+                  <Skeleton className="mt-2 h-7 w-28 bg-[color:var(--app-surface-muted)]" />
                 </div>
               ))}
             </div>
           ) : balanceError ? (
-            <p className="mt-3 rounded-[1rem] border border-white/18 bg-white/10 px-4 py-3 text-sm text-rose-100">
+            <p className="mt-3 rounded-[1rem] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] px-4 py-3 text-sm text-[color:var(--app-danger)]">
               {balanceError}
             </p>
           ) : (
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
+              <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
                   Saldo sekarang
                 </p>
-                <p className="mt-1.5 text-lg font-black text-white sm:text-xl">
+                <p className="mt-1.5 text-lg font-black text-[color:var(--app-text)] sm:text-xl">
                   {moneyFromCents(
                     selectedAccount?.available_balance_cents || 0,
                     selectedAccount?.currency || 'IDR',
                   )}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
-                  Akan masuk ke
+              <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                  Dompet aktif
                 </p>
-                <p className="mt-1.5 text-sm font-bold text-white">
+                <p className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
                   {selectedEnvironment === 'live'
                     ? 'Saldo utama'
                     : 'Saldo simulasi'}
                 </p>
-                <p className="mt-1 text-[11px] text-emerald-50/80">
+                <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
                   Ditahan{' '}
                   {moneyFromCents(
                     selectedAccount?.held_balance_cents || 0,
@@ -1328,14 +1614,14 @@ export default function PaymentsPage() {
                   )}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-white/12 bg-white/10 p-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">
-                  Perkiraan setelah isi
+              <div className="rounded-[0.95rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                  Tarik pending
                 </p>
-                <p className="mt-1.5 text-lg font-black text-white sm:text-xl">
+                <p className="mt-1.5 text-lg font-black text-[color:var(--app-text)] sm:text-xl">
                   {moneyFromCents(
-                    projectedAvailableBalanceCents,
-                    selectedAccount?.currency || selectedCurrency,
+                    pendingWithdrawalTotalCents,
+                    selectedAccount?.currency || 'IDR',
                   )}
                 </p>
               </div>
@@ -1345,14 +1631,14 @@ export default function PaymentsPage() {
       </div>
 
       <div className="hidden">
-        <div className="rounded-[1.35rem] bg-[linear-gradient(155deg,#0f1f17_0%,#128a45_52%,#0f766e_100%)] p-3.5 text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]">
+        <div className="rounded-[1.1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3.5 text-[color:var(--app-text)] shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/90">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                 Payments
               </p>
-              <h1 className="mt-1 text-[1.35rem] font-black tracking-[-0.05em]">
-                Bayar cepat
+              <h1 className="mt-1 text-[1.35rem] font-black tracking-normal">
+                Payments
               </h1>
             </div>
             <button
@@ -1361,19 +1647,19 @@ export default function PaymentsPage() {
                 void loadBalances();
                 void refreshLists(selectedEnvironment);
               }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-emerald-50"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]"
               aria-label="Muat ulang saldo"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-emerald-50">
+            <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2.5 py-1 text-[color:var(--app-text-soft)]">
               {selectedEnvironment === 'live'
                 ? 'Saldo utama'
                 : 'Mode coba dulu'}
             </span>
-            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-emerald-50">
+            <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2.5 py-1 text-[color:var(--app-text-soft)]">
               {loadingBalances
                 ? 'Memuat saldo...'
                 : moneyFromCents(
@@ -1381,7 +1667,7 @@ export default function PaymentsPage() {
                     selectedAccount?.currency || 'IDR',
                   )}
             </span>
-            <span className="rounded-full border border-white/12 bg-white/10 px-2.5 py-1 text-emerald-50">
+            <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2.5 py-1 text-[color:var(--app-text-soft)]">
               {paymentMethodDisplayLabel(paymentMethod)}
             </span>
           </div>
@@ -1389,6 +1675,85 @@ export default function PaymentsPage() {
       </div>
 
       <div className="ui-page-section space-y-2 sm:hidden">
+        <div className="rounded-[1.05rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center justify-between gap-2 px-1 py-1">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+                Dompet
+              </p>
+              <p className="truncate text-[11px] text-[color:var(--app-text-soft)]">
+                {loadingBalances
+                  ? 'Memuat saldo...'
+                  : `${moneyFromCents(
+                      selectedAccount?.available_balance_cents || 0,
+                      selectedAccount?.currency || 'IDR',
+                    )} tersedia`}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void loadBalances();
+                void refreshLists(selectedEnvironment);
+              }}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]"
+              aria-label="Muat ulang saldo"
+            >
+              <RefreshCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {[
+              {
+                key: 'topup' as const,
+                label: 'Isi',
+                value:
+                  normalizedAmountMajor > 0
+                    ? moneyFromCents(estimatedTopupCents, selectedCurrency)
+                    : 'Saldo',
+                icon: Wallet,
+              },
+              {
+                key: 'withdraw' as const,
+                label: 'Tarik',
+                value: pendingWithdrawals.length
+                  ? `${pendingWithdrawals.length} proses`
+                  : 'Bank',
+                icon: Landmark,
+              },
+              {
+                key: 'history' as const,
+                label: 'Riwayat',
+                value: `${topups.length + withdrawals.length} data`,
+                icon: Clock3,
+              },
+            ].map(item => {
+              const Icon = item.icon;
+              const active = activeActionPanel === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveActionPanel(item.key)}
+                  className={`min-h-[58px] rounded-[0.95rem] border px-2 py-2 text-left transition ${
+                    active
+                      ? 'border-[color:var(--app-accent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] text-[color:var(--app-accent)]'
+                      : 'border-[color:var(--app-border)] bg-[color:var(--app-surface)] text-[color:var(--app-text)]'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.08em]">
+                    <Icon className="h-3.5 w-3.5" />
+                    {item.label}
+                  </span>
+                  <span className="mt-1 block truncate text-[11px] font-semibold">
+                    {item.value}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {actionableTopup ? (
           <div className="rounded-[1.05rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
             <div className="flex items-start justify-between gap-2">
@@ -1490,7 +1855,9 @@ export default function PaymentsPage() {
           </div>
         ) : null}
 
-        <div className="rounded-[1.05rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+        <div
+          className={`${activeActionPanel === 'topup' ? '' : 'hidden'} rounded-[1.05rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]`}
+        >
           <div className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-black text-[color:var(--app-text)]">
@@ -1623,10 +1990,123 @@ export default function PaymentsPage() {
           </button>
         </div>
 
+        <div
+          className={`${activeActionPanel === 'withdraw' ? '' : 'hidden'} rounded-[1.05rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-black text-[color:var(--app-text)]">
+                Tarik ke bank
+              </h2>
+              <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)]">
+                Diproses setelah dicek. Saldo ditahan dulu.
+              </p>
+            </div>
+            <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[9px] font-semibold text-[color:var(--app-text-soft)]">
+              {pendingWithdrawals.length
+                ? `${pendingWithdrawals.length} proses`
+                : 'Baru'}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2">
+            <label>
+              <span className={PAYMENT_FIELD_LABEL_CLASS}>Nominal</span>
+              <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
+                <span className="text-sm font-black text-[color:var(--app-accent)]">
+                  Rp
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={withdrawAmountMajor}
+                  onChange={event => setWithdrawAmountMajor(event.target.value)}
+                  className={PAYMENT_AMOUNT_INPUT_CLASS}
+                  placeholder="50000"
+                  aria-label="Nominal tarik dana"
+                />
+              </div>
+            </label>
+            <label>
+              <span className={PAYMENT_FIELD_LABEL_CLASS}>Bank</span>
+              <select
+                value={withdrawBankCode}
+                onChange={event => {
+                  const next = BANK_OPTIONS.find(
+                    bank => bank.code === event.target.value,
+                  );
+                  setWithdrawBankCode(next?.code || event.target.value);
+                  setWithdrawBankName(next?.name || '');
+                }}
+                className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+              >
+                {BANK_OPTIONS.map(bank => (
+                  <option key={bank.code} value={bank.code}>
+                    {bank.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {withdrawBankCode === 'other' ? (
+              <label>
+                <span className={PAYMENT_FIELD_LABEL_CLASS}>Nama bank</span>
+                <input
+                  value={withdrawBankName}
+                  onChange={event => setWithdrawBankName(event.target.value)}
+                  className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="Contoh: Bank Jago"
+                />
+              </label>
+            ) : null}
+            <label>
+              <span className={PAYMENT_FIELD_LABEL_CLASS}>Nama rekening</span>
+              <input
+                value={withdrawAccountName}
+                onChange={event => setWithdrawAccountName(event.target.value)}
+                className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+                placeholder="Sesuai buku rekening"
+              />
+            </label>
+            <label>
+              <span className={PAYMENT_FIELD_LABEL_CLASS}>Nomor rekening</span>
+              <input
+                value={withdrawAccountNumber}
+                onChange={event => setWithdrawAccountNumber(event.target.value)}
+                inputMode="numeric"
+                className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+                placeholder="Tanpa spasi"
+              />
+            </label>
+          </div>
+          {submitError ? (
+            <p className="mt-2 rounded-[0.9rem] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] px-2.5 py-2 text-[11px] text-[color:var(--app-danger)]">
+              {submitError}
+            </p>
+          ) : null}
+          {submitSuccess ? (
+            <p className="mt-2 rounded-[0.9rem] border border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] px-2.5 py-2 text-[11px] text-[color:var(--app-accent)]">
+              {submitSuccess}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void submitWithdrawal()}
+            disabled={submittingWithdrawal || loadingBalances}
+            className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[0.95rem] bg-[color:var(--app-accent)] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)] disabled:opacity-50"
+          >
+            {submittingWithdrawal ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Landmark className="h-4 w-4" />
+            )}
+            {submittingWithdrawal ? 'Mengajukan...' : 'Ajukan tarik dana'}
+          </button>
+        </div>
+
         <DetailAccordion
           title="Riwayat"
-          description="Cek yang lama."
-          className="hidden"
+          description="Top up dan penarikan terakhir."
+          className={activeActionPanel === 'history' ? '' : 'hidden'}
         >
           {topupsLoading ? (
             <div className="mt-3 space-y-2">
@@ -1703,13 +2183,13 @@ export default function PaymentsPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                Flow isi saldo
+                Dompet
               </p>
-              <h2 className="mt-1.5 text-base font-black tracking-[-0.03em] text-[color:var(--app-text)] sm:text-lg">
-                Tiga langkah, selesai.
+              <h2 className="mt-1.5 text-base font-black tracking-normal text-[color:var(--app-text)] sm:text-lg">
+                Isi saldo
               </h2>
               <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                Isi yang wajib dulu.
+                Saldo, top up, dan tarik dana.
               </p>
             </div>
             <button
@@ -1739,8 +2219,8 @@ export default function PaymentsPage() {
                       </p>
                       <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
                         {selectedEnvironment === 'live'
-                          ? 'Saldo ini dipakai untuk transaksi asli.'
-                          : 'Cocok untuk coba flow tanpa pusing.'}
+                          ? 'Dipakai untuk transaksi asli.'
+                          : 'Mode simulasi aktif.'}
                       </p>
                     </div>
                     <span className="inline-flex items-center rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1768,7 +2248,7 @@ export default function PaymentsPage() {
                   </div>
                   {selectedEnvironment === 'live' && !balances?.live_enabled ? (
                     <p className="mt-3 rounded-[0.95rem] border border-[color:color-mix(in_srgb,_var(--app-warning-border)_30%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] px-3 py-2 text-xs text-[color:var(--app-warning)]">
-                      Saldo utama belum aktif. Gunakan mode coba dulu dulu.
+                      Saldo utama belum aktif. Gunakan mode coba dulu.
                     </p>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
@@ -1802,10 +2282,12 @@ export default function PaymentsPage() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-black text-[color:var(--app-text)]">
-                    Tentukan nominal
+                    Nominal
                   </p>
                   <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
-                    Pilih nominal atau ketik.
+                    {normalizedAmountMajor > 0
+                      ? moneyFromCents(estimatedTopupCents, selectedCurrency)
+                      : 'Masukkan nominal'}
                   </p>
                   <div
                     className={`${PAYMENT_AMOUNT_FIELD_CLASS} sm:min-h-[62px] sm:px-4`}
@@ -1863,10 +2345,10 @@ export default function PaymentsPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-black text-[color:var(--app-text)]">
-                        Pilih metode bayar
+                        Metode bayar
                       </p>
                       <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
-                        Yang sering dipakai dulu.
+                        {paymentMethodDisplayLabel(paymentMethod)}
                       </p>
                     </div>
                     <span className="inline-flex rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1967,14 +2449,14 @@ export default function PaymentsPage() {
               </div>
             </div>
 
-            <div className="rounded-[1.25rem] border border-[color:color-mix(in_srgb,_var(--app-accent-border)_34%,_transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-accent-soft)_20%,white_80%),color-mix(in_srgb,var(--app-surface-strong)_90%,var(--app-accent-soft)_10%))] p-3.5">
+            <div className="rounded-[1.15rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3.5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                     Ringkasan sebelum bayar
                   </p>
-                  <h3 className="mt-1.5 text-base font-black tracking-[-0.03em] text-[color:var(--app-text)]">
-                    Tinggal buat tagihan lalu lanjut bayar.
+                  <h3 className="mt-1.5 text-base font-black tracking-normal text-[color:var(--app-text)]">
+                    Ringkasan
                   </h3>
                 </div>
                 <span className="inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,var(--app-accent-border)_40%,transparent)] bg-[color:var(--app-surface)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-accent)]">
@@ -2047,17 +2529,17 @@ export default function PaymentsPage() {
 
             <div className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-3 py-3 text-sm">
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-                Dibuat otomatis
+                Catatan
               </p>
               <p className="mt-2 text-[color:var(--app-text)]">
-                Catatan otomatis. Mata uang {selectedCurrency}.
+                Mata uang {selectedCurrency}.
               </p>
               <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
                 {resolvedDescription}
               </p>
               {selectedEnvironment === 'development' ? (
                 <p className="mt-2 text-[12px] text-[color:var(--app-text-soft)]">
-                  Mode coba aman untuk cek flow.
+                  Mode simulasi.
                 </p>
               ) : null}
             </div>
@@ -2065,7 +2547,133 @@ export default function PaymentsPage() {
         </div>
 
         <div className="space-y-2.5 lg:col-span-2">
-          <div className="rounded-[1.35rem] border border-[color:var(--app-border-strong)] bg-[linear-gradient(155deg,color-mix(in_srgb,var(--app-surface-strong)_94%,white_6%),color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong)_78%))] p-3.5 shadow-[0_14px_38px_rgba(15,23,42,0.08)]">
+          <div className="rounded-[1.35rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3.5 shadow-[0_14px_38px_rgba(15,23,42,0.08)]">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                  Tarik dana
+                </p>
+                <h2 className="mt-1.5 text-base font-black tracking-normal text-[color:var(--app-text)]">
+                  Ke rekening bank
+                </h2>
+                <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
+                  Saldo tersedia:{' '}
+                  {moneyFromCents(
+                    selectedAccount?.available_balance_cents || 0,
+                    selectedAccount?.currency || selectedCurrency,
+                  )}
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                <Landmark className="h-3.5 w-3.5" />
+                {pendingWithdrawals.length
+                  ? `${pendingWithdrawals.length} proses`
+                  : 'Bank'}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="col-span-2">
+                <span className={PAYMENT_FIELD_LABEL_CLASS}>Nominal</span>
+                <div className={PAYMENT_AMOUNT_FIELD_CLASS}>
+                  <span className="text-sm font-black text-[color:var(--app-accent)]">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={withdrawAmountMajor}
+                    onChange={event =>
+                      setWithdrawAmountMajor(event.target.value)
+                    }
+                    className={PAYMENT_AMOUNT_INPUT_CLASS}
+                    placeholder="50000"
+                    aria-label="Nominal tarik dana"
+                  />
+                </div>
+              </label>
+              <label>
+                <span className={PAYMENT_FIELD_LABEL_CLASS}>Bank</span>
+                <select
+                  value={withdrawBankCode}
+                  onChange={event => {
+                    const next = BANK_OPTIONS.find(
+                      bank => bank.code === event.target.value,
+                    );
+                    setWithdrawBankCode(next?.code || event.target.value);
+                    setWithdrawBankName(next?.name || '');
+                  }}
+                  className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+                >
+                  {BANK_OPTIONS.map(bank => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className={PAYMENT_FIELD_LABEL_CLASS}>Rekening</span>
+                <input
+                  value={withdrawAccountNumber}
+                  onChange={event =>
+                    setWithdrawAccountNumber(event.target.value)
+                  }
+                  inputMode="numeric"
+                  className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="Nomor"
+                />
+              </label>
+              <label className="col-span-2">
+                <span className={PAYMENT_FIELD_LABEL_CLASS}>Nama pemilik</span>
+                <input
+                  value={withdrawAccountName}
+                  onChange={event => setWithdrawAccountName(event.target.value)}
+                  className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+                  placeholder="Sesuai rekening"
+                />
+              </label>
+              {withdrawBankCode === 'other' ? (
+                <label className="col-span-2">
+                  <span className={PAYMENT_FIELD_LABEL_CLASS}>Nama bank</span>
+                  <input
+                    value={withdrawBankName}
+                    onChange={event => setWithdrawBankName(event.target.value)}
+                    className="mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950"
+                    placeholder="Contoh: Bank Jago"
+                  />
+                </label>
+              ) : null}
+            </div>
+            {submitError ? (
+              <p className="mt-2 rounded-[0.9rem] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] px-2.5 py-2 text-[11px] text-[color:var(--app-danger)]">
+                {submitError}
+              </p>
+            ) : null}
+            {submitSuccess ? (
+              <p className="mt-2 rounded-[0.9rem] border border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] px-2.5 py-2 text-[11px] text-[color:var(--app-accent)]">
+                {submitSuccess}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void submitWithdrawal()}
+              disabled={submittingWithdrawal || loadingBalances}
+              className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)] disabled:opacity-50"
+            >
+              {submittingWithdrawal ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Landmark className="h-4 w-4" />
+              )}
+              {submittingWithdrawal ? 'Mengajukan...' : 'Ajukan tarik dana'}
+            </button>
+            <p className="mt-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+              Pengajuan bisa dibatalkan selama masih dicek.
+            </p>
+          </div>
+
+          <div className="rounded-[1.15rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-3.5 shadow-[0_14px_38px_rgba(15,23,42,0.08)]">
             {actionableTopup ? (
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2075,10 +2683,10 @@ export default function PaymentsPage() {
                         ? 'Lanjutkan pembayaran'
                         : 'Top up terakhir'}
                     </p>
-                    <h2 className="mt-1.5 text-base font-black tracking-[-0.03em] text-[color:var(--app-text)]">
+                    <h2 className="mt-1.5 text-base font-black tracking-normal text-[color:var(--app-text)]">
                       {actionableTopup.status === 'pending'
-                        ? 'Pembayaran aktif ada di atas.'
-                        : 'Status terakhir kelihatan.'}
+                        ? 'Menunggu pembayaran'
+                        : 'Pembayaran terakhir'}
                     </h2>
                   </div>
                   <span
@@ -2245,7 +2853,7 @@ export default function PaymentsPage() {
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                   Belum ada yang aktif
                 </p>
-                <h2 className="mt-1.5 text-base font-black tracking-[-0.03em] text-[color:var(--app-text)]">
+                <h2 className="mt-1.5 text-base font-black tracking-normal text-[color:var(--app-text)]">
                   Tagihan baru muncul di sini.
                 </h2>
                 <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
@@ -2478,8 +3086,80 @@ export default function PaymentsPage() {
           </DetailAccordion>
 
           <DetailAccordion
+            title="Tarik dana"
+            description="Status pencairan ke bank."
+            className="rounded-[1.35rem] p-3.5 shadow-[0_14px_38px_rgba(15,23,42,0.08)]"
+          >
+            {withdrawalsLoading ? (
+              <div className="mt-3 space-y-2">
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3"
+                  >
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="mt-2 h-3 w-36" />
+                  </div>
+                ))}
+              </div>
+            ) : withdrawalsError ? (
+              <p className="mt-3 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] px-3 py-2 text-xs text-[color:var(--app-danger)]">
+                {withdrawalsError}
+              </p>
+            ) : recentWithdrawals.length === 0 ? (
+              <p className="mt-3 rounded-xl border border-dashed border-[color:var(--app-border-strong)] px-3 py-3 text-xs text-[color:var(--app-text-soft)]">
+                Belum ada pengajuan tarik dana.
+              </p>
+            ) : (
+              <div className="mt-2.5 space-y-1.5">
+                {recentWithdrawals.map(withdrawal => (
+                  <div
+                    key={withdrawal.id}
+                    className="rounded-[1rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="inline-flex items-center gap-1.5 text-[13px] font-black text-[color:var(--app-text)] sm:text-sm">
+                        <Landmark className="h-4 w-4 text-[color:var(--app-accent)]" />
+                        {moneyFromCents(
+                          withdrawal.amount_cents,
+                          withdrawal.currency,
+                        )}
+                      </p>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${withdrawalStatusClass(withdrawal.status)}`}
+                      >
+                        {withdrawalStatusLabel(withdrawal.status)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                      {withdrawal.bank_name}{' '}
+                      {withdrawal.bank_account_number_masked} -{' '}
+                      {dateTimeLabel(withdrawal.created_at)}
+                    </p>
+                    {withdrawal.status === 'pending_review' ? (
+                      <button
+                        type="button"
+                        onClick={() => void cancelWithdrawal(withdrawal.id)}
+                        disabled={cancellingWithdrawalId === withdrawal.id}
+                        className="mt-2 inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-danger)_16%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-danger)] disabled:opacity-50"
+                      >
+                        {cancellingWithdrawalId === withdrawal.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5" />
+                        )}
+                        Batalkan
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            )}
+          </DetailAccordion>
+
+          <DetailAccordion
             title="Mutasi saldo"
-            description="Tetap ada, tapi disembunyikan dulu biar halaman fokus."
+            description="Perubahan saldo terbaru."
             className="rounded-[1.35rem] p-3.5 shadow-[0_14px_38px_rgba(15,23,42,0.08)]"
           >
             {ledgerLoading ? (

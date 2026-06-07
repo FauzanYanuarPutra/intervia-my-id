@@ -157,9 +157,9 @@ function getStoreCapabilities(store: StoreRecord) {
   const meta = store.metadata || {};
   return parseCapabilityList(
     meta.business_capabilities ??
-      meta.business_capability ??
-      meta.capabilities ??
-      meta.capability_list,
+    meta.business_capability ??
+    meta.capabilities ??
+    meta.capability_list,
     readBusinessCategory(meta) ?? undefined,
   );
 }
@@ -211,19 +211,19 @@ function getStoreStatus(
 
   return snapshot && (snapshot.ordersActive > 0 || snapshot.reservationsActive > 0)
     ? {
-        tone: 'success',
-        label: isId ? 'Sedang berjalan' : 'Running now',
-        desc: isId
-          ? 'Sudah ada aktivitas masuk. Fokus ke pesanan dan operasional harian.'
-          : 'There is already activity. Focus on orders and daily operations.',
-      }
+      tone: 'success',
+      label: isId ? 'Sedang berjalan' : 'Running now',
+      desc: isId
+        ? 'Sudah ada aktivitas masuk. Fokus ke pesanan dan operasional harian.'
+        : 'There is already activity. Focus on orders and daily operations.',
+    }
     : {
-        tone: 'success',
-        label: isId ? 'Siap operasional' : 'Operationally ready',
-        desc: isId
-          ? 'Flow inti sudah terpasang. Tinggal jaga ritme katalog, order, dan tim.'
-          : 'The core flow is in place. Keep the catalog, orders, and team moving.',
-      };
+      tone: 'success',
+      label: isId ? 'Siap operasional' : 'Operationally ready',
+      desc: isId
+        ? 'Flow inti sudah terpasang. Tinggal jaga ritme katalog, order, dan tim.'
+        : 'The core flow is in place. Keep the catalog, orders, and team moving.',
+    };
 }
 
 function toneBadgeClass(tone: Tone): string {
@@ -297,7 +297,7 @@ function WorkflowCard({ action }: { action: WorkflowAction }) {
         </div>
         <span
           className={cn(
-            'inline-flex min-h-[28px] shrink-0 items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]',
+            'inline-flex min-h-[28px] max-h-[28px] shrink-0 items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]',
             toneBadgeClass(action.done ? 'success' : action.tone),
           )}
         >
@@ -413,7 +413,7 @@ export function UsahaFlowLandingClient({
       if (!response.ok || !payload.data) {
         throw new Error(
           payload.error ||
-            (isId ? 'Gagal memuat daftar usaha.' : 'Failed to load the business list.'),
+          (isId ? 'Gagal memuat daftar usaha.' : 'Failed to load the business list.'),
         );
       }
 
@@ -471,9 +471,9 @@ export function UsahaFlowLandingClient({
 
           throw new Error(
             firstError ||
-              (isId
-                ? 'Gagal memuat ringkasan operasional usaha.'
-                : 'Failed to load the business operations summary.'),
+            (isId
+              ? 'Gagal memuat ringkasan operasional usaha.'
+              : 'Failed to load the business operations summary.'),
           );
         }
 
@@ -553,8 +553,8 @@ export function UsahaFlowLandingClient({
     const savedStoreId =
       typeof window !== 'undefined'
         ? normalizeText(
-            window.localStorage.getItem(UMKM_ACTIVE_STORE_STORAGE_KEY),
-          )
+          window.localStorage.getItem(UMKM_ACTIVE_STORE_STORAGE_KEY),
+        )
         : '';
     const fallbackStoreId =
       (savedStoreId && stores.some(store => store.id === savedStoreId)
@@ -646,9 +646,9 @@ export function UsahaFlowLandingClient({
         : live
           ? buildUsahaPath('order', { storeId: selectedStore.id })
           : buildUsahaPath('profile', {
-              storeId: selectedStore.id,
-              hash: 'umkm-verification',
-            });
+            storeId: selectedStore.id,
+            hash: 'umkm-verification',
+          });
 
     return [
       {
@@ -815,7 +815,7 @@ export function UsahaFlowLandingClient({
         badge: `${selectedStoreProfileCompletion}/5`,
         tone:
           hasCoreProfile(selectedStore) &&
-          derivePublishServices(selectedStore.metadata || {}).length > 0
+            derivePublishServices(selectedStore.metadata || {}).length > 0
             ? 'success'
             : 'warning',
         icon: BookOpen,

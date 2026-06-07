@@ -49,6 +49,7 @@ type UmkmStoreMapProps = {
   stores: UmkmMapStore[];
   selectedStoreId?: string | null;
   onSelectStore?: (storeId: string) => void;
+  isId?: boolean;
   viewerLocation?: LatLng | null;
   className?: string;
   interactive?: boolean;

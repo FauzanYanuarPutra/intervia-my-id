@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { type FormEvent, useMemo, useState } from 'react';
 import {
   ArrowRight,
@@ -22,11 +22,9 @@ import {
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNotificationInbox } from '@/context/NotificationInboxContext';
-import { Header } from '@/components/layout/Header';
 import {
   localContentImageForTopic,
   localHomeVisual,
-  localProductImageForCategory,
 } from '@/lib/media/localSeedMedia';
 import { cn } from '@/lib/utils';
 
@@ -135,7 +133,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'Compare area, traffic, and budget faster',
     },
     illustration: localHomeVisual('location'),
-    browseHref: '/property',
+    browseHref: '/search?type=property&q=lokasi%20usaha',
     searchQuery: 'lokasi usaha',
   },
   {
@@ -185,7 +183,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'Fast-moving items, safer margins, cleaner sourcing',
     },
     illustration: localContentImageForTopic('product', 'category-product'),
-    browseHref: '/marketplace',
+    browseHref: '/search?type=product&q=produk%20reseller',
     searchQuery: 'produk reseller',
   },
   {
@@ -210,7 +208,7 @@ const CATEGORY_DEFINITIONS: CategoryDefinition[] = [
       en: 'Freelancers, admins, sales support, and creative partners',
     },
     illustration: localContentImageForTopic('talent', 'category-talent'),
-    browseHref: '/freelancers',
+    browseHref: '/search?type=freelancer&q=talent%20usaha',
     searchQuery: 'talent usaha',
   },
 ];
@@ -352,37 +350,37 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'ruko',
       emoji: '🏬',
       label: { id: 'Ruko', en: 'Shophouse' },
-      href: '/property?q=ruko',
+      href: '/search?type=property&q=ruko',
     },
     {
       id: 'kios',
       emoji: '🛍️',
       label: { id: 'Kios', en: 'Kiosk' },
-      href: '/property?q=kios',
+      href: '/search?type=property&q=kios',
     },
     {
       id: 'booth',
       emoji: '🧺',
       label: { id: 'Booth', en: 'Booth' },
-      href: '/property?q=booth',
+      href: '/search?type=property&q=booth',
     },
     {
       id: 'cloud',
       emoji: '🍽️',
       label: { id: 'Cloud Kitchen', en: 'Cloud Kitchen' },
-      href: '/property?q=cloud%20kitchen',
+      href: '/search?type=property&q=cloud%20kitchen',
     },
     {
       id: 'warehouse',
       emoji: '🏭',
       label: { id: 'Gudang Kecil', en: 'Small Warehouse' },
-      href: '/property?q=gudang',
+      href: '/search?type=property&q=gudang',
     },
     {
       id: 'mall',
       emoji: '🏢',
       label: { id: 'Mall Area', en: 'Mall Area' },
-      href: '/property?q=mall',
+      href: '/search?type=property&q=mall',
     },
   ],
   service: [
@@ -428,37 +426,37 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'frozen',
       emoji: '🧊',
       label: { id: 'Frozen Food', en: 'Frozen Food' },
-      href: '/marketplace?category=Frozen%20Food',
+      href: '/search?type=product&q=Frozen%20Food',
     },
     {
       id: 'drinks',
       emoji: '🥤',
       label: { id: 'Minuman', en: 'Drinks' },
-      href: '/marketplace?category=Minuman',
+      href: '/search?type=product&q=Minuman',
     },
     {
       id: 'snacks',
       emoji: '🍪',
       label: { id: 'Snack', en: 'Snacks' },
-      href: '/marketplace?category=Snack',
+      href: '/search?type=product&q=Snack',
     },
     {
       id: 'staples',
       emoji: '🛒',
       label: { id: 'Sembako', en: 'Staples' },
-      href: '/marketplace?category=Sembako',
+      href: '/search?type=product&q=Sembako',
     },
     {
       id: 'packaging',
       emoji: '📦',
       label: { id: 'Kemasan', en: 'Packaging' },
-      href: '/marketplace?category=Kemasan',
+      href: '/search?type=product&q=Kemasan',
     },
     {
       id: 'tools',
       emoji: '🍳',
       label: { id: 'Peralatan', en: 'Tools' },
-      href: '/marketplace?category=Peralatan',
+      href: '/search?type=product&q=Peralatan',
     },
   ],
   talent: [
@@ -466,267 +464,67 @@ const CATEGORY_TOPICS: Record<LeafCategoryId, TopicChip[]> = {
       id: 'cashier',
       emoji: '💳',
       label: { id: 'Kasir', en: 'Cashier' },
-      href: '/freelancers?q=kasir',
+      href: '/search?type=freelancer&q=kasir',
     },
     {
       id: 'admin',
       emoji: '🧾',
       label: { id: 'Admin Toko', en: 'Store Admin' },
-      href: '/freelancers?q=admin%20toko',
+      href: '/search?type=freelancer&q=admin%20toko',
     },
     {
       id: 'creator',
       emoji: '🎥',
       label: { id: 'Konten Kreator', en: 'Content Creator' },
-      href: '/freelancers?q=konten%20kreator',
+      href: '/search?type=freelancer&q=konten%20kreator',
     },
     {
       id: 'sales',
       emoji: '🤝',
       label: { id: 'Sales', en: 'Sales' },
-      href: '/freelancers?q=sales',
+      href: '/search?type=freelancer&q=sales',
     },
     {
       id: 'ops',
       emoji: '📋',
       label: { id: 'Operasional', en: 'Operations' },
-      href: '/freelancers?q=operasional',
+      href: '/search?type=freelancer&q=operasional',
     },
     {
       id: 'design',
       emoji: '✏️',
       label: { id: 'Desainer', en: 'Designer' },
-      href: '/freelancers?q=desainer',
+      href: '/search?type=freelancer&q=desainer',
     },
   ],
 };
 
-const SHOWCASE_ITEMS: ShowcaseItem[] = [
-  {
-    id: 'supplier-ayam',
-    category: 'supplier',
-    title: 'Supplier Ayam Segar Premium',
-    location: 'Jakarta Barat',
-    rating: '4.9',
-    reviews: '128',
-    price: 'Rp 28.000',
-    unit: '/kg',
-    image: localProductImageForCategory('ayam', 'kategori-ayam'),
-    href: '/search?q=supplier%20ayam%20segar',
-    description: {
-      id: 'Potongan ayam segar dengan pasokan rutin untuk kebutuhan outlet harian.',
-      en: 'Fresh chicken cuts with steady daily supply for food outlets.',
-    },
-    verified: true,
-  },
-  {
-    id: 'supplier-daging',
-    category: 'supplier',
-    title: 'Daging Nusantara',
-    location: 'Jakarta Utara',
-    rating: '4.8',
-    reviews: '52',
-    price: 'Rp 120.000',
-    unit: '/kg',
-    image: localProductImageForCategory('daging', 'kategori-daging'),
-    href: '/search?q=supplier%20daging',
-    description: {
-      id: 'Supplier daging sapi dan kambing segar, halal, dan higienis.',
-      en: 'Fresh halal beef and lamb supplier for business kitchens.',
-    },
-    verified: true,
-  },
-  {
-    id: 'location-office',
-    category: 'location',
-    title: 'Sewa Kantor Strategis',
-    location: 'Jakarta Selatan',
-    rating: '4.7',
-    reviews: '76',
-    price: 'Rp 5.000.000',
-    unit: '/bulan',
-    image: localContentImageForTopic('property', 'kategori-kantor'),
-    href: '/property?q=kantor%20strategis',
-    description: {
-      id: 'Lokasi kantor dan showroom dekat akses utama dengan fasilitas siap pakai.',
-      en: 'Office and showroom location close to major access points.',
-    },
-    verified: true,
-  },
-  {
-    id: 'service-logo',
-    category: 'service',
-    title: 'Jasa Desain Logo',
-    location: 'Bandung',
-    rating: '4.9',
-    reviews: '54',
-    price: 'Rp 250.000',
-    unit: '',
-    image: localContentImageForTopic('service', 'kategori-logo'),
-    href: '/search?q=jasa%20desain%20logo',
-    description: {
-      id: 'Desain logo dan identitas visual untuk produk, outlet, dan campaign baru.',
-      en: 'Logo and visual identity design for products and new campaigns.',
-    },
-    verified: true,
-  },
-  {
-    id: 'talent-photo',
-    category: 'talent',
-    title: 'Fotografer Produk',
-    location: 'Surabaya',
-    rating: '4.8',
-    reviews: '62',
-    price: 'Rp 500.000',
-    unit: '',
-    image: localContentImageForTopic('talent', 'kategori-fotografer'),
-    href: '/freelancers?q=fotografer%20produk',
-    description: {
-      id: 'Fotografer berpengalaman untuk katalog, menu, dan konten marketplace.',
-      en: 'Experienced photographer for catalog, menu, and marketplace content.',
-    },
-    verified: true,
-  },
-  {
-    id: 'supplier-eggs',
-    category: 'supplier',
-    title: 'Toko Telur Kita',
-    location: 'Jakarta Pusat',
-    rating: '4.9',
-    reviews: '64',
-    price: 'Rp 24.000',
-    unit: '/kg',
-    image: localProductImageForCategory('telur', 'kategori-telur'),
-    href: '/search?q=supplier%20telur',
-    description: {
-      id: 'Menyediakan telur segar berkualitas dengan harga terjangkau.',
-      en: 'Fresh eggs with consistent quality and practical pricing.',
-    },
-    verified: true,
-  },
-  {
-    id: 'supplier-seafood',
-    category: 'supplier',
-    title: 'Fresh Seafood Indo',
-    location: 'Tangerang Selatan',
-    rating: '4.7',
-    reviews: '38',
-    price: 'Rp 35.000',
-    unit: '/kg',
-    image: localProductImageForCategory('seafood', 'kategori-seafood'),
-    href: '/search?q=supplier%20seafood',
-    description: {
-      id: 'Berbagai pilihan seafood segar langsung dari nelayan.',
-      en: 'Fresh seafood selection sourced directly from fishers.',
-    },
-    verified: true,
-  },
-  {
-    id: 'location-kiosk',
-    category: 'location',
-    title: 'Kios Ramai Pasar Baru',
-    location: 'Bandung',
-    rating: '4.8',
-    reviews: '41',
-    price: 'Rp 3.200.000',
-    unit: '/bulan',
-    image: localContentImageForTopic('property', 'kategori-kios'),
-    href: '/property?q=kios%20pasar',
-    description: {
-      id: 'Kios dengan traffic tinggi cocok untuk F&B dan retail cepat putar.',
-      en: 'High-traffic kiosk for F&B and fast-moving retail businesses.',
-    },
-    verified: true,
-  },
-  {
-    id: 'service-marketplace',
-    category: 'service',
-    title: 'Jasa Kelola Marketplace',
-    location: 'Online',
-    rating: '4.8',
-    reviews: '48',
-    price: 'Rp 1.800.000',
-    unit: '/bulan',
-    image: localContentImageForTopic('service', 'kategori-marketplace'),
-    href: '/search?q=jasa%20kelola%20marketplace',
-    description: {
-      id: 'Optimasi listing, balas chat, dan rutinitas operasional marketplace.',
-      en: 'Listing optimization, chat response, and marketplace operations support.',
-    },
-    verified: true,
-  },
-  {
-    id: 'product-frozen',
-    category: 'product',
-    title: 'Frozen Food Siap Jual',
-    location: 'Bekasi',
-    rating: '4.7',
-    reviews: '71',
-    price: 'Rp 18.000',
-    unit: '/pack',
-    image: localProductImageForCategory('frozen', 'kategori-frozen'),
-    href: '/marketplace?category=Frozen%20Food',
-    description: {
-      id: 'Produk frozen food dengan margin aman dan stok siap kirim.',
-      en: 'Frozen food products with safer margins and ready stock.',
-    },
-    verified: true,
-  },
-  {
-    id: 'product-drinks',
-    category: 'product',
-    title: 'Paket Minuman Literan',
-    location: 'Depok',
-    rating: '4.8',
-    reviews: '33',
-    price: 'Rp 22.000',
-    unit: '/botol',
-    image: localProductImageForCategory('minuman', 'kategori-minuman'),
-    href: '/marketplace?category=Minuman',
-    description: {
-      id: 'Minuman siap jual untuk reseller, booth, dan penjualan event.',
-      en: 'Ready-to-sell drinks for resellers, booths, and event sales.',
-    },
-    verified: true,
-  },
-  {
-    id: 'talent-admin',
-    category: 'talent',
-    title: 'Admin Operasional UMKM',
-    location: 'Yogyakarta',
-    rating: '4.8',
-    reviews: '29',
-    price: 'Rp 2.800.000',
-    unit: '/bulan',
-    image: localContentImageForTopic('talent', 'kategori-admin'),
-    href: '/freelancers?q=admin%20operasional',
-    description: {
-      id: 'Bisa bantu order entry, follow up supplier, dan administrasi harian.',
-      en: 'Helps with order entry, supplier follow-up, and daily admin work.',
-    },
-    verified: true,
-  },
-  {
-    id: 'talent-creator',
-    category: 'talent',
-    title: 'Konten Kreator Produk',
-    location: 'Jakarta Barat',
-    rating: '4.9',
-    reviews: '35',
-    price: 'Rp 1.200.000',
-    unit: '/project',
-    image: localContentImageForTopic('talent', 'kategori-kreator'),
-    href: '/freelancers?q=konten%20kreator',
-    description: {
-      id: 'Bikin konten promosi, reels, dan materi upload marketplace.',
-      en: 'Creates promo content, reels, and marketplace-ready assets.',
-    },
-    verified: true,
-  },
-];
+const SHOWCASE_ITEMS: ShowcaseItem[] = [];
 
 function pick(isId: boolean, copy: Copy): string {
   return isId ? copy.id : copy.en;
+}
+
+function canonicalizeDiscoveryHref(href: string): string {
+  const [pathname, queryString = ''] = href.split('?');
+  const params = new URLSearchParams(queryString);
+
+  if (pathname === '/property') {
+    const query = params.get('q') || params.get('category') || 'lokasi jualan';
+    return `/search?type=property&q=${encodeURIComponent(query)}`;
+  }
+
+  if (pathname === '/marketplace') {
+    const query = params.get('q') || params.get('category') || 'supplier';
+    return `/search?type=product&q=${encodeURIComponent(query)}`;
+  }
+
+  if (pathname === '/freelancers') {
+    const query = params.get('q') || 'umkm';
+    return `/search?type=freelancer&q=${encodeURIComponent(query)}`;
+  }
+
+  return href;
 }
 
 function toneStyles(tone: Tone) {
@@ -792,19 +590,19 @@ function getPrimaryAction(
 ): { href: string; label: string } {
   if (category === 'location') {
     return {
-      href: '/property',
+      href: '/search?type=property&q=lokasi%20jualan',
       label: isId ? 'Cari Lokasi' : 'Find Location',
     };
   }
   if (category === 'product') {
     return {
-      href: '/marketplace',
+      href: '/search?type=product&q=supplier',
       label: isId ? 'Lihat Produk' : 'View Products',
     };
   }
   if (category === 'talent') {
     return {
-      href: '/freelancers',
+      href: '/search?type=freelancer&q=umkm',
       label: isId ? 'Cari Talent' : 'Find Talent',
     };
   }
@@ -815,11 +613,8 @@ function getPrimaryAction(
 }
 
 function getShowcaseItems(category: CategoryId): ShowcaseItem[] {
-  if (category === 'all') {
-    return SHOWCASE_ITEMS.slice(0, 5);
-  }
-  const filtered = SHOWCASE_ITEMS.filter(item => item.category === category);
-  return filtered.length ? filtered : SHOWCASE_ITEMS.slice(0, 5);
+  void category;
+  return [];
 }
 
 function getTopicLabel(category: LeafCategoryId, isId: boolean): string {
@@ -906,11 +701,7 @@ export function CategoryLandingClient({
       : resolvedDesktopConfig.illustration;
 
   return (
-    <main className="lajukan-market-page lajukan-market-category page-shell max-lg:!px-0 overflow-x-hidden pb-5 pt-2 sm:pt-4 lg:pb-8">
-      <div className="hidden lg:block">
-        <Header />
-      </div>
-      <div aria-hidden="true" className="hidden h-[4.625rem] lg:block" />
+    <main className="lajukan-market-page lajukan-market-category page-shell max-lg:!px-1 overflow-x-hidden pb-5 pt-2 sm:pt-4 lg:pb-8">
       <div className="mx-auto w-full max-w-[1500px] px-2 sm:px-4 lg:px-6">
         <div className="lg:hidden">
           <section
@@ -1000,7 +791,7 @@ export function CategoryLandingClient({
                   {pick(isId, mobileCategoryConfig.heroDescription)}
                 </p>
                 <Link
-                  href={mobileAction.href}
+                  href={canonicalizeDiscoveryHref(mobileAction.href)}
                   className="inline-flex min-h-[38px] items-center justify-center rounded-[14px] bg-emerald-600 px-4 text-xs font-semibold text-white shadow-[0_14px_26px_-20px_rgba(22,163,74,0.55)]"
                 >
                   {mobileAction.label}
@@ -1030,11 +821,18 @@ export function CategoryLandingClient({
               mobile
             />
 
-            <div className="-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {mobileShowcase.map(item => (
-                <MobileShowcaseCard key={item.id} item={item} isId={isId} />
-              ))}
-            </div>
+            {mobileShowcase.length > 0 ? (
+              <div className="-mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {mobileShowcase.map(item => (
+                  <MobileShowcaseCard key={item.id} item={item} isId={isId} />
+                ))}
+              </div>
+            ) : (
+              <CategoryEmptyShowcase
+                isId={isId}
+                href={mobileCategoryConfig.browseHref}
+              />
+            )}
 
             <SectionHeader
               title={getTopicLabel(mobileCategory, isId)}
@@ -1047,7 +845,7 @@ export function CategoryLandingClient({
               {mobileTopics.map(topic => (
                 <Link
                   key={topic.id}
-                  href={topic.href}
+                  href={canonicalizeDiscoveryHref(topic.href)}
                   className="rounded-[16px] border border-slate-200 bg-white px-2 py-2.5 text-center shadow-[0_14px_26px_-24px_rgba(15,23,42,0.18)]"
                 >
                   <span className="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-slate-50 text-xl">
@@ -1067,15 +865,23 @@ export function CategoryLandingClient({
               mobile
             />
 
-            <div className="space-y-2">
-              {mobileShowcase.slice(0, 3).map(item => (
-                <MobileRecommendationRow
-                  key={`${item.id}-row`}
-                  item={item}
-                  isId={isId}
-                />
-              ))}
-            </div>
+            {mobileShowcase.length > 0 ? (
+              <div className="space-y-2">
+                {mobileShowcase.slice(0, 3).map(item => (
+                  <MobileRecommendationRow
+                    key={`${item.id}-row`}
+                    item={item}
+                    isId={isId}
+                  />
+                ))}
+              </div>
+            ) : (
+              <CategoryEmptyShowcase
+                isId={isId}
+                href={mobileCategoryConfig.browseHref}
+                compact
+              />
+            )}
           </div>
         </div>
 
@@ -1203,7 +1009,7 @@ export function CategoryLandingClient({
                     {desktopBannerDescription}
                   </p>
                   <Link
-                    href={desktopAction.href}
+                    href={canonicalizeDiscoveryHref(desktopAction.href)}
                     className="mt-6 inline-flex min-h-[48px] items-center justify-center rounded-[16px] bg-emerald-600 px-5 text-sm font-semibold text-white"
                   >
                     {desktopAction.label}
@@ -1270,7 +1076,7 @@ export function CategoryLandingClient({
                   {desktopTopics.map(topic => (
                     <Link
                       key={topic.id}
-                      href={topic.href}
+                      href={canonicalizeDiscoveryHref(topic.href)}
                       className="rounded-[24px] border border-slate-200 bg-white px-4 py-5 text-center shadow-[0_20px_36px_-34px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-[0_28px_50px_-36px_rgba(22,163,74,0.28)]"
                     >
                       <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-[1.7rem]">
@@ -1297,15 +1103,26 @@ export function CategoryLandingClient({
                   actionLabel={isId ? 'Lihat Semua' : 'View All'}
                 />
 
-                <div className="grid gap-5 xl:grid-cols-5">
-                  {desktopShowcase.map(item => (
-                    <DesktopShowcaseCard
-                      key={item.id}
-                      item={item}
-                      isId={isId}
-                    />
-                  ))}
-                </div>
+                {desktopShowcase.length > 0 ? (
+                  <div className="grid gap-5 xl:grid-cols-5">
+                    {desktopShowcase.map(item => (
+                      <DesktopShowcaseCard
+                        key={item.id}
+                        item={item}
+                        isId={isId}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <CategoryEmptyShowcase
+                    isId={isId}
+                    href={
+                      desktopCategory === 'all'
+                        ? '/search'
+                        : CATEGORY_BY_ID[desktopCategory].browseHref
+                    }
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -1337,7 +1154,7 @@ function SectionHeader({
         {title}
       </h2>
       <Link
-        href={actionHref}
+        href={canonicalizeDiscoveryHref(actionHref)}
         className={cn(
           'shrink-0 font-semibold text-emerald-600 transition hover:text-emerald-700',
           mobile ? 'rounded-full bg-emerald-50 px-2.5 py-1 text-xs' : 'text-sm',
@@ -1346,6 +1163,43 @@ function SectionHeader({
         {actionLabel}
       </Link>
     </div>
+  );
+}
+
+function CategoryEmptyShowcase({
+  isId,
+  href,
+  compact = false,
+}: {
+  isId: boolean;
+  href: string;
+  compact?: boolean;
+}) {
+  return (
+    <section
+      className={cn(
+        'rounded-[24px] border border-dashed border-slate-200 bg-white px-4 text-center shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)]',
+        compact ? 'py-4' : 'py-6',
+      )}
+    >
+      <span className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-[15px] bg-emerald-50 text-emerald-600">
+        <Search className="h-5 w-5" />
+      </span>
+      <p className="mt-3 text-sm font-black text-slate-950">
+        {isId ? 'Belum ada listing aktif' : 'No active listings yet'}
+      </p>
+      <p className="mx-auto mt-1 max-w-md text-xs font-semibold leading-5 text-slate-500">
+        {isId
+          ? 'Kami tidak menampilkan contoh palsu. Cari data real atau buat permintaan baru.'
+          : 'We do not show fake examples. Search live data or create a request.'}
+      </p>
+      <Link
+        href={canonicalizeDiscoveryHref(href)}
+        className="mt-4 inline-flex min-h-10 items-center justify-center rounded-[14px] bg-emerald-600 px-4 text-xs font-black text-white"
+      >
+        {isId ? 'Cari data real' : 'Search real data'}
+      </Link>
+    </section>
   );
 }
 
@@ -1499,7 +1353,7 @@ function DesktopShowcaseCard({
           <span className="text-slate-500">{item.unit}</span>
         </p>
         <Link
-          href={item.href}
+          href={canonicalizeDiscoveryHref(item.href)}
           className="inline-flex min-h-[44px] w-full items-center justify-center rounded-[16px] border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
         >
           {isId ? 'Lihat Detail' : 'View Details'}
@@ -1615,7 +1469,7 @@ function MobileRecommendationRow({
           </p>
         </div>
         <Link
-          href={item.href}
+          href={canonicalizeDiscoveryHref(item.href)}
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600"
           aria-label={isId ? 'Simpan rekomendasi' : 'Save recommendation'}
         >

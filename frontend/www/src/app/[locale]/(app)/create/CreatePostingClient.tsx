@@ -16,6 +16,7 @@ import { getSubSectors, getSubSectorName } from '@/data/subSectors';
 import { getFieldsForCreate, needsImageGallery } from '@/data/sectorFields';
 import type { SectorField } from '@/data/sectorFields';
 import { normalizeContentMediaUrl } from '@/lib/content/catalog';
+import { normalizePriceUnit } from '@/lib/content/priceUnit';
 import { readSocialConnections } from '@/lib/content/distribution';
 import { LISTING_TEMPLATES } from '@/lib/content/listingTemplates';
 import { buildContentHref } from '@/lib/content/routes';
@@ -145,6 +146,7 @@ const FIELD_ICON_BY_KEY: Record<string, LucideIcon> = {
   must_have_skills: BriefcaseBusiness,
   responsibilities: ClipboardList,
   price_cents: BadgeDollarSign,
+  price_unit: BadgeDollarSign,
   salary_range: BadgeDollarSign,
   promo_budget_amount: BadgeDollarSign,
   promo_target_audience: Users,
@@ -307,6 +309,20 @@ function supportsSimpleListingMode(type: string): boolean {
   return SIMPLE_MODE_ALLOWED_TYPES.has(type as ListingTypeId);
 }
 
+function getDefaultPriceUnitForType(
+  type: string,
+  listingSide: ListingSide,
+): string {
+  if (type === 'property') return 'month';
+  if (type === 'tool_rental') return 'day';
+  if (type === 'job') return 'month';
+  if (type === 'service')
+    return listingSide === 'demand' ? 'project' : 'project';
+  if (type === 'business_transfer') return 'deal';
+  if (type === 'product') return listingSide === 'demand' ? 'shipment' : 'pcs';
+  return '';
+}
+
 function getSimpleModePinnedFieldKeys(
   type: ListingTypeId,
   listingSide: ListingSide,
@@ -316,16 +332,16 @@ function getSimpleModePinnedFieldKeys(
     case 'property':
     case 'tool_rental':
       return listingSide === 'demand'
-        ? ['title', 'price_cents', 'location']
-        : ['title', 'price_cents', 'location'];
+        ? ['title', 'price_cents', 'price_unit', 'location']
+        : ['title', 'price_cents', 'price_unit', 'location'];
     case 'business_transfer':
-      return ['title', 'price_cents', 'location'];
+      return ['title', 'price_cents', 'price_unit', 'location'];
     case 'service':
       return listingSide === 'demand'
-        ? ['title', 'summary', 'price_cents', 'location']
-        : ['title', 'price_cents', 'location'];
+        ? ['title', 'summary', 'price_cents', 'price_unit', 'location']
+        : ['title', 'price_cents', 'price_unit', 'location'];
     case 'job':
-      return ['title', 'salary_range', 'location'];
+      return ['title', 'salary_range', 'price_unit', 'location'];
     case 'company':
       return ['title', 'company_name'];
     default:
@@ -426,37 +442,37 @@ function CreateEntryActionCard({ item }: { item: CreateEntryAction }) {
     <Link
       href={item.href}
       data-testid="create-entry-action-card"
-      className="group flex min-h-[178px] flex-col justify-between rounded-[16px] border border-[color:var(--app-border)] bg-white p-4 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_34px_-30px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/70"
+      className="group flex min-h-[124px] flex-col justify-between rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_34px_-30px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/70 sm:min-h-[150px] sm:p-3.5"
     >
       <span
         className={cn(
-          'mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full',
+          'inline-flex h-10 w-10 items-center justify-center rounded-[15px] sm:h-11 sm:w-11 sm:rounded-[16px]',
           item.tone,
         )}
       >
-        <Icon className="h-7 w-7" />
+        <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
       </span>
-      <span className="mt-3 block text-center">
-        <span className="block text-[14px] font-black leading-tight text-[color:var(--app-text)]">
+      <span className="mt-2.5 block">
+        <span className="line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
           {item.title}
         </span>
-        <span className="mt-1.5 block line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+        <span className="mt-1 block line-clamp-2 text-[10.5px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px] sm:leading-5">
           {item.description}
         </span>
       </span>
-      <span className="mt-3 flex items-center justify-between gap-2">
-        <span className="flex min-w-0 flex-wrap gap-1">
-          {item.chips.slice(0, 2).map(chip => (
+      <span className="mt-2 flex items-center justify-between gap-2">
+        <span className="flex min-w-0 gap-1 overflow-hidden">
+          {item.chips.slice(0, 1).map(chip => (
             <span
               key={chip}
-              className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]"
+              className="truncate rounded-full bg-[color:var(--app-surface-muted)] px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]"
             >
               {chip}
             </span>
           ))}
         </span>
-        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-          <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] sm:h-8 sm:w-8">
+          <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5 sm:h-4 sm:w-4" />
         </span>
       </span>
     </Link>
@@ -528,6 +544,7 @@ function CreateChoiceCard({
   badge,
   title,
   description,
+  example,
   highlights,
   actionLabel,
   Icon,
@@ -539,6 +556,7 @@ function CreateChoiceCard({
   badge: string;
   title: string;
   description: string;
+  example?: string;
   highlights?: string[];
   actionLabel: string;
   Icon: LucideIcon;
@@ -553,60 +571,132 @@ function CreateChoiceCard({
       disabled={disabled}
       onClick={onClick}
       aria-label={`${title}. ${actionLabel}`}
-      className={`group relative flex min-h-[164px] w-full flex-col items-center justify-between overflow-hidden rounded-[16px] px-4 py-4 text-center transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={cn(
+        'group relative flex min-h-[124px] w-full flex-col justify-end overflow-hidden rounded-[18px] border px-3 pb-2.5 pt-12 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] transition disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[150px] sm:px-3.5 sm:pb-3 sm:pt-14',
         selected
-          ? `${theme.cardSelected} shadow-[0_12px_24px_-22px_rgba(15,23,42,0.18)] ring-1 ring-current/12`
-          : `bg-white/96 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.16)] ring-1 ring-slate-200/80 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_28px_-24px_rgba(15,23,42,0.18)] dark:bg-slate-950/85 dark:ring-slate-800/80`
-      }`}
+          ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_28%,white)] shadow-[0_18px_34px_-30px_rgba(15,23,42,0.22)] ring-1 ring-[color:var(--app-accent-border)] dark:border-[color:var(--app-accent-border)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_16%,rgba(15,23,42,0.94))]'
+          : `${theme.cardBase} hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_34px_-30px_rgba(15,23,42,0.24)]`,
+      )}
     >
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-current/20" />
       <span
-        className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${
+        className={`absolute left-3 top-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] sm:h-10 sm:w-10 sm:rounded-[15px] ${
           selected
-            ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]'
+            ? 'bg-[color:var(--app-accent)] text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.72)]'
             : theme.cardIcon
         }`}
       >
-        <Icon className="h-7 w-7" />
+        <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
       </span>
-      <span className="mt-3 min-w-0">
-        <span className="text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+      <span className="mt-auto block min-w-0">
+        <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
           {badge}
         </span>
-        <span className="mt-1 block text-[14px] font-black leading-tight text-[color:var(--app-text)]">
+        <span className="mt-1 line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
           {title}
         </span>
-        <span className="mt-1 block line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+        <span className="mt-1 hidden line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] min-[420px]:block">
           {description}
         </span>
-        {highlights?.length ? (
-          <span className="mt-2 flex flex-wrap justify-center gap-1">
-            {highlights.slice(0, 2).map(item => (
-              <span
-                key={item}
-                className="rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)]"
-              >
-                {item}
-              </span>
-            ))}
+        {example ? (
+          <span className="mt-2 block rounded-[12px] bg-white/78 px-2.5 py-1.5 text-[10.5px] font-semibold leading-4 text-[color:var(--app-text)] ring-1 ring-white/80 dark:bg-slate-950/48 dark:ring-white/10 sm:text-[11px]">
+            <span className="font-black text-[color:var(--app-accent)]">
+              {example.startsWith('Example:')
+                ? 'Example:'
+                : example.startsWith('Contoh:')
+                  ? 'Contoh:'
+                  : 'Contoh:'}
+            </span>{' '}
+            {example.replace(/^(Contoh:|Example:)\s*/i, '')}
           </span>
         ) : null}
       </span>
-      <span
-        className={cn(
-          'mt-3 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition',
-          selected
-            ? 'bg-[color:var(--app-accent)] text-white'
-            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] dark:bg-slate-900/80',
-        )}
-      >
-        {selected ? (
-          <CheckCircle2 className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-        )}
+      <span className="mt-2 flex w-full items-center justify-between gap-2">
+        <span className="min-w-0 flex-1 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+          {highlights?.[0] || actionLabel}
+        </span>
+        <span
+          className={cn(
+            'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition sm:h-8 sm:w-8',
+            selected
+              ? 'bg-[color:var(--app-accent)] text-white'
+              : 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] dark:bg-slate-900/80',
+          )}
+        >
+          {selected ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+          )}
+        </span>
       </span>
     </button>
   );
+}
+
+function getCreateChoiceExample(
+  type: ListingTypeId,
+  listingSide: ListingSide,
+  locale: string,
+): string {
+  const isId = locale === 'id';
+  const demand = listingSide === 'demand';
+
+  if (type === 'product') {
+    return demand
+      ? isId
+        ? 'Contoh: cari supplier kopi 10 kg/bulan Bandung'
+        : 'Example: find a coffee supplier for 10 kg/month in Bandung'
+      : isId
+        ? 'Contoh: supplier kemasan standing pouch 1.000 pcs'
+        : 'Example: standing pouch packaging supplier, 1,000 pcs';
+  }
+
+  if (type === 'service') {
+    return demand
+      ? isId
+        ? 'Contoh: cari jasa foto produk untuk katalog skincare'
+        : 'Example: need product photos for a skincare catalog'
+      : isId
+        ? 'Contoh: jasa host live shopping Tangerang'
+        : 'Example: live-shopping host service in Tangerang';
+  }
+
+  if (type === 'property') {
+    return demand
+      ? isId
+        ? 'Contoh: cari booth bazaar 3 hari area BSD'
+        : 'Example: looking for a three-day bazaar booth in BSD'
+      : isId
+        ? 'Contoh: sewa kios kuliner dekat kampus Bandung'
+        : 'Example: rent a food kiosk near a Bandung campus';
+  }
+
+  if (type === 'tool_rental') {
+    return demand
+      ? isId
+        ? 'Contoh: cari sewa freezer display 1 minggu'
+        : 'Example: need a display freezer rental for one week'
+      : isId
+        ? 'Contoh: sewa tenda lipat event booth Bandung'
+        : 'Example: folding tent rental for an event booth in Bandung';
+  }
+
+  if (type === 'job') {
+    return isId
+      ? 'Contoh: cari admin toko online shift sore Jakarta'
+      : 'Example: hiring an online-store admin for evening shift in Jakarta';
+  }
+
+  if (type === 'business_transfer') {
+    return isId
+      ? 'Contoh: oper usaha laundry aktif dengan alat dan SOP'
+      : 'Example: transfer an active laundry business with assets and SOP';
+  }
+
+  return isId
+    ? 'Contoh: tulis kebutuhan atau penawaran yang paling dekat'
+    : 'Example: describe the closest need or offer';
 }
 
 function getQuickCreateExamples(
@@ -619,7 +709,7 @@ function getQuickCreateExamples(
   if (type === 'job') {
     return isId
       ? [
-          'Judul: Butuh admin live TikTok untuk brand F&B Jakarta',
+          'Judul: Cari admin live TikTok untuk brand F&B Jakarta',
           'Budget: Rp 4.500.000 / bulan',
           'Lokasi: Jakarta Barat, shift sore',
         ]
@@ -776,7 +866,7 @@ function getFieldExample(
   if (key.includes('summary')) {
     if (type === 'business_transfer') {
       return isId
-        ? 'Usaha berjalan, omzet stabil, aset siap dicek, alasan jual jelas.'
+        ? 'Usaha berjalan, omzet stabil, aset siap dicek, alasan ditawarkan jelas.'
         : 'Running business with stable revenue, verifiable assets, and a clear reason for sale.';
     }
     if (listingSide === 'demand' && type === 'product') {
@@ -786,7 +876,7 @@ function getFieldExample(
     }
     if (listingSide === 'demand' && type === 'service') {
       return isId
-        ? 'Butuh jasa atau channel operasional seperti host live, reseller aktif, admin marketplace, atau vendor eksekusi dengan output jelas.'
+        ? 'Cari jasa atau channel operasional seperti host live, reseller aktif, admin marketplace, atau vendor eksekusi dengan output jelas.'
         : 'Need an operations or channel partner such as live hosts, active resellers, marketplace admins, or an execution vendor with clear output.';
     }
     if (listingSide === 'demand' && type === 'property') {
@@ -806,7 +896,7 @@ function getFieldExample(
   if (key === 'body' || key.includes('description')) {
     if (type === 'business_transfer') {
       return isId
-        ? 'Tulis alasan jual, omzet rata-rata, biaya operasional, aset yang ikut, rating/review, akun yang bisa dipindahkan, hutang/kontrak, dan skema handover.'
+        ? 'Tulis alasan ditawarkan, omzet rata-rata, biaya operasional, aset yang ikut, rating/review, akun yang bisa dipindahkan, hutang/kontrak, dan skema handover.'
         : 'Describe the reason for sale, average revenue, operational costs, included assets, ratings/reviews, transferable accounts, liabilities/contracts, and handover flow.';
     }
     if (listingSide === 'demand' && type === 'product') {
@@ -832,6 +922,14 @@ function getFieldExample(
     return isId
       ? 'Tulis kondisi, spesifikasi, benefit, dan cara transaksi secara singkat.'
       : 'Write the condition, specs, benefit, and transaction flow briefly.';
+  }
+  if (key === 'price_unit') {
+    if (type === 'property') return 'month';
+    if (type === 'tool_rental') return 'day';
+    if (type === 'job') return 'month';
+    if (type === 'service') return 'project';
+    if (type === 'business_transfer') return 'deal';
+    return listingSide === 'demand' ? 'shipment' : 'pcs';
   }
   if (
     key.includes('price') ||
@@ -1031,6 +1129,15 @@ function getFieldHelperHint(
     key.includes('rent') ||
     key.includes('rate')
   ) {
+    if (key === 'price_unit') {
+      return listingSide === 'demand'
+        ? isId
+          ? 'Pilih satuan budget supaya penawaran yang masuk tidak salah hitung.'
+          : 'Pick a budget unit so incoming offers calculate the basis correctly.'
+        : isId
+          ? 'Pilih satuan harga supaya buyer paham harga ini untuk apa.'
+          : 'Pick a price unit so buyers understand what the price covers.';
+    }
     return listingSide === 'demand'
       ? isId
         ? 'Boleh dikosongkan kalau budgetnya masih fleksibel.'
@@ -1084,6 +1191,7 @@ const SIMPLE_FIELD_KEYS = new Set([
   'summary',
   'body',
   'price_cents',
+  'price_unit',
   'salary_range',
   'location',
   'address',
@@ -1135,6 +1243,7 @@ const TYPE_SWITCH_SAFE_KEYS = new Set([
   'location',
   'address',
   'price_cents',
+  'price_unit',
   'price',
 ]);
 const PROMOTION_BASE_FIELDS: SectorField[] = [
@@ -1795,9 +1904,9 @@ const ALL_PROMOTION_KEYS = Array.from(
 
 const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
   product: {
-    headlineId: 'Supplier / stok usaha',
+    headlineId: 'Tawarkan produk / stok usaha',
     headlineEn: 'Supplier / Stock Listing',
-    descId: 'Pasang supplier, bahan baku, atau stok.',
+    descId: 'Tawarkan barang jadi, bahan baku, stok grosir, atau supplier.',
     descEn:
       'Publish suppliers, distributors, raw materials, or business stock that is ready to offer.',
     stepsId: ['Informasi Produk', 'Harga & Stok', 'Foto Produk', 'Selesai'],
@@ -1807,6 +1916,7 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'summary',
       'body',
       'price_cents',
+      'price_unit',
       'location',
       'brand',
       'sku',
@@ -1818,9 +1928,9 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
     step2HintEn: 'Complete shipping, returns, warranty, and product specs.',
   },
   service: {
-    headlineId: 'Jasa operasional',
+    headlineId: 'Tawarkan jasa operasional',
     headlineEn: 'Operations Service Listing',
-    descId: 'Pasang jasa admin, konten, desain, legal.',
+    descId: 'Tawarkan jasa admin, konten, desain, legal, dan operasional.',
     descEn:
       'Offer marketplace admin, content, packaging, design, legal, or other operational services for businesses.',
     stepsId: ['Informasi Jasa', 'Paket & Area', 'Portfolio', 'Selesai'],
@@ -1830,6 +1940,7 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'summary',
       'body',
       'price_cents',
+      'price_unit',
       'location',
       'work_mode',
       'rate_type',
@@ -1863,6 +1974,7 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'salary_range',
       'compensation_period',
       'price_cents',
+      'price_unit',
     ],
     step2HintId:
       'Tambahin skill wajib, tugas utama, tanggal mulai, dan batas lamarannya ya.',
@@ -1892,6 +2004,7 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'summary',
       'body',
       'price_cents',
+      'price_unit',
       'location',
       'listing_purpose',
       'property_type',
@@ -1906,9 +2019,10 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'Complete available-from date, ownership, full address, and legal docs.',
   },
   tool_rental: {
-    headlineId: 'Sewa alat usaha',
+    headlineId: 'Sewakan alat usaha',
     headlineEn: 'Business Tool Rental Listing',
-    descId: 'Pasang alat sewa: freezer, kamera, lighting.',
+    descId:
+      'Tawarkan alat sewa: freezer, kamera, lighting, atau alat produksi.',
     descEn:
       'Publish business tools ready for rent: freezers, vacuum sealers, content cameras, lighting, and other operational gear.',
     stepsId: ['Informasi Aset', 'Aturan Sewa', 'Foto Aset', 'Selesai'],
@@ -1918,6 +2032,7 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'summary',
       'body',
       'price_cents',
+      'price_unit',
       'location',
       'brand',
       'model_name',
@@ -1935,10 +2050,10 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'Complete defects, included items, usage restrictions, ownership proof, and complaint rules.',
   },
   business_transfer: {
-    headlineId: 'Oper usaha berjalan',
+    headlineId: 'Tawarkan oper usaha',
     headlineEn: 'Running Business Transfer',
     descId:
-      'Jual usaha aktif lengkap dengan aset, angka, rating, dan catatan handover yang jelas.',
+      'Tawarkan usaha aktif lengkap dengan aset, angka, rating, dan catatan handover yang jelas.',
     descEn:
       'Sell an active business with clear assets, numbers, ratings, and handover notes.',
     stepsId: ['Profil Usaha', 'Aset & Risiko', 'Bukti', 'Selesai'],
@@ -1948,6 +2063,7 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
       'summary',
       'body',
       'price_cents',
+      'price_unit',
       'location',
       'business_name',
       'business_category',
@@ -2107,6 +2223,14 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       hintId: 'Kalau cukup pakai range gaji, ini boleh dikosongin.',
       hintEn: 'Optional if salary range is filled.',
     },
+    price_unit: {
+      labelId: 'Gaji per',
+      labelEn: 'Salary per',
+      hintId:
+        'Biasanya per bulan, tapi bisa per hari/jam untuk shift atau freelance.',
+      hintEn:
+        'Usually monthly, but daily/hourly can fit shift or freelance roles.',
+    },
     salary_range: {
       hintId: 'Contoh: 10-15 jt per bulan.',
       hintEn: 'Example: 10-15M per month.',
@@ -2123,6 +2247,14 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       placeholderId: 'mis. 500000',
       placeholderEn: 'e.g. 500000',
     },
+    price_unit: {
+      labelId: 'Harga jasa per',
+      labelEn: 'Service price per',
+      hintId:
+        'Pilih proyek, sesi, jam, atau bulan supaya buyer paham hitungannya.',
+      hintEn:
+        'Choose project, session, hour, or month so buyers understand the basis.',
+    },
     delivery_time: {
       hintId: 'Kasih perkiraan beresnya, mis. 5-7 hari.',
       hintEn: 'Add delivery estimate, e.g. 5-7 days.',
@@ -2134,6 +2266,14 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       labelEn: 'Price / Rent (IDR)',
       placeholderId: 'mis. 1500000000',
       placeholderEn: 'e.g. 1500000000',
+    },
+    price_unit: {
+      labelId: 'Harga / sewa per',
+      labelEn: 'Price / rent per',
+      hintId:
+        'Untuk lokasi jualan biasanya per bulan, tahun, hari, atau event.',
+      hintEn:
+        'Business locations are usually monthly, yearly, daily, or per event.',
     },
     area_sqm: {
       labelId: 'Luas (m2)',
@@ -2153,6 +2293,12 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       hintId: 'Isi sesuai skema sewanya, mis. per hari.',
       hintEn:
         'Enter the amount based on the selected rate type, for example per day.',
+    },
+    price_unit: {
+      labelId: 'Tarif sewa per',
+      labelEn: 'Rental rate per',
+      hintId: 'Pilih hari, minggu, bulan, atau event sesuai cara sewa alatnya.',
+      hintEn: 'Choose day, week, month, or event based on the rental scheme.',
     },
     deposit_amount_cents: {
       hintId: 'Biar aman, batas depositnya tulis jelas dari awal.',
@@ -2183,6 +2329,12 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       hintId: 'Isi harga acuan. Kalau nego, tulis di ringkasan/detail.',
       hintEn:
         'Add the reference asking price. Mention negotiation in the summary or details.',
+    },
+    price_unit: {
+      labelId: 'Harga untuk',
+      labelEn: 'Price for',
+      hintId: 'Untuk oper usaha biasanya per deal/handover.',
+      hintEn: 'Business transfer pricing is usually for the deal or handover.',
     },
     business_name: {
       hintId: 'Pakai nama usaha yang dikenal pelanggan.',
@@ -2271,6 +2423,12 @@ const FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
     },
   },
   product: {
+    price_unit: {
+      labelId: 'Harga produk per',
+      labelEn: 'Product price per',
+      hintId: 'Contoh: pcs, paket, bal, karton, kg, atau pengiriman.',
+      hintEn: 'Examples: piece, pack, bale, carton, kg, or shipment.',
+    },
     delivery_estimate: {
       hintId: 'Contoh: 2-3 hari kerja ya.',
       hintEn: 'Example: 2-3 business days.',
@@ -2310,12 +2468,18 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
         'Boleh kosong, tapi ini bantu supplier kasih penawaran yang lebih pas.',
       hintEn: 'Optional, but helps providers send a more precise offer.',
     },
+    price_unit: {
+      labelId: 'Budget per',
+      labelEn: 'Budget per',
+      hintId: 'Contoh: per bal, karton, pcs, atau pengiriman.',
+      hintEn: 'Examples: per bale, carton, piece, or shipment.',
+    },
     stock: {
       labelId: 'Volume / qty dibutuhkan',
       labelEn: 'Volume / quantity needed',
     },
     delivery_estimate: {
-      labelId: 'Maunya diterima kapan',
+      labelId: 'Target diterima kapan',
       labelEn: 'Target receive date',
       hintId: 'Contoh: maksimal H+2 atau rutin tiap Senin dan Kamis.',
       hintEn:
@@ -2350,10 +2514,10 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
         'e.g. Need live hosts and a marketplace admin for a launch',
     },
     summary: {
-      labelId: 'Butuh apa secara singkat?',
+      labelId: 'Ringkasan jasa yang dicari',
       labelEn: 'Need summary',
       placeholderId:
-        'Contoh: butuh partner yang bisa bantu live, closing, dan operasional selama 2 minggu.',
+        'Contoh: cari partner untuk live, closing, dan operasional selama 2 minggu.',
       placeholderEn:
         'Example: need a partner to handle live sessions, selling, and operations for 2 weeks.',
     },
@@ -2370,6 +2534,12 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       labelEn: 'Reference budget (IDR)',
       placeholderId: 'mis. 2500000',
       placeholderEn: 'e.g. 2500000',
+    },
+    price_unit: {
+      labelId: 'Budget jasa per',
+      labelEn: 'Service budget per',
+      hintId: 'Pilih proyek, sesi, jam, hari, atau bulan.',
+      hintEn: 'Choose project, session, hour, day, or month.',
     },
     work_mode: {
       labelId: 'Cara kerjanya',
@@ -2425,6 +2595,12 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       labelEn: 'Reference budget / rent (IDR)',
       placeholderId: 'mis. 1000000',
       placeholderEn: 'e.g. 1000000',
+    },
+    price_unit: {
+      labelId: 'Budget lokasi per',
+      labelEn: 'Location budget per',
+      hintId: 'Pilih bulan, tahun, hari, atau event.',
+      hintEn: 'Choose month, year, day, or event.',
     },
     listing_purpose: {
       labelId: 'Skema lokasi',
@@ -2483,6 +2659,12 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       placeholderId: 'mis. 4500000',
       placeholderEn: 'e.g. 4500000',
     },
+    price_unit: {
+      labelId: 'Budget gaji per',
+      labelEn: 'Salary budget per',
+      hintId: 'Biasanya per bulan, tapi bisa per shift/hari/jam.',
+      hintEn: 'Usually monthly, but shift/day/hour can fit some roles.',
+    },
     company_name: {
       labelId: 'Nama usaha / brand',
       labelEn: 'Business / brand name',
@@ -2500,7 +2682,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       labelEn: 'Engagement type',
     },
     openings: {
-      labelId: 'Butuh berapa orang',
+      labelId: 'Jumlah orang yang dicari',
       labelEn: 'Headcount needed',
     },
     salary_range: {
@@ -2530,7 +2712,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       labelEn: 'Core responsibilities',
     },
     start_date: {
-      labelId: 'Maunya mulai kapan',
+      labelId: 'Target mulai kapan',
       labelEn: 'Target start date',
     },
     application_deadline: {
@@ -2566,6 +2748,12 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
       labelEn: 'Reference rental budget (IDR)',
       placeholderId: 'mis. 750000',
       placeholderEn: 'e.g. 750000',
+    },
+    price_unit: {
+      labelId: 'Budget sewa per',
+      labelEn: 'Rental budget per',
+      hintId: 'Pilih hari, minggu, bulan, atau event.',
+      hintEn: 'Choose day, week, month, or event.',
     },
     brand: {
       labelId: 'Merek / tipe (opsional)',
@@ -2691,7 +2879,7 @@ const TYPE_COMPLIANCE_GUIDANCE: Record<ListingTypeId, TypeChecklistMeta> = {
     titleId: 'Yang wajib jelas untuk oper usaha',
     titleEn: 'What must be clear for business transfers',
     itemsId: [
-      'Omzet, biaya, aset, rating, dan alasan jual harus bisa dibuktikan saat due diligence.',
+      'Omzet, biaya, aset, rating, dan alasan ditawarkan harus bisa dibuktikan saat due diligence.',
       'Akun, rating, lokasi, kontrak, dan database pelanggan hanya boleh dialihkan kalau aturan pihak terkait mengizinkan.',
       'Hutang, pajak, deposit sewa, kewajiban karyawan, dan risiko usaha wajib ditulis jujur dari awal.',
     ],
@@ -2722,9 +2910,9 @@ const TYPE_COMPLIANCE_GUIDANCE: Record<ListingTypeId, TypeChecklistMeta> = {
       'Kalau tujuan utama Anda hiring, partnership, atau employer branding, company page ini jadi hub; transaksi langsung tidak dipakai di sini.',
     noteEn:
       'If your goal is hiring, partnerships, or employer branding, use this company page as the hub; direct transaction flow is not used here.',
-    href: '/company/create',
-    hrefLabelId: 'Buka add company page',
-    hrefLabelEn: 'Open add company page',
+    href: '/usaha/onboarding',
+    hrefLabelId: 'Buka setup usaha',
+    hrefLabelEn: 'Open business setup',
   },
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -3157,11 +3345,11 @@ const DEMAND_TYPE_META: Partial<Record<ListingTypeId, DemandTypeMeta>> = {
 };
 const TYPE_PICKER_META: Record<ListingTypeId, TypePickerMeta> = {
   product: {
-    helperId: 'Supplier / stok',
+    helperId: 'Tawarkan barang / stok',
     helperEn: 'Suppliers / business stock',
   },
   service: {
-    helperId: 'Jasa / channel',
+    helperId: 'Tawarkan jasa / channel',
     helperEn: 'Operations / channel',
   },
   job: {
@@ -3169,15 +3357,15 @@ const TYPE_PICKER_META: Record<ListingTypeId, TypePickerMeta> = {
     helperEn: 'Talent / operations PIC',
   },
   property: {
-    helperId: 'Lokasi jualan',
+    helperId: 'Tawarkan lokasi jualan',
     helperEn: 'Selling locations',
   },
   tool_rental: {
-    helperId: 'Sewa alat',
+    helperId: 'Sewakan alat usaha',
     helperEn: 'Business tool rental',
   },
   business_transfer: {
-    helperId: 'Oper usaha / aset + rating',
+    helperId: 'Tawarkan oper usaha',
     helperEn: 'Business handover / assets + ratings',
   },
   company: {
@@ -3193,7 +3381,10 @@ function sanitizeFieldValuesForType(
   const next: Record<string, string> = {};
   for (const [key, value] of Object.entries(values)) {
     if (!TYPE_SWITCH_SAFE_KEYS.has(key)) continue;
-    if ((key === 'price_cents' || key === 'price') && nextType === 'company') {
+    if (
+      (key === 'price_cents' || key === 'price_unit' || key === 'price') &&
+      nextType === 'company'
+    ) {
       continue;
     }
     const normalized = cleanText(value);
@@ -3258,7 +3449,6 @@ export function CreatePostingClient({
   const [sector, setSector] = useState<string>('');
   const [subSector, setSubSector] = useState<string>('');
   const [isSectorPickerOpen, setIsSectorPickerOpen] = useState(false);
-  const [showOtherSupplyPaths, setShowOtherSupplyPaths] = useState(true);
   const [sectorQuery, setSectorQuery] = useState('');
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [images, setImages] = useState<ImageFile[]>([]);
@@ -3357,6 +3547,16 @@ export function CreatePostingClient({
     if (!isNeedServiceJourney || listingMode === 'simple') return;
     setListingMode('simple');
   }, [isNeedServiceJourney, listingMode]);
+
+  useEffect(() => {
+    if (!typePicked || activeType === 'company') return;
+    const defaultUnit = getDefaultPriceUnitForType(activeType, listingSide);
+    if (!defaultUnit) return;
+    setFieldValues(prev => {
+      if (normalizePriceUnit(prev.price_unit)) return prev;
+      return { ...prev, price_unit: defaultUnit };
+    });
+  }, [activeType, listingSide, typePicked]);
 
   const canSwitchListingSide =
     typePicked &&
@@ -3841,13 +4041,13 @@ export function CreatePostingClient({
         icon: ImageIcon,
         title:
           locale === 'id'
-            ? 'Butuh minimal 1 foto'
+            ? 'Perlu minimal 1 foto'
             : 'At least 1 photo is required',
         description:
           locale === 'id'
             ? activeType === 'tool_rental'
-              ? 'Biar kondisinya gampang dicek, listing sewa alat butuh foto utama dulu.'
-              : 'Produk dan properti butuh cover dulu biar bisa tayang.'
+              ? 'Biar kondisinya gampang dicek, listing sewa alat perlu foto utama dulu.'
+              : 'Produk dan properti perlu cover dulu biar bisa tayang.'
             : activeType === 'tool_rental'
               ? 'Rental listings need a primary image so the asset condition can be verified before publish.'
               : 'Products and properties need a cover image before publishing.',
@@ -3874,7 +4074,7 @@ export function CreatePostingClient({
         icon: BadgeDollarSign,
         title:
           locale === 'id'
-            ? 'Benefit butuh harga patokan'
+            ? 'Benefit perlu harga patokan'
             : 'Benefit needs a price anchor',
         description:
           locale === 'id'
@@ -4125,11 +4325,11 @@ export function CreatePostingClient({
     {
       key: 'product',
       typeId: 'product' as ListingTypeId,
-      badge: locale === 'id' ? 'Supplier' : 'Suppliers',
-      title: locale === 'id' ? 'Supplier' : 'Suppliers',
+      badge: locale === 'id' ? 'Produk' : 'Products',
+      title: locale === 'id' ? 'Tawarkan produk Anda' : 'Offer your products',
       description:
         locale === 'id'
-          ? 'Stok, bahan baku, atau produk siap jual.'
+          ? 'Untuk barang jadi, bahan baku, stok grosir, atau supplier.'
           : 'Offer stock, raw materials, or ready-to-ship products.',
       Icon: Package,
       theme: TYPE_THEMES.product,
@@ -4142,10 +4342,10 @@ export function CreatePostingClient({
       key: 'service',
       typeId: 'service' as ListingTypeId,
       badge: locale === 'id' ? 'Jasa' : 'Services',
-      title: locale === 'id' ? 'Jasa' : 'Services',
+      title: locale === 'id' ? 'Tawarkan jasa Anda' : 'Offer your service',
       description:
         locale === 'id'
-          ? 'Jasa operasional yang bisa langsung dipahami buyer.'
+          ? 'Untuk layanan, paket kerja, atau channel operasional.'
           : 'Offer services buyers can understand immediately.',
       Icon: Wrench,
       theme: TYPE_THEMES.service,
@@ -4160,11 +4360,15 @@ export function CreatePostingClient({
       key: 'property',
       href: resolveMarketplaceCreatePath(locale, 'property', 'supply'),
       badge: locale === 'id' ? 'Lokasi' : 'Spaces',
-      title: locale === 'id' ? 'Lokasi jualan' : 'Selling space',
+      title: locale === 'id' ? 'Tawarkan lokasi jualan' : 'Offer selling space',
       description:
         locale === 'id'
           ? 'Untuk booth, kios, ruko, atau area jual.'
           : 'Use this for booths, kiosks, shophouses, or selling spaces.',
+      example:
+        locale === 'id'
+          ? 'Contoh: sewa booth bazaar weekend di Bekasi'
+          : 'Example: rent a weekend bazaar booth in Bekasi',
       Icon: MapPin,
       theme: TYPE_THEMES.property,
       highlights:
@@ -4176,11 +4380,15 @@ export function CreatePostingClient({
       key: 'tool_rental',
       href: resolveMarketplaceCreatePath(locale, 'tool_rental', 'supply'),
       badge: locale === 'id' ? 'Sewa alat' : 'Tool rental',
-      title: locale === 'id' ? 'Sewa alat' : 'Tool rental',
+      title: locale === 'id' ? 'Sewakan alat usaha' : 'Rent out tools',
       description:
         locale === 'id'
           ? 'Untuk freezer, alat produksi, atau alat konten.'
           : 'Use this for freezers, production gear, or content tools.',
+      example:
+        locale === 'id'
+          ? 'Contoh: sewa freezer display 7 hari untuk pop-up'
+          : 'Example: rent a display freezer for a seven-day pop-up',
       Icon: Snowflake,
       theme: TYPE_THEMES.tool_rental,
       highlights:
@@ -4192,11 +4400,16 @@ export function CreatePostingClient({
       key: 'business_transfer',
       href: resolveMarketplaceCreatePath(locale, 'business_transfer', 'supply'),
       badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
-      title: locale === 'id' ? 'Oper usaha' : 'Business transfer',
+      title:
+        locale === 'id' ? 'Tawarkan oper usaha' : 'Offer business transfer',
       description:
         locale === 'id'
-          ? 'Jual usaha berjalan, aset, rating, dan handover.'
+          ? 'Usaha berjalan, aset, rating, dan handover.'
           : 'Sell a running business, assets, ratings, and handover.',
+      example:
+        locale === 'id'
+          ? 'Contoh: oper usaha laundry aktif plus SOP'
+          : 'Example: transfer an active laundry business plus SOP',
       Icon: Handshake,
       theme: TYPE_THEMES.business_transfer,
       highlights:
@@ -4209,11 +4422,17 @@ export function CreatePostingClient({
       href: '/profile/edit?focus=talent',
       badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
       title:
-        locale === 'id' ? 'Rapihin profil talent' : 'Complete talent profile',
+        locale === 'id'
+          ? 'Tawarkan skill lewat profil'
+          : 'Offer skills via profile',
       description:
         locale === 'id'
-          ? 'Kalau mau jual skill pribadi, rapikan profil user.'
+          ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
           : 'If you want to sell personal skills, polish your user profile.',
+      example:
+        locale === 'id'
+          ? 'Contoh: profil akuntan UMKM freelance'
+          : 'Example: freelance MSME accountant profile',
       Icon: Users,
       theme: specialCreateThemes.profile,
       highlights:
@@ -4223,7 +4442,7 @@ export function CreatePostingClient({
     },
   ] as const;
   const typeSelectorGrid = (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
       {supplyCreateCards.map(card => {
         const pickerMeta =
           TYPE_PICKER_META[card.typeId] || TYPE_PICKER_META.product;
@@ -4242,6 +4461,7 @@ export function CreatePostingClient({
                 ? pickerMeta?.helperId || card.description
                 : pickerMeta?.helperEn || card.description
             }
+            example={getCreateChoiceExample(card.typeId, 'supply', locale)}
             highlights={card.highlights}
             actionLabel={locale === 'id' ? 'Mulai' : 'Start'}
           />
@@ -4250,35 +4470,50 @@ export function CreatePostingClient({
     </div>
   );
   const supplySupportQuickLinks = (
-    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-3">
       {supplySupportCards.map(card => (
         <button
           key={card.key}
           type="button"
           onClick={() => router.push(card.href)}
-          className="group flex min-h-[122px] flex-col items-start justify-between rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 text-left shadow-[0_12px_24px_-24px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:bg-white dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/60"
+          className={cn(
+            'group relative flex min-h-[124px] flex-col items-start justify-end overflow-hidden rounded-[18px] border px-3 pb-2.5 pt-12 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_34px_-30px_rgba(15,23,42,0.24)] sm:min-h-[150px] sm:px-3.5 sm:pb-3 sm:pt-14',
+            card.theme.cardBase,
+          )}
         >
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-current/20" />
           <span
             className={cn(
-              'inline-flex h-9 w-9 items-center justify-center rounded-[12px]',
+              'absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-[13px] sm:h-10 sm:w-10 sm:rounded-[15px]',
               card.theme.cardIcon,
             )}
           >
-            <card.Icon className="h-4 w-4" />
+            <card.Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
           </span>
-          <span className="mt-2 block">
-            <span className="block text-[12px] font-black text-[color:var(--app-text)]">
+          <span className="mt-auto block min-w-0">
+            <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
+              {card.badge}
+            </span>
+            <span className="mt-1 line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
               {card.title}
             </span>
-            <span className="mt-1 block line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
+            <span className="mt-1 hidden line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] min-[420px]:block">
               {card.description}
+            </span>
+            <span className="mt-2 block rounded-[12px] bg-white/78 px-2.5 py-1.5 text-[10.5px] font-semibold leading-4 text-[color:var(--app-text)] ring-1 ring-white/80 dark:bg-slate-950/48 dark:ring-white/10 sm:text-[11px]">
+              <span className="font-black text-[color:var(--app-accent)]">
+                {locale === 'id' ? 'Contoh:' : 'Example:'}
+              </span>{' '}
+              {card.example.replace(/^(Contoh:|Example:)\s*/i, '')}
             </span>
           </span>
           <span className="mt-2 flex w-full items-center justify-between gap-2">
             <span className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-              {card.highlights.slice(0, 2).join(' / ')}
+              {card.highlights[0]}
             </span>
-            <ChevronRight className="h-4 w-4 text-[color:var(--app-accent)] transition group-hover:translate-x-0.5" />
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] sm:h-8 sm:w-8">
+              <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+            </span>
           </span>
         </button>
       ))}
@@ -4292,11 +4527,6 @@ export function CreatePostingClient({
   const showRootIntentPicker = showCreateEntry && entryMode === 'root';
   const showDemandIntentPicker = showCreateEntry && entryMode === 'demand';
   const showSupplyIntentPicker = showCreateEntry && entryMode === 'supply';
-  useEffect(() => {
-    if (!showSupplyIntentPicker) {
-      setShowOtherSupplyPaths(false);
-    }
-  }, [showSupplyIntentPicker]);
   const demandEntryHref = buildCreateBasePath({
     locale,
     sideId: 'demand',
@@ -4310,24 +4540,31 @@ export function CreatePostingClient({
     href: string;
     label: string;
     helper: string;
+    Icon: LucideIcon;
   }> = [
     {
       key: 'supply',
       href: supplyEntryHref,
-      label: locale === 'id' ? 'Menawarkan (Listing)' : 'Offer listing',
+      label: locale === 'id' ? 'Tawarkan' : 'Offer',
       helper:
         locale === 'id' ? 'Produk, jasa, lokasi' : 'Products, services, spaces',
+      Icon: Store,
     },
     {
       key: 'demand',
       href: demandEntryHref,
-      label: locale === 'id' ? 'Membuat Permintaan' : 'Create request',
+      label: locale === 'id' ? 'Cari kebutuhan' : 'Find what you need',
       helper:
-        locale === 'id' ? 'Cari barang atau vendor' : 'Find goods or vendors',
+        locale === 'id'
+          ? 'Supplier, jasa, talent'
+          : 'Find suppliers, services, talent',
+      Icon: Target,
     },
   ];
   const renderCreateEntrySurface = ({
     activeIntent,
+    topTitle,
+    showIntentTabs = true,
     eyebrow,
     title,
     description,
@@ -4335,6 +4572,8 @@ export function CreatePostingClient({
     aside,
   }: {
     activeIntent: CreateFlowIntent;
+    topTitle?: string;
+    showIntentTabs?: boolean;
     eyebrow: string;
     title: string;
     description: string;
@@ -4343,50 +4582,51 @@ export function CreatePostingClient({
   }) => {
     return (
       <div className="mx-auto w-full max-w-none px-0 py-0">
-        <CreateHeroShell className="p-4 sm:p-5 lg:p-5">
+        <CreateHeroShell className="border-emerald-100/90 bg-[linear-gradient(180deg,#ffffff_0%,#f7fff9_100%)] p-3 shadow-[0_20px_44px_-38px_rgba(15,23,42,0.22)] sm:p-5 lg:p-5 dark:border-emerald-900/40 dark:bg-[color:var(--app-surface-strong)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
                 onClick={handlePageBack}
                 aria-label={locale === 'id' ? 'Kembali' : 'Back'}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] transition hover:bg-white dark:bg-slate-950/60 dark:ring-[color:var(--app-border-strong)]"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] bg-white text-[color:var(--app-text)] ring-1 ring-emerald-100 transition hover:bg-emerald-50 dark:bg-slate-950/60 dark:ring-[color:var(--app-border-strong)]"
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
                   {locale === 'id' ? 'Buat Baru' : 'Create'}
                 </p>
                 <h1 className="truncate text-[1.1rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.3rem]">
-                  {activeIntent === 'supply'
-                    ? locale === 'id'
-                      ? 'Listing'
-                      : 'Listing'
-                    : locale === 'id'
-                      ? 'Permintaan'
-                      : 'Request'}
+                  {topTitle ??
+                    (activeIntent === 'supply'
+                      ? locale === 'id'
+                        ? 'Listing'
+                        : 'Listing'
+                      : locale === 'id'
+                        ? 'Permintaan'
+                        : 'Request')}
                 </h1>
               </div>
             </div>
             <button
               type="button"
               onClick={() => router.push('/my-listings')}
-              className="inline-flex min-h-[36px] items-center justify-center gap-2 rounded-full bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] transition hover:bg-white dark:bg-slate-950/60 dark:ring-[color:var(--app-border-strong)]"
+              className="inline-flex min-h-[36px] items-center justify-center gap-2 rounded-full bg-white px-3 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100 transition hover:bg-emerald-50 dark:bg-slate-950/60 dark:ring-[color:var(--app-border-strong)]"
             >
               <FolderKanban className="h-4 w-4" />
               {locale === 'id' ? 'Draft' : 'Drafts'}
             </button>
           </div>
 
-          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px] 2xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px] 2xl:grid-cols-[minmax(0,1fr)_300px]">
             <section className="min-w-0">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="inline-flex rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                  <p className="inline-flex rounded-full border border-[color:var(--app-accent-border)] bg-white/88 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] shadow-sm">
                     {eyebrow}
                   </p>
-                  <h2 className="mt-2 text-[1.45rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.8rem]">
+                  <h2 className="mt-2 text-[1.25rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.75rem]">
                     {title}
                   </h2>
                   <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]">
@@ -4395,29 +4635,53 @@ export function CreatePostingClient({
                 </div>
               </div>
 
-              <nav className="mt-4 grid max-w-[520px] grid-cols-2 gap-1 rounded-[12px] bg-[color:var(--app-surface-muted)] p-1 text-[11px] font-semibold dark:bg-slate-950/55">
-                {createEntryTabs.map(tab => {
-                  const isActive = tab.key === activeIntent;
-                  return (
-                    <Link
-                      key={tab.key}
-                      href={tab.href}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={cn(
-                        'min-h-[38px] rounded-[10px] px-3 py-2 text-center transition',
-                        isActive
-                          ? 'bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-22px_rgba(22,163,74,0.45)]'
-                          : 'text-[color:var(--app-text-soft)] hover:bg-white hover:text-[color:var(--app-text)] dark:hover:bg-slate-900/80',
-                      )}
-                    >
-                      <span className="block truncate font-black">
-                        {tab.label}
-                      </span>
-                      <span className="sr-only">{tab.helper}</span>
-                    </Link>
-                  );
-                })}
-              </nav>
+              {showIntentTabs ? (
+                <nav className="mt-3 grid max-w-[560px] grid-cols-2 gap-1.5 rounded-[16px] border border-emerald-100 bg-white/86 p-1.5 text-[11px] font-semibold shadow-[0_14px_28px_-26px_rgba(15,23,42,0.16)] dark:border-slate-800 dark:bg-slate-950/55">
+                  {createEntryTabs.map(tab => {
+                    const isActive = tab.key === activeIntent;
+                    const TabIcon = tab.Icon;
+                    return (
+                      <Link
+                        key={tab.key}
+                        href={tab.href}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={cn(
+                          'flex min-h-[44px] min-w-0 items-center gap-2 rounded-[13px] px-2.5 py-2 text-left transition',
+                          isActive
+                            ? tab.key === 'demand'
+                              ? 'bg-amber-500 text-white shadow-[0_14px_26px_-22px_rgba(217,119,6,0.45)]'
+                              : 'bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-22px_rgba(22,163,74,0.45)]'
+                            : 'text-[color:var(--app-text-soft)] hover:bg-white hover:text-[color:var(--app-text)] dark:hover:bg-slate-900/80',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]',
+                            isActive ? 'bg-white/16' : 'bg-emerald-50',
+                          )}
+                        >
+                          <TabIcon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-black">
+                            {tab.label}
+                          </span>
+                          <span
+                            className={cn(
+                              'block truncate text-[10px] font-semibold',
+                              isActive
+                                ? 'text-white/78'
+                                : 'text-[color:var(--app-text-soft)]',
+                            )}
+                          >
+                            {tab.helper}
+                          </span>
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </nav>
+              ) : null}
 
               <div className="mt-3">{children}</div>
             </section>
@@ -4663,107 +4927,147 @@ export function CreatePostingClient({
     {
       key: 'company',
       href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
-      title: locale === 'id' ? 'Tambah Usaha' : 'Add Business',
+      title: locale === 'id' ? 'Buat profil usaha' : 'Create business profile',
       description:
         locale === 'id'
-          ? 'Buat profil usaha atau perusahaan untuk mulai berjualan.'
+          ? 'Biar calon pembeli tahu alamat, kontak, dan usaha kamu.'
           : 'Create a business profile before selling.',
       chips:
         locale === 'id'
-          ? ['Profil', 'Alamat', 'Kontak']
+          ? ['Alamat', 'Kontak', 'Jam buka']
           : ['Profile', 'Address', 'Contact'],
       Icon: Store,
       tone: 'bg-emerald-100 text-emerald-700',
     },
     {
-      key: 'product',
+      key: 'sell-product',
       href: buildCreateBasePath({
         locale,
         sideId: 'supply',
         typeId: 'product',
       }),
-      title: locale === 'id' ? 'Tambah Produk' : 'Add Product',
+      title: locale === 'id' ? 'Tawarkan produk' : 'Offer product',
       description:
         locale === 'id'
-          ? 'Posting produk, stok, atau bahan baku yang tersedia.'
+          ? 'Barang jadi, bahan baku, stok grosir, atau paket supplier.'
           : 'Post products, stock, or raw materials.',
       chips:
         locale === 'id'
-          ? ['Harga', 'Stok', 'Foto']
+          ? ['Harga', 'Stok', 'MOQ']
           : ['Price', 'Stock', 'Photos'],
       Icon: Package,
       tone: 'bg-emerald-100 text-emerald-700',
     },
     {
-      key: 'service',
+      key: 'sell-service',
       href: buildCreateBasePath({
         locale,
         sideId: 'supply',
         typeId: 'service',
       }),
-      title: locale === 'id' ? 'Tambah Jasa' : 'Add Service',
+      title: locale === 'id' ? 'Tawarkan jasa' : 'Offer service',
       description:
         locale === 'id'
-          ? 'Tawarkan layanan, paket kerja, atau portfolio jasa.'
+          ? 'Untuk desain, foto produk, admin live, legal, kirim, dan lainnya.'
           : 'Offer services, packages, or service portfolios.',
       chips:
         locale === 'id'
-          ? ['Paket', 'Portfolio', 'Harga']
+          ? ['Paket', 'Area', 'Harga']
           : ['Package', 'Portfolio', 'Price'],
       Icon: BriefcaseBusiness,
       tone: 'bg-orange-100 text-orange-700',
     },
     {
-      key: 'property',
+      key: 'sell-property',
       href: buildCreateBasePath({
         locale,
         sideId: 'supply',
         typeId: 'property',
       }),
-      title: locale === 'id' ? 'Tambah Lokasi' : 'Add Space',
+      title: locale === 'id' ? 'Tawarkan lokasi' : 'Offer space',
       description:
         locale === 'id'
-          ? 'Sewakan atau promosikan lokasi usaha yang tersedia.'
+          ? 'Untuk ruko, booth, kios, dapur, gudang, atau area jualan.'
           : 'Offer business locations, booths, or spaces.',
       chips:
         locale === 'id'
-          ? ['Harga sewa', 'Fasilitas', 'Maps']
+          ? ['Sewa', 'Fasilitas', 'Maps']
           : ['Rent', 'Facilities', 'Maps'],
       Icon: MapPin,
       tone: 'bg-rose-100 text-rose-700',
     },
     {
-      key: 'talent',
-      href: resolveMarketplaceCreatePath(locale, 'talent', 'supply'),
-      title: locale === 'id' ? 'Tambah Talent' : 'Add Talent',
+      key: 'need-product',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'demand',
+        typeId: 'product',
+      }),
+      title: locale === 'id' ? 'Cari produk/supplier' : 'Find supplier/goods',
       description:
         locale === 'id'
-          ? 'Rapikan profil talent, kandidat, atau skill pribadi.'
-          : 'Complete a talent, candidate, or personal skill profile.',
+          ? 'Tulis barang, jumlah, lokasi kirim, dan budget agar supplier bisa menawar.'
+          : 'Post a need so matching suppliers can offer.',
+      chips:
+        locale === 'id' ? ['Budget', 'Area', 'Qty'] : ['Budget', 'Area', 'Qty'],
+      Icon: Target,
+      tone: 'bg-amber-100 text-amber-700',
+    },
+    {
+      key: 'need-service',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'demand',
+        typeId: 'service',
+      }),
+      title: locale === 'id' ? 'Cari jasa/vendor' : 'Find service',
+      description:
+        locale === 'id'
+          ? 'Tulis scope, deadline, area kerja, dan budget supaya vendor paham.'
+          : 'Need a vendor? Add scope, deadline, and budget.',
       chips:
         locale === 'id'
-          ? ['Skill', 'Pengalaman', 'Gaji']
-          : ['Skill', 'Experience', 'Rate'],
+          ? ['Scope', 'Deadline', 'Budget']
+          : ['Scope', 'Deadline', 'Budget'],
+      Icon: Wrench,
+      tone: 'bg-sky-100 text-sky-700',
+    },
+    {
+      key: 'need-talent',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'demand',
+        typeId: 'job',
+      }),
+      title: locale === 'id' ? 'Cari talent/pekerja' : 'Find talent',
+      description:
+        locale === 'id'
+          ? 'Untuk lowongan, freelance, shift toko, admin, atau kreator.'
+          : 'For jobs, freelancers, shop shifts, admins, or creators.',
+      chips:
+        locale === 'id'
+          ? ['Role', 'Gaji', 'Skill']
+          : ['Role', 'Salary', 'Skills'],
       Icon: Users,
       tone: 'bg-lime-100 text-lime-800',
     },
     {
-      key: 'supplier',
+      key: 'need-property',
       href: buildCreateBasePath({
         locale,
-        sideId: 'supply',
-        typeId: 'product',
+        sideId: 'demand',
+        typeId: 'property',
       }),
-      title: locale === 'id' ? 'Tambah Supplier' : 'Add Supplier',
+      title: locale === 'id' ? 'Cari lokasi jualan' : 'Find selling space',
       description:
         locale === 'id'
-          ? 'Daftarkan diri sebagai supplier untuk menerima permintaan.'
-          : 'Register as a supplier so you can receive requests.',
+          ? 'Cari booth, ruko, kios, dapur, gudang, atau titik ramai.'
+          : 'Find booths, shops, kitchens, warehouses, or busy locations.',
       chips:
         locale === 'id'
-          ? ['Kategori', 'Produk', 'MOQ']
-          : ['Category', 'Product', 'MOQ'],
-      Icon: Building2,
+          ? ['Budget', 'Area', 'Traffic']
+          : ['Budget', 'Area', 'Traffic'],
+      Icon: MapPin,
       tone: 'bg-teal-100 text-teal-700',
     },
   ];
@@ -4797,19 +5101,19 @@ export function CreatePostingClient({
   const supplyFormEyebrow =
     activeType === 'product'
       ? locale === 'id'
-        ? 'Jual barang'
+        ? 'Tawarkan produk'
         : 'Supplier listing'
       : activeType === 'property'
         ? locale === 'id'
-          ? 'Jual properti'
+          ? 'Tawarkan lokasi'
           : 'Location listing'
         : activeType === 'service'
           ? locale === 'id'
-            ? 'Jual jasa'
+            ? 'Tawarkan jasa'
             : 'Service listing'
           : activeType === 'tool_rental'
             ? locale === 'id'
-              ? 'Sewain alat'
+              ? 'Sewakan alat'
               : 'Tool rental listing'
             : activeType === 'company'
               ? locale === 'id'
@@ -4849,23 +5153,23 @@ export function CreatePostingClient({
   const supplyFormTitle =
     activeType === 'product'
       ? locale === 'id'
-        ? 'Tambah Produk Baru'
+        ? 'Tawarkan Produk Baru'
         : 'Add New Product'
       : activeType === 'property'
         ? locale === 'id'
-          ? 'Tambah Properti Baru'
+          ? 'Tawarkan Lokasi Baru'
           : 'Add New Space'
         : activeType === 'service'
           ? locale === 'id'
-            ? 'Tambah Jasa Baru'
+            ? 'Tawarkan Jasa Baru'
             : 'Add New Service'
           : activeType === 'tool_rental'
             ? locale === 'id'
-              ? 'Tambah Sewa Alat Baru'
+              ? 'Sewakan Alat Baru'
               : 'Add New Tool Rental'
             : activeType === 'business_transfer'
               ? locale === 'id'
-                ? 'Tambah Oper Usaha'
+                ? 'Tawarkan Oper Usaha'
                 : 'Add Business Transfer'
               : activeType === 'company'
                 ? locale === 'id'
@@ -4905,7 +5209,7 @@ export function CreatePostingClient({
           : 'Pick the closest option, then fill it step by step.';
   const effectiveFormEyebrow = isNeedServiceJourney
     ? locale === 'id'
-      ? 'Butuh jasa'
+      ? 'Cari jasa'
       : 'Need services'
     : formEyebrow;
   const effectiveFormTitle = isNeedServiceJourney
@@ -4987,7 +5291,7 @@ export function CreatePostingClient({
           },
           business_transfer: {
             step1Title: 'Usaha',
-            step1Description: 'Nama, harga, omzet, alasan jual.',
+            step1Description: 'Nama, harga, omzet, alasan ditawarkan.',
             step2Title: 'Handover',
             step2Description: 'Aset, akun/rating, biaya, risiko.',
             step3Title: 'Bukti',
@@ -5148,7 +5452,7 @@ export function CreatePostingClient({
   const supplyActionTitle =
     activeType === 'property'
       ? locale === 'id'
-        ? 'Jual properti'
+        ? 'Tawarkan lokasi'
         : 'Sell property'
       : activeType === 'service'
         ? locale === 'id'
@@ -5163,7 +5467,7 @@ export function CreatePostingClient({
               ? 'Sewakan alat'
               : 'Rent out tools'
             : locale === 'id'
-              ? 'Jual barang atau stok'
+              ? 'Tawarkan barang atau stok'
               : 'Sell products or stock';
   const selectedTypeLabel = selectedType
     ? getContentTypeName(selectedType, locale)
@@ -5756,6 +6060,17 @@ export function CreatePostingClient({
             nextValues[key] = String(value);
           }
         });
+        const loadedPriceUnit =
+          normalizePriceUnit(data.price_unit) ||
+          normalizePriceUnit(meta.price_unit) ||
+          normalizePriceUnit(meta.unit) ||
+          normalizePriceUnit(meta.price_basis) ||
+          normalizePriceUnit(meta.rate_type) ||
+          normalizePriceUnit(meta.rental_rate_type) ||
+          normalizePriceUnit(meta.rental_period) ||
+          normalizePriceUnit(meta.lease_term) ||
+          normalizePriceUnit(meta.compensation_period);
+        if (loadedPriceUnit) nextValues.price_unit = loadedPriceUnit;
         const promotionMetaRaw = meta.promotion;
         if (promotionMetaRaw && typeof promotionMetaRaw === 'object') {
           const promotionMeta = promotionMetaRaw as Record<string, unknown>;
@@ -6157,6 +6472,7 @@ export function CreatePostingClient({
       persistStep?: number;
       silentSuccess?: boolean;
       successMessage?: string;
+      redirectOnSuccess?: boolean;
     },
   ): Promise<string | null> => {
     const persistStep = clampStep(options?.persistStep ?? currentStep);
@@ -6324,6 +6640,14 @@ export function CreatePostingClient({
       if (fieldValues.location?.trim())
         metadata.location = fieldValues.location.trim();
       else delete metadata.location;
+      const priceUnit = normalizePriceUnit(fieldValues.price_unit);
+      if (priceUnit) {
+        metadata.price_unit = priceUnit;
+        metadata.unit = priceUnit;
+      } else {
+        delete metadata.price_unit;
+        delete metadata.unit;
+      }
 
       for (const f of effectiveFields) {
         if (
@@ -6332,6 +6656,7 @@ export function CreatePostingClient({
             'summary',
             'body',
             'price_cents',
+            'price_unit',
             'tags',
             'images',
           ].includes(f.key)
@@ -6456,6 +6781,7 @@ export function CreatePostingClient({
         summary: resolvedSummary || undefined,
         body: resolvedBody || undefined,
         price_cents: priceCents,
+        price_unit: priceUnit || undefined,
         original_price_cents: derivedPromotionFields.originalPriceCents,
         promo_label: derivedPromotionFields.promoLabel,
         promo_start_at: derivedPromotionFields.promoStartAt,
@@ -6498,6 +6824,16 @@ export function CreatePostingClient({
                 ? 'Listing sudah aktif. Share Pack dan channel distribusi siap dipakai.'
                 : 'The listing is now active. Share Pack and distribution channels are ready.'),
           );
+          if (options?.redirectOnSuccess) {
+            router.push(
+              buildContentHref(
+                data.id || savedId,
+                data.title || title || 'listing',
+                data.slug,
+              ),
+            );
+            return savedId;
+          }
         }
         goToStep(persistStep, {
           draftId: savedId,
@@ -6585,6 +6921,7 @@ export function CreatePostingClient({
         if (canPublishFromCurrentStep) {
           await saveListing('active', {
             persistStep: currentStep,
+            redirectOnSuccess: true,
             successMessage:
               locale === 'id'
                 ? 'Postingan kamu sudah tayang.'
@@ -6633,7 +6970,10 @@ export function CreatePostingClient({
       }
       return;
     }
-    await saveListing('active', { persistStep: TOTAL_STEPS });
+    await saveListing('active', {
+      persistStep: TOTAL_STEPS,
+      redirectOnSuccess: true,
+    });
   };
 
   const handleAddDocuments = async (files: FileList | null) => {
@@ -6816,11 +7156,11 @@ export function CreatePostingClient({
     const inputPlaceholder = placeholder || example || '';
     const fieldIsFilled = cleanText(value).length > 0;
     const baseInput = cn(
-      'ui-data-control h-12 px-3.5 text-[14px] font-semibold min-[360px]:text-[15px]',
+      'ui-data-control h-10 px-3 text-[13px] font-semibold min-[360px]:text-[14px]',
       'placeholder:text-[color:var(--app-text-soft)]',
     );
     const textAreaInput = cn(
-      'ui-data-control ui-data-textarea min-h-[116px] px-3.5 py-3 text-[14px] font-medium leading-6 min-[360px]:text-[15px]',
+      'ui-data-control ui-data-textarea min-h-[96px] px-3 py-2.5 text-[13px] font-medium leading-5 min-[360px]:text-[14px]',
       'placeholder:text-[color:var(--app-text-soft)]',
     );
 
@@ -6948,6 +7288,7 @@ export function CreatePostingClient({
         lowerKey === 'summary' ||
         lowerKey === 'body' ||
         lowerKey === 'price_cents' ||
+        lowerKey === 'price_unit' ||
         lowerKey === 'salary_range' ||
         lowerKey === 'location' ||
         lowerKey === 'address' ||
@@ -7024,18 +7365,125 @@ export function CreatePostingClient({
   if (showRootIntentPicker) {
     return renderCreateEntrySurface({
       activeIntent: 'supply',
-      eyebrow: locale === 'id' ? 'Mulai cepat' : 'Quick start',
+      topTitle: locale === 'id' ? 'Buat posting' : 'Create post',
+      showIntentTabs: false,
+      eyebrow: locale === 'id' ? 'Mulai dari sini' : 'Start here',
       title:
         locale === 'id'
-          ? 'Mau buat apa hari ini?'
-          : 'What do you want to create today?',
+          ? 'Mau menawarkan atau mencari?'
+          : 'Do you want to sell or need something?',
       description:
         locale === 'id'
-          ? 'Pilih jenis postingan. Isi yang penting dulu, detail bisa menyusul.'
-          : 'Choose a post type. Start with the essentials, details can follow.',
+          ? 'Pilih sesuai tujuan Anda. Setelah itu isi detail singkat seperti judul, harga atau budget, lokasi, dan foto.'
+          : 'Choose one first. Then add the short details like title, price/budget, location, and photos.',
       children: (
         <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <Link
+              href={supplyEntryHref}
+              className="group relative overflow-hidden rounded-[18px] border border-emerald-200 bg-[linear-gradient(135deg,#ffffff_0%,#f4fff8_100%)] p-4 text-left shadow-[0_18px_34px_-30px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-emerald-300 dark:border-emerald-900/70 dark:bg-emerald-950/20"
+            >
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-emerald-600 text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.72)]">
+                  <Store className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                    {locale === 'id' ? 'Saya menawarkan' : 'I offer'}
+                  </span>
+                  <span className="mt-3 block text-[1.15rem] font-black leading-tight text-[color:var(--app-text)] dark:text-white">
+                    {locale === 'id' ? 'Tawarkan sesuatu' : 'Want to sell'}
+                  </span>
+                  <span className="mt-1.5 block text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                    {locale === 'id'
+                      ? 'Untuk produk, jasa, lokasi, alat sewa, atau oper usaha.'
+                      : 'Products, services, spaces, rentals, or business transfer.'}
+                  </span>
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {(locale === 'id'
+                  ? ['Produk', 'Jasa', 'Lokasi']
+                  : ['Product', 'Service', 'Space']
+                ).map(item => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-100"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <span className="mt-4 inline-flex min-h-9 items-center justify-center gap-2 rounded-full bg-emerald-600 px-3.5 text-[12px] font-black text-white transition group-hover:bg-emerald-700">
+                {locale === 'id' ? 'Mulai tawarkan' : 'Start selling'}
+                <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+            <Link
+              href={demandEntryHref}
+              className="group relative overflow-hidden rounded-[18px] border border-amber-200 bg-[linear-gradient(135deg,#ffffff_0%,#fffbeb_100%)] p-4 text-left shadow-[0_18px_34px_-30px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-amber-300 dark:border-amber-900/70 dark:bg-amber-950/20"
+            >
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-amber-500 text-white shadow-[0_14px_26px_-18px_rgba(217,119,6,0.72)]">
+                  <Target className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="rounded-full border border-amber-200 bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
+                    {locale === 'id' ? 'Saya mencari' : 'I need'}
+                  </span>
+                  <span className="mt-3 block text-[1.15rem] font-black leading-tight text-[color:var(--app-text)] dark:text-white">
+                    {locale === 'id'
+                      ? 'Cari kebutuhan usaha'
+                      : 'Need something'}
+                  </span>
+                  <span className="mt-1.5 block text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                    {locale === 'id'
+                      ? 'Cari supplier, jasa, pekerja, lokasi, atau alat.'
+                      : 'Find suppliers, services, talent, spaces, or tools.'}
+                  </span>
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {(locale === 'id'
+                  ? ['Supplier', 'Jasa', 'Talent']
+                  : ['Supplier', 'Service', 'Talent']
+                ).map(item => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold text-amber-700 ring-1 ring-amber-100"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <span className="mt-4 inline-flex min-h-9 items-center justify-center gap-2 rounded-full bg-amber-500 px-3.5 text-[12px] font-black text-white transition group-hover:bg-amber-600">
+                {locale === 'id' ? 'Mulai cari' : 'Create request'}
+                <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              </span>
+            </Link>
+          </div>
+
+          <div className="mt-4 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/45">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[12px] font-black text-[color:var(--app-text)]">
+                  {locale === 'id'
+                    ? 'Langsung pilih yang paling mirip'
+                    : 'Pick the closest shortcut'}
+                </p>
+                <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Nanti masih bisa diedit sebelum tayang.'
+                    : 'You can still edit before publishing.'}
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
+                {locale === 'id' ? 'Mode cepat' : 'Quick mode'}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
             {rootCreateActions.map(item => (
               <CreateEntryActionCard key={item.key} item={item} />
             ))}
@@ -7055,20 +7503,32 @@ export function CreatePostingClient({
               <ClipboardList className="h-4 w-4" />
             </span>
             <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
-              {locale === 'id' ? 'Butuh sesuatu?' : 'Need something?'}
+              {locale === 'id' ? 'Alurnya simpel' : 'Simple flow'}
             </p>
-            <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-              {locale === 'id'
-                ? 'Cari supplier, jasa, lokasi, produk, atau talent.'
-                : 'Find suppliers, services, locations, products, or talent.'}
-            </p>
-            <Link
-              href={demandEntryHref}
-              className="mt-3 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[12px] font-semibold text-[color:var(--app-text-inverse)]"
-            >
-              {locale === 'id' ? 'Buat Permintaan' : 'Create Request'}
-              <ChevronRight className="h-4 w-4" />
-            </Link>
+            <div className="mt-2 grid gap-2">
+              {(locale === 'id'
+                ? [
+                    'Pilih Tawarkan atau Cari',
+                    'Isi detail yang wajib',
+                    'Tayang, lalu lanjut chat',
+                  ]
+                : [
+                    'Choose Sell or Need',
+                    'Fill required details',
+                    'Publish, then continue in chat',
+                  ]
+              ).map((item, index) => (
+                <span
+                  key={item}
+                  className="flex items-start gap-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]"
+                >
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
+                    {index + 1}
+                  </span>
+                  {item}
+                </span>
+              ))}
+            </div>
           </div>
           <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
             <p className="text-[13px] font-black text-[color:var(--app-text)]">
@@ -7099,14 +7559,15 @@ export function CreatePostingClient({
   if (showDemandIntentPicker) {
     return renderCreateEntrySurface({
       activeIntent: 'demand',
-      eyebrow: locale === 'id' ? 'Lagi cari sesuatu' : 'Post a need',
-      title: locale === 'id' ? 'Kamu butuh apa?' : 'What do you need?',
+      eyebrow: locale === 'id' ? 'Cari kebutuhan usaha' : 'Post a need',
+      title:
+        locale === 'id' ? 'Apa yang ingin Anda cari?' : 'What do you need?',
       description:
         locale === 'id'
-          ? 'Pilih kategori yang paling dekat. Nanti tinggal isi detail singkat.'
+          ? 'Pilih kategori yang paling dekat. Setelah itu tulis barang, jasa, talent, lokasi, atau alat yang sedang dicari.'
           : 'Choose the closest category. Then add a short brief.',
       children: (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
           {journeyIntents.map(step => (
             <CreateChoiceCard
               key={step.id}
@@ -7127,6 +7588,11 @@ export function CreatePostingClient({
               }
               title={locale === 'id' ? step.titleId : step.titleEn}
               description={locale === 'id' ? step.bodyId : step.bodyEn}
+              example={getCreateChoiceExample(
+                step.typeId as ListingTypeId,
+                step.listingSide,
+                locale,
+              )}
               highlights={
                 step.typeId === 'product'
                   ? locale === 'id'
@@ -7160,18 +7626,18 @@ export function CreatePostingClient({
               <Store className="h-4 w-4" />
             </span>
             <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
-              {locale === 'id' ? 'Mau jualan?' : 'Want to offer?'}
+              {locale === 'id' ? 'Ingin menawarkan?' : 'Want to offer?'}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
               {locale === 'id'
-                ? 'Kalau mau posting produk, jasa, lokasi, atau talent, pindah ke tab Tawarkan.'
-                : 'If you want to post products, services, spaces, or talent, switch to Offer.'}
+                ? 'Kalau Anda menyediakan produk, jasa, lokasi, alat, atau oper usaha, pindah ke Tawarkan.'
+                : 'If you want to post products, services, or spaces, switch to Offer. Talent is managed from the account profile.'}
             </p>
             <Link
               href={supplyEntryHref}
               className="mt-3 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-full bg-[color:var(--app-surface-strong)] px-4 text-[12px] font-semibold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]"
             >
-              {locale === 'id' ? 'Pindah ke Tawarkan' : 'Switch to Offer'}
+              {locale === 'id' ? 'Pindah ke Tawarkan' : 'Switch to Sell'}
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
@@ -7206,12 +7672,14 @@ export function CreatePostingClient({
   if (showSupplyIntentPicker) {
     return renderCreateEntrySurface({
       activeIntent: 'supply',
-      eyebrow: locale === 'id' ? 'Kategori jual' : 'Offer category',
+      eyebrow: locale === 'id' ? 'Tawarkan ke pasar' : 'Sell category',
       title:
-        locale === 'id' ? 'Kamu mau tawarkan apa?' : 'What are you offering?',
+        locale === 'id'
+          ? 'Apa yang ingin Anda tawarkan?'
+          : 'What do you want to sell?',
       description:
         locale === 'id'
-          ? 'Pilih kategori jual dulu. Setelah itu isi form yang pendek dan jelas.'
+          ? 'Pilih jenis tawaran yang paling dekat. Setelah itu isi form pendek dengan contoh yang mudah dipahami pembeli.'
           : 'Choose an offer category first. Then fill a short, clear form.',
       children: (
         <>
@@ -7221,31 +7689,7 @@ export function CreatePostingClient({
             </div>
           )}
           {typeSelectorGrid}
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setShowOtherSupplyPaths(current => !current)}
-              className="inline-flex min-h-[36px] items-center rounded-full bg-[color:var(--app-surface-muted)] px-3.5 text-[11px] font-semibold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] transition hover:bg-white dark:bg-slate-950/55"
-            >
-              {showOtherSupplyPaths
-                ? locale === 'id'
-                  ? 'Tutup lainnya'
-                  : 'Hide other paths'
-                : locale === 'id'
-                  ? 'Lihat lainnya'
-                  : 'See other paths'}
-            </button>
-            {showOtherSupplyPaths ? (
-              <div className="mt-2 rounded-[14px] bg-[color:var(--app-surface-muted)] p-2.5 dark:bg-slate-950/45">
-                <p className="text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                  {locale === 'id'
-                    ? 'Buka ini kalau bukan produk, jasa, atau profil usaha.'
-                    : 'Open these if you need something other than products, services, or a business profile.'}
-                </p>
-                {supplySupportQuickLinks}
-              </div>
-            ) : null}
-          </div>
+          {supplySupportQuickLinks}
         </>
       ),
       aside: (
@@ -7414,186 +7858,190 @@ export function CreatePostingClient({
         <div className="space-y-3">
           {showStepOneSetupCard && (
             <div className="space-y-2">
-                {typePicked && supportsDemandListing(activeType) && (
-                  <section className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] dark:border-[color:var(--app-border-strong)]">
-                    <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                          {locale === 'id' ? 'Arah posting' : 'Post direction'}
-                        </p>
-                        <p className="truncate text-xs font-medium text-[color:var(--app-text)]">
-                          {locale === 'id'
-                            ? 'Pilih cepat, detail bisa diedit nanti.'
-                            : 'Pick quickly. Details can be edited later.'}
-                        </p>
-                      </div>
-                      <span className="inline-flex max-w-[54vw] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
-                        <span className="truncate">{selectedTypeLabel}</span>
+              {typePicked && supportsDemandListing(activeType) && (
+                <section className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] dark:border-[color:var(--app-border-strong)]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Arah posting' : 'Post direction'}
+                      </p>
+                      <p className="truncate text-xs font-medium text-[color:var(--app-text)]">
+                        {locale === 'id'
+                          ? 'Pilih cepat, detail bisa diedit nanti.'
+                          : 'Pick quickly. Details can be edited later.'}
+                      </p>
+                    </div>
+                    <span className="inline-flex max-w-[54vw] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                      <span className="truncate">{selectedTypeLabel}</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      aria-pressed={listingSide === 'demand'}
+                      disabled={!canSwitchListingSide}
+                      onClick={() => {
+                        if (listingSide === 'demand') return;
+                        setListingSide('demand');
+                        syncCreateRoute({ sideId: 'demand' });
+                      }}
+                      className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        listingSide === 'demand'
+                          ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-warning-border)_70%,transparent)]'
+                          : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
+                      }`}
+                    >
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
+                        {listingSide === 'demand' ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                          <Target className="h-4 w-4" />
+                        )}
                       </span>
-                    </div>
-                    <div className="mt-2 grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        aria-pressed={listingSide === 'demand'}
-                        disabled={!canSwitchListingSide}
-                        onClick={() => {
-                          if (listingSide === 'demand') return;
-                          setListingSide('demand');
-                          syncCreateRoute({ sideId: 'demand' });
-                        }}
-                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                          listingSide === 'demand'
-                            ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-warning-border)_70%,transparent)]'
-                            : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
-                        }`}
-                      >
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
-                          {listingSide === 'demand' ? (
-                            <CheckCircle2 className="h-4 w-4" />
-                          ) : (
-                            <Target className="h-4 w-4" />
-                          )}
+                      <span className="min-w-0 text-[13px] font-black leading-4">
+                        <span className="line-clamp-2">
+                          {demandActionTitle}
                         </span>
-                        <span className="min-w-0 text-[13px] font-black leading-4">
-                          <span className="line-clamp-2">{demandActionTitle}</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={listingSide === 'supply'}
+                      disabled={!canSwitchListingSide}
+                      onClick={() => {
+                        if (listingSide === 'supply') return;
+                        setListingSide('supply');
+                        syncCreateRoute({ sideId: 'supply' });
+                      }}
+                      className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        listingSide === 'supply'
+                          ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-accent-border)_70%,transparent)]'
+                          : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
+                      }`}
+                    >
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
+                        {listingSide === 'supply' ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                          <Sparkles className="h-4 w-4" />
+                        )}
+                      </span>
+                      <span className="min-w-0 text-[13px] font-black leading-4">
+                        <span className="line-clamp-2">
+                          {supplyActionTitle}
                         </span>
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={listingSide === 'supply'}
-                        disabled={!canSwitchListingSide}
-                        onClick={() => {
-                          if (listingSide === 'supply') return;
-                          setListingSide('supply');
-                          syncCreateRoute({ sideId: 'supply' });
-                        }}
-                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                          listingSide === 'supply'
-                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-accent-border)_70%,transparent)]'
-                            : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
-                        }`}
-                      >
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
-                          {listingSide === 'supply' ? (
-                            <CheckCircle2 className="h-4 w-4" />
-                          ) : (
-                            <Sparkles className="h-4 w-4" />
-                          )}
-                        </span>
-                        <span className="min-w-0 text-[13px] font-black leading-4">
-                          <span className="line-clamp-2">{supplyActionTitle}</span>
-                        </span>
-                      </button>
-                    </div>
-                    {!canSwitchListingSide && (
-                      <p className="px-1 pt-2 text-[11px] text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? 'Arah ini udah dikunci.'
-                          : 'Direction is locked.'}
-                      </p>
-                    )}
-                  </section>
-                )}
-
-                {typePicked && activeTypeIsProperty && (
-                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                    <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
-                      {locale === 'id' ? 'Sektor listing' : 'Listing sector'}
-                    </label>
-                    <p className="text-[11px] text-[color:var(--app-text)]">
+                      </span>
+                    </button>
+                  </div>
+                  {!canSwitchListingSide && (
+                    <p className="px-1 pt-2 text-[11px] text-[color:var(--app-text-soft)]">
                       {locale === 'id'
-                        ? 'Untuk properti, sektornya otomatis Real Estate.'
-                        : 'Property is mapped to Real Estate.'}
+                        ? 'Arah ini udah dikunci.'
+                        : 'Direction is locked.'}
                     </p>
-                  </div>
-                )}
+                  )}
+                </section>
+              )}
 
-                {showSectorPicker && !isSimpleModeActive && (
-                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {locale === 'id'
-                            ? 'Kategori usaha (opsional)'
-                            : 'Industry specialization (optional)'}
-                        </label>
-                        <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                          {locale === 'id'
-                            ? 'Boleh kosong. Pakai kalau butuh field yang lebih spesifik.'
-                            : 'Optional. Use it for more specific fields.'}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSectorQuery('');
-                          setIsSectorPickerOpen(true);
-                        }}
-                        className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-info-border)] hover:text-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)]"
-                      >
-                        {selectedSectorView
-                          ? locale === 'id'
-                            ? 'Ganti kategori'
-                            : 'Change category'
-                          : locale === 'id'
-                            ? 'Pilih kategori'
-                            : 'Choose category'}
-                      </button>
-                    </div>
+              {typePicked && activeTypeIsProperty && (
+                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                  <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
+                    {locale === 'id' ? 'Sektor listing' : 'Listing sector'}
+                  </label>
+                  <p className="text-[11px] text-[color:var(--app-text)]">
+                    {locale === 'id'
+                      ? 'Untuk properti, sektornya otomatis Real Estate.'
+                      : 'Property is mapped to Real Estate.'}
+                  </p>
+                </div>
+              )}
 
-                    {selectedSectorView ? (
-                      <div className="mt-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            style={selectedSectorView.colorStyle}
-                            className={cn(
-                              'inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm',
-                              selectedSectorView.colorClass,
-                            )}
-                          >
-                            <selectedSectorView.icon className="h-3.5 w-3.5" />
-                            {getSectorLabel(selectedSectorView, locale)}
-                          </span>
-                          {selectedSubSectorView ? (
-                            <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]">
-                              {getSubSectorName(selectedSubSectorView, locale)}
-                            </span>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSector('');
-                              setSubSector('');
-                              setSectorQuery('');
-                            }}
-                            className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-danger)] dark:border-[color:var(--app-border-strong)]"
-                          >
-                            {locale === 'id' ? 'Hapus' : 'Clear'}
-                          </button>
-                        </div>
-                        {getSectorDescription(selectedSectorView, locale) ? (
-                          <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                            {getSectorDescription(selectedSectorView, locale)}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <p className="mt-3 rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+              {showSectorPicker && !isSimpleModeActive && (
+                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                         {locale === 'id'
-                          ? 'Belum dipilih, tapi tetap bisa lanjut.'
-                          : 'Nothing selected. You can continue.'}
+                          ? 'Kategori usaha (opsional)'
+                          : 'Industry specialization (optional)'}
+                      </label>
+                      <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
+                        {locale === 'id'
+                          ? 'Boleh kosong. Pakai kalau butuh field yang lebih spesifik.'
+                          : 'Optional. Use it for more specific fields.'}
                       </p>
-                    )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSectorQuery('');
+                        setIsSectorPickerOpen(true);
+                      }}
+                      className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-info-border)] hover:text-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)]"
+                    >
+                      {selectedSectorView
+                        ? locale === 'id'
+                          ? 'Ganti kategori'
+                          : 'Change category'
+                        : locale === 'id'
+                          ? 'Pilih kategori'
+                          : 'Choose category'}
+                    </button>
                   </div>
-                )}
-                {typePicked && !isSimpleModeActive ? (
-                  <CreateListingTemplatePicker
-                    locale={localeCode}
-                    listingSide={listingSide}
-                    activeType={activeType as ListingTypeId}
-                    onApplyTemplate={applyListingTemplate}
-                  />
-                ) : null}
+
+                  {selectedSectorView ? (
+                    <div className="mt-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          style={selectedSectorView.colorStyle}
+                          className={cn(
+                            'inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm',
+                            selectedSectorView.colorClass,
+                          )}
+                        >
+                          <selectedSectorView.icon className="h-3.5 w-3.5" />
+                          {getSectorLabel(selectedSectorView, locale)}
+                        </span>
+                        {selectedSubSectorView ? (
+                          <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]">
+                            {getSubSectorName(selectedSubSectorView, locale)}
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSector('');
+                            setSubSector('');
+                            setSectorQuery('');
+                          }}
+                          className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-danger)] dark:border-[color:var(--app-border-strong)]"
+                        >
+                          {locale === 'id' ? 'Hapus' : 'Clear'}
+                        </button>
+                      </div>
+                      {getSectorDescription(selectedSectorView, locale) ? (
+                        <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                          {getSectorDescription(selectedSectorView, locale)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-3 rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                      {locale === 'id'
+                        ? 'Belum dipilih, tapi tetap bisa lanjut.'
+                        : 'Nothing selected. You can continue.'}
+                    </p>
+                  )}
+                </div>
+              )}
+              {typePicked && !isSimpleModeActive ? (
+                <CreateListingTemplatePicker
+                  locale={localeCode}
+                  listingSide={listingSide}
+                  activeType={activeType as ListingTypeId}
+                  onApplyTemplate={applyListingTemplate}
+                />
+              ) : null}
             </div>
           )}
 
@@ -7678,7 +8126,9 @@ export function CreatePostingClient({
           {currentStep === 2 && (
             <>
               <CreateFormSectionCard
-                eyebrow={locale === 'id' ? 'Detail opsional' : 'Optional detail'}
+                eyebrow={
+                  locale === 'id' ? 'Detail opsional' : 'Optional detail'
+                }
                 title={stepTwoMainTitle}
                 description={stepTwoMainDescription}
                 aside={
@@ -7920,7 +8370,7 @@ export function CreatePostingClient({
                     placeholder={
                       locale === 'id' ? 'Pisahin pakai koma' : 'Comma-separated'
                     }
-                    className="h-12 w-full min-w-0 rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-[15px] font-medium text-[color:var(--app-text)] shadow-[0_1px_0_rgba(15,23,42,0.04)] transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-[color:var(--app-accent)]"
+                    className="h-10 w-full min-w-0 rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-medium text-[color:var(--app-text)] shadow-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-[color:var(--app-accent)]"
                   />
                 </div>
               </CreateFormSectionCard>

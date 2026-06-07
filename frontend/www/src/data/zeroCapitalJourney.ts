@@ -172,7 +172,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'emerald',
       },
       {
-        href: '/jobs',
+        href: '/search?type=job&q=lowongan',
         title: {
           id: 'Masuk ke kerja yang paling dekat',
           en: 'Enter the nearest work path',
@@ -279,7 +279,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'emerald',
       },
       {
-        href: '/freelancers',
+        href: '/search?type=freelancer&q=umkm',
         title: {
           id: 'Lihat benchmark talent lain',
           en: 'See how other talent positions themselves',
@@ -338,7 +338,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
       id: 'Atur uang dan inventaris awal',
       en: 'Set up money and starter inventory',
     },
-    ctaHref: '/finance',
+    ctaHref: '/payments',
     missions: [
       {
         id: 'Pisahkan uang hidup, uang jalan, dan uang reinvest.',
@@ -369,7 +369,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
     ],
     actions: [
       {
-        href: '/finance',
+        href: '/payments',
         title: {
           id: 'Bangun disiplin uang',
           en: 'Build money discipline',
@@ -386,7 +386,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'sky',
       },
       {
-        href: '/marketplace',
+        href: '/search?type=product&q=supplier',
         title: {
           id: 'Cari alat atau barang pendukung',
           en: 'Find tools or support goods',
@@ -617,7 +617,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'sky',
       },
       {
-        href: '/analytics',
+        href: '/dashboard',
         title: {
           id: 'Putuskan dari data, bukan perasaan',
           en: 'Decide from data, not feelings',
@@ -659,7 +659,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
       id: 'Lihat jalur ekspansi',
       en: 'See the expansion path',
     },
-    ctaHref: '/super-app',
+    ctaHref: '/umkm',
     missions: [
       {
         id: 'Tambah channel penjualan yang paling masuk akal, satu per satu.',
@@ -690,7 +690,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
     ],
     actions: [
       {
-        href: '/super-app',
+        href: '/umkm',
         title: {
           id: 'Masuk ke mesin distribusi lebih besar',
           en: 'Move into a larger distribution engine',
@@ -724,7 +724,7 @@ export const ZERO_CAPITAL_STAGES: JourneyStage[] = [
         tone: 'amber',
       },
       {
-        href: '/marketplace',
+        href: '/search?type=product&q=supplier',
         title: {
           id: 'Perluas penawaran dan partner',
           en: 'Expand offers and partners',
@@ -790,7 +790,7 @@ export const ZERO_CAPITAL_OPPORTUNITIES: OpportunityLane[] = [
       id: 'Affiliate, reseller tanpa stok, makelar sehat, jasa titip, atau pencarian lead bisa jadi jembatan saat modal masih nol.',
       en: 'Affiliate work, inventory-free reselling, healthy brokering, concierge sourcing, or lead generation can bridge the gap while capital is still zero.',
     },
-    href: '/marketplace',
+    href: '/search?type=product&q=supplier',
     cta: {
       id: 'Lihat barang dan peluang tanpa stok',
       en: 'See stock-light opportunities',
@@ -807,7 +807,7 @@ export const ZERO_CAPITAL_OPPORTUNITIES: OpportunityLane[] = [
       id: 'Bantu UMKM, toko, creator, atau tim kecil lain untuk belajar sistem sebelum buka usaha sendiri.',
       en: 'Support MSMEs, shops, creators, or other small teams to learn the system before opening your own business.',
     },
-    href: '/jobs',
+    href: '/search?type=job&q=lowongan',
     cta: {
       id: 'Cari pintu masuk',
       en: 'Find an entry point',
@@ -935,7 +935,7 @@ export const ZERO_CAPITAL_LADDER: CapitalLadderItem[] = [
       id: 'Aturan: reinvest hanya pada hal yang mempercepat uang kembali.',
       en: 'Rule: reinvest only in things that speed money coming back.',
     },
-    href: '/finance',
+    href: '/payments',
   },
   {
     slug: 'catalog',

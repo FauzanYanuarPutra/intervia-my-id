@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       async (ctx) =>
         withIdempotency(req, {
           scope: `tx-offer:${content_id}`,
-          actorHint: ctx.token,
+          actorHint: ctx.userId,
           forward: () =>
             fetch(`${MARKETPLACE_URL}/v1/content/${content_id}/offers`, {
               method: 'POST',

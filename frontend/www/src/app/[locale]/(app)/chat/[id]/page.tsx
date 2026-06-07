@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useDialog } from '@/components/system/feedback/DialogProvider';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { useAuth } from '@/context/AuthContext';
-import { useChatInbox } from '@/context/ChatInboxContext';
+import { useChatInbox, type InboxRoom } from '@/context/ChatInboxContext';
 import { motion } from 'framer-motion';
 import {
   AlertCircle,
@@ -16,6 +17,8 @@ import {
   CheckCheck,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock,
   Loader2,
@@ -37,6 +40,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { joinRoom, onMessage, sendMessageViaSocket } from '@/lib/chat';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
 import { useAppBack } from '@/lib/navigation/useAppBack';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { buildAiChatPayload } from '@/lib/aiChat';
 import {
   buildAiRoomCardPayload,
@@ -108,11 +112,11 @@ const MAX_COMPOSER_ATTACHMENTS = 10;
 const CHAT_FIELD_LABEL_CLASS =
   'block text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)]';
 const CHAT_CONTROL_CLASS =
-  'mt-1.5 min-h-[46px] w-full rounded-[14px] border-2 border-slate-300 bg-white px-3.5 text-[14px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+  'mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_TEXTAREA_CLASS =
-  'mt-1.5 min-h-[116px] w-full resize-y rounded-[14px] border-2 border-slate-300 bg-white px-3.5 py-3 text-[14px] font-medium leading-6 text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_16%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
+  'mt-1.5 min-h-[96px] w-full resize-y rounded-[12px] border border-slate-300 bg-white px-3 py-2.5 text-[13px] font-medium leading-5 text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_COMPOSER_SHELL_CLASS =
-  'flex min-w-0 flex-1 items-end gap-1 rounded-[24px] border-2 border-slate-300 bg-white px-2 py-1.5 shadow-none transition focus-within:border-[#25d366] focus-within:ring-4 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366]';
+  'flex min-w-0 flex-1 items-end gap-1 rounded-[20px] border border-slate-300 bg-white px-2 py-1 shadow-none transition focus-within:border-[#25d366] focus-within:ring-2 focus-within:ring-[#25d366]/14 dark:border-[#3b4a54] dark:bg-[#2a3942] dark:focus-within:border-[#25d366]';
 
 const QUICK_EMOJIS = [
   '\u{1F600}',
@@ -318,6 +322,23 @@ function normalizeRoomId(raw: unknown): string {
   }
 }
 
+function inboxRoomId(room: Pick<InboxRoom, 'room_id' | 'id'>): string {
+  return normalizeRoomId(room.room_id ?? room.id);
+}
+
+function inboxRoomAvatar(
+  room: Pick<InboxRoom, 'room_avatar' | 'avatar'> | null,
+): string | null {
+  if (!room) return null;
+  if (typeof room.room_avatar === 'string' && room.room_avatar.trim()) {
+    return room.room_avatar;
+  }
+  if (typeof room.avatar === 'string' && room.avatar.trim()) {
+    return room.avatar;
+  }
+  return null;
+}
+
 function parseDraftContact(roomId: string): string | null {
   if (!roomId.startsWith('draft:')) return null;
   const raw = roomId.slice('draft:'.length).trim();
@@ -512,6 +533,10 @@ type RoomTransaction = {
   }>;
 };
 
+type RoomTransactionTimelineItem = NonNullable<
+  RoomTransaction['timeline']
+>[number];
+
 type FraudSignal = {
   severity: 'high' | 'medium';
   message: string;
@@ -696,6 +721,96 @@ function humanizeStatus(value: unknown): string {
     .join(' ');
 }
 
+function formatTransactionStatusLabel(value: unknown, locale: string): string {
+  const status = normalizeTransactionStatus(value);
+  const labels: Record<string, { id: string; en: string }> = {
+    pending: { id: 'Menunggu respon', en: 'Pending' },
+    accepted: { id: 'Disetujui', en: 'Accepted' },
+    in_progress: { id: 'Diproses', en: 'In progress' },
+    delivered: { id: 'Dikirim', en: 'Delivered' },
+    completed: { id: 'Selesai', en: 'Completed' },
+    cancelled: { id: 'Dibatalkan', en: 'Cancelled' },
+    disputed: { id: 'Sengketa', en: 'Disputed' },
+  };
+  const label = labels[status];
+  return label
+    ? locale === 'id'
+      ? label.id
+      : label.en
+    : humanizeStatus(status);
+}
+
+function formatProtectionStatusLabel(value: unknown, locale: string): string {
+  const status = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  const labels: Record<string, { id: string; en: string }> = {
+    awaiting_funding: { id: 'Belum didanai', en: 'Awaiting funding' },
+    funds_held: { id: 'Dana aman', en: 'Funds secured' },
+    on_hold: { id: 'Dana ditahan', en: 'Funds on hold' },
+    escrow_released: { id: 'Dana diteruskan', en: 'Funds released' },
+    refunded: { id: 'Dana kembali', en: 'Refunded' },
+  };
+  const label = labels[status];
+  return label
+    ? locale === 'id'
+      ? label.id
+      : label.en
+    : humanizeStatus(status);
+}
+
+function formatPaymentStatusLabel(
+  txn: RoomTransaction | null,
+  locale: string,
+): string {
+  const paymentStatus = resolveTransactionPaymentStatus(txn);
+  const protectionStatus =
+    typeof txn?.protection_status === 'string'
+      ? txn.protection_status.trim().toLowerCase()
+      : '';
+
+  if (protectionStatus === 'refunded') {
+    return locale === 'id' ? 'Sempat dibayar' : 'Previously paid';
+  }
+  if (paymentStatus === 'paid') {
+    return locale === 'id' ? 'Pembayaran masuk' : 'Paid';
+  }
+  if (paymentStatus === 'partial') {
+    return locale === 'id' ? 'Bayar sebagian' : 'Partial payment';
+  }
+  if (paymentStatus === 'hold_error') {
+    return locale === 'id' ? 'Pembayaran bermasalah' : 'Payment issue';
+  }
+  return locale === 'id' ? 'Menunggu bayar' : 'Awaiting payment';
+}
+
+function formatDealKindLabel(value: unknown, locale: string): string {
+  const kind = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  const labels: Record<string, { id: string; en: string }> = {
+    product: { id: 'Produk', en: 'Product' },
+    service: { id: 'Jasa', en: 'Service' },
+    job: { id: 'Pekerjaan', en: 'Job' },
+    property: { id: 'Properti', en: 'Property' },
+    tool_rental: { id: 'Sewa alat', en: 'Tool rental' },
+    profile: { id: 'Profil talent', en: 'Talent profile' },
+  };
+  const label = labels[kind];
+  return label ? (locale === 'id' ? label.id : label.en) : humanizeStatus(kind);
+}
+
+function formatFulfillmentModeLabel(value: unknown, locale: string): string {
+  const mode = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  const labels: Record<string, { id: string; en: string }> = {
+    shipping: { id: 'Dikirim', en: 'Shipping' },
+    courier: { id: 'Kurir', en: 'Courier' },
+    pickup: { id: 'Ambil di tempat', en: 'Pickup' },
+    remote: { id: 'Online/remote', en: 'Remote' },
+    onsite: { id: 'Datang ke lokasi', en: 'Onsite' },
+    instant: { id: 'Instan', en: 'Instant' },
+    standard: { id: 'Standar', en: 'Standard' },
+  };
+  const label = labels[mode];
+  return label ? (locale === 'id' ? label.id : label.en) : humanizeStatus(mode);
+}
+
 function normalizeTransactionStatus(raw: unknown): string {
   const value = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
   return value || 'pending';
@@ -795,62 +910,85 @@ type TransactionStep = {
   label: string;
   done: boolean;
   active: boolean;
+  state: 'done' | 'active' | 'waiting' | 'stopped' | 'skipped';
 };
 
-function getTransactionSteps(txn: RoomTransaction | null): TransactionStep[] {
+function getTransactionSteps(
+  txn: RoomTransaction | null,
+  locale = 'id',
+): TransactionStep[] {
   const status = normalizeTransactionStatus(
     txn?.status || txn?.transaction_status,
   );
-  const paymentReady = transactionPaymentReady(txn);
+  const protectionStatus =
+    typeof txn?.protection_status === 'string'
+      ? txn.protection_status.trim().toLowerCase()
+      : '';
+  const isCancelled = status === 'cancelled';
+  const paymentReady =
+    transactionPaymentReady(txn) || protectionStatus === 'refunded';
   const acceptedDone =
     status === 'accepted' ||
     status === 'in_progress' ||
     status === 'delivered' ||
-    status === 'completed';
+    status === 'completed' ||
+    (isCancelled && paymentReady);
   const inProgressDone =
     status === 'in_progress' ||
     status === 'delivered' ||
     status === 'completed';
   const deliveredDone = status === 'delivered' || status === 'completed';
   const completedDone = status === 'completed';
+  let stoppedStepAssigned = false;
+
+  const stateFor = (
+    done: boolean,
+    active: boolean,
+  ): TransactionStep['state'] => {
+    if (done) return 'done';
+    if (isCancelled) {
+      if (!stoppedStepAssigned) {
+        stoppedStepAssigned = true;
+        return 'stopped';
+      }
+      return 'skipped';
+    }
+    if (active) return 'active';
+    return 'waiting';
+  };
+
+  const labels: Record<TransactionStepKey, string> = {
+    offer_created: locale === 'id' ? 'Offer dibuat' : 'Offer created',
+    accepted: locale === 'id' ? 'Disetujui seller' : 'Accepted by seller',
+    payment_secured: locale === 'id' ? 'Dana diamankan' : 'Funds secured',
+    in_progress: locale === 'id' ? 'Pengerjaan dimulai' : 'Work started',
+    delivered: locale === 'id' ? 'Hasil dikirim' : 'Delivery sent',
+    completed: locale === 'id' ? 'Selesai' : 'Completed',
+  };
+
+  const makeStep = (
+    key: TransactionStepKey,
+    done: boolean,
+    active: boolean,
+  ): TransactionStep => ({
+    key,
+    label: labels[key],
+    done,
+    active,
+    state: stateFor(done, active),
+  });
 
   return [
-    {
-      key: 'offer_created',
-      label: 'Offer dibuat',
-      done: Boolean(txn),
-      active: !txn,
-    },
-    {
-      key: 'accepted',
-      label: 'Disetujui seller',
-      done: acceptedDone,
-      active: status === 'pending',
-    },
-    {
-      key: 'payment_secured',
-      label: 'Dana diamankan',
-      done: paymentReady,
-      active: acceptedDone && !paymentReady,
-    },
-    {
-      key: 'in_progress',
-      label: 'Pengerjaan dimulai',
-      done: inProgressDone,
-      active: paymentReady && status === 'accepted',
-    },
-    {
-      key: 'delivered',
-      label: 'Hasil dikirim',
-      done: deliveredDone,
-      active: status === 'in_progress',
-    },
-    {
-      key: 'completed',
-      label: 'Selesai',
-      done: completedDone,
-      active: status === 'delivered',
-    },
+    makeStep('offer_created', Boolean(txn), !txn),
+    makeStep('accepted', acceptedDone, status === 'pending'),
+    makeStep('payment_secured', paymentReady, acceptedDone && !paymentReady),
+    makeStep(
+      'in_progress',
+      inProgressDone,
+      paymentReady && status === 'accepted',
+    ),
+    makeStep('delivered', deliveredDone, status === 'in_progress'),
+    makeStep('completed', completedDone, status === 'delivered'),
   ];
 }
 
@@ -859,7 +997,6 @@ function getTransactionProgressPercent(txn: RoomTransaction | null): number {
     txn?.status || txn?.transaction_status,
   );
   if (status === 'completed') return 100;
-  if (status === 'cancelled') return 100;
   const steps = getTransactionSteps(txn);
   if (steps.length === 0) return 0;
   const doneCount = steps.filter(step => step.done).length;
@@ -878,7 +1015,15 @@ function getTransactionWaitingParty(
     txn.status || txn.transaction_status,
   );
   if (status === 'completed') return 'Transaksi selesai';
-  if (status === 'cancelled') return 'Transaksi dibatalkan';
+  if (status === 'cancelled') {
+    const protectionStatus =
+      typeof txn.protection_status === 'string'
+        ? txn.protection_status.trim().toLowerCase()
+        : '';
+    return protectionStatus === 'refunded'
+      ? 'Transaksi dibatalkan; dana sudah kembali'
+      : 'Transaksi dibatalkan';
+  }
   if (status === 'disputed') return 'Menunggu mediasi Support';
 
   const isBuyer = Boolean(
@@ -911,6 +1056,233 @@ function getTransactionWaitingParty(
   }
 
   return 'Menunggu pembaruan transaksi';
+}
+
+function getTransactionOutcome(
+  txn: RoomTransaction | null,
+  currentUserId: string | null | undefined,
+  locale: string,
+): {
+  title: string;
+  description: string;
+  tone: 'danger' | 'warning' | 'success' | 'info' | 'neutral';
+  terminal: boolean;
+  progressLabel: string;
+} {
+  const status = normalizeTransactionStatus(
+    txn?.status || txn?.transaction_status,
+  );
+  const protectionStatus =
+    typeof txn?.protection_status === 'string'
+      ? txn.protection_status.trim().toLowerCase()
+      : '';
+  const paymentStatus = resolveTransactionPaymentStatus(txn);
+  const steps = getTransactionSteps(txn, locale);
+  const doneCount = steps.filter(step => step.done).length;
+  const progressLabel =
+    locale === 'id'
+      ? `${doneCount}/${steps.length} tahap tercatat`
+      : `${doneCount}/${steps.length} steps recorded`;
+  const isBuyer = Boolean(
+    txn && currentUserId && normId(txn.buyer_id) === normId(currentUserId),
+  );
+  const partyLabel = isBuyer
+    ? locale === 'id'
+      ? 'kamu'
+      : 'you'
+    : locale === 'id'
+      ? 'buyer'
+      : 'the buyer';
+
+  if (status === 'cancelled') {
+    if (protectionStatus === 'refunded') {
+      return {
+        title:
+          locale === 'id'
+            ? 'Transaksi dibatalkan, dana sudah kembali'
+            : 'Transaction cancelled, funds refunded',
+        description:
+          locale === 'id'
+            ? `Order ini tidak berjalan lagi. Pembayaran sempat masuk lalu dana dikembalikan ke ${partyLabel}.`
+            : `This order is no longer active. Payment was received earlier and the funds were returned to ${partyLabel}.`,
+        tone: 'danger',
+        terminal: true,
+        progressLabel,
+      };
+    }
+    return {
+      title: locale === 'id' ? 'Transaksi dibatalkan' : 'Transaction cancelled',
+      description:
+        locale === 'id'
+          ? 'Order ini tidak berjalan lagi. Tidak ada tahap pengerjaan berikutnya.'
+          : 'This order is no longer active. There are no further work steps.',
+      tone: 'danger',
+      terminal: true,
+      progressLabel,
+    };
+  }
+
+  if (status === 'completed') {
+    return {
+      title: locale === 'id' ? 'Transaksi selesai' : 'Transaction completed',
+      description:
+        locale === 'id'
+          ? 'Order sudah selesai dan alur transaksi ditutup.'
+          : 'The order is complete and the transaction flow is closed.',
+      tone: 'success',
+      terminal: true,
+      progressLabel: locale === 'id' ? 'Selesai' : 'Completed',
+    };
+  }
+
+  if (status === 'disputed') {
+    return {
+      title:
+        locale === 'id'
+          ? 'Transaksi sedang dimediasi'
+          : 'Transaction under review',
+      description:
+        locale === 'id'
+          ? 'Support perlu meninjau transaksi ini sebelum lanjut.'
+          : 'Support needs to review this transaction before it continues.',
+      tone: 'warning',
+      terminal: false,
+      progressLabel,
+    };
+  }
+
+  if (status === 'delivered') {
+    return {
+      title: locale === 'id' ? 'Hasil sudah dikirim' : 'Delivery has been sent',
+      description:
+        locale === 'id'
+          ? 'Menunggu buyer mengecek hasil dan konfirmasi selesai.'
+          : 'Waiting for the buyer to review and confirm completion.',
+      tone: 'info',
+      terminal: false,
+      progressLabel,
+    };
+  }
+
+  if (status === 'accepted' && paymentStatus === 'paid') {
+    return {
+      title: locale === 'id' ? 'Dana aman, menunggu proses' : 'Funds secured',
+      description:
+        locale === 'id'
+          ? 'Pembayaran sudah masuk proteksi. Seller bisa mulai pengerjaan.'
+          : 'Payment is protected. The seller can start the work.',
+      tone: 'info',
+      terminal: false,
+      progressLabel,
+    };
+  }
+
+  return {
+    title: getTransactionWaitingParty(txn, currentUserId),
+    description:
+      locale === 'id'
+        ? 'Status akan berubah mengikuti aksi buyer, seller, atau sistem pembayaran.'
+        : 'The status changes as the buyer, seller, or payment system takes action.',
+    tone: 'neutral',
+    terminal: false,
+    progressLabel,
+  };
+}
+
+function outcomeToneClass(
+  tone: ReturnType<typeof getTransactionOutcome>['tone'],
+) {
+  if (tone === 'danger') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-danger-border)_45%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] text-[color:var(--app-danger)]';
+  }
+  if (tone === 'warning') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-warning-border)_45%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] text-[color:var(--app-warning)]';
+  }
+  if (tone === 'success') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_45%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] text-[color:var(--app-accent)]';
+  }
+  if (tone === 'info') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-info-border)_45%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] text-[color:var(--app-info)]';
+  }
+  return 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] text-[color:var(--app-text-soft)]';
+}
+
+function transactionStepToneClass(step: TransactionStep): string {
+  if (step.state === 'done') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] text-[color:var(--app-accent)]';
+  }
+  if (step.state === 'active') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-info-border)_50%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] text-[color:var(--app-info)]';
+  }
+  if (step.state === 'stopped') {
+    return 'border-[color:color-mix(in_srgb,_var(--app-danger-border)_42%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-danger)_10%,_transparent)] text-[color:var(--app-danger)]';
+  }
+  if (step.state === 'skipped') {
+    return 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] text-[color:color-mix(in_srgb,_var(--app-text-soft)_72%,_transparent)] opacity-75';
+  }
+  return 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]';
+}
+
+function transactionStepStateLabel(
+  step: TransactionStep,
+  locale: string,
+): string {
+  if (step.state === 'done') return locale === 'id' ? 'Selesai' : 'Done';
+  if (step.state === 'active')
+    return locale === 'id' ? 'Sedang berjalan' : 'In progress';
+  if (step.state === 'stopped')
+    return locale === 'id' ? 'Dihentikan di sini' : 'Stopped here';
+  if (step.state === 'skipped')
+    return locale === 'id' ? 'Tidak dilanjutkan' : 'Not continued';
+  return locale === 'id' ? 'Menunggu' : 'Waiting';
+}
+
+function timelineStatusLabel(
+  item: RoomTransactionTimelineItem,
+  locale: string,
+): string {
+  const raw = item.status || item.event || 'updated';
+  const status = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  if (
+    status === 'paid' ||
+    status === 'awaiting_payment' ||
+    status === 'partial'
+  ) {
+    return formatPaymentStatusLabel(
+      { id: 'timeline', transaction_meta: { payment: { status } } },
+      locale,
+    );
+  }
+  if (status === 'refunded') return formatProtectionStatusLabel(status, locale);
+  if (
+    status === 'pending' ||
+    status === 'accepted' ||
+    status === 'in_progress' ||
+    status === 'delivered' ||
+    status === 'completed' ||
+    status === 'cancelled' ||
+    status === 'disputed'
+  ) {
+    return formatTransactionStatusLabel(status, locale);
+  }
+  return humanizeStatus(status);
+}
+
+function timelineDescriptionLabel(value: unknown, locale: string): string {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  if (locale !== 'id') return raw;
+  return raw
+    .replace(/^Order dibuat buyer$/i, 'Order dibuat oleh pembeli')
+    .replace(/^Order dibatalkan$/i, 'Order dibatalkan')
+    .replace(/^Pembayaran terkonfirmasi$/i, 'Pembayaran terkonfirmasi')
+    .replace(/^Dana dikembalikan ke buyer$/i, 'Dana dikembalikan ke pembeli')
+    .replace(/^Catatan buyer:/i, 'Catatan pembeli:')
+    .replace(/^Catatan seller:/i, 'Catatan penjual:')
+    .replace(
+      /Superseded by counter offer/i,
+      'Digantikan oleh counter offer baru',
+    );
 }
 
 function canRunTransactionAction(
@@ -1275,11 +1647,19 @@ export default function ChatRoomPage() {
   const allowedRoomIds = useMemo(() => {
     const set = new Set<string>();
     for (const r of inboxRooms) {
-      const rid = normalizeRoomId((r as any).room_id ?? (r as any).id);
+      const rid = inboxRoomId(r);
       if (rid) set.add(rid);
     }
     return set;
   }, [inboxRooms]);
+  const currentInboxRoom = useMemo(
+    () =>
+      inboxRooms.find(room => inboxRoomId(room) === canonicalRoomId) ?? null,
+    [canonicalRoomId, inboxRooms],
+  );
+  const roomAvatarUrl = profileAvatarSrc(
+    isDraftRoom ? null : inboxRoomAvatar(currentInboxRoom),
+  );
 
   const [roomValidationPending, setRoomValidationPending] = useState(true);
   const roomValidationAttemptRef = useRef<string>('');
@@ -1376,12 +1756,7 @@ export default function ChatRoomPage() {
     const peerIds = Array.from(
       new Set(
         inboxRooms
-          .map(room =>
-            parseDmPeerId(
-              String((room as any).room_id ?? (room as any).id ?? ''),
-              user.id,
-            ),
-          )
+          .map(room => parseDmPeerId(inboxRoomId(room), user.id))
           .filter((id): id is string => Boolean(id)),
       ),
     );
@@ -1437,9 +1812,7 @@ export default function ChatRoomPage() {
       return;
     }
     if (!canonicalRoomId || inboxLoading) return;
-    const found = inboxRooms.find(
-      (r: any) => normalizeRoomId(r.room_id ?? r.id) === canonicalRoomId,
-    ) as any;
+    const found = currentInboxRoom;
     if (!found) return;
 
     const rawRoomId = String(found.room_id ?? found.id ?? '');
@@ -1457,8 +1830,8 @@ export default function ChatRoomPage() {
     }
   }, [
     canonicalRoomId,
+    currentInboxRoom,
     inboxLoading,
-    inboxRooms,
     user?.id,
     dmNamesByUserId,
     isDraftRoom,
@@ -1538,10 +1911,24 @@ export default function ChatRoomPage() {
   const [draftAttachments, setDraftAttachments] = useState<DraftAttachment[]>(
     [],
   );
+  const [activeDraftAttachmentId, setActiveDraftAttachmentId] = useState<
+    string | null
+  >(null);
   const isUploadingAttachments = draftAttachments.some(
     att => att.status === 'uploading',
   );
   const hasComposerAttachments = draftAttachments.length > 0;
+  const activeDraftAttachmentIndex = useMemo(() => {
+    if (draftAttachments.length === 0) return -1;
+    const selectedIndex = draftAttachments.findIndex(
+      attachment => attachment.id === activeDraftAttachmentId,
+    );
+    return selectedIndex >= 0 ? selectedIndex : 0;
+  }, [activeDraftAttachmentId, draftAttachments]);
+  const activeDraftAttachment =
+    activeDraftAttachmentIndex >= 0
+      ? draftAttachments[activeDraftAttachmentIndex]
+      : null;
   const canSendMessage = newMessage.trim().length > 0 || hasComposerAttachments;
   const composerFraudSignals = useMemo(
     () => detectFraudSignals(newMessage),
@@ -1592,26 +1979,20 @@ export default function ChatRoomPage() {
     [aiLengthId],
   );
   const aiContextMessages = useMemo(() => {
-    if (!aiUseContext) return [];
+    if (!aiUseContext || !user?.id) return [];
     return messages
       .filter(
-        msg => typeof msg.content === 'string' && msg.content.trim().length > 0,
+        msg =>
+          msg.sender_id === user.id &&
+          typeof msg.content === 'string' &&
+          msg.content.trim().length > 0,
       )
       .slice(-8)
       .map(msg => ({
-        role: msg.sender_id === user?.id ? 'user' : 'assistant',
+        role: 'user' as const,
         content: msg.content,
       }));
   }, [aiUseContext, messages, user?.id]);
-  const lastIncomingMessage = useMemo(
-    () =>
-      [...messages]
-        .reverse()
-        .find(msg => msg.sender_id !== user?.id && msg.content?.trim())
-        ?.content || '',
-    [messages, user?.id],
-  );
-
   const [incomingCall, setIncomingCall] = useState<{
     callId: string;
     callerId: string;
@@ -1632,6 +2013,7 @@ export default function ChatRoomPage() {
   const composerRef = useRef<HTMLDivElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const stickerPanelRef = useRef<HTMLDivElement>(null);
+  const attachmentTouchStartXRef = useRef<number | null>(null);
   const keyboardBaselineHeightRef = useRef(0);
 
   const channelRef = useRef<Awaited<ReturnType<typeof joinRoom>> | null>(null);
@@ -1851,14 +2233,12 @@ export default function ChatRoomPage() {
       setAiWorkspaceMode(workspace);
       if (workspace === 'reply') return;
       setAiStructuredPrompt(
-        buildDefaultAiRoomDraftPrompt(workspace, chatLocale, {
-          lastIncoming: lastIncomingMessage,
-        }),
+        buildDefaultAiRoomDraftPrompt(workspace, chatLocale),
       );
       setAiStructuredDraft(null);
       setAiStructuredError(null);
     },
-    [chatLocale, lastIncomingMessage],
+    [chatLocale],
   );
 
   const applyStructuredPromptExample = useCallback(
@@ -1874,14 +2254,12 @@ export default function ChatRoomPage() {
   const resetStructuredPrompt = useCallback(
     (workspace: AiRoomDraftWorkspace) => {
       setAiStructuredPrompt(
-        buildDefaultAiRoomDraftPrompt(workspace, chatLocale, {
-          lastIncoming: lastIncomingMessage,
-        }),
+        buildDefaultAiRoomDraftPrompt(workspace, chatLocale),
       );
       setAiStructuredDraft(null);
       setAiStructuredError(null);
     },
-    [chatLocale, lastIncomingMessage],
+    [chatLocale],
   );
 
   const handleGenerateStructuredDraft = useCallback(async () => {
@@ -1906,11 +2284,10 @@ export default function ChatRoomPage() {
         locale: chatLocale,
         prompt,
         extraInstruction: aiInstruction,
-        lastIncoming: lastIncomingMessage,
         composerDraft: newMessage.trim(),
       });
       const payload = buildAiChatPayload(instruction, aiContextMessages);
-      const res = await fetch('/api/ai/chat', {
+      const res = await authFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1957,8 +2334,8 @@ export default function ChatRoomPage() {
     aiStructuredLoading,
     aiStructuredPrompt,
     aiWorkspaceMode,
+    authFetch,
     chatLocale,
-    lastIncomingMessage,
     newMessage,
   ]);
 
@@ -2586,7 +2963,7 @@ export default function ChatRoomPage() {
       }
 
       const selectedFiles = Array.from(fileList).slice(0, remainingSlots);
-      selectedFiles.forEach(file => {
+      const nextAttachments = selectedFiles.map(file => {
         const attachmentId =
           crypto.randomUUID?.() ??
           `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -2597,19 +2974,20 @@ export default function ChatRoomPage() {
             : undefined;
         rememberPreviewUrl(previewUrl);
 
-        setDraftAttachments(prev => [
-          ...prev,
-          {
-            id: attachmentId,
-            file,
-            name: file.name,
-            size: file.size,
-            type,
-            previewUrl,
-            status: 'uploading',
-          },
-        ]);
-        uploadAttachment(file, attachmentId);
+        return {
+          id: attachmentId,
+          file,
+          name: file.name,
+          size: file.size,
+          type,
+          previewUrl,
+          status: 'uploading' as const,
+        };
+      });
+      setDraftAttachments(prev => [...prev, ...nextAttachments]);
+      setActiveDraftAttachmentId(current => current || nextAttachments[0]?.id);
+      nextAttachments.forEach(attachment => {
+        if (attachment.file) uploadAttachment(attachment.file, attachment.id);
       });
 
       setShowEmojiPicker(false);
@@ -2625,6 +3003,9 @@ export default function ChatRoomPage() {
 
   const removeDraftAttachment = useCallback(
     (attachmentId: string) => {
+      setActiveDraftAttachmentId(current =>
+        current === attachmentId ? null : current,
+      );
       setDraftAttachments(prev => {
         const target = prev.find(att => att.id === attachmentId);
         cleanupPreviewUrl(target?.previewUrl);
@@ -2643,11 +3024,23 @@ export default function ChatRoomPage() {
   );
 
   const clearDraftAttachments = useCallback(() => {
+    setActiveDraftAttachmentId(null);
     setDraftAttachments(prev => {
       prev.forEach(att => cleanupPreviewUrl(att.previewUrl));
       return [];
     });
   }, [cleanupPreviewUrl]);
+
+  const showDraftAttachmentAtOffset = useCallback(
+    (offset: number) => {
+      if (draftAttachments.length < 2) return;
+      const nextIndex =
+        (activeDraftAttachmentIndex + offset + draftAttachments.length) %
+        draftAttachments.length;
+      setActiveDraftAttachmentId(draftAttachments[nextIndex]?.id ?? null);
+    },
+    [activeDraftAttachmentIndex, draftAttachments],
+  );
 
   const sendPayload = async (
     content: string,
@@ -3034,9 +3427,6 @@ export default function ChatRoomPage() {
     setAiError(null);
     setAiLoading(true);
 
-    const lastIncoming = [...messages]
-      .reverse()
-      .find(msg => msg.sender_id !== user?.id && msg.content?.trim())?.content;
     const userDraftHint = newMessage.trim();
     const instructionParts = [
       `Kamu adalah asisten chat pribadi milik pengguna Lajukan.`,
@@ -3044,13 +3434,14 @@ export default function ChatRoomPage() {
       `Tujuan: ${aiTemplate.label}.`,
       `Arahan template: ${aiTemplate.prompt}.`,
       `Nada: ${aiTone.label}. Panjang: ${aiLength.label}.`,
+      aiUseContext
+        ? 'Privasi: pelajari gaya dari contoh pesan yang dikirim user sendiri saja. Jangan gunakan pesan lawan bicara sebagai bahan belajar.'
+        : 'Privasi: jangan gunakan riwayat chat sebagai contoh gaya.',
       aiInstruction ? `Instruksi tambahan user: ${aiInstruction}` : '',
       userDraftHint
         ? `Gunakan draft pengguna sebagai referensi lalu rapikan: "${userDraftHint}"`
         : '',
-      lastIncoming
-        ? `Pesan terakhir lawan bicara: "${lastIncoming}"`
-        : 'Belum ada pesan. Tulis singkat.',
+      'Kalau butuh konteks dari lawan bicara, minta user menuliskan poinnya di draft/instruksi. Jangan menebak data sensitif.',
       'Balasan harus natural, siap dikirim, dan tidak kaku.',
     ].filter(Boolean);
 
@@ -3059,7 +3450,7 @@ export default function ChatRoomPage() {
         instructionParts.join('\n'),
         aiContextMessages,
       );
-      const res = await fetch('/api/ai/chat', {
+      const res = await authFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -3102,8 +3493,9 @@ export default function ChatRoomPage() {
     aiTemplate.label,
     aiTemplate.prompt,
     aiTone.label,
+    aiUseContext,
+    authFetch,
     isUploadingAttachments,
-    messages,
     newMessage,
     sendPayload,
     sending,
@@ -4101,7 +4493,6 @@ export default function ChatRoomPage() {
   };
 
   const statusInfo = statusMeta[connectionStatus];
-  const roomInitial = roomName?.charAt(0)?.toUpperCase() || 'C';
   const roomKind = canonicalRoomId.startsWith('support:')
     ? 'support'
     : canonicalRoomId.startsWith('dm:') || canonicalRoomId.startsWith('draft:')
@@ -4125,9 +4516,9 @@ export default function ChatRoomPage() {
     roomSummaryTransaction?.status ||
     roomSummaryTransaction?.transaction_status,
   );
-  const roomSummaryTxnPaymentStatus = resolveTransactionPaymentStatus(
-    roomSummaryTransaction,
-  );
+  const roomSummaryTxnIsTerminal =
+    roomSummaryTxnStatus === 'completed' ||
+    roomSummaryTxnStatus === 'cancelled';
   const roomSummaryTxnProgress = useMemo(
     () => getTransactionProgressPercent(roomSummaryTransaction),
     [roomSummaryTransaction],
@@ -4220,8 +4611,8 @@ export default function ChatRoomPage() {
     (selectedTxnIsBuyer || selectedTxnIsSeller),
   );
   const selectedTxnSteps = useMemo(
-    () => getTransactionSteps(selectedTransaction),
-    [selectedTransaction],
+    () => getTransactionSteps(selectedTransaction, chatLocale),
+    [chatLocale, selectedTransaction],
   );
   const selectedTxnProgressPercent = useMemo(
     () => getTransactionProgressPercent(selectedTransaction),
@@ -4230,6 +4621,10 @@ export default function ChatRoomPage() {
   const selectedTxnWaitingParty = useMemo(
     () => getTransactionWaitingParty(selectedTransaction, user?.id),
     [selectedTransaction, user?.id],
+  );
+  const selectedTxnOutcome = useMemo(
+    () => getTransactionOutcome(selectedTransaction, user?.id, chatLocale),
+    [chatLocale, selectedTransaction, user?.id],
   );
   const selectedTxnMeta = asObject(selectedTransaction?.transaction_meta);
   const selectedTxnTicket = asObject(selectedTxnMeta.ticket);
@@ -4424,7 +4819,7 @@ export default function ChatRoomPage() {
         backgroundColor: 'transparent',
       }}
     >
-      <header className="z-40 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
+      <header className="fixed top-0 left-0 right-0 z-50 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
         <div className="min-w-0 px-2.5 py-2 sm:px-4 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
@@ -4437,8 +4832,15 @@ export default function ChatRoomPage() {
               <ArrowLeft className="h-5 w-5" />
             </button>
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dfe5e7] text-sm font-semibold text-[#54656f] dark:bg-[#2a3942] dark:text-[#d1d7db] sm:h-11 sm:w-11">
-              {roomInitial}
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#dfe5e7] dark:bg-[#2a3942] sm:h-11 sm:w-11">
+              <Image
+                src={roomAvatarUrl}
+                alt=""
+                width={44}
+                height={44}
+                className="h-full w-full object-cover"
+                priority
+              />
             </div>
 
             <div className="min-w-0 flex-1">
@@ -4512,12 +4914,14 @@ export default function ChatRoomPage() {
             </div>
           </div>
 
-          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="inline-flex min-h-[28px] min-w-0 max-w-full items-center gap-1.5 rounded-full bg-white/70 px-2.5 text-[11px] font-medium text-[#667781] dark:bg-[#111b21]/50 dark:text-[#aebac1] sm:text-xs">
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+            {/* 1. STATUS & TYPING INDICATOR */}
+            <span className="inline-flex min-h-[26px] min-w-0 max-w-full items-center gap-1.5 rounded-md bg-zinc-100/70 px-2 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800/40 dark:text-zinc-400 sm:text-xs">
               <span
-                className={`h-2 w-2 shrink-0 rounded-full ${statusInfo.dotClass}`}
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusInfo.dotClass} ${typingUser ? 'animate-pulse scale-110' : ''
+                  }`}
               />
-              <span className="min-w-0 truncate">
+              <span className="min-w-0 truncate tracking-wide">
                 {typingUser
                   ? chatLocale === 'id'
                     ? `${typingUser} sedang mengetik...`
@@ -4526,33 +4930,33 @@ export default function ChatRoomPage() {
               </span>
             </span>
 
-            {roomKind !== 'direct' ? (
+            {/* 2. ROOM KIND BADGE (GROUP / SUPPORT) */}
+            {roomKind !== 'direct' && (
               <span
-                className={`inline-flex min-h-[28px] shrink-0 items-center rounded-full px-2.5 text-[10px] font-semibold ${roomKind === 'group'
-                  ? 'bg-[#dfe5e7] text-[#54656f] dark:bg-[#2a3942] dark:text-[#aebac1]'
-                  : 'bg-[#fff3cd] text-[#8a6d1d] dark:bg-[#3b2f12] dark:text-[#f6d87a]'
+                className={`inline-flex min-h-[26px] shrink-0 items-center rounded-md px-2 text-[10px] font-bold uppercase tracking-wider ${roomKind === 'group'
+                    ? 'bg-zinc-200/60 text-zinc-600 dark:bg-zinc-800/70 dark:text-zinc-400'
+                    : 'bg-amber-100/60 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
                   }`}
               >
                 {roomKind === 'group'
-                  ? chatLocale === 'id'
-                    ? 'Grup'
-                    : 'Group'
-                  : chatLocale === 'id'
-                    ? 'Bantuan'
-                    : 'Support'}
+                  ? chatLocale === 'id' ? 'Grup' : 'Group'
+                  : chatLocale === 'id' ? 'Bantuan' : 'Support'}
               </span>
-            ) : null}
+            )}
 
+            {/* 3. TRANSACTION BUTTON ACTION */}
             <button
               onClick={() => setShowTransactionsDrawer(prev => !prev)}
-              className="inline-flex min-h-[28px] shrink-0 items-center gap-1.5 rounded-full bg-white/70 px-2.5 text-[11px] font-semibold text-[#54656f] transition hover:bg-white dark:bg-[#111b21]/50 dark:text-[#aebac1] dark:hover:bg-[#111b21]"
+              className="inline-flex min-h-[26px] shrink-0 items-center gap-1 rounded-md bg-zinc-100/70 px-2 text-[11px] font-semibold text-zinc-600 transition-all duration-150 hover:bg-zinc-200/80 hover:text-zinc-900 active:scale-95 dark:bg-zinc-800/40 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200"
               aria-label={
                 chatLocale === 'id' ? 'Buka transaksi' : 'Open transactions'
               }
               title={chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
             >
-              <ReceiptText className="h-3.5 w-3.5" />
-              {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
+              <ReceiptText className="h-3.5 w-3.5 opacity-70" />
+              <span>
+                {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
+              </span>
             </button>
           </div>
         </div>
@@ -4677,7 +5081,10 @@ export default function ChatRoomPage() {
                         {chatLocale === 'id' ? 'Status' : 'Status'}
                       </p>
                       <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
-                        {humanizeStatus(roomSummaryTxnStatus)}
+                        {formatTransactionStatusLabel(
+                          roomSummaryTxnStatus,
+                          chatLocale,
+                        )}
                       </p>
                     </div>
                     <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
@@ -4685,24 +5092,41 @@ export default function ChatRoomPage() {
                         {chatLocale === 'id' ? 'Pembayaran' : 'Payment'}
                       </p>
                       <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
-                        {humanizeStatus(roomSummaryTxnPaymentStatus)}
+                        {formatPaymentStatusLabel(
+                          roomSummaryTransaction,
+                          chatLocale,
+                        )}
                       </p>
                     </div>
                     <div className="rounded-[16px] bg-[#f7f5f3] px-3 py-2.5 dark:bg-[#111b21]">
                       <p className="text-[10px] uppercase tracking-[0.16em] text-[#667781] dark:text-[#8696a0]">
-                        {chatLocale === 'id' ? 'Progress' : 'Progress'}
+                        {roomSummaryTxnIsTerminal
+                          ? chatLocale === 'id'
+                            ? 'Status akhir'
+                            : 'Final status'
+                          : 'Progress'}
                       </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e9edef] dark:bg-[#202c33]">
-                          <div
-                            className="h-full rounded-full bg-[#25d366]"
-                            style={{ width: `${roomSummaryTxnProgress}%` }}
-                          />
+                      {roomSummaryTxnIsTerminal &&
+                        roomSummaryTxnStatus !== 'completed' ? (
+                        <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
+                          {formatTransactionStatusLabel(
+                            roomSummaryTxnStatus,
+                            chatLocale,
+                          )}
+                        </p>
+                      ) : (
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e9edef] dark:bg-[#202c33]">
+                            <div
+                              className="h-full rounded-full bg-[#25d366]"
+                              style={{ width: `${roomSummaryTxnProgress}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
+                            {roomSummaryTxnProgress}%
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
-                          {roomSummaryTxnProgress}%
-                        </span>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -4767,7 +5191,7 @@ export default function ChatRoomPage() {
                         key={item.id}
                         className="sticky top-2 z-10 flex justify-center py-1"
                       >
-                        <span className="rounded-full border border-black/5 bg-[#e9edef]/92 px-3 py-1 text-[10px] font-medium text-[#54656f] shadow-sm dark:border-white/8 dark:bg-[#202c33]/92 dark:text-[#aebac1]">
+                        <span className="rounded-full border border-black/5 bg-white/95 px-3 py-1 text-[10px] font-medium text-[#54656f] shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#202c33]/95 dark:text-[#d1d7db]">
                           {item.label}
                         </span>
                       </div>
@@ -4980,6 +5404,19 @@ export default function ChatRoomPage() {
                     );
                   const transactionShouldShowPay =
                     canUserOpenTransactionPayment(transactionCardTxn, user?.id);
+                  const transactionCardProtectionStatus =
+                    transactionCardMeta?.protection_status ||
+                    'awaiting_funding';
+                  const transactionCardDealLabel = [
+                    transactionCardMeta?.deal_kind
+                      ? humanizeStatus(transactionCardMeta.deal_kind)
+                      : '',
+                    transactionCardMeta?.fulfillment_mode
+                      ? humanizeStatus(transactionCardMeta.fulfillment_mode)
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' / ');
                   const isStructured =
                     msg.message_type === 'offer' ||
                     msg.message_type === 'application' ||
@@ -4987,7 +5424,11 @@ export default function ChatRoomPage() {
                     msg.message_type === 'transaction' ||
                     msg.message_type === 'job_update';
 
-                  const bubbleClass = `relative max-w-[86%] overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:max-w-[72%] sm:px-3 sm:py-2.5 sm:text-sm ${isOwn
+                  const bubbleMaxWidthClass =
+                    msg.message_type === 'transaction'
+                      ? 'max-w-[94%] sm:max-w-[520px]'
+                      : 'max-w-[86%] sm:max-w-[72%]';
+                  const bubbleClass = `relative ${bubbleMaxWidthClass} overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:px-3 sm:py-2.5 sm:text-sm ${isOwn
                     ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
                     : 'rounded-bl-[6px] bg-white text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#202c33] dark:text-[#e9edef]'
                     }`;
@@ -5031,8 +5472,8 @@ export default function ChatRoomPage() {
                                       : 'Listing Shared')}
                                 {msg.message_type === 'transaction' &&
                                   (chatLocale === 'id'
-                                    ? 'Update transaksi'
-                                    : 'Transaction Update')}
+                                    ? 'Transaksi'
+                                    : 'Transaction')}
                                 {msg.message_type === 'job_update' &&
                                   (chatLocale === 'id'
                                     ? 'Update kerja'
@@ -5533,68 +5974,92 @@ export default function ChatRoomPage() {
 
                               {msg.message_type === 'transaction' && (
                                 <div
-                                  className={`rounded-2xl border p-3 ${isOwn ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_20%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)]' : 'border-[color:var(--app-border-strong)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)]'}`}
+                                  className={`overflow-hidden rounded-[20px] border shadow-[0_14px_34px_-28px_rgba(15,23,42,0.55)] ${isOwn ? 'border-emerald-600/20 bg-white/90 dark:border-emerald-300/15 dark:bg-[#0b4f42]/78' : 'border-[#d6e6de] bg-white/95 dark:border-white/10 dark:bg-[#17232a]/96'}`}
                                 >
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">
-                                    {chatLocale === 'id'
-                                      ? 'Transaksi'
-                                      : 'Transaction'}
-                                  </p>
-                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold opacity-80">
-                                    {typeof ticketMeta.reference === 'string' &&
-                                      ticketMeta.reference.trim() && (
-                                        <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                          {ticketMeta.reference}
+                                  <div className="flex items-start gap-2.5 p-3">
+                                    {transactionCardCoverImage ? (
+                                      <img
+                                        src={transactionCardCoverImage}
+                                        alt={transactionCardTitle}
+                                        className="h-12 w-12 shrink-0 rounded-2xl object-cover"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-300/12 dark:text-emerald-200">
+                                        <ReceiptText className="h-5 w-5" />
+                                      </span>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700 dark:bg-emerald-300/12 dark:text-emerald-200">
+                                          {structuredSideContext}
                                         </span>
-                                      )}
-                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                      {structuredSideContext}
-                                    </span>
-                                    <span className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-0.5">
-                                      {transactionCardWalletLabel}
-                                    </span>
-                                  </div>
-                                  {transactionCardCoverImage && (
-                                    <img
-                                      src={transactionCardCoverImage}
-                                      alt={transactionCardTitle}
-                                      className="mt-2 h-20 w-full rounded-xl object-cover"
-                                      loading="lazy"
-                                    />
-                                  )}
-                                  <div className="mt-2 flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="truncate text-xs font-semibold">
+                                        <span className="rounded-full bg-[#f2f5f4] px-2 py-0.5 text-[10px] font-bold text-[#667781] dark:bg-white/[0.08] dark:text-[#c8d2d1]">
+                                          {transactionCardWalletLabel}
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 line-clamp-2 text-sm font-black leading-5 text-[#111b21] dark:text-[#e9edef]">
                                         {transactionCardTitle}
                                       </p>
-                                      <p className="mt-1 text-[11px] opacity-80">
-                                        {transactionCardShortId}
-                                      </p>
+                                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] font-semibold text-[#667781] dark:text-[#aebac1]">
+                                        {transactionCardShortId !== '-' ? (
+                                          <span>{transactionCardShortId}</span>
+                                        ) : null}
+                                        {transactionCardDealLabel ? (
+                                          <>
+                                            <span className="h-1 w-1 rounded-full bg-current opacity-45" />
+                                            <span>
+                                              {transactionCardDealLabel}
+                                            </span>
+                                          </>
+                                        ) : null}
+                                      </div>
                                     </div>
-                                    <p className="shrink-0 text-base font-black text-[color:var(--app-accent)]">
-                                      {formatMoney(
-                                        transactionCardMeta?.amount_cents,
-                                        transactionCardMeta?.currency,
-                                      )}
-                                    </p>
                                   </div>
-                                  <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold">
-                                    <span
-                                      className={`rounded-full border px-2 py-0.5 ${statusTone(transactionCardStatus)}`}
-                                    >
-                                      {humanizeStatus(transactionCardStatus)}
-                                    </span>
-                                    <span
-                                      className={`rounded-full border px-2 py-0.5 ${protectionTone(
-                                        transactionCardMeta?.protection_status ||
-                                        'awaiting_funding',
-                                      )}`}
-                                    >
-                                      {humanizeStatus(
-                                        transactionCardMeta?.protection_status ||
-                                        'awaiting_funding',
-                                      )}
-                                    </span>
+
+                                  <div className="mx-3 rounded-2xl bg-[#f6f8f7] p-2.5 dark:bg-white/[0.07]">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#667781] dark:text-[#aebac1]">
+                                          {chatLocale === 'id'
+                                            ? 'Nominal'
+                                            : 'Amount'}
+                                        </p>
+                                        <p className="mt-0.5 text-base font-black leading-5 text-emerald-700 dark:text-emerald-200">
+                                          {formatMoney(
+                                            transactionCardMeta?.amount_cents,
+                                            transactionCardMeta?.currency,
+                                          )}
+                                        </p>
+                                      </div>
+                                      <span
+                                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black ${statusTone(transactionCardStatus)}`}
+                                      >
+                                        {humanizeStatus(transactionCardStatus)}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 flex items-center justify-between gap-2">
+                                      <p className="line-clamp-2 text-[12px] font-semibold leading-4 text-[#27343a] dark:text-[#d8e3e2]">
+                                        {transactionCardNextStep ||
+                                          (chatLocale === 'id'
+                                            ? 'Menunggu pembaruan transaksi'
+                                            : 'Waiting for transaction update')}
+                                      </p>
+                                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-800 dark:bg-emerald-300/14 dark:text-emerald-100">
+                                        {transactionCardProgress}%
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dfe7e3] dark:bg-white/[0.12]">
+                                      <div
+                                        className="h-full rounded-full bg-emerald-600 dark:bg-emerald-300"
+                                        style={{
+                                          width: `${transactionCardProgress}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-1.5 px-3 pt-2 text-[10px] font-bold">
                                     <span
                                       className={`rounded-full border px-2 py-0.5 ${paymentTone(transactionCardPaymentStatus)}`}
                                     >
@@ -5602,47 +6067,50 @@ export default function ChatRoomPage() {
                                         transactionCardPaymentStatus,
                                       )}
                                     </span>
-                                  </div>
-                                  <div className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_18%,_transparent)] px-3 py-2">
-                                    <div className="flex items-center justify-between gap-2 text-[11px]">
-                                      <p className="font-semibold opacity-90">
-                                        {transactionCardNextStep ||
-                                          (chatLocale === 'id'
-                                            ? 'Menunggu pembaruan transaksi'
-                                            : 'Waiting for transaction update')}
-                                      </p>
-                                      <span className="font-bold text-[color:var(--app-accent)]">
-                                        {transactionCardProgress}%
-                                      </span>
-                                    </div>
-                                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface)_45%,_transparent)]">
-                                      <div
-                                        className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)]"
-                                        style={{
-                                          width: `${transactionCardProgress}%`,
-                                        }}
-                                      />
-                                    </div>
-                                    <p className="mt-2 text-[11px] opacity-80">
+                                    <span
+                                      className={`rounded-full border px-2 py-0.5 ${protectionTone(
+                                        transactionCardProtectionStatus,
+                                      )}`}
+                                    >
                                       {humanizeStatus(
-                                        transactionCardMeta?.deal_kind ||
-                                        'deal',
-                                      )}{' '}
-                                      |{' '}
-                                      {humanizeStatus(
-                                        transactionCardMeta?.fulfillment_mode ||
-                                        'standard',
+                                        transactionCardProtectionStatus,
                                       )}
-                                    </p>
+                                    </span>
+                                    {typeof ticketMeta.reference === 'string' &&
+                                      ticketMeta.reference.trim() ? (
+                                      <span className="rounded-full border border-[#d8e3df] px-2 py-0.5 text-[#667781] dark:border-white/10 dark:text-[#aebac1]">
+                                        {ticketMeta.reference}
+                                      </span>
+                                    ) : null}
                                   </div>
+
                                   {typeof transactionCardMeta?.response_message ===
                                     'string' &&
                                     transactionCardMeta.response_message.trim() && (
-                                      <p className="mt-2 rounded-xl bg-[color:color-mix(in_srgb,_var(--app-overlay)_20%,_transparent)] px-3 py-2 text-xs opacity-90">
+                                      <p className="mx-3 mt-2 rounded-2xl bg-[#f2f5f4] px-3 py-2 text-xs font-semibold text-[#27343a] dark:bg-white/[0.08] dark:text-[#d8e3e2]">
                                         {transactionCardMeta.response_message}
                                       </p>
                                     )}
-                                  <div className="mt-2 flex flex-wrap gap-1.5">
+
+                                  <div className="flex flex-wrap gap-2 p-3 pt-2">
+                                    {transactionShouldShowPay ? (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          openPaymentForTransaction({
+                                            transaction_id: transactionCardId,
+                                            amount_cents:
+                                              transactionCardMeta?.amount_cents,
+                                            currency:
+                                              transactionCardMeta?.currency,
+                                          })
+                                        }
+                                        className="inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-full bg-emerald-600 px-3 text-xs font-black text-white shadow-[0_12px_24px_-18px_rgba(4,120,87,0.85)] hover:bg-emerald-700 dark:bg-emerald-400 dark:text-[#052e1a] dark:hover:bg-emerald-300"
+                                      >
+                                        <Wallet className="h-3.5 w-3.5" />
+                                        {chatLocale === 'id' ? 'Bayar' : 'Pay'}
+                                      </button>
+                                    ) : null}
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -5658,32 +6126,10 @@ export default function ChatRoomPage() {
                                             setSelectedTransaction(found);
                                         })();
                                       }}
-                                      className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
+                                      className="inline-flex min-h-[34px] flex-1 items-center justify-center rounded-full border border-[#d4e1dc] bg-white px-3 text-xs font-black text-[#0f3f2e] hover:bg-emerald-50 dark:border-white/10 dark:bg-white/[0.08] dark:text-[#e9edef] dark:hover:bg-white/[0.12]"
                                     >
-                                      {chatLocale === 'id'
-                                        ? 'Buka transaksi'
-                                        : 'Open transaction'}
+                                      {chatLocale === 'id' ? 'Buka' : 'Open'}
                                     </button>
-                                    {transactionShouldShowPay ? (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          openPaymentForTransaction({
-                                            transaction_id: transactionCardId,
-                                            amount_cents:
-                                              transactionCardMeta?.amount_cents,
-                                            currency:
-                                              transactionCardMeta?.currency,
-                                          })
-                                        }
-                                        className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_30%,_transparent)]"
-                                      >
-                                        <Wallet className="h-3.5 w-3.5" />
-                                        {chatLocale === 'id'
-                                          ? 'Bayar sekarang'
-                                          : 'Pay now'}
-                                      </button>
-                                    ) : null}
                                   </div>
                                 </div>
                               )}
@@ -5845,72 +6291,206 @@ export default function ChatRoomPage() {
             accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
           />
 
-          {draftAttachments.length > 0 && (
-            <div className="rounded-[20px] border border-black/5 bg-white/82 p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21]/82">
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {draftAttachments.map(attachment => (
-                  <div
-                    key={attachment.id}
-                    className="relative min-w-[112px] max-w-[136px] rounded-2xl border border-black/5 bg-[#f8fafb] p-2 shadow-sm dark:border-white/8 dark:bg-[#202c33]"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => removeDraftAttachment(attachment.id)}
-                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[#54656f] shadow-md dark:bg-[#111b21] dark:text-[#aebac1]"
-                      title="Remove attachment"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+          {activeDraftAttachment && (
+            <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white/90 p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21]/90">
+              <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                <div className="min-w-0">
+                  <p className="truncate text-[12px] font-black text-[#111b21] dark:text-[#e9edef]">
+                    Preview sebelum kirim
+                  </p>
+                  <p className="truncate text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
+                    {draftAttachments.length > 1
+                      ? `${activeDraftAttachmentIndex + 1}/${draftAttachments.length} file`
+                      : '1 file'}
+                    {' - '}
+                    {isUploadingAttachments
+                      ? 'Upload masih jalan'
+                      : 'Siap dikirim'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => clearDraftAttachments()}
+                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-black/5 bg-[#f0f2f5] px-3 text-[11px] font-black text-[#54656f] transition hover:bg-[#e9edef] dark:border-white/8 dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
+                >
+                  Hapus semua
+                </button>
+              </div>
 
-                    {attachment.type === 'image' && attachment.previewUrl ? (
-                      <img
-                        src={attachment.previewUrl}
-                        alt={attachment.name}
-                        className="h-24 w-full rounded-xl border border-black/5 object-cover dark:border-white/8"
-                      />
-                    ) : attachment.type === 'video' && attachment.previewUrl ? (
-                      <video
-                        src={attachment.previewUrl}
-                        className="h-24 w-full rounded-xl border border-black/5 object-cover dark:border-white/8"
-                        muted
-                        loop
-                        playsInline
-                      />
-                    ) : (
-                      <div className="flex h-24 flex-col items-center justify-center gap-1 text-xs text-[#667781] dark:text-[#8696a0]">
-                        <Paperclip className="w-5 h-5" />
-                        <span className="text-center line-clamp-2">
-                          {attachment.name}
-                        </span>
+              <div
+                className="relative overflow-hidden rounded-[20px] bg-[#0b141a]"
+                onTouchStart={event => {
+                  if (draftAttachments.length < 2) return;
+                  attachmentTouchStartXRef.current =
+                    event.touches[0]?.clientX ?? null;
+                }}
+                onTouchEnd={event => {
+                  if (draftAttachments.length < 2) return;
+                  const startX = attachmentTouchStartXRef.current;
+                  const endX = event.changedTouches[0]?.clientX ?? null;
+                  attachmentTouchStartXRef.current = null;
+                  if (startX == null || endX == null) return;
+                  const deltaX = endX - startX;
+                  if (Math.abs(deltaX) < 42) return;
+                  showDraftAttachmentAtOffset(deltaX < 0 ? 1 : -1);
+                }}
+              >
+                <div className="flex min-h-[230px] items-center justify-center sm:min-h-[320px]">
+                  {activeDraftAttachment.type === 'image' &&
+                    activeDraftAttachment.previewUrl ? (
+                    <img
+                      src={activeDraftAttachment.previewUrl}
+                      alt={activeDraftAttachment.name}
+                      className="max-h-[52vh] w-full object-contain"
+                    />
+                  ) : activeDraftAttachment.type === 'video' &&
+                    activeDraftAttachment.previewUrl ? (
+                    <video
+                      src={activeDraftAttachment.previewUrl}
+                      className="max-h-[52vh] w-full object-contain"
+                      muted
+                      loop
+                      playsInline
+                      controls
+                    />
+                  ) : (
+                    <div className="flex min-h-[230px] w-full flex-col items-center justify-center gap-3 px-6 text-center text-white/82 sm:min-h-[320px]">
+                      <span className="inline-flex h-16 w-16 items-center justify-center rounded-[22px] bg-white/10 text-white">
+                        <Paperclip className="h-7 w-7" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-black">
+                          {activeDraftAttachment.name}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-white/58">
+                          {formatFileSize(activeDraftAttachment.size)}
+                        </p>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    <div className="mt-2 flex items-center justify-between text-[11px] text-[#667781] dark:text-[#8696a0]">
-                      <span>{formatFileSize(attachment.size)}</span>
-                      {attachment.status === 'uploading' && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeDraftAttachment(activeDraftAttachment.id)
+                    }
+                    className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white shadow-sm transition hover:bg-black/72"
+                    title="Remove attachment"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+
+                  {draftAttachments.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => showDraftAttachmentAtOffset(-1)}
+                        className="absolute left-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
+                        aria-label="Previous attachment"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => showDraftAttachmentAtOffset(1)}
+                        className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/48 text-white shadow-sm transition hover:bg-black/70"
+                        aria-label="Next attachment"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/76 via-black/36 to-transparent px-3 pb-3 pt-8">
+                  <div className="flex min-w-0 items-center justify-between gap-3 text-white">
+                    <div className="min-w-0">
+                      <p className="truncate text-[12px] font-black">
+                        {activeDraftAttachment.name}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] font-semibold text-white/64">
+                        {formatFileSize(activeDraftAttachment.size)}
+                      </p>
+                    </div>
+                    {activeDraftAttachment.status === 'uploading' ? (
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-black text-white">
                         <Loader2
-                          className="w-3 h-3 animate-spin text-[#25d366]"
+                          className="h-3.5 w-3.5 animate-spin"
                           aria-label="Uploading"
                         />
-                      )}
-                      {attachment.status === 'error' && (
-                        <button
-                          type="button"
-                          onClick={() => retryAttachmentUpload(attachment.id)}
-                          className="text-[#128c7e] hover:underline dark:text-[#25d366]"
-                        >
-                          Retry
-                        </button>
-                      )}
-                    </div>
+                        Upload
+                      </span>
+                    ) : activeDraftAttachment.status === 'error' ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          retryAttachmentUpload(activeDraftAttachment.id)
+                        }
+                        className="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-[#128c7e]"
+                      >
+                        Retry
+                      </button>
+                    ) : (
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-[#25d366] px-2.5 py-1 text-[11px] font-black text-[#0b141a]">
+                        Siap
+                      </span>
+                    )}
                   </div>
-                ))}
+                </div>
               </div>
-              <p className="mt-1 text-xs text-[#667781] dark:text-[#8696a0]">
-                {isUploadingAttachments
-                  ? 'Uploading attachments...'
-                  : 'Attachments ready to send'}
-              </p>
+
+              {draftAttachments.length > 1 && (
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {draftAttachments.map((attachment, index) => {
+                    const isActive = attachment.id === activeDraftAttachment.id;
+                    return (
+                      <button
+                        key={attachment.id}
+                        type="button"
+                        onClick={() =>
+                          setActiveDraftAttachmentId(attachment.id)
+                        }
+                        className={`relative h-[58px] w-[58px] shrink-0 overflow-hidden rounded-[14px] border transition ${isActive
+                          ? 'border-[#25d366] ring-2 ring-[#25d366]/28'
+                          : 'border-black/5 opacity-72 hover:opacity-100 dark:border-white/8'
+                          }`}
+                        aria-label={`Open attachment ${index + 1}`}
+                      >
+                        {attachment.type === 'image' &&
+                          attachment.previewUrl ? (
+                          <img
+                            src={attachment.previewUrl}
+                            alt={attachment.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : attachment.type === 'video' &&
+                          attachment.previewUrl ? (
+                          <video
+                            src={attachment.previewUrl}
+                            className="h-full w-full object-cover"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center bg-[#f0f2f5] text-[#667781] dark:bg-[#202c33] dark:text-[#aebac1]">
+                            <Paperclip className="h-5 w-5" />
+                          </span>
+                        )}
+                        {attachment.status === 'uploading' && (
+                          <span className="absolute inset-0 grid place-items-center bg-black/36 text-white">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </span>
+                        )}
+                        {attachment.status === 'error' && (
+                          <span className="absolute inset-x-1 bottom-1 rounded-full bg-white px-1 py-0.5 text-[9px] font-black text-[#d14343]">
+                            Retry
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -5991,7 +6571,8 @@ export default function ChatRoomPage() {
                 </button>
               </div>
 
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {/* CONTAINER INPUT & EMOJI */}
                 <div className="relative min-w-0 flex-1">
                   <input
                     ref={messageInputRef}
@@ -6010,23 +6591,24 @@ export default function ChatRoomPage() {
                       }
                     }}
                     placeholder={
-                      chatLocale === 'id' ? 'Ketik pesan' : 'Type a message'
+                      chatLocale === 'id' ? 'Ketik pesan...' : 'Type a message...'
                     }
-                    className="h-10 w-full rounded-[18px] border border-transparent bg-transparent px-2 text-[14px] font-semibold text-[#111b21] placeholder:text-[#667781] outline-none transition focus:border-[#25d366]/35 focus:bg-[#f7fff8] dark:text-[#e9edef] dark:placeholder:text-[#8696a0] dark:focus:bg-[#202c33]"
+                    className="h-10 w-full rounded-xl bg-zinc-100/80 px-4 text-sm font-medium text-zinc-800 placeholder:text-zinc-400 outline-none transition-all duration-200 focus:bg-zinc-100 dark:bg-zinc-800/60 dark:text-zinc-200 dark:placeholder:text-zinc-500 dark:focus:bg-zinc-800"
                   />
 
+                  {/* FLOATING EMOJI PICKER PREMIUM */}
                   {showEmojiPicker && (
                     <div
                       ref={emojiPickerRef}
-                      className="absolute bottom-full left-1/2 z-40 mb-2 w-[min(300px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-black/5 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-[#202c33] sm:left-0 sm:w-[300px] sm:translate-x-0"
+                      className="absolute bottom-full left-1/2 z-40 mb-3 w-[min(300px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-zinc-100 bg-white/95 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95 sm:left-0 sm:w-[300px] sm:translate-x-0"
                     >
-                      <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6 sm:gap-2">
+                      <div className="grid grid-cols-5 gap-1 sm:grid-cols-6 sm:gap-1.5">
                         {QUICK_EMOJIS.map(emoji => (
                           <button
                             key={emoji}
                             type="button"
                             onClick={() => handleEmojiPick(emoji)}
-                            className="rounded-lg p-1.5 text-lg transition-colors hover:bg-[#f0f2f5] dark:hover:bg-[#2a3942] sm:p-2 sm:text-xl"
+                            className="rounded-lg p-1.5 text-lg transition-all hover:bg-zinc-100 hover:scale-110 active:scale-95 dark:hover:bg-zinc-800 sm:p-2 sm:text-xl"
                           >
                             {emoji}
                           </button>
@@ -6039,16 +6621,14 @@ export default function ChatRoomPage() {
                 <button
                   type="button"
                   onClick={() => void handleSend()}
-                  disabled={
-                    !canSendMessage || sending || isUploadingAttachments
-                  }
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#25d366] text-[#111b21] transition hover:bg-[#22c55e] disabled:cursor-not-allowed disabled:bg-[#dfe5e7] disabled:text-[#7b8b94] disabled:opacity-100 dark:disabled:bg-[#374248] dark:disabled:text-[#8696a0]"
+                  disabled={!canSendMessage || sending || isUploadingAttachments}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm transition-all duration-200 hover:bg-emerald-600 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 disabled:shadow-none dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:disabled:bg-zinc-800/50 dark:disabled:text-zinc-600"
                   title="Send"
                 >
                   {sending ? (
-                    <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Send className="h-4.5 w-4.5" />
+                    <Send className="h-4 w-4 tracking-wide" />
                   )}
                 </button>
               </div>
@@ -6517,18 +7097,19 @@ export default function ChatRoomPage() {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-8">
-              <div className="ui-feed-tile rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-8">
+              <div className="ui-feed-tile rounded-[24px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                       AI Pribadi
                     </p>
-                    <h4 className="mt-1 text-sm font-semibold text-[color:var(--app-text-soft)]">
-                      {aiProfileName || 'AI Pribadi'}
+                    <h4 className="mt-1 text-base font-black text-[color:var(--app-text)]">
+                      Balas seperti kamu
                     </h4>
-                    <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
-                      Atur gaya balasan AI untuk room ini.
+                    <p className="mt-1 max-w-[28rem] text-xs font-medium leading-5 text-[color:var(--app-text-soft)]">
+                      AI hanya belajar dari pesan yang kamu kirim sendiri. Pesan
+                      lawan bicara tidak dipakai buat gaya balasan.
                     </p>
                   </div>
                   <button
@@ -6537,40 +7118,158 @@ export default function ChatRoomPage() {
                       setShowChatSettings(false);
                       openAiWorkspace('reply');
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-inverse)]"
+                    className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)]"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     Buka AI
                   </button>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => setAiUseContext(prev => !prev)}
                     aria-pressed={aiUseContext}
-                    className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiUseContext
-                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                    className={`rounded-[18px] border p-3 text-left transition ${aiUseContext
+                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
                       }`}
                   >
-                    Konteks
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-black">
+                        Belajar gaya saya
+                      </span>
+                      {aiUseContext ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : null}
+                    </span>
+                    <span className="mt-1 block text-[11px] font-semibold leading-4 opacity-80">
+                      Pakai maksimal 8 pesan terakhir dari saya saja.
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setAiAutoSend(prev => !prev)}
                     aria-pressed={aiAutoSend}
-                    className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiAutoSend
-                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                    className={`rounded-[18px] border p-3 text-left transition ${aiAutoSend
+                      ? 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_12%,_transparent)] text-[color:var(--app-warning)]'
+                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
                       }`}
                   >
-                    {aiAutoSend ? 'Auto send' : 'Manual'}
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-black">
+                        {aiAutoSend ? 'Auto kirim' : 'Review dulu'}
+                      </span>
+                      {aiAutoSend ? <CheckCircle2 className="h-4 w-4" /> : null}
+                    </span>
+                    <span className="mt-1 block text-[11px] font-semibold leading-4 opacity-80">
+                      {aiAutoSend
+                        ? 'AI langsung kirim setelah draft jadi.'
+                        : 'Lebih aman: cek draft sebelum dikirim.'}
+                    </span>
                   </button>
                 </div>
 
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <label className={CHAT_FIELD_LABEL_CLASS}>
+                <div className="mt-4">
+                  <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+                    Gaya balasan
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {AI_TONES.map(tone => (
+                      <button
+                        key={tone.id}
+                        type="button"
+                        onClick={() => setAiToneId(tone.id)}
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiToneId === tone.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                          }`}
+                      >
+                        {tone.label}
+                      </button>
+                    ))}
+                    {AI_LENGTHS.map(length => (
+                      <button
+                        key={length.id}
+                        type="button"
+                        onClick={() => setAiLengthId(length.id)}
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiLengthId === length.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                          }`}
+                      >
+                        {length.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+                    Tujuan balasan
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {AI_TEMPLATES.map(template => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => setAiTemplateId(template.id)}
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiTemplateId === template.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                          }`}
+                      >
+                        {template.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className={`mt-4 ${CHAT_FIELD_LABEL_CLASS}`}>
+                  Instruksi singkat
+                  <input
+                    type="text"
+                    value={aiInstruction}
+                    onChange={event => setAiInstruction(event.target.value)}
+                    className={CHAT_CONTROL_CLASS}
+                    placeholder="Contoh: fokus ke harga dan deadline"
+                  />
+                </label>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {AI_PROMPT_EXAMPLES.map(example => (
+                    <button
+                      key={example.id}
+                      type="button"
+                      onClick={() => setAiInstruction(example.prompt)}
+                      className="rounded-full border border-[color:var(--app-border-strong)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
+                    >
+                      {example.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-4 rounded-[18px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
+                  <div className="flex items-start gap-2">
+                    <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-[color:var(--app-text)]">
+                        Izin konteks dibuat ketat
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]">
+                        Saat aktif, payload AI cuma berisi contoh pesan milik
+                        kamu. Jika butuh membalas detail dari lawan bicara,
+                        tulis poinnya dulu di input chat.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <details className="mt-3 rounded-[18px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
+                  <summary className="cursor-pointer text-xs font-black text-[color:var(--app-text)]">
+                    Pengaturan lanjutan
+                  </summary>
+                  <label className={`mt-3 ${CHAT_FIELD_LABEL_CLASS}`}>
                     Nama AI
                     <input
                       type="text"
@@ -6580,88 +7279,7 @@ export default function ChatRoomPage() {
                       placeholder="AI Pribadi"
                     />
                   </label>
-                  <label className={CHAT_FIELD_LABEL_CLASS}>
-                    Nada
-                    <select
-                      value={aiToneId}
-                      onChange={event => {
-                        const next = event.target.value;
-                        if (isAiToneId(next)) setAiToneId(next);
-                      }}
-                      className={CHAT_CONTROL_CLASS}
-                    >
-                      {AI_TONES.map(tone => (
-                        <option key={tone.id} value={tone.id}>
-                          {tone.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <label className={CHAT_FIELD_LABEL_CLASS}>
-                    Panjang
-                    <select
-                      value={aiLengthId}
-                      onChange={event => {
-                        const next = event.target.value;
-                        if (isAiLengthId(next)) setAiLengthId(next);
-                      }}
-                      className={CHAT_CONTROL_CLASS}
-                    >
-                      {AI_LENGTHS.map(length => (
-                        <option key={length.id} value={length.id}>
-                          {length.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className={CHAT_FIELD_LABEL_CLASS}>
-                    Instruksi tambahan
-                    <input
-                      type="text"
-                      value={aiInstruction}
-                      onChange={event => setAiInstruction(event.target.value)}
-                      className={CHAT_CONTROL_CLASS}
-                      placeholder="Contoh: fokus ke harga dan deadline"
-                    />
-                  </label>
-                </div>
-
-                <div className="mt-3">
-                  <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                    Template default
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {AI_TEMPLATES.map(template => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => setAiTemplateId(template.id)}
-                        className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiTemplateId === template.id
-                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                          }`}
-                      >
-                        {template.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {AI_PROMPT_EXAMPLES.map(example => (
-                    <button
-                      key={example.id}
-                      type="button"
-                      onClick={() => setAiInstruction(example.prompt)}
-                      className="rounded-full border border-[color:var(--app-border-strong)] px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
-                    >
-                      {example.label}
-                    </button>
-                  ))}
-                </div>
+                </details>
               </div>
             </div>
           </div>
@@ -6985,6 +7603,8 @@ export default function ChatRoomPage() {
                     const isSelected = selectedTransaction?.id === txn.id;
                     const txnProgressPercent =
                       getTransactionProgressPercent(txn);
+                    const txnIsTerminal =
+                      status === 'completed' || status === 'cancelled';
                     const txnWaitingParty = getTransactionWaitingParty(
                       txn,
                       user?.id,
@@ -7043,30 +7663,54 @@ export default function ChatRoomPage() {
                               <span
                                 className={`rounded-full border px-2 py-0.5 ${statusTone(status)}`}
                               >
-                                {humanizeStatus(status)}
+                                {formatTransactionStatusLabel(
+                                  status,
+                                  chatLocale,
+                                )}
                               </span>
                               <span
                                 className={`rounded-full border px-2 py-0.5 ${protectionTone(protection)}`}
                               >
-                                {humanizeStatus(protection)}
+                                {formatProtectionStatusLabel(
+                                  protection,
+                                  chatLocale,
+                                )}
                               </span>
                               <span
-                                className={`rounded-full border px-2 py-0.5 ${paymentTone(paymentStatus)}`}
+                                className={`rounded-full border px-2 py-0.5 ${protection === 'refunded'
+                                  ? protectionTone(protection)
+                                  : paymentTone(paymentStatus)
+                                  }`}
                               >
-                                {humanizeStatus(paymentStatus)}
+                                {formatPaymentStatusLabel(txn, chatLocale)}
                               </span>
                             </div>
                             <div className="mt-2">
                               <div className="flex items-center justify-between text-[10px] text-[color:var(--app-text-soft)]">
-                                <span>Progress</span>
-                                <span>{txnProgressPercent}%</span>
+                                <span>
+                                  {txnIsTerminal
+                                    ? chatLocale === 'id'
+                                      ? 'Status'
+                                      : 'Status'
+                                    : 'Progress'}
+                                </span>
+                                <span>
+                                  {txnIsTerminal
+                                    ? formatTransactionStatusLabel(
+                                      status,
+                                      chatLocale,
+                                    )
+                                    : `${txnProgressPercent}%`}
+                                </span>
                               </div>
-                              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)]"
-                                  style={{ width: `${txnProgressPercent}%` }}
-                                />
-                              </div>
+                              {!txnIsTerminal || status === 'completed' ? (
+                                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)]"
+                                    style={{ width: `${txnProgressPercent}%` }}
+                                  />
+                                </div>
+                              ) : null}
                               <p className="mt-1 truncate text-[10px] font-medium text-[color:var(--app-text-soft)]">
                                 {txnWaitingParty}
                               </p>
@@ -7115,31 +7759,35 @@ export default function ChatRoomPage() {
               <span
                 className={`rounded-full border px-2 py-0.5 ${statusTone(selectedTxnStatus)}`}
               >
-                {humanizeStatus(selectedTxnStatus)}
+                {formatTransactionStatusLabel(selectedTxnStatus, chatLocale)}
               </span>
               <span
                 className={`rounded-full border px-2 py-0.5 ${protectionTone(
                   selectedTxnProtectionStatus,
                 )}`}
               >
-                {humanizeStatus(selectedTxnProtectionStatus)}
+                {formatProtectionStatusLabel(
+                  selectedTxnProtectionStatus,
+                  chatLocale,
+                )}
               </span>
               <span
-                className={`rounded-full border px-2 py-0.5 ${paymentTone(
-                  selectedTxnPaymentStatus,
-                )}`}
+                className={`rounded-full border px-2 py-0.5 ${selectedTxnProtectionStatus === 'refunded'
+                  ? protectionTone(selectedTxnProtectionStatus)
+                  : paymentTone(selectedTxnPaymentStatus)
+                  }`}
               >
                 {chatLocale === 'id' ? 'Pembayaran' : 'Payment'}:{' '}
-                {humanizeStatus(selectedTxnPaymentStatus)}
+                {formatPaymentStatusLabel(selectedTransaction, chatLocale)}
               </span>
               <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
                 {selectedTxnIsBuyer
                   ? chatLocale === 'id'
-                    ? 'Peran: Buyer'
+                    ? 'Peran: Pembeli'
                     : 'Role: Buyer'
                   : selectedTxnIsSeller
                     ? chatLocale === 'id'
-                      ? 'Peran: Seller'
+                      ? 'Peran: Penjual'
                       : 'Role: Seller'
                     : chatLocale === 'id'
                       ? 'Penonton'
@@ -7161,23 +7809,58 @@ export default function ChatRoomPage() {
                 </div>
               )}
 
+            <div
+              className={`mb-3 rounded-xl border p-3 ${outcomeToneClass(
+                selectedTxnOutcome.tone,
+              )}`}
+            >
+              <div className="flex items-start gap-2.5">
+                {selectedTxnOutcome.terminal ? (
+                  selectedTxnOutcome.tone === 'success' ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  )
+                ) : (
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-black">
+                    {selectedTxnOutcome.title}
+                  </p>
+                  <p className="mt-1 text-xs font-medium leading-5 opacity-90">
+                    {selectedTxnOutcome.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="mb-3 rounded-xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
                   {chatLocale === 'id'
-                    ? 'Progress transaksi'
-                    : 'Transaction progress'}
+                    ? selectedTxnOutcome.terminal
+                      ? 'Status alur'
+                      : 'Progress transaksi'
+                    : selectedTxnOutcome.terminal
+                      ? 'Flow status'
+                      : 'Transaction progress'}
                 </p>
                 <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  {selectedTxnProgressPercent}%
+                  {selectedTxnOutcome.terminal
+                    ? selectedTxnOutcome.progressLabel
+                    : `${selectedTxnProgressPercent}%`}
                 </span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)] transition-all"
-                  style={{ width: `${selectedTxnProgressPercent}%` }}
-                />
-              </div>
+              {!selectedTxnOutcome.terminal ||
+                selectedTxnStatus === 'completed' ? (
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)] transition-all"
+                    style={{ width: `${selectedTxnProgressPercent}%` }}
+                  />
+                </div>
+              ) : null}
               <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
                 {selectedTxnWaitingParty}
               </p>
@@ -7185,22 +7868,13 @@ export default function ChatRoomPage() {
                 {selectedTxnSteps.map((step, index) => (
                   <div
                     key={`${selectedTransaction.id}-step-${step.key}`}
-                    className={`rounded-lg border px-2 py-1.5 text-[11px] ${step.done
-                      ? 'border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] text-[color:var(--app-accent)]'
-                      : step.active
-                        ? 'border-[color:color-mix(in_srgb,_var(--app-info-border)_50%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] text-[color:var(--app-info)]'
-                        : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]'
-                      }`}
+                    className={`rounded-lg border px-2 py-1.5 text-[11px] ${transactionStepToneClass(step)}`}
                   >
                     <p className="font-semibold">
                       {index + 1}. {step.label}
                     </p>
                     <p className="mt-0.5">
-                      {step.done
-                        ? 'Selesai'
-                        : step.active
-                          ? 'Sedang berjalan'
-                          : 'Menunggu'}
+                      {transactionStepStateLabel(step, chatLocale)}
                     </p>
                   </div>
                 ))}
@@ -7233,19 +7907,31 @@ export default function ChatRoomPage() {
                 </p>
               </div>
               <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2">
-                <p className="text-[color:var(--app-text-soft)]">Deal</p>
+                <p className="text-[color:var(--app-text-soft)]">
+                  {chatLocale === 'id' ? 'Jenis' : 'Deal'}
+                </p>
                 <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
-                  {String(selectedTransaction.deal_kind || '-')}
+                  {formatDealKindLabel(
+                    selectedTransaction.deal_kind,
+                    chatLocale,
+                  )}
                 </p>
               </div>
               <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2">
-                <p className="text-[color:var(--app-text-soft)]">Fulfillment</p>
+                <p className="text-[color:var(--app-text-soft)]">
+                  {chatLocale === 'id' ? 'Pemenuhan' : 'Fulfillment'}
+                </p>
                 <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
-                  {String(selectedTransaction.fulfillment_mode || '-')}
+                  {formatFulfillmentModeLabel(
+                    selectedTransaction.fulfillment_mode,
+                    chatLocale,
+                  )}
                 </p>
               </div>
               <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2">
-                <p className="text-[color:var(--app-text-soft)]">Last Update</p>
+                <p className="text-[color:var(--app-text-soft)]">
+                  {chatLocale === 'id' ? 'Update terakhir' : 'Last update'}
+                </p>
                 <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
                   {formatDateTimeLabel(
                     selectedTransaction.updated_at ||
@@ -7255,7 +7941,8 @@ export default function ChatRoomPage() {
               </div>
             </div>
 
-            {typeof selectedTxnTicket.next_step === 'string' &&
+            {!selectedTxnOutcome.terminal &&
+              typeof selectedTxnTicket.next_step === 'string' &&
               selectedTxnTicket.next_step.trim() && (
                 <div className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
                   <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
@@ -7350,7 +8037,9 @@ export default function ChatRoomPage() {
               open
             >
               <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                Ringkasan Aktivitas
+                {chatLocale === 'id'
+                  ? 'Ringkasan aktivitas'
+                  : 'Activity summary'}
               </summary>
               <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
                 {(
@@ -7364,13 +8053,16 @@ export default function ChatRoomPage() {
                     <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[color:var(--app-accent)]" />
                     <div>
                       <p className="font-semibold">
-                        {humanizeStatus(item.status || item.event || 'updated')}
+                        {timelineStatusLabel(item, chatLocale)}
                       </p>
                       {'description' in item &&
                         typeof item.description === 'string' &&
                         item.description.trim() ? (
                         <p className="text-[11px] text-[color:color-mix(in_srgb,_var(--app-text-soft)_90%,_transparent)]">
-                          {item.description}
+                          {timelineDescriptionLabel(
+                            item.description,
+                            chatLocale,
+                          )}
                         </p>
                       ) : null}
                       <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -7386,13 +8078,15 @@ export default function ChatRoomPage() {
               selectedTransaction.response_message) && (
                 <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
                   <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                    Catatan Negosiasi
+                    {chatLocale === 'id'
+                      ? 'Catatan negosiasi'
+                      : 'Negotiation notes'}
                   </summary>
                   <div className="mt-2 space-y-2">
                     {selectedTransaction.offer_message ? (
                       <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
                         <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                          Catatan Buyer
+                          {chatLocale === 'id' ? 'Catatan pembeli' : 'Buyer note'}
                         </p>
                         <p>{selectedTransaction.offer_message}</p>
                       </div>
@@ -7400,7 +8094,9 @@ export default function ChatRoomPage() {
                     {selectedTransaction.response_message ? (
                       <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
                         <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                          Catatan Seller
+                          {chatLocale === 'id'
+                            ? 'Catatan penjual'
+                            : 'Seller note'}
                         </p>
                         <p>{selectedTransaction.response_message}</p>
                       </div>

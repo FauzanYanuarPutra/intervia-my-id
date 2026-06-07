@@ -3,9 +3,11 @@ import { routes } from '@/lib/routes';
 import { findRouteConfig } from '@/lib/routesHelpers';
 
 const DEFAULT_META: MetaType = {
+  topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
   navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
   bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
   footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+  isDisabled: false, // Tambahkan properti isDisabled dengan nilai default false
 };
 
 const LOCALES = new Set(['en', 'id']);
@@ -23,5 +25,13 @@ export function stripLocaleFromPath(pathname: string): string {
 export function getPageMeta(pathname: string): MetaType {
   const normalizedPath = stripLocaleFromPath(pathname);
   const route = findRouteConfig(normalizedPath, routes);
-  return route?.meta ?? DEFAULT_META;
+
+  return route
+    ? {
+      ...DEFAULT_META,
+      ...route.meta,
+      isDisabled: route.isDisabled ?? false,
+    }
+    : DEFAULT_META;
 }
+

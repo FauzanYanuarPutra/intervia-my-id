@@ -11,6 +11,10 @@ import {
   formatIDRFromCents,
   parseImages,
 } from '@/lib/content/catalog';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 
 const MARKETPLACE_BASE =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -48,7 +52,9 @@ async function fetchPropertyContent(slug: string): Promise<ContentItem | null> {
       { cache: 'no-store' },
     );
     if (byIdRes.ok) {
-      const item = (await byIdRes.json().catch(() => null)) as ContentItem | null;
+      const item = (await byIdRes
+        .json()
+        .catch(() => null)) as ContentItem | null;
       if (item?.id) return item;
     }
   } catch {
@@ -62,14 +68,17 @@ async function fetchPropertyContent(slug: string): Promise<ContentItem | null> {
       limit: '20',
       offset: '0',
     });
-    const res = await fetch(`${MARKETPLACE_BASE}/v1/content?${query.toString()}`, {
-      cache: 'no-store',
-    });
+    const res = await fetch(
+      `${MARKETPLACE_BASE}/v1/content?${query.toString()}`,
+      {
+        cache: 'no-store',
+      },
+    );
     if (!res.ok) return null;
     const payload = await res.json().catch(() => []);
     const items = extractContentItems(payload);
     return (
-      items.find((item) => item.slug === slug || String(item.id) === slug) || null
+      items.find(item => item.slug === slug || String(item.id) === slug) || null
     );
   } catch {
     return null;
@@ -80,11 +89,14 @@ function splitTextBlock(text?: string): string[] {
   if (!text) return [];
   return text
     .split(/\n+/)
-    .map((line) => line.trim())
+    .map(line => line.trim())
     .filter(Boolean);
 }
 
-function mapToPropertyDetail(item: ContentItem): PropertyDetailView {
+function mapToPropertyDetail(
+  item: ContentItem,
+  locale: 'id' | 'en' = 'id',
+): PropertyDetailView {
   const meta = item.metadata || {};
   const statusRaw = (
     asString(meta.status_type) ||
@@ -95,28 +107,39 @@ function mapToPropertyDetail(item: ContentItem): PropertyDetailView {
   ).toLowerCase();
 
   let statusType: 'sale' | 'rent' | 'sold' = 'sale';
-  if (statusRaw.includes('rent') || statusRaw.includes('sewa')) statusType = 'rent';
-  if (statusRaw.includes('sold') || statusRaw.includes('terjual')) statusType = 'sold';
+  if (statusRaw.includes('rent') || statusRaw.includes('sewa'))
+    statusType = 'rent';
+  if (statusRaw.includes('sold') || statusRaw.includes('terjual'))
+    statusType = 'sold';
 
   const images = parseImages(item);
   const features = Array.isArray(meta.features)
     ? (meta.features as Array<unknown>)
-        .map((entry) => asString(entry))
+        .map(entry => asString(entry))
         .filter((entry): entry is string => Boolean(entry))
     : [];
   const description =
-    splitTextBlock(item.body || item.summary || asString(meta.description)) || [];
+    splitTextBlock(item.body || item.summary || asString(meta.description)) ||
+    [];
+  const price = formatIDRFromCents(item.price_cents);
+  const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const fallbackPriceLabel = asString(meta.price_label);
 
   return {
     id: String(item.id),
     slug: item.slug || String(item.id),
     title: item.title || item.summary || 'Property Listing',
     location:
-      asString(meta.location) || asString(meta.city) || asString(meta.region) || 'Indonesia',
+      asString(meta.location) ||
+      asString(meta.city) ||
+      asString(meta.region) ||
+      'Indonesia',
     price:
-      formatIDRFromCents(item.price_cents) !== '-'
-        ? formatIDRFromCents(item.price_cents)
-        : asString(meta.price_label) || 'Negotiable',
+      price !== '-'
+        ? formatPriceWithUnit(price, priceUnitLabel)
+        : fallbackPriceLabel
+          ? formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
+          : 'Negotiable',
     statusType,
     type: asString(meta.property_type) || asString(item.category) || 'Property',
     bedrooms: asNumber(meta.bedrooms) || asNumber(meta.kamar_tidur) || 0,
@@ -124,7 +147,9 @@ function mapToPropertyDetail(item: ContentItem): PropertyDetailView {
     area: asNumber(meta.area) || asNumber(meta.luas) || 0,
     landArea: asNumber(meta.land_area) || asNumber(meta.luas_tanah) || 0,
     certificate: asString(meta.certificate) || '',
-    description: description.length ? description : [item.summary || 'No description'],
+    description: description.length
+      ? description
+      : [item.summary || 'No description'],
     features,
     images,
     agent: {
@@ -173,7 +198,7 @@ export default async function PropertyDetailPage({
   const item = await fetchPropertyContent(slug);
   if (!item) notFound();
 
-  const property = mapToPropertyDetail(item);
+  const property = mapToPropertyDetail(item, locale === 'en' ? 'en' : 'id');
   const numericPrice = Math.max(0, Math.floor((item.price_cents || 0) / 100));
 
   const jsonLd = {
@@ -224,4 +249,3 @@ export default async function PropertyDetailPage({
     </>
   );
 }
-

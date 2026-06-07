@@ -12,9 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = 'https://www.lajukan.com';
 
   return {
-    title: isId
-      ? 'Masuk Nomor HP - Lajukan'
-      : 'Phone Login - Lajukan',
+    title: isId ? 'Masuk Nomor HP - Lajukan' : 'Phone Login - Lajukan',
     description: isId
       ? 'Masuk ke akun Lajukan cukup pakai nomor HP dan OTP.'
       : 'Sign in to your Lajukan account with your phone number and OTP.',
@@ -26,8 +24,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         'x-default': `${baseUrl}/id/login`,
       },
     },
-    // Menyarankan Google untuk mengindeks tapi tidak menjadikannya prioritas utama
-    robots: { index: true, follow: true },
+    robots: {
+      index: false,
+      follow: false,
+      googleBot: {
+        index: false,
+        follow: false,
+        noarchive: true,
+      },
+    },
   };
 }
 

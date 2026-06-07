@@ -1,4 +1,13 @@
 export type ReelTone = 'emerald' | 'orange' | 'blue' | 'amber' | 'rose';
+export type ReelFilterPreset =
+  | 'natural'
+  | 'warm'
+  | 'fresh'
+  | 'cinema'
+  | 'mono'
+  | 'pop';
+export type ReelCaptureMode = 'upload' | 'camera' | 'live';
+export type ReelLiveStatus = 'none' | 'scheduled' | 'live' | 'ended';
 
 export type LajukanReel = {
   id: string;
@@ -26,6 +35,12 @@ export type LajukanReel = {
   tone: ReelTone;
   iconKey: 'supplier' | 'marketing' | 'finance' | 'packaging' | 'frozen';
   mediaType?: 'video' | 'image';
+  filterPreset?: ReelFilterPreset;
+  captureMode?: ReelCaptureMode;
+  liveStatus?: ReelLiveStatus;
+  liveTitle?: string | null;
+  liveScheduledAt?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 export type ReelsPageResult = {
@@ -34,128 +49,13 @@ export type ReelsPageResult = {
   hasMore: boolean;
 };
 
-type PlayableReelVideoSource = {
-  videoSrc: string;
-  sourceUrl: string;
-  durationSeconds: number;
-  hasAudio: true;
-  label: string;
-};
-
 export const FALLBACK_REEL_COUNT = 0;
 export const REELS_PAGE_SIZE = 24;
 export const MAX_REELS_PAGE_LIMIT = 120;
 
-export const PLAYABLE_REEL_VIDEO_SOURCES: PlayableReelVideoSource[] = [
-  {
-    videoSrc: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
-    sourceUrl: 'https://www.w3.org/2010/05/video/mediaevents.html',
-    durationSeconds: 52,
-    hasAudio: true,
-    label: 'Sintel trailer MP4',
-  },
-  {
-    videoSrc: 'https://media.w3.org/2010/05/sintel/trailer.webm',
-    sourceUrl: 'https://www.w3.org/2010/05/video/mediaevents.html',
-    durationSeconds: 52,
-    hasAudio: true,
-    label: 'Sintel trailer WebM',
-  },
-  {
-    videoSrc: 'https://media.w3.org/2010/05/video/movie_300.webm',
-    sourceUrl: 'https://www.w3.org/2010/05/video/mediaevents.html',
-    durationSeconds: 300,
-    hasAudio: true,
-    label: 'W3C sample WebM',
-  },
-  {
-    videoSrc: 'https://media.w3.org/2010/05/sintel/trailer.ogv',
-    sourceUrl: 'https://www.w3.org/2010/05/video/mediaevents.html',
-    durationSeconds: 52,
-    hasAudio: true,
-    label: 'Sintel trailer OGV',
-  },
-  {
-    videoSrc: 'https://media.w3.org/2010/05/bunny/trailer.ogv',
-    sourceUrl: 'https://www.w3.org/2010/05/video/mediaevents.html',
-    durationSeconds: 33,
-    hasAudio: true,
-    label: 'Bunny trailer OGV',
-  },
-];
-
-function stableVideoIndex(seed: string | number) {
-  if (typeof seed === 'number') {
-    return Math.abs(seed) % PLAYABLE_REEL_VIDEO_SOURCES.length;
-  }
-
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) | 0;
-  }
-
-  return Math.abs(hash) % PLAYABLE_REEL_VIDEO_SOURCES.length;
-}
-
-function withMediaFragment(
-  source: PlayableReelVideoSource,
-  seed: string | number,
-) {
-  const duration = Math.max(source.durationSeconds - 8, 1);
-  const numericSeed =
-    typeof seed === 'number'
-      ? seed
-      : Array.from(seed).reduce((total, char) => total + char.charCodeAt(0), 0);
-  const startAt = Math.max(0, numericSeed % duration);
-
-  return {
-    ...source,
-    videoSrc: startAt > 0 ? `${source.videoSrc}#t=${startAt}` : source.videoSrc,
-  };
-}
-
-export function getPlayableReelVideoSource(seed: string | number) {
-  return withMediaFragment(
-    PLAYABLE_REEL_VIDEO_SOURCES[stableVideoIndex(seed)],
-    seed,
-  );
-}
-
-export function getPrimaryPlayableReelVideoSource(seed: string | number) {
-  return withMediaFragment(PLAYABLE_REEL_VIDEO_SOURCES[0], seed);
-}
-
 function looksLikeImageMedia(value: string) {
   const lower = value.split('?')[0]?.toLowerCase() || '';
   return /\.(avif|gif|jpe?g|png|webp)$/.test(lower);
-}
-
-function isKnownAudioSource(value: string) {
-  const withoutFragment = value.split('#')[0];
-  return PLAYABLE_REEL_VIDEO_SOURCES.some(
-    source => source.videoSrc === withoutFragment,
-  );
-}
-
-function shouldReplaceVideoSource(value: string) {
-  const src = value.trim();
-  if (!src) return true;
-  if (isKnownAudioSource(src)) return false;
-
-  try {
-    const url = new URL(src);
-    const host = url.hostname.toLowerCase();
-    const path = url.pathname.toLowerCase();
-
-    return (
-      ((host === 'pexels.com' || host === 'www.pexels.com') &&
-        (path.includes('/download/video') || path.includes('/video/'))) ||
-      host === 'upload.wikimedia.org' ||
-      host === 'interactive-examples.mdn.mozilla.net'
-    );
-  } catch {
-    return false;
-  }
 }
 
 export function normalizePlayableReel(

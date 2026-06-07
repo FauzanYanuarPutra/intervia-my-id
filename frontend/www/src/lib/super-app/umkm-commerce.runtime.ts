@@ -34,6 +34,10 @@ type SeedGroupConfig = {
   }>;
 };
 
+const ENABLE_UMKM_RUNTIME_SEED_DATA =
+  process.env.ENABLE_UMKM_RUNTIME_SEED_DATA === 'true' ||
+  process.env.NEXT_PUBLIC_ENABLE_UMKM_RUNTIME_SEED_DATA === 'true';
+
 const BASE_STORE_COUNT = 10;
 const STORE_ID_PREFIX = '50000000-0000-0000-0000-';
 const CITY_HUBS: SeedCityHub[] = [
@@ -653,6 +657,19 @@ function seedMembers(stores: UmkmStore[]): UmkmStoreMember[] {
 }
 
 function createSeededRuntimeState(): RuntimeState {
+  if (!ENABLE_UMKM_RUNTIME_SEED_DATA) {
+    return {
+      stores: [],
+      products: [],
+      tables: [],
+      qrTokens: [],
+      reservations: [],
+      orders: [],
+      orderItems: [],
+      members: [],
+    };
+  }
+
   const stores = seedStores();
   const { tables, qrTokens } = seedTablesAndQr(stores);
   return {

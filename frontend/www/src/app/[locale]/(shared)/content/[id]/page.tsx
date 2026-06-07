@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import NextImage from 'next/image';
 import { Link, useRouter } from '@/i18n/navigation';
+import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { useLocale } from 'next-intl';
 import {
   BadgePercent,
@@ -12,24 +13,26 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Clock3,
+  Coins,
   FileText,
   Gift,
-  Image as ImageIcon,
+  Layers3,
+  ListChecks,
   MapPin,
   MessageCircle,
   Package,
   Share2,
   ShieldCheck,
   Star,
-  Tag,
+  Target,
   Trophy,
   User,
   Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getSectorLabel, useSectors } from '@/context/SectorContext';
-import { findSubSector, getSubSectorName } from '@/data/subSectors';
 import { getFieldsForDisplay, WORK_MODE_OPTIONS } from '@/data/sectorFields';
 import { CONTENT_TYPES, getContentTypeName } from '@/data/contentTypes';
 import {
@@ -41,12 +44,17 @@ import {
 } from '@/lib/content/listingSide';
 import {
   normalizeContentMediaUrl,
-  parseImages,
+  resolveImageGallery,
   type ContentOwnerProfile,
 } from '@/lib/content/catalog';
+import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
 import { buildContentHref, extractContentId } from '@/lib/content/routes';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { Modal } from '@/components/common/Modal';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import { ContentDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
@@ -71,6 +79,7 @@ type ContentItem = {
   body?: string | null;
   pricing_mode?: 'fixed' | 'request' | string | null;
   price_cents?: number | null;
+  price_unit?: string | null;
   original_price_cents?: number | null;
   promo_label?: string | null;
   promo_start_at?: string | null;
@@ -302,7 +311,7 @@ function formatRemainingDuration(ms: number, locale: string): string {
 }
 
 function getImages(item: ContentItem): string[] {
-  return parseImages(item as Parameters<typeof parseImages>[0]);
+  return resolveImageGallery(item as Parameters<typeof resolveImageGallery>[0]);
 }
 
 function getDocuments(
@@ -558,7 +567,6 @@ export default function ContentDetailPage({ params }: PageProps) {
   const [shareError, setShareError] = useState<string | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [relatedTx, setRelatedTx] = useState<RelatedTransaction | null>(null);
   const [relatedTxLoading, setRelatedTxLoading] = useState(false);
   const [nowTs, setNowTs] = useState<number>(Date.now());
@@ -631,7 +639,6 @@ export default function ContentDetailPage({ params }: PageProps) {
   useEffect(() => {
     if (!item) return;
     const meta = (item.metadata as Record<string, unknown> | null) || {};
-    setActiveImageIndex(0);
     setApplyLocation(
       prev =>
         prev ||
@@ -1608,13 +1615,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     Boolean(peerUserId) &&
     (user?.id || '').trim().toLowerCase() === peerUserId.toLowerCase();
   const sectorId = meta.sector as string | undefined;
-  const subSectorId = meta.sub_sector as string | undefined;
   const sectorObj = sectorId ? getSectorById(sectorId) : null;
-  const sectorColorClass =
-    sectorObj?.colorClass || 'bg-[color:var(--app-surface)]';
-  const sectorColorStyle = sectorObj?.colorStyle;
-  const subSectorObj =
-    sectorId && subSectorId ? findSubSector(sectorId, subSectorId) : null;
   const images = getImages(item);
   const documents = getDocuments(item);
   const contentType = item.type || item.content_type || 'product';
@@ -1736,11 +1737,24 @@ export default function ContentDetailPage({ params }: PageProps) {
       : promotionSnapshot?.offerType === 'loyalty_card'
         ? Gift
         : Trophy;
+  const priceUnitLabel = resolveContentPriceUnitLabel(
+    {
+      id: item.id,
+      content_type: item.content_type || item.type,
+      category: item.type,
+      price_unit: item.price_unit,
+      metadata: meta,
+    },
+    localeCode,
+  );
   const priceLabel = hasPrice
     ? formatCurrency(item.price_cents as number, item.currency || 'IDR')
     : locale === 'id'
       ? 'Harga menyesuaikan'
       : 'Price on request';
+  const priceLabelWithUnit = hasPrice
+    ? formatPriceWithUnit(priceLabel, priceUnitLabel)
+    : priceLabel;
   const salaryRange =
     typeof meta.salary_range === 'string' ? meta.salary_range.trim() : '';
   const priceHeading =
@@ -1774,10 +1788,14 @@ export default function ContentDetailPage({ params }: PageProps) {
   const primaryPrice =
     displayType === 'job'
       ? salaryRange ||
-        (hasPrice ? priceLabel : locale === 'id' ? 'Nego' : 'Negotiable')
+        (hasPrice
+          ? priceLabelWithUnit
+          : locale === 'id'
+            ? 'Nego'
+            : 'Negotiable')
       : displayType === 'tool_rental'
         ? hasPrice
-          ? priceLabel
+          ? priceLabelWithUnit
           : locale === 'id'
             ? 'Tarif menyesuaikan'
             : 'Rate on request'
@@ -1785,7 +1803,11 @@ export default function ContentDetailPage({ params }: PageProps) {
           ? (typeof meta.industry_focus === 'string' && meta.industry_focus) ||
             (typeof meta.company_size === 'string' && meta.company_size) ||
             (locale === 'id' ? 'Profil publik' : 'Public profile')
-          : priceLabel;
+          : priceLabelWithUnit;
+  const displayPriceHeading =
+    displayType === 'service' && priceUnitLabel
+      ? `${locale === 'id' ? 'Harga per' : 'Price per'} ${priceUnitLabel}`
+      : priceHeading;
   const baseCurrency = item.currency || 'IDR';
   const listPriceCents = hasPrice ? Number(item.price_cents || 0) : 0;
   const suggestedOfferCents = (() => {
@@ -2132,26 +2154,12 @@ export default function ContentDetailPage({ params }: PageProps) {
     typeof sellerStats?.accepted_transactions === 'number'
       ? sellerStats.accepted_transactions
       : 0;
-  const sellerCancelledTransactions =
-    typeof sellerStats?.cancelled_transactions === 'number'
-      ? sellerStats.cancelled_transactions
-      : 0;
-  const sellerPendingTransactions =
-    typeof sellerStats?.pending_transactions === 'number'
-      ? sellerStats.pending_transactions
-      : 0;
   const sellerAcceptanceRate =
     typeof sellerStats?.acceptance_rate === 'number'
       ? sellerStats.acceptance_rate
       : sellerTotalTransactions > 0
         ? (sellerCompletedTransactions + sellerAcceptedTransactions) /
           sellerTotalTransactions
-        : 0;
-  const sellerCancelRate =
-    typeof sellerStats?.cancel_rate === 'number'
-      ? sellerStats.cancel_rate
-      : sellerTotalTransactions > 0
-        ? sellerCancelledTransactions / sellerTotalTransactions
         : 0;
   const showSellerStats = sellerReviewCount > 0 || sellerTotalTransactions > 0;
   const metadataOwnerProfile =
@@ -2228,7 +2236,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         {
           key: 'salary_range',
           label: locale === 'id' ? 'Range gaji' : 'Salary range',
-          value: salaryRange || (hasPrice ? priceLabel : ''),
+          value: salaryRange || (hasPrice ? priceLabelWithUnit : ''),
         },
         {
           key: 'openings',
@@ -2278,7 +2286,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           {
             key: 'price_cents',
             label: locale === 'id' ? 'Budget' : 'Budget',
-            value: hasPrice ? priceLabel : '',
+            value: hasPrice ? priceLabelWithUnit : '',
           },
           {
             key: serviceOutputValue ? 'output_needed' : 'area_served',
@@ -2333,7 +2341,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           {
             key: 'price_cents',
             label: locale === 'id' ? 'Budget' : 'Budget',
-            value: hasPrice ? priceLabel : '',
+            value: hasPrice ? priceLabelWithUnit : '',
           },
           {
             key: areaValue ? 'area_sqm' : 'preferred_period',
@@ -2400,7 +2408,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           {
             key: 'price_cents',
             label: locale === 'id' ? 'Budget' : 'Budget',
-            value: hasPrice ? priceLabel : '',
+            value: hasPrice ? priceLabelWithUnit : '',
           },
         ];
       }
@@ -2454,7 +2462,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         {
           key: 'price_cents',
           label: locale === 'id' ? 'Budget' : 'Budget',
-          value: hasPrice ? priceLabel : '',
+          value: hasPrice ? priceLabelWithUnit : '',
         },
       ];
     }
@@ -2925,6 +2933,123 @@ export default function ContentDetailPage({ params }: PageProps) {
     item.body,
     displayType === 'product' || displayType === 'property' ? 120 : 140,
   );
+  const deliveryDaysLabel =
+    meta.delivery_days != null && String(meta.delivery_days).trim()
+      ? `${meta.delivery_days} ${locale === 'id' ? 'hari kerja' : 'business days'}`
+      : '';
+  const nextAvailableLabel = formatDate(String(meta.next_available || ''));
+  const getDetailEntryIcon = (key: string, label: string) => {
+    const text = `${key} ${label}`.toLowerCase();
+    if (
+      /(price|harga|budget|rate|tarif|salary|kompensasi|nominal|fee)/.test(text)
+    ) {
+      return Coins;
+    }
+    if (/(deliver|output|hasil|file|handoff|terima)/.test(text)) {
+      return Package;
+    }
+    if (/(require|kebutuhan|dibutuhkan|data|brief|klien|client)/.test(text)) {
+      return ClipboardCheck;
+    }
+    if (/(scope|ruang lingkup|cakupan|dikerjakan|responsibil)/.test(text)) {
+      return ListChecks;
+    }
+    if (
+      /(time|timeline|waktu|durasi|delivery|jadwal|available|tersedia|mulai|date|tanggal)/.test(
+        text,
+      )
+    ) {
+      return Clock3;
+    }
+    if (/(location|lokasi|alamat|city|kota|region|wilayah)/.test(text)) {
+      return MapPin;
+    }
+    if (/(mode|type|tipe|jenis|category|kategori|level|kelas)/.test(text)) {
+      return Layers3;
+    }
+    if (/(target|goal|tujuan|audience|market)/.test(text)) {
+      return Target;
+    }
+    if (/(company|perusahaan|owner|pemilik|seller|penjual)/.test(text)) {
+      return Building2;
+    }
+    return FileText;
+  };
+  const serviceSummaryDescription =
+    bodyPreview && bodyPreview !== summaryPreview ? bodyPreview : '';
+  const serviceTimelineValue = [
+    readMetaText(meta, 'availability'),
+    readMetaText(meta, 'delivery_time') || deliveryDaysLabel,
+    nextAvailableLabel
+      ? `${locale === 'id' ? 'Mulai' : 'Starts'} ${nextAvailableLabel}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' - ');
+  const serviceGuideSections =
+    displayType === 'service'
+      ? [
+          {
+            key: 'service_summary',
+            icon: FileText,
+            eyebrow: locale === 'id' ? 'Mulai dari sini' : 'Start here',
+            title: locale === 'id' ? 'Ringkasan Layanan' : 'Service Summary',
+            value:
+              summaryPreview ||
+              (locale === 'id'
+                ? 'Layanan profesional yang bisa dibahas dulu sebelum pekerjaan dimulai.'
+                : 'A professional service that can be aligned before the work starts.'),
+            description: serviceSummaryDescription,
+          },
+          {
+            key: 'service_scope',
+            icon: ListChecks,
+            eyebrow: locale === 'id' ? 'Scope kerja' : 'Work scope',
+            title: locale === 'id' ? 'Ruang lingkup layanan' : 'Service scope',
+            value:
+              readMetaText(meta, 'service_scope') ||
+              (locale === 'id'
+                ? 'Scope mencakup briefing, eksekusi inti, revisi seperlunya, dan handoff yang siap dipakai buyer.'
+                : 'Scope includes briefing, core execution, necessary revisions, and a usable handoff.'),
+          },
+          {
+            key: 'deliverables',
+            icon: Package,
+            eyebrow: locale === 'id' ? 'Hasil akhir' : 'Final output',
+            title: locale === 'id' ? 'Output yang diterima' : 'Deliverables',
+            value:
+              readMetaText(meta, 'deliverables') ||
+              (locale === 'id'
+                ? 'Buyer menerima output kerja utama, ringkasan tindak lanjut, serta file akhir atau checklist eksekusi.'
+                : 'Buyer receives the main work output, follow-up notes, and final files or execution checklist.'),
+          },
+          {
+            key: 'client_requirements',
+            icon: ClipboardCheck,
+            eyebrow: locale === 'id' ? 'Sebelum mulai' : 'Before starting',
+            title:
+              locale === 'id'
+                ? 'Data yang dibutuhkan dari klien'
+                : 'Client requirements',
+            value:
+              readMetaText(meta, 'client_requirements') ||
+              (locale === 'id'
+                ? 'Siapkan brief, referensi, target audience, dan akses dasar yang memang diperlukan untuk eksekusi.'
+                : 'Prepare a brief, references, target audience, and the basic access needed for execution.'),
+          },
+          {
+            key: 'availability_window',
+            icon: Clock3,
+            eyebrow: locale === 'id' ? 'Jadwal' : 'Schedule',
+            title: locale === 'id' ? 'Slot & timeline' : 'Slot & timeline',
+            value:
+              serviceTimelineValue ||
+              (locale === 'id'
+                ? 'Timeline dan slot kerja dikonfirmasi setelah kebutuhan jelas.'
+                : 'Timeline and work slots are confirmed once the requirements are clear.'),
+          },
+        ].filter(section => section.value || section.description)
+      : [];
   const flowSteps = (() => {
     if (isOwner) {
       return locale === 'id'
@@ -3069,13 +3194,17 @@ export default function ContentDetailPage({ params }: PageProps) {
           ? locale === 'id'
             ? 'Tanggapi Kebutuhan'
             : 'Respond to Need'
-          : pricingMode === 'fixed'
+          : displayType === 'service'
             ? locale === 'id'
-              ? 'Lanjutkan Deal'
-              : 'Continue Deal'
-            : locale === 'id'
-              ? 'Pilih Respons'
-              : 'Choose Action';
+              ? 'Minta Penawaran'
+              : 'Request Quote'
+            : pricingMode === 'fixed'
+              ? locale === 'id'
+                ? 'Lanjutkan Deal'
+                : 'Continue Deal'
+              : locale === 'id'
+                ? 'Pilih Respons'
+                : 'Choose Action';
   const primaryActionHint =
     displayType === 'job'
       ? locale === 'id'
@@ -3095,8 +3224,8 @@ export default function ContentDetailPage({ params }: PageProps) {
               : 'Start by chatting about the viewing first, then continue the deal.'
             : displayType === 'service' || displayType === 'profile'
               ? locale === 'id'
-                ? 'Chat dulu. Lanjut offer.'
-                : 'Start with a short chat first, then continue to offers and transactions.'
+                ? 'Scope, timeline, dan harga bisa dikunci setelah chat.'
+                : 'Align scope, timeline, and price in chat before continuing.'
               : displayType === 'product'
                 ? locale === 'id'
                   ? 'Chat stok. Lanjut bayar.'
@@ -3296,25 +3425,76 @@ export default function ContentDetailPage({ params }: PageProps) {
   const relatedTxWorkspaceHref = relatedTx
     ? `/transactions?focus_transaction_id=${encodeURIComponent(relatedTx.id)}`
     : '/transactions';
-  const detailPageShellClass =
-    'lajukan-market-page lajukan-market-detail page-shell overflow-x-hidden py-0 pb-20 sm:py-2 lg:pb-8';
+  const detailTone =
+    displayType === 'job'
+      ? {
+          page: 'bg-[linear-gradient(180deg,#fffdf5_0%,#ffffff_34%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#1c1002_0%,#020617_42%,#04110d_100%)]',
+          surface:
+            'border-emerald-200/80 bg-[linear-gradient(135deg,#fffdf5_0%,#ffffff_54%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.22))] dark:ring-emerald-400/15',
+          inset:
+            'bg-amber-50/72 ring-amber-100/80 dark:bg-amber-400/10 dark:ring-amber-300/15',
+          compact:
+            'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
+          row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
+        }
+      : displayType === 'service' || displayType === 'profile'
+        ? {
+            page: 'bg-[linear-gradient(180deg,#f0fdfa_0%,#ffffff_36%,#f0f9ff_100%)] dark:bg-[linear-gradient(180deg,#042f2e_0%,#020617_44%,#082f49_100%)]',
+            surface:
+              'border-teal-200/80 bg-[linear-gradient(135deg,#f0fdfa_0%,#ffffff_54%,#ecfeff_100%)] ring-teal-100/80 dark:border-teal-400/20 dark:bg-[linear-gradient(135deg,rgba(19,78,74,0.28),rgba(2,6,23,0.96)_56%,rgba(8,47,73,0.24))] dark:ring-teal-400/15',
+            inset:
+              'bg-teal-50/72 ring-teal-100/80 dark:bg-teal-400/10 dark:ring-teal-300/15',
+            compact:
+              'bg-white/76 ring-teal-100/80 dark:bg-white/[0.06] dark:ring-teal-300/12',
+            row: 'bg-white/74 ring-teal-100/80 hover:bg-teal-50 dark:bg-white/[0.06] dark:ring-teal-300/12 dark:hover:bg-teal-400/12',
+          }
+        : displayType === 'property'
+          ? {
+              page: 'bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_36%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#431407_0%,#020617_44%,#04110d_100%)]',
+              surface:
+                'border-orange-200/80 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_54%,#ecfdf5_100%)] ring-orange-100/80 dark:border-orange-400/20 dark:bg-[linear-gradient(135deg,rgba(67,20,7,0.3),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-orange-400/15',
+              inset:
+                'bg-orange-50/72 ring-orange-100/80 dark:bg-orange-400/10 dark:ring-orange-300/15',
+              compact:
+                'bg-white/76 ring-orange-100/80 dark:bg-white/[0.06] dark:ring-orange-300/12',
+              row: 'bg-white/74 ring-orange-100/80 hover:bg-orange-50 dark:bg-white/[0.06] dark:ring-orange-300/12 dark:hover:bg-orange-400/12',
+            }
+          : displayType === 'tool_rental'
+            ? {
+                page: 'bg-[linear-gradient(180deg,#f7fee7_0%,#ffffff_36%,#ecfdf5_100%)] dark:bg-[linear-gradient(180deg,#1a2e05_0%,#020617_44%,#04110d_100%)]',
+                surface:
+                  'border-lime-200/80 bg-[linear-gradient(135deg,#f7fee7_0%,#ffffff_54%,#ecfdf5_100%)] ring-lime-100/80 dark:border-lime-400/20 dark:bg-[linear-gradient(135deg,rgba(54,83,20,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-lime-400/15',
+                inset:
+                  'bg-lime-50/72 ring-lime-100/80 dark:bg-lime-400/10 dark:ring-lime-300/15',
+                compact:
+                  'bg-white/76 ring-lime-100/80 dark:bg-white/[0.06] dark:ring-lime-300/12',
+                row: 'bg-white/74 ring-lime-100/80 hover:bg-lime-50 dark:bg-white/[0.06] dark:ring-lime-300/12 dark:hover:bg-lime-400/12',
+              }
+            : {
+                page: 'bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_34%,#f0fdfa_100%)] dark:bg-[linear-gradient(180deg,#04110d_0%,#020617_42%,#042f2e_100%)]',
+                surface:
+                  'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_56%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_56%,rgba(20,83,45,0.22))] dark:ring-emerald-400/15',
+                inset:
+                  'bg-emerald-50/72 ring-emerald-100/80 dark:bg-emerald-400/10 dark:ring-emerald-300/15',
+                compact:
+                  'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
+                row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
+              };
+  const detailPageShellClass = `lajukan-market-page lajukan-market-detail page-shell overflow-x-hidden py-0 pb-20 sm:py-1.5 lg:pb-7 ${detailTone.page}`;
   const detailShellStackClass =
-    'flex w-full flex-col gap-2.5 sm:mx-auto sm:max-w-[1700px] sm:gap-3';
-  const detailSectionClass =
-    'relative overflow-hidden rounded-[20px] bg-white px-3.5 py-3.5 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.16)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px] sm:p-4';
-  const detailInsetClass =
-    'rounded-[18px] bg-slate-50 px-3 py-3 ring-1 ring-slate-200/60 dark:bg-slate-900 dark:ring-slate-800/70';
-  const detailInsetCompactClass =
-    'rounded-[16px] bg-slate-50 px-3 py-2.5 ring-1 ring-slate-200/60 dark:bg-slate-900 dark:ring-slate-800/70';
+    'flex w-full flex-col gap-2 sm:mx-auto sm:max-w-[1360px] sm:gap-2.5';
+  const detailSectionClass = `relative overflow-hidden rounded-[18px] border px-3 py-3 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.16)] ring-1 sm:rounded-[20px] sm:p-3.5 ${detailTone.surface}`;
+  const detailInsetClass = `rounded-[16px] px-2.5 py-2.5 ring-1 sm:px-3 sm:py-3 ${detailTone.inset}`;
+  const detailInsetCompactClass = `rounded-[14px] px-2.5 py-2 ring-1 sm:rounded-[16px] sm:px-3 sm:py-2.5 ${detailTone.compact}`;
   const detailPrimaryButtonClass =
-    'inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-sm font-semibold text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_48%,transparent)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-60';
+    'inline-flex min-h-[40px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3.5 text-xs font-black text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_48%,transparent)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[42px] sm:px-4 sm:text-sm';
   const detailSecondaryButtonClass =
-    'inline-flex min-h-[44px] items-center justify-center gap-1 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800';
+    'inline-flex min-h-[40px] items-center justify-center gap-1 rounded-full bg-slate-100 px-3.5 text-xs font-black text-slate-700 transition hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:min-h-[42px] sm:px-4 sm:text-sm';
   const detailTextLinkClass =
     'text-sm font-semibold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]';
 
   const actionButtons = (
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(132px,1fr))] gap-2 lg:grid-cols-1">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(118px,1fr))] gap-1.5 sm:gap-2 lg:grid-cols-1">
       {isOwner && (
         <Link
           href={`/create?draft=${item.id}`}
@@ -3372,18 +3552,14 @@ export default function ContentDetailPage({ params }: PageProps) {
       <section className={detailSectionClass}>
         <div className="flex items-start gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900">
-            {ownerAvatarUrl ? (
-              <NextImage
-                src={ownerAvatarUrl}
-                alt={ownerDisplayName}
-                width={48}
-                height={48}
-                className="h-full w-full object-cover"
-                unoptimized
-              />
-            ) : (
-              <User className="h-5 w-5 text-[color:var(--app-text-soft)]" />
-            )}
+            <NextImage
+              src={profileAvatarSrc(ownerAvatarUrl)}
+              alt={ownerDisplayName}
+              width={48}
+              height={48}
+              className="h-full w-full object-cover"
+              unoptimized
+            />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
@@ -3420,7 +3596,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     <section className={detailSectionClass}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] uppercase tracking-[0.25em] text-[color:var(--app-text-soft)]">
-          {priceHeading}
+          {displayPriceHeading}
         </span>
         <div className="flex flex-wrap justify-end gap-2">
           <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
@@ -3699,14 +3875,23 @@ export default function ContentDetailPage({ params }: PageProps) {
     </section>
   );
 
-  const safeActiveImageIndex =
-    images.length > 0 && activeImageIndex >= 0 && activeImageIndex < images.length
-      ? activeImageIndex
-      : 0;
-  const activeImageUrl = images[safeActiveImageIndex] || '';
-  const galleryThumbs = images.slice(0, 6);
-  const hiddenImageCount = Math.max(0, images.length - galleryThumbs.length);
-  const typeLabel = ct ? getContentTypeName(ct, locale) : humanizeToken(displayType);
+  const mobileActionCard = (
+    <section className={`${detailSectionClass} lg:hidden`}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+          {locale === 'id' ? 'Lanjutkan' : 'Continue'}
+        </span>
+        <span className="rounded-full bg-white/82 px-2.5 py-1 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200/70 dark:bg-slate-950/70 dark:text-slate-200 dark:ring-slate-800">
+          {listingSideContextLabel}
+        </span>
+      </div>
+      {actionButtons}
+    </section>
+  );
+
+  const typeLabel = ct
+    ? getContentTypeName(ct, locale)
+    : humanizeToken(displayType);
   const locationLabel =
     quickSpecs.find(spec => spec.key === 'location')?.value ||
     readMetaText(meta, 'location', 'city', 'region', 'address') ||
@@ -3716,7 +3901,10 @@ export default function ContentDetailPage({ params }: PageProps) {
     : `/${locale}${listingHref.startsWith('/') ? listingHref : `/${listingHref}`}`;
   const handleNativeShare = async () => {
     if (typeof window === 'undefined') return;
-    const shareUrl = new URL(localizedListingHref, window.location.origin).toString();
+    const shareUrl = new URL(
+      localizedListingHref,
+      window.location.origin,
+    ).toString();
     try {
       if (navigator.share) {
         await navigator.share({ title: item.title, url: shareUrl });
@@ -3781,8 +3969,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                       ? 'Detail item'
                       : 'Item detail',
               };
-  const detailSurfaceClass =
-    'overflow-hidden rounded-[20px] border border-slate-200/80 bg-white shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] dark:border-slate-800/80 dark:bg-slate-950 sm:rounded-[22px]';
+  const detailSurfaceClass = `overflow-hidden rounded-[20px] border shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] ring-1 sm:rounded-[22px] ${detailTone.surface}`;
   const reviewBuckets = [5, 4, 3, 2, 1].map(score => ({
     score,
     count: reviews.filter(review => Math.round(review.rating) === score).length,
@@ -3799,8 +3986,8 @@ export default function ContentDetailPage({ params }: PageProps) {
         onShare={() => void handleNativeShare()}
       />
       <div className={detailShellStackClass}>
-        <section className="ui-page-section px-2 sm:px-3">
-          <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-3">
+        <section className="ui-page-section px-1 sm:px-2">
+          <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-2.5">
             <div className="hidden items-center justify-between gap-3 px-1 text-xs text-[color:var(--app-text-soft)] lg:flex">
               <div className="flex min-w-0 items-center gap-2">
                 <button
@@ -3811,7 +3998,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <Link href="/search" className="font-semibold text-[color:var(--app-text)]">
+                <Link
+                  href="/search"
+                  className="font-semibold text-[color:var(--app-text)]"
+                >
                   {locale === 'id' ? 'Search' : 'Search'}
                 </Link>
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -3835,97 +4025,52 @@ export default function ContentDetailPage({ params }: PageProps) {
               </button>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.98fr)_minmax(340px,0.78fr)_300px] lg:items-start xl:grid-cols-[minmax(0,1fr)_minmax(390px,0.82fr)_320px]">
-              <section className={`${detailSurfaceClass} p-1.5 sm:p-2`}>
+            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.34fr)] lg:items-start xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.34fr)]">
+              <section
+                className={`${detailSurfaceClass} p-1 sm:p-1.5 lg:col-start-1 lg:row-start-1`}
+              >
                 <div className="relative overflow-hidden rounded-[18px] bg-slate-100 dark:bg-slate-900">
-                  <div className="absolute right-3 top-3 z-10 hidden items-center gap-2 lg:flex">
-                    <button
-                      type="button"
-                      onClick={() => void handleNativeShare()}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/92 text-slate-800 shadow-sm backdrop-blur transition hover:bg-white"
-                      aria-label={locale === 'id' ? 'Bagikan' : 'Share'}
-                    >
-                      <Share2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <div className="relative aspect-[16/11] w-full sm:aspect-[16/9] lg:aspect-[4/3] xl:aspect-[16/10]">
-                    {activeImageUrl ? (
-                      <NextImage
-                        src={activeImageUrl}
-                        alt={item.title}
-                        fill
-                        sizes="(min-width: 1280px) 760px, (min-width: 1024px) 48vw, 100vw"
-                        className="object-cover"
-                        priority
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
-                        <ImageIcon className="h-8 w-8" />
-                        {locale === 'id' ? 'Belum ada foto' : 'No images yet'}
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-slate-950/68 via-slate-950/12 to-transparent p-2.5 text-white sm:p-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {locale === 'id' ? 'Terverifikasi' : 'Verified'}
-                        </span>
-                        <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
-                          {listingSideContextLabel}
-                        </span>
-                      </div>
-                      {images.length > 0 ? (
-                        <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
-                          {safeActiveImageIndex + 1}/{images.length}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                {galleryThumbs.length > 1 ? (
-                  <div className="mt-1.5 grid grid-cols-5 gap-1.5 sm:grid-cols-6">
-                    {galleryThumbs.map((image, index) => (
-                      <button
-                        key={`${image}-${index}`}
-                        type="button"
-                        onClick={() => setActiveImageIndex(index)}
-                        className={`relative aspect-[4/3] overflow-hidden rounded-[12px] bg-slate-100 ring-offset-2 transition dark:bg-slate-900 ${
-                          index === safeActiveImageIndex
-                            ? 'ring-2 ring-[color:var(--app-accent)]'
-                            : 'ring-1 ring-slate-200 hover:ring-slate-300 dark:ring-slate-800'
-                        }`}
-                        aria-label={`${locale === 'id' ? 'Lihat foto' : 'View image'} ${index + 1}`}
-                      >
-                        <NextImage
-                          src={image}
-                          alt={`${item.title} ${index + 1}`}
-                          fill
-                          sizes="140px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                        {hiddenImageCount > 0 && index === galleryThumbs.length - 1 ? (
-                          <span className="absolute inset-0 flex items-center justify-center bg-slate-950/58 text-xs font-semibold text-white">
-                            +{hiddenImageCount}
+                  <MediaPreviewCarousel
+                    items={images}
+                    alt={item.title}
+                    aspectClassName="aspect-[16/9] w-full lg:aspect-[16/10] xl:aspect-[16/9]"
+                    sizes="(min-width: 1280px) 1080px, (min-width: 1024px) 64vw, 100vw"
+                    priority
+                    controls
+                    lightbox
+                    overlay={
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-slate-950/68 via-slate-950/12 to-transparent p-2.5 text-white sm:p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            {locale === 'id' ? 'Terverifikasi' : 'Verified'}
                           </span>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                          <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
+                            {listingSideContextLabel}
+                          </span>
+                        </div>
+                      </div>
+                    }
+                  />
+                </div>
               </section>
 
-              <section className={`${detailSurfaceClass} ${detailVisual.wash} p-3.5 sm:p-4`}>
-                <div className={`h-1 w-20 rounded-full bg-gradient-to-r ${detailVisual.line}`} />
+              <section
+                className={`${detailSurfaceClass} ${detailVisual.wash} p-3 sm:p-3.5 lg:col-start-2 lg:row-start-1`}
+              >
+                <div
+                  className={`h-1 w-20 rounded-full bg-gradient-to-r ${detailVisual.line}`}
+                />
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
+                  >
                     <TypeIcon className="h-3.5 w-3.5" />
                     {detailVisual.eyebrow}
                   </span>
-                  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusBadgeClass}`}>
+                  <span
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusBadgeClass}`}
+                  >
                     {statusLabel}
                   </span>
                   {ct ? (
@@ -3935,11 +4080,11 @@ export default function ContentDetailPage({ params }: PageProps) {
                   ) : null}
                 </div>
 
-                <h1 className="mt-3 text-[24px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[30px] lg:text-[28px] xl:text-[32px]">
+                <h1 className="mt-2.5 text-[21px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px] lg:text-[25px] xl:text-[29px]">
                   {item.title}
                 </h1>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                   {ratingValue > 0 ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1.5 font-semibold text-amber-700 dark:bg-amber-500/12 dark:text-amber-200">
                       <Star className="h-3.5 w-3.5 fill-[color:var(--app-warning)] text-[color:var(--app-warning)]" />
@@ -3961,48 +4106,62 @@ export default function ContentDetailPage({ params }: PageProps) {
                   ) : null}
                 </div>
 
-                <div className="mt-3 rounded-[18px] bg-white/82 p-3 ring-1 ring-slate-200/70 dark:bg-slate-950/72 dark:ring-slate-800">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                        {priceHeading}
-                      </p>
-                      <p className="mt-1 text-[26px] font-semibold leading-none text-[color:var(--app-accent)] sm:text-3xl">
-                        {primaryPrice}
-                      </p>
-                      {hasOriginalPrice ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                          <span className="text-[color:var(--app-text-soft)] line-through">
-                            {formatCurrency(displayOriginalPriceCents as number, item.currency || 'IDR')}
-                          </span>
-                          <span className="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-600 dark:bg-red-500/12 dark:text-red-300">
-                            -{discountPercent}%
-                          </span>
-                        </div>
-                      ) : null}
+                <div className="mt-2.5 rounded-[16px] bg-white/82 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/72 dark:ring-slate-800 sm:p-3">
+                  <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <span
+                        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ${detailVisual.icon}`}
+                      >
+                        <Coins className="h-4.5 w-4.5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                          {displayPriceHeading}
+                        </p>
+                        <p className="mt-1 text-[22px] font-semibold leading-none text-[color:var(--app-accent)] sm:text-[26px]">
+                          {primaryPrice}
+                        </p>
+                        {hasOriginalPrice ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                            <span className="text-[color:var(--app-text-soft)] line-through">
+                              {formatCurrency(
+                                displayOriginalPriceCents as number,
+                                item.currency || 'IDR',
+                              )}
+                            </span>
+                            <span className="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-600 dark:bg-red-500/12 dark:text-red-300">
+                              -{discountPercent}%
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}
+                    >
                       <MessageCircle className="h-3.5 w-3.5" />
                       {primaryActionHint}
                     </span>
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="mt-2.5 grid grid-cols-3 gap-1.5 sm:gap-2">
                   {quickSpecs.slice(0, 3).map(spec => {
                     const SpecIcon = spec.icon;
                     return (
                       <div
                         key={spec.key}
-                        className="rounded-[16px] bg-white/78 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/66 dark:ring-slate-800"
+                        className="min-w-0 rounded-[14px] bg-white/78 p-2 ring-1 ring-slate-200/70 dark:bg-slate-950/66 dark:ring-slate-800 sm:p-2.5"
                       >
-                        <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${detailVisual.icon}`}>
-                    <SpecIcon className="h-3.5 w-3.5" />
+                        <span
+                          className={`inline-flex h-7 w-7 items-center justify-center rounded-[11px] ${detailVisual.icon} sm:h-8 sm:w-8 sm:rounded-xl`}
+                        >
+                          <SpecIcon className="h-3.5 w-3.5" />
                         </span>
-                        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                        <p className="mt-1.5 truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.18em]">
                           {spec.label}
                         </p>
-                        <p className="mt-1 line-clamp-2 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                        <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:mt-1 sm:text-sm">
                           {spec.value}
                         </p>
                       </div>
@@ -4010,33 +4169,93 @@ export default function ContentDetailPage({ params }: PageProps) {
                   })}
                 </div>
 
-                {summaryPreview || bodyPreview ? (
-                  <div className="mt-3 rounded-[18px] bg-white/68 p-3 text-sm leading-6 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800">
-                    {summaryPreview ? <p className="font-medium">{summaryPreview}</p> : null}
-                    {bodyPreview ? <p className={summaryPreview ? 'mt-2' : ''}>{bodyPreview}</p> : null}
+                {displayType === 'service' &&
+                serviceGuideSections.length > 0 ? (
+                  <div className="mt-2.5 overflow-hidden rounded-[16px] bg-white/74 ring-1 ring-slate-200/70 dark:bg-slate-950/64 dark:ring-slate-800">
+                    {serviceGuideSections.map((section, index) => {
+                      const SectionIcon = section.icon;
+                      return (
+                        <div
+                          key={section.key}
+                          className={`flex gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${
+                            index > 0
+                              ? 'border-t border-slate-200/70 dark:border-slate-800'
+                              : ''
+                          }`}
+                        >
+                          <span
+                            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
+                          >
+                            <SectionIcon className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                              {section.eyebrow}
+                            </p>
+                            <h3 className="mt-0.5 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              {section.title}
+                            </h3>
+                            <p className="mt-1 text-sm leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:leading-6">
+                              {section.value}
+                            </p>
+                            {section.description ? (
+                              <p className="mt-1 text-sm leading-5 text-[color:var(--app-text-soft)] sm:leading-6">
+                                {section.description}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : summaryPreview || bodyPreview ? (
+                  <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 text-sm leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800 sm:p-3 sm:leading-6">
+                    {summaryPreview ? (
+                      <p className="font-medium">{summaryPreview}</p>
+                    ) : null}
+                    {bodyPreview ? (
+                      <p className={summaryPreview ? 'mt-2' : ''}>
+                        {bodyPreview}
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
 
                 {previewHighlightItems.length > 0 ? (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {previewHighlightItems.map(entry => (
-                      <div
-                        key={entry.key}
-                        className="rounded-[16px] bg-white/72 px-3 py-2 ring-1 ring-slate-200/70 dark:bg-slate-950/62 dark:ring-slate-800"
-                      >
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                          {entry.label}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                          {entry.value}
-                        </p>
-                      </div>
-                    ))}
+                  <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:gap-2">
+                    {previewHighlightItems.map(entry => {
+                      const EntryIcon = getDetailEntryIcon(
+                        entry.key,
+                        entry.label,
+                      );
+                      return (
+                        <div
+                          key={entry.key}
+                          className="min-w-0 rounded-[14px] bg-white/72 px-2.5 py-2 ring-1 ring-slate-200/70 dark:bg-slate-950/62 dark:ring-slate-800 sm:rounded-[16px] sm:px-3"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <span
+                              className={`mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[12px] ${detailVisual.icon}`}
+                            >
+                              <EntryIcon className="h-3.5 w-3.5" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.18em]">
+                                {entry.label}
+                              </p>
+                              <p className="mt-1 line-clamp-2 text-xs font-semibold leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
+                                {entry.value}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
 
                 {previewTags.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-1.5">
                     {previewTags.map(tag => (
                       <span
                         key={tag}
@@ -4046,7 +4265,9 @@ export default function ContentDetailPage({ params }: PageProps) {
                       </span>
                     ))}
                     {extraTagCount > 0 ? (
-                      <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
+                      >
                         +{extraTagCount}
                       </span>
                     ) : null}
@@ -4054,42 +4275,31 @@ export default function ContentDetailPage({ params }: PageProps) {
                 ) : null}
               </section>
 
-              <div className="grid gap-3 lg:hidden">
-                {actionCard}
+              <div className="grid gap-2.5 lg:hidden">
+                {mobileActionCard}
                 {ownerProfileCard}
               </div>
 
-              <aside className="hidden lg:block">
-                <div className="sticky top-24 space-y-3">
+              <aside className="hidden lg:col-start-2 lg:row-start-2 lg:block">
+                <div className="sticky top-20 space-y-2.5">
                   {actionCard}
                   {ownerProfileCard}
                   <section className={`${detailSurfaceClass} p-3.5`}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id' ? 'Lokasi' : 'Location'}
+                        {locale === 'id' ? 'Info cepat' : 'Quick info'}
                       </p>
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${detailVisual.chip}`}>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ring-1 ${detailVisual.chip}`}
+                      >
                         {listingSideLabel}
                       </span>
                     </div>
-                    <div className="relative mt-3 h-32 overflow-hidden rounded-[18px] bg-[linear-gradient(135deg,#e2e8f0,#f8fafc_48%,#dcfce7)] dark:bg-[linear-gradient(135deg,#0f172a,#020617_52%,#064e3b)]">
-                      <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(15,23,42,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white shadow-[0_18px_34px_-20px_rgba(16,185,129,0.8)]">
-                          <MapPin className="h-5 w-5" />
-                        </span>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {locationLabel}
-                    </p>
-                  </section>
-                  <section className={`${detailSurfaceClass} p-3.5`}>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                      {locale === 'id' ? 'Info listing' : 'Listing info'}
-                    </p>
                     <div className="mt-3 space-y-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                       {[
+                        locationLabel
+                          ? `${locale === 'id' ? 'Lokasi' : 'Location'}: ${locationLabel}`
+                          : '',
                         updatedLabel
                           ? `${locale === 'id' ? 'Diperbarui' : 'Updated'}: ${updatedLabel}`
                           : '',
@@ -4105,7 +4315,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                       ]
                         .filter(Boolean)
                         .map(label => (
-                          <div key={label} className="flex items-center gap-2 rounded-[14px] bg-slate-50 px-3 py-2 dark:bg-slate-900">
+                          <div
+                            key={label}
+                            className={`flex items-center gap-2 rounded-[14px] px-3 py-2 ring-1 ${detailTone.row}`}
+                          >
                             <CheckCircle2 className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                             <span>{label}</span>
                           </div>
@@ -4115,52 +4328,127 @@ export default function ContentDetailPage({ params }: PageProps) {
                 </div>
               </aside>
 
-              <div className="space-y-3 lg:col-span-2">
-                <section className={`${detailSurfaceClass} p-3.5 sm:p-4`}>
+              <div className="space-y-2.5 lg:col-start-1 lg:row-start-2">
+                <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                         {detailHeading}
                       </p>
-                      <h2 className="mt-1 text-xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {locale === 'id' ? 'Informasi lengkap' : 'Full information'}
+                      <h2 className="mt-1 text-lg font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
+                        {locale === 'id'
+                          ? 'Informasi lengkap'
+                          : 'Full information'}
                       </h2>
                     </div>
-                    <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}>
+                    <span
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}
+                    >
                       {highlightHeading}
                     </span>
                   </div>
 
                   {item.body ? (
-                    <div className="prose prose-sm mt-3 max-w-none whitespace-pre-line text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
-                      {item.body}
+                    <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800 sm:p-3">
+                      <div className="flex items-start gap-2.5 sm:gap-3">
+                        <span
+                          className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                            {locale === 'id' ? 'Ringkasan' : 'Summary'}
+                          </p>
+                          <h3 className="mt-0.5 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {displayType === 'service'
+                              ? locale === 'id'
+                                ? 'Ringkasan Layanan'
+                                : 'Service Summary'
+                              : highlightHeading}
+                          </h3>
+                          <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
+                            {item.body}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
 
                   {expandedDetailItems.length > 0 ? (
-                    <div className="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                      {expandedDetailItems.map(entry => (
-                        <div
-                          key={entry.key}
-                          className="rounded-[16px] bg-slate-50 px-3 py-2.5 ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800"
-                        >
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                            {entry.label}
-                          </p>
-                          <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {entry.value}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                    displayType === 'service' ? (
+                      <div className="mt-3 overflow-hidden rounded-[16px] bg-white/66 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800">
+                        {expandedDetailItems.map((entry, index) => {
+                          const DetailIcon = getDetailEntryIcon(
+                            entry.key,
+                            entry.label,
+                          );
+                          return (
+                            <div
+                              key={entry.key}
+                              className={`flex items-start gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${
+                                index > 0
+                                  ? 'border-t border-slate-200/70 dark:border-slate-800'
+                                  : ''
+                              }`}
+                            >
+                              <span
+                                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
+                              >
+                                <DetailIcon className="h-4 w-4" />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                                  {entry.label}
+                                </p>
+                                <p className="mt-1 text-sm font-semibold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                  {entry.value}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:gap-2.5 xl:grid-cols-3">
+                        {expandedDetailItems.map(entry => {
+                          const DetailIcon = getDetailEntryIcon(
+                            entry.key,
+                            entry.label,
+                          );
+                          return (
+                            <div
+                              key={entry.key}
+                              className={detailInsetCompactClass}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <span
+                                  className={`mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px] ${detailVisual.icon}`}
+                                >
+                                  <DetailIcon className="h-3.5 w-3.5" />
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.18em]">
+                                    {entry.label}
+                                  </p>
+                                  <p className="mt-1 line-clamp-2 text-xs font-semibold leading-4 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
+                                    {entry.value}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
                   ) : null}
 
                   {tags.length > 0 ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-3 flex flex-wrap gap-1.5">
                       {tags.map(tag => (
                         <span
                           key={tag}
-                          className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
                         >
                           {tag}
                         </span>
@@ -4169,11 +4457,13 @@ export default function ContentDetailPage({ params }: PageProps) {
                   ) : null}
                 </section>
 
-                <section className={`${detailSurfaceClass} p-3.5 sm:p-4`}>
-                  <div className="grid gap-4 lg:grid-cols-[200px_minmax(0,1fr)]">
+                <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
+                  <div className="grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id' ? 'Ulasan pelanggan' : 'Customer reviews'}
+                        {locale === 'id'
+                          ? 'Ulasan pelanggan'
+                          : 'Customer reviews'}
                       </p>
                       <div className="mt-3 flex items-end gap-2">
                         <span className="text-3xl font-semibold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
@@ -4200,15 +4490,22 @@ export default function ContentDetailPage({ params }: PageProps) {
                       </div>
                       <div className="mt-4 space-y-1.5">
                         {reviewBuckets.map(bucket => (
-                          <div key={bucket.score} className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]">
+                          <div
+                            key={bucket.score}
+                            className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]"
+                          >
                             <span className="w-3">{bucket.score}</span>
                             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-900">
                               <div
                                 className="h-full rounded-full bg-[color:var(--app-accent)]"
-                                style={{ width: `${(bucket.count / reviewBucketTotal) * 100}%` }}
+                                style={{
+                                  width: `${(bucket.count / reviewBucketTotal) * 100}%`,
+                                }}
                               />
                             </div>
-                            <span className="w-5 text-right">{bucket.count}</span>
+                            <span className="w-5 text-right">
+                              {bucket.count}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -4216,11 +4513,17 @@ export default function ContentDetailPage({ params }: PageProps) {
 
                     <div className="space-y-3">
                       {reviewsLoading ? (
-                        <div className="rounded-[18px] bg-slate-50 p-3 text-xs text-[color:var(--app-text)] dark:bg-slate-900 dark:text-[color:var(--app-text-soft)]">
-                          {locale === 'id' ? 'Memuat ulasan...' : 'Loading reviews...'}
+                        <div
+                          className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
+                        >
+                          {locale === 'id'
+                            ? 'Memuat ulasan...'
+                            : 'Loading reviews...'}
                         </div>
                       ) : reviews.length === 0 ? (
-                        <div className="rounded-[18px] bg-slate-50 p-3 text-xs text-[color:var(--app-text)] dark:bg-slate-900 dark:text-[color:var(--app-text-soft)]">
+                        <div
+                          className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
+                        >
                           {locale === 'id'
                             ? 'Belum ada ulasan untuk listing ini.'
                             : 'No reviews for this listing yet.'}
@@ -4229,7 +4532,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                         reviews.slice(0, 4).map(review => (
                           <div
                             key={review.id}
-                            className="rounded-[18px] bg-slate-50 p-3 text-sm text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800"
+                            className={`rounded-[18px] p-3 text-sm text-[color:var(--app-text)] ring-1 dark:text-[color:var(--app-text-soft)] ${detailTone.row}`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1">
@@ -4250,7 +4553,9 @@ export default function ContentDetailPage({ params }: PageProps) {
                             </div>
                             <p className="mt-2 leading-6">
                               {review.comment ||
-                                (locale === 'id' ? 'Tanpa komentar.' : 'No comment provided.')}
+                                (locale === 'id'
+                                  ? 'Tanpa komentar.'
+                                  : 'No comment provided.')}
                             </p>
                           </div>
                         ))
@@ -4260,26 +4565,38 @@ export default function ContentDetailPage({ params }: PageProps) {
                 </section>
 
                 {showSellerStats ? (
-                  <section className={`${detailSurfaceClass} p-3.5 sm:p-4 lg:hidden`}>
+                  <section
+                    className={`${detailSurfaceClass} p-3.5 sm:p-4 lg:hidden`}
+                  >
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                       {locale === 'id' ? 'Kepercayaan penjual' : 'Seller trust'}
                     </p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-3">
                       {[
                         {
-                          label: locale === 'id' ? 'Rating penjual' : 'Seller rating',
-                          value: sellerRating > 0 ? sellerRating.toFixed(1) : '0.0',
+                          label:
+                            locale === 'id'
+                              ? 'Rating penjual'
+                              : 'Seller rating',
+                          value:
+                            sellerRating > 0 ? sellerRating.toFixed(1) : '0.0',
                         },
                         {
-                          label: locale === 'id' ? 'Transaksi selesai' : 'Completed deals',
+                          label:
+                            locale === 'id'
+                              ? 'Transaksi selesai'
+                              : 'Completed deals',
                           value: `${sellerCompletedTransactions}/${sellerTotalTransactions}`,
                         },
                         {
-                          label: locale === 'id' ? 'Acceptance rate' : 'Acceptance rate',
+                          label:
+                            locale === 'id'
+                              ? 'Acceptance rate'
+                              : 'Acceptance rate',
                           value: formatPercent(sellerAcceptanceRate),
                         },
                       ].map(stat => (
-                        <div key={stat.label} className="rounded-[16px] bg-slate-50 p-3 ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800">
+                        <div key={stat.label} className={detailInsetClass}>
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
                             {stat.label}
                           </p>
@@ -4305,14 +4622,15 @@ export default function ContentDetailPage({ params }: PageProps) {
                           href={doc.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="group flex items-center justify-between gap-3 rounded-[18px] bg-slate-50 px-3 py-2.5 text-sm ring-1 ring-slate-200/70 transition hover:bg-emerald-50 dark:bg-slate-900 dark:ring-slate-800 dark:hover:bg-emerald-500/12"
+                          className={`group flex items-center justify-between gap-3 rounded-[18px] px-3 py-2.5 text-sm ring-1 transition ${detailTone.row}`}
                         >
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                               {doc.name}
                             </p>
                             <p className="text-xs text-[color:var(--app-text-soft)]">
-                              {doc.mime || (locale === 'id' ? 'Dokumen' : 'Document')}
+                              {doc.mime ||
+                                (locale === 'id' ? 'Dokumen' : 'Document')}
                               {doc.size ? ` - ${formatSize(doc.size)}` : ''}
                             </p>
                           </div>
@@ -4337,7 +4655,6 @@ export default function ContentDetailPage({ params }: PageProps) {
             {actionButtons}
           </div>
         </div>
-
       </div>
 
       {showShareModal && (

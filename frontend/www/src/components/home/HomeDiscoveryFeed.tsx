@@ -14,6 +14,10 @@ import {
   parseImages,
 } from '@/lib/content/catalog';
 import {
+  formatPriceWithUnit,
+  resolveContentPriceUnitLabel,
+} from '@/lib/content/priceUnit';
+import {
   getListingSideContextLabel,
   getListingSideLabel,
   resolveListingSide,
@@ -110,19 +114,19 @@ const FILTER_OPTIONS: Array<{
   labelId: string;
   labelEn: string;
 }> = [
-    { value: 'all', labelId: 'Semua', labelEn: 'All' },
-    { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
-    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
-    { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
-    { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
-    {
-      value: 'business_transfer',
-      labelId: 'Oper Usaha',
-      labelEn: 'Business Transfer',
-    },
-    { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
-    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
-  ];
+  { value: 'all', labelId: 'Semua', labelEn: 'All' },
+  { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
+  { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
+  { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
+  { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
+  {
+    value: 'business_transfer',
+    labelId: 'Oper Usaha',
+    labelEn: 'Business Transfer',
+  },
+  { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
+  { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
+];
 
 function isDiscoveryFilter(value: string | null): value is DiscoveryFilter {
   return [
@@ -383,8 +387,20 @@ function mapContentItem(
     'Indonesia';
 
   const price = formatIDRFromCents(item.price_cents);
+  const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
+  const fallbackPriceLabel =
+    asString(meta.price_label) ||
+    asString(meta.salary_range) ||
+    asString(meta.budget_range) ||
+    asString(meta.rate_label);
   const priceLabel =
-    price !== '-' ? price : locale === 'id' ? 'Negosiasi' : 'Negotiable';
+    price !== '-'
+      ? formatPriceWithUnit(price, priceUnitLabel)
+      : fallbackPriceLabel
+        ? formatPriceWithUnit(fallbackPriceLabel, priceUnitLabel)
+        : locale === 'id'
+          ? 'Negosiasi'
+          : 'Negotiable';
 
   const typeToken = [
     item.content_type,
@@ -755,9 +771,9 @@ export function HomeDiscoveryFeed({
       if (!response.ok) {
         throw new Error(
           (payload as { error?: string }).error ||
-          (isId
-            ? 'Konten belum bisa dimuat.'
-            : 'Content is unavailable right now.'),
+            (isId
+              ? 'Konten belum bisa dimuat.'
+              : 'Content is unavailable right now.'),
         );
       }
 
@@ -918,9 +934,9 @@ export function HomeDiscoveryFeed({
         ? allCards
         : filter === 'service'
           ? dedupeCards([
-            ...(cardsByFilter.service || []),
-            ...(cardsByFilter.tool_rental || []),
-          ])
+              ...(cardsByFilter.service || []),
+              ...(cardsByFilter.tool_rental || []),
+            ])
           : dedupeCards(cardsByFilter[filter] || fallback);
 
     return sortCards(source, 'top').slice(0, 12);
@@ -980,15 +996,15 @@ export function HomeDiscoveryFeed({
 
   const growthLinks = isId
     ? [
-      { href: '/community', label: 'Komunitas' },
-      { href: '/learn', label: 'Harga sehat' },
-      { href: '/search?type=product&q=distributor', label: 'Distributor' },
-    ]
+        { href: '/community', label: 'Komunitas' },
+        { href: '/learn', label: 'Harga sehat' },
+        { href: '/search?type=product&q=distributor', label: 'Distributor' },
+      ]
     : [
-      { href: '/community', label: 'Community' },
-      { href: '/learn', label: 'Healthy pricing' },
-      { href: '/search?type=product&q=distributor', label: 'Distributors' },
-    ];
+        { href: '/community', label: 'Community' },
+        { href: '/learn', label: 'Healthy pricing' },
+        { href: '/search?type=product&q=distributor', label: 'Distributors' },
+      ];
 
   const browseHref = resolveBrowseHref(filter, 'newest');
   const activeLoading = loading;

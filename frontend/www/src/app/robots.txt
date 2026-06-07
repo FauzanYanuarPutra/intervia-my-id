@@ -2,18 +2,7 @@
 
 User-agent: *
 Allow: /
-Disallow: /private/
-Disallow: /admin/
-Disallow: /tmp/
-
-User-agent: Googlebot
-Allow: /
-Disallow: /private/
-Disallow: /admin/
-Disallow: /tmp/
-
-User-agent: Bingbot
-Allow: /
+Disallow: /api/
 Disallow: /private/
 Disallow: /admin/
 Disallow: /tmp/

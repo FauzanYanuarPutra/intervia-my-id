@@ -1,0 +1,2 @@
+-- No destructive rollback: this migration replaces generated placeholder URLs
+-- with first-party category media for seeded content.

@@ -7,15 +7,13 @@ import { usePathname } from 'next/navigation';
 import GlobalLoader from '@/components/GlobalLoader';
 import NetworkStatus from '@/components/common/NetworkStatus';
 import { GlobalPreferenceDock } from '@/components/common/GlobalPreferenceDock';
-import { DevelopmentStageNotice } from '@/components/layout/DevelopmentStageNotice';
-import {
-  MobileRouteChrome,
-  resolveMobileRouteChromeConfig,
-} from '@/components/layout/MobileRouteChrome';
+import { Header } from '@/components/layout/Header';
 import StackMaintenanceGate from '@/components/layout/StackMaintenanceGate';
 import { LanguageModalProvider } from '@/components/modal/LanguageModal/LanguageModalContext';
 import type { StackStartupState } from '@/lib/system/startupState';
 import { cn } from '@/lib/utils';
+import { useRouteLayout } from '@/lib/useRouteLayout';
+import { MobileRouteChrome } from './MobileRouteChrome';
 
 const LanguageModal = dynamic(
   () =>
@@ -31,35 +29,18 @@ type Props = {
   initialMaintenanceState?: StackStartupState;
 };
 
-function resolveRouteIntent(pathname: string | null): string {
-  const path = (pathname || '/').replace(/^\/(id|en)(?=\/|$)/, '') || '/';
-
-  if (path === '/' || path.startsWith('/home')) return 'home';
-  if (path.startsWith('/search') || path.startsWith('/kategori')) return 'search';
-  if (path.startsWith('/create')) return 'create';
-  if (path.startsWith('/reels')) return 'reels';
-  if (path.startsWith('/chat')) return 'chat';
-  if (
-    path.startsWith('/login') ||
-    path.startsWith('/register') ||
-    path.startsWith('/forgot-password') ||
-    path.startsWith('/reset-password') ||
-    path.startsWith('/onboarding')
-  ) return 'auth';
-  if (path.startsWith('/community') || path.startsWith('/forum')) return 'community';
-  if (path.startsWith('/jobs') || path.startsWith('/projects') || path.startsWith('/my-applications')) return 'jobs';
-  if (path.startsWith('/property')) return 'property';
-  if (path.startsWith('/marketplace') || path.startsWith('/listing') || path.startsWith('/content')) return 'market';
-  if (path.startsWith('/super-app') || path.startsWith('/usaha') || path.startsWith('/umkm')) return 'super';
-  if (path.startsWith('/profile') || path.startsWith('/freelancers')) return 'profile';
-  if (path.startsWith('/transactions') || path.startsWith('/payments')) return 'activity';
-  if (path.startsWith('/notifications')) return 'notifications';
-  if (path.startsWith('/settings')) return 'settings';
-  if (path.startsWith('/support') || path.startsWith('/contact')) return 'support';
-  if (path.startsWith('/trust') || path.startsWith('/privacy') || path.startsWith('/terms')) return 'trust';
-  if (path.startsWith('/dashboard') || path.startsWith('/my-')) return 'dashboard';
-
-  return 'market';
+function DesktopRouteHeader() {
+  return (
+    <>
+      <div className="hidden lg:block">
+        <Header />
+      </div>
+      <div
+        aria-hidden="true"
+        className="hidden h-[calc(52px+env(safe-area-inset-top))] shrink-0 sm:h-[calc(60px+env(safe-area-inset-top))] lg:block"
+      />
+    </>
+  );
 }
 
 export default function ClientLayoutWrapper({
@@ -67,26 +48,41 @@ export default function ClientLayoutWrapper({
   initialMaintenanceState,
   locale,
 }: Props) {
-  const pathname = usePathname();
-  const mobileChrome = resolveMobileRouteChromeConfig(pathname, locale);
+  const { pathname, showHeaderMobile, showHeaderDesktop, showBottomNavMobile, showTopBarMobile, showTopBarDesktop } = useRouteLayout();
+
+  const mobileChrome = {
+    showTopBar: showTopBarMobile,
+    showBottomNav: showBottomNavMobile,
+    title: '',
+    eyebrow: '',
+  };
+
 
   return (
     <>
-      <GlobalLoader />
+      <Suspense fallback={null}>
+        <GlobalLoader />
+      </Suspense>
       <NetworkStatus />
-      <DevelopmentStageNotice locale={locale} />
       <LanguageModalProvider locale={locale}>
         <div
           className={cn(
             'lajukan-route-surface',
-            mobileChrome.showBottomNav &&
-              'pb-[calc(3.35rem+env(safe-area-inset-bottom))] lg:pb-0',
+            showBottomNavMobile &&
+            'pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0',
           )}
-          data-route-intent={resolveRouteIntent(pathname)}
-          data-mobile-bottom-nav={mobileChrome.showBottomNav ? 'true' : 'false'}
+        // data-route-intent={resolveRouteIntent(pathname)}
+        // data-mobile-bottom-nav={showBottomNavMobile ? 'true' : 'false'}
         >
           <StackMaintenanceGate
-            chrome={<MobileRouteChrome config={mobileChrome} locale={locale} />}
+            chrome={
+              <>
+                {showHeaderDesktop ? <DesktopRouteHeader /> : null}
+                {showBottomNavMobile || showTopBarMobile ? (
+                  <MobileRouteChrome config={mobileChrome} locale={locale} />
+                ) : null}
+              </>
+            }
             initialState={initialMaintenanceState}
             locale={locale}
           >

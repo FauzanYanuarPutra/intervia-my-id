@@ -101,6 +101,10 @@ declare global {
   var __usahaPortalStore: PortalStore | undefined;
 }
 
+const ENABLE_PORTAL_SEED_DATA =
+  process.env.ENABLE_USAHA_SEED_DATA === 'true' ||
+  process.env.NEXT_PUBLIC_ENABLE_USAHA_SEED_DATA === 'true';
+
 function normalizePhone(phone: string) {
   return phone.replace(/[^\d]/g, '');
 }
@@ -182,6 +186,13 @@ function buildSeedStore(): PortalStore {
   const accounts = new Map<string, PortalAccount>();
   const businessMap = new Map<string, BusinessBaseRecord>();
 
+  if (!ENABLE_PORTAL_SEED_DATA) {
+    return {
+      accounts,
+      businesses: businessMap,
+    };
+  }
+
   for (const business of seedBusinesses) {
     const { currentRole, permissions, ...baseBusiness } = business;
     void currentRole;
@@ -189,8 +200,8 @@ function buildSeedStore(): PortalStore {
     businessMap.set(business.id, syncBusinessRecord(baseBusiness));
   }
 
-  const demoAccount: PortalAccount = {
-    id: 'account-demo-owner',
+  const seedAccount: PortalAccount = {
+    id: 'account-seed-owner',
     name: 'Nadia Putri',
     phone: normalizePhone('0812-1111-2222'),
     email: 'nadia@lajukan.test',
@@ -201,7 +212,7 @@ function buildSeedStore(): PortalStore {
     createdAt: nowLabel(),
   };
 
-  accounts.set(demoAccount.id, demoAccount);
+  accounts.set(seedAccount.id, seedAccount);
 
   const helperAccounts: PortalAccount[] = [
     {
@@ -380,10 +391,11 @@ function createOwnerMember(ownerName: string, phone: string): TeamMember {
 }
 
 export function listSeedBusinesses() {
-  return seedBusinesses;
+  return ENABLE_PORTAL_SEED_DATA ? seedBusinesses : [];
 }
 
 export function getSeedBusinessById(id: string) {
+  if (!ENABLE_PORTAL_SEED_DATA) return null;
   return seedBusinesses.find(business => business.id === id) ?? null;
 }
 

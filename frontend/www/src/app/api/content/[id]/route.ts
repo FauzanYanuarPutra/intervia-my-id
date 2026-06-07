@@ -12,6 +12,11 @@ import {
   fetchOwnerPublicProfiles,
   shouldIncludeOwnerProfiles,
 } from '@/lib/content/ownerProfiles';
+import {
+  isPlaceholderLikeContentImage,
+  resolveImageGallery,
+  type ContentItem as CatalogContentItem,
+} from '@/lib/content/catalog';
 import { extractContentId } from '@/lib/content/routes';
 import { requirePhoneVerifiedForListing } from '@/lib/server/phoneVerification';
 
@@ -74,6 +79,37 @@ function absolutizeIfRelativeUrl(value: string, origin: string): string {
   }
 }
 
+function normalizeMediaPayloadValue(value: unknown, origin: string): unknown {
+  if (typeof value === 'string') return absolutizeIfRelativeUrl(value, origin);
+  if (Array.isArray(value)) {
+    return value.map(entry => normalizeMediaPayloadValue(entry, origin));
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const record = { ...(value as Record<string, unknown>) };
+  for (const key of [
+    'url',
+    'src',
+    'image',
+    'image_url',
+    'imageUrl',
+    'cover_image',
+    'coverImage',
+    'thumbnail',
+    'thumbnail_url',
+    'thumbnailUrl',
+    'media_url',
+    'mediaUrl',
+    'photo_url',
+    'photoUrl',
+  ]) {
+    if (typeof record[key] === 'string') {
+      record[key] = absolutizeIfRelativeUrl(record[key] as string, origin);
+    }
+  }
+  return record;
+}
+
 function normalizeContentMediaUrls(
   payload: Record<string, unknown>,
   origin: string,
@@ -98,18 +134,61 @@ function normalizeContentMediaUrls(
     ...(normalized.metadata as Record<string, unknown>),
   };
 
-  for (const key of ['cover_image', 'image', 'thumbnail']) {
+  for (const key of [
+    'cover_image',
+    'coverImage',
+    'cover_image_url',
+    'coverImageUrl',
+    'image',
+    'image_url',
+    'imageUrl',
+    'thumbnail',
+    'thumbnail_url',
+    'thumbnailUrl',
+    'media_url',
+    'mediaUrl',
+    'photo_url',
+    'photoUrl',
+    'banner',
+    'banner_url',
+    'bannerUrl',
+    'logo',
+    'logo_url',
+    'logoUrl',
+  ]) {
     if (typeof metadata[key] === 'string') {
       metadata[key] = absolutizeIfRelativeUrl(metadata[key] as string, origin);
     }
   }
 
-  for (const key of ['images', 'image_urls', 'gallery', 'gallery_images']) {
+  for (const key of [
+    'images',
+    'image_urls',
+    'imageUrls',
+    'gallery',
+    'gallery_images',
+    'galleryImages',
+    'media_urls',
+    'mediaUrls',
+    'media',
+    'media_gallery',
+    'mediaGallery',
+    'photos',
+    'photo_urls',
+    'photoUrls',
+    'attachments',
+    'detail_images',
+    'detailImages',
+    'portfolio_images',
+    'portfolioImages',
+    'property_images',
+    'propertyImages',
+    'listing_images',
+    'listingImages',
+  ]) {
     if (Array.isArray(metadata[key])) {
       metadata[key] = metadata[key].map(entry =>
-        typeof entry === 'string'
-          ? absolutizeIfRelativeUrl(entry, origin)
-          : entry,
+        normalizeMediaPayloadValue(entry, origin),
       );
     }
   }
@@ -128,6 +207,79 @@ function normalizeContentMediaUrls(
 
   normalized.metadata = metadata;
   return normalized;
+}
+
+function extractMediaString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  const record = value as Record<string, unknown>;
+  for (const key of [
+    'url',
+    'src',
+    'image',
+    'image_url',
+    'imageUrl',
+    'cover_image',
+    'coverImage',
+    'thumbnail',
+    'thumbnail_url',
+    'thumbnailUrl',
+    'media_url',
+    'mediaUrl',
+    'photo_url',
+    'photoUrl',
+  ]) {
+    if (typeof record[key] === 'string' && record[key].trim()) {
+      return record[key].trim();
+    }
+  }
+  return '';
+}
+
+function shouldReplaceMediaList(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return true;
+  return value.every(entry => {
+    const src = extractMediaString(entry);
+    return !src || isPlaceholderLikeContentImage(src);
+  });
+}
+
+function attachResolvedContentMedia(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const next = { ...payload };
+  const gallery = resolveImageGallery(next as CatalogContentItem);
+  if (gallery.length === 0) return next;
+
+  const coverImage =
+    typeof next.cover_image === 'string' ? next.cover_image : '';
+  if (!coverImage || isPlaceholderLikeContentImage(coverImage)) {
+    next.cover_image = gallery[0];
+  }
+  if (shouldReplaceMediaList(next.image_urls)) {
+    next.image_urls = gallery;
+  }
+
+  const metadata =
+    next.metadata &&
+    typeof next.metadata === 'object' &&
+    !Array.isArray(next.metadata)
+      ? { ...(next.metadata as Record<string, unknown>) }
+      : {};
+  const metadataCover =
+    typeof metadata.cover_image === 'string' ? metadata.cover_image : '';
+  if (!metadataCover || isPlaceholderLikeContentImage(metadataCover)) {
+    metadata.cover_image = gallery[0];
+  }
+  if (shouldReplaceMediaList(metadata.image_urls)) {
+    metadata.image_urls = gallery;
+  }
+  if (metadata.media_source === 'first_party_category_asset') {
+    metadata.media_source = 'external_category_photo';
+  }
+  next.metadata = metadata;
+
+  return next;
 }
 
 export async function GET(
@@ -156,25 +308,27 @@ export async function GET(
   let data = await backendRes.json().catch(() => null);
   if (
     backendRes.ok &&
-    includeOwnerProfiles &&
     data &&
     typeof data === 'object' &&
     !Array.isArray(data)
   ) {
-    const enriched = await fetchOwnerPublicProfiles({
-      req,
-      identityBase:
-        process.env.INTERNAL_API_URL ||
-        process.env.NEXT_PUBLIC_API_URL ||
-        'http://localhost:8080',
-      items: [data as Record<string, unknown>],
-    });
-    if (enriched.size > 0) {
-      data = attachOwnerProfilesToContent(
-        [data as Record<string, unknown>],
-        enriched,
-      )[0];
+    if (includeOwnerProfiles) {
+      const enriched = await fetchOwnerPublicProfiles({
+        req,
+        identityBase:
+          process.env.INTERNAL_API_URL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          'http://localhost:8080',
+        items: [data as Record<string, unknown>],
+      });
+      if (enriched.size > 0) {
+        data = attachOwnerProfilesToContent(
+          [data as Record<string, unknown>],
+          enriched,
+        )[0];
+      }
     }
+    data = attachResolvedContentMedia(data as Record<string, unknown>);
   }
   return NextResponse.json(data ?? { error: 'Invalid response' }, {
     status: backendRes.status,

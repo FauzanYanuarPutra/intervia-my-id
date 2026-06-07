@@ -23,7 +23,7 @@ export async function generateMetadata({
       ? 'Buat Listing atau Brief | Lajukan'
       : 'Create a Listing or Brief | Lajukan',
     description: isId
-      ? 'Pilih dulu: mau cari supplier, talent, lokasi, jasa, atau alat sewa; atau mau pasang produk, jasa, lokasi, dan rental.'
+      ? 'Pilih dulu: mau mencari supplier, talent, lokasi, jasa, atau alat sewa; atau mau menawarkan produk, jasa, lokasi, dan rental.'
       : 'Choose whether you need suppliers, talent, spaces, services, or rental tools, or want to publish products, services, spaces, and rentals on Lajukan.',
     alternates: {
       canonical,
@@ -39,7 +39,7 @@ export async function generateMetadata({
         ? 'Buat Listing atau Brief | Lajukan'
         : 'Create a Listing or Brief | Lajukan',
       description: isId
-        ? 'Masuk ke jalur cari atau jual, lalu lanjut ke form supplier, talent, rental, lokasi, atau jasa yang paling cocok.'
+        ? 'Masuk ke jalur Cari Kebutuhan atau Tawarkan, lalu lanjut ke form supplier, talent, rental, lokasi, atau jasa yang paling cocok.'
         : 'Start from the need or sell flow, then continue to the supplier, talent, rental, property, or service form that fits best.',
       url: canonical,
       type: 'website',
@@ -53,7 +53,7 @@ export async function generateMetadata({
         ? 'Buat Listing atau Brief | Lajukan'
         : 'Create a Listing or Brief | Lajukan',
       description: isId
-        ? 'Pilih jalur cari atau jual, lalu lanjut ke form supplier, talent, rental, lokasi, atau jasa.'
+        ? 'Pilih jalur Cari Kebutuhan atau Tawarkan, lalu lanjut ke form supplier, talent, rental, lokasi, atau jasa.'
         : 'Choose the need or sell path, then continue to the best-fit supplier, talent, rental, location, or service form.',
       images: ['https://www.lajukan.com/og-image-home.png'],
     },

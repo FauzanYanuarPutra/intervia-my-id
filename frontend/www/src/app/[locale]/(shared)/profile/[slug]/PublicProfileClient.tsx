@@ -20,7 +20,6 @@ import {
   Link2,
   MapPin,
   MessageCircle,
-  MessageSquareText,
   RefreshCcw,
   Share2,
   ShieldCheck,
@@ -49,8 +48,10 @@ import {
   type ProfileContentTab,
   type ProfileLeafTab,
 } from '@/lib/profile/profileContentTabs';
-import { normalizeProfileMediaUrl } from '@/lib/profile/profileMedia';
+import type { CommunityFeedItem } from '@/lib/community/types';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
+import type { LajukanReel } from '../../../_data/reels';
 
 type PublicProfileClientProps = {
   locale: string;
@@ -121,6 +122,10 @@ type PublicSocialUser = {
   avatarUrl: string;
   badge: string;
   verified: boolean;
+};
+
+type PublicProfileActivityPayload<T> = {
+  items?: T[];
 };
 
 const PUBLIC_PROFILE_FOLLOW_KEY = 'lajukan.public-profile.following.v1';
@@ -245,7 +250,7 @@ function mapProfileToSocialUser(
     id: profile.id,
     name,
     handle,
-    avatarUrl: normalizeProfileMediaUrl(profile.avatar_url) || '/default-avatar.svg',
+    avatarUrl: profileAvatarSrc(profile.avatar_url),
     badge:
       roles.length > 0
         ? roles.slice(0, 1).map(formatRole).join('')
@@ -401,6 +406,48 @@ function buildPublicListingHref(item: PublicListing): string {
     : `/content/${encodeURIComponent(item.id)}`;
 }
 
+function normalizeComparableName(value?: string | null): string {
+  return (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function profileNameCandidates(profile: PublicUserProfile): string[] {
+  return Array.from(
+    new Set(
+      [profile.id, profile.username, profile.full_name]
+        .map(item => normalizeComparableName(item))
+        .filter(Boolean),
+    ),
+  );
+}
+
+function isImageMediaUrl(value?: string | null): boolean {
+  const lower = (value || '').split('?')[0]?.toLowerCase() || '';
+  return /\.(avif|gif|jpe?g|png|webp)$/.test(lower);
+}
+
+function matchesPublicProfileReel(
+  reel: LajukanReel,
+  profile: PublicUserProfile,
+): boolean {
+  if (reel.creatorUserId && reel.creatorUserId === profile.id) return true;
+  const candidates = profileNameCandidates(profile);
+  const creator = normalizeComparableName(reel.creator);
+  return Boolean(creator && candidates.includes(creator));
+}
+
+function matchesPublicProfileCommunityItem(
+  item: CommunityFeedItem,
+  profile: PublicUserProfile,
+): boolean {
+  if (item.author?.id && item.author.id === profile.id) return true;
+  const candidates = profileNameCandidates(profile);
+  const author = normalizeComparableName(item.author?.name);
+  return Boolean(author && candidates.includes(author));
+}
+
 async function fetchProfileById(
   id: string,
   signal: AbortSignal,
@@ -414,6 +461,30 @@ async function fetchProfileById(
   return normalizePublicUserProfile(payload);
 }
 
+async function fetchDiscoverProfiles(
+  signal: AbortSignal,
+  query?: string,
+  limit = 24,
+): Promise<PublicUserProfile[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  const normalizedQuery = query?.trim();
+  if (normalizedQuery) {
+    params.set('q', normalizedQuery);
+  }
+
+  const response = await fetch(`/api/users/discover?${params.toString()}`, {
+    cache: 'no-store',
+    signal,
+  });
+  if (!response.ok) return [];
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: unknown[];
+  };
+  return (Array.isArray(payload.data) ? payload.data : [])
+    .map(item => normalizePublicUserProfile(item))
+    .filter((item): item is PublicUserProfile => Boolean(item));
+}
+
 export default function PublicProfileClient({
   locale,
   slug,
@@ -424,6 +495,11 @@ export default function PublicProfileClient({
   const localeCode = locale === 'id' ? 'id' : 'en';
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [listings, setListings] = useState<PublicListing[]>([]);
+  const [profileReels, setProfileReels] = useState<LajukanReel[]>([]);
+  const [profileCommunityItems, setProfileCommunityItems] = useState<
+    CommunityFeedItem[]
+  >([]);
+  const [profileActivityLoading, setProfileActivityLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -446,6 +522,8 @@ export default function PublicProfileClient({
       setLoading(true);
       setError(null);
       setNotFound(false);
+      setProfileReels([]);
+      setProfileCommunityItems([]);
 
       try {
         let nextProfile: PublicUserProfile | null = null;
@@ -456,38 +534,56 @@ export default function PublicProfileClient({
         }
 
         if (!nextProfile) {
-          const searchTerm = decodePublicProfileSlug(slug)
-            .replace(/--.+$/, '')
-            .replace(/-/g, ' ')
-            .trim();
+          const decodedSlug = decodePublicProfileSlug(slug);
+          const slugHandle = decodedSlug.replace(/--.+$/, '').trim();
+          const searchTerm = slugHandle.replace(/-/g, ' ').trim();
 
-          if (!searchTerm) {
+          if (!slugHandle && !searchTerm) {
             setNotFound(true);
             setProfile(null);
             setListings([]);
             return;
           }
 
-          const discoverResponse = await fetch(
-            `/api/users/discover?q=${encodeURIComponent(searchTerm)}&limit=24`,
-            {
-              cache: 'no-store',
-              signal: controller.signal,
-            },
+          const directSlugProfile = slugHandle
+            ? await fetchProfileById(slugHandle, controller.signal)
+            : null;
+
+          const searchVariants = Array.from(
+            new Set(
+              [searchTerm, slugHandle, slugHandle.replace(/-/g, '_')]
+                .map(item => item.trim())
+                .filter(Boolean),
+            ),
           );
+          let candidate =
+            directSlugProfile &&
+            matchesPublicProfileSlug(slug, directSlugProfile)
+              ? directSlugProfile
+              : null;
 
-          const discoverPayload = (await discoverResponse
-            .json()
-            .catch(() => ({}))) as {
-            data?: unknown[];
-          };
+          for (const variant of searchVariants) {
+            if (candidate) break;
+            const candidates = await fetchDiscoverProfiles(
+              controller.signal,
+              variant,
+              32,
+            );
+            candidate =
+              candidates.find(item => matchesPublicProfileSlug(slug, item)) ||
+              null;
+          }
 
-          const candidate = (
-            Array.isArray(discoverPayload.data) ? discoverPayload.data : []
-          )
-            .map(item => normalizePublicUserProfile(item))
-            .filter((item): item is PublicUserProfile => Boolean(item))
-            .find(item => matchesPublicProfileSlug(slug, item));
+          if (!candidate) {
+            const candidates = await fetchDiscoverProfiles(
+              controller.signal,
+              undefined,
+              100,
+            );
+            candidate =
+              candidates.find(item => matchesPublicProfileSlug(slug, item)) ||
+              null;
+          }
 
           if (!candidate) {
             setNotFound(true);
@@ -521,7 +617,7 @@ export default function PublicProfileClient({
         setProfile(nextProfile);
 
         const listingResponse = await fetch(
-          `/api/content?owner_id=${encodeURIComponent(nextProfile.id)}&limit=9&status=active`,
+          `/api/content?owner_id=${encodeURIComponent(nextProfile.id)}&limit=36&status=active`,
           {
             cache: 'no-store',
             signal: controller.signal,
@@ -612,6 +708,73 @@ export default function PublicProfileClient({
     return () => controller.abort();
   }, [localeCode, profile]);
 
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const activeProfile = profile;
+
+    async function loadPublicActivity() {
+      setProfileActivityLoading(true);
+      try {
+        const [reelsResponse, communityResponse] = await Promise.all([
+          fetch('/api/reels?limit=36', {
+            cache: 'no-store',
+            signal: controller.signal,
+          }),
+          fetch('/api/community/feed?limit=36&tab=for-you', {
+            cache: 'no-store',
+            signal: controller.signal,
+          }),
+        ]);
+
+        const [reelsPayload, communityPayload] = await Promise.all([
+          reelsResponse.json().catch(() => ({})),
+          communityResponse.json().catch(() => ({})),
+        ]);
+
+        if (controller.signal.aborted) return;
+
+        const nextReels = Array.isArray(
+          (reelsPayload as PublicProfileActivityPayload<LajukanReel>).items,
+        )
+          ? (reelsPayload as PublicProfileActivityPayload<LajukanReel>)
+              .items!.filter(item =>
+                matchesPublicProfileReel(item, activeProfile),
+              )
+              .slice(0, 6)
+          : [];
+        const nextCommunityItems = Array.isArray(
+          (communityPayload as PublicProfileActivityPayload<CommunityFeedItem>)
+            .items,
+        )
+          ? (
+              communityPayload as PublicProfileActivityPayload<CommunityFeedItem>
+            )
+              .items!.filter(item =>
+                matchesPublicProfileCommunityItem(item, activeProfile),
+              )
+              .slice(0, 6)
+          : [];
+
+        setProfileReels(nextReels);
+        setProfileCommunityItems(nextCommunityItems);
+      } catch {
+        if (!controller.signal.aborted) {
+          setProfileReels([]);
+          setProfileCommunityItems([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setProfileActivityLoading(false);
+      }
+    }
+
+    void loadPublicActivity();
+    return () => controller.abort();
+  }, [profile]);
+
   const detail = useMemo(
     () => (profile ? buildProfileDetail(profile, localeCode) : null),
     [localeCode, profile],
@@ -691,8 +854,7 @@ export default function PublicProfileClient({
     );
   }
 
-  const avatarUrl =
-    normalizeProfileMediaUrl(profile.avatar_url) || '/default-avatar.svg';
+  const avatarUrl = profileAvatarSrc(profile.avatar_url);
   const statCards = [
     {
       label: localeCode === 'id' ? 'Rating' : 'Rating',
@@ -799,16 +961,31 @@ export default function PublicProfileClient({
     label: string;
     icon: typeof Sparkles;
   }> = [
-    { key: 'ringkas', label: localeCode === 'id' ? 'Ringkas' : 'Summary', icon: Sparkles },
-    { key: 'etalase', label: localeCode === 'id' ? 'Etalase' : 'Showcase', icon: Store },
+    {
+      key: 'ringkas',
+      label: localeCode === 'id' ? 'Ringkas' : 'Summary',
+      icon: Sparkles,
+    },
+    {
+      key: 'etalase',
+      label: localeCode === 'id' ? 'Etalase' : 'Showcase',
+      icon: Store,
+    },
     { key: 'reels', label: 'Reels', icon: Clapperboard },
-    { key: 'komunitas', label: localeCode === 'id' ? 'Komunitas' : 'Community', icon: Users },
+    {
+      key: 'komunitas',
+      label: localeCode === 'id' ? 'Komunitas' : 'Community',
+      icon: Users,
+    },
     { key: 'trust', label: 'Trust', icon: ShieldCheck },
   ];
-  const followerCount = Math.max(
-    socialUsers.length + listings.length * 2 + (profile.identity_verified ? 8 : 3),
-    typeof profile.completed_jobs === 'number' ? profile.completed_jobs : 0,
-  ) + (isFollowing ? 1 : 0);
+  const followerCount =
+    Math.max(
+      socialUsers.length +
+        listings.length * 2 +
+        (profile.identity_verified ? 8 : 3),
+      typeof profile.completed_jobs === 'number' ? profile.completed_jobs : 0,
+    ) + (isFollowing ? 1 : 0);
   const followingCount = Math.max(
     1,
     Math.min(99, Math.ceil(socialUsers.length / 2) + detail.roles.length),
@@ -823,6 +1000,200 @@ export default function PublicProfileClient({
     profile.email_verified,
     profile.phone_verified,
   ].filter(Boolean).length;
+  const numberLocale = localeCode === 'id' ? 'id-ID' : 'en-US';
+  const capabilityIconByTab: Record<ProfileLeafTab, typeof Sparkles> = {
+    job: BriefcaseBusiness,
+    freelancer: Award,
+    product: Store,
+    service: Sparkles,
+    tool_rental: Clock3,
+    business_transfer: Store,
+    property: MapPin,
+    umkm: Store,
+  };
+  const capabilityLabelByTab: Record<ProfileLeafTab, string> = {
+    job: localeCode === 'id' ? 'Merekrut talent' : 'Hiring talent',
+    freelancer: localeCode === 'id' ? 'Profil talent' : 'Talent profile',
+    product: localeCode === 'id' ? 'Menjual produk' : 'Selling products',
+    service: localeCode === 'id' ? 'Menyediakan jasa' : 'Offering services',
+    tool_rental:
+      localeCode === 'id'
+        ? 'Sewa alat/inventaris'
+        : 'Tool and inventory rental',
+    business_transfer: localeCode === 'id' ? 'Oper usaha' : 'Business transfer',
+    property: localeCode === 'id' ? 'Properti/lokasi' : 'Property/spaces',
+    umkm: localeCode === 'id' ? 'Toko UMKM' : 'UMKM store',
+  };
+  const capabilityHelperByTab: Record<ProfileLeafTab, string> = {
+    job:
+      localeCode === 'id'
+        ? 'Lowongan dan kebutuhan tim yang sedang dibuka.'
+        : 'Open jobs and team needs.',
+    freelancer:
+      localeCode === 'id'
+        ? 'Skill, pengalaman, dan portofolio yang bisa dinilai cepat.'
+        : 'Skills, experience, and portfolio visitors can scan quickly.',
+    product:
+      localeCode === 'id'
+        ? 'Produk atau stok yang bisa langsung dicek.'
+        : 'Products or stock visitors can inspect.',
+    service:
+      localeCode === 'id'
+        ? 'Layanan yang bisa diajak kerja sama.'
+        : 'Services available for collaboration.',
+    tool_rental:
+      localeCode === 'id'
+        ? 'Alat atau perlengkapan yang bisa disewa.'
+        : 'Tools or equipment available to rent.',
+    business_transfer:
+      localeCode === 'id'
+        ? 'Usaha berjalan yang bisa dilihat peluangnya.'
+        : 'Running businesses visitors can evaluate.',
+    property:
+      localeCode === 'id'
+        ? 'Ruang, ruko, kios, atau aset lokasi.'
+        : 'Spaces, shops, kiosks, or location assets.',
+    umkm:
+      localeCode === 'id'
+        ? 'Toko dan operasional usaha yang terhubung.'
+        : 'Connected store and business operations.',
+  };
+  const listingCapabilityCards = (
+    Object.entries(listingGroups) as Array<[ProfileLeafTab, PublicListing[]]>
+  )
+    .filter(([, items]) => items.length > 0)
+    .map(([tab, items]) => {
+      const Icon = capabilityIconByTab[tab];
+      const preview = items
+        .slice(0, 3)
+        .map(item => readString(item.title))
+        .filter(Boolean)
+        .join(' / ');
+
+      return {
+        key: tab,
+        label: capabilityLabelByTab[tab],
+        helper: capabilityHelperByTab[tab],
+        meta:
+          localeCode === 'id'
+            ? `${items.length.toLocaleString(numberLocale)} aktif`
+            : `${items.length.toLocaleString(numberLocale)} active`,
+        preview,
+        icon: Icon,
+        onSelect: () => {
+          setActiveProfileTab('etalase');
+          setActiveContentTab(tab);
+        },
+      };
+    });
+  const capabilityCards: Array<{
+    key: string;
+    label: string;
+    helper: string;
+    meta: string;
+    preview: string;
+    icon: typeof Sparkles;
+    onSelect: () => void;
+  }> = [
+    ...(detail.roles.length > 0
+      ? [
+          {
+            key: 'roles',
+            label: localeCode === 'id' ? 'Mode profil' : 'Profile modes',
+            helper:
+              localeCode === 'id'
+                ? 'Peran utama yang dipakai di Lajukan.'
+                : 'Primary roles used on Lajukan.',
+            meta:
+              localeCode === 'id'
+                ? `${detail.roles.length.toLocaleString(numberLocale)} peran`
+                : `${detail.roles.length.toLocaleString(numberLocale)} roles`,
+            preview: detail.roles.slice(0, 4).map(formatRole).join(' / '),
+            icon: ShieldCheck,
+            onSelect: () => setActiveProfileTab('ringkas'),
+          },
+        ]
+      : []),
+    ...listingCapabilityCards,
+    ...(detail.skills.length > 0
+      ? [
+          {
+            key: 'skills',
+            label: localeCode === 'id' ? 'Skill inti' : 'Core skills',
+            helper:
+              localeCode === 'id'
+                ? 'Keahlian yang paling cepat dinilai pengunjung.'
+                : 'Skills visitors can evaluate quickly.',
+            meta:
+              localeCode === 'id'
+                ? `${detail.skills.length.toLocaleString(numberLocale)} skill`
+                : `${detail.skills.length.toLocaleString(numberLocale)} skills`,
+            preview: detail.skills.slice(0, 5).join(' / '),
+            icon: Sparkles,
+            onSelect: () => setActiveProfileTab('ringkas'),
+          },
+        ]
+      : []),
+    ...(profileReels.length > 0
+      ? [
+          {
+            key: 'reels',
+            label: 'Reels',
+            helper:
+              localeCode === 'id'
+                ? 'Bukti aktivitas dan konten singkat.'
+                : 'Short-form proof and activity.',
+            meta: `${profileReels.length.toLocaleString(numberLocale)} reels`,
+            preview: profileReels
+              .slice(0, 3)
+              .map(reel => reel.title)
+              .filter(Boolean)
+              .join(' / '),
+            icon: Clapperboard,
+            onSelect: () => setActiveProfileTab('reels'),
+          },
+        ]
+      : []),
+    ...(profileCommunityItems.length > 0
+      ? [
+          {
+            key: 'community',
+            label: localeCode === 'id' ? 'Komunitas' : 'Community',
+            helper:
+              localeCode === 'id'
+                ? 'Diskusi dan kontribusi publik.'
+                : 'Public discussions and contributions.',
+            meta:
+              localeCode === 'id'
+                ? `${profileCommunityItems.length.toLocaleString(numberLocale)} aktivitas`
+                : `${profileCommunityItems.length.toLocaleString(numberLocale)} activities`,
+            preview: profileCommunityItems
+              .slice(0, 3)
+              .map(item => item.title)
+              .filter(Boolean)
+              .join(' / '),
+            icon: Users,
+            onSelect: () => setActiveProfileTab('komunitas'),
+          },
+        ]
+      : []),
+    {
+      key: 'trust',
+      label: localeCode === 'id' ? 'Siap dipercaya' : 'Trust ready',
+      helper:
+        localeCode === 'id'
+          ? 'Status verifikasi yang membantu orang cepat yakin.'
+          : 'Verification signals that help visitors trust faster.',
+      meta: `${trustScore}/4`,
+      preview:
+        detail.verificationBadges.slice(0, 3).join(' / ') ||
+        (localeCode === 'id'
+          ? 'Verifikasi belum lengkap'
+          : 'Verification is not complete yet'),
+      icon: ShieldCheck,
+      onSelect: () => setActiveProfileTab('trust'),
+    },
+  ];
 
   const handleFollowToggle = () => {
     if (typeof window === 'undefined') return;
@@ -955,7 +1326,11 @@ export default function PublicProfileClient({
                 <button
                   type="button"
                   onClick={handleFollowToggle}
-                  className={isFollowing ? profileSoftActionClass : profilePrimaryActionClass}
+                  className={
+                    isFollowing
+                      ? profileSoftActionClass
+                      : profilePrimaryActionClass
+                  }
                 >
                   {isFollowing ? (
                     <UserMinus className="h-4 w-4" />
@@ -1018,7 +1393,9 @@ export default function PublicProfileClient({
                 className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
               >
                 <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {followerCount.toLocaleString(localeCode === 'id' ? 'id-ID' : 'en-US')}
+                  {followerCount.toLocaleString(
+                    localeCode === 'id' ? 'id-ID' : 'en-US',
+                  )}
                 </span>
                 <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                   {localeCode === 'id' ? 'Pengikut' : 'Followers'}
@@ -1030,7 +1407,9 @@ export default function PublicProfileClient({
                 className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
               >
                 <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {followingCount.toLocaleString(localeCode === 'id' ? 'id-ID' : 'en-US')}
+                  {followingCount.toLocaleString(
+                    localeCode === 'id' ? 'id-ID' : 'en-US',
+                  )}
                 </span>
                 <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                   {localeCode === 'id' ? 'Mengikuti' : 'Following'}
@@ -1041,7 +1420,9 @@ export default function PublicProfileClient({
                 className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
               >
                 <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {listings.length.toLocaleString(localeCode === 'id' ? 'id-ID' : 'en-US')}
+                  {listings.length.toLocaleString(
+                    localeCode === 'id' ? 'id-ID' : 'en-US',
+                  )}
                 </span>
                 <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                   {localeCode === 'id' ? 'Etalase' : 'Showcase'}
@@ -1088,6 +1469,72 @@ export default function PublicProfileClient({
           </div>
         </section>
 
+        <section className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                {localeCode === 'id'
+                  ? 'Kemampuan profil'
+                  : 'Profile capabilities'}
+              </p>
+              <h2 className="mt-1 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
+                {localeCode === 'id'
+                  ? 'Bisa dibantu apa?'
+                  : 'What can they help with?'}
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {localeCode === 'id'
+                  ? 'Semua mode aktif diringkas jadi pilihan cepat. Buka yang relevan tanpa harus membaca seluruh profil.'
+                  : 'Active modes are summarized into quick choices, so visitors can open the relevant part without reading everything.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveProfileTab('etalase');
+                setActiveContentTab('all');
+              }}
+              className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
+            >
+              <Store className="h-4 w-4" />
+              {localeCode === 'id' ? 'Lihat semua' : 'View all'}
+            </button>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {capabilityCards.map(item => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={item.onSelect}
+                  className="group min-h-[132px] rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 text-left shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.36)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] transition group-hover:bg-[color:var(--app-accent)] group-hover:text-[color:var(--app-text-inverse)]">
+                      <Icon className="h-4.5 w-4.5" />
+                    </span>
+                    <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]">
+                      {item.meta}
+                    </span>
+                  </span>
+                  <span className="mt-3 block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {item.label}
+                  </span>
+                  <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                    {item.preview || item.helper}
+                  </span>
+                  <span className="mt-3 inline-flex items-center text-xs font-black text-[color:var(--app-accent)]">
+                    {localeCode === 'id' ? 'Buka bagian ini' : 'Open section'}
+                    <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto rounded-[20px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:border-[color:var(--app-border-strong)] sm:top-[calc(60px+env(safe-area-inset-top))]">
           <div className="flex min-w-max gap-2">
             {profileTabs.map(tab => {
@@ -1113,253 +1560,296 @@ export default function PublicProfileClient({
         </section>
 
         {activeProfileTab === 'ringkas' ? (
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-          <div className="space-y-3">
-            {detail.skills.length > 0 ? (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+            <div className="space-y-3">
               <section className={profileSectionClass}>
-                <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id' ? 'Keahlian inti' : 'Core skills'}
-                </h2>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {detail.skills.map(skill => (
-                    <span
-                      key={skill}
-                      className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-accent)]"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {detail.experience.length > 0 ? (
-              <section className={profileSectionClass}>
-                <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id' ? 'Pengalaman' : 'Experience'}
-                </h2>
-                <div className="mt-3 space-y-2.5">
-                  {detail.experience.slice(0, 6).map(item => (
-                    <div
-                      key={item}
-                      className={`${profileRowClass} text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {detail.education.length > 0 || detail.certifications.length > 0 ? (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {detail.education.length > 0 ? (
-                  <section className={profileSectionClass}>
-                    <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                      <GraduationCap className="h-4 w-4" />
-                      {localeCode === 'id' ? 'Pendidikan' : 'Education'}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                      {localeCode === 'id'
+                        ? 'Ringkasan cepat'
+                        : 'Quick summary'}
+                    </p>
+                    <h2 className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {localeCode === 'id'
+                        ? 'Hal yang paling relevan'
+                        : 'Most relevant signals'}
                     </h2>
-                    <div className="mt-3 space-y-2.5">
-                      {detail.education.slice(0, 5).map(item => (
-                        <div
-                          key={item}
-                          className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
-                        >
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {detail.certifications.length > 0 ? (
-                  <section className={profileSectionClass}>
-                    <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                      <Award className="h-4 w-4" />
-                      {localeCode === 'id' ? 'Sertifikasi' : 'Certifications'}
-                    </h2>
-                    <div className="mt-3 space-y-2.5">
-                      {detail.certifications.slice(0, 5).map(item => (
-                        <div
-                          key={item}
-                          className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
-                        >
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="space-y-3">
-            {detail.languages.length > 0 ? (
-              <section className={profileSectionClass}>
-                <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                  <Languages className="h-4 w-4" />
-                  {localeCode === 'id' ? 'Bahasa' : 'Languages'}
-                </h2>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {localeCode === 'id' ? 'Aktif' : 'Active'}
+                  </span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  {detail.summary}
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {detail.languages.map(language => (
-                    <span
-                      key={language}
-                      className="rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] sm:border sm:border-[color:var(--app-border)] dark:sm:border-[color:var(--app-border-strong)]"
-                    >
-                      {language}
-                    </span>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {detail.links.length > 0 ? (
-              <section className={profileSectionClass}>
-                <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                  <Link2 className="h-4 w-4" />
-                  {localeCode === 'id'
-                    ? 'Link profesional'
-                    : 'Professional links'}
-                </h2>
-                <div className="mt-3 space-y-2">
-                  {detail.links.slice(0, 8).map(item => (
-                    <a
-                      key={`${item.label}-${item.url}`}
-                      href={item.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`${profileRowClass} flex items-center justify-between text-sm font-medium text-[color:var(--app-text)] transition sm:hover:border-[color:var(--app-accent-border)] sm:hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]`}
-                    >
-                      <span className="truncate">{item.label}</span>
-                      <ExternalLink className="h-4 w-4 shrink-0" />
-                    </a>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            <section className={profileSectionClass}>
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id' ? 'Konten publik' : 'Public content'}
-                </h2>
-                {activeListingItems.length > 0 ? (
-                  <Link
-                    href={
-                      getProfileContentTabDefinition(resolvedActiveContentTab)
-                        .browseHref
-                    }
-                    className="text-[11px] font-semibold text-[color:var(--app-accent)]"
-                  >
-                    {localeCode === 'id' ? 'Lihat lebih banyak' : 'See more'}
-                  </Link>
-                ) : null}
-              </div>
-
-              {availableTabs.length > 1 ? (
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                  {availableTabs.map(tab => (
+                  {capabilityCards.slice(0, 6).map(item => (
                     <button
-                      key={tab}
+                      key={`quick-${item.key}`}
                       type="button"
-                      onClick={() => setActiveContentTab(tab)}
-                      className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
-                        resolvedActiveContentTab === tab
-                          ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                          : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
-                      }`}
+                      onClick={item.onSelect}
+                      className="inline-flex min-h-[34px] items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
                     >
-                      <span>{getProfileContentTabLabel(tab, localeCode)}</span>
-                      <span className="rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)]">
-                        {tab === 'all'
-                          ? listings.length
-                          : listingGroups[tab].length}
+                      {item.label}
+                      <span className="text-[color:var(--app-text-soft)]">
+                        {item.meta}
                       </span>
                     </button>
                   ))}
                 </div>
+              </section>
+
+              {detail.skills.length > 0 ? (
+                <section className={profileSectionClass}>
+                  <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                    {localeCode === 'id' ? 'Keahlian inti' : 'Core skills'}
+                  </h2>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {detail.skills.map(skill => (
+                      <span
+                        key={skill}
+                        className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-accent)]"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </section>
               ) : null}
 
-              {activeListingItems.length === 0 ? (
-                <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
-                  {resolvedActiveContentTab === 'all'
-                    ? localeCode === 'id'
-                      ? 'Belum ada listing publik yang aktif.'
-                      : 'No public active listings yet.'
-                    : localeCode === 'id'
-                      ? `${getProfileContentTabDefinition(resolvedActiveContentTab).labelId} belum tersedia di profil ini.`
-                      : `${getProfileContentTabDefinition(resolvedActiveContentTab).labelEn} is not available on this profile yet.`}
-                </p>
-              ) : (
-                <div className="mt-3 space-y-2.5">
-                  {previewListingItems.map(item => (
-                    <Link
-                      key={item.id}
-                      href={buildPublicListingHref(item)}
-                      className={`${profileRowClass} flex items-start gap-3 transition sm:hover:border-[color:var(--app-accent-border)]`}
-                    >
-                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-[color:var(--app-surface)]">
-                        <Image
-                          src={
-                            normalizeContentMediaUrl(item.cover_image || '') ||
-                            '/default-avatar.svg'
-                          }
-                          alt={item.title || 'Listing'}
-                          fill
-                          sizes="64px"
-                          className="object-cover"
-                          unoptimized
-                        />
+              {detail.experience.length > 0 ? (
+                <section className={profileSectionClass}>
+                  <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                    {localeCode === 'id' ? 'Pengalaman' : 'Experience'}
+                  </h2>
+                  <div className="mt-3 space-y-2.5">
+                    {detail.experience.slice(0, 6).map(item => (
+                      <div
+                        key={item}
+                        className={`${profileRowClass} text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
+                      >
+                        {item}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {item.title ||
-                            (localeCode === 'id'
-                              ? 'Listing tanpa judul'
-                              : 'Untitled listing')}
-                        </p>
-                        {item.summary ? (
-                          <p className="mt-1 line-clamp-2 text-sm text-[color:var(--app-text-soft)]">
-                            {item.summary}
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {detail.education.length > 0 ||
+              detail.certifications.length > 0 ? (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {detail.education.length > 0 ? (
+                    <section className={profileSectionClass}>
+                      <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                        <GraduationCap className="h-4 w-4" />
+                        {localeCode === 'id' ? 'Pendidikan' : 'Education'}
+                      </h2>
+                      <div className="mt-3 space-y-2.5">
+                        {detail.education.slice(0, 5).map(item => (
+                          <div
+                            key={item}
+                            className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+                          >
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {detail.certifications.length > 0 ? (
+                    <section className={profileSectionClass}>
+                      <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                        <Award className="h-4 w-4" />
+                        {localeCode === 'id' ? 'Sertifikasi' : 'Certifications'}
+                      </h2>
+                      <div className="mt-3 space-y-2.5">
+                        {detail.certifications.slice(0, 5).map(item => (
+                          <div
+                            key={item}
+                            className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+                          >
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-3">
+              {detail.languages.length > 0 ? (
+                <section className={profileSectionClass}>
+                  <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                    <Languages className="h-4 w-4" />
+                    {localeCode === 'id' ? 'Bahasa' : 'Languages'}
+                  </h2>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {detail.languages.map(language => (
+                      <span
+                        key={language}
+                        className="rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] sm:border sm:border-[color:var(--app-border)] dark:sm:border-[color:var(--app-border-strong)]"
+                      >
+                        {language}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {detail.links.length > 0 ? (
+                <section className={profileSectionClass}>
+                  <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                    <Link2 className="h-4 w-4" />
+                    {localeCode === 'id'
+                      ? 'Link profesional'
+                      : 'Professional links'}
+                  </h2>
+                  <div className="mt-3 space-y-2">
+                    {detail.links.slice(0, 8).map(item => (
+                      <a
+                        key={`${item.label}-${item.url}`}
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`${profileRowClass} flex items-center justify-between text-sm font-medium text-[color:var(--app-text)] transition sm:hover:border-[color:var(--app-accent-border)] sm:hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]`}
+                      >
+                        <span className="truncate">{item.label}</span>
+                        <ExternalLink className="h-4 w-4 shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className={profileSectionClass}>
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                    {localeCode === 'id' ? 'Konten publik' : 'Public content'}
+                  </h2>
+                  {activeListingItems.length > 0 ? (
+                    <Link
+                      href={
+                        getProfileContentTabDefinition(resolvedActiveContentTab)
+                          .browseHref
+                      }
+                      className="text-[11px] font-semibold text-[color:var(--app-accent)]"
+                    >
+                      {localeCode === 'id' ? 'Lihat lebih banyak' : 'See more'}
+                    </Link>
+                  ) : null}
+                </div>
+
+                {availableTabs.length > 1 ? (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {availableTabs.map(tab => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActiveContentTab(tab)}
+                        className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
+                          resolvedActiveContentTab === tab
+                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
+                        }`}
+                      >
+                        <span>
+                          {getProfileContentTabLabel(tab, localeCode)}
+                        </span>
+                        <span className="rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)]">
+                          {tab === 'all'
+                            ? listings.length
+                            : listingGroups[tab].length}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {activeListingItems.length === 0 ? (
+                  <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
+                    {resolvedActiveContentTab === 'all'
+                      ? localeCode === 'id'
+                        ? 'Belum ada listing publik yang aktif.'
+                        : 'No public active listings yet.'
+                      : localeCode === 'id'
+                        ? `${getProfileContentTabDefinition(resolvedActiveContentTab).labelId} belum tersedia di profil ini.`
+                        : `${getProfileContentTabDefinition(resolvedActiveContentTab).labelEn} is not available on this profile yet.`}
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2.5">
+                    {previewListingItems.map(item => (
+                      <Link
+                        key={item.id}
+                        href={buildPublicListingHref(item)}
+                        className={`${profileRowClass} flex items-start gap-3 transition sm:hover:border-[color:var(--app-accent-border)]`}
+                      >
+                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-[color:var(--app-surface)]">
+                          <Image
+                            src={
+                              normalizeContentMediaUrl(
+                                item.cover_image || '',
+                              ) || '/default-avatar.svg'
+                            }
+                            alt={item.title || 'Listing'}
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {item.title ||
+                              (localeCode === 'id'
+                                ? 'Listing tanpa judul'
+                                : 'Untitled listing')}
                           </p>
-                        ) : null}
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text-soft)]">
-                          <span className="font-semibold text-[color:var(--app-accent)]">
-                            {typeof item.price_cents === 'number' &&
-                            item.price_cents > 0
-                              ? formatIDRFromCents(item.price_cents)
-                              : localeCode === 'id'
-                                ? 'Negosiasi'
-                                : 'Negotiable'}
-                          </span>
-                          <span>
-                            {getProfileContentTabLabel(
-                              normalizeProfileContentTab({
-                                type: item.content_type,
-                                category: item.category,
-                                metadata: item.metadata || null,
-                              }),
-                              localeCode,
-                            )}
-                          </span>
-                          {item.updated_at || item.created_at ? (
+                          {item.summary ? (
+                            <p className="mt-1 line-clamp-2 text-sm text-[color:var(--app-text-soft)]">
+                              {item.summary}
+                            </p>
+                          ) : null}
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text-soft)]">
+                            <span className="font-semibold text-[color:var(--app-accent)]">
+                              {typeof item.price_cents === 'number' &&
+                              item.price_cents > 0
+                                ? formatIDRFromCents(item.price_cents)
+                                : localeCode === 'id'
+                                  ? 'Negosiasi'
+                                  : 'Negotiable'}
+                            </span>
                             <span>
-                              {formatShortDate(
-                                item.updated_at || item.created_at,
+                              {getProfileContentTabLabel(
+                                normalizeProfileContentTab({
+                                  type: item.content_type,
+                                  category: item.category,
+                                  metadata: item.metadata || null,
+                                }),
                                 localeCode,
                               )}
                             </span>
-                          ) : null}
+                            {item.updated_at || item.created_at ? (
+                              <span>
+                                {formatShortDate(
+                                  item.updated_at || item.created_at,
+                                  localeCode,
+                                )}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
           </div>
-        </div>
         ) : null}
 
         {activeProfileTab === 'etalase' ? (
@@ -1396,7 +1886,9 @@ export default function PublicProfileClient({
                   >
                     {getProfileContentTabLabel(tab, localeCode)}
                     <span className="rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)]">
-                      {tab === 'all' ? listings.length : listingGroups[tab].length}
+                      {tab === 'all'
+                        ? listings.length
+                        : listingGroups[tab].length}
                     </span>
                   </button>
                 ))}
@@ -1463,49 +1955,172 @@ export default function PublicProfileClient({
 
         {activeProfileTab === 'reels' ? (
           <section className={profileSectionClass}>
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                <Clapperboard className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Reels
-                </h2>
-                <p className="text-sm text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id'
-                    ? 'Video usaha singkat dari profil ini akan tampil di sini.'
-                    : 'Short business videos from this profile will appear here.'}
-                </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <Clapperboard className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    Reels
+                  </h2>
+                  <p className="text-sm text-[color:var(--app-text-soft)]">
+                    {localeCode === 'id'
+                      ? 'Video singkat dari creator ini, termasuk reels yang dibuat dari komunitas.'
+                      : 'Short videos from this creator, including reels created from community posts.'}
+                  </p>
+                </div>
               </div>
+              <Link
+                href="/reels"
+                className="hidden shrink-0 text-sm font-semibold text-[color:var(--app-accent)] sm:inline-flex"
+              >
+                {localeCode === 'id' ? 'Buka Reels' : 'Open Reels'}
+              </Link>
             </div>
-            <Link href="/reels" className={`${profileSoftActionClass} mt-4`}>
-              <Clapperboard className="h-4 w-4" />
-              {localeCode === 'id' ? 'Buka Reels' : 'Open Reels'}
-            </Link>
+            {profileActivityLoading ? (
+              <p className="mt-4 rounded-[16px] bg-[color:var(--app-surface-muted)] px-4 py-4 text-sm font-semibold text-[color:var(--app-text-soft)]">
+                {localeCode === 'id'
+                  ? 'Memuat reels profil...'
+                  : 'Loading profile reels...'}
+              </p>
+            ) : profileReels.length > 0 ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {profileReels.map(reel => {
+                  const mediaIsImage =
+                    reel.mediaType === 'image' ||
+                    isImageMediaUrl(reel.videoSrc);
+                  return (
+                    <Link
+                      key={reel.id}
+                      href={`/reels?reel=${encodeURIComponent(reel.id)}`}
+                      className="group overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
+                    >
+                      <div className="relative aspect-[9/12] overflow-hidden bg-slate-950">
+                        {mediaIsImage ? (
+                          <Image
+                            src={reel.videoSrc || '/default-avatar.svg'}
+                            alt={reel.title}
+                            fill
+                            sizes="(max-width: 640px) 50vw, 220px"
+                            className="object-cover transition group-hover:scale-[1.03]"
+                            unoptimized
+                          />
+                        ) : (
+                          <video
+                            src={reel.videoSrc}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full object-cover transition group-hover:scale-[1.03]"
+                          />
+                        )}
+                        <span className="absolute left-2 top-2 rounded-full bg-black/48 px-2 py-1 text-[10px] font-black text-white backdrop-blur">
+                          {reel.tag || 'Reels'}
+                        </span>
+                      </div>
+                      <div className="p-3">
+                        <p className="line-clamp-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          {reel.title}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                          {reel.caption}
+                        </p>
+                        <p className="mt-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                          {reel.likes} suka - {reel.comments} komentar
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-5 text-sm text-[color:var(--app-text-soft)]">
+                {localeCode === 'id'
+                  ? 'Belum ada reels publik dari profil ini.'
+                  : 'No public reels from this profile yet.'}
+              </div>
+            )}
           </section>
         ) : null}
 
         {activeProfileTab === 'komunitas' ? (
           <section className={profileSectionClass}>
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                <Users className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {localeCode === 'id' ? 'Komunitas' : 'Community'}
-                </h2>
-                <p className="text-sm text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id'
-                    ? 'Aktivitas grup dan diskusi publik akan tampil ringkas.'
-                    : 'Group activity and public discussions will appear compactly.'}
-                </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <Users className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    {localeCode === 'id' ? 'Komunitas' : 'Community'}
+                  </h2>
+                  <p className="text-sm text-[color:var(--app-text-soft)]">
+                    {localeCode === 'id'
+                      ? 'Postingan, diskusi, dan komentar publik yang terhubung ke profil ini.'
+                      : 'Public posts, discussions, and comments connected to this profile.'}
+                  </p>
+                </div>
               </div>
+              <Link
+                href="/community"
+                className="hidden shrink-0 text-sm font-semibold text-[color:var(--app-accent)] sm:inline-flex"
+              >
+                {localeCode === 'id' ? 'Lihat komunitas' : 'Open community'}
+              </Link>
             </div>
-            <Link href="/community" className={`${profileSoftActionClass} mt-4`}>
-              <MessageSquareText className="h-4 w-4" />
-              {localeCode === 'id' ? 'Lihat komunitas' : 'Open community'}
-            </Link>
+            {profileActivityLoading ? (
+              <p className="mt-4 rounded-[16px] bg-[color:var(--app-surface-muted)] px-4 py-4 text-sm font-semibold text-[color:var(--app-text-soft)]">
+                {localeCode === 'id'
+                  ? 'Memuat aktivitas komunitas...'
+                  : 'Loading community activity...'}
+              </p>
+            ) : profileCommunityItems.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {profileCommunityItems.map(item => (
+                  <Link
+                    key={item.id}
+                    href={item.href || '/community'}
+                    className={`${profileRowClass} block transition sm:hover:border-[color:var(--app-accent-border)]`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                          {item.body}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)]">
+                        {item.kind === 'reel' ? 'Reels' : 'Diskusi'}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                      <span>{item.communityName}</span>
+                      <span>-</span>
+                      <span>
+                        {formatShortDate(item.createdAt, localeCode) ||
+                          (localeCode === 'id' ? 'Baru' : 'New')}
+                      </span>
+                      <span>-</span>
+                      <span>
+                        {item.stats.comments.toLocaleString(
+                          localeCode === 'id' ? 'id-ID' : 'en-US',
+                        )}{' '}
+                        {localeCode === 'id' ? 'komentar' : 'comments'}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-5 text-sm text-[color:var(--app-text-soft)]">
+                {localeCode === 'id'
+                  ? 'Belum ada postingan komunitas publik dari profil ini.'
+                  : 'No public community posts from this profile yet.'}
+              </div>
+            )}
           </section>
         ) : null}
 
@@ -1528,10 +2143,19 @@ export default function PublicProfileClient({
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {[
-                [localeCode === 'id' ? 'Identitas' : 'Identity', profile.identity_verified],
-                [localeCode === 'id' ? 'Transaksi' : 'Transaction', profile.transaction_eligible],
+                [
+                  localeCode === 'id' ? 'Identitas' : 'Identity',
+                  profile.identity_verified,
+                ],
+                [
+                  localeCode === 'id' ? 'Transaksi' : 'Transaction',
+                  profile.transaction_eligible,
+                ],
                 ['Email', profile.email_verified],
-                [localeCode === 'id' ? 'Telepon' : 'Phone', profile.phone_verified],
+                [
+                  localeCode === 'id' ? 'Telepon' : 'Phone',
+                  profile.phone_verified,
+                ],
               ].map(([label, ready]) => (
                 <div key={String(label)} className={profileRowClass}>
                   <div className="flex items-center gap-2">
@@ -1578,7 +2202,7 @@ export default function PublicProfileClient({
                 >
                   <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
                     <Image
-                      src={item.avatarUrl}
+                      src={profileAvatarSrc(item.avatarUrl)}
                       alt={item.name}
                       fill
                       sizes="44px"

@@ -1,28 +1,18 @@
-// app/dashboard/layout.js
-'use client'; // Pastikan ini karena kita akan gunakan hook Client
-import { Icon, IconEnum } from '@/components/ui-kit';
-import { useRouter } from 'next/navigation';
+import { ReactNode } from 'react';
+import type { Metadata } from 'next';
 
-export default function AuthLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+      noarchive: true,
+    },
+  },
+};
 
-  const handleBack = () => {
-    router.back(); // navigasi ke halaman sebelumnya
-  };
-
-  return (
-    <div>
-      {/* <div
-        className="fixed top-5 left-5 cursor-pointer text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]"
-        onClick={handleBack}
-      >
-        <Icon name={IconEnum.CircleArrowLeft} className="w-8 h-8" />
-      </div> */}
-      {children}
-    </div>
-  );
+export default function AuthLayout({ children }: { children: ReactNode }) {
+  return children;
 }

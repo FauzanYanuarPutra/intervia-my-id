@@ -1,6 +1,5 @@
 import 'server-only';
 
-import { localProductImageForCategory } from '@/lib/media/localSeedMedia';
 import { getUsahaPortalBaseUrl } from '@/lib/umkmSurface';
 import type { UmkmProduct, UmkmStore } from '@/lib/super-app/umkm-commerce.types';
 
@@ -231,7 +230,7 @@ function mapPortalBusinessToUmkmStore(
     owner_user_id: `usaha:${business.id}`,
     name: business.name,
     slug: business.slug,
-    description: readText(business.description) || `${business.category} di ${business.city}`,
+    description: readText(business.description) || null,
     city: business.city,
     address: business.address,
     lat: coords.lat,
@@ -245,11 +244,11 @@ function mapPortalBusinessToUmkmStore(
       portal_business_id: business.id,
       portal_public_url: readText(business.publicUrl) || null,
       recommended_qr: business.isOpen ? 'offline' : 'online',
-      open_hours: business.schedule || '08:00-20:00',
+      open_hours: readText(business.schedule) || null,
       outlet_active: business.isOpen,
-      owner_name: readText(owner?.name) || 'Pemilik usaha',
+      owner_name: readText(owner?.name) || null,
       owner_phone: readText(owner?.phone) || readText(business.phone) || null,
-      owner_role: readText(owner?.role) || readText(business.currentRole) || 'owner',
+      owner_role: readText(owner?.role) || readText(business.currentRole) || null,
       umkm_category: business.category,
       business_type: business.category,
       focus_label: business.category,
@@ -257,9 +256,9 @@ function mapPortalBusinessToUmkmStore(
       products_count: business.productsCount,
       active_orders: business.activeOrders,
       reservations_count: business.reservationsCount,
-      rating_avg: 4.6,
-      rating_count: 24 + index * 3,
-      response_time_minutes: business.activeOrders > 0 ? 6 : 10,
+      rating_avg: null,
+      rating_count: 0,
+      response_time_minutes: null,
     },
     created_at: timestamp,
     updated_at: timestamp,
@@ -270,10 +269,11 @@ function mapPortalProductToUmkmProduct(
   business: PortalBusiness,
   product: PortalBusinessProduct,
   index: number,
-): UmkmProduct {
-  const productName = readText(product.name) || `${business.name} item ${index + 1}`;
-  const productCategory = readText(product.category) || business.category || 'general';
-  const stockLabel = readText(product.stockLabel) || 'Tersedia';
+): UmkmProduct | null {
+  const productName = readText(product.name);
+  if (!productName) return null;
+  const productCategory = readText(product.category) || readText(business.category);
+  const stockLabel = readText(product.stockLabel);
   const priceLabel = readText(product.priceLabel);
   const priceCents = parsePortalPriceCents(priceLabel);
   const timestamp = new Date(Date.now() - index * 1_000).toISOString();
@@ -283,12 +283,12 @@ function mapPortalProductToUmkmProduct(
     store_id: business.id,
     name: productName,
     slug: slugifyText(readText(product.id) || productName) || `${business.slug}-${index + 1}`,
-    description: `${productCategory} • ${stockLabel}`,
+    description: [productCategory, stockLabel].filter(Boolean).join(' - ') || null,
     category: productCategory,
-    price_cents: priceCents > 0 ? priceCents : 15_000 * 100,
+    price_cents: priceCents > 0 ? priceCents : 0,
     stock_qty: parsePortalStockQty(stockLabel),
     is_available: readText(product.status).toLowerCase() !== 'draft',
-    image_url: localProductImageForCategory(productCategory),
+    image_url: '',
     metadata: {
       source: 'usaha_portal',
       channel: ['online', 'offline'],
@@ -331,7 +331,8 @@ export async function listUsahaPortalProductsByStoreId(storeId: string): Promise
     return [];
   }
 
-  return business.products.map((product, index) =>
-    mapPortalProductToUmkmProduct(business, product, index),
-  );
+  return business.products.flatMap((product, index) => {
+    const mapped = mapPortalProductToUmkmProduct(business, product, index);
+    return mapped ? [mapped] : [];
+  });
 }

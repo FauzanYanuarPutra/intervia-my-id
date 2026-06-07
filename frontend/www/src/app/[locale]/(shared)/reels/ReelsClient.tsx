@@ -1,5 +1,6 @@
 'use client';
 
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAppBack } from '@/lib/navigation/useAppBack';
@@ -9,8 +10,10 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent,
   type TouchEvent,
   type UIEvent,
   type WheelEvent,
@@ -20,6 +23,7 @@ import {
   Bookmark,
   Box,
   BriefcaseBusiness,
+  Building2,
   Camera,
   Check,
   ChevronRight,
@@ -31,12 +35,15 @@ import {
   Hash,
   Heart,
   Home,
+  ImageIcon,
   Info,
   Link2,
   Loader2,
   Megaphone,
   MessageCircle,
   MessageSquareText,
+  MoreHorizontal,
+  Music,
   Play,
   Plus,
   Radio,
@@ -44,12 +51,14 @@ import {
   Search,
   Send,
   ShoppingBag,
+  SlidersHorizontal,
   Sparkles,
   Store,
   Upload,
   User,
   UserPlus,
   Users,
+  Video,
   Volume2,
   VolumeX,
   WalletCards,
@@ -64,6 +73,12 @@ import {
   type LajukanReel,
   type ReelsPageResult,
 } from '../../_data/reels';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
+import {
+  openNativeReelsStudio,
+  requestNativePermissions,
+} from '@/lib/nativeBridge';
 
 type ReelsClientProps = {
   locale: string;
@@ -72,6 +87,7 @@ type ReelsClientProps = {
   initialCursor: number | null;
   initialHasMore: boolean;
   initialSearchQuery: string;
+  initialUploadOpen?: boolean;
 };
 
 const iconMap: Record<LajukanReel['iconKey'], LucideIcon> = {
@@ -82,14 +98,16 @@ const iconMap: Record<LajukanReel['iconKey'], LucideIcon> = {
   frozen: ShoppingBag,
 };
 
-type ReelsSignal =
-  | 'watch'
-  | 'like'
-  | 'comment'
-  | 'share'
-  | 'save'
-  | 'detail'
-  | 'product';
+type ReelsSignal = 'watch' | 'share' | 'detail' | 'product';
+
+type ReelUserAction = 'like' | 'save' | 'follow';
+
+type ReelActionState = {
+  liked: boolean;
+  saved: boolean;
+  followed: boolean;
+  loading?: ReelUserAction | null;
+};
 
 type ReelComment = {
   id: string;
@@ -112,11 +130,16 @@ type ReelCommentsBucket = {
 };
 
 type UploadReelForm = {
+  captureMode: NonNullable<LajukanReel['captureMode']>;
+  filterPreset: NonNullable<LajukanReel['filterPreset']>;
+  musicTrack: string;
   title: string;
   caption: string;
   tag: string;
   mediaUrl: string;
   hook: string;
+  liveTitle: string;
+  liveSchedule: string;
   productName: string;
   productPrice: string;
   productHref: string;
@@ -127,6 +150,19 @@ type UploadReelForm = {
 type UploadReelStep = 'media' | 'edit' | 'post';
 
 type ReelsFeedTab = 'fyp' | 'friends' | 'following';
+
+type ReelsStudioMode = 'gallery' | 'photo' | 'video' | 'live';
+type ReelsStudioPanel = 'filters' | 'effects' | 'music' | 'speed' | null;
+type ReelsStudioSpeed = (typeof REELS_STUDIO_SPEEDS)[number];
+type ReelsStudioDuration = (typeof REELS_STUDIO_DURATIONS)[number];
+type ReelsStudioEffect =
+  | 'none'
+  | 'clean'
+  | 'product'
+  | 'focus'
+  | 'scan'
+  | 'grain';
+type ReelsStudioFacingMode = 'environment' | 'user';
 
 type PreferenceProfile = {
   terms: Record<string, number>;
@@ -141,6 +177,14 @@ const REELS_SNAP_LOCK_MS = 520;
 const REELS_WHEEL_THRESHOLD = 42;
 const REELS_TOUCH_THRESHOLD = 46;
 const REELS_AUTO_SCROLL_MS = 11000;
+const REELS_RENDER_WINDOW = 2;
+const REEL_SLIDE_LOADED_STYLE: CSSProperties = {
+  contentVisibility: 'visible',
+};
+const REEL_SLIDE_PLACEHOLDER_STYLE: CSSProperties = {
+  contentVisibility: 'auto',
+  containIntrinsicSize: '100svh 430px',
+};
 const STOP_WORDS = new Set([
   'dan',
   'atau',
@@ -163,11 +207,16 @@ const STOP_WORDS = new Set([
 ]);
 
 const EMPTY_UPLOAD_FORM: UploadReelForm = {
+  captureMode: 'camera',
+  filterPreset: 'natural',
+  musicTrack: 'Original sound',
   title: '',
   caption: '',
   tag: 'UMKM',
   mediaUrl: '',
   hook: '',
+  liveTitle: '',
+  liveSchedule: '',
   productName: '',
   productPrice: '',
   productHref: '',
@@ -175,31 +224,383 @@ const EMPTY_UPLOAD_FORM: UploadReelForm = {
   storeCity: '',
 };
 
+const REEL_CAPTURE_MODES: Array<{
+  id: NonNullable<LajukanReel['captureMode']>;
+  label: string;
+  helper: string;
+  icon: LucideIcon;
+}> = [
+    {
+      id: 'camera',
+      label: 'Kamera',
+      helper: 'Rekam cepat',
+      icon: Camera,
+    },
+    {
+      id: 'upload',
+      label: 'Galeri',
+      helper: 'Pilih file',
+      icon: Upload,
+    },
+    {
+      id: 'live',
+      label: 'Live',
+      helper: 'Jadwal siaran',
+      icon: Radio,
+    },
+  ];
+
+const REELS_STUDIO_MODES: Array<{
+  id: ReelsStudioMode;
+  label: string;
+  helper: string;
+  icon: LucideIcon;
+}> = [
+    {
+      id: 'gallery',
+      label: 'Galeri',
+      helper: 'Ambil file',
+      icon: Upload,
+    },
+    {
+      id: 'photo',
+      label: 'Foto',
+      helper: 'Jepret cepat',
+      icon: Camera,
+    },
+    {
+      id: 'video',
+      label: 'Video',
+      helper: 'Rekam',
+      icon: Clapperboard,
+    },
+    {
+      id: 'live',
+      label: 'Live',
+      helper: 'Siaran',
+      icon: Radio,
+    },
+  ];
+
+const REELS_MUSIC_TRACKS = [
+  'Original sound',
+  'Beat UMKM',
+  'Soft promo',
+  'Live shop',
+  'Packing ASMR',
+];
+
+const REELS_STUDIO_SPEEDS = ['0,25x', '0,5x', '1x', '1,5x', '2x'] as const;
+const REELS_STUDIO_DURATIONS = ['60s', '15s', '05s'] as const;
+const REELS_CAPTURE_CANVAS_WIDTH = 720;
+const REELS_CAPTURE_CANVAS_HEIGHT = 1280;
+const REELS_CAPTURE_FPS = 30;
+
+const REEL_FILTER_PRESETS: Array<{
+  id: NonNullable<LajukanReel['filterPreset']>;
+  label: string;
+  helper: string;
+  css: string;
+  swatch: string;
+}> = [
+    {
+      id: 'natural',
+      label: 'Asli',
+      helper: 'warna normal',
+      css: 'none',
+      swatch: 'bg-gradient-to-br from-slate-100 via-white to-emerald-100',
+    },
+    {
+      id: 'fresh',
+      label: 'Fresh',
+      helper: 'produk lebih segar',
+      css: 'saturate(1.12) contrast(1.04) brightness(1.03)',
+      swatch: 'bg-gradient-to-br from-emerald-200 via-teal-100 to-white',
+    },
+    {
+      id: 'warm',
+      label: 'Warm',
+      helper: 'kuliner hangat',
+      css: 'sepia(0.08) saturate(1.14) contrast(1.02) brightness(1.02)',
+      swatch: 'bg-gradient-to-br from-amber-200 via-orange-100 to-white',
+    },
+    {
+      id: 'pop',
+      label: 'Pop',
+      helper: 'promo mencolok',
+      css: 'saturate(1.28) contrast(1.08)',
+      swatch: 'bg-gradient-to-br from-rose-200 via-fuchsia-100 to-sky-100',
+    },
+    {
+      id: 'cinema',
+      label: 'Cinema',
+      helper: 'lebih dramatis',
+      css: 'contrast(1.12) saturate(0.94) brightness(0.96)',
+      swatch: 'bg-gradient-to-br from-slate-900 via-slate-500 to-amber-100',
+    },
+    {
+      id: 'mono',
+      label: 'Mono',
+      helper: 'hitam putih',
+      css: 'grayscale(1) contrast(1.1)',
+      swatch: 'bg-gradient-to-br from-slate-950 via-slate-400 to-white',
+    },
+  ];
+
+const REELS_STUDIO_EFFECTS: Array<{
+  id: ReelsStudioEffect;
+  label: string;
+  helper: string;
+  swatch: string;
+}> = [
+    {
+      id: 'none',
+      label: 'Original',
+      helper: 'tanpa efek',
+      swatch: 'bg-gradient-to-br from-white via-slate-100 to-slate-300',
+    },
+    {
+      id: 'clean',
+      label: 'Clean',
+      helper: 'cahaya halus',
+      swatch: 'bg-gradient-to-br from-white via-emerald-100 to-sky-100',
+    },
+    {
+      id: 'product',
+      label: 'Product',
+      helper: 'produk pop',
+      swatch: 'bg-gradient-to-br from-yellow-200 via-white to-rose-200',
+    },
+    {
+      id: 'focus',
+      label: 'Focus',
+      helper: 'vignette',
+      swatch: 'bg-gradient-to-br from-slate-950 via-slate-500 to-white',
+    },
+    {
+      id: 'scan',
+      label: 'Scan',
+      helper: 'garis preview',
+      swatch:
+        'bg-[repeating-linear-gradient(180deg,#67e8f9_0_3px,#0f172a_3px_7px)]',
+    },
+    {
+      id: 'grain',
+      label: 'Grain',
+      helper: 'tekstur halus',
+      swatch:
+        'bg-[radial-gradient(circle_at_30%_20%,#fef3c7,transparent_24%),radial-gradient(circle_at_70%_64%,#e879f9,transparent_22%),#111827]',
+    },
+  ];
+
 const REELS_FEED_TABS: Array<{ id: ReelsFeedTab; label: string }> = [
   { id: 'fyp', label: 'FYP' },
   { id: 'friends', label: 'Teman' },
   { id: 'following', label: 'Diikuti' },
 ];
 
-const SIGNAL_WEIGHT: Record<ReelsSignal, number> = {
+const SIGNAL_WEIGHT: Record<ReelsSignal | ReelUserAction, number> = {
   watch: 0.7,
   like: 4,
-  comment: 3.2,
   share: 4.8,
   save: 5.5,
+  follow: 5,
   detail: 2.4,
   product: 6,
 };
 
 const BACKEND_SIGNAL_EVENT: Record<ReelsSignal, string> = {
   watch: 'watch',
-  like: 'like',
-  comment: 'comment',
   share: 'share',
-  save: 'view',
   detail: 'view',
   product: 'open_product',
 };
+
+const EMPTY_REEL_ACTION_STATE: ReelActionState = {
+  liked: false,
+  saved: false,
+  followed: false,
+  loading: null,
+};
+
+function getReelFilterCss(filterPreset?: string | null) {
+  return (
+    REEL_FILTER_PRESETS.find(item => item.id === filterPreset)?.css ?? 'none'
+  );
+}
+
+function getReelMediaStyle(
+  filterPreset?: string | null,
+): CSSProperties | undefined {
+  const filter = getReelFilterCss(filterPreset);
+  return filter === 'none' ? undefined : { filter };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isStudioEffect(value: unknown): value is ReelsStudioEffect {
+  return (
+    typeof value === 'string' &&
+    REELS_STUDIO_EFFECTS.some(effect => effect.id === value)
+  );
+}
+
+function getReelStudioEffect(reel: Pick<LajukanReel, 'metadata'>) {
+  const metadata = reel.metadata;
+  if (!isPlainRecord(metadata)) return 'none' as ReelsStudioEffect;
+
+  const directEffect =
+    metadata.cameraEffect || metadata.effect || metadata.studioEffect;
+  if (isStudioEffect(directEffect)) return directEffect;
+
+  const studio = metadata.studio;
+  if (isPlainRecord(studio) && isStudioEffect(studio.effect)) {
+    return studio.effect;
+  }
+
+  return 'none' as ReelsStudioEffect;
+}
+
+function getStudioDurationMs(duration: ReelsStudioDuration) {
+  const seconds = Number.parseInt(duration.replace(/\D/g, ''), 10);
+  return Math.max(Number.isFinite(seconds) ? seconds : 15, 5) * 1000;
+}
+
+function drawVideoCoverFrame(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+) {
+  const sourceWidth = video.videoWidth || width;
+  const sourceHeight = video.videoHeight || height;
+  const targetRatio = width / height;
+  const sourceRatio = sourceWidth / sourceHeight;
+  let sx = 0;
+  let sy = 0;
+  let sw = sourceWidth;
+  let sh = sourceHeight;
+
+  if (sourceRatio > targetRatio) {
+    sw = sourceHeight * targetRatio;
+    sx = (sourceWidth - sw) / 2;
+  } else {
+    sh = sourceWidth / targetRatio;
+    sy = (sourceHeight - sh) / 2;
+  }
+
+  context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
+}
+
+function drawStudioCanvasEffect(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  effect: ReelsStudioEffect,
+) {
+  if (effect === 'none') return;
+
+  context.save();
+  if (effect === 'clean') {
+    const glow = context.createRadialGradient(
+      width * 0.5,
+      height * 0.18,
+      0,
+      width * 0.5,
+      height * 0.18,
+      width * 0.78,
+    );
+    glow.addColorStop(0, 'rgba(255,255,255,0.22)');
+    glow.addColorStop(0.55, 'rgba(16,185,129,0.08)');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = glow;
+    context.fillRect(0, 0, width, height);
+  } else if (effect === 'product') {
+    const warmth = context.createLinearGradient(0, 0, width, height);
+    warmth.addColorStop(0, 'rgba(250,204,21,0.16)');
+    warmth.addColorStop(0.52, 'rgba(255,255,255,0.03)');
+    warmth.addColorStop(1, 'rgba(244,63,94,0.12)');
+    context.fillStyle = warmth;
+    context.fillRect(0, 0, width, height);
+  } else if (effect === 'focus') {
+    const vignette = context.createRadialGradient(
+      width / 2,
+      height * 0.47,
+      width * 0.16,
+      width / 2,
+      height * 0.5,
+      width * 0.76,
+    );
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(0.62, 'rgba(0,0,0,0.08)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.42)');
+    context.fillStyle = vignette;
+    context.fillRect(0, 0, width, height);
+  } else if (effect === 'scan') {
+    context.fillStyle = 'rgba(6,182,212,0.12)';
+    for (let y = 0; y < height; y += 18) {
+      context.fillRect(0, y, width, 2);
+    }
+  } else if (effect === 'grain') {
+    context.fillStyle = 'rgba(255,255,255,0.025)';
+    for (let i = 0; i < 280; i += 1) {
+      const x = Math.random() * width;
+      const y = Math.random() * height;
+      context.fillRect(x, y, 1.2, 1.2);
+    }
+  }
+  context.restore();
+}
+
+function getLiveLabel(reel: Pick<LajukanReel, 'liveStatus' | 'captureMode'>) {
+  if (reel.liveStatus === 'live') return 'LIVE';
+  if (reel.liveStatus === 'scheduled' || reel.captureMode === 'live') {
+    return 'Live siap';
+  }
+  return null;
+}
+
+function toDatetimeLocalValue(value: Date) {
+  const offset = value.getTimezoneOffset();
+  const local = new Date(value.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(value: string) {
+  const parsed = value ? new Date(value) : null;
+  return parsed && Number.isFinite(parsed.getTime())
+    ? parsed.toISOString()
+    : undefined;
+}
+
+function normalizeReelActionState(
+  value: Partial<ReelActionState> | null | undefined,
+): ReelActionState {
+  return {
+    liked: Boolean(value?.liked),
+    saved: Boolean(value?.saved),
+    followed: Boolean(value?.followed),
+    loading: value?.loading ?? null,
+  };
+}
+
+function setActionValue(
+  state: ReelActionState,
+  action: ReelUserAction,
+  active: boolean,
+): ReelActionState {
+  if (action === 'like') return { ...state, liked: active };
+  if (action === 'save') return { ...state, saved: active };
+  return { ...state, followed: active };
+}
+
+function readActionValue(state: ReelActionState, action: ReelUserAction) {
+  if (action === 'like') return state.liked;
+  if (action === 'save') return state.saved;
+  return state.followed;
+}
 
 const compactMultipliers: Record<string, number> = {
   K: 1_000,
@@ -241,7 +642,7 @@ function writeProfile(profile: PreferenceProfile) {
 
   try {
     window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-  } catch {}
+  } catch { }
 }
 
 function readInitialMuted() {
@@ -259,7 +660,7 @@ function writeSoundPreference(muted: boolean) {
 
   try {
     window.localStorage.setItem(SOUND_STORAGE_KEY, muted ? 'off' : 'on');
-  } catch {}
+  } catch { }
 }
 
 function normalizeToken(value: string) {
@@ -407,6 +808,80 @@ function buildReelShareUrl(locale: string, reel: LajukanReel | null) {
   return url.toString();
 }
 
+function buildReelCreatorProfileHref(locale: string, reel: LajukanReel) {
+  return localizedHref(
+    locale,
+    buildPublicProfileHref({
+      id: reel.creatorUserId || undefined,
+      full_name: reel.creator,
+      title: reel.creator,
+    }),
+  );
+}
+
+function readReelMetadataText(reel: LajukanReel, ...keys: string[]): string {
+  const metadata = reel.metadata;
+  if (!metadata) return '';
+
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return '';
+}
+
+function getReelCreatorAvatarSrc(reel: LajukanReel) {
+  return profileAvatarSrc(
+    readReelMetadataText(
+      reel,
+      'creator_avatar_url',
+      'creatorAvatarUrl',
+      'author_avatar_url',
+      'authorAvatarUrl',
+      'owner_avatar_url',
+      'ownerAvatarUrl',
+      'profile_image_url',
+      'profileImageUrl',
+      'avatar_url',
+      'avatarUrl',
+      'avatar',
+    ),
+  );
+}
+
+function ReelCreatorAvatar({
+  reel,
+  className,
+  imageClassName,
+  size = 48,
+}: {
+  reel: LajukanReel;
+  className?: string;
+  imageClassName?: string;
+  size?: number;
+}) {
+  return (
+    <span
+      className={cn(
+        'relative block shrink-0 overflow-hidden rounded-full bg-white/12',
+        className,
+      )}
+    >
+      <NextImage
+        src={getReelCreatorAvatarSrc(reel)}
+        alt=""
+        width={size}
+        height={size}
+        className={cn('h-full w-full object-cover', imageClassName)}
+        unoptimized
+      />
+    </span>
+  );
+}
+
 export default function ReelsClient({
   locale,
   initialIndex,
@@ -414,8 +889,9 @@ export default function ReelsClient({
   initialCursor,
   initialHasMore,
   initialSearchQuery,
+  initialUploadOpen = false,
 }: ReelsClientProps) {
-  const { user, isAuthenticated, authFetch } = useAuth();
+  const { user, isAuthenticated, authFetch, loading: authLoading } = useAuth();
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
@@ -452,7 +928,7 @@ export default function ReelsClient({
   const [muted, setMuted] = useState(() => readInitialMuted());
   const [soundUnlocked, setSoundUnlocked] = useState(() => !readInitialMuted());
   const [pausedByUser, setPausedByUser] = useState(false);
-  const [autoScroll, setAutoScroll] = useState(false);
+  const [autoScroll] = useState(false);
   const [bufferingId, setBufferingId] = useState<string | null>(null);
 
   const [searchOpen, setSearchOpen] = useState(Boolean(initialSearchQuery));
@@ -461,8 +937,12 @@ export default function ReelsClient({
   const [productReel, setProductReel] = useState<LajukanReel | null>(null);
   const [commentsReel, setCommentsReel] = useState<LajukanReel | null>(null);
   const [shareReel, setShareReel] = useState<LajukanReel | null>(null);
+  const [actionsReel, setActionsReel] = useState<LajukanReel | null>(null);
   const [commentsByReel, setCommentsByReel] = useState<
     Record<string, ReelCommentsBucket>
+  >({});
+  const [actionsByReel, setActionsByReel] = useState<
+    Record<string, ReelActionState>
   >({});
   const [commentBody, setCommentBody] = useState('');
   const [replyTarget, setReplyTarget] = useState<ReelComment | null>(null);
@@ -470,6 +950,7 @@ export default function ReelsClient({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const [chatBusyReelId, setChatBusyReelId] = useState<string | null>(null);
+  const initialUploadHandledRef = useRef(false);
 
   const overlayOpen =
     searchOpen ||
@@ -477,21 +958,28 @@ export default function ReelsClient({
     productReel !== null ||
     commentsReel !== null ||
     shareReel !== null ||
+    actionsReel !== null ||
     uploadOpen ||
     authPrompt !== null;
 
+  const hasEndSlide = !hasMore && items.length > 0;
+  const reelPageCount = items.length + (hasEndSlide ? 1 : 0);
+
   const activeReel = useMemo(() => {
     if (items.length === 0) return null;
-    return items[Math.min(activeIndex, items.length - 1)] || null;
+    if (activeIndex >= items.length) return null;
+    return items[activeIndex] || null;
   }, [activeIndex, items]);
+  const activeReelId = activeReel?.id ?? null;
 
   const learnedTerms = useMemo(() => topProfileTerms(profile), [profile]);
   const activeSearchQuery = searchContextQuery.trim();
 
   const loginHref = useMemo(() => {
-    const callbackUrl = `/${locale}/reels?video=${Math.max(activeIndex + 1, 1)}`;
+    const videoParam = activeReel?.id || String(Math.max(activeIndex + 1, 1));
+    const callbackUrl = `/${locale}/reels?video=${encodeURIComponent(videoParam)}`;
     return `/${locale}/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-  }, [activeIndex, locale]);
+  }, [activeIndex, activeReel?.id, locale]);
 
   const displayName =
     user?.fullName ||
@@ -544,7 +1032,8 @@ export default function ReelsClient({
         return next;
       });
 
-      void fetch(`/api/reels/${encodeURIComponent(reel.id)}/events`, {
+      const request = isAuthenticated ? authFetch : fetch;
+      void request(`/api/reels/${encodeURIComponent(reel.id)}/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -562,7 +1051,108 @@ export default function ReelsClient({
         })
         .catch(() => undefined);
     },
-    [replaceReel],
+    [authFetch, isAuthenticated, replaceReel],
+  );
+
+  const loadReelActionState = useCallback(
+    async (reel: LajukanReel) => {
+      if (!isAuthenticated) return;
+
+      setActionsByReel(current => ({
+        ...current,
+        [reel.id]: {
+          ...(current[reel.id] || EMPTY_REEL_ACTION_STATE),
+          loading: current[reel.id]?.loading ?? null,
+        },
+      }));
+
+      try {
+        const response = await authFetch(
+          `/api/reels/${encodeURIComponent(reel.id)}/me`,
+          { cache: 'no-store' },
+        );
+        const payload = (await response
+          .json()
+          .catch(() => null)) as Partial<ReelActionState> | null;
+        if (!response.ok || !payload) return;
+        setActionsByReel(current => ({
+          ...current,
+          [reel.id]: normalizeReelActionState(payload),
+        }));
+      } catch { }
+    },
+    [authFetch, isAuthenticated],
+  );
+
+  const handleReelAction = useCallback(
+    async (reel: LajukanReel, action: ReelUserAction, active?: boolean) => {
+      if (!isAuthenticated) {
+        const prompt =
+          action === 'like'
+            ? 'Masuk dulu untuk menyukai reels.'
+            : action === 'save'
+              ? 'Masuk dulu untuk menyimpan reels.'
+              : 'Masuk dulu untuk mengikuti creator.';
+        setAuthPrompt(prompt);
+        return;
+      }
+
+      const previous = actionsByReel[reel.id] || normalizeReelActionState(null);
+      const nextActive = active ?? !readActionValue(previous, action);
+      const optimistic = setActionValue(previous, action, nextActive);
+
+      setActionsByReel(current => ({
+        ...current,
+        [reel.id]: { ...optimistic, loading: action },
+      }));
+
+      if (nextActive) {
+        setProfile(current => {
+          const next = boostProfile(
+            current,
+            reelTokens(reel),
+            SIGNAL_WEIGHT[action],
+          );
+          writeProfile(next);
+          return next;
+        });
+      }
+
+      try {
+        const response = await authFetch(
+          `/api/reels/${encodeURIComponent(reel.id)}/actions`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, active: nextActive }),
+          },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          actionState?: Partial<ReelActionState>;
+          reel?: LajukanReel;
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error || 'Aksi reels gagal disimpan');
+        }
+
+        if (payload.reel) replaceReel(payload.reel);
+        setActionsByReel(current => ({
+          ...current,
+          [reel.id]: normalizeReelActionState(payload.actionState),
+        }));
+      } catch (error) {
+        setActionsByReel(current => ({
+          ...current,
+          [reel.id]: previous,
+        }));
+        setAuthPrompt(
+          error instanceof Error ? error.message : 'Aksi reels gagal disimpan',
+        );
+      }
+    },
+    [actionsByReel, authFetch, isAuthenticated, replaceReel],
   );
 
   const openShareSheet = useCallback(
@@ -581,6 +1171,16 @@ export default function ReelsClient({
       setItems(current => rankItems(current, storedProfile));
     }
   }, [safeInitialIndex]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setActionsByReel({});
+      return;
+    }
+    if (activeReel) {
+      void loadReelActionState(activeReel);
+    }
+  }, [activeReel, isAuthenticated, loadReelActionState]);
 
   const loadMore = useCallback(async () => {
     if (loadingRef.current || !hasMore || cursor === null) return;
@@ -738,7 +1338,7 @@ export default function ReelsClient({
       const creatorUserId = reel.creatorUserId?.trim();
       if (!creatorUserId) {
         setAuthPrompt(
-          'Creator reels seed belum terhubung ke akun chat. Coba reels yang dibuat user login.',
+          'Creator reels ini belum terhubung ke akun chat. Coba reels yang dibuat user login.',
         );
         return;
       }
@@ -901,7 +1501,7 @@ export default function ReelsClient({
 
       const nextIndex = Math.min(
         Math.max(index, 0),
-        Math.max(items.length - 1, 0),
+        Math.max(reelPageCount - 1, 0),
       );
 
       container.scrollTo({
@@ -912,16 +1512,16 @@ export default function ReelsClient({
       setActiveIndex(nextIndex);
       setPausedByUser(false);
     },
-    [items.length],
+    [reelPageCount],
   );
 
   const snapToAdjacent = useCallback(
     (direction: -1 | 1) => {
-      if (overlayOpen || scrollLockRef.current || items.length === 0) return;
+      if (overlayOpen || scrollLockRef.current || reelPageCount === 0) return;
 
       const nextIndex = Math.min(
         Math.max(activeIndex + direction, 0),
-        Math.max(items.length - 1, 0),
+        Math.max(reelPageCount - 1, 0),
       );
 
       if (nextIndex === activeIndex) return;
@@ -933,7 +1533,7 @@ export default function ReelsClient({
         scrollLockRef.current = false;
       }, REELS_SNAP_LOCK_MS);
     },
-    [activeIndex, items.length, overlayOpen, scrollToIndex],
+    [activeIndex, overlayOpen, reelPageCount, scrollToIndex],
   );
 
   const handleWheel = useCallback(
@@ -1021,14 +1621,14 @@ export default function ReelsClient({
       rafRef.current = null;
 
       const container = containerRef.current;
-      if (!container || items.length === 0) return;
+      if (!container || reelPageCount === 0) return;
 
       const height = container.clientHeight || window.innerHeight;
       const rawIndex = Math.round(container.scrollTop / height);
 
       const nextIndex = Math.min(
         Math.max(rawIndex, 0),
-        Math.max(items.length - 1, 0),
+        Math.max(reelPageCount - 1, 0),
       );
 
       setActiveIndex(prev => (prev === nextIndex ? prev : nextIndex));
@@ -1040,7 +1640,7 @@ export default function ReelsClient({
         void loadMore();
       }
     });
-  }, [items.length, loadMore]);
+  }, [loadMore, reelPageCount]);
 
   useEffect(() => {
     if (firstScrollDoneRef.current) return;
@@ -1067,14 +1667,14 @@ export default function ReelsClient({
   }, [activeIndex, items.length, loadMore]);
 
   useEffect(() => {
-    if (activeIndex < items.length) {
+    if (activeReel) {
       window.history.replaceState(
         null,
         '',
-        `/${locale}/reels?video=${activeIndex + 1}`,
+        `/${locale}/reels?video=${encodeURIComponent(activeReel.id)}`,
       );
     }
-  }, [activeIndex, items.length, locale]);
+  }, [activeReel, locale]);
 
   useEffect(() => {
     if (!activeReel || overlayOpen) return;
@@ -1110,37 +1710,35 @@ export default function ReelsClient({
   }, [activeIndex]);
 
   useEffect(() => {
-    items.forEach((item, index) => {
-      const video = videoRefs.current[item.id];
+    Object.entries(videoRefs.current).forEach(([reelId, video]) => {
       if (!video) return;
 
       video.muted = muted;
       video.volume = muted ? 0 : 1;
 
-      if (overlayOpen) {
+      const isActiveVideo = reelId === activeReelId;
+
+      if (overlayOpen || !isActiveVideo || pausedByUser) {
         video.pause();
         return;
       }
 
-      if (index === activeIndex && !pausedByUser) {
-        video.play().catch(() => {
-          if (!muted) {
-            video.muted = true;
-            video.volume = 0;
-            setMuted(true);
-            setSoundUnlocked(false);
-            writeSoundPreference(true);
-          }
-        });
-      } else {
-        video.pause();
-      }
+      video.play().catch(() => {
+        if (!muted) {
+          video.muted = true;
+          video.volume = 0;
+          setMuted(true);
+          setSoundUnlocked(false);
+          writeSoundPreference(true);
+        }
+      });
     });
-  }, [activeIndex, items, muted, overlayOpen, pausedByUser]);
+  }, [activeReelId, muted, overlayOpen, pausedByUser]);
 
   useEffect(() => {
+    const mountedVideoRefs = videoRefs.current;
     return () => {
-      Object.values(videoRefs.current).forEach(video => {
+      Object.values(mountedVideoRefs).forEach(video => {
         video?.pause();
       });
     };
@@ -1153,7 +1751,7 @@ export default function ReelsClient({
     if (!video) return;
 
     if (video.paused) {
-      video.play().catch(() => {});
+      video.play().catch(() => { });
       setPausedByUser(false);
     } else {
       video.pause();
@@ -1180,7 +1778,7 @@ export default function ReelsClient({
     video.volume = nextMuted ? 0 : 1;
 
     if (!nextMuted) {
-      video.play().catch(() => {});
+      video.play().catch(() => { });
       setPausedByUser(false);
     }
   }
@@ -1212,24 +1810,30 @@ export default function ReelsClient({
     setUploadOpen(true);
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!initialUploadOpen || initialUploadHandledRef.current || authLoading)
+      return;
+    initialUploadHandledRef.current = true;
+    if (!isAuthenticated) {
+      setAuthPrompt('Masuk dulu untuk upload reels usaha.');
+      return;
+    }
+    setUploadOpen(true);
+  }, [authLoading, initialUploadOpen, isAuthenticated]);
+
   return (
     <main className="h-[100svh] overflow-hidden bg-black text-white">
-      <div className="relative grid h-full w-full grid-cols-1 overflow-hidden bg-[#050505] lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="relative min-w-0 overflow-hidden bg-black lg:bg-[#050505]">
-          <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.10),transparent_32%)] lg:block" />
+      <div className="relative h-full w-full overflow-hidden bg-[#050505]">
+        <div className="relative h-full min-w-0 overflow-hidden bg-black lg:bg-[#050505]">
+          <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.10),transparent_32%)] lg:block" />
 
           <div className="relative mx-auto h-full w-full max-w-[430px] overflow-hidden bg-black shadow-2xl sm:max-w-[460px] lg:my-3 lg:h-[calc(100svh-24px)] lg:max-w-[430px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10">
             <ReelsTopBar
               locale={locale}
-              muted={muted}
-              autoScroll={autoScroll}
               feedTab={feedTab}
               searchQuery={activeSearchQuery}
-              onToggleSound={toggleSound}
-              onToggleAutoScroll={() => setAutoScroll(current => !current)}
               onFeedTabChange={handleFeedTabChange}
               onOpenSearch={() => openSearchOverlay(activeSearchQuery)}
-              onOpenUpload={requestUpload}
             />
 
             <div
@@ -1243,48 +1847,73 @@ export default function ReelsClient({
               className="h-full snap-y snap-mandatory overflow-hidden scroll-smooth outline-none [scrollbar-width:none] [touch-action:none] [&::-webkit-scrollbar]:hidden"
             >
               {items.length > 0 ? (
-                items.map((reel, index) => (
-                  <ReelSlide
-                    key={reel.id}
-                    reel={reel}
-                    active={index === activeIndex}
-                    shouldLoad={Math.abs(index - activeIndex) <= 1}
-                    muted={muted}
-                    soundUnlocked={soundUnlocked}
-                    paused={pausedByUser && index === activeIndex}
-                    buffering={bufferingId === reel.id && index === activeIndex}
-                    setVideoRef={node => {
-                      if (node) {
-                        videoRefs.current[reel.id] = node;
-                      } else {
-                        delete videoRefs.current[reel.id];
+                <>
+                  {items.map((reel, index) => (
+                    <ReelSlide
+                      key={reel.id}
+                      locale={locale}
+                      reel={reel}
+                      active={index === activeIndex}
+                      shouldLoad={
+                        Math.abs(index - activeIndex) <= REELS_RENDER_WINDOW
                       }
-                    }}
-                    onWaiting={() => {
-                      if (index === activeIndex) setBufferingId(reel.id);
-                    }}
-                    onPlaying={() => {
-                      if (bufferingId === reel.id) setBufferingId(null);
-                    }}
-                    onError={() => {
-                      if (index === activeIndex) setBufferingId(null);
-                      setLoadError('Video dari database tidak bisa diputar.');
-                    }}
-                    onTogglePlay={toggleCurrentVideo}
-                    onToggleSound={toggleSound}
-                    onOpenDetail={() => {
-                      recordSignal(reel, 'detail');
-                      setDetailReel(reel);
-                    }}
-                    onOpenComments={() => openComments(reel)}
-                    onOpenProduct={() => {
-                      recordSignal(reel, 'product');
-                      setProductReel(reel);
-                    }}
-                    onOpenShare={() => openShareSheet(reel)}
-                    onSignal={signal => recordSignal(reel, signal)}
-                  />
-                ))
+                      muted={muted}
+                      soundUnlocked={soundUnlocked}
+                      paused={pausedByUser && index === activeIndex}
+                      buffering={
+                        bufferingId === reel.id && index === activeIndex
+                      }
+                      actionState={
+                        actionsByReel[reel.id] || EMPTY_REEL_ACTION_STATE
+                      }
+                      setVideoRef={node => {
+                        if (node) {
+                          videoRefs.current[reel.id] = node;
+                        } else {
+                          delete videoRefs.current[reel.id];
+                        }
+                      }}
+                      onWaiting={() => {
+                        if (index === activeIndex) setBufferingId(reel.id);
+                      }}
+                      onPlaying={() => {
+                        if (bufferingId === reel.id) setBufferingId(null);
+                      }}
+                      onError={() => {
+                        if (index === activeIndex) setBufferingId(null);
+                        setLoadError('Video dari database tidak bisa diputar.');
+                      }}
+                      onTogglePlay={toggleCurrentVideo}
+                      onToggleSound={toggleSound}
+                      onOpenDetail={() => {
+                        recordSignal(reel, 'detail');
+                        setDetailReel(reel);
+                      }}
+                      onOpenComments={() => openComments(reel)}
+                      onOpenProduct={() => {
+                        recordSignal(reel, 'product');
+                        setProductReel(reel);
+                      }}
+                      onOpenShare={() => openShareSheet(reel)}
+                      onOpenActions={() => setActionsReel(reel)}
+                      onAction={(action, active) =>
+                        void handleReelAction(reel, action, active)
+                      }
+                    />
+                  ))}
+                  {hasEndSlide ? (
+                    <ReelsEndSlide
+                      locale={locale}
+                      totalCount={items.length}
+                      learnedTerms={learnedTerms}
+                      onRestart={() => scrollToIndex(0)}
+                      onSearch={(seed?: string) =>
+                        openSearchOverlay(seed ?? '')
+                      }
+                      onUpload={requestUpload}
+                    />
+                  ) : null}
+                </>
               ) : (
                 <ReelsEmptyState
                   locale={locale}
@@ -1300,53 +1929,14 @@ export default function ReelsClient({
               onRetry={() => void loadMore()}
             />
 
-            {!hasMore &&
-              activeIndex >= items.length - 1 &&
-              items.length > 0 && (
-                <EndMiniToast
-                  onRestart={() => scrollToIndex(0)}
-                  onSearch={() => openSearchOverlay('')}
-                />
-              )}
+            <ReelsCreateDock
+              locale={locale}
+              isAuthenticated={isAuthenticated}
+              activeReelId={activeReelId}
+              onOpenUpload={requestUpload}
+            />
           </div>
         </div>
-
-        <ReelsDesktopInfoSidebar
-          locale={locale}
-          reel={activeReel}
-          commentsBucket={
-            activeReel ? commentsByReel[activeReel.id] : undefined
-          }
-          chatBusy={chatBusyReelId === activeReel?.id}
-          onOpenDetail={() => {
-            if (!activeReel) return;
-            recordSignal(activeReel, 'detail');
-            setDetailReel(activeReel);
-          }}
-          onOpenComments={() => {
-            if (!activeReel) return;
-            openComments(activeReel);
-          }}
-          onOpenProduct={() => {
-            if (!activeReel) return;
-            recordSignal(activeReel, 'product');
-            setProductReel(activeReel);
-          }}
-          onOpenShare={() => {
-            if (!activeReel) return;
-            openShareSheet(activeReel);
-          }}
-          onMessageCreator={() => {
-            if (!activeReel) return;
-            void startChatFromReel(activeReel);
-          }}
-          onSave={() => {
-            if (!activeReel) return;
-            recordSignal(activeReel, 'save');
-          }}
-          onOpenUpload={requestUpload}
-          onOpenSearch={() => openSearchOverlay(activeSearchQuery)}
-        />
 
         <SearchOverlay
           key={searchSeed}
@@ -1370,8 +1960,16 @@ export default function ReelsClient({
         />
 
         <DetailOverlay
+          locale={locale}
           reel={detailReel}
-          onSignal={(reel, signal) => recordSignal(reel, signal)}
+          actionState={
+            detailReel
+              ? actionsByReel[detailReel.id] || EMPTY_REEL_ACTION_STATE
+              : EMPTY_REEL_ACTION_STATE
+          }
+          onAction={(reel, action, active) =>
+            void handleReelAction(reel, action, active)
+          }
           onOpenComments={reel => openComments(reel)}
           onOpenProduct={reel => {
             recordSignal(reel, 'product');
@@ -1436,7 +2034,41 @@ export default function ReelsClient({
           onClose={() => setShareReel(null)}
         />
 
+        <MoreActionsSheet
+          reel={actionsReel}
+          actionState={
+            actionsReel
+              ? actionsByReel[actionsReel.id] || EMPTY_REEL_ACTION_STATE
+              : EMPTY_REEL_ACTION_STATE
+          }
+          chatBusy={chatBusyReelId === actionsReel?.id}
+          onClose={() => setActionsReel(null)}
+          onOpenDetail={reel => {
+            setActionsReel(null);
+            recordSignal(reel, 'detail');
+            setDetailReel(reel);
+          }}
+          onOpenProduct={reel => {
+            setActionsReel(null);
+            recordSignal(reel, 'product');
+            setProductReel(reel);
+          }}
+          onOpenComments={reel => {
+            setActionsReel(null);
+            openComments(reel);
+          }}
+          onOpenShare={reel => {
+            setActionsReel(null);
+            openShareSheet(reel);
+          }}
+          onMessageCreator={reel => void startChatFromReel(reel)}
+          onAction={(reel, action, active) =>
+            void handleReelAction(reel, action, active)
+          }
+        />
+
         <UploadReelSheet
+          locale={locale}
           open={uploadOpen}
           authFetch={authFetch}
           displayName={displayName}
@@ -1486,25 +2118,25 @@ function ReelsDesktopSidebar({
     helper: string;
     icon: LucideIcon;
   }> = [
-    {
-      id: 'fyp',
-      label: 'Untukmu',
-      helper: 'FYP bisnis yang paling relevan',
-      icon: Compass,
-    },
-    {
-      id: 'friends',
-      label: 'Friend',
-      helper: 'Aktivitas akun yang sering interaksi',
-      icon: Users,
-    },
-    {
-      id: 'following',
-      label: 'Following',
-      helper: 'Creator dan usaha yang kamu ikuti',
-      icon: UserPlus,
-    },
-  ];
+      {
+        id: 'fyp',
+        label: 'Untukmu',
+        helper: 'FYP bisnis yang paling relevan',
+        icon: Compass,
+      },
+      {
+        id: 'friends',
+        label: 'Friend',
+        helper: 'Aktivitas akun yang sering interaksi',
+        icon: Users,
+      },
+      {
+        id: 'following',
+        label: 'Following',
+        helper: 'Creator dan usaha yang kamu ikuti',
+        icon: UserPlus,
+      },
+    ];
   const trendTerms =
     learnedTerms.length > 0
       ? learnedTerms.slice(0, 6)
@@ -1626,8 +2258,8 @@ function ReelsDesktopSidebar({
           className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-400 px-4 text-sm font-black text-slate-950 shadow-lg shadow-emerald-400/15 transition active:scale-[0.98]"
           data-testid="reels-upload-button"
         >
-          <Upload className="h-4.5 w-4.5" />
-          Upload Reels
+          <Camera className="h-4.5 w-4.5" />
+          Buat Reels
         </button>
 
         <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3">
@@ -1663,6 +2295,7 @@ function ReelsDesktopSidebar({
 function ReelsDesktopInfoSidebar({
   locale,
   reel,
+  actionState,
   commentsBucket,
   chatBusy,
   onOpenDetail,
@@ -1671,11 +2304,13 @@ function ReelsDesktopInfoSidebar({
   onOpenShare,
   onMessageCreator,
   onSave,
+  onFollow,
   onOpenUpload,
   onOpenSearch,
 }: {
   locale: string;
   reel: LajukanReel | null;
+  actionState: ReelActionState;
   commentsBucket?: ReelCommentsBucket;
   chatBusy: boolean;
   onOpenDetail: () => void;
@@ -1684,6 +2319,7 @@ function ReelsDesktopInfoSidebar({
   onOpenShare: () => void;
   onMessageCreator: () => void;
   onSave: () => void;
+  onFollow: () => void;
   onOpenUpload: () => void;
   onOpenSearch: () => void;
 }) {
@@ -1706,21 +2342,29 @@ function ReelsDesktopInfoSidebar({
   }
 
   const imageMedia = isImageMediaUrl(reel.videoSrc);
+  const mediaStyle = getReelMediaStyle(reel.filterPreset);
+  const studioEffect = getReelStudioEffect(reel);
+  const liveLabel = getLiveLabel(reel);
   const recentComments = commentsBucket?.items.slice(0, 2) ?? [];
   const productHref = reel.productHref
     ? localizedHref(locale, reel.productHref)
     : null;
+  const profileHref = buildReelCreatorProfileHref(locale, reel);
   const actions: Array<{
     label: string;
     icon: LucideIcon;
     onClick: () => void;
     featured?: boolean;
   }> = [
-    { label: 'Detail', icon: Info, onClick: onOpenDetail },
-    { label: 'Komentar', icon: MessageCircle, onClick: onOpenComments },
-    { label: 'Share', icon: Forward, onClick: onOpenShare, featured: true },
-    { label: 'Simpan', icon: Bookmark, onClick: onSave },
-  ];
+      { label: 'Detail', icon: Info, onClick: onOpenDetail },
+      { label: 'Komentar', icon: MessageCircle, onClick: onOpenComments },
+      { label: 'Share', icon: Forward, onClick: onOpenShare, featured: true },
+      {
+        label: actionState.saved ? 'Tersimpan' : 'Simpan',
+        icon: Bookmark,
+        onClick: onSave,
+      },
+    ];
 
   return (
     <aside className="hidden h-full min-h-0 flex-col border-l border-white/10 bg-[#080808] text-white lg:flex">
@@ -1751,21 +2395,30 @@ function ReelsDesktopInfoSidebar({
               src={reel.videoSrc}
               alt={reel.title}
               className="absolute inset-0 h-full w-full object-cover"
+              style={mediaStyle}
             />
           ) : (
             <video
               src={reel.videoSrc}
               className="absolute inset-0 h-full w-full object-cover"
+              style={mediaStyle}
               muted
               loop
               playsInline
-              preload="metadata"
+              preload="none"
             />
           )}
+          <StudioEffectOverlay effect={studioEffect} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/14 to-black/20" />
           <div className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-black backdrop-blur">
             {reel.tag}
           </div>
+          {liveLabel && (
+            <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1.5 text-[11px] font-black text-white shadow-lg shadow-rose-950/20">
+              <Radio className="h-3.5 w-3.5" />
+              {liveLabel}
+            </div>
+          )}
           <button
             type="button"
             onClick={onOpenDetail}
@@ -1780,11 +2433,20 @@ function ReelsDesktopInfoSidebar({
 
         <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10">
-              <User className="h-5 w-5" />
-            </div>
+            <Link
+              href={profileHref}
+              className="shrink-0 rounded-full bg-white/14 p-0.5 ring-1 ring-white/18 transition active:scale-95"
+              aria-label={`Lihat profil ${reel.creator}`}
+            >
+              <ReelCreatorAvatar reel={reel} className="h-10 w-10" size={40} />
+            </Link>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black">{reel.creator}</p>
+              <Link
+                href={profileHref}
+                className="block truncate text-sm font-black text-white underline-offset-4 transition hover:underline"
+              >
+                {reel.creator}
+              </Link>
               <p className="truncate text-[11px] font-semibold text-white/42">
                 Creator bisnis dan supplier
               </p>
@@ -1801,6 +2463,26 @@ function ReelsDesktopInfoSidebar({
                 <MessageSquareText className="h-3.5 w-3.5" />
               )}
               Chat
+            </button>
+            <button
+              type="button"
+              onClick={onFollow}
+              disabled={actionState.loading === 'follow'}
+              className={cn(
+                'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-black transition active:scale-[0.98] disabled:opacity-60',
+                actionState.followed
+                  ? 'bg-emerald-400 text-slate-950'
+                  : 'bg-white/10 text-white ring-1 ring-white/10',
+              )}
+            >
+              {actionState.loading === 'follow' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : actionState.followed ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <UserPlus className="h-3.5 w-3.5" />
+              )}
+              {actionState.followed ? 'Diikuti' : 'Ikuti'}
             </button>
           </div>
 
@@ -1866,7 +2548,7 @@ function ReelsDesktopInfoSidebar({
                 onClick={onOpenProduct}
                 className="rounded-2xl bg-slate-950 px-3 py-2.5 text-xs font-black text-white"
               >
-                Keranjang
+                Detail
               </button>
               {productHref ? (
                 <Link
@@ -1976,8 +2658,8 @@ function ReelsDesktopInfoSidebar({
             onClick={onOpenUpload}
             className="flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] bg-white text-xs font-black text-slate-950"
           >
-            <Upload className="h-4.5 w-4.5" />
-            Upload
+            <Camera className="h-4.5 w-4.5" />
+            Buat
           </button>
           <button
             type="button"
@@ -1995,119 +2677,48 @@ function ReelsDesktopInfoSidebar({
 
 function ReelsTopBar({
   locale,
-  muted,
-  autoScroll,
   feedTab,
   searchQuery,
-  onToggleSound,
-  onToggleAutoScroll,
   onFeedTabChange,
   onOpenSearch,
-  onOpenUpload,
 }: {
   locale: string;
-  muted: boolean;
-  autoScroll: boolean;
   feedTab: ReelsFeedTab;
   searchQuery: string;
-  onToggleSound: () => void;
-  onToggleAutoScroll: () => void;
   onFeedTabChange: (tab: ReelsFeedTab) => void;
   onOpenSearch: () => void;
-  onOpenUpload: () => void;
 }) {
   const router = useRouter();
   const hasSearchContext = searchQuery.trim().length > 0;
   const handleBack = useAppBack(router, `/${locale}/home`);
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/86 via-black/36 to-transparent px-2.5 pb-4 pt-[calc(env(safe-area-inset-top)+7px)] sm:px-4 sm:pb-6">
-      <div className="pointer-events-auto grid min-w-0 gap-2">
-        <div className="grid min-h-9 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-1.5 sm:min-h-10 sm:gap-2">
-          <button
-            type="button"
-            onClick={handleBack}
-            aria-label={locale === 'id' ? 'Kembali' : 'Back'}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/12 bg-black/42 font-black text-white backdrop-blur-xl transition active:scale-[0.96] sm:h-10 sm:w-10"
-          >
-            <ArrowLeft className="h-4.5 w-4.5" />
-          </button>
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-black/86 via-black/30 to-transparent px-3 pb-4 pt-[calc(env(safe-area-inset-top)+8px)] sm:px-4">
+      <div className="pointer-events-auto grid min-h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-1.5 sm:gap-2">
+        <button
+          type="button"
+          onClick={handleBack}
+          aria-label={locale === 'id' ? 'Kembali' : 'Back'}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-black/45 font-black text-white backdrop-blur-xl transition active:scale-[0.96]"
+        >
+          <ArrowLeft className="h-4.5 w-4.5" />
+        </button>
 
-          <div className="flex min-w-0 justify-center px-1">
-            {hasSearchContext ? (
-              <button
-                type="button"
-                onClick={onOpenSearch}
-                className="inline-flex h-9 min-w-0 max-w-full items-center gap-2 rounded-full border border-white/14 bg-black/45 px-3 text-left text-xs font-bold text-white/90 backdrop-blur-xl transition active:scale-[0.98] sm:h-10 sm:px-4 sm:text-sm"
-              >
-                <Search className="h-4 w-4 shrink-0" />
-                <span className="truncate">Hasil: {searchQuery}</span>
-                <Sparkles className="hidden h-3.5 w-3.5 shrink-0 text-yellow-300 min-[390px]:block" />
-              </button>
-            ) : (
-              <span className="hidden min-h-9 items-center rounded-full border border-white/12 bg-black/30 px-3 text-xs font-black uppercase tracking-[0.12em] text-white/70 backdrop-blur-xl min-[380px]:inline-flex sm:min-h-10">
-                Reels
-              </span>
-            )}
-          </div>
-
-          <div className="flex h-9 shrink-0 items-start justify-end gap-1.5 sm:h-10">
+        <div className="flex min-w-0 justify-center px-1">
+          {hasSearchContext ? (
             <button
               type="button"
               onClick={onOpenSearch}
-              aria-label="Cari reels"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/12 bg-black/42 text-white backdrop-blur-xl transition active:scale-[0.96] sm:h-10 sm:w-10"
+              className="inline-flex h-10 min-w-0 max-w-full items-center gap-2 rounded-full border border-white/14 bg-black/52 px-3 text-left text-xs font-black text-white/92 shadow-[0_18px_38px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl transition active:scale-[0.98] sm:px-4 sm:text-sm"
             >
-              <Search className="h-4.5 w-4.5" />
+              <Search className="h-4 w-4 shrink-0" />
+              <span className="truncate">{searchQuery}</span>
+              <Sparkles className="hidden h-3.5 w-3.5 shrink-0 text-yellow-300 min-[390px]:block" />
             </button>
-
-            <button
-              type="button"
-              onClick={onOpenUpload}
-              aria-label={locale === 'id' ? 'Upload reels' : 'Upload reels'}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-emerald-300/40 bg-emerald-400 text-slate-950 shadow-[0_12px_22px_-16px_rgba(16,185,129,0.8)] backdrop-blur-xl transition active:scale-[0.96] sm:h-10 sm:w-10"
-            >
-              <Plus className="h-4.5 w-4.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onToggleAutoScroll}
-              aria-pressed={autoScroll}
-              aria-label={
-                autoScroll ? 'Matikan auto scroll' : 'Nyalakan auto scroll'
-              }
-              className={cn(
-                'hidden h-9 w-9 shrink-0 place-items-center rounded-full border border-white/12 bg-black/42 text-white backdrop-blur-xl transition active:scale-[0.96] min-[420px]:grid sm:h-10 sm:w-10',
-                autoScroll &&
-                  'border-emerald-300/50 bg-emerald-400 text-slate-950',
-              )}
-            >
-              <RefreshCcw
-                className={cn('h-4.5 w-4.5', autoScroll && 'animate-spin')}
-              />
-            </button>
-
-            <button
-              type="button"
-              onClick={onToggleSound}
-              aria-label={muted ? 'Nyalakan suara' : 'Matikan suara'}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-white/12 bg-black/42 text-white backdrop-blur-xl transition active:scale-[0.96] sm:h-10 sm:w-10"
-            >
-              {muted ? (
-                <VolumeX className="h-4.5 w-4.5" />
-              ) : (
-                <Volume2 className="h-4.5 w-4.5" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {!hasSearchContext ? (
-          <div className="flex min-w-0 justify-center">
+          ) : (
             <nav
               aria-label="Filter reels"
-              className="inline-flex h-9 max-w-full items-center justify-center gap-0.5 rounded-full border border-white/16 bg-black/48 p-1 text-[12px] font-black shadow-[0_16px_34px_-24px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:h-10 sm:text-sm"
+              className="inline-flex h-10 max-w-full items-center justify-center gap-0.5 rounded-full border border-white/16 bg-black/52 p-1 text-[12px] font-black shadow-[0_16px_34px_-24px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:text-sm"
             >
               {REELS_FEED_TABS.map(tab => (
                 <button
@@ -2119,19 +2730,253 @@ function ReelsTopBar({
                   }}
                   aria-pressed={feedTab === tab.id}
                   className={cn(
-                    'relative h-7 rounded-full px-2.5 text-white/62 transition active:scale-95 sm:h-8 sm:px-3',
+                    'relative h-8 rounded-full px-2.5 text-white/62 transition active:scale-95 sm:px-3',
                     feedTab === tab.id &&
-                      'bg-white text-slate-950 shadow-lg shadow-black/24 after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-emerald-400',
+                    'bg-white text-slate-950 shadow-lg shadow-black/24',
                   )}
                 >
                   {tab.label}
                 </button>
               ))}
             </nav>
-          </div>
-        ) : null}
+          )}
+        </div>
+
+        <div className="flex h-10 shrink-0 items-start justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            aria-label="Cari reels"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur-xl transition active:scale-[0.96]"
+          >
+            <Search className="h-4.5 w-4.5" />
+          </button>
+        </div>
       </div>
     </header>
+  );
+}
+
+const REELS_LAST_CREATE_ACTION_KEY = 'lajukan:reels-last-create-action';
+
+function buildReelsCreateHref(
+  href: string,
+  locale: string,
+  isAuthenticated: boolean,
+  activeReelId: string | null,
+) {
+  const localizedHref = `/${locale}${href}`;
+  if (isAuthenticated) return localizedHref;
+
+  const videoParam = activeReelId || '1';
+  const fallback = `/${locale}/reels?video=${encodeURIComponent(videoParam)}`;
+  return `/${locale}/login?callbackUrl=${encodeURIComponent(fallback)}`;
+}
+
+function ReelsCreateDock({
+  locale,
+  isAuthenticated,
+  activeReelId,
+  onOpenUpload,
+}: {
+  locale: string;
+  isAuthenticated: boolean;
+  activeReelId: string | null;
+  onOpenUpload: () => void;
+}) {
+  const isId = locale === 'id';
+  const [open, setOpen] = useState(false);
+  const [lastAction, setLastAction] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(REELS_LAST_CREATE_ACTION_KEY);
+  });
+  const dragStartY = useRef<number | null>(null);
+
+  const actions = useMemo(
+    () => [
+      {
+        key: 'video',
+        label: isId ? 'Upload Video' : 'Upload Video',
+        icon: Video,
+        onClick: () => {
+          window.localStorage.setItem(REELS_LAST_CREATE_ACTION_KEY, 'video');
+          setLastAction('video');
+          setOpen(false);
+          onOpenUpload();
+        },
+      },
+      {
+        key: 'photo',
+        label: isId ? 'Upload Foto' : 'Upload Photo',
+        href: '/create/jual/produk?media=photo',
+        icon: ImageIcon,
+      },
+      {
+        key: 'listing',
+        label: isId ? 'Buat Listing' : 'Create Listing',
+        href: '/create/jual/produk',
+        icon: Store,
+      },
+      {
+        key: 'service',
+        label: isId ? 'Tawarkan Jasa' : 'Offer Service',
+        href: '/create/jual/jasa',
+        icon: BriefcaseBusiness,
+      },
+      {
+        key: 'talent',
+        label: isId ? 'Cari Talent' : 'Find Talent',
+        href: '/create/butuh/lowongan',
+        icon: Users,
+      },
+      {
+        key: 'property',
+        label: isId ? 'Tambah Properti' : 'Add Property',
+        href: '/create/jual/properti',
+        icon: Building2,
+      },
+    ],
+    [isId, onOpenUpload],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
+  const rememberAction = (key: string) => {
+    window.localStorage.setItem(REELS_LAST_CREATE_ACTION_KEY, key);
+    setLastAction(key);
+    setOpen(false);
+  };
+
+  const handleSheetPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    dragStartY.current = event.clientY;
+  };
+
+  const handleSheetPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    if (dragStartY.current === null) return;
+    const deltaY = event.clientY - dragStartY.current;
+    dragStartY.current = null;
+    if (deltaY > 58) setOpen(false);
+  };
+
+  return (
+    <>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-50 flex justify-center pb-[calc(env(safe-area-inset-bottom)+14px)]">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="pointer-events-auto flex h-10 min-h-10 w-10 min-w-10 touch-manipulation items-center justify-center rounded-full bg-[#6cd698] text-white shadow-[0_18px_38px_-14px_rgba(16,185,129,0.82),0_8px_18px_-10px_rgba(0,0,0,0.72)] ring-4 ring-black/55 transition active:scale-95"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={isId ? 'Buat di Lajukan' : 'Create on Lajukan'}
+          data-testid="reels-create-fab"
+        >
+          <Plus className="h-8 w-8 stroke-[3]" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        className={cn(
+          'absolute inset-0 z-[70] bg-black/58 backdrop-blur-[3px] transition-opacity duration-200',
+          open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        aria-hidden={!open}
+        onClick={() => setOpen(false)}
+      />
+
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reels-create-sheet-title"
+        className={cn(
+          'absolute inset-x-0 bottom-0 z-[80] px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] transition-transform duration-300 ease-out',
+          open ? 'translate-y-0' : 'translate-y-[115%]',
+        )}
+        onPointerDown={handleSheetPointerDown}
+        onPointerUp={handleSheetPointerUp}
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="mx-auto max-w-[430px] rounded-t-[28px] border border-white/12 bg-[#080f0c] p-4 text-white shadow-[0_-22px_52px_-24px_rgba(0,0,0,0.86)]">
+          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/24" />
+          <div className="mb-3 px-1">
+            <p id="reels-create-sheet-title" className="text-lg font-black">
+              {isId ? 'Buat di Lajukan' : 'Create on Lajukan'}
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-white/58">
+              {isId ? 'Pilih yang ingin kamu bagikan' : 'Choose what you want to share'}
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            {actions.map(action => {
+              // 1. Defensively handle the Icon component casing
+              const RawIcon = action.icon;
+              const Icon = typeof RawIcon === 'function' || (RawIcon && typeof RawIcon === 'object')
+                ? (RawIcon as LucideIcon)
+                : null;
+
+              const selected = lastAction === action.key;
+
+              const content = (
+                <>
+                  <span className="flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full bg-[#6cd698] text-white shadow-[0_10px_22px_-16px_rgba(0,0,0,0.8)]">
+                    {/* Render safely only if it's a valid React component */}
+                    {Icon ? <Icon className="h-5 w-5" /> : null}
+                  </span>
+                  <span className="min-w-0 flex-1 text-[15px] font-black leading-tight">
+                    {action.label}
+                  </span>
+                </>
+              );
+
+              const className = cn(
+                'flex min-h-[56px] touch-manipulation items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left transition active:scale-[0.99]',
+                selected
+                  ? 'border-[#6cd698]/55 bg-[#6cd698]/16'
+                  : 'border-white/10 bg-white/[0.06] hover:border-[#6cd698]/45 hover:bg-[#6cd698]/10',
+              );
+
+              if ('onClick' in action) {
+                return (
+                  <button
+                    key={action.key}
+                    type="button"
+                    onClick={action.onClick}
+                    className={className}
+                    data-testid={`reels-create-action-${action.key}`}
+                  >
+                    {content}
+                  </button>
+                );
+              }
+
+              return (
+                <Link
+                  key={action.key}
+                  href={buildReelsCreateHref(
+                    action.href,
+                    locale,
+                    isAuthenticated,
+                    activeReelId,
+                  )}
+                  onClick={() => rememberAction(action.key)}
+                  className={className}
+                  data-testid={`reels-create-action-${action.key}`}
+                >
+                  {content}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -2149,25 +2994,25 @@ function ReelsEmptyState({
   return (
     <div className="flex h-full snap-start items-center justify-center px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+6rem)] text-center">
       <div className="w-full max-w-[320px] rounded-[28px] border border-white/10 bg-white/[0.07] p-5 text-white shadow-[0_24px_58px_-36px_rgba(0,0,0,0.85)] backdrop-blur-xl">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-400 text-slate-950">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-950/20">
           <Clapperboard className="h-7 w-7" />
         </div>
         <h2 className="mt-4 text-lg font-black leading-tight">
-          {isId ? 'Belum ada reels di database' : 'No reels in database yet'}
+          {isId ? 'Belum ada reels untuk ditampilkan' : 'No reels to show yet'}
         </h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-white/62">
           {isId
-            ? 'Upload video usaha pertama, atau cek koneksi community service kalau data seed belum muncul.'
-            : 'Upload the first business video, or check the community service connection if seed data is not visible.'}
+            ? 'Coba cari topik lain atau buat reels usaha pertama dari kamera/galeri.'
+            : 'Try another topic or create the first business reel from camera/gallery.'}
         </p>
         <div className="mt-4 grid gap-2">
           <button
             type="button"
             onClick={onUpload}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-400 px-4 text-sm font-black text-slate-950 transition active:scale-[0.98]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-rose-500 px-4 text-sm font-black text-white transition active:scale-[0.98]"
           >
-            <Upload className="h-4.5 w-4.5" />
-            {isId ? 'Upload Reels' : 'Upload Reels'}
+            <Camera className="h-4.5 w-4.5" />
+            {isId ? 'Buat Reels' : 'Create Reels'}
           </button>
           <button
             type="button"
@@ -2183,11 +3028,174 @@ function ReelsEmptyState({
   );
 }
 
+function ReelsEndSlide({
+  locale,
+  totalCount,
+  learnedTerms,
+  onRestart,
+  onSearch,
+  onUpload,
+}: {
+  locale: string;
+  totalCount: number;
+  learnedTerms: string[];
+  onRestart: () => void;
+  onSearch: (query?: string) => void;
+  onUpload: () => void;
+}) {
+  const isId = locale === 'id';
+  const topicChips =
+    learnedTerms.length > 0
+      ? learnedTerms.slice(0, 6)
+      : ['supplier', 'kuliner', 'packaging', 'cashflow', 'reseller', 'promo'];
+
+  return (
+    <article className="relative h-full snap-start overflow-hidden bg-[#070707] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,#101010_0%,#050505_42%,#0f172a_100%)]" />
+
+      <div
+        className="relative z-10 h-full overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+28px)] pt-[calc(env(safe-area-inset-top)+76px)] [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden"
+        onWheel={event => event.stopPropagation()}
+        onTouchStart={event => event.stopPropagation()}
+        onTouchEnd={event => event.stopPropagation()}
+      >
+        <div className="mx-auto min-h-full w-full max-w-[380px] pb-8">
+          <div className="flex items-start gap-3">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-white text-slate-950 shadow-xl">
+              <Check className="h-6 w-6" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-300">
+                {isId ? 'Feed selesai' : 'Feed complete'}
+              </p>
+              <h2 className="mt-1 text-[26px] font-black leading-[1.05] tracking-[-0.03em]">
+                {isId ? 'Kamu sudah sampai akhir' : 'You are all caught up'}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-white/62">
+                {isId
+                  ? 'Lanjut dari sini: ulangi feed, cari topik lain, atau buat reels usaha baru.'
+                  : 'Continue from here: restart the feed, search another topic, or create a new business reel.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <div className="rounded-[22px] border border-white/10 bg-white/[0.07] p-3">
+              <p className="text-2xl font-black">
+                {totalCount.toLocaleString(locale)}
+              </p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/46">
+                {isId ? 'reels dimuat' : 'reels loaded'}
+              </p>
+            </div>
+            <div className="rounded-[22px] border border-white/10 bg-white/[0.07] p-3">
+              <p className="text-2xl font-black">
+                {topicChips.length.toLocaleString(locale)}
+              </p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/46">
+                {isId ? 'topik lanjut' : 'next topics'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-2">
+            <button
+              type="button"
+              onClick={onRestart}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] bg-white px-4 text-sm font-black text-slate-950 transition active:scale-[0.98]"
+            >
+              <RefreshCcw className="h-4.5 w-4.5" />
+              {isId ? 'Ulangi feed dari awal' : 'Restart feed'}
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onSearch()}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-white/12 bg-white/[0.08] px-3 text-xs font-black text-white transition active:scale-[0.98]"
+              >
+                <Search className="h-4 w-4" />
+                {isId ? 'Cari topik' : 'Search'}
+              </button>
+              <button
+                type="button"
+                onClick={onUpload}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] bg-rose-500 px-3 text-xs font-black text-white transition active:scale-[0.98]"
+              >
+                <Camera className="h-4 w-4" />
+                {isId ? 'Buat reels' : 'Create'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
+            <p className="text-xs font-black uppercase tracking-wide text-white/52">
+              {isId ? 'Topik yang bisa dicari' : 'Topics to search'}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {topicChips.map(topic => (
+                <button
+                  key={topic}
+                  type="button"
+                  onClick={() => onSearch(topic)}
+                  className="rounded-full bg-white/10 px-3 py-2 text-[11px] font-black text-white/76 ring-1 ring-white/10 transition active:scale-95"
+                >
+                  #{topic}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Link
+            href={`/${locale}/home`}
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[18px] bg-white/10 px-4 text-xs font-black text-white/72 ring-1 ring-white/10 transition active:scale-[0.98]"
+          >
+            <Home className="h-4 w-4" />
+            {isId ? 'Kembali ke beranda' : 'Back to home'}
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function StudioEffectOverlay({ effect }: { effect: ReelsStudioEffect }) {
+  if (effect === 'none') return null;
+
+  if (effect === 'clean') {
+    return (
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_16%,rgba(255,255,255,0.26),transparent_42%),linear-gradient(180deg,rgba(16,185,129,0.09),transparent_58%)] mix-blend-screen" />
+    );
+  }
+
+  if (effect === 'product') {
+    return (
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(250,204,21,0.18),transparent_42%,rgba(244,63,94,0.14))] mix-blend-soft-light" />
+    );
+  }
+
+  if (effect === 'focus') {
+    return (
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_46%,transparent_36%,rgba(0,0,0,0.58)_100%)]" />
+    );
+  }
+
+  if (effect === 'scan') {
+    return (
+      <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(180deg,rgba(103,232,249,0.28)_0_1px,transparent_1px_11px)] mix-blend-screen" />
+    );
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(255,255,255,0.12),transparent_10%),radial-gradient(circle_at_64%_42%,rgba(255,255,255,0.08),transparent_8%),radial-gradient(circle_at_82%_74%,rgba(255,255,255,0.10),transparent_9%)] opacity-75 mix-blend-soft-light" />
+  );
+}
+
 /* =========================
    MAIN REEL
 ========================= */
 
 function ReelSlide({
+  locale,
   reel,
   active,
   shouldLoad,
@@ -2201,12 +3209,15 @@ function ReelSlide({
   onError,
   onTogglePlay,
   onToggleSound,
+  actionState,
   onOpenDetail,
   onOpenComments,
   onOpenProduct,
   onOpenShare,
-  onSignal,
+  onOpenActions,
+  onAction,
 }: {
+  locale: string;
   reel: LajukanReel;
   active: boolean;
   shouldLoad: boolean;
@@ -2220,38 +3231,68 @@ function ReelSlide({
   onError: () => void;
   onTogglePlay: () => void;
   onToggleSound: () => void;
+  actionState: ReelActionState;
   onOpenDetail: () => void;
   onOpenComments: () => void;
   onOpenProduct: () => void;
   onOpenShare: () => void;
-  onSignal: (signal: ReelsSignal) => void;
+  onOpenActions: () => void;
+  onAction: (action: ReelUserAction, active?: boolean) => void;
 }) {
   const Icon = iconMap[reel.iconKey];
   const imageMedia = isImageMediaUrl(reel.videoSrc);
+  const mediaStyle = getReelMediaStyle(reel.filterPreset);
+  const studioEffect = getReelStudioEffect(reel);
+  const liveLabel = getLiveLabel(reel);
+
+  if (!shouldLoad) {
+    return (
+      <article
+        className="relative flex h-full snap-start overflow-hidden bg-black px-2.5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+18px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
+        style={REEL_SLIDE_PLACEHOLDER_STYLE}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-[#050505]" />
+        <div className="relative z-10 mt-auto min-w-0 flex-1 pr-[58px] opacity-0 sm:pr-[70px]">
+          <h1 className="line-clamp-2 text-[16px] font-black leading-tight">
+            {reel.title}
+          </h1>
+        </div>
+      </article>
+    );
+  }
 
   return (
-    <article className="relative flex h-full snap-start overflow-hidden px-3 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-[calc(env(safe-area-inset-top)+58px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+24px)] sm:pt-[calc(env(safe-area-inset-top)+66px)]">
+    <article
+      className="relative flex h-full snap-start overflow-hidden px-2.5 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+70px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
+      style={REEL_SLIDE_LOADED_STYLE}
+    >
       {imageMedia ? (
         <img
-          src={shouldLoad ? reel.videoSrc : undefined}
+          src={reel.videoSrc}
           alt={reel.title}
           className="absolute inset-0 h-full w-full object-cover"
+          style={mediaStyle}
         />
       ) : (
         <video
           ref={setVideoRef}
-          src={shouldLoad ? reel.videoSrc : undefined}
+          src={reel.videoSrc}
           className="absolute inset-0 h-full w-full object-cover"
+          style={mediaStyle}
           muted={muted}
           loop
           playsInline
-          preload={shouldLoad ? 'metadata' : 'none'}
+          preload={active ? 'auto' : 'metadata'}
+          autoPlay={active && !paused}
           disablePictureInPicture
           onWaiting={onWaiting}
           onPlaying={onPlaying}
+          onCanPlay={onPlaying}
           onError={onError}
         />
       )}
+      <StudioEffectOverlay effect={studioEffect} />
 
       <button
         type="button"
@@ -2260,18 +3301,27 @@ function ReelSlide({
         aria-label={paused ? 'Putar video' : 'Pause video'}
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/18 to-black/32" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/16 to-black/36" />
 
-      <div className="absolute left-3 top-[calc(env(safe-area-inset-top)+56px)] z-20 flex max-w-[calc(100%-92px)] items-center gap-1.5 rounded-full bg-black/35 px-2.5 py-1.5 text-[11px] font-black backdrop-blur sm:left-4 sm:top-[calc(env(safe-area-inset-top)+66px)] sm:max-w-[calc(100%-112px)] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs">
+      <div className="absolute left-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 flex max-w-[calc(100%-84px)] items-center gap-1.5 rounded-full bg-black/32 px-2 py-1 text-[10px] font-black backdrop-blur sm:left-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:max-w-[calc(100%-108px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
         <Icon className="h-4 w-4" />
         <span className="truncate">{reel.tag}</span>
       </div>
+      {liveLabel && (
+        <div className="absolute right-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-black text-white shadow-2xl shadow-rose-950/25 sm:right-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
+          <Radio className="h-3.5 w-3.5" />
+          {liveLabel}
+        </div>
+      )}
 
       <ActionRail
+        locale={locale}
         reel={reel}
+        actionState={actionState}
         onOpenComments={onOpenComments}
         onOpenShare={onOpenShare}
-        onSignal={onSignal}
+        onOpenActions={onOpenActions}
+        onAction={onAction}
       />
 
       {buffering && (
@@ -2304,59 +3354,80 @@ function ReelSlide({
         </button>
       )}
 
-      <div className="relative z-20 mt-auto min-w-0 flex-1 pr-[72px] sm:pr-[82px]">
-        <CreatorRow reel={reel} />
+      <div className="relative z-20 mt-auto min-w-0 flex-1 pr-[72px]">
+        <div className="max-w-[78%] text-white">
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            className="block text-left"
+          >
+            <h1 className="line-clamp-1 text-[15px] font-bold">
+              @{reel.creator}
+            </h1>
+          </button>
 
-        <button
-          type="button"
-          onClick={onOpenDetail}
-          className="block text-left"
-        >
-          <h1 className="text-[19px] font-black leading-tight drop-shadow-sm sm:text-[22px]">
-            {reel.title}
-          </h1>
-        </button>
-
-        <p className="mt-1.5 line-clamp-2 text-[13px] font-medium leading-relaxed text-white/90 drop-shadow-sm sm:mt-2 sm:line-clamp-3 sm:text-sm">
-          {reel.caption}
-        </p>
-
-        <ProductCartDock reel={reel} onOpenProduct={onOpenProduct} />
-
-        {!reel.productName && (
-          <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1.5 text-[11px] font-black text-white backdrop-blur sm:mt-4 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs">
-            <Info className="h-3.5 w-3.5" />
-            Konten informasi bisnis
+          <div className="mt-1 text-[14px] leading-5">
+            <ExpandableCaption
+              text={reel.caption}
+              maxLength={90}
+            />
           </div>
-        )}
+
+          {reel.productName && (
+            <button
+              onClick={onOpenProduct}
+              className="
+                mt-2
+                inline-flex
+                items-center
+                gap-2
+                rounded-full
+                bg-black/40
+                px-3
+                py-1.5
+                text-xs
+                font-semibold
+                backdrop-blur-sm
+              "
+            >
+              <ShoppingBag className="h-3.5 w-3.5" />
+              {reel.productName}
+            </button>
+          )}
+
+        </div>
       </div>
     </article>
   );
 }
 
-function CreatorRow({ reel }: { reel: LajukanReel }) {
-  return (
-    <div className="mb-2 flex items-center gap-2.5 sm:mb-3 sm:gap-3">
-      <div className="grid h-9 w-9 place-items-center rounded-full bg-white/15 ring-1 ring-white/20 sm:h-11 sm:w-11">
-        <User className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
-      </div>
+function ExpandableCaption({
+  text,
+  maxLength = 90,
+}: {
+  text: string;
+  maxLength?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
 
-      <div className="min-w-0">
-        <p className="truncate text-[13px] font-black sm:text-sm">
-          {reel.creator}
-        </p>
-        <p className="text-[11px] font-semibold text-white/70 sm:text-xs">
-          Tips bisnis & supplier
-        </p>
-      </div>
+  if (text.length <= maxLength) {
+    return <p>{text}</p>;
+  }
+
+  return (
+    <p>
+      {expanded
+        ? text
+        : `${text.slice(0, maxLength)}... `}
 
       <button
         type="button"
-        className="rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-950 sm:px-3 sm:py-1.5 sm:text-xs"
+        onClick={() => setExpanded(!expanded)}
+        className="font-bold text-white"
       >
-        Ikuti
+        {expanded ? ' lebih sedikit' : ' lainnya'}
       </button>
-    </div>
+    </p>
   );
 }
 
@@ -2379,16 +3450,16 @@ function ProductCartDock({
     <button
       type="button"
       onClick={onOpenProduct}
-      className="mt-3 inline-flex max-w-[min(260px,calc(100vw-122px))] items-center gap-2 rounded-full bg-yellow-400 px-2 py-1.5 text-left text-slate-950 shadow-xl shadow-yellow-500/20 ring-1 ring-yellow-200 transition active:scale-[0.98] sm:mt-4 sm:max-w-[300px] sm:gap-2.5 sm:px-2.5 sm:py-2"
+      className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-[18px] bg-white/94 px-1.5 py-1.5 text-left text-slate-950 shadow-xl shadow-black/20 ring-1 ring-white/70 transition active:scale-[0.98] sm:mt-2.5 sm:gap-2 sm:px-2"
     >
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-950 text-yellow-300 sm:h-10 sm:w-10">
-        <ShoppingBag className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[14px] bg-yellow-400 text-slate-950 sm:h-9 sm:w-9">
+        <ShoppingBag className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12px] font-black sm:text-[13px]">
-          1 item
+        <span className="block truncate text-[11px] font-black sm:text-[12px]">
+          {reel.productName}
         </span>
-        <span className="block truncate text-[10px] font-bold text-slate-700 sm:text-[11px]">
+        <span className="block truncate text-[9px] font-bold text-slate-600 sm:text-[10px]">
           {reel.productPrice}
         </span>
       </span>
@@ -2398,88 +3469,141 @@ function ProductCartDock({
 }
 
 function ActionRail({
+  locale,
   reel,
+  actionState,
   onOpenComments,
   onOpenShare,
-  onSignal,
+  onOpenActions,
+  onAction,
 }: {
+  locale: string;
   reel: LajukanReel;
+  actionState: ReelActionState;
   onOpenComments: () => void;
   onOpenShare: () => void;
-  onSignal: (signal: ReelsSignal) => void;
+  onOpenActions: () => void;
+  onAction: (action: ReelUserAction, active?: boolean) => void;
 }) {
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [followed, setFollowed] = useState(false);
-
+  const profileHref = buildReelCreatorProfileHref(locale, reel);
   const actions: Array<{
     key: string;
-    label: string;
+    label?: string;
     icon: LucideIcon;
     active?: boolean;
+    loading?: boolean;
     onClick: () => void;
   }> = [
-    {
-      key: 'like',
-      label: formatCompactMetric(metricCount(reel, 'likes') + (liked ? 1 : 0)),
-      icon: Heart,
-      active: liked,
-      onClick: () => {
-        setLiked(value => {
-          const next = !value;
-          if (next) onSignal('like');
-          return next;
-        });
+      {
+        key: 'like',
+        label: formatCompactMetric(metricCount(reel, 'likes')),
+        icon: Heart,
+        active: actionState.liked,
+        loading: actionState.loading === 'like',
+        onClick: () => onAction('like'),
       },
-    },
-    {
-      key: 'comments',
-      label: formatCompactMetric(metricCount(reel, 'comments')),
-      icon: MessageCircle,
-      onClick: onOpenComments,
-    },
-    {
-      key: 'save',
-      label: saved ? 'Tersimpan' : 'Simpan',
-      icon: Bookmark,
-      active: saved,
-      onClick: () => {
-        setSaved(value => !value);
-        onSignal('save');
+      {
+        key: 'comments',
+        label: formatCompactMetric(metricCount(reel, 'comments')),
+        icon: MessageCircle,
+        onClick: onOpenComments,
       },
-    },
-    {
-      key: 'share',
-      label: formatCompactMetric(metricCount(reel, 'shares')),
-      icon: Forward,
-      onClick: onOpenShare,
-    },
-  ];
+      {
+        key: 'share',
+        label: formatCompactMetric(metricCount(reel, 'shares')),
+        icon: Forward,
+        onClick: onOpenShare,
+      },
+      {
+        key: 'more',
+        icon: MoreHorizontal,
+        onClick: onOpenActions,
+      },
+    ];
 
   return (
-    <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+132px)] right-2 z-30 flex flex-col items-center gap-2 sm:bottom-[calc(env(safe-area-inset-bottom)+146px)] sm:right-3 sm:gap-2.5">
-      <button
-        type="button"
-        onClick={() => setFollowed(value => !value)}
-        className="relative grid h-11 w-11 place-items-center rounded-full bg-gradient-to-br from-white/30 to-white/10 p-0.5 shadow-xl ring-1 ring-white/20 transition active:scale-95 sm:h-12 sm:w-12"
-        aria-label={followed ? 'Mengikuti kreator' : 'Ikuti kreator'}
-      >
-        <span className="grid h-full w-full place-items-center rounded-full bg-black/45 backdrop-blur">
-          <User className="h-5 w-5 sm:h-[22px] sm:w-[22px]" />
-        </span>
-        <span
+    <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+148px)] right-1.5 z-30 flex flex-col items-center gap-2 sm:bottom-[calc(env(safe-area-inset-bottom)+166px)] sm:right-3">
+      <div className="relative mb-2 flex h-16 w-16 items-center justify-center">
+        <Link
+          href={profileHref}
+          aria-label={`Lihat profil ${reel.creator}`}
+          className="
+            absolute
+            inset-0
+            overflow-hidden
+            rounded-full
+            bg-white/10
+            p-[2px]
+            shadow-[0_12px_28px_-12px_rgba(0,0,0,0.7)]
+            ring-2
+            ring-white/25
+            transition
+            active:scale-95
+          "
+        >
+          <ReelCreatorAvatar
+            reel={reel}
+            className="h-full w-full rounded-full object-cover"
+            size={64}
+          />
+        </Link>
+
+        <button
+          type="button"
+          onClick={() => onAction('follow')}
+          disabled={actionState.loading === 'follow'}
           className={cn(
-            'absolute -bottom-1 grid h-4.5 w-4.5 place-items-center rounded-full text-[10px] font-black text-white ring-2 ring-black sm:h-5 sm:w-5',
-            followed ? 'bg-emerald-500' : 'bg-rose-500',
+            `
+            absolute
+            left-1/2
+            -bottom-1
+            z-20
+
+            !h-7
+            !w-7
+
+            !min-h-0
+            !min-w-0
+
+            !max-h-7
+            !max-w-7
+
+            aspect-square
+            shrink-0
+
+            -translate-x-1/2
+
+            flex
+            items-center
+            justify-center
+
+            rounded-full
+
+            p-0
+
+            text-white
+            shadow-[0_8px_20px_-8px_rgba(0,0,0,0.9)]
+            ring-2
+            ring-black
+
+            transition
+            active:scale-95
+            disabled:opacity-60
+            `,
+            actionState.followed
+              ? 'bg-emerald-500'
+              : 'bg-[#ff2d55]',
           )}
         >
-          {followed ? (
-            <Check className="h-3 w-3" />
+          {actionState.loading === 'follow' ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : actionState.followed ? (
+            <Check className="h-3.5 w-3.5" />
           ) : (
-            <Plus className="h-3 w-3" />
+            <Plus className="h-4 w-4 stroke-[3]" />
           )}
-        </span>
-      </button>
+        </button>
+      </div>
 
       {actions.map(action => {
         const ActionIcon = action.icon;
@@ -2489,25 +3613,32 @@ function ActionRail({
             key={action.key}
             type="button"
             onClick={action.onClick}
-            className="flex max-w-[52px] flex-col items-center gap-0.5 transition active:scale-95"
+            disabled={action.loading}
+            className="flex max-w-[48px] flex-col items-center gap-0.5 transition active:scale-95"
             data-testid={`reels-action-${action.key}`}
           >
             <span
               className={cn(
-                'grid h-10 w-10 place-items-center rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 transition sm:h-11 sm:w-11',
+                'grid h-10 w-10 place-items-center rounded-full bg-black/34 text-white shadow-[0_14px_30px_-20px_rgba(0,0,0,0.9)] backdrop-blur-md ring-1 ring-white/18 transition sm:h-11 sm:w-11',
                 action.active && 'bg-white text-rose-600 ring-white',
               )}
             >
-              <ActionIcon
-                className={cn(
-                  'h-5 w-5 sm:h-[22px] sm:w-[22px]',
-                  action.active && 'fill-current',
-                )}
-              />
+              {action.loading ? (
+                <Loader2 className="h-4.5 w-4.5 animate-spin sm:h-5 sm:w-5" />
+              ) : (
+                <ActionIcon
+                  className={cn(
+                    'h-4.5 w-4.5 sm:h-5 sm:w-5',
+                    action.active && 'fill-current',
+                  )}
+                />
+              )}
             </span>
-            <span className="max-w-full truncate text-center text-[10px] font-black leading-3 drop-shadow sm:text-[11px]">
-              {action.label}
-            </span>
+            {action.label && (
+              <span className="max-w-full truncate text-center text-[9px] font-black leading-3 drop-shadow sm:text-[10px]">
+                {action.label}
+              </span>
+            )}
           </button>
         );
       })}
@@ -2574,7 +3705,7 @@ function SearchOverlay({
       .sort(
         (a, b) =>
           scoreReel(b.item, profile, query) -
-            scoreReel(a.item, profile, query) || a.index - b.index,
+          scoreReel(a.item, profile, query) || a.index - b.index,
       );
   }, [items, profile, query]);
 
@@ -2800,6 +3931,8 @@ function SearchVideoCard({
 }) {
   const Icon = iconMap[reel.iconKey];
   const imageMedia = isImageMediaUrl(reel.videoSrc);
+  const mediaStyle = getReelMediaStyle(reel.filterPreset);
+  const liveLabel = getLiveLabel(reel);
 
   return (
     <button
@@ -2808,7 +3941,7 @@ function SearchVideoCard({
       onMouseEnter={event => {
         const video = event.currentTarget.querySelector('video');
         if (video instanceof HTMLVideoElement) {
-          video.play().catch(() => {});
+          video.play().catch(() => { });
         }
       }}
       onMouseLeave={event => {
@@ -2825,15 +3958,17 @@ function SearchVideoCard({
           src={reel.videoSrc}
           alt={reel.title}
           className="absolute inset-0 h-full w-full object-cover"
+          style={mediaStyle}
         />
       ) : (
         <video
           src={reel.videoSrc}
           className="absolute inset-0 h-full w-full object-cover"
+          style={mediaStyle}
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="none"
         />
       )}
 
@@ -2847,6 +3982,12 @@ function SearchVideoCard({
       {reel.productName && (
         <div className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-yellow-400 text-slate-950 shadow-lg">
           <ShoppingBag className="h-4 w-4" />
+        </div>
+      )}
+      {liveLabel && (
+        <div className="absolute right-2 top-11 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-black text-white shadow-lg">
+          <Radio className="h-3 w-3" />
+          {liveLabel}
         </div>
       )}
 
@@ -2887,8 +4028,10 @@ function SearchVideoCard({
 ========================= */
 
 function DetailOverlay({
+  locale,
   reel,
-  onSignal,
+  actionState,
+  onAction,
   onOpenComments,
   onOpenProduct,
   onOpenShare,
@@ -2896,8 +4039,14 @@ function DetailOverlay({
   chatBusyReelId,
   onClose,
 }: {
+  locale: string;
   reel: LajukanReel | null;
-  onSignal: (reel: LajukanReel, signal: ReelsSignal) => void;
+  actionState: ReelActionState;
+  onAction: (
+    reel: LajukanReel,
+    action: ReelUserAction,
+    active?: boolean,
+  ) => void;
   onOpenComments: (reel: LajukanReel) => void;
   onOpenProduct: (reel: LajukanReel) => void;
   onOpenShare: (reel: LajukanReel) => void;
@@ -2909,6 +4058,9 @@ function DetailOverlay({
 
   const Icon = iconMap[reel.iconKey];
   const imageMedia = isImageMediaUrl(reel.videoSrc);
+  const mediaStyle = getReelMediaStyle(reel.filterPreset);
+  const liveLabel = getLiveLabel(reel);
+  const profileHref = buildReelCreatorProfileHref(locale, reel);
 
   return (
     <div
@@ -2931,11 +4083,13 @@ function DetailOverlay({
               src={reel.videoSrc}
               alt={reel.title}
               className="absolute inset-0 h-full w-full object-cover"
+              style={mediaStyle}
             />
           ) : (
             <video
               src={reel.videoSrc}
               className="absolute inset-0 h-full w-full object-cover"
+              style={mediaStyle}
               muted
               loop
               autoPlay
@@ -2949,6 +4103,12 @@ function DetailOverlay({
             <Icon className="h-4 w-4" />
             {reel.tag}
           </div>
+          {liveLabel && (
+            <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-2 text-xs font-black text-white shadow-xl">
+              <Radio className="h-3.5 w-3.5" />
+              {liveLabel}
+            </div>
+          )}
 
           <div className="absolute inset-0 grid place-items-center">
             <div className="grid h-16 w-16 place-items-center rounded-full bg-white/15 backdrop-blur">
@@ -2978,16 +4138,37 @@ function DetailOverlay({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-slate-100">
-              <User className="h-5 w-5 text-slate-500" />
-            </div>
+            <Link
+              href={profileHref}
+              className="shrink-0 rounded-full bg-slate-100 p-0.5 ring-1 ring-slate-200 transition active:scale-95"
+              aria-label={`Lihat profil ${reel.creator}`}
+            >
+              <ReelCreatorAvatar
+                reel={reel}
+                className="h-11 w-11 bg-slate-200"
+                size={44}
+              />
+            </Link>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black">{reel.creator}</p>
+              <Link
+                href={profileHref}
+                className="block truncate text-sm font-black text-slate-950 underline-offset-4 transition hover:underline"
+              >
+                {reel.creator}
+              </Link>
               <p className="text-xs font-semibold text-slate-500">
-                {reel.tag} · Tips bisnis
+                {reel.tag} / Tips bisnis
               </p>
             </div>
+
+            <Link
+              href={profileHref}
+              className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-800 transition active:scale-[0.98] min-[430px]:inline-flex"
+            >
+              <User className="h-3.5 w-3.5" />
+              Profil
+            </Link>
 
             <button
               type="button"
@@ -3005,9 +4186,23 @@ function DetailOverlay({
 
             <button
               type="button"
-              className="rounded-full bg-slate-950 px-4 py-2 text-xs font-black text-white"
+              onClick={() => onAction(reel, 'follow')}
+              disabled={actionState.loading === 'follow'}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-black disabled:opacity-60',
+                actionState.followed
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-slate-950 text-white',
+              )}
             >
-              Ikuti
+              {actionState.loading === 'follow' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : actionState.followed ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : (
+                <UserPlus className="h-3.5 w-3.5" />
+              )}
+              {actionState.followed ? 'Diikuti' : 'Ikuti'}
             </button>
           </div>
 
@@ -3077,10 +4272,11 @@ function DetailOverlay({
             </button>
             <button
               type="button"
-              onClick={() => onSignal(reel, 'save')}
+              onClick={() => onAction(reel, 'save')}
+              disabled={actionState.loading === 'save'}
               className="rounded-2xl bg-slate-100 px-3 py-3 text-sm font-black text-slate-800"
             >
-              Simpan
+              {actionState.saved ? 'Tersimpan' : 'Simpan'}
             </button>
             <button
               type="button"
@@ -3137,7 +4333,7 @@ function ShareSheet({
 
     try {
       await navigator.clipboard?.writeText(shareUrl);
-    } catch {}
+    } catch { }
 
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
@@ -3175,63 +4371,63 @@ function ShareSheet({
     className: string;
     onClick: () => void;
   }> = [
-    {
-      label: 'Repost',
-      icon: RefreshCcw,
-      className: 'bg-yellow-400 text-white',
-      onClick: () => void copyLink(),
-    },
-    {
-      label: 'WhatsApp',
-      icon: MessageCircle,
-      className: 'bg-[#25D366] text-white',
-      onClick: () => openExternal(`https://wa.me/?text=${encodedText}`),
-    },
-    {
-      label: copied ? 'Copied' : 'Copy link',
-      icon: Link2,
-      className: 'bg-emerald-600 text-white',
-      onClick: () => void copyLink(),
-    },
-    {
-      label: 'Status',
-      icon: Plus,
-      className: 'bg-emerald-500 text-white',
-      onClick: () => void copyLink(),
-    },
-    {
-      label: 'Facebook',
-      glyph: 'f',
-      className: 'bg-[#1877F2] text-white',
-      onClick: () =>
-        openExternal(
-          `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-        ),
-    },
-    {
-      label: 'Instagram',
-      icon: Send,
-      className:
-        'bg-gradient-to-br from-emerald-600 via-lime-500 to-orange-400 text-white',
-      onClick: () => void copyLink(),
-    },
-  ];
+      {
+        label: 'Repost',
+        icon: RefreshCcw,
+        className: 'bg-yellow-400 text-white',
+        onClick: () => void copyLink(),
+      },
+      {
+        label: 'WhatsApp',
+        icon: MessageCircle,
+        className: 'bg-[#25D366] text-white',
+        onClick: () => openExternal(`https://wa.me/?text=${encodedText}`),
+      },
+      {
+        label: copied ? 'Copied' : 'Copy link',
+        icon: Link2,
+        className: 'bg-emerald-600 text-white',
+        onClick: () => void copyLink(),
+      },
+      {
+        label: 'Status',
+        icon: Plus,
+        className: 'bg-emerald-500 text-white',
+        onClick: () => void copyLink(),
+      },
+      {
+        label: 'Facebook',
+        glyph: 'f',
+        className: 'bg-[#1877F2] text-white',
+        onClick: () =>
+          openExternal(
+            `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+          ),
+      },
+      {
+        label: 'Instagram',
+        icon: Send,
+        className:
+          'bg-gradient-to-br from-emerald-600 via-lime-500 to-orange-400 text-white',
+        onClick: () => void copyLink(),
+      },
+    ];
   const utilityActions: Array<{
     label: string;
     icon: LucideIcon;
     onClick: () => void;
   }> = [
-    { label: 'Report', icon: Flag, onClick: onClose },
-    { label: 'Not interested', icon: X, onClick: onClose },
-    {
-      label: 'Download',
-      icon: Download,
-      onClick: () => openExternal(reel.videoSrc),
-    },
-    { label: 'Add to Story', icon: Plus, onClick: () => void copyLink() },
-    { label: 'Promote', icon: Megaphone, onClick: onClose },
-    { label: 'Cast', icon: Radio, onClick: onClose },
-  ];
+      { label: 'Report', icon: Flag, onClick: onClose },
+      { label: 'Not interested', icon: X, onClick: onClose },
+      {
+        label: 'Download',
+        icon: Download,
+        onClick: () => openExternal(reel.videoSrc),
+      },
+      { label: 'Add to Story', icon: Plus, onClick: () => void copyLink() },
+      { label: 'Promote', icon: Megaphone, onClick: onClose },
+      { label: 'Cast', icon: Radio, onClick: onClose },
+    ];
 
   return (
     <div
@@ -3379,6 +4575,156 @@ function ShareSheet({
    COMMENTS / PRODUCT / UPLOAD
 ========================= */
 
+function MoreActionsSheet({
+  reel,
+  actionState,
+  chatBusy,
+  onClose,
+  onOpenDetail,
+  onOpenProduct,
+  onOpenComments,
+  onOpenShare,
+  onMessageCreator,
+  onAction,
+}: {
+  reel: LajukanReel | null;
+  actionState: ReelActionState;
+  chatBusy: boolean;
+  onClose: () => void;
+  onOpenDetail: (reel: LajukanReel) => void;
+  onOpenProduct: (reel: LajukanReel) => void;
+  onOpenComments: (reel: LajukanReel) => void;
+  onOpenShare: (reel: LajukanReel) => void;
+  onMessageCreator: (reel: LajukanReel) => void;
+  onAction: (
+    reel: LajukanReel,
+    action: ReelUserAction,
+    active?: boolean,
+  ) => void;
+}) {
+  if (!reel) return null;
+
+  const actions: Array<{
+    label: string;
+    icon: LucideIcon;
+    onClick: () => void;
+    active?: boolean;
+    featured?: boolean;
+    disabled?: boolean;
+  }> = [
+      {
+        label: actionState.saved ? 'Tersimpan' : 'Simpan',
+        icon: Bookmark,
+        active: actionState.saved,
+        disabled: actionState.loading === 'save',
+        onClick: () => onAction(reel, 'save'),
+      },
+      {
+        label: 'Detail',
+        icon: Info,
+        onClick: () => onOpenDetail(reel),
+      },
+      {
+        label: 'Komentar',
+        icon: MessageCircle,
+        onClick: () => onOpenComments(reel),
+      },
+      {
+        label: 'Share',
+        icon: Forward,
+        featured: true,
+        onClick: () => onOpenShare(reel),
+      },
+      {
+        label: actionState.followed ? 'Diikuti' : 'Ikuti',
+        icon: actionState.followed ? Check : UserPlus,
+        active: actionState.followed,
+        disabled: actionState.loading === 'follow',
+        onClick: () => onAction(reel, 'follow'),
+      },
+      {
+        label: 'Chat',
+        icon: chatBusy ? Loader2 : MessageSquareText,
+        disabled: chatBusy,
+        onClick: () => onMessageCreator(reel),
+      },
+    ];
+
+  if (reel.productName) {
+    actions.splice(2, 0, {
+      label: 'Produk',
+      icon: ShoppingBag,
+      featured: true,
+      onClick: () => onOpenProduct(reel),
+    });
+  }
+
+  return (
+    <div
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-slate-950 backdrop-blur-sm sm:items-end lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        aria-label="Tutup aksi reels"
+        onClick={onClose}
+        className="absolute inset-0"
+      />
+
+      <section className="relative w-full overflow-hidden rounded-t-[26px] bg-white shadow-2xl lg:h-full lg:w-[420px] lg:rounded-none lg:border-l lg:border-white/10">
+        <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200 lg:hidden" />
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
+              Aksi reels
+            </p>
+            <h2 className="truncate text-base font-black">{reel.title}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 transition active:scale-95"
+            aria-label="Tutup aksi"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] sm:grid-cols-4 lg:grid-cols-2 lg:pb-5">
+          {actions.map(action => {
+            const ActionIcon = action.icon;
+            return (
+              <button
+                key={action.label}
+                type="button"
+                disabled={action.disabled}
+                onClick={action.onClick}
+                className={cn(
+                  'flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] px-2 text-xs font-black transition active:scale-[0.98] disabled:opacity-60',
+                  action.featured
+                    ? 'bg-slate-950 text-white'
+                    : action.active
+                      ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
+                      : 'bg-slate-100 text-slate-800',
+                )}
+              >
+                <ActionIcon
+                  className={cn(
+                    'h-5 w-5',
+                    action.icon === Loader2 && chatBusy && 'animate-spin',
+                  )}
+                />
+                <span className="max-w-full truncate">{action.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function CommentsSheet({
   reel,
   bucket,
@@ -3499,7 +4845,7 @@ function CommentsSheet({
                   <article key={comment.id} className="space-y-2">
                     <div className="flex gap-2.5">
                       <img
-                        src={comment.authorAvatarUrl || '/default-avatar.svg'}
+                        src={profileAvatarSrc(comment.authorAvatarUrl)}
                         alt={comment.authorName}
                         className="h-9 w-9 shrink-0 rounded-full object-cover"
                       />
@@ -3537,9 +4883,7 @@ function CommentsSheet({
                         {replies.map(reply => (
                           <div key={reply.id} className="flex gap-2">
                             <img
-                              src={
-                                reply.authorAvatarUrl || '/default-avatar.svg'
-                              }
+                              src={profileAvatarSrc(reply.authorAvatarUrl)}
                               alt={reply.authorName}
                               className="h-7 w-7 shrink-0 rounded-full object-cover"
                             />
@@ -3704,7 +5048,7 @@ function ProductSheet({
         <div className="flex items-start justify-between gap-3 p-4">
           <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-wide text-yellow-700">
-              Keranjang reels
+              Produk terkait
             </p>
             <h2 className="mt-1 text-xl font-black leading-tight">
               {reel.productName || 'Produk terkait'}
@@ -3773,12 +5117,14 @@ function ProductSheet({
 }
 
 function UploadReelSheet({
+  locale,
   open,
   authFetch,
   displayName,
   onClose,
   onCreated,
 }: {
+  locale: string;
   open: boolean;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   displayName: string;
@@ -3788,18 +5134,447 @@ function UploadReelSheet({
   const [form, setForm] = useState<UploadReelForm>(EMPTY_UPLOAD_FORM);
   const [file, setFile] = useState<File | null>(null);
   const [step, setStep] = useState<UploadReelStep>('media');
+  const [studioMode, setStudioMode] = useState<ReelsStudioMode>('video');
+  const [studioPanel, setStudioPanel] = useState<ReelsStudioPanel>(null);
+  const [studioSpeed, setStudioSpeed] = useState<ReelsStudioSpeed>('1x');
+  const [studioDuration, setStudioDuration] =
+    useState<ReelsStudioDuration>('15s');
+  const [studioEffect, setStudioEffect] = useState<ReelsStudioEffect>('none');
+  const [cameraFacingMode, setCameraFacingMode] =
+    useState<ReelsStudioFacingMode>('environment');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderChunksRef = useRef<Blob[]>([]);
+  const recordingTimeoutRef = useRef<number | null>(null);
+  const recordingAnimationRef = useRef<number | null>(null);
+  const autoCameraAttemptedRef = useRef(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(
+    null,
+  );
+  const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const hasMedia = Boolean(file || form.mediaUrl.trim());
+
+  const setField = useCallback(
+    <K extends keyof UploadReelForm>(field: K, value: UploadReelForm[K]) => {
+      setForm(current => ({ ...current, [field]: value }));
+    },
+    [],
+  );
+
+  const stopCamera = useCallback(() => {
+    if (recordingTimeoutRef.current !== null) {
+      window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
+    }
+    if (recordingAnimationRef.current !== null) {
+      window.cancelAnimationFrame(recordingAnimationRef.current);
+      recordingAnimationRef.current = null;
+    }
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.ondataavailable = null;
+      recorderRef.current.onstop = null;
+      recorderRef.current.stop();
+    }
+    recorderRef.current = null;
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+    setCameraReady(false);
+    setRecording(false);
+    setRecordingStartedAt(null);
+    setRecordingElapsedMs(0);
+  }, []);
+
+  const openCamera = useCallback(
+    async (facingMode = cameraFacingMode) => {
+      setError(null);
+      setCameraError(null);
+      setForm(current => ({ ...current, captureMode: 'camera' }));
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError('Kamera belum didukung di browser ini.');
+        return;
+      }
+
+      if (openNativeReelsStudio('reels_upload')) {
+        return;
+      }
+
+      requestNativePermissions(['camera', 'microphone']);
+      stopCamera();
+
+      try {
+        const videoConstraints: MediaTrackConstraints = {
+          facingMode: { ideal: facingMode },
+          width: { ideal: 1080 },
+          height: { ideal: 1920 },
+        };
+        let stream: MediaStream;
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: videoConstraints,
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: videoConstraints,
+          });
+          setCameraError(
+            'Kamera aktif tanpa mikrofon. Kamu tetap bisa rekam visual atau upload audio nanti.',
+          );
+        }
+
+        cameraStreamRef.current = stream;
+        setCameraFacingMode(facingMode);
+        setCameraReady(true);
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          await cameraVideoRef.current.play().catch(() => undefined);
+        }
+      } catch {
+        setCameraError(
+          'Kamera belum bisa dibuka. Cek izin browser atau pakai galeri dulu.',
+        );
+      }
+    },
+    [cameraFacingMode, stopCamera],
+  );
+
+  const flipCamera = useCallback(() => {
+    const nextFacingMode =
+      cameraFacingMode === 'environment' ? 'user' : 'environment';
+    setCameraFacingMode(nextFacingMode);
+    void openCamera(nextFacingMode);
+  }, [cameraFacingMode, openCamera]);
+
+  const selectStudioMode = useCallback(
+    (mode: ReelsStudioMode) => {
+      setStudioMode(mode);
+      setStudioPanel(null);
+      setError(null);
+      setCameraError(null);
+
+      if (mode === 'gallery') {
+        stopCamera();
+        setForm(current => ({ ...current, captureMode: 'upload' }));
+        return;
+      }
+
+      if (mode === 'live') {
+        stopCamera();
+        setForm(current => ({
+          ...current,
+          captureMode: 'live',
+          tag: current.tag === 'UMKM' ? 'Live UMKM' : current.tag,
+          liveSchedule: current.liveSchedule
+            ? current.liveSchedule
+            : toDatetimeLocalValue(new Date(Date.now() + 60 * 60_000)),
+        }));
+        return;
+      }
+
+      setForm(current => ({
+        ...current,
+        captureMode: 'camera',
+        title: current.title.trim()
+          ? current.title
+          : mode === 'photo'
+            ? 'Foto usaha'
+            : 'Rekaman usaha',
+        hook: current.hook.trim()
+          ? current.hook
+          : mode === 'photo'
+            ? 'Lihat detailnya'
+            : 'Lihat prosesnya langsung',
+      }));
+    },
+    [setStudioMode, stopCamera],
+  );
+
+  const captureCameraPhoto = useCallback(() => {
+    setError(null);
+    setCameraError(null);
+    setStudioPanel(null);
+
+    const video = cameraVideoRef.current;
+    if (!video || !cameraStreamRef.current || !cameraReady) {
+      setCameraError('Buka kamera dulu, baru ambil foto.');
+      return;
+    }
+
+    const width = REELS_CAPTURE_CANVAS_WIDTH;
+    const height = REELS_CAPTURE_CANVAS_HEIGHT;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setCameraError('Foto belum bisa dibuat di browser ini.');
+      return;
+    }
+
+    context.filter = getReelFilterCss(form.filterPreset);
+    drawVideoCoverFrame(context, video, width, height);
+    context.filter = 'none';
+    drawStudioCanvasEffect(context, width, height, studioEffect);
+    canvas.toBlob(
+      blob => {
+        if (!blob) {
+          setCameraError('Foto belum bisa dibuat. Coba sekali lagi.');
+          return;
+        }
+        const photoFile = new File(
+          [blob],
+          `lajukan-reels-photo-${Date.now()}.jpg`,
+          { type: 'image/jpeg' },
+        );
+        setStudioMode('photo');
+        setFile(photoFile);
+        setForm(current => ({
+          ...current,
+          captureMode: 'camera',
+          mediaUrl: '',
+          title: current.title.trim() ? current.title : 'Foto usaha',
+          hook: current.hook.trim() ? current.hook : 'Lihat detailnya',
+          caption: current.caption.trim()
+            ? current.caption
+            : current.hook.trim() || 'Foto usaha dari kamera Lajukan.',
+        }));
+        setStep('edit');
+      },
+      'image/jpeg',
+      0.92,
+    );
+  }, [cameraReady, form.filterPreset, setStudioMode, studioEffect]);
+
+  const startCameraRecording = useCallback(() => {
+    setError(null);
+    setCameraError(null);
+    setStudioPanel(null);
+    setStudioMode('video');
+    const stream = cameraStreamRef.current;
+    if (!stream) {
+      setCameraError('Buka kamera dulu, baru rekam.');
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      setCameraError('Rekam langsung belum didukung di browser ini.');
+      return;
+    }
+
+    const video = cameraVideoRef.current;
+    let recorderStream: MediaStream = stream;
+
+    if (video) {
+      const canvas = document.createElement('canvas');
+      canvas.width = REELS_CAPTURE_CANVAS_WIDTH;
+      canvas.height = REELS_CAPTURE_CANVAS_HEIGHT;
+      const context = canvas.getContext('2d');
+      const canvasStream =
+        context && typeof canvas.captureStream === 'function'
+          ? canvas.captureStream(REELS_CAPTURE_FPS)
+          : null;
+
+      if (context && canvasStream) {
+        stream.getAudioTracks().forEach(track => canvasStream.addTrack(track));
+        recorderStream = canvasStream;
+
+        const paintFrame = () => {
+          const currentVideo = cameraVideoRef.current;
+          const currentRecorder = recorderRef.current;
+          if (
+            !currentVideo ||
+            !currentRecorder ||
+            currentRecorder.state === 'inactive'
+          ) {
+            recordingAnimationRef.current = null;
+            return;
+          }
+
+          context.clearRect(
+            0,
+            0,
+            REELS_CAPTURE_CANVAS_WIDTH,
+            REELS_CAPTURE_CANVAS_HEIGHT,
+          );
+          context.filter = getReelFilterCss(form.filterPreset);
+          drawVideoCoverFrame(
+            context,
+            currentVideo,
+            REELS_CAPTURE_CANVAS_WIDTH,
+            REELS_CAPTURE_CANVAS_HEIGHT,
+          );
+          context.filter = 'none';
+          drawStudioCanvasEffect(
+            context,
+            REELS_CAPTURE_CANVAS_WIDTH,
+            REELS_CAPTURE_CANVAS_HEIGHT,
+            studioEffect,
+          );
+          recordingAnimationRef.current =
+            window.requestAnimationFrame(paintFrame);
+        };
+
+        recordingAnimationRef.current =
+          window.requestAnimationFrame(paintFrame);
+      }
+    }
+
+    const mimeType = [
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ].find(type => MediaRecorder.isTypeSupported(type));
+    const recorder = mimeType
+      ? new MediaRecorder(recorderStream, { mimeType })
+      : new MediaRecorder(recorderStream);
+
+    recorderChunksRef.current = [];
+    recorder.ondataavailable = event => {
+      if (event.data.size > 0) {
+        recorderChunksRef.current.push(event.data);
+      }
+    };
+    recorder.onstop = () => {
+      if (recordingTimeoutRef.current !== null) {
+        window.clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+      }
+      if (recordingAnimationRef.current !== null) {
+        window.cancelAnimationFrame(recordingAnimationRef.current);
+        recordingAnimationRef.current = null;
+      }
+      const type = recorder.mimeType || 'video/webm';
+      const blob = new Blob(recorderChunksRef.current, { type });
+      if (blob.size > 0) {
+        const recordedFile = new File(
+          [blob],
+          `lajukan-reels-${Date.now()}.webm`,
+          { type },
+        );
+        setFile(recordedFile);
+        setForm(current => ({
+          ...current,
+          mediaUrl: '',
+          title: current.title.trim() ? current.title : 'Rekaman usaha',
+          hook: current.hook.trim() ? current.hook : 'Lihat prosesnya langsung',
+          caption: current.caption.trim()
+            ? current.caption
+            : current.hook.trim() ||
+            'Rekaman singkat usaha dari kamera Lajukan.',
+        }));
+        setStep('edit');
+      }
+      setRecording(false);
+      setRecordingStartedAt(null);
+      setRecordingElapsedMs(0);
+    };
+    recorder.start(250);
+    recorderRef.current = recorder;
+    setRecording(true);
+    setRecordingStartedAt(Date.now());
+    setRecordingElapsedMs(0);
+    recordingTimeoutRef.current = window.setTimeout(() => {
+      const currentRecorder = recorderRef.current;
+      if (currentRecorder && currentRecorder.state !== 'inactive') {
+        currentRecorder.stop();
+      }
+    }, getStudioDurationMs(studioDuration));
+  }, [form.filterPreset, setStudioMode, studioDuration, studioEffect]);
+
+  const stopCameraRecording = useCallback(() => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop();
+    } else {
+      if (recordingTimeoutRef.current !== null) {
+        window.clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+      }
+      if (recordingAnimationRef.current !== null) {
+        window.cancelAnimationFrame(recordingAnimationRef.current);
+        recordingAnimationRef.current = null;
+      }
+      setRecording(false);
+      setRecordingStartedAt(null);
+      setRecordingElapsedMs(0);
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) {
       setError(null);
       setFile(null);
       setStep('media');
+      setStudioMode('video');
+      setStudioPanel(null);
+      setStudioSpeed('1x');
+      setStudioDuration('15s');
+      setStudioEffect('none');
+      setCameraFacingMode('environment');
       setForm(EMPTY_UPLOAD_FORM);
+      setCameraError(null);
+      setRecordingStartedAt(null);
+      setRecordingElapsedMs(0);
+      autoCameraAttemptedRef.current = false;
+      stopCamera();
     }
-  }, [open]);
+  }, [open, setStudioMode, stopCamera]);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
+
+  useEffect(() => {
+    if (!recording || !recordingStartedAt) return;
+
+    const updateElapsed = () =>
+      setRecordingElapsedMs(Date.now() - recordingStartedAt);
+    updateElapsed();
+    const interval = window.setInterval(updateElapsed, 200);
+    return () => window.clearInterval(interval);
+  }, [recording, recordingStartedAt]);
+
+  useEffect(() => {
+    if (form.captureMode !== 'camera') {
+      stopCamera();
+    }
+  }, [form.captureMode, stopCamera]);
+
+  useEffect(() => {
+    if (
+      !open ||
+      step !== 'media' ||
+      form.captureMode !== 'camera' ||
+      hasMedia ||
+      cameraReady ||
+      cameraError ||
+      autoCameraAttemptedRef.current
+    ) {
+      return;
+    }
+
+    autoCameraAttemptedRef.current = true;
+    const timer = window.setTimeout(() => void openCamera(), 220);
+    return () => window.clearTimeout(timer);
+  }, [
+    cameraError,
+    cameraReady,
+    form.captureMode,
+    hasMedia,
+    open,
+    openCamera,
+    step,
+  ]);
 
   useEffect(() => {
     if (!file) {
@@ -3812,27 +5587,125 @@ function UploadReelSheet({
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return;
+
+    const handleNativeCapture = (event: Event) => {
+      const detail = (event as CustomEvent<Record<string, unknown>>).detail;
+      if (!detail || typeof detail !== 'object') return;
+      const path = typeof detail.path === 'string' ? detail.path : '';
+      const mode: ReelsStudioMode =
+        detail.mode === 'photo' ||
+          detail.mode === 'video' ||
+          detail.mode === 'gallery' ||
+          detail.mode === 'live'
+          ? detail.mode
+          : 'video';
+      const mediaType = detail.mediaType === 'image' ? 'image' : 'video';
+      const filter =
+        typeof detail.filter === 'string'
+          ? detail.filter.toLowerCase()
+          : form.filterPreset;
+      const music =
+        typeof detail.music === 'string' ? detail.music : form.musicTrack;
+      const speed =
+        typeof detail.speed === 'string' &&
+          REELS_STUDIO_SPEEDS.includes(detail.speed as ReelsStudioSpeed)
+          ? (detail.speed as ReelsStudioSpeed)
+          : studioSpeed;
+      const duration =
+        typeof detail.duration === 'string' &&
+          REELS_STUDIO_DURATIONS.includes(detail.duration as ReelsStudioDuration)
+          ? (detail.duration as ReelsStudioDuration)
+          : studioDuration;
+      const effect = isStudioEffect(detail.effect)
+        ? detail.effect
+        : studioEffect;
+
+      setStudioMode(mode === 'gallery' ? 'gallery' : mode);
+      setStudioSpeed(speed);
+      setStudioDuration(duration);
+      setStudioEffect(effect);
+      setForm(current => ({
+        ...current,
+        captureMode:
+          mode === 'live' ? 'live' : mode === 'gallery' ? 'upload' : 'camera',
+        mediaUrl: path || current.mediaUrl,
+        filterPreset: REEL_FILTER_PRESETS.some(item => item.id === filter)
+          ? (filter as UploadReelForm['filterPreset'])
+          : current.filterPreset,
+        musicTrack: music,
+        title: current.title.trim()
+          ? current.title
+          : mediaType === 'image'
+            ? 'Foto usaha'
+            : 'Rekaman usaha',
+      }));
+      if (path) {
+        setFile(null);
+        setStep('edit');
+      }
+    };
+
+    window.addEventListener(
+      'lajukan-native-reels-capture',
+      handleNativeCapture,
+    );
+    return () =>
+      window.removeEventListener(
+        'lajukan-native-reels-capture',
+        handleNativeCapture,
+      );
+  }, [
+    form.filterPreset,
+    form.musicTrack,
+    open,
+    setStudioMode,
+    studioDuration,
+    studioEffect,
+    studioSpeed,
+  ]);
+
   if (!open) return null;
 
-  const setField = (field: keyof UploadReelForm, value: string) => {
-    setForm(current => ({ ...current, [field]: value }));
-  };
-
   const mediaPreviewSrc = previewUrl || form.mediaUrl.trim();
-  const hasMedia = Boolean(file || form.mediaUrl.trim());
   const isImageMedia = file
     ? file.type.startsWith('image/')
     : isImageMediaUrl(mediaPreviewSrc);
-  const fieldLabelClass =
-    'text-xs font-black text-[color:var(--app-text)]';
+  const previewMediaStyle = getReelMediaStyle(form.filterPreset);
+  const activeStudioEffect =
+    REELS_STUDIO_EFFECTS.find(effect => effect.id === studioEffect) ||
+    REELS_STUDIO_EFFECTS[0];
+  const recordingLimitMs = getStudioDurationMs(studioDuration);
+  const recordingProgress = recording
+    ? Math.min(recordingElapsedMs / recordingLimitMs, 1)
+    : 0;
+  const recordingRemainingSeconds = Math.max(
+    Math.ceil((recordingLimitMs - recordingElapsedMs) / 1000),
+    0,
+  );
+  const selectedCaptureMode = REEL_CAPTURE_MODES.find(
+    mode => mode.id === form.captureMode,
+  );
+  const SelectedCaptureIcon = selectedCaptureMode?.icon ?? Camera;
+  const activeStudioMode =
+    REELS_STUDIO_MODES.find(mode => mode.id === studioMode) ||
+    REELS_STUDIO_MODES[2];
+  const ActiveStudioIcon = activeStudioMode.icon;
+  const fieldLabelClass = 'text-xs font-black text-white/84';
   const inputClass =
-    'mt-1 h-11 w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface-strong)]';
+    'mt-1 h-10 w-full rounded-[13px] border border-white/10 bg-white/[0.08] px-3 text-[13px] font-semibold text-white outline-none placeholder:text-white/38 focus:border-emerald-300/50 focus:bg-white/[0.11]';
   const textareaClass =
-    'mt-1 w-full resize-none rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[13px] font-semibold text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface-strong)]';
+    'mt-1 w-full resize-none rounded-[13px] border border-white/10 bg-white/[0.08] px-3 py-2 text-[13px] font-semibold text-white outline-none placeholder:text-white/38 focus:border-emerald-300/50 focus:bg-white/[0.11]';
 
   const handleFile = (nextFile: File | null) => {
     setFile(nextFile);
     setError(null);
+    setStudioPanel(null);
+    if (nextFile && form.captureMode !== 'live') {
+      setStudioMode('gallery');
+      setField('captureMode', 'upload');
+    }
     if (nextFile && !form.title.trim()) {
       const name = nextFile.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
       setField('title', name.slice(0, 90));
@@ -3843,7 +5716,11 @@ function UploadReelSheet({
     setError(null);
     if (step === 'media') {
       if (!hasMedia) {
-        setError('Pilih video/foto dulu sebelum lanjut.');
+        setError(
+          form.captureMode === 'live'
+            ? 'Tambahkan poster atau teaser live dulu.'
+            : 'Pilih video/foto dulu sebelum lanjut.',
+        );
         return;
       }
       setStep('edit');
@@ -3854,12 +5731,42 @@ function UploadReelSheet({
     }
   };
 
+  const handleStudioCapture = () => {
+    if (studioMode === 'gallery') {
+      setStudioMode('video');
+      setForm(current => ({ ...current, captureMode: 'camera' }));
+      setStudioPanel(null);
+      return;
+    }
+    if (studioMode === 'live') {
+      setStep('post');
+      return;
+    }
+    if (!cameraReady) {
+      void openCamera();
+      return;
+    }
+    if (studioMode === 'photo') {
+      captureCameraPhoto();
+      return;
+    }
+    if (recording) {
+      stopCameraRecording();
+    } else {
+      startCameraRecording();
+    }
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitting) return;
 
     const title = form.title.trim() || form.hook.trim() || 'Reels usaha';
-    const caption = form.caption.trim() || form.hook.trim();
+    const caption =
+      form.caption.trim() ||
+      form.hook.trim() ||
+      title ||
+      'Reels usaha dari Lajukan';
     const tag = form.tag.trim();
     let mediaUrl = form.mediaUrl.trim();
 
@@ -3868,7 +5775,12 @@ function UploadReelSheet({
       return;
     }
     if (!hasMedia) {
-      setError('Upload video/foto atau isi URL media dulu.');
+      setError('Pilih atau upload media dulu.');
+      return;
+    }
+    if (form.captureMode === 'live' && !form.liveTitle.trim()) {
+      setError('Judul live wajib diisi biar penonton langsung paham.');
+      setStep('post');
       return;
     }
 
@@ -3886,9 +5798,9 @@ function UploadReelSheet({
         const uploadPayload = (await uploadResponse
           .json()
           .catch(() => ({}))) as {
-          urls?: string[];
-          error?: string;
-        };
+            urls?: string[];
+            error?: string;
+          };
         if (!uploadResponse.ok || !uploadPayload.urls?.[0]) {
           throw new Error(uploadPayload.error || 'Upload media gagal');
         }
@@ -3917,6 +5829,30 @@ function UploadReelSheet({
           hook: (form.hook.trim() || caption).slice(0, 150),
           tone: 'emerald',
           iconKey: 'marketing',
+          filterPreset: form.filterPreset,
+          captureMode: form.captureMode,
+          liveStatus: form.captureMode === 'live' ? 'scheduled' : 'none',
+          liveTitle:
+            form.captureMode === 'live'
+              ? form.liveTitle.trim() || title
+              : undefined,
+          liveScheduledAt:
+            form.captureMode === 'live'
+              ? toIsoDateTime(form.liveSchedule)
+              : undefined,
+          metadata: {
+            studio: {
+              filterPreset: form.filterPreset,
+              captureMode: form.captureMode,
+              mode: studioMode,
+              speed: studioSpeed,
+              duration: studioDuration,
+              effect: studioEffect,
+              musicTrack: form.musicTrack,
+              live: form.captureMode === 'live',
+            },
+            studioEffect,
+          },
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
@@ -3931,6 +5867,8 @@ function UploadReelSheet({
       setForm(EMPTY_UPLOAD_FORM);
       setFile(null);
       setStep('media');
+      setStudioMode('video');
+      setStudioEffect('none');
       onCreated(payload.reel);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Reels gagal dibuat');
@@ -3941,7 +5879,7 @@ function UploadReelSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/72 text-[color:var(--app-text)] backdrop-blur-md lg:items-stretch lg:justify-end lg:bg-black/50 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/86 text-[color:var(--app-text)] backdrop-blur-md lg:items-center lg:justify-center lg:p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -3954,18 +5892,34 @@ function UploadReelSheet({
 
       <form
         onSubmit={submit}
-        className="relative flex max-h-[92svh] w-full flex-col overflow-hidden rounded-t-[26px] bg-[color:var(--app-surface-strong)] shadow-2xl lg:h-full lg:max-h-none lg:w-[680px] lg:rounded-none lg:border-l lg:border-[color:var(--app-border)] xl:w-[760px]"
+        data-lajukan-reels-studio="true"
+        className={cn(
+          'relative flex h-[100svh] max-h-[100svh] w-full flex-col overflow-hidden bg-[#050505] text-white shadow-2xl',
+          step === 'media'
+            ? 'lg:max-w-[460px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10'
+            : 'lg:h-[calc(100svh-2rem)] lg:max-w-[960px] lg:rounded-[30px] lg:ring-1 lg:ring-white/10',
+        )}
       >
-        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-[color:var(--app-border)] lg:hidden" />
-        <div className="flex items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4 py-2.5">
+        <div
+          className={cn(
+            'mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/20 lg:hidden',
+            step === 'media' && 'hidden',
+          )}
+        />
+        <div
+          className={cn(
+            'items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 sm:px-4',
+            step === 'media' ? 'hidden' : 'flex',
+          )}
+        >
           <div>
-            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-300">
               Reels
             </p>
-            <h2 className="text-base font-black">Buat video usaha</h2>
+            <h2 className="text-base font-black">Kamera Reels</h2>
           </div>
 
-          <div className="hidden items-center gap-1 rounded-full bg-slate-100 p-1 sm:flex">
+          <div className="hidden items-center gap-1 rounded-full bg-white/10 p-1 sm:flex">
             {(['media', 'edit', 'post'] as UploadReelStep[]).map(
               (item, index) => (
                 <span
@@ -3973,8 +5927,8 @@ function UploadReelSheet({
                   className={cn(
                     'rounded-full px-3 py-1.5 text-[11px] font-black',
                     step === item
-                      ? 'bg-white text-emerald-700 shadow-sm'
-                      : 'text-slate-500',
+                      ? 'bg-white text-slate-950 shadow-sm'
+                      : 'text-white/58',
                   )}
                 >
                   {index + 1}.{' '}
@@ -3991,32 +5945,93 @@ function UploadReelSheet({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-full bg-[color:var(--app-surface-muted)]"
+            className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
-          <div className="grid gap-3 lg:grid-cols-[minmax(190px,250px)_minmax(0,1fr)]">
-            <div className="mx-auto w-full max-w-[250px]">
-              <div className="relative aspect-[9/16] max-h-[58svh] overflow-hidden rounded-[24px] bg-slate-950 shadow-2xl ring-1 ring-[color:var(--app-border)]">
+        <div
+          className={cn(
+            'min-h-0 flex-1',
+            step === 'media'
+              ? 'overflow-hidden p-0 sm:grid sm:place-items-center sm:p-3'
+              : 'overflow-y-auto p-2 sm:p-3',
+          )}
+        >
+          <div
+            className={cn(
+              'min-h-0 gap-2.5',
+              step === 'media'
+                ? 'h-full w-full'
+                : 'grid lg:grid-cols-[minmax(250px,360px)_minmax(0,1fr)] lg:gap-3',
+            )}
+          >
+            <div
+              className={cn(
+                'mx-auto',
+                step === 'media'
+                  ? 'h-full w-full sm:aspect-[9/16] sm:h-[calc(100svh-1.5rem)] sm:max-h-[820px] sm:w-auto'
+                  : 'w-full max-w-[340px]',
+              )}
+            >
+              <div
+                className={cn(
+                  'relative overflow-hidden bg-[#2d374b] shadow-2xl ring-1 ring-white/10',
+                  step === 'media'
+                    ? 'h-full w-full rounded-none sm:aspect-[9/16] sm:rounded-[32px]'
+                    : 'aspect-[9/16] max-h-[calc(100svh-128px)] rounded-[24px] lg:max-h-[calc(100svh-150px)]',
+                )}
+              >
                 {mediaPreviewSrc ? (
                   isImageMedia ? (
                     <img
                       src={mediaPreviewSrc}
                       alt="Preview reels"
                       className="h-full w-full object-cover"
+                      style={previewMediaStyle}
                     />
                   ) : (
                     <video
                       src={mediaPreviewSrc}
                       className="h-full w-full object-cover"
+                      style={previewMediaStyle}
                       controls
                       playsInline
                       preload="metadata"
                     />
                   )
+                ) : form.captureMode === 'camera' ? (
+                  <>
+                    <video
+                      ref={cameraVideoRef}
+                      className="h-full w-full object-cover"
+                      style={previewMediaStyle}
+                      muted
+                      playsInline
+                      autoPlay
+                    />
+                    {!cameraReady && (
+                      <div className="absolute inset-0 grid place-items-center p-5 text-center text-white">
+                        <div>
+                          <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/12">
+                            <Camera className="h-8 w-8" />
+                          </div>
+                          {step !== 'media' && (
+                            <>
+                              <p className="mt-4 text-sm font-black">
+                                Buka kamera Lajukan
+                              </p>
+                              <p className="mt-1 text-xs font-semibold leading-5 text-white/58">
+                                Rekam video, ambil foto, tambah filter, lalu
+                                post.
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="grid h-full place-items-center p-6 text-center text-white">
                     <div>
@@ -4032,8 +6047,9 @@ function UploadReelSheet({
                     </div>
                   </div>
                 )}
+                <StudioEffectOverlay effect={studioEffect} />
 
-                {(form.hook || form.title) && (
+                {step !== 'media' && (form.hook || form.title) && (
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
                     <p className="text-[11px] font-black text-yellow-300">
                       {form.tag}
@@ -4043,26 +6059,416 @@ function UploadReelSheet({
                     </p>
                   </div>
                 )}
+                {step !== 'media' && (
+                  <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 text-[11px] font-black text-white backdrop-blur">
+                    <SelectedCaptureIcon className="h-3.5 w-3.5" />
+                    {selectedCaptureMode?.label ?? 'Kamera'}
+                  </div>
+                )}
+                {step !== 'media' && form.captureMode === 'live' && (
+                  <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1.5 text-[11px] font-black text-white shadow-xl">
+                    <Radio className="h-3.5 w-3.5" />
+                    Live
+                  </div>
+                )}
+                {step !== 'media' && (
+                  <div className="absolute right-3 top-14 z-20 flex flex-col gap-2">
+                    {[
+                      {
+                        label: 'Filter',
+                        icon: Sparkles,
+                        action: () => setStep('edit'),
+                      },
+                      {
+                        label: form.musicTrack || 'Original',
+                        icon: Volume2,
+                        action: () =>
+                          setField(
+                            'musicTrack',
+                            form.musicTrack === 'Original sound'
+                              ? 'Suara toko'
+                              : 'Original sound',
+                          ),
+                      },
+                      {
+                        label: 'Balik',
+                        icon: RefreshCcw,
+                        action: flipCamera,
+                      },
+                    ].map(tool => {
+                      const ToolIcon = tool.icon;
+                      return (
+                        <button
+                          key={tool.label}
+                          type="button"
+                          onClick={tool.action}
+                          className="grid h-10 w-10 place-items-center rounded-full bg-black/38 text-white shadow-xl ring-1 ring-white/12 backdrop-blur transition active:scale-95"
+                          aria-label={tool.label}
+                        >
+                          <ToolIcon className="h-4.5 w-4.5" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {step !== 'media' && (
+                  <div className="absolute inset-x-2 bottom-3 z-20">
+                    <div className="mx-auto flex max-w-[240px] items-center justify-center rounded-full bg-black/42 px-3 py-2 text-white shadow-2xl ring-1 ring-white/12 backdrop-blur">
+                      <div className="flex items-center gap-2 text-[11px] font-black">
+                        <Camera className="h-4 w-4 text-emerald-200" />
+                        <span>{selectedCaptureMode?.label ?? 'Kamera'}</span>
+                        <span className="rounded-full bg-white/12 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/74">
+                          {locale === 'id' ? 'Mode cepat' : 'Quick mode'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {step === 'media' && (
+                  <>
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/42 via-transparent to-black/74" />
+
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="absolute left-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/34 text-white ring-1 ring-white/12 backdrop-blur"
+                      aria-label="Tutup"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setStudioPanel(current =>
+                          current === 'music' ? null : 'music',
+                        )
+                      }
+                      className="absolute left-1/2 top-4 z-30 inline-flex max-w-[210px] -translate-x-1/2 items-center gap-2 rounded-full bg-black/24 px-3 py-2 text-xs font-black text-white ring-1 ring-white/10 backdrop-blur"
+                    >
+                      <Music className="h-4 w-4" />
+                      <span className="truncate">
+                        {form.musicTrack === 'Original sound'
+                          ? 'Suara'
+                          : form.musicTrack}
+                      </span>
+                    </button>
+
+                    {hasMedia && (
+                      <button
+                        type="button"
+                        onClick={goNext}
+                        className="absolute right-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-white text-slate-950 shadow-xl"
+                        aria-label="Lanjut edit"
+                      >
+                        <Check className="h-5 w-5" />
+                      </button>
+                    )}
+
+                    <div className="absolute right-2 top-[calc(env(safe-area-inset-top)+76px)] z-30 flex w-11 flex-col items-center gap-2 text-white">
+                      <button
+                        type="button"
+                        onClick={flipCamera}
+                        className="grid h-10 w-10 place-items-center rounded-full bg-black/32 text-white shadow-lg ring-1 ring-white/12 backdrop-blur transition active:scale-95"
+                        aria-label="Flip"
+                        title="Flip"
+                      >
+                        <RefreshCcw className="h-4.5 w-4.5" />
+                      </button>
+                    </div>
+
+                    {cameraError && (
+                      <div
+                        className={cn(
+                          'absolute inset-x-4 z-40 rounded-[16px] bg-amber-300/18 px-3 py-2 text-center text-xs font-bold text-amber-50 ring-1 ring-amber-200/20 backdrop-blur',
+                          studioPanel ? 'bottom-[258px]' : 'bottom-[196px]',
+                        )}
+                      >
+                        {cameraError}
+                      </div>
+                    )}
+
+                    <div className="absolute inset-x-0 bottom-[148px] z-30 flex justify-center">
+                      {recording ? (
+                        <div className="w-[210px] overflow-hidden rounded-full bg-black/52 px-3 py-2 text-[12px] font-black text-white shadow-xl ring-1 ring-white/12 backdrop-blur">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-rose-500" />
+                              REC
+                            </span>
+                            <span>{recordingRemainingSeconds}s</span>
+                          </div>
+                          <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/16">
+                            <span
+                              className="block h-full origin-left rounded-full bg-rose-500"
+                              style={{
+                                transform: `scaleX(${recordingProgress})`,
+                              }}
+                            />
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1 rounded-full bg-black/42 p-1 text-[12px] font-black text-white/50 shadow-xl ring-1 ring-white/12 backdrop-blur">
+                          {REELS_STUDIO_DURATIONS.map(duration => (
+                            <button
+                              key={duration}
+                              type="button"
+                              onClick={() => setStudioDuration(duration)}
+                              className={cn(
+                                'h-8 rounded-full px-3 transition',
+                                studioDuration === duration
+                                  ? 'bg-white text-slate-950'
+                                  : 'text-white/62',
+                              )}
+                            >
+                              {duration}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="absolute inset-x-5 bottom-[52px] z-30 grid grid-cols-[68px_minmax(88px,1fr)_68px] items-end gap-2 text-white">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setStudioPanel(current =>
+                            current === 'effects' ? null : 'effects',
+                          )
+                        }
+                        className="flex flex-col items-center gap-1 text-[11px] font-black"
+                      >
+                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 backdrop-blur">
+                          <Sparkles className="h-5 w-5 text-yellow-200" />
+                        </span>
+                        <span className="max-w-[64px] truncate">
+                          {studioEffect === 'none'
+                            ? 'Efek'
+                            : activeStudioEffect.label}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        data-lajukan-reels-camera="true"
+                        onClick={handleStudioCapture}
+                        className={cn(
+                          'mx-auto grid h-[86px] w-[86px] place-items-center rounded-full border-[5px] border-white shadow-2xl transition active:scale-95',
+                          recording ? 'bg-rose-500' : 'bg-white/12',
+                        )}
+                        aria-label="Ambil media reels"
+                      >
+                        {recording ? (
+                          <span className="h-8 w-8 rounded-[8px] bg-white" />
+                        ) : studioMode === 'photo' ? (
+                          <Camera className="h-8 w-8" />
+                        ) : studioMode === 'live' ? (
+                          <Radio className="h-8 w-8" />
+                        ) : (
+                          <span className="h-[62px] w-[62px] rounded-full bg-rose-500 ring-4 ring-rose-400/35" />
+                        )}
+                      </button>
+
+                      <label className="flex cursor-pointer flex-col items-center gap-1 text-[11px] font-black">
+                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 backdrop-blur">
+                          <Upload className="h-5 w-5 text-orange-200" />
+                        </span>
+                        Galeri
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/*"
+                          onChange={event =>
+                            handleFile(event.target.files?.[0] ?? null)
+                          }
+                          className="sr-only"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="absolute inset-x-7 bottom-3 z-30 flex items-center justify-center">
+                      <span className="rounded-full bg-black/30 px-3 py-1.5 text-[11px] font-black text-white/72 ring-1 ring-white/10 backdrop-blur">
+                        {locale === 'id'
+                          ? 'Langsung rekam dari sini'
+                          : 'Record straight from here'}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="min-w-0">
+            <div
+              className={cn('min-w-0 text-white', step === 'media' && 'hidden')}
+            >
               {step === 'media' && (
                 <div className="space-y-3">
-                  <div>
-                    <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
-                      Langkah 1
-                    </p>
-                    <h3 className="text-lg font-black leading-tight">
-                      Pilih video atau foto
-                    </h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-                      Mulai dari media utama dulu, baru lanjut edit teks dan
-                      detail post.
-                    </p>
+                  <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+                          {activeStudioMode.label}
+                        </p>
+                        <h3 className="truncate text-base font-black">
+                          {studioMode === 'gallery'
+                            ? 'Pilih dari galeri'
+                            : studioMode === 'photo'
+                              ? 'Ambil foto produk'
+                              : studioMode === 'live'
+                                ? 'Siapkan live'
+                                : 'Rekam video vertikal'}
+                        </h3>
+                      </div>
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-slate-950">
+                        <ActiveStudioIcon className="h-4.5 w-4.5" />
+                      </span>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                      <label className="inline-flex h-12 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/10 px-3 text-xs font-black text-white ring-1 ring-white/10 transition active:scale-[0.98]">
+                        <Upload className="h-4 w-4" />
+                        Galeri
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/*"
+                          onChange={event =>
+                            handleFile(event.target.files?.[0] ?? null)
+                          }
+                          className="sr-only"
+                        />
+                      </label>
+
+                      <button
+                        type="button"
+                        data-lajukan-reels-camera="true"
+                        onClick={() => {
+                          if (studioMode === 'gallery') {
+                            selectStudioMode('video');
+                            return;
+                          }
+                          if (studioMode === 'live') {
+                            setStep('post');
+                            return;
+                          }
+                          if (!cameraReady) {
+                            void openCamera();
+                            return;
+                          }
+                          if (studioMode === 'photo') {
+                            captureCameraPhoto();
+                            return;
+                          }
+                          if (recording) {
+                            stopCameraRecording();
+                          } else {
+                            startCameraRecording();
+                          }
+                        }}
+                        className={cn(
+                          'grid h-16 w-16 place-items-center rounded-full border-4 border-white text-white shadow-2xl transition active:scale-95',
+                          recording ? 'bg-rose-500' : 'bg-white/18',
+                        )}
+                        aria-label="Ambil media reels"
+                      >
+                        {recording ? (
+                          <span className="h-6 w-6 rounded-[6px] bg-white" />
+                        ) : studioMode === 'photo' ? (
+                          <Camera className="h-7 w-7" />
+                        ) : studioMode === 'live' ? (
+                          <Radio className="h-7 w-7" />
+                        ) : (
+                          <span className="h-9 w-9 rounded-full bg-rose-500" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => void openCamera()}
+                        disabled={
+                          studioMode === 'gallery' || studioMode === 'live'
+                        }
+                        className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-xs font-black text-slate-950 transition active:scale-[0.98] disabled:bg-white/10 disabled:text-white/38"
+                      >
+                        <RefreshCcw className="h-4 w-4" />
+                        {cameraReady ? 'Reset' : 'Kamera'}
+                      </button>
+                    </div>
+
+                    {cameraError && (
+                      <p className="mt-3 rounded-[13px] bg-amber-300/12 px-3 py-2 text-xs font-bold text-amber-100">
+                        {cameraError}
+                      </p>
+                    )}
                   </div>
 
-                  <label className="block cursor-pointer rounded-[18px] border-2 border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-center transition hover:border-emerald-300 hover:bg-emerald-50/40">
+                  <div className="rounded-[20px] border border-white/10 bg-white/[0.05] p-3">
+                    <div className="flex items-center gap-2 text-xs font-black text-white/82">
+                      <SlidersHorizontal className="h-4 w-4 text-emerald-300" />
+                      Filter
+                    </div>
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {REEL_FILTER_PRESETS.map(filter => {
+                        const active = form.filterPreset === filter.id;
+                        return (
+                          <button
+                            key={filter.id}
+                            type="button"
+                            onClick={() => setField('filterPreset', filter.id)}
+                            className={cn(
+                              'inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-[11px] font-black ring-1 transition active:scale-95',
+                              active
+                                ? 'bg-white text-slate-950 ring-white'
+                                : 'bg-white/8 text-white/70 ring-white/10',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'h-5 w-5 rounded-full ring-1 ring-black/5',
+                                filter.swatch,
+                              )}
+                            />
+                            {filter.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[20px] border border-white/10 bg-white/[0.05] p-3">
+                    <div className="flex items-center gap-2 text-xs font-black text-white/82">
+                      <Music className="h-4 w-4 text-yellow-300" />
+                      Musik
+                    </div>
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {REELS_MUSIC_TRACKS.map(track => (
+                        <button
+                          key={track}
+                          type="button"
+                          onClick={() => setField('musicTrack', track)}
+                          className={cn(
+                            'h-9 shrink-0 rounded-full px-3 text-[11px] font-black ring-1 transition active:scale-95',
+                            form.musicTrack === track
+                              ? 'bg-yellow-300 text-slate-950 ring-yellow-200'
+                              : 'bg-white/8 text-white/70 ring-white/10',
+                          )}
+                        >
+                          {track}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[18px] border border-white/10 bg-white/[0.04] px-3 py-2 text-xs leading-5 text-white/60">
+                    Media diambil dari file yang dipilih atau hasil upload
+                    internal. Kita tidak mendorong paste URL manual di flow ini.
+                  </div>
+
+                  {studioMode === 'live' && (
+                    <div className="rounded-[18px] border border-rose-400/20 bg-rose-500/10 p-3 text-xs font-semibold leading-5 text-rose-50">
+                      Pilih poster dari galeri, lalu isi judul dan jadwal live.
+                    </div>
+                  )}
+
+                  <label className="hidden cursor-pointer rounded-[18px] border-2 border-dashed border-white/12 bg-white/[0.05] p-4 text-center transition hover:border-emerald-300">
                     <input
                       type="file"
                       accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/*"
@@ -4075,30 +6481,19 @@ function UploadReelSheet({
                       <Upload className="h-6 w-6" />
                     </div>
                     <p className="mt-3 text-sm font-black text-[color:var(--app-text)]">
-                      Pilih dari perangkat
+                      {form.captureMode === 'camera'
+                        ? 'Atau pilih dari galeri'
+                        : form.captureMode === 'live'
+                          ? 'Pilih poster / teaser live'
+                          : 'Pilih dari perangkat'}
                     </p>
                     <p className="mt-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       MP4, WebM, MOV, JPG, PNG, WebP
                     </p>
                   </label>
 
-                  <label className="block">
-                    <span className={fieldLabelClass}>
-                      Atau tempel URL media
-                    </span>
-                    <input
-                      value={form.mediaUrl}
-                      onChange={event => {
-                        setField('mediaUrl', event.target.value);
-                        setError(null);
-                      }}
-                      placeholder="https://... atau /api/forum/media/..."
-                      className={inputClass}
-                    />
-                  </label>
-
                   {file && (
-                    <div className="rounded-2xl bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-bold text-[color:var(--app-text-soft)]">
+                    <div className="rounded-2xl bg-white/[0.08] px-3 py-2 text-xs font-bold text-white/62">
                       Terpilih: {file.name}
                     </div>
                   )}
@@ -4108,19 +6503,95 @@ function UploadReelSheet({
               {step === 'edit' && (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
+                    <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
                       Langkah 2
                     </p>
                     <h3 className="text-lg font-black leading-tight">
                       Edit tampilan reels
                     </h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                    <p className="mt-1 text-xs font-semibold leading-5 text-white/52">
                       Buat hook pendek biar cepat paham.
                     </p>
                   </div>
 
+                  <div>
+                    <p className={fieldLabelClass}>Filter tampilan</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {REEL_FILTER_PRESETS.map(filter => {
+                        const active = form.filterPreset === filter.id;
+                        return (
+                          <button
+                            key={filter.id}
+                            type="button"
+                            onClick={() => setField('filterPreset', filter.id)}
+                            className={cn(
+                              'flex items-center gap-2 rounded-[15px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
+                              active
+                                ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-100'
+                                : 'border-white/10 bg-white/[0.08] text-white',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'h-8 w-8 shrink-0 rounded-[12px] ring-1 ring-black/5',
+                                filter.swatch,
+                              )}
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate text-[12px] font-black">
+                                {filter.label}
+                              </span>
+                              <span className="block truncate text-[10px] font-semibold opacity-70">
+                                {filter.helper}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className={fieldLabelClass}>Efek kamera gratis</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {REELS_STUDIO_EFFECTS.map(effect => {
+                        const active = studioEffect === effect.id;
+                        return (
+                          <button
+                            key={effect.id}
+                            type="button"
+                            onClick={() => setStudioEffect(effect.id)}
+                            className={cn(
+                              'flex items-center gap-2 rounded-[15px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
+                              active
+                                ? 'border-yellow-200 bg-yellow-300 text-slate-950 ring-2 ring-yellow-100'
+                                : 'border-white/10 bg-white/[0.08] text-white',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'h-8 w-8 shrink-0 rounded-[12px] ring-1 ring-black/5',
+                                effect.swatch,
+                              )}
+                            />
+                            <span className="min-w-0">
+                              <span className="block truncate text-[12px] font-black">
+                                {effect.label}
+                              </span>
+                              <span className="block truncate text-[10px] font-semibold opacity-70">
+                                {effect.helper}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <label className="block">
-                    <span className={`${fieldLabelClass} inline-flex items-center gap-1`}>
+                    <span
+                      className={`${fieldLabelClass} inline-flex items-center gap-1`}
+                    >
                       <Camera className="h-3.5 w-3.5" />
                       Teks hook di video
                     </span>
@@ -4134,9 +6605,7 @@ function UploadReelSheet({
                   </label>
 
                   <label className="block">
-                    <span className={fieldLabelClass}>
-                      Judul reels
-                    </span>
+                    <span className={fieldLabelClass}>Judul reels</span>
                     <input
                       value={form.title}
                       onChange={event => setField('title', event.target.value)}
@@ -4147,7 +6616,9 @@ function UploadReelSheet({
                   </label>
 
                   <label className="block">
-                    <span className={`${fieldLabelClass} inline-flex items-center gap-1`}>
+                    <span
+                      className={`${fieldLabelClass} inline-flex items-center gap-1`}
+                    >
                       <Hash className="h-3.5 w-3.5" />
                       Kategori
                     </span>
@@ -4177,7 +6648,7 @@ function UploadReelSheet({
                           'rounded-full px-3 py-2 text-xs font-black',
                           form.tag === chip
                             ? 'bg-emerald-700 text-white'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+                            : 'bg-white/[0.08] text-white/64',
                         )}
                       >
                         {chip}
@@ -4190,22 +6661,56 @@ function UploadReelSheet({
               {step === 'post' && (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
+                    <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
                       Langkah 3
                     </p>
                     <h3 className="text-lg font-black leading-tight">
                       Caption dan produk
                     </h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                    <p className="mt-1 text-xs font-semibold leading-5 text-white/52">
                       Tambahkan konteks usaha, produk, dan link transaksi kalau
                       ada.
                     </p>
                   </div>
 
+                  {form.captureMode === 'live' && (
+                    <div className="rounded-[18px] border border-rose-100 bg-rose-50/80 p-3">
+                      <div className="flex items-center gap-2 text-rose-700">
+                        <Radio className="h-4 w-4" />
+                        <p className="text-xs font-black uppercase tracking-wide">
+                          Setup live
+                        </p>
+                      </div>
+                      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                        <label>
+                          <span className={fieldLabelClass}>Judul live</span>
+                          <input
+                            value={form.liveTitle}
+                            onChange={event =>
+                              setField('liveTitle', event.target.value)
+                            }
+                            maxLength={120}
+                            placeholder="Contoh: Live stok baju lebaran jam 8"
+                            className={inputClass}
+                          />
+                        </label>
+                        <label>
+                          <span className={fieldLabelClass}>Jadwal</span>
+                          <input
+                            type="datetime-local"
+                            value={form.liveSchedule}
+                            onChange={event =>
+                              setField('liveSchedule', event.target.value)
+                            }
+                            className={inputClass}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   <label className="block">
-                    <span className={fieldLabelClass}>
-                      Caption
-                    </span>
+                    <span className={fieldLabelClass}>Caption</span>
                     <textarea
                       value={form.caption}
                       onChange={event =>
@@ -4220,7 +6725,9 @@ function UploadReelSheet({
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label>
-                      <span className={`${fieldLabelClass} inline-flex items-center gap-1`}>
+                      <span
+                        className={`${fieldLabelClass} inline-flex items-center gap-1`}
+                      >
                         <Store className="h-3.5 w-3.5" />
                         Nama toko
                       </span>
@@ -4236,9 +6743,7 @@ function UploadReelSheet({
                     </label>
 
                     <label>
-                      <span className={fieldLabelClass}>
-                        Kota toko
-                      </span>
+                      <span className={fieldLabelClass}>Kota toko</span>
                       <input
                         value={form.storeCity}
                         onChange={event =>
@@ -4251,9 +6756,7 @@ function UploadReelSheet({
                     </label>
 
                     <label>
-                      <span className={fieldLabelClass}>
-                        Nama produk
-                      </span>
+                      <span className={fieldLabelClass}>Nama produk</span>
                       <input
                         value={form.productName}
                         onChange={event =>
@@ -4266,9 +6769,7 @@ function UploadReelSheet({
                     </label>
 
                     <label>
-                      <span className={fieldLabelClass}>
-                        Harga
-                      </span>
+                      <span className={fieldLabelClass}>Harga</span>
                       <input
                         value={form.productPrice}
                         onChange={event =>
@@ -4281,9 +6782,7 @@ function UploadReelSheet({
                     </label>
 
                     <label className="sm:col-span-2">
-                      <span className={fieldLabelClass}>
-                        Link produk
-                      </span>
+                      <span className={fieldLabelClass}>Link produk</span>
                       <input
                         value={form.productHref}
                         onChange={event =>
@@ -4306,13 +6805,18 @@ function UploadReelSheet({
           </div>
         </div>
 
-        <div className="border-t border-[color:var(--app-border)] p-3.5">
+        <div
+          className={cn(
+            'border-t border-white/10 p-3.5',
+            step === 'media' && 'hidden',
+          )}
+        >
           <div className="flex items-center gap-2">
             {step !== 'media' && (
               <button
                 type="button"
                 onClick={() => setStep(step === 'post' ? 'edit' : 'media')}
-                className="h-11 rounded-full border border-[color:var(--app-border)] px-4 text-sm font-black text-[color:var(--app-text)]"
+                className="h-11 rounded-full border border-white/14 px-4 text-sm font-black text-white"
               >
                 Kembali
               </button>
@@ -4334,7 +6838,11 @@ function UploadReelSheet({
                 className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 disabled:opacity-60"
               >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {submitting ? 'Mengirim...' : 'Publish reels'}
+                {submitting
+                  ? 'Mengirim...'
+                  : form.captureMode === 'live'
+                    ? 'Jadwalkan live'
+                    : 'Publish reels'}
               </button>
             )}
           </div>
@@ -4445,37 +6953,6 @@ function LoadingToast({
   );
 }
 
-function EndMiniToast({
-  onRestart,
-  onSearch,
-}: {
-  onRestart: () => void;
-  onSearch: () => void;
-}) {
-  return (
-    <div className="absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
-      <div className="flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 text-xs font-black text-slate-950 shadow-xl backdrop-blur">
-        <span>Semua reels sudah dimuat</span>
-        <button
-          type="button"
-          onClick={onRestart}
-          className="inline-flex items-center gap-1 rounded-full bg-slate-950 px-3 py-1.5 text-white"
-        >
-          <RefreshCcw className="h-3.5 w-3.5" />
-          Ulang
-        </button>
-        <button
-          type="button"
-          onClick={onSearch}
-          className="rounded-full bg-slate-100 px-3 py-1.5"
-        >
-          Cari
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /* =========================
    UTILS
 ========================= */
@@ -4497,9 +6974,8 @@ function appendQuery(href: string, key: string, value: string) {
 
   const [path, hash = ''] = href.split('#');
   const separator = path.includes('?') ? '&' : '?';
-  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${
-    hash ? `#${hash}` : ''
-  }`;
+  return `${path}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash ? `#${hash}` : ''
+    }`;
 }
 
 function formatCommentTime(value: string) {

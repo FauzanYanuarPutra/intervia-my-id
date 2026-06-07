@@ -1,8 +1,9 @@
 'use client';
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -18,7 +19,6 @@ import {
   Globe2,
   Heart,
   Home,
-  ImageIcon,
   LayoutGrid,
   LockKeyhole,
   MapPin,
@@ -29,7 +29,6 @@ import {
   Share2,
   ShieldCheck,
   ShoppingBag,
-  SmilePlus,
   Sparkles,
   Star,
   Target,
@@ -38,10 +37,12 @@ import {
   Trophy,
   UserRound,
   Users,
+  X,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { HomeUmkmMapPreview } from '@/components/home/HomeUmkmMapPreview';
+import { DailyLoginRewardCard } from '@/components/rewards/DailyLoginRewardCard';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { useAuth } from '@/context/AuthContext';
 import { useChatInbox } from '@/context/ChatInboxContext';
@@ -53,21 +54,34 @@ import {
 import {
   extractContentItems,
   formatCurrencyFromCents,
-  parseImages,
+  resolveImageGallery,
   type ContentItem,
 } from '@/lib/content/catalog';
+import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import { MarketplacePageFrame } from '@/components/layout/MarketplacePageFrame';
+import type { UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
 import type {
   CommunityFeedItem,
+  CommunityFeedOverview,
   CommunityFeedResponse,
 } from '@/lib/community/types';
-import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
+import { CommunityComposer } from '@/components/community/CommunityFeedClient';
+import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
+import { profileAvatarSrc } from '@/lib/profile/avatar';
+import {
+  UMKM_DISCOVERY_PATH,
+  buildUmkmDiscoveryPath,
+  buildUmkmStorefrontPath,
+} from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 
 type HomeContentSimpleProps = {
   locale: string;
 };
+
+const HOME_COMMUNITY_PAGE_SIZE = 6;
 
 type Tone =
   | 'emerald'
@@ -110,11 +124,16 @@ type RecommendationItem = {
   price: string;
   unit: string;
   image?: string;
+  images: string[];
   href: string;
   badge?: string;
   badgeTone?: Tone;
   typeLabel: string;
   createHref: string;
+  entityType?: string;
+  detailActionLabel?: string;
+  secondaryActionLabel?: string;
+  secondaryEventName?: string;
 };
 
 type CommunityTab = 'for-you' | 'following' | 'community' | 'reels';
@@ -122,17 +141,22 @@ type CommunityTab = 'for-you' | 'following' | 'community' | 'reels';
 type CommunityPost = {
   id: string;
   tab: CommunityTab;
+  href?: string;
+  kind: 'discussion' | 'reel';
   community: string;
   author: string;
   time: string;
   title: string;
   body: string;
   image?: string;
+  mediaUrl?: string;
+  mediaType?: string;
   avatar?: string;
   tags: string[];
   likes: string;
   comments: string;
   shares: string;
+  views: string;
 };
 
 type ReelItem = {
@@ -204,10 +228,31 @@ type HomeWalletBalancesResponse = {
   error?: string;
 };
 
+type HomeUmkmRecommendationStore = UmkmMapStore & {
+  description?: string | null;
+  phone?: string | null;
+  offline_order_enabled?: boolean;
+  online_order_enabled?: boolean;
+  reservation_enabled?: boolean;
+  table_count?: number | null;
+  available_table_count?: number | null;
+  max_table_capacity?: number | null;
+  metadata?: Record<string, unknown>;
+};
+
+type HomeUmkmStoresResponse = {
+  data?: {
+    items?: HomeUmkmRecommendationStore[];
+    count?: number;
+  };
+  error?: string;
+};
+
 const HERO_TAGS = ['Bahan Lokal', 'Siap Ekspor', 'Kemasan', 'Mesin UMKM'];
 const HOME_HERO_IMAGE = '/images/hero/lajukan.png';
 
 function buildCommunityPostHref(post: CommunityPost): string {
+  if (post.href) return post.href;
   const params = new URLSearchParams();
   params.set('tab', post.tab);
   const tag = post.tags[0];
@@ -215,36 +260,12 @@ function buildCommunityPostHref(post: CommunityPost): string {
   return `/community?${params.toString()}`;
 }
 
-const COMPOSER_ACTIONS = [
-  {
-    id: 'photo',
-    label: 'Foto/Video',
-    href: '/community?compose=photo',
-    icon: ImageIcon,
-    tone: 'emerald' as Tone,
-  },
-  {
-    id: 'reels',
-    label: 'Reels',
-    href: '/community?compose=reel',
-    icon: Clapperboard,
-    tone: 'rose' as Tone,
-  },
-  {
-    id: 'polling',
-    label: 'Polling',
-    href: '/community?compose=poll',
-    icon: BarChart3,
-    tone: 'amber' as Tone,
-  },
-  {
-    id: 'feeling',
-    label: 'Perasaan',
-    href: '/community?compose=feeling',
-    icon: SmilePlus,
-    tone: 'teal' as Tone,
-  },
-];
+function buildCommunityTabHref(tab: CommunityTab): string {
+  if (tab === 'reels') return '/reels';
+  const params = new URLSearchParams();
+  params.set('tab', tab);
+  return `/community?${params.toString()}`;
+}
 
 function toneClassNames(tone: Tone) {
   if (tone === 'blue' || tone === 'teal') {
@@ -292,7 +313,7 @@ function toneClassNames(tone: Tone) {
       icon: 'bg-emerald-100 text-emerald-700',
       soft: 'bg-emerald-50 text-emerald-700',
       surface: 'border-emerald-100 bg-emerald-50/70',
-      card: 'border-emerald-100 bg-[linear-gradient(180deg,#ffffff,#f0fdf4)]',
+      card: 'border-emerald-100',
       glow: 'bg-emerald-400/16',
       text: 'text-emerald-700',
     };
@@ -302,7 +323,7 @@ function toneClassNames(tone: Tone) {
       icon: 'bg-lime-100 text-lime-700',
       soft: 'bg-lime-50 text-lime-700',
       surface: 'border-lime-100 bg-lime-50/70',
-      card: 'border-lime-100 bg-[linear-gradient(180deg,#ffffff,#f7fee7)]',
+      card: 'border-lime-100',
       glow: 'bg-lime-400/16',
       text: 'text-lime-700',
     };
@@ -312,7 +333,7 @@ function toneClassNames(tone: Tone) {
       icon: 'bg-orange-100 text-orange-700',
       soft: 'bg-orange-50 text-orange-700',
       surface: 'border-orange-100 bg-orange-50/70',
-      card: 'border-orange-100 bg-[linear-gradient(180deg,#ffffff,#fff7ed)]',
+      card: 'border-orange-100',
       glow: 'bg-orange-400/16',
       text: 'text-orange-700',
     };
@@ -321,7 +342,7 @@ function toneClassNames(tone: Tone) {
     icon: 'bg-emerald-100 text-emerald-700',
     soft: 'bg-emerald-50 text-emerald-700',
     surface: 'border-emerald-100 bg-emerald-50/70',
-    card: 'border-emerald-100 bg-[linear-gradient(180deg,#ffffff,#effdf5)]',
+    card: 'border-emerald-100',
     glow: 'bg-emerald-400/16',
     text: 'text-emerald-700',
   };
@@ -336,7 +357,9 @@ function resolveCountLabel(
   value: number | null | undefined,
   fallback: string,
 ): string {
-  return typeof value === 'number' ? formatLajukanCountLabel(value) : fallback;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? formatLajukanCountLabel(value)
+    : fallback;
 }
 
 function formatCompactCount(
@@ -393,7 +416,7 @@ function createHrefForContentType(type?: string | null): string {
   if (normalized === 'tool_rental') return '/create/jual/sewa-alat';
   if (normalized === 'business_transfer') return '/create/jual/oper-usaha';
   if (normalized === 'freelancer' || normalized === 'job')
-    return '/create/jual/talent';
+    return '/profile/edit?focus=talent';
   return '/create';
 }
 
@@ -402,7 +425,8 @@ function mapContentToRecommendation(
   isId: boolean,
 ): RecommendationItem | null {
   if (!item.id || !item.title) return null;
-  const image = parseImages(item)[0];
+  const images = resolveImageGallery(item);
+  const image = images[0];
   const statsRating = item.seller_stats?.rating ?? item.rating;
   const statsReviews = item.seller_stats?.review_count ?? item.review_count;
   const type = item.content_type || item.category;
@@ -418,13 +442,9 @@ function mapContentToRecommendation(
       : isId
         ? 'Tanya harga'
         : 'Ask price';
-  const unit = metadataText(
-    item,
-    'unit',
-    'rate_type',
-    'min_order_qty',
-    'lease_term',
-  );
+  const unit =
+    resolveContentPriceUnitLabel(item, isId ? 'id' : 'en') ||
+    metadataText(item, 'unit', 'rate_type', 'min_order_qty', 'lease_term');
 
   return {
     id: item.id,
@@ -442,11 +462,58 @@ function mapContentToRecommendation(
     price,
     unit,
     image,
+    images,
     href: buildContentHref(item.id, item.title, item.slug),
     badge: item.promo_label || undefined,
     badgeTone: item.promo_label ? 'rose' : undefined,
     typeLabel: labelForContentType(isId, type),
     createHref: createHrefForContentType(type),
+  };
+}
+
+function mapUmkmStoreToRecommendation(
+  store: HomeUmkmRecommendationStore,
+  isId: boolean,
+): RecommendationItem | null {
+  if (!store.id || !store.name) return null;
+
+  const ui = buildUmkmPlacePresentation(store, isId);
+  const detailHref = store.slug
+    ? buildUmkmStorefrontPath(store.slug)
+    : buildUmkmDiscoveryPath({ q: store.name, city: store.city });
+  const mapHref = store.slug
+    ? buildUmkmDiscoveryPath({ store: store.slug })
+    : buildUmkmDiscoveryPath({ q: store.name, city: store.city });
+  const images = Array.from(
+    new Set([ui.coverImage, ...ui.gallery].filter(Boolean)),
+  ).slice(0, 4);
+  const badge =
+    ui.openNow === true
+      ? isId
+        ? 'Buka sekarang'
+        : 'Open now'
+      : ui.serviceBadges[0] || ui.statusLabel;
+
+  return {
+    id: `umkm-store-${store.id}`,
+    title: store.name,
+    vendor: ui.categoryLabel,
+    location: store.city || ui.addressLine,
+    rating: ui.ratingLabel,
+    reviews: formatCompactCount(ui.ratingCount, '0'),
+    price: ui.priceLabel,
+    unit: ui.statusLabel || ui.locationModeLabel,
+    image: images[0],
+    images,
+    href: detailHref,
+    badge,
+    badgeTone: ui.openNow === true ? 'emerald' : 'teal',
+    typeLabel: ui.kindLabel,
+    createHref: mapHref,
+    entityType: 'umkm_store',
+    detailActionLabel: isId ? 'Profil' : 'Profile',
+    secondaryActionLabel: isId ? 'Lihat peta' : 'Open map',
+    secondaryEventName: 'umkm.map_opened',
   };
 }
 
@@ -466,20 +533,35 @@ function formatCommunityTime(value: string, isId: boolean): string {
 function mapCommunityItemToPost(
   item: CommunityFeedItem,
   isId: boolean,
+  activeTab: CommunityTab,
 ): CommunityPost {
+  const isReel = item.kind === 'reel' || activeTab === 'reels';
+  const mediaUrl = item.media?.src;
   return {
     id: item.id,
-    tab: item.kind === 'reel' ? 'reels' : 'community',
+    tab: isReel ? 'reels' : activeTab,
+    href: item.href || undefined,
+    kind: isReel ? 'reel' : 'discussion',
     community:
       item.group?.name ||
       item.communityName ||
-      (isId ? 'Komunitas' : 'Community'),
+      (isReel ? 'Reels Usaha' : isId ? 'Komunitas' : 'Community'),
     author: item.author?.name || (isId ? 'Member Lajukan' : 'Lajukan member'),
     time: formatCommunityTime(item.createdAt, isId),
-    title: item.title || (isId ? 'Diskusi komunitas' : 'Community discussion'),
+    title:
+      item.title ||
+      (isReel
+        ? isId
+          ? 'Reels usaha'
+          : 'Business reel'
+        : isId
+          ? 'Diskusi komunitas'
+          : 'Community discussion'),
     body: item.body || '',
-    image: item.media?.type === 'image' ? item.media.src : undefined,
-    avatar: item.author?.avatarUrl || undefined,
+    image: item.media?.type === 'image' ? mediaUrl : undefined,
+    mediaUrl,
+    mediaType: item.media?.type,
+    avatar: profileAvatarSrc(item.author?.avatarUrl),
     tags: item.tags
       .map(tag => tag.name || tag.slug)
       .filter(Boolean)
@@ -487,6 +569,7 @@ function mapCommunityItemToPost(
     likes: formatCompactCount(item.stats?.reactions, '0'),
     comments: formatCompactCount(item.stats?.comments, '0'),
     shares: formatCompactCount(item.stats?.shares, '0'),
+    views: formatCompactCount(item.stats?.views, '0'),
   };
 }
 
@@ -690,7 +773,7 @@ function getQuickCategories(
       href: '/search?type=product&q=supplier',
       icon: ShoppingBag,
       tone: 'emerald',
-      countLabel: resolveCountLabel(summary?.categories?.supplier, '12.000+'),
+      countLabel: resolveCountLabel(summary?.categories?.supplier, '0'),
     },
     {
       id: 'product',
@@ -699,7 +782,7 @@ function getQuickCategories(
       href: '/search?q=produk%20reseller',
       icon: Package,
       tone: 'orange',
-      countLabel: resolveCountLabel(summary?.categories?.product, '8.500+'),
+      countLabel: resolveCountLabel(summary?.categories?.product, '0'),
     },
     {
       id: 'service',
@@ -708,7 +791,7 @@ function getQuickCategories(
       href: '/search?type=service&q=jasa%20usaha',
       icon: BriefcaseBusiness,
       tone: 'violet',
-      countLabel: resolveCountLabel(summary?.categories?.service, '3.700+'),
+      countLabel: resolveCountLabel(summary?.categories?.service, '0'),
     },
     {
       id: 'location',
@@ -717,7 +800,7 @@ function getQuickCategories(
       href: '/search?type=property&q=lokasi%20usaha',
       icon: MapPin,
       tone: 'rose',
-      countLabel: resolveCountLabel(summary?.categories?.location, '5.200+'),
+      countLabel: resolveCountLabel(summary?.categories?.location, '0'),
     },
     {
       id: 'talent',
@@ -726,7 +809,7 @@ function getQuickCategories(
       href: '/search?type=freelancer&q=talent',
       icon: UserRound,
       tone: 'cyan',
-      countLabel: resolveCountLabel(summary?.categories?.talent, '2.100+'),
+      countLabel: resolveCountLabel(summary?.categories?.talent, '0'),
     },
     {
       id: 'request',
@@ -735,7 +818,7 @@ function getQuickCategories(
       href: isAuthenticated ? '/my-projects' : '/register',
       icon: TrendingUp,
       tone: 'lime',
-      countLabel: resolveCountLabel(summary?.requests?.total, '1.200+'),
+      countLabel: resolveCountLabel(summary?.requests?.total, '0'),
     },
     {
       id: 'community',
@@ -746,7 +829,7 @@ function getQuickCategories(
       href: '/community',
       icon: MessageCircle,
       tone: 'amber',
-      countLabel: resolveCountLabel(summary?.requests?.active, '800+'),
+      countLabel: resolveCountLabel(summary?.requests?.active, '0'),
     },
   ];
 }
@@ -759,23 +842,23 @@ function getHeroMetrics(
     {
       id: 'verified',
       label: isId ? 'Supplier siap' : 'Verified suppliers',
-      value: `+${formatCompactCount(summary?.stores?.verified, '2.5K')}`,
+      value: formatCompactCount(summary?.stores?.verified, '0'),
       note: isId ? 'Partner siap diajak kerja' : 'Partners ready to work',
       icon: ShieldCheck,
       tone: 'emerald',
     },
     {
       id: 'demand',
-      label: isId ? 'Permintaan Meningkat' : 'Rising demand',
-      value: '+28%',
-      note: isId ? 'Minat naik minggu ini' : 'Demand is up this week',
+      label: isId ? 'Permintaan aktif' : 'Active requests',
+      value: formatCompactCount(summary?.requests?.active, '0'),
+      note: isId ? 'Diambil dari data platform' : 'From platform data',
       icon: TrendingUp,
       tone: 'amber',
     },
     {
       id: 'community',
       label: isId ? 'Komunitas Aktif' : 'Active community',
-      value: `+${formatCompactCount(summary?.requests?.active, '8K')}`,
+      value: formatCompactCount(summary?.requests?.active, '0'),
       note: isId ? 'Diskusi dan peluang baru' : 'Discussions and new leads',
       icon: UserRound,
       tone: 'blue',
@@ -783,18 +866,71 @@ function getHeroMetrics(
   ];
 }
 
-function getCommunityTabs(isId: boolean) {
+type CommunityTabItem = {
+  id: CommunityTab;
+  label: string;
+  caption: string;
+  actionLabel: string;
+  emptyLabel: string;
+  loadingLabel: string;
+  icon: LucideIcon;
+  tone: Tone;
+};
+
+function getCommunityTabs(isId: boolean): CommunityTabItem[] {
   return [
-    { id: 'for-you' as CommunityTab, label: isId ? 'Untukmu' : 'For you' },
     {
-      id: 'following' as CommunityTab,
-      label: isId ? 'Mengikuti' : 'Following',
+      id: 'for-you',
+      label: isId ? 'Untukmu' : 'For you',
+      caption: isId ? 'Rekomendasi & tren' : 'Recommended trends',
+      actionLabel: isId ? 'Buka Untukmu' : 'Open For you',
+      emptyLabel: isId
+        ? 'Belum ada rekomendasi komunitas.'
+        : 'No recommended community posts yet.',
+      loadingLabel: isId
+        ? 'Memuat rekomendasi...'
+        : 'Loading recommendations...',
+      icon: Sparkles,
+      tone: 'emerald',
     },
     {
-      id: 'community' as CommunityTab,
-      label: isId ? 'Komunitas' : 'Community',
+      id: 'following',
+      label: isId ? 'Diikuti' : 'Following',
+      caption: isId ? 'Dari akun/topik pilihan' : 'From followed signals',
+      actionLabel: isId ? 'Buka Diikuti' : 'Open Following',
+      emptyLabel: isId
+        ? 'Belum ada update dari yang diikuti.'
+        : 'No following updates yet.',
+      loadingLabel: isId ? 'Memuat update...' : 'Loading updates...',
+      icon: Heart,
+      tone: 'rose',
     },
-    { id: 'reels' as CommunityTab, label: 'Reels' },
+    {
+      id: 'community',
+      label: isId ? 'Grup' : 'Groups',
+      caption: isId ? 'Diskusi ruang UMKM' : 'Business group rooms',
+      actionLabel: isId ? 'Buka Grup' : 'Open Groups',
+      emptyLabel: isId
+        ? 'Belum ada diskusi grup dari database.'
+        : 'No group discussions from the database yet.',
+      loadingLabel: isId
+        ? 'Memuat diskusi grup...'
+        : 'Loading group discussions...',
+      icon: Users,
+      tone: 'teal',
+    },
+    {
+      id: 'reels',
+      label: 'Reels',
+      caption: isId ? 'Video singkat bisnis' : 'Short business videos',
+      actionLabel: isId ? 'Buka Reels' : 'Open Reels',
+      emptyLabel: isId
+        ? 'Belum ada reels dari database.'
+        : 'No database reels yet.',
+      loadingLabel: isId ? 'Memuat reels...' : 'Loading reels...',
+      icon: Clapperboard,
+      tone: 'orange',
+    },
   ];
 }
 
@@ -856,7 +992,7 @@ function DesktopSidebar({
                 itemPath === '/home'
                   ? currentPath === '/home' || currentPath === '/'
                   : currentPath === itemPath ||
-                    currentPath.startsWith(`${itemPath}/`);
+                  currentPath.startsWith(`${itemPath}/`);
 
               return (
                 <Link
@@ -1373,106 +1509,131 @@ function GameProgressCard({
   return (
     <section
       className={cn(
-        'relative overflow-hidden rounded-[20px] border border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_58%,#ecfdf5_100%)] text-[color:var(--app-text)] shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_62%,#10251e_100%)] dark:text-white',
-        compact ? 'p-2.5' : 'p-3',
+        'lajukan-game-progress-card relative overflow-hidden rounded-2xl border border-slate-100 bg-white text-[color:var(--app-text)] shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all dark:border-zinc-800/80 dark:bg-zinc-950 dark:text-zinc-50',
+        compact ? 'lajukan-game-progress-card-compact p-3' : 'p-4',
       )}
     >
-      <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-200/55 blur-3xl dark:bg-emerald-500/10" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/80 dark:bg-white/10" />
-      <div className="relative">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center gap-1 rounded-[15px] bg-[linear-gradient(135deg,#059669,#047857)] text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.85)]">
-            <Trophy className="h-4 w-4 text-amber-200" />
-            <span className="text-sm font-black leading-none text-white">
-              {snapshot.level}
-            </span>
+      {/* Ambient Background Glow (Lebih Smooth) */}
+      <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-emerald-400/10 blur-2xl dark:bg-emerald-500/5" />
+      <div className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-amber-400/10 blur-2xl dark:bg-amber-500/5" />
+
+      <div className="relative space-y-3.5">
+
+        {/* SECTION 1: LEVEL & RANK HEADER */}
+        <div className="flex min-w-0 items-center gap-3">
+          {/* Badge Level dengan Efek 3D Clean */}
+          <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
+            <span className="text-base font-black tracking-tight">{snapshot.level}</span>
+            <div className="absolute -bottom-1 -right-1 rounded-md bg-amber-400 p-0.5 shadow-sm">
+              <Trophy className="h-3 w-3 text-emerald-950" />
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <p className="truncate text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-white">
-                {isId ? 'Arena level' : 'Level arena'}
+
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                {isId ? 'Arena Level' : 'Level Arena'}
               </p>
-              <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:border-amber-300/20 dark:bg-amber-300/12 dark:text-amber-100">
+              <span className="shrink-0 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-inset ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20">
                 {snapshot.rank}
               </span>
             </div>
-            <div className="mt-1 flex items-center gap-2">
-              <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-emerald-100 dark:bg-white/12">
+
+            {/* Progress Bar Minimalis & Modern */}
+            <div className="flex items-center gap-2">
+              {/* Diubah dari h-2 menjadi h-2.5 */}
+              <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800 p-0 m-0 relative">
                 <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,#10b981,#34d399,#fbbf24)]"
+                  className="absolute left-0 top-0 bottom-0 h-full rounded-full bg-gradient-to-r from-emerald-500 via-teal-400 to-amber-400 transition-all duration-500 ease-out p-0 m-0"
                   style={{ width: `${snapshot.xpPercent}%` }}
                 />
               </div>
-              <span className="shrink-0 text-[10px] font-black text-emerald-700 dark:text-emerald-100">
+              <span className="shrink-0 font-mono text-[10px] font-bold leading-none text-zinc-500 dark:text-zinc-400">
                 {snapshot.xp}/{snapshot.xpGoal}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="mt-2 flex min-w-0 items-center gap-2 rounded-[15px] border border-emerald-100 bg-white/90 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-white/10 dark:bg-white/[0.08]">
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-100">
-            <CreditCard className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <p className="text-[10px] font-black uppercase leading-3 text-[color:var(--app-text-soft)] dark:text-white/62">
-                {isId ? 'Saldo' : 'Balance'}
-              </p>
-              {walletModeLabel ? (
-                <span className="shrink-0 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-black leading-none text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-100">
-                  {walletModeLabel}
-                </span>
-              ) : null}
+        {/* SECTION 2: INTEGRATED WALLET CARD */}
+        <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-zinc-100 bg-zinc-50/50 p-2.5 dark:border-zinc-900 dark:bg-zinc-900/40">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+              <CreditCard className="h-4 w-4" />
             </div>
-            {walletLoading ? (
-              <span className="mt-1 block h-4 w-24 animate-pulse rounded-full bg-emerald-100 dark:bg-white/15" />
-            ) : (
-              <p className="truncate text-[0.92rem] font-black leading-5 text-[color:var(--app-text)] dark:text-white">
-                {amountLabel}
-              </p>
-            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  {isId ? 'Saldo' : 'Balance'}
+                </p>
+                {walletModeLabel && (
+                  <span className="rounded bg-zinc-200/60 px-1 py-0.2 text-[9px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                    {walletModeLabel}
+                  </span>
+                )}
+              </div>
+              {walletLoading ? (
+                <div className="mt-1 h-4 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+              ) : (
+                <p className="truncate text-sm font-bold tracking-tight text-zinc-800 dark:text-zinc-200">
+                  {amountLabel}
+                </p>
+              )}
+            </div>
           </div>
+
           <Link
             href="/payments"
-            className="inline-flex min-h-8 shrink-0 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[11px] font-black text-white shadow-[0_12px_22px_-17px_rgba(4,120,87,0.82)] transition hover:bg-[color:var(--app-accent-strong)]"
+            className="inline-flex h-8 items-center justify-center rounded-lg bg-zinc-900 px-3.5 text-xs font-bold text-white transition-all hover:bg-zinc-800 active:scale-95 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
           >
             Top up
           </Link>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          <div className="min-w-[92px] flex-1 basis-[calc(50%-0.1875rem)] rounded-[13px] border border-slate-200/75 bg-white/[0.88] px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.08]">
-            <p className="flex items-center gap-1 text-[10px] font-black text-[color:var(--app-text)] dark:text-white">
-              <Flame className="h-3 w-3 text-orange-500 dark:text-orange-200" />
+        {/* SECTION 3: QUICK STATS & QUEST */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Streak Card */}
+          <div className="rounded-xl border border-zinc-100 bg-white p-2 shadow-sm dark:border-zinc-900 dark:bg-zinc-900/20">
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">Streak</p>
+            <p className="mt-0.5 flex items-center gap-1 text-sm font-bold text-orange-600 dark:text-orange-400">
+              <Flame className="h-3.5 w-3.5 fill-orange-500/10" />
               {snapshot.streak}x
             </p>
-            <p className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] dark:text-white/58">
-              streak
-            </p>
           </div>
-          <div className="min-w-[92px] flex-1 basis-[calc(50%-0.1875rem)] rounded-[13px] border border-slate-200/75 bg-white/[0.88] px-2 py-1.5 dark:border-white/10 dark:bg-white/[0.08]">
-            <p className="flex items-center gap-1 text-[10px] font-black text-[color:var(--app-text)] dark:text-white">
-              <Zap className="h-3 w-3 text-amber-500 dark:text-amber-200" />
+
+          {/* Reward Card */}
+          <div className="rounded-xl border border-zinc-100 bg-white p-2 shadow-sm dark:border-zinc-900 dark:bg-zinc-900/20">
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">Next Reward</p>
+            <p className="mt-0.5 flex items-center gap-1 text-sm font-bold text-amber-600 dark:text-amber-500">
+              <Zap className="h-3.5 w-3.5 fill-amber-500/10" />
               {snapshot.nextReward}
             </p>
-            <p className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] dark:text-white/58">
-              reward
-            </p>
           </div>
+
+          {/* Active Quest Full Width Action Card */}
           <Link
             href={activeQuest.href}
-            className="min-w-0 flex-[1_1_100%] rounded-[13px] border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-emerald-800 shadow-[0_12px_20px_-18px_rgba(15,23,42,0.35)] transition hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-400/12 dark:text-emerald-100 dark:hover:bg-emerald-400/18"
+            className="group col-span-2 flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/40 p-2.5 transition-all hover:bg-emerald-50 dark:border-emerald-500/10 dark:bg-emerald-500/5 dark:hover:bg-emerald-500/10"
           >
-            <p className="flex min-w-0 items-center gap-1 text-[10px] font-black">
-              <ActiveQuestIcon className="h-3 w-3 shrink-0" />
-              <span className="truncate">{activeQuest.label}</span>
-            </p>
-            <p className="truncate text-[10px] font-semibold text-emerald-700/75 dark:text-emerald-100/70">
-              {activeQuest.xp}
-            </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-white shadow-sm group-hover:scale-105 transition-transform">
+                <ActiveQuestIcon className="h-3.5 w-3.5" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-xs font-bold text-emerald-950 dark:text-emerald-300">
+                  {activeQuest.label}
+                </p>
+                <p className="text-[10px] font-medium text-emerald-600/80 dark:text-emerald-400/70">
+                  Active Quest
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 text-xs font-black text-emerald-600 dark:text-emerald-400 bg-white dark:bg-zinc-900 px-2 py-1 rounded-md border border-emerald-100/50 dark:border-zinc-800">
+              +{activeQuest.xp} XP
+            </span>
           </Link>
         </div>
+
       </div>
     </section>
   );
@@ -1533,37 +1694,29 @@ function QuickCategoriesSection({
                 href={item.href}
                 aria-label={`${item.label}: ${item.description}`}
                 className={cn(
-                  'group relative flex min-h-[106px] flex-col items-center justify-center overflow-hidden rounded-[18px] border px-1.5 py-2 text-center transition active:scale-[0.98]',
-                  isAll
-                    ? 'border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-white shadow-[0_16px_30px_-22px_rgba(22,163,74,0.56)]'
-                    : tone.card,
+                  'group relative flex min-h-[106px] flex-col items-center justify-center overflow-hidden rounded-[18px] px-1.5 py-2 text-center transition active:scale-[0.98]',
                 )}
               >
                 <span
                   className={cn(
                     'absolute -right-5 -top-5 h-20 w-20 rounded-full blur-xl transition group-hover:scale-125',
-                    isAll ? 'bg-white/28' : tone.glow,
+                    isAll ? 'bg-slate-200/45' : 'hidden',
                   )}
                 />
                 <span
                   className={cn(
-                    'relative inline-flex h-11 w-11 items-center justify-center rounded-[15px] bg-white/88 shadow-[0_14px_24px_-20px_rgba(15,23,42,0.36)] ring-1 ring-white/70',
+                    'relative inline-flex h-12 w-12 items-center justify-center rounded-[15px] bg-white/88 shadow-[0_14px_24px_-20px_rgba(15,23,42,0.36)] ring-1 ring-white/70',
                     isAll
-                      ? 'text-[color:var(--app-accent)]'
+                      ? 'bg-white text-[color:var(--app-accent)] ring-slate-100'
                       : [tone.surface, tone.text],
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-6 w-6" />
                 </span>
-                <span
-                  className={cn(
-                    'relative mt-2 line-clamp-2 max-w-full text-[11.5px] font-black leading-[1.1]',
-                    isAll ? 'text-white' : 'text-[color:var(--app-text)]',
-                  )}
-                >
+                <span className="relative mt-2 line-clamp-2 max-w-full text-[11.5px] font-black leading-[1.1] text-[color:var(--app-text)]">
                   {item.label}
                 </span>
-                <span
+                {/* <span
                   className={cn(
                     'relative mt-1 max-w-full truncate text-[9.5px] font-bold leading-3',
                     isAll
@@ -1572,10 +1725,10 @@ function QuickCategoriesSection({
                   )}
                 >
                   {item.countLabel}
-                </span>
-                {isAll ? (
+                </span> */}
+                {/* {isAll ? (
                   <ChevronRight className="absolute bottom-2 right-2 h-3.5 w-3.5 text-white/86" />
-                ) : null}
+                ) : null} */}
               </Link>
             );
           })}
@@ -1612,16 +1765,13 @@ function QuickCategoriesSection({
                 href={item.href}
                 aria-label={`${item.label}: ${item.description}`}
                 className={cn(
-                  'group relative min-h-[142px] overflow-hidden rounded-[18px] border p-2.5 transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.2)]',
-                  isAll
-                    ? 'border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-white shadow-[0_18px_34px_-28px_rgba(22,163,74,0.38)]'
-                    : tone.card,
+                  'group relative min-h-[142px] overflow-hidden rounded-[18px] p-2.5 transition hover:-translate-y-0.5 ',
                 )}
               >
                 <span
                   className={cn(
                     'absolute -right-7 -top-7 h-16 w-16 rounded-full blur-2xl transition group-hover:scale-125',
-                    isAll ? 'bg-white/24' : tone.glow,
+                    isAll ? 'bg-slate-200/45' : tone.glow,
                   )}
                 />
                 <div className="relative flex h-full flex-col items-center text-center">
@@ -1629,31 +1779,19 @@ function QuickCategoriesSection({
                     className={cn(
                       'inline-flex h-14 w-14 items-center justify-center rounded-[17px] border bg-white/88 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.28)]',
                       isAll
-                        ? 'border-white/35 text-[color:var(--app-accent)]'
+                        ? 'border-slate-100 bg-white text-[color:var(--app-accent)]'
                         : [tone.surface, tone.text],
                     )}
                   >
                     <Icon className="h-6 w-6" />
                   </span>
-                  <p
-                    className={cn(
-                      'mt-2.5 w-full truncate text-[0.92rem] font-black leading-5 tracking-[-0.025em]',
-                      isAll ? 'text-white' : 'text-[color:var(--app-text)]',
-                    )}
-                  >
+                  <p className="mt-2.5 w-full truncate text-[0.92rem] font-black leading-5 tracking-[-0.025em] text-[color:var(--app-text)]">
                     {item.label}
                   </p>
-                  <p
-                    className={cn(
-                      'mt-1 line-clamp-2 text-[12px] font-medium leading-4',
-                      isAll
-                        ? 'text-white/82'
-                        : 'text-[color:var(--app-text-soft)]',
-                    )}
-                  >
+                  <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-4 text-[color:var(--app-text-soft)]">
                     {item.description}
                   </p>
-                  <span
+                  {/* <span
                     className={cn(
                       'mt-auto inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black',
                       isAll
@@ -1662,7 +1800,7 @@ function QuickCategoriesSection({
                     )}
                   >
                     {item.countLabel}
-                  </span>
+                  </span> */}
                 </div>
               </Link>
             );
@@ -1684,6 +1822,7 @@ function RecommendationCard({
 }) {
   const badgeTone = toneClassNames(item.badgeTone || 'emerald');
   const favoriteHref = `/login?callbackUrl=${encodeURIComponent(item.href)}`;
+  const entityType = item.entityType || 'listing';
 
   return (
     <article
@@ -1700,13 +1839,25 @@ function RecommendationCard({
           href={item.href}
           className="block h-full"
           aria-label={`${isId ? 'Buka detail' : 'Open detail'} ${item.title}`}
+          data-lajukan-event="home.card_clicked"
+          data-lajukan-surface="home_recommendations"
+          data-lajukan-entity-type={entityType}
+          data-lajukan-entity-id={item.id}
+          data-lajukan-label={item.title}
         >
-          {item.image ? (
-            <Image
-              src={item.image}
+          {item.images.length > 0 ? (
+            <MediaPreviewCarousel
+              items={item.images}
               alt={item.title}
-              fill
-              className="object-cover"
+              aspectClassName="h-full w-full"
+              className="h-full w-full bg-transparent"
+              sizes="260px"
+              loading="eager"
+              controls={false}
+              lightbox={false}
+              showCounter={item.images.length > 1}
+              showDots={item.images.length > 1}
+              mediaClassName="transition duration-500 group-hover:scale-[1.03]"
             />
           ) : (
             <span className="flex h-full items-center justify-center bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]">
@@ -1731,11 +1882,24 @@ function RecommendationCard({
           href={favoriteHref}
           className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[color:var(--app-text)] shadow-[0_12px_22px_-18px_rgba(15,23,42,0.22)] transition hover:text-rose-500"
           aria-label={isId ? `Simpan ${item.title}` : `Save ${item.title}`}
+          data-lajukan-event="recommendation.clicked"
+          data-lajukan-surface="home_recommendations_save"
+          data-lajukan-entity-type={entityType}
+          data-lajukan-entity-id={item.id}
+          data-lajukan-label={item.title}
         >
           <Heart className="h-4 w-4" />
         </Link>
       </div>
-      <Link href={item.href} className="flex flex-1 flex-col">
+      <Link
+        href={item.href}
+        className="flex flex-1 flex-col"
+        data-lajukan-event="home.card_clicked"
+        data-lajukan-surface="home_recommendations"
+        data-lajukan-entity-type={entityType}
+        data-lajukan-entity-id={item.id}
+        data-lajukan-label={item.title}
+      >
         <div className="flex flex-1 flex-col p-3">
           <h3 className="line-clamp-3 min-h-[3.25rem] break-words text-[0.9rem] font-bold leading-[1.2] text-[color:var(--app-text)]">
             {item.title}
@@ -1771,14 +1935,27 @@ function RecommendationCard({
         <Link
           href={item.href}
           className="inline-flex min-h-[34px] items-center justify-center rounded-[12px] bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
+          data-lajukan-event="home.card_clicked"
+          data-lajukan-surface="home_recommendations_detail"
+          data-lajukan-entity-type={entityType}
+          data-lajukan-entity-id={item.id}
+          data-lajukan-label={item.title}
         >
-          {isId ? 'Detail' : 'Detail'}
+          {item.detailActionLabel || (isId ? 'Detail' : 'Detail')}
         </Link>
         <Link
           href={item.createHref}
           className="inline-flex min-h-[34px] items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[11px] font-semibold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)]"
+          data-lajukan-event={
+            item.secondaryEventName || 'listing.create_started'
+          }
+          data-lajukan-surface="home_recommendations_similar"
+          data-lajukan-entity-type={entityType}
+          data-lajukan-entity-id={item.id}
+          data-lajukan-label={item.title}
         >
-          {isId ? 'Buat serupa' : 'Create similar'}
+          {item.secondaryActionLabel ||
+            (isId ? 'Buat serupa' : 'Create similar')}
         </Link>
       </div>
     </article>
@@ -1796,11 +1973,18 @@ function RecommendationsSection({
 }) {
   return (
     <section className="space-y-3" data-testid="home-recommendations-section">
-      <SectionHeading
-        title={isId ? 'Rekomendasi untuk Usaha' : 'Recommended for Business'}
-        actionLabel={isId ? 'Lihat semua' : 'See all'}
-        actionHref={UMKM_DISCOVERY_PATH}
-      />
+      <div>
+        <SectionHeading
+          title={isId ? 'Rekomendasi untuk Usaha' : 'Recommended for Business'}
+          actionLabel={isId ? 'Lihat semua' : 'See all'}
+          actionHref={UMKM_DISCOVERY_PATH}
+        />
+        <p className="mt-1 text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
+          {isId
+            ? 'Geser untuk lihat supplier, jasa, lokasi, dan peluang usaha.'
+            : 'Swipe through suppliers, services, locations, and business opportunities.'}
+        </p>
+      </div>
       {items.length === 0 ? (
         <div className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-white px-4 py-5 text-sm font-semibold text-[color:var(--app-text-soft)]">
           {isId
@@ -1835,97 +2019,161 @@ function RecommendationsSection({
 
 function CommunityPanel({
   isId,
+  isAuthenticated,
   activeTab,
   onTabChange,
   avatarSrc,
+  overview,
   posts,
-  mobile = false,
+  loading = false,
+  hasMore = false,
+  onLoadMore,
+  onCreated,
 }: {
   isId: boolean;
+  isAuthenticated: boolean;
   activeTab: CommunityTab;
   onTabChange: (tab: CommunityTab) => void;
   avatarSrc: string;
+  overview: CommunityFeedOverview | null;
   posts: CommunityPost[];
-  mobile?: boolean;
+  loading?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  onCreated?: (item?: CommunityFeedItem) => void;
 }) {
   const router = useRouter();
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [postOptionsOpen, setPostOptionsOpen] = useState(false);
+  const [postOptionsCopied, setPostOptionsCopied] = useState(false);
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const tabs = getCommunityTabs(isId);
-  const post = posts.find(item => item.tab === activeTab) || posts[0] || null;
-  const communityPostHref = post ? buildCommunityPostHref(post) : '/community';
+  const activeTabMeta = tabs.find(item => item.id === activeTab) || tabs[0]!;
+  const ActiveTabIcon = activeTabMeta.icon;
+  const activeTone = toneClassNames(activeTabMeta.tone);
+  const visiblePosts = posts.filter(item => !hiddenPostIds.has(item.id));
+  const post =
+    visiblePosts.find(item => item.tab === activeTab) ||
+    visiblePosts[0] ||
+    null;
+  const communityPostHref = post
+    ? buildCommunityPostHref(post)
+    : buildCommunityTabHref(activeTab);
   const openCommunityPost = () => router.push(communityPostHref);
+  const activeTabHref = buildCommunityTabHref(activeTab);
+  const morePosts = post
+    ? visiblePosts.filter(item => item.id !== post.id)
+    : visiblePosts.slice(1);
+  const postMediaUrl = post?.mediaUrl || post?.image;
+  const postIsVideo = post?.mediaType === 'video';
+  const postStatsLabel = post
+    ? post.kind === 'reel'
+      ? `${post.views} ${isId ? 'tayangan' : 'views'} - ${post.comments} ${isId ? 'komentar' : 'comments'
+      }`
+      : `${post.comments} ${isId ? 'komentar' : 'comments'} - ${post.shares
+      } ${isId ? 'bagikan' : 'shares'}`
+    : '';
+
+  const copyPostLink = async () => {
+    if (!post) return;
+    const href = buildCommunityPostHref(post);
+    const url =
+      typeof window === 'undefined'
+        ? href
+        : `${window.location.origin}${href.startsWith('/') ? href : `/${href}`}`;
+    try {
+      await navigator.clipboard?.writeText(url);
+      setPostOptionsCopied(true);
+      window.setTimeout(() => setPostOptionsCopied(false), 1600);
+    } catch {
+      setPostOptionsCopied(false);
+    }
+  };
+
+  const hidePostFromHome = () => {
+    if (!post) return;
+    setHiddenPostIds(current => {
+      const next = new Set(current);
+      next.add(post.id);
+      return next;
+    });
+    setPostOptionsOpen(false);
+  };
+
+  useEffect(() => {
+    if (!hasMore || loading || !onLoadMore) return;
+    const node = sentinelRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: '220px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loading, onLoadMore, posts.length]);
 
   return (
-    <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)] sm:p-4">
+    <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-1.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)] sm:p-2">
       <SectionHeading
         title={isId ? 'Dari Komunitas' : 'From the Community'}
-        actionLabel={isId ? 'Lihat semua' : 'See all'}
-        actionHref="/community"
+        actionLabel={activeTabMeta.actionLabel}
+        actionHref={activeTabHref}
       />
       <div
-        className="mt-3 flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)] pb-1.5"
+        className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
         data-auto-scrollbar
       >
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onTabChange(tab.id)}
-            className={cn(
-              'relative shrink-0 pb-1.5 text-xs font-semibold transition',
-              activeTab === tab.id
-                ? 'text-[color:var(--app-accent)]'
-                : 'text-[color:var(--app-text-soft)]',
-            )}
-          >
-            {tab.label}
-            {activeTab === tab.id ? (
-              <span className="absolute inset-x-0 -bottom-[9px] h-[3px] rounded-full bg-[color:var(--app-accent)]" />
-            ) : null}
-          </button>
-        ))}
-      </div>
-      <div className="mt-3 rounded-[20px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff,#fbfffd)] p-3">
-        <div className="flex items-center gap-2.5">
-          <Image
-            src={avatarSrc}
-            alt="Profile"
-            width={36}
-            height={36}
-            className="h-9 w-9 rounded-full object-cover"
-          />
-          <Link
-            href="/community?compose=post"
-            className="flex min-h-[40px] flex-1 items-center rounded-full bg-slate-50 px-3 text-xs text-[color:var(--app-text-soft)]"
-          >
-            {isId
-              ? 'Apa yang sedang Anda pikirkan?'
-              : 'What are you thinking about?'}
-          </Link>
-        </div>
-        <div
-          className={cn(
-            'mt-3 grid gap-2',
-            mobile
-              ? 'grid-cols-2 sm:grid-cols-4'
-              : 'grid-cols-2 lg:grid-cols-4',
-          )}
-        >
-          {COMPOSER_ACTIONS.map(action => {
-            const Icon = action.icon;
-            const tone = toneClassNames(action.tone);
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const tone = toneClassNames(tab.tone);
+          const active = activeTab === tab.id;
 
-            return (
-              <Link
-                key={action.id}
-                href={action.href}
-                className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-white px-2.5 text-xs font-medium text-[color:var(--app-text-soft)]"
-              >
-                <Icon className={cn('h-4.5 w-4.5', tone.soft)} />
-                {action.label}
-              </Link>
-            );
-          })}
-        </div>
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setPostOptionsOpen(false);
+                setPostOptionsCopied(false);
+                onTabChange(tab.id);
+              }}
+              className={cn(
+                'flex min-h-[58px] min-w-0 flex-col justify-center rounded-[16px] border px-3 text-left transition',
+                active
+                  ? cn(tone.surface, tone.text, 'border-current shadow-sm')
+                  : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:border-[color:var(--app-accent-border)] hover:bg-slate-50',
+              )}
+            >
+              <span className="flex min-w-0 items-center gap-1.5 text-xs font-black">
+                <Icon
+                  className={cn(
+                    'h-3.5 w-3.5 shrink-0',
+                    active ? tone.text : 'text-[color:var(--app-text-soft)]',
+                  )}
+                />
+                <span className="truncate">{tab.label}</span>
+              </span>
+              <span className="mt-0.5 line-clamp-1 text-[10px] font-semibold leading-3 opacity-80">
+                {tab.caption}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3">
+        <CommunityComposer
+          isId={isId}
+          userAvatar={avatarSrc}
+          isAuthenticated={isAuthenticated}
+          overview={overview}
+          onCreated={onCreated || (() => undefined)}
+        />
       </div>
       {post ? (
         <article
@@ -1945,19 +2193,13 @@ function CommunityPanel({
           <div className="p-3.5 sm:p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                {post.avatar ? (
-                  <Image
-                    src={post.avatar}
-                    alt={post.author}
-                    width={44}
-                    height={44}
-                    className="h-10 w-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]">
-                    <UserRound className="h-5 w-5" />
-                  </span>
-                )}
+                <Image
+                  src={profileAvatarSrc(post.avatar)}
+                  alt={post.author}
+                  width={44}
+                  height={44}
+                  className="h-10 w-10 rounded-full object-cover"
+                />
                 <div className="min-w-0">
                   <p className="truncate text-[0.95rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">
                     {post.author}
@@ -1968,21 +2210,76 @@ function CommunityPanel({
                   </p>
                 </div>
               </div>
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPostOptionsCopied(false);
+                    setPostOptionsOpen(open => !open);
+                  }}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--app-text-soft)] transition hover:bg-slate-50 hover:text-[color:var(--app-text)]"
+                  aria-label={isId ? 'Buka opsi posting' : 'Open post options'}
+                  aria-expanded={postOptionsOpen}
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+                {postOptionsOpen ? (
+                  <div
+                    className="absolute right-0 top-10 z-20 w-56 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-white p-1.5 text-left shadow-[0_20px_44px_-26px_rgba(15,23,42,0.28)]"
+                    onClick={event => event.stopPropagation()}
+                  >
+                    <Link
+                      href={communityPostHref}
+                      className="flex min-h-[38px] items-center justify-between gap-2 rounded-[12px] px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-slate-50"
+                    >
+                      {isId ? 'Buka detail posting' : 'Open post detail'}
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void copyPostLink()}
+                      className="flex min-h-[38px] w-full items-center justify-between gap-2 rounded-[12px] px-3 text-left text-xs font-bold text-[color:var(--app-text)] hover:bg-slate-50"
+                    >
+                      {postOptionsCopied
+                        ? isId
+                          ? 'Link tersalin'
+                          : 'Link copied'
+                        : isId
+                          ? 'Salin link'
+                          : 'Copy link'}
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={hidePostFromHome}
+                      className="flex min-h-[38px] w-full items-center justify-between gap-2 rounded-[12px] px-3 text-left text-xs font-bold text-[color:var(--app-text-soft)] hover:bg-slate-50"
+                    >
+                      {isId ? 'Sembunyikan di home' : 'Hide from home'}
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href={activeTabHref}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-black',
+                  activeTone.soft,
+                )}
+              >
+                <ActiveTabIcon className="h-3.5 w-3.5" />
+                {activeTabMeta.label}
+              </Link>
               <Link
                 href={communityPostHref}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[color:var(--app-text-soft)]"
-                aria-label="Open community options"
+                className="inline-flex min-w-0 items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-text-soft)]"
               >
-                <MoreHorizontal className="h-5 w-5" />
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{post.community}</span>
               </Link>
             </div>
-            <Link
-              href={communityPostHref}
-              className="mt-3 inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]"
-            >
-              <Users className="h-3.5 w-3.5" />
-              {post.community}
-            </Link>
             <h3 className="mt-3 text-[0.98rem] font-bold leading-5 text-[color:var(--app-text)]">
               {post.title}
             </h3>
@@ -2001,17 +2298,44 @@ function CommunityPanel({
               ))}
             </div>
           </div>
-          {post.image ? (
+          {postMediaUrl ? (
             <Link
               href={communityPostHref}
-              className="relative block h-[140px] sm:h-[190px]"
+              className={cn(
+                'relative block overflow-hidden bg-slate-100',
+                post.kind === 'reel'
+                  ? 'h-[220px] sm:h-[280px]'
+                  : 'h-[140px] sm:h-[190px]',
+              )}
             >
-              <Image
-                src={post.image}
-                alt={post.community}
-                fill
-                className="object-cover"
-              />
+              {postIsVideo ? (
+                <video
+                  src={postMediaUrl}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <MediaPreviewCarousel
+                  items={[postMediaUrl]}
+                  alt={post.community}
+                  aspectClassName="h-full w-full"
+                  className="h-full w-full bg-transparent"
+                  sizes="(max-width: 640px) 100vw, 720px"
+                  controls={false}
+                  lightbox={false}
+                  showCounter={false}
+                  showDots={false}
+                />
+              )}
+              {post.kind === 'reel' ? (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/18 text-white">
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-black/45">
+                    <PlayCircle className="h-7 w-7" />
+                  </span>
+                </span>
+              ) : null}
             </Link>
           ) : null}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-4 py-2.5 text-xs text-[color:var(--app-text-soft)]">
@@ -2021,10 +2345,7 @@ function CommunityPanel({
               </span>
               {post.likes}
             </span>
-            <span>
-              {post.comments} {isId ? 'komentar' : 'comments'} - {post.shares}{' '}
-              {isId ? 'bagikan' : 'shares'}
-            </span>
+            <span>{postStatsLabel}</span>
           </div>
           <div className="grid grid-cols-3 border-t border-[color:var(--app-border)] px-2 py-1.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
             <Link
@@ -2052,17 +2373,67 @@ function CommunityPanel({
         </article>
       ) : (
         <div className="mt-3 rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-white px-4 py-5 text-sm font-semibold text-[color:var(--app-text-soft)]">
-          {isId
-            ? 'Belum ada posting komunitas dari database.'
-            : 'No community database posts yet.'}
+          {activeTabMeta.emptyLabel}
         </div>
       )}
+      {morePosts.length ? (
+        <div className="mt-3 space-y-2">
+          {morePosts.map(item => {
+            const href = buildCommunityPostHref(item);
+            return (
+              <Link
+                key={item.id}
+                href={href}
+                className="flex min-w-0 items-start gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]/40"
+              >
+                <Image
+                  src={profileAvatarSrc(item.avatar)}
+                  alt={item.author}
+                  width={38}
+                  height={38}
+                  className="h-9 w-9 shrink-0 rounded-full object-cover"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                    <span className="truncate">{item.community}</span>
+                    <span className="shrink-0">-</span>
+                    <span className="shrink-0">{item.time}</span>
+                  </span>
+                  <span className="mt-0.5 line-clamp-1 block text-sm font-black text-[color:var(--app-text)]">
+                    {item.title}
+                  </span>
+                  <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-[color:var(--app-text-soft)]">
+                    {item.body}
+                  </span>
+                </span>
+                <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+      {hasMore || loading ? (
+        <div ref={sentinelRef} className="mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loading}
+            className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white px-4 text-xs font-bold text-[color:var(--app-text)] disabled:opacity-55"
+          >
+            {loading
+              ? activeTabMeta.loadingLabel
+              : isId
+                ? 'Muat lagi'
+                : 'Load more'}
+          </button>
+        </div>
+      ) : null}
       <div className="mt-4 flex items-center justify-end">
         <Link
-          href={communityPostHref}
+          href={activeTabHref}
           className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--app-accent)]"
         >
-          {isId ? 'Lihat semua diskusi' : 'See all discussions'}
+          {activeTabMeta.actionLabel}
           <ChevronRight className="h-4 w-4" />
         </Link>
       </div>
@@ -2101,8 +2472,13 @@ function ReelsPanel({
             <Link
               key={item.id}
               href={item.href}
-              className="group relative min-h-[220px] w-[174px] min-w-[174px] max-w-[174px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-slate-950 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)]"
+              className="group relative aspect-[9/16] w-[174px] shrink-0 snap-start overflow-hidden rounded-[20px]"
               data-testid="home-reel-card"
+              data-lajukan-event="home.card_clicked"
+              data-lajukan-surface="home_reels"
+              data-lajukan-entity-type="reel"
+              data-lajukan-entity-id={item.id}
+              data-lajukan-label={item.title}
             >
               {item.mediaUrl && item.mediaType !== 'image' ? (
                 <video
@@ -2125,7 +2501,10 @@ function ReelsPanel({
                 </span>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-              <span className="absolute left-3 top-3 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+              <span
+                className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-emerald-700"
+                title={item.category}
+              >
                 {item.category}
               </span>
               <div className="absolute inset-x-4 bottom-4">
@@ -2150,8 +2529,13 @@ function ReelsPanel({
             <Link
               key={item.id}
               href={item.href}
-              className="group relative min-h-[250px] w-[172px] min-w-[172px] max-w-[172px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-slate-950 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] xl:w-[186px] xl:min-w-[186px] xl:max-w-[186px]"
+              className="group relative aspect-[9/16] min-h-[250px] w-[172px] min-w-[172px] max-w-[172px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-slate-950 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] xl:w-[186px] xl:min-w-[186px] xl:max-w-[186px]"
               data-testid="home-reel-card"
+              data-lajukan-event="home.card_clicked"
+              data-lajukan-surface="home_reels"
+              data-lajukan-entity-type="reel"
+              data-lajukan-entity-id={item.id}
+              data-lajukan-label={item.title}
             >
               {item.mediaUrl && item.mediaType !== 'image' ? (
                 <video
@@ -2174,7 +2558,10 @@ function ReelsPanel({
                 </span>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-transparent" />
-              <span className="absolute left-3 top-3 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+              <span
+                className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-emerald-700"
+                title={item.category}
+              >
                 {item.category}
               </span>
               <div className="absolute inset-x-4 bottom-4">
@@ -2196,6 +2583,7 @@ function ReelsPanel({
 
 function RightRail({
   isId,
+  locale,
   isAuthenticated,
   summary,
   primaryCtaHref,
@@ -2204,6 +2592,7 @@ function RightRail({
   walletLoading,
 }: {
   isId: boolean;
+  locale: string;
   isAuthenticated: boolean;
   summary: LajukanSummary | null;
   primaryCtaHref: string;
@@ -2216,21 +2605,21 @@ function RightRail({
     {
       id: 'verified',
       label: isId ? 'Supplier siap' : 'Verified suppliers',
-      value: resolveCountLabel(summary?.stores?.verified, '6'),
+      value: resolveCountLabel(summary?.stores?.verified, '0'),
       icon: ShieldCheck,
       tone: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-200 dark:ring-emerald-900/60',
     },
     {
       id: 'cities',
       label: isId ? 'Kota aktif' : 'Active cities',
-      value: resolveCountLabel(summary?.stores?.cities, '10'),
+      value: resolveCountLabel(summary?.stores?.cities, '0'),
       icon: MapPin,
       tone: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-950/40 dark:text-teal-200 dark:ring-teal-900/60',
     },
     {
       id: 'requests',
       label: isId ? 'Permintaan aktif' : 'Active requests',
-      value: resolveCountLabel(summary?.requests?.active, '2'),
+      value: resolveCountLabel(summary?.requests?.active, '0'),
       icon: ClipboardList,
       tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
     },
@@ -2238,11 +2627,11 @@ function RightRail({
   const benefitPoints = isId
     ? ['Semua fitur', 'Nego langsung', 'Transaksi aman', 'Jaringan luas']
     : [
-        'Unlock every Lajukan feature',
-        'Negotiate directly with suppliers',
-        'Safer and trusted transactions',
-        'Build a wider business network',
-      ];
+      'Unlock every Lajukan feature',
+      'Negotiate directly with suppliers',
+      'Safer and trusted transactions',
+      'Build a wider business network',
+    ];
   const slideCount = 2;
 
   useEffect(() => {
@@ -2283,9 +2672,9 @@ function RightRail({
   };
 
   return (
-    <aside className="lajukan-home-right-rail hidden xl:block xl:min-h-0 xl:pt-2">
+    <aside className="lajukan-home-right-rail hidden min-w-0 xl:flex xl:h-full xl:max-h-full xl:min-h-0 xl:flex-col xl:overflow-hidden xl:pt-2">
       <div
-        className="lajukan-home-right-rail-scroll flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3 pl-4 overscroll-contain"
+        className="lajukan-home-right-rail-scroll flex h-full max-h-full min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-2.5 py-3 overscroll-contain"
         data-auto-scrollbar
       >
         <GameProgressCard
@@ -2297,10 +2686,11 @@ function RightRail({
           walletLoading={walletLoading}
           compact
         />
-        <section className="lajukan-home-pulse-card flex max-h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)]">
-          <div className="lajukan-home-pulse-header flex items-center justify-between border-b border-[color:var(--app-border)] px-4 py-3">
+        <DailyLoginRewardCard locale={locale} compact />
+        <section className="lajukan-home-pulse-card flex max-h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)]">
+          <div className="lajukan-home-pulse-header flex items-center justify-between gap-2 border-b border-[color:var(--app-border)] px-3 py-2.5">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
                 {activeSlide === 0 ? (
                   <BarChart3 className="h-4 w-4" />
                 ) : (
@@ -2328,11 +2718,11 @@ function RightRail({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => goToSlide(activeSlide - 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
                 aria-label="Previous slide"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -2340,7 +2730,7 @@ function RightRail({
               <button
                 type="button"
                 onClick={() => goToSlide(activeSlide + 1)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
                 aria-label="Next slide"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -2352,25 +2742,25 @@ function RightRail({
             className="lajukan-home-pulse-track flex w-full transition-transform duration-500 ease-out"
             style={{ transform: `translateX(-${activeSlide * 100}%)` }}
           >
-            <div className="lajukan-home-pulse-slide w-full shrink-0 p-4">
-              <div className="lajukan-home-pulse-list space-y-2.5">
+            <div className="lajukan-home-pulse-slide w-full shrink-0 p-3">
+              <div className="lajukan-home-pulse-list space-y-2">
                 {pulseItems.map(item => {
                   const Icon = item.icon;
                   return (
                     <div
                       key={item.id}
-                      className="lajukan-home-pulse-row flex items-center justify-between gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff,#fbfffd)] px-3 py-2.5"
+                      className="lajukan-home-pulse-row flex min-w-0 items-center justify-between gap-2 rounded-[15px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff,#fbfffd)] px-2.5 py-2"
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <span
                           className={cn(
-                            'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ring-1',
+                            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] ring-1',
                             item.tone,
                           )}
                         >
                           <Icon className="h-4 w-4" />
                         </span>
-                        <span className="truncate text-xs font-semibold text-[color:var(--app-text)]">
+                        <span className="min-w-0 truncate text-xs font-semibold text-[color:var(--app-text)]">
                           {item.label}
                         </span>
                       </span>
@@ -2383,8 +2773,8 @@ function RightRail({
               </div>
             </div>
 
-            <div className="lajukan-home-pulse-slide lajukan-home-pulse-growth w-full shrink-0 bg-[linear-gradient(180deg,#f4fff8_0%,#ffffff_62%,#eefbf4_100%)] p-4">
-              <h2 className="lajukan-home-pulse-title text-[1.18rem] font-black leading-tight tracking-[-0.045em] text-[color:var(--app-text)]">
+            <div className="lajukan-home-pulse-slide lajukan-home-pulse-growth w-full shrink-0 bg-[linear-gradient(180deg,#f4fff8_0%,#ffffff_62%,#eefbf4_100%)] p-3">
+              <h2 className="lajukan-home-pulse-title text-[1.02rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
                 {isAuthenticated
                   ? isId
                     ? 'Naikkan jangkauan, dapatkan lebih banyak peluang'
@@ -2393,11 +2783,11 @@ function RightRail({
                     ? 'Gabung sekarang, dapatkan lebih banyak peluang'
                     : 'Join now and unlock more opportunities'}
               </h2>
-              <ul className="lajukan-home-pulse-benefits mt-4 space-y-2.5">
+              <ul className="lajukan-home-pulse-benefits mt-3 space-y-2">
                 {benefitPoints.map(point => (
                   <li
                     key={point}
-                    className="lajukan-home-pulse-benefit flex items-start gap-2.5 text-xs leading-5 text-[color:var(--app-text-soft)]"
+                    className="lajukan-home-pulse-benefit flex items-start gap-2 text-xs leading-4 text-[color:var(--app-text-soft)]"
                   >
                     <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                       <ShieldCheck className="h-3 w-3" />
@@ -2418,16 +2808,16 @@ function RightRail({
                     ? 'Daftar Gratis'
                     : 'Join Free'}
               </Link>
-              <div className="lajukan-home-pulse-visual relative mt-4 flex h-32 items-center justify-center rounded-[22px] bg-[radial-gradient(circle_at_top,#ddffe9,transparent_64%)]">
-                <div className="lajukan-home-pulse-visual-glow absolute h-20 w-20 rounded-full bg-emerald-100 blur-3xl" />
-                <div className="lajukan-home-pulse-visual-icon relative flex h-20 w-20 items-center justify-center rounded-[22px] border border-emerald-200 bg-white shadow-[0_18px_32px_-24px_rgba(15,23,42,0.16)]">
-                  <Gift className="lajukan-home-pulse-gift h-10 w-10 text-emerald-500" />
+              <div className="lajukan-home-pulse-visual relative mt-3 flex h-24 items-center justify-center rounded-[18px] bg-[radial-gradient(circle_at_top,#ddffe9,transparent_64%)]">
+                <div className="lajukan-home-pulse-visual-glow absolute h-16 w-16 rounded-full bg-emerald-100 blur-3xl" />
+                <div className="lajukan-home-pulse-visual-icon relative flex h-14 w-14 items-center justify-center rounded-[18px] border border-emerald-200 bg-white shadow-[0_18px_32px_-24px_rgba(15,23,42,0.16)]">
+                  <Gift className="lajukan-home-pulse-gift h-7 w-7 text-emerald-500" />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="lajukan-home-pulse-dots flex items-center justify-center gap-2 border-t border-[color:var(--app-border)] px-4 py-3">
+          <div className="lajukan-home-pulse-dots flex items-center justify-center gap-2 border-t border-[color:var(--app-border)] px-3 py-2.5">
             {Array.from({ length: slideCount }).map((_, index) => (
               <button
                 key={index}
@@ -2456,7 +2846,7 @@ function HomeLoadingState() {
       shellClassName="h-full max-w-[1480px] px-4 py-4"
     >
       <div
-        className="mt-4 grid min-h-0 gap-4 lg:h-[calc(100%-5rem)] lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[280px_minmax(0,1fr)_280px]"
+        className="mt-4 grid min-h-0 gap-4 lg:h-[calc(100%-5rem)] lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_288px] 2xl:grid-cols-[280px_minmax(0,1fr)_320px]"
         data-skeleton-route="true"
       >
         <div className="ui-skeleton ui-skeleton-pulse hidden h-[540px] rounded-[24px] lg:block" />
@@ -2485,6 +2875,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     [],
   );
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
+  const [communityOverview, setCommunityOverview] =
+    useState<CommunityFeedOverview | null>(null);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityHasMore, setCommunityHasMore] = useState(false);
+  const [communityOffset, setCommunityOffset] = useState(0);
   const [reels, setReels] = useState<ReelItem[]>([]);
   const [walletAmountLabel, setWalletAmountLabel] = useState(() =>
     formatCurrencyFromCents(0, 'IDR'),
@@ -2602,7 +2997,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     let active = true;
 
     const loadHomeContent = async () => {
-      try {
+      const loadListingRecommendations = async () => {
         const response = await fetch(
           '/api/content?limit=16&status=active&include_owner=1&database_only=1',
           {
@@ -2611,13 +3006,37 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           },
         );
         const payload = await response.json().catch(() => null);
-        if (!active || !response.ok) return;
-        setRecommendations(
-          extractContentItems(payload)
-            .map(item => mapContentToRecommendation(item, isId))
-            .filter((item): item is RecommendationItem => Boolean(item))
-            .slice(0, 12),
+        if (!response.ok) return [];
+        return extractContentItems(payload)
+          .map(item => mapContentToRecommendation(item, isId))
+          .filter((item): item is RecommendationItem => Boolean(item));
+      };
+
+      const loadUmkmRecommendations = async () => {
+        const response = await fetch('/api/super-app/umkm/stores?limit=18', {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as HomeUmkmStoresResponse;
+        if (!response.ok || !payload.data?.items) return [];
+        return payload.data.items
+          .map(store => mapUmkmStoreToRecommendation(store, isId))
+          .filter((item): item is RecommendationItem => Boolean(item));
+      };
+
+      try {
+        const [listingItems, umkmItems] = await Promise.all([
+          loadListingRecommendations().catch(() => []),
+          loadUmkmRecommendations().catch(() => []),
+        ]);
+        if (!active) return;
+        const mergedItems = [...listingItems, ...umkmItems].filter(
+          (item, index, allItems) =>
+            allItems.findIndex(candidate => candidate.id === item.id) === index,
         );
+        setRecommendations(mergedItems.slice(0, 12));
       } catch {
         if (active) setRecommendations([]);
       }
@@ -2630,14 +3049,14 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     };
   }, [isId]);
 
-  useEffect(() => {
-    let active = true;
-
-    const loadCommunityPosts = async () => {
+  const loadCommunityPostsPage = useCallback(
+    async (offset = 0) => {
+      setCommunityLoading(true);
       try {
         const params = new URLSearchParams({
           tab: activeTab,
-          limit: '6',
+          limit: String(HOME_COMMUNITY_PAGE_SIZE),
+          cursor: String(offset),
         });
         const response = await fetch(
           `/api/community/feed?${params.toString()}`,
@@ -2649,23 +3068,76 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         const payload = (await response
           .json()
           .catch(() => null)) as CommunityFeedResponse | null;
-        if (!active || !response.ok) return;
-        setCommunityPosts(
-          (payload?.items || []).map(item =>
-            mapCommunityItemToPost(item, isId),
-          ),
+        if (!response.ok) return;
+        const mapped = (payload?.items || []).map(item =>
+          mapCommunityItemToPost(item, isId, activeTab),
         );
+        setCommunityOverview(payload?.overview || null);
+        setCommunityPosts(prev => {
+          if (offset === 0) return mapped;
+          const seen = new Set(prev.map(item => item.id));
+          return [...prev, ...mapped.filter(item => !seen.has(item.id))];
+        });
+        setCommunityOffset(payload?.nextCursor ?? offset + mapped.length);
+        setCommunityHasMore(Boolean(payload?.hasMore));
       } catch {
-        if (active) setCommunityPosts([]);
+        if (offset === 0) setCommunityPosts([]);
+        if (offset === 0) setCommunityOverview(null);
+        setCommunityHasMore(false);
+      } finally {
+        setCommunityLoading(false);
       }
-    };
+    },
+    [activeTab, isId],
+  );
 
-    void loadCommunityPosts();
+  useEffect(() => {
+    setCommunityPosts([]);
+    setCommunityOverview(null);
+    setCommunityOffset(0);
+    setCommunityHasMore(false);
+    void loadCommunityPostsPage(0);
+  }, [loadCommunityPostsPage]);
 
-    return () => {
-      active = false;
-    };
-  }, [activeTab, isId]);
+  const loadMoreCommunityPosts = useCallback(() => {
+    if (communityLoading || !communityHasMore) return;
+    void loadCommunityPostsPage(communityOffset);
+  }, [
+    communityHasMore,
+    communityLoading,
+    communityOffset,
+    loadCommunityPostsPage,
+  ]);
+
+  const handleCommunityComposerCreated = useCallback(
+    (createdItem?: CommunityFeedItem) => {
+      if (!createdItem) {
+        void loadCommunityPostsPage(0);
+        return;
+      }
+
+      const nextTab = createdItem.kind === 'reel' ? 'reels' : activeTab;
+      const nextPost = mapCommunityItemToPost(createdItem, isId, nextTab);
+      if (nextTab !== activeTab) setActiveTab(nextTab);
+      setCommunityPosts(current => [
+        nextPost,
+        ...current.filter(item => item.id !== nextPost.id),
+      ]);
+      setCommunityOverview(current =>
+        current
+          ? {
+            ...current,
+            stats: {
+              ...current.stats,
+              totalThreads: current.stats.totalThreads + 1,
+              totalPosts: current.stats.totalPosts + 1,
+            },
+          }
+          : current,
+      );
+    },
+    [activeTab, isId, loadCommunityPostsPage],
+  );
 
   useEffect(() => {
     let active = true;
@@ -2699,32 +3171,37 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   const text = isId
     ? {
-        help: 'Bantuan',
-        login: 'Masuk',
-        register: 'Daftar Gratis',
-        inviteTitle: 'Siap jalan?',
-        inviteDescription: 'Gabung, cari peluang, lanjut chat.',
-        inviteButton: 'Daftar Gratis',
-        searchPlaceholder: 'Cari supplier, jasa, lokasi...',
-        searchButton: 'Cari',
-      }
+      help: 'Bantuan',
+      login: 'Masuk',
+      register: 'Daftar Gratis',
+      inviteTitle: 'Siap jalan?',
+      inviteDescription: 'Gabung, cari peluang, lanjut chat.',
+      inviteButton: 'Daftar Gratis',
+      searchPlaceholder: 'Cari supplier, jasa, lokasi...',
+      searchButton: 'Cari',
+    }
     : {
-        help: 'Help',
-        login: 'Login',
-        register: 'Join Free',
-        inviteTitle: 'Ready to grow your business?',
-        inviteDescription:
-          'Join Lajukan and unlock more supplier, service, and operating opportunities for your business.',
-        inviteButton: 'Join Free',
-        searchPlaceholder: 'Search suppliers, services, places...',
-        searchButton: 'Search',
-      };
+      help: 'Help',
+      login: 'Login',
+      register: 'Join Free',
+      inviteTitle: 'Ready to grow your business?',
+      inviteDescription:
+        'Join Lajukan and unlock more supplier, service, and operating opportunities for your business.',
+      inviteButton: 'Join Free',
+      searchPlaceholder: 'Search suppliers, services, places...',
+      searchButton: 'Search',
+    };
 
-  const avatarSrc =
-    user?.avatarUrl || user?.avatar_url || '/default-avatar.svg';
+  const avatarSrc = profileAvatarSrc(user?.avatarUrl || user?.avatar_url);
   const primaryCtaHref = isAuthenticated ? '/create' : '/register';
   const handleSearchSubmit = (submittedQuery: string) => {
     const trimmedQuery = submittedQuery.trim();
+    void trackLajukanEvent('search.submitted', {
+      properties: {
+        query: trimmedQuery,
+        source: 'home_hero',
+      },
+    });
     router.push(
       trimmedQuery
         ? `/search?q=${encodeURIComponent(trimmedQuery)}`
@@ -2734,169 +3211,169 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   const sidebarItems = isAuthenticated
     ? {
-        primary: [
-          {
-            id: 'home',
-            label: isId ? 'Beranda' : 'Home',
-            caption: isId ? 'Ringkasan' : 'Main business overview',
-            href: '/home',
-            icon: Home,
-          },
-          {
-            id: 'explore',
-            label: isId ? 'Jelajah' : 'Explore',
-            caption: isId
-              ? 'Supplier, produk, jasa'
-              : 'Suppliers, products, services',
-            href: UMKM_DISCOVERY_PATH,
-            icon: LayoutGrid,
-          },
-          {
-            id: 'community',
-            label: isId ? 'Komunitas' : 'Community',
-            caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
-            href: '/community',
-            icon: Sparkles,
-          },
-          {
-            id: 'reels',
-            label: isId ? 'Reels Bisnis' : 'Business Reels',
-            caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
-            href: '/reels',
-            icon: PlayCircle,
-          },
-          {
-            id: 'requests',
-            label: isId ? 'Permintaan' : 'My Requests',
-            caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
-            href: '/my-projects',
-            icon: ClipboardList,
-          },
-          {
-            id: 'transactions',
-            label: isId ? 'Transaksi' : 'Transactions',
-            caption: isId ? 'Status & bayar' : 'Progress and payments',
-            href: '/transactions',
-            icon: CreditCard,
-          },
-        ],
-        secondary: [
-          {
-            id: 'chat',
-            label: 'Chat',
-            caption: isId ? 'Nego & follow-up' : 'Negotiation and follow-up',
-            href: '/chat',
-            icon: MessageCircle,
-            badge:
-              totalUnread > 0
-                ? totalUnread > 99
-                  ? '99+'
-                  : totalUnread
-                : undefined,
-          },
-          {
-            id: 'account',
-            label: isId ? 'Akun' : 'My Account',
-            caption: isId ? 'Profil' : 'Profile and preferences',
-            href: '/profile',
-            icon: UserRound,
-          },
-          {
-            id: 'support',
-            label: isId ? 'Bantuan' : 'Help',
-            caption: isId ? 'Support' : 'Guides and support',
-            href: '/support',
-            icon: CircleHelp,
-          },
-        ],
-      }
+      primary: [
+        {
+          id: 'home',
+          label: isId ? 'Beranda' : 'Home',
+          caption: isId ? 'Ringkasan' : 'Main business overview',
+          href: '/home',
+          icon: Home,
+        },
+        {
+          id: 'explore',
+          label: isId ? 'Jelajah' : 'Explore',
+          caption: isId
+            ? 'Supplier, produk, jasa'
+            : 'Suppliers, products, services',
+          href: UMKM_DISCOVERY_PATH,
+          icon: LayoutGrid,
+        },
+        {
+          id: 'community',
+          label: isId ? 'Komunitas' : 'Community',
+          caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
+          href: '/community',
+          icon: Sparkles,
+        },
+        {
+          id: 'reels',
+          label: isId ? 'Reels Bisnis' : 'Business Reels',
+          caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
+          href: '/reels',
+          icon: PlayCircle,
+        },
+        {
+          id: 'requests',
+          label: isId ? 'Permintaan' : 'My Requests',
+          caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
+          href: '/my-projects',
+          icon: ClipboardList,
+        },
+        {
+          id: 'transactions',
+          label: isId ? 'Transaksi' : 'Transactions',
+          caption: isId ? 'Status & bayar' : 'Progress and payments',
+          href: '/transactions',
+          icon: CreditCard,
+        },
+      ],
+      secondary: [
+        {
+          id: 'chat',
+          label: 'Chat',
+          caption: isId ? 'Nego & follow-up' : 'Negotiation and follow-up',
+          href: '/chat',
+          icon: MessageCircle,
+          badge:
+            totalUnread > 0
+              ? totalUnread > 99
+                ? '99+'
+                : totalUnread
+              : undefined,
+        },
+        {
+          id: 'account',
+          label: isId ? 'Akun' : 'My Account',
+          caption: isId ? 'Profil' : 'Profile and preferences',
+          href: '/profile',
+          icon: UserRound,
+        },
+        {
+          id: 'support',
+          label: isId ? 'Bantuan' : 'Help',
+          caption: isId ? 'Support' : 'Guides and support',
+          href: '/support',
+          icon: CircleHelp,
+        },
+      ],
+    }
     : {
-        primary: [
-          {
-            id: 'home',
-            label: isId ? 'Beranda' : 'Home',
-            caption: isId ? 'Peluang terbaru' : 'Latest opportunity overview',
-            href: '/home',
-            icon: Home,
-          },
-          {
-            id: 'explore',
-            label: isId ? 'Jelajah' : 'Explore',
-            caption: isId
-              ? 'Supplier, produk, jasa'
-              : 'Suppliers, products, services',
-            href: UMKM_DISCOVERY_PATH,
-            icon: LayoutGrid,
-          },
-          {
-            id: 'supplier',
-            label: isId ? 'Supplier' : 'Suppliers',
-            caption: isId ? 'Siap respon' : 'Trusted suppliers',
-            href: '/search?type=product&q=supplier',
-            icon: ShoppingBag,
-          },
-          {
-            id: 'service',
-            label: isId ? 'Jasa' : 'Services',
-            caption: isId ? 'Operasional' : 'Business services',
-            href: '/search?type=service&q=jasa%20usaha',
-            icon: BriefcaseBusiness,
-          },
-          {
-            id: 'location',
-            label: isId ? 'Lokasi' : 'Places',
-            caption: isId ? 'Titik jual' : 'Strategic places',
-            href: '/search?type=property&q=lokasi%20usaha',
-            icon: MapPin,
-          },
-          {
-            id: 'talent',
-            label: 'Talent',
-            caption: isId ? 'Siap bantu' : 'Qualified talent',
-            href: '/search?type=freelancer&q=talent',
-            icon: UserRound,
-          },
-          {
-            id: 'opportunity',
-            label: isId ? 'Peluang' : 'Business Opportunities',
-            caption: isId ? 'Ide tumbuh' : 'Growth and expansion ideas',
-            href: '/learn',
-            icon: TrendingUp,
-          },
-        ],
-        secondary: [
-          {
-            id: 'community',
-            label: isId ? 'Komunitas' : 'Community',
-            caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
-            href: '/community',
-            icon: Sparkles,
-          },
-          {
-            id: 'reels',
-            label: isId ? 'Reels' : 'Business Reels',
-            caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
-            href: '/reels',
-            icon: PlayCircle,
-          },
-          {
-            id: 'requests',
-            label: isId ? 'Permintaan Saya' : 'My Requests',
-            caption: isId ? 'Login untuk akses' : 'Login to access',
-            href: '/login',
-            icon: ClipboardList,
-            locked: true,
-          },
-          {
-            id: 'transactions',
-            label: isId ? 'Transaksi' : 'Transactions',
-            caption: isId ? 'Login untuk akses' : 'Login to access',
-            href: '/login',
-            icon: CreditCard,
-            locked: true,
-          },
-        ],
-      };
+      primary: [
+        {
+          id: 'home',
+          label: isId ? 'Beranda' : 'Home',
+          caption: isId ? 'Peluang terbaru' : 'Latest opportunity overview',
+          href: '/home',
+          icon: Home,
+        },
+        {
+          id: 'explore',
+          label: isId ? 'Jelajah' : 'Explore',
+          caption: isId
+            ? 'Supplier, produk, jasa'
+            : 'Suppliers, products, services',
+          href: UMKM_DISCOVERY_PATH,
+          icon: LayoutGrid,
+        },
+        {
+          id: 'supplier',
+          label: isId ? 'Supplier' : 'Suppliers',
+          caption: isId ? 'Siap respon' : 'Trusted suppliers',
+          href: '/search?type=product&q=supplier',
+          icon: ShoppingBag,
+        },
+        {
+          id: 'service',
+          label: isId ? 'Jasa' : 'Services',
+          caption: isId ? 'Operasional' : 'Business services',
+          href: '/search?type=service&q=jasa%20usaha',
+          icon: BriefcaseBusiness,
+        },
+        {
+          id: 'location',
+          label: isId ? 'Lokasi' : 'Places',
+          caption: isId ? 'Titik jual' : 'Strategic places',
+          href: '/search?type=property&q=lokasi%20usaha',
+          icon: MapPin,
+        },
+        {
+          id: 'talent',
+          label: 'Talent',
+          caption: isId ? 'Siap bantu' : 'Qualified talent',
+          href: '/search?type=freelancer&q=talent',
+          icon: UserRound,
+        },
+        {
+          id: 'opportunity',
+          label: isId ? 'Peluang' : 'Business Opportunities',
+          caption: isId ? 'Ide tumbuh' : 'Growth and expansion ideas',
+          href: '/learn',
+          icon: TrendingUp,
+        },
+      ],
+      secondary: [
+        {
+          id: 'community',
+          label: isId ? 'Komunitas' : 'Community',
+          caption: isId ? 'Diskusi bisnis' : 'Forum and business discussion',
+          href: '/community',
+          icon: Sparkles,
+        },
+        {
+          id: 'reels',
+          label: isId ? 'Reels' : 'Business Reels',
+          caption: isId ? 'Tips singkat' : 'Short inspiration and tips',
+          href: '/reels',
+          icon: PlayCircle,
+        },
+        {
+          id: 'requests',
+          label: isId ? 'Permintaan Saya' : 'My Requests',
+          caption: isId ? 'Login untuk akses' : 'Login to access',
+          href: '/login',
+          icon: ClipboardList,
+          locked: true,
+        },
+        {
+          id: 'transactions',
+          label: isId ? 'Transaksi' : 'Transactions',
+          caption: isId ? 'Login untuk akses' : 'Login to access',
+          href: '/login',
+          icon: CreditCard,
+          locked: true,
+        },
+      ],
+    };
 
   if (authLoading) {
     return <HomeLoadingState />;
@@ -2919,6 +3396,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           walletLoading={walletLoading}
           compact
         />
+        <DailyLoginRewardCard locale={locale} compact />
         <QuickCategoriesSection
           isId={isId}
           isAuthenticated={isAuthenticated}
@@ -2928,19 +3406,24 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
         <HomeUmkmMapPreview locale={locale} />
         <RecommendationsSection isId={isId} items={recommendations} mobile />
+        <ReelsPanel isId={isId} items={reels} mobile />
         <CommunityPanel
           isId={isId}
+          isAuthenticated={isAuthenticated}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           avatarSrc={avatarSrc}
+          overview={communityOverview}
           posts={communityPosts}
-          mobile
+          loading={communityLoading}
+          hasMore={communityHasMore}
+          onLoadMore={loadMoreCommunityPosts}
+          onCreated={handleCommunityComposerCreated}
         />
-        <ReelsPanel isId={isId} items={reels} mobile />
       </div>
 
       <div className="lajukan-home-desktop-shell hidden min-h-0 min-w-0 lg:flex lg:flex-1 lg:flex-col">
-        <div className="lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 min-w-0 max-w-[1700px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[280px_minmax(0,1fr)_280px]">
+        <div className="lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 min-w-0 max-w-[1700px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_288px] 2xl:grid-cols-[280px_minmax(0,1fr)_320px]">
           <DesktopSidebar
             pathname={pathname}
             items={sidebarItems}
@@ -2974,6 +3457,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   walletModeLabel={walletModeLabel}
                   walletLoading={walletLoading}
                 />
+                <div className="mt-4">
+                  <DailyLoginRewardCard locale={locale} />
+                </div>
               </div>
               <QuickCategoriesSection
                 isId={isId}
@@ -2986,16 +3472,23 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 <ReelsPanel isId={isId} items={reels} />
                 <CommunityPanel
                   isId={isId}
+                  isAuthenticated={isAuthenticated}
                   activeTab={activeTab}
                   onTabChange={setActiveTab}
                   avatarSrc={avatarSrc}
+                  overview={communityOverview}
                   posts={communityPosts}
+                  loading={communityLoading}
+                  hasMore={communityHasMore}
+                  onLoadMore={loadMoreCommunityPosts}
+                  onCreated={handleCommunityComposerCreated}
                 />
               </div>
             </div>
           </main>
           <RightRail
             isId={isId}
+            locale={locale}
             isAuthenticated={isAuthenticated}
             summary={summary}
             primaryCtaHref={primaryCtaHref}

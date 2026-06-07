@@ -26,6 +26,8 @@
 	<string>Kamera diperlukan untuk panggilan video dan unggah foto.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Mikrofon diperlukan untuk panggilan suara.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Galeri diperlukan untuk memilih foto atau video reels.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Lokasi diperlukan untuk fitur driver, tracker, dan matching.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

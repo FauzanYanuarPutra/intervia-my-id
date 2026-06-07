@@ -6,6 +6,7 @@
     var(--app-bottom-nav-height) + var(--app-thumb-zone-gap)
   );
   --app-page-x-base: clamp(10px, 1.8vw, 20px);
+  --app-mobile-page-x: 0.25rem;
   --app-section-y-base: clamp(10px, 1.8vw, 22px);
   --app-radius-base: 16px;
   --app-radius-sm-base: 10px;
@@ -232,7 +233,11 @@
 :root[data-theme='ocean'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb, var(--app-brand-primary) 18%, transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 18%,
+    transparent
+  );
 }
 
 :root[data-theme='sunset'] {
@@ -244,19 +249,31 @@
 :root[data-theme='orchid'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb, var(--app-brand-primary) 18%, transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 18%,
+    transparent
+  );
 }
 
 :root[data-theme='mono'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb, var(--app-brand-primary) 14%, transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 14%,
+    transparent
+  );
 }
 
 .dark[data-theme='ocean'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb, var(--app-brand-primary) 20%, transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 20%,
+    transparent
+  );
 }
 
 .dark[data-theme='sunset'] {
@@ -268,13 +285,21 @@
 .dark[data-theme='orchid'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb, var(--app-brand-primary) 20%, transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 20%,
+    transparent
+  );
 }
 
 .dark[data-theme='mono'] {
   --app-accent: var(--app-brand-primary);
   --app-accent-strong: var(--app-brand-primary-strong);
-  --app-highlight: color-mix(in srgb, var(--app-brand-primary) 14%, transparent);
+  --app-highlight: color-mix(
+    in srgb,
+    var(--app-brand-primary) 14%,
+    transparent
+  );
 }
 
 .ui-layer-content-raised {
@@ -478,6 +503,10 @@ button,
 
 .app-shell[data-route-intent='features'] {
   --route-accent: var(--app-warning);
+}
+
+.app-shell[data-route-intent='learn'] {
+  --route-accent: var(--app-brand-info);
 }
 
 .app-shell[data-route-intent='super'] {
@@ -701,7 +730,9 @@ button,
   box-shadow: var(--app-shadow-soft);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']) {
   --app-max-width: 1180px;
   --app-page-x-base: clamp(10px, 1.6vw, 18px);
   --app-section-y-base: clamp(8px, 1.35vw, 16px);
@@ -710,40 +741,60 @@ button,
   --app-radius-lg-base: 22px;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .page-shell {
   padding-top: clamp(0.75rem, 1.4vw, 1.25rem);
   padding-bottom: clamp(1.25rem, 2.2vw, 2rem);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   > :where(main, section, div)[class*='mx-auto'][class*='max-w-'] {
   padding-inline: var(--app-page-x);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  .page-rhythm > * + * {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  .page-rhythm
+  > *
+  + * {
   margin-top: clamp(0.65rem, 1.2vw, 1rem);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel, .ui-feed-section, .ui-section-shell-content) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-panel,
+    .ui-panel-strong,
+    .ui-sheet,
+    .ui-hero-panel,
+    .ui-feed-section,
+    .ui-section-shell-content
+  ) {
   border-color: var(--app-border);
   border-radius: var(--app-radius);
   box-shadow: var(--app-shadow-soft);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-section-shell-content) {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
-      color-mix(in srgb, var(--app-surface) 94%, transparent)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-surface-strong) 98%, transparent),
+    color-mix(in srgb, var(--app-surface) 94%, transparent)
+  );
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-hero-panel {
   background:
     radial-gradient(
@@ -758,24 +809,36 @@ button,
     );
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-8'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-7'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-6'],
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel)[class*='p-5'] {
   padding: clamp(0.875rem, 1.45vw, 1.2rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-page-eyebrow {
   font-size: 10px;
   letter-spacing: 0.12em;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-kicker {
   min-height: 28px;
   padding: 0.3rem 0.65rem;
@@ -783,77 +846,113 @@ button,
   letter-spacing: 0.12em;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-page-title {
   font-size: clamp(1.12rem, 1.45vw, 1.55rem);
   line-height: 1.12;
   letter-spacing: -0.025em;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-page-copy {
   max-width: 38rem;
   font-size: 0.84rem;
   line-height: 1.5;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-page-actions {
   gap: 0.45rem;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-page-link-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   gap: 0.55rem;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-page-link-card {
   border-radius: 16px;
   background: color-mix(in srgb, var(--app-surface-strong) 96%, transparent);
   box-shadow: 0 14px 28px -26px rgba(15, 23, 42, 0.18);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .ui-page-step-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where(.ui-button-primary, .ui-button-secondary, .ui-button-danger, .ui-route-action-primary, .ui-route-action-secondary) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-button-primary,
+    .ui-button-secondary,
+    .ui-button-danger,
+    .ui-route-action-primary,
+    .ui-route-action-secondary
+  ) {
   min-height: 38px;
   border-radius: 13px;
   padding-inline: 0.85rem;
   font-size: 0.78rem;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(.ui-inline-meta, .ui-action-cue) {
   min-height: 27px;
   padding-inline: 0.55rem;
   font-size: 10px;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(.ui-page-stack, .ui-feed-tight-stack) {
   gap: 0.625rem;
 }
 
 @media (max-width: 640px) {
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
     .page-shell {
     padding-inline: 0.5rem;
     padding-top: 0.5rem;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where(.ui-panel, .ui-panel-strong, .ui-sheet, .ui-hero-panel, .ui-section-shell-content) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      .ui-panel,
+      .ui-panel-strong,
+      .ui-sheet,
+      .ui-hero-panel,
+      .ui-section-shell-content
+    ) {
     border-radius: 16px;
   }
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']) {
   --app-max-width: 1440px;
   --app-page-x-base: clamp(8px, 1.2vw, 16px);
   --app-section-y-base: clamp(7px, 1vw, 14px);
@@ -872,22 +971,43 @@ button,
     [data-route-intent='super'],
     [data-route-intent='create']
   )
-  :where([class*='max-w-7xl'], [class*='max-w-6xl'], [class*='max-w-[var(--app-max-width)]']) {
+  :where(
+    [class*='max-w-7xl'],
+    [class*='max-w-6xl'],
+    [class*='max-w-[var(--app-max-width)]']
+  ) {
   max-width: min(1500px, calc(100vw - 12px)) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='gap-8'], [class~='gap-7'], [class~='gap-6'], [class~='gap-5']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='gap-8'],
+    [class~='gap-7'],
+    [class~='gap-6'],
+    [class~='gap-5']
+  ) {
   gap: 0.875rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where([class~='gap-4']) {
   gap: 0.75rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class*='space-y-8'], [class*='space-y-7'], [class*='space-y-6'], [class*='space-y-5'], [class*='space-y-4'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='space-y-8'],
+    [class*='space-y-7'],
+    [class*='space-y-6'],
+    [class*='space-y-5'],
+    [class*='space-y-4']
+  )
   > :not([hidden])
   ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
@@ -895,57 +1015,141 @@ button,
   margin-bottom: calc(0.75rem * var(--tw-space-y-reverse)) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='p-10'], [class~='p-9'], [class~='p-8'], [class~='p-7'], [class~='p-6'], [class~='p-5']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='p-10'],
+    [class~='p-9'],
+    [class~='p-8'],
+    [class~='p-7'],
+    [class~='p-6'],
+    [class~='p-5']
+  ) {
   padding: clamp(0.75rem, 1.2vw, 1rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='px-10'], [class~='px-9'], [class~='px-8'], [class~='px-7'], [class~='px-6'], [class~='px-5']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='px-10'],
+    [class~='px-9'],
+    [class~='px-8'],
+    [class~='px-7'],
+    [class~='px-6'],
+    [class~='px-5']
+  ) {
   padding-left: clamp(0.75rem, 1.2vw, 1rem) !important;
   padding-right: clamp(0.75rem, 1.2vw, 1rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='py-24'], [class~='py-20'], [class~='py-16'], [class~='py-14'], [class~='py-12'], [class~='py-10'], [class~='py-8']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='py-24'],
+    [class~='py-20'],
+    [class~='py-16'],
+    [class~='py-14'],
+    [class~='py-12'],
+    [class~='py-10'],
+    [class~='py-8']
+  ) {
   padding-top: clamp(1rem, 1.7vw, 1.5rem) !important;
   padding-bottom: clamp(1rem, 1.7vw, 1.5rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   [class*='min-h-[120px]'] {
   min-height: 4.25rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class*='rounded-[40px]'], [class*='rounded-[36px]'], [class*='rounded-[34px]'], [class*='rounded-[32px]'], [class*='rounded-[30px]'], [class*='rounded-[28px]'], [class*='rounded-3xl']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='rounded-[40px]'],
+    [class*='rounded-[36px]'],
+    [class*='rounded-[34px]'],
+    [class*='rounded-[32px]'],
+    [class*='rounded-[30px]'],
+    [class*='rounded-[28px]'],
+    [class*='rounded-3xl']
+  ) {
   border-radius: 20px !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where(a, button, [role='button'], input, select, textarea)[class*='rounded-2xl'] {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    a,
+    button,
+    [role='button'],
+    input,
+    select,
+    textarea
+  )[class*='rounded-2xl'] {
   border-radius: 14px !important;
 }
 
 @media (max-width: 640px) {
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels']) {
     --app-page-x-base: 0.5rem;
     --app-section-y-base: 0.5rem;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where([class~='p-10'], [class~='p-9'], [class~='p-8'], [class~='p-7'], [class~='p-6'], [class~='p-5'], [class~='p-4']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='p-10'],
+      [class~='p-9'],
+      [class~='p-8'],
+      [class~='p-7'],
+      [class~='p-6'],
+      [class~='p-5'],
+      [class~='p-4']
+    ) {
     padding: 0.75rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where([class~='px-10'], [class~='px-9'], [class~='px-8'], [class~='px-7'], [class~='px-6'], [class~='px-5'], [class~='px-4']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4']
+    ) {
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where([class~='py-24'], [class~='py-20'], [class~='py-16'], [class~='py-14'], [class~='py-12'], [class~='py-10'], [class~='py-8'], [class~='py-6'], [class~='py-5'], [class~='py-4']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='py-24'],
+      [class~='py-20'],
+      [class~='py-16'],
+      [class~='py-14'],
+      [class~='py-12'],
+      [class~='py-10'],
+      [class~='py-8'],
+      [class~='py-6'],
+      [class~='py-5'],
+      [class~='py-4']
+    ) {
     padding-top: 0.75rem !important;
     padding-bottom: 0.75rem !important;
   }
@@ -991,8 +1195,7 @@ canvas {
   overflow-wrap: break-word;
 }
 
-.lajukan-route-surface
-  :where(input, textarea, select) {
+.lajukan-route-surface :where(input, textarea, select) {
   font-size: max(0.875rem, 16px);
 }
 
@@ -1001,7 +1204,11 @@ canvas {
 }
 
 .lajukan-route-surface
-  :where(input:not([type='checkbox']):not([type='radio']):not([type='range']), textarea, select) {
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea,
+    select
+  ) {
   max-width: 100%;
 }
 
@@ -1010,7 +1217,7 @@ canvas {
 .lajukan-route-surface
   :where(button, a, input, select, textarea)[class*='rounded-2xl'],
 .lajukan-route-surface
-  :where(button, a, input, select, textarea)[class*="rounded-["] {
+  :where(button, a, input, select, textarea)[class*='rounded-['] {
   white-space: normal;
 }
 
@@ -1683,12 +1890,12 @@ canvas {
 .ui-data-control {
   width: 100%;
   min-width: 0;
-  min-height: 48px;
+  min-height: 40px;
   appearance: none;
   -webkit-appearance: none;
-  border: 2px solid
+  border: 1.5px solid
     color-mix(in srgb, var(--app-text) 22%, var(--app-border-strong));
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--app-surface-strong);
   color: var(--app-text);
   box-shadow:
@@ -1702,12 +1909,24 @@ canvas {
 }
 
 .ui-data-control[data-filled='true'] {
-  border-color: color-mix(in srgb, var(--app-accent) 46%, var(--app-border-strong));
-  background: color-mix(in srgb, var(--app-accent-soft) 12%, var(--app-surface-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-accent) 46%,
+    var(--app-border-strong)
+  );
+  background: color-mix(
+    in srgb,
+    var(--app-accent-soft) 12%,
+    var(--app-surface-strong)
+  );
 }
 
 .ui-data-control:hover {
-  border-color: color-mix(in srgb, var(--app-text) 32%, var(--app-border-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-text) 32%,
+    var(--app-border-strong)
+  );
 }
 
 .ui-data-control:focus,
@@ -1715,7 +1934,7 @@ canvas {
   border-color: var(--app-accent);
   background: var(--app-surface-strong);
   box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--app-accent) 16%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--app-accent) 14%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.64);
   outline: none;
 }
@@ -1725,22 +1944,34 @@ canvas {
 }
 
 .ui-data-textarea {
-  min-height: 116px;
-  padding-block: 0.75rem;
+  min-height: 96px;
+  padding-block: 0.625rem;
   resize: vertical;
 }
 
 .dark .ui-control,
 .dark .ui-data-control {
-  border-color: color-mix(in srgb, var(--app-text) 22%, var(--app-border-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-text) 22%,
+    var(--app-border-strong)
+  );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 1px 0 rgba(0, 0, 0, 0.22);
 }
 
 .dark .ui-data-control[data-filled='true'] {
-  border-color: color-mix(in srgb, var(--app-accent) 48%, var(--app-border-strong));
-  background: color-mix(in srgb, var(--app-accent) 10%, var(--app-surface-strong));
+  border-color: color-mix(
+    in srgb,
+    var(--app-accent) 48%,
+    var(--app-border-strong)
+  );
+  background: color-mix(
+    in srgb,
+    var(--app-accent) 10%,
+    var(--app-surface-strong)
+  );
 }
 
 .ui-form-textarea {
@@ -2157,11 +2388,11 @@ canvas {
 
   .page-shell {
     max-width: 100%;
-    padding-inline: 0;
+    padding-inline: var(--app-mobile-page-x) !important;
   }
 
   .page-shell-inset {
-    padding-inline: var(--app-page-x);
+    padding-inline: var(--app-mobile-page-x) !important;
   }
 
   .page-shell.py-10 {
@@ -2294,10 +2525,13 @@ canvas {
   .ui-page-stack > .ui-page-section .ui-feed-tile,
   .ui-page-stack > .ui-page-section .ui-feed-row {
     border: 0 !important;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-surface-strong) 96%, white 4%),
-      color-mix(in srgb, var(--app-surface) 92%, transparent)
+    background: var(
+      --route-panel-muted-bg,
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--app-surface-strong) 96%, white 4%),
+        color-mix(in srgb, var(--app-surface) 92%, transparent)
+      )
     ) !important;
   }
 
@@ -2305,10 +2539,17 @@ canvas {
   .dark .ui-page-stack > .ui-feed-section .ui-feed-row,
   .dark .ui-page-stack > .ui-page-section .ui-feed-tile,
   .dark .ui-page-stack > .ui-page-section .ui-feed-row {
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-surface-strong) 96%, rgba(15, 23, 42, 0.98)),
-      color-mix(in srgb, var(--app-surface) 94%, rgba(2, 6, 23, 0.98))
+    background: var(
+      --route-panel-muted-bg,
+      linear-gradient(
+        180deg,
+        color-mix(
+          in srgb,
+          var(--app-surface-strong) 96%,
+          rgba(15, 23, 42, 0.98)
+        ),
+        color-mix(in srgb, var(--app-surface) 94%, rgba(2, 6, 23, 0.98))
+      )
     ) !important;
   }
 }
@@ -2352,7 +2593,9 @@ canvas {
 }
 
 /* Compact app density pass for authenticated/work pages. */
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels']) {
   --app-max-width: 1560px;
   --app-page-x-base: clamp(6px, 0.9vw, 13px);
   --app-section-y-base: clamp(6px, 0.8vw, 11px);
@@ -2364,7 +2607,7 @@ canvas {
 }
 
 .lajukan-route-surface[data-mobile-bottom-nav='true'] {
-  padding-bottom: calc(3.35rem + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important;
 }
 
 @media (min-width: 1024px) {
@@ -2373,24 +2616,47 @@ canvas {
   }
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .page-shell {
   padding-top: clamp(0.35rem, 0.8vw, 0.75rem);
   padding-bottom: clamp(0.6rem, 1.15vw, 1rem);
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='gap-10'], [class~='gap-9'], [class~='gap-8'], [class~='gap-7'], [class~='gap-6'], [class~='gap-5']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='gap-10'],
+    [class~='gap-9'],
+    [class~='gap-8'],
+    [class~='gap-7'],
+    [class~='gap-6'],
+    [class~='gap-5']
+  ) {
   gap: 0.65rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where([class~='gap-4'], [class~='gap-3']) {
   gap: 0.55rem !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class*='space-y-10'], [class*='space-y-9'], [class*='space-y-8'], [class*='space-y-7'], [class*='space-y-6'], [class*='space-y-5'], [class*='space-y-4'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='space-y-10'],
+    [class*='space-y-9'],
+    [class*='space-y-8'],
+    [class*='space-y-7'],
+    [class*='space-y-6'],
+    [class*='space-y-5'],
+    [class*='space-y-4']
+  )
   > :not([hidden])
   ~ :not([hidden]) {
   --tw-space-y-reverse: 0;
@@ -2398,41 +2664,100 @@ canvas {
   margin-bottom: calc(0.6rem * var(--tw-space-y-reverse)) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='p-10'], [class~='p-9'], [class~='p-8'], [class~='p-7'], [class~='p-6'], [class~='p-5'], [class~='p-4']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='p-10'],
+    [class~='p-9'],
+    [class~='p-8'],
+    [class~='p-7'],
+    [class~='p-6'],
+    [class~='p-5'],
+    [class~='p-4']
+  ) {
   padding: clamp(0.625rem, 0.95vw, 0.875rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='px-10'], [class~='px-9'], [class~='px-8'], [class~='px-7'], [class~='px-6'], [class~='px-5'], [class~='px-4']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='px-10'],
+    [class~='px-9'],
+    [class~='px-8'],
+    [class~='px-7'],
+    [class~='px-6'],
+    [class~='px-5'],
+    [class~='px-4']
+  ) {
   padding-left: clamp(0.625rem, 0.95vw, 0.875rem) !important;
   padding-right: clamp(0.625rem, 0.95vw, 0.875rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class~='py-24'], [class~='py-20'], [class~='py-16'], [class~='py-14'], [class~='py-12'], [class~='py-10'], [class~='py-8'], [class~='py-6'], [class~='py-5'], [class~='py-4']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class~='py-24'],
+    [class~='py-20'],
+    [class~='py-16'],
+    [class~='py-14'],
+    [class~='py-12'],
+    [class~='py-10'],
+    [class~='py-8'],
+    [class~='py-6'],
+    [class~='py-5'],
+    [class~='py-4']
+  ) {
   padding-top: clamp(0.625rem, 1vw, 0.9rem) !important;
   padding-bottom: clamp(0.625rem, 1vw, 0.9rem) !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where([class*='rounded-[44px]'], [class*='rounded-[40px]'], [class*='rounded-[36px]'], [class*='rounded-[34px]'], [class*='rounded-[32px]'], [class*='rounded-[30px]'], [class*='rounded-[28px]'], [class*='rounded-3xl'], [class*='rounded-2xl']) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    [class*='rounded-[44px]'],
+    [class*='rounded-[40px]'],
+    [class*='rounded-[36px]'],
+    [class*='rounded-[34px]'],
+    [class*='rounded-[32px]'],
+    [class*='rounded-[30px]'],
+    [class*='rounded-[28px]'],
+    [class*='rounded-3xl'],
+    [class*='rounded-2xl']
+  ) {
   border-radius: 14px !important;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   :where(a, button, [role='button'], input, select, textarea) {
   min-height: 38px;
 }
 
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-  :where(.ui-button-primary, .ui-button-secondary, .ui-button-danger, .ui-shell-button, .ui-route-action-primary, .ui-route-action-secondary) {
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
+  :where(
+    .ui-button-primary,
+    .ui-button-secondary,
+    .ui-button-danger,
+    .ui-shell-button,
+    .ui-route-action-primary,
+    .ui-route-action-secondary
+  ) {
   min-height: 36px;
   border-radius: 11px;
   padding-inline: 0.7rem;
 }
 
-[data-compact-bottom-nav='true'] a,
+[data-compact-bottom-nav='true'] a {
+  min-height: 58px !important;
+}
+
 .lajukan-mobile-topbar a,
 .lajukan-mobile-topbar button {
   min-height: 40px !important;
@@ -2464,57 +2789,848 @@ canvas {
 }
 
 @media (max-width: 640px) {
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels']) {
     --app-page-x-base: 0.375rem;
     --app-section-y-base: 0.375rem;
     font-size: 0.875rem;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
     .page-shell {
-    padding-inline: 0 !important;
+    padding-inline: var(--app-mobile-page-x) !important;
     padding-top: 0.25rem !important;
     padding-bottom: 0.5rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where([class~='p-10'], [class~='p-9'], [class~='p-8'], [class~='p-7'], [class~='p-6'], [class~='p-5'], [class~='p-4'], [class~='p-3']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='p-10'],
+      [class~='p-9'],
+      [class~='p-8'],
+      [class~='p-7'],
+      [class~='p-6'],
+      [class~='p-5'],
+      [class~='p-4'],
+      [class~='p-3']
+    ) {
     padding: 0.625rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where([class~='px-10'], [class~='px-9'], [class~='px-8'], [class~='px-7'], [class~='px-6'], [class~='px-5'], [class~='px-4'], [class~='px-3']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4'],
+      [class~='px-3']
+    ) {
     padding-left: 0.625rem !important;
     padding-right: 0.625rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where([class~='py-24'], [class~='py-20'], [class~='py-16'], [class~='py-14'], [class~='py-12'], [class~='py-10'], [class~='py-8'], [class~='py-6'], [class~='py-5'], [class~='py-4'], [class~='py-3']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class~='py-24'],
+      [class~='py-20'],
+      [class~='py-16'],
+      [class~='py-14'],
+      [class~='py-12'],
+      [class~='py-10'],
+      [class~='py-8'],
+      [class~='py-6'],
+      [class~='py-5'],
+      [class~='py-4'],
+      [class~='py-3']
+    ) {
     padding-top: 0.625rem !important;
     padding-bottom: 0.625rem !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where([class*='rounded-[44px]'], [class*='rounded-[40px]'], [class*='rounded-[36px]'], [class*='rounded-[34px]'], [class*='rounded-[32px]'], [class*='rounded-[30px]'], [class*='rounded-[28px]'], [class*='rounded-3xl'], [class*='rounded-2xl']) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      [class*='rounded-[44px]'],
+      [class*='rounded-[40px]'],
+      [class*='rounded-[36px]'],
+      [class*='rounded-[34px]'],
+      [class*='rounded-[32px]'],
+      [class*='rounded-[30px]'],
+      [class*='rounded-[28px]'],
+      [class*='rounded-3xl'],
+      [class*='rounded-2xl']
+    ) {
     border-radius: 12px !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
     :where(a, button, [role='button'], input, select, textarea) {
     min-height: 40px !important;
   }
 
-  .lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
-    :where(.ui-button-primary, .ui-button-secondary, .ui-button-danger, .ui-shell-button, .ui-route-action-primary, .ui-route-action-secondary) {
+  .lajukan-route-surface:not([data-route-intent='home']):not(
+      [data-route-intent='chat']
+    ):not([data-route-intent='reels'])
+    :where(
+      .ui-button-primary,
+      .ui-button-secondary,
+      .ui-button-danger,
+      .ui-shell-button,
+      .ui-route-action-primary,
+      .ui-route-action-secondary
+    ) {
     min-height: 40px !important;
+  }
+
+  .lajukan-route-surface
+    :where(.page-shell, .page-shell-inset):not(.lajukan-header-shell) {
+    padding-inline: var(--app-mobile-page-x) !important;
+  }
+
+  .lajukan-route-surface.lajukan-route-surface
+    > div
+    > :where(main, section, div):not(.lajukan-mobile-topbar):not(
+      .ui-layer-mobile-topbar
+    ):not([class*='fixed']):where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4'],
+      [class~='px-3'],
+      [class~='px-2.5'],
+      [class~='px-2']
+    ) {
+    padding-left: var(--app-mobile-page-x) !important;
+    padding-right: var(--app-mobile-page-x) !important;
+  }
+
+  .lajukan-route-surface.lajukan-route-surface
+    :where(main, section, div):not([class*='fixed']):not(
+      [class*='rounded']
+    ):where([class*='mx-auto']):where([class*='max-w-']):where(
+      [class~='px-10'],
+      [class~='px-9'],
+      [class~='px-8'],
+      [class~='px-7'],
+      [class~='px-6'],
+      [class~='px-5'],
+      [class~='px-4'],
+      [class~='px-3'],
+      [class~='px-2.5'],
+      [class~='px-2']
+    ) {
+    padding-left: var(--app-mobile-page-x) !important;
+    padding-right: var(--app-mobile-page-x) !important;
   }
 }
 
 .lajukan-route-surface .lajukan-header-shell.page-shell,
-.lajukan-route-surface:not([data-route-intent='home']):not([data-route-intent='chat']):not([data-route-intent='reels'])
+.lajukan-route-surface:not([data-route-intent='home']):not(
+    [data-route-intent='chat']
+  ):not([data-route-intent='reels'])
   .lajukan-header-shell.page-shell {
   max-width: min(1700px, 100vw) !important;
   padding-inline: clamp(0.75rem, 1.35vw, 1.125rem) !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+
+/* Form-control contract:
+   - Pure inputs/selects/textareas draw their own field border.
+   - Icon/search/composer wrappers draw the field border; children stay plain. */
+.app-cohesive-theme,
+.lajukan-route-surface {
+  --app-field-border: color-mix(
+    in srgb,
+    var(--app-text) 30%,
+    var(--app-border-strong)
+  );
+  --app-field-border-hover: color-mix(
+    in srgb,
+    var(--app-text) 42%,
+    var(--app-border-strong)
+  );
+  --app-field-focus: color-mix(
+    in srgb,
+    var(--route-accent, var(--app-accent)) 72%,
+    var(--app-border-strong)
+  );
+  --app-field-bg: color-mix(
+    in srgb,
+    var(--app-surface-strong) 96%,
+    transparent
+  );
+  --app-field-focus-ring: color-mix(
+    in srgb,
+    var(--route-accent, var(--app-accent)) 16%,
+    transparent
+  );
+}
+
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input) {
+  min-height: 44px;
+  border: 1.5px solid var(--app-field-border) !important;
+  border-radius: 14px !important;
+  background-color: var(--app-field-bg) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 1px 0 rgba(15, 23, 42, 0.04) !important;
+  color: var(--app-text);
+  outline: none !important;
+}
+
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):hover {
+  border-color: var(--app-field-border-hover) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):focus,
+.lajukan-route-surface
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input):focus-visible {
+  border-color: var(--app-field-focus) !important;
+  box-shadow:
+    inset 0 0 0 1px var(--app-field-focus),
+    0 0 0 3px var(--app-field-focus-ring) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ) {
+  border: 1.5px solid var(--app-field-border) !important;
+  background-color: var(--app-field-bg) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.56),
+    0 1px 0 rgba(15, 23, 42, 0.04) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ):hover {
+  border-color: var(--app-field-border-hover) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ):has(
+    :where(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+          [type='file']
+        ):not([type='hidden']),
+      textarea,
+      select
+    )
+  ):focus-within {
+  border-color: var(--app-field-focus) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-field-focus) 58%, transparent),
+    0 0 0 3px var(--app-field-focus-ring) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
+  min-height: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  ) {
+  border-color: var(--app-field-border) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  ):hover {
+  border-color: var(--app-field-border-hover) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  ):focus-within {
+  border-color: var(--app-field-focus) !important;
+}
+
+.lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ) {
+  border: 1.5px solid var(--app-field-border) !important;
+  background-color: var(--app-field-bg) !important;
+}
+
+.lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ):focus-within {
+  border-color: var(--app-field-focus) !important;
+}
+
+.lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.app-cohesive-theme
+  .lajukan-route-surface
+  :where(.ui-field-shell, .ui-input-shell, .ui-search-form)
+  > :where(label, div):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-cohesive-theme
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']):not([type='color']):not([type='button']):not(
+        [type='submit']
+      ):not([type='reset']),
+    textarea,
+    select
+  ):not(.ui-navbar-search-input) {
+  min-height: 44px;
+  border: 1.5px solid var(--app-field-border) !important;
+  border-radius: 14px !important;
+  background-color: var(--app-field-bg) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 1px 0 rgba(15, 23, 42, 0.04) !important;
+  color: var(--app-text);
+  outline: none !important;
+}
+
+.app-cohesive-theme
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row,
+    label:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    div:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    ),
+    form:has(
+      > :where(
+        input[class*='bg-transparent'],
+        input[class*='border-0'],
+        textarea[class*='bg-transparent'],
+        textarea[class*='border-0'],
+        select[class*='bg-transparent'],
+        select[class*='border-0']
+      )
+    )
+  ) {
+  border-color: var(--app-field-border) !important;
+}
+
+.app-cohesive-theme
+  :where(
+    .ui-field-shell,
+    .ui-input-shell,
+    .ui-navbar-search-field,
+    .ui-search-form,
+    .ui-control,
+    .ui-feed-row
+  )
+  :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.app-cohesive-theme
+  :where(.ui-field-shell, .ui-input-shell, .ui-search-form)
+  > :where(label, div):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  ) {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-cohesive-theme
+  .ui-field-shell
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-input-shell
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-navbar-search-field
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-search-form
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-control
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  .ui-feed-row
+  :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ),
+.app-cohesive-theme
+  :is(label, div, form):has(
+    > :is(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :is(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.lajukan-route-surface
+  :where(label, div, form):has(
+    > :where(
+      input[class*='bg-transparent'],
+      input[class*='border-0'],
+      textarea[class*='bg-transparent'],
+      textarea[class*='border-0'],
+      select[class*='bg-transparent'],
+      select[class*='border-0']
+    )
+  )
+  > :where(
+    input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+        [type='file']
+      ):not([type='hidden']),
+    textarea,
+    select
+  ) {
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
 }

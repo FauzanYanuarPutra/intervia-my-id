@@ -17,13 +17,7 @@ export const PROTECTED_ROUTE_PREFIXES = [
   '/settings',
   '/my-projects',
   '/my-listings',
-  '/my-applications',
-  '/collaboration',
-  '/spatial',
   '/onboarding',
-  '/jobs/create',
-  '/property/create',
-  '/company/create',
 ] as const;
 
 function stripQueryAndHash(pathname: string): string {
@@ -61,11 +55,7 @@ export function isProtectedRoutePath(
   pathname: string | null | undefined,
 ): boolean {
   const routePath = normalizeAuthRoutePath(pathname);
-  if (
-    routePath === '/profile' ||
-    routePath.startsWith('/profile/edit') ||
-    routePath.startsWith('/profile/freelancer/create')
-  ) {
+  if (routePath === '/profile' || routePath.startsWith('/profile/edit')) {
     return true;
   }
   if (/^\/content\/[^/]+\/edit$/.test(routePath)) return true;

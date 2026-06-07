@@ -736,7 +736,7 @@ services:
     restart: unless-stopped
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in your env file}
-    command: tunnel --no-autoupdate run
+    command: tunnel --protocol http2 run
     networks:
       - web
 

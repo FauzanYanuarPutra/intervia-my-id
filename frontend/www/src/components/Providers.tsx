@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { AuthProvider } from '@/context/AuthContext';
 import { ChatInboxProvider } from '@/context/ChatInboxContext';
 import { NotificationInboxProvider } from '@/context/NotificationInboxContext';
@@ -13,6 +13,7 @@ import { BrowserNotificationBridge } from '@/components/system/feedback/BrowserN
 import { ToastProvider } from '@/components/system/feedback/ToastProvider';
 import { ClientSecurityGuards } from '@/components/common/ClientSecurityGuards';
 import { GlobalImageFallback } from '@/components/common/GlobalImageFallback';
+import { LajukanEventBridge } from '@/components/analytics/LajukanEventBridge';
 
 type Props = {
   children: React.ReactNode;
@@ -74,6 +75,9 @@ export function Providers({ children }: Props) {
                 <NotificationInboxProvider>
                   <SectorProvider>
                     <PageMetaProviderWrapper>
+                      <Suspense fallback={null}>
+                        <LajukanEventBridge />
+                      </Suspense>
                       {children}
                     </PageMetaProviderWrapper>
                   </SectorProvider>

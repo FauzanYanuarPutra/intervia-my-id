@@ -25,8 +25,33 @@ export const CreateWalletTopupSchema = z
       .optional(),
     payment_method: optionalTrimmed,
     description: optionalTrimmed,
-    metadata: z.unknown().optional(),
-    auto_settle: z.boolean().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
-  .passthrough();
+  .strip();
+
+export const CreateWalletWithdrawalSchema = z
+  .object({
+    amount_cents: z.preprocess(
+      (value) => {
+        if (value == null || value === '') return NaN;
+        if (typeof value === 'number') return value;
+        return Number(value);
+      },
+      z.number().int().positive().max(5_000_000_000_000),
+    ),
+    currency: optionalTrimmed,
+    environment: z
+      .enum(['development', 'live', 'dev', 'sandbox', 'test', 'production', 'prod'])
+      .optional(),
+    bank_code: z.string().trim().min(2).max(32),
+    bank_name: z.string().trim().min(2).max(80),
+    bank_account_name: z.string().trim().min(3).max(100),
+    bank_account_number: z
+      .string()
+      .trim()
+      .regex(/^[0-9\s.-]{6,40}$/),
+    note: optionalTrimmed,
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strip();
 

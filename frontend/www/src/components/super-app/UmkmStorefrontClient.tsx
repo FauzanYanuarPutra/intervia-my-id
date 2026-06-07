@@ -32,13 +32,13 @@ import {
   Star,
   Table2,
   Truck,
-  Users,
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { LocalizedAnchor } from '@/components/navigation/LocalizedAnchor';
 import { Modal } from '@/components/common/Modal';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { useAuth } from '@/context/AuthContext';
+import { localProductImageForCategory } from '@/lib/media/localSeedMedia';
 import {
   UMKM_DISCOVERY_PATH,
   buildUsahaPath,
@@ -46,7 +46,6 @@ import {
   buildUmkmScanPath,
 } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
-import { localProductImageForCategory } from '@/lib/media/localSeedMedia';
 import { DEFAULT_ONLINE_SERVICE_FEE_CENTS } from '@/lib/super-app/umkm-commerce.constants';
 import { buildUmkmOrderComposition } from '@/lib/super-app/umkm-fulfillment';
 import {
@@ -67,14 +66,11 @@ import {
   normalizeUmkmBusinessCategory,
 } from '@/lib/super-app/umkm-taxonomy';
 import {
-  MapQuickControls,
   getBusinessModeLabel,
   getPlaceIcon,
   toneClass,
 } from './UmkmPlacesChromePrimitives';
 import {
-  getNextUmkmMapTheme,
-  getUmkmMapThemeLabel,
   UmkmStoreMap,
   type UmkmMapRouteSummary,
   type UmkmMapTheme,
@@ -184,6 +180,8 @@ const CHECKOUT_LIMITS = {
   itemCount: 120,
   itemQuantity: 200,
 } as const;
+
+const DEFAULT_STOREFRONT_HERO_IMAGE = '/images/umkm/home-hero.png';
 
 function normalizeSingleLineInput(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
@@ -295,19 +293,19 @@ type PublicStoreReview = {
 };
 
 type PublicStoreProfile = {
-  ratingAverage: number;
-  ratingCount: number;
-  responseMinutes: number;
-  repeatCustomerRate: number;
-  completionRate: number;
+  ratingAverage: number | null;
+  ratingCount: number | null;
+  responseMinutes: number | null;
+  repeatCustomerRate: number | null;
+  completionRate: number | null;
   deliveryEtaMinutes: number | null;
-  establishedYear: number;
-  ownerName: string;
+  establishedYear: number | null;
+  ownerName: string | null;
   businessCategoryLabel: string;
   businessFocus: string | null;
-  priceBand: string;
-  openHours: string;
-  serviceArea: string;
+  priceBand: string | null;
+  openHours: string | null;
+  serviceArea: string | null;
   specialties: string[];
   highlights: string[];
   facilities: string[];
@@ -414,14 +412,6 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function hashSeed(value: string): number {
-  let hash = 0;
-  for (const char of value) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  }
-  return hash;
-}
-
 function formatProductCategory(category: string, isId: boolean): string {
   return getUmkmProductCategoryLabel(category, isId);
 }
@@ -497,8 +487,11 @@ function simplifyCheckoutErrorMessage(message: string, isId: boolean): string {
   return normalized;
 }
 
-function inferPriceBand(products: ProductRecord[], isId: boolean): string {
-  if (!products.length) return isId ? 'Menengah' : 'Mid range';
+function inferPriceBand(
+  products: ProductRecord[],
+  isId: boolean,
+): string | null {
+  if (!products.length) return null;
   const average =
     products.reduce((sum, product) => sum + product.price_cents, 0) /
     products.length /
@@ -571,74 +564,51 @@ function parseProfileReviews(value: unknown): PublicStoreReview[] {
     .slice(0, 4);
 }
 
-function buildFallbackReviews(
-  store: StoreRecord,
-  products: ProductRecord[],
-  tables: TableRecord[],
+function readStoreImageUrls(store: StoreRecord): string[] {
+  const metadata = asRecord(store.metadata);
+  return uniqueTexts([
+    readText(metadata.store_photo_url),
+    readText(metadata.cover_image_url),
+    readText(metadata.cover_url),
+    readText(metadata.banner_url),
+    readText(metadata.image_url),
+    readText(metadata.imageUrl),
+    readText(metadata.image),
+    readText(metadata.menu_photo_url),
+    ...readTextArray(metadata.gallery_images),
+    ...readTextArray(metadata.gallery),
+    ...readTextArray(metadata.images),
+    ...readTextArray(metadata.photos),
+  ]);
+}
+
+function parseStoreForumTopics(
+  value: unknown,
   isId: boolean,
-  ratingAverage: number,
-): PublicStoreReview[] {
-  const seed = hashSeed(store.slug || store.name || store.id);
-  const names = [
-    'Rani',
-    'Bagas',
-    'Nadia',
-    'Tegar',
-    'Alya',
-    'Rafi',
-    'Dimas',
-    'Salsa',
-  ];
-  const roles = isId
-    ? ['Pelanggan tetap', 'Order kantor', 'Kunjungan keluarga']
-    : ['Repeat customer', 'Office order', 'Family visit'];
-  const visits = isId
-    ? ['2 hari lalu', 'minggu ini', 'bulan ini']
-    : ['2 days ago', 'this week', 'this month'];
-  const topProducts = products.slice(0, 3);
-  const mainItem = topProducts[0]?.name || store.name;
-  const secondaryItem =
-    topProducts[1]?.name || (isId ? 'menu andalan' : 'signature menu');
-  const thirdItem =
-    topProducts[2]?.name || (isId ? 'paket favorit' : 'signature bundle');
+): StoreForumTopic[] {
+  if (!Array.isArray(value)) return [];
 
-  const comments = isId
-    ? [
-        `${mainItem} rasanya konsisten, packing rapi, dan timnya gercep kalau ada catatan pesanan.`,
-        tables.length > 0
-          ? `Tempatnya gampang dicari, mejanya rapi, dan alur reservasi sampai duduk di tempat terasa enak diikutin.`
-          : `${secondaryItem} enak buat repeat order karena rasanya stabil dan prosesnya cepat.`,
-        store.online_order_enabled === false
-          ? `${thirdItem} enak buat didatengin langsung. Info toko dan kontaknya juga jelas banget di halaman ini.`
-          : `${thirdItem} datang tepat waktu dan info alamat di halaman ini bantu banget.`,
-      ]
-    : [
-        `${mainItem} stays consistent, the packaging is neat, and the business team responds fast to custom notes.`,
-        tables.length > 0
-          ? `The place is easy to find, tables are organized, and the reservation-to-dine-in flow feels clear.`
-          : `${secondaryItem} is great for repeat orders because the taste stays reliable and the process is fast.`,
-        store.online_order_enabled === false
-          ? `${thirdItem} is worth visiting in person. The outlet info and contact details are clear on this page.`
-          : `${thirdItem} arrived on time, and the delivery details on this page made checkout easy.`,
-      ];
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      const record = item as Record<string, unknown>;
+      const title = readText(record.title || record.label);
+      const prompt = readText(record.prompt || record.body || record.question);
+      if (!title || !prompt) return null;
 
-  const highlights = isId
-    ? ['Balasnya cepat', 'Sering diorder lagi', 'Pengalaman belinya enak']
-    : ['Fast response', 'High repeat rate', 'Clean experience'];
-
-  return comments.map((comment, index) => ({
-    id: `${store.id}-review-${index}`,
-    author: `${names[(seed + index * 3) % names.length]} ${String.fromCharCode(65 + ((seed + index) % 26))}.`,
-    role: roles[(seed + index) % roles.length],
-    rating: clampNumber(
-      Number((ratingAverage - index * 0.1).toFixed(1)),
-      4.2,
-      5,
-    ),
-    comment,
-    highlight: highlights[index] || highlights[0],
-    visitedLabel: visits[(seed + index * 2) % visits.length],
-  }));
+      return {
+        id: readText(record.id) || `topic-${index}`,
+        title,
+        prompt,
+        tag:
+          readText(record.tag || record.topic || record.category) || 'business',
+        categoryHint:
+          readText(record.categoryHint || record.category_hint) ||
+          (isId ? 'diskusi-bisnis' : 'business-discussion'),
+      };
+    })
+    .filter((item): item is StoreForumTopic => Boolean(item))
+    .slice(0, 6);
 }
 
 function buildStorePublicProfile(
@@ -648,60 +618,55 @@ function buildStorePublicProfile(
   isId: boolean,
 ): PublicStoreProfile {
   const metadata = asRecord(store.metadata);
-  const seed = hashSeed(store.slug || store.name || store.id);
-  const ratingAverage = Number(
-    clampNumber(
-      readNumber(metadata.rating_avg || metadata.rating_average) ??
-        4.55 + (seed % 30) / 100,
-      4.2,
-      5,
-    ).toFixed(1),
+  const ratingAverageValue = readNumber(
+    metadata.rating_avg || metadata.rating_average,
   );
-  const ratingCount = Math.max(
-    18,
-    Math.round(
-      readNumber(metadata.rating_count || metadata.review_count) ??
-        36 + products.length * 18 + tables.length * 9 + (seed % 40),
-    ),
-  );
-  const responseMinutes = Math.max(
-    2,
-    Math.round(readNumber(metadata.response_time_minutes) ?? 3 + (seed % 6)),
-  );
-  const repeatCustomerRate = clampNumber(
-    Math.round(readNumber(metadata.repeat_customer_rate) ?? 54 + (seed % 24)),
-    30,
-    92,
-  );
-  const completionRate = clampNumber(
-    Math.round(readNumber(metadata.completion_rate) ?? 93 + (seed % 5)),
-    85,
-    99,
-  );
-  const deliveryEtaMinutes =
-    store.online_order_enabled === false
+  const ratingAverage =
+    ratingAverageValue === null
       ? null
-      : Math.max(
-          12,
-          Math.round(
-            readNumber(metadata.delivery_eta_minutes) ?? 16 + (seed % 13),
-          ),
-        );
-  const establishedYear = clampNumber(
-    Math.round(readNumber(metadata.established_year) ?? 2017 + (seed % 7)),
-    2010,
-    new Date().getFullYear(),
+      : Number(clampNumber(ratingAverageValue, 1, 5).toFixed(1));
+  const ratingCountValue = readNumber(
+    metadata.rating_count || metadata.review_count,
   );
-  const ownerName =
-    readText(metadata.owner_name) ||
-    `${isId ? 'Pemilik' : 'Owner'} ${store.name.split(' ')[0] || (isId ? 'Usaha' : 'Business')}`;
-  const openHours =
-    readText(metadata.open_hours) || (isId ? 'Setiap hari' : 'Daily');
+  const ratingCount =
+    ratingCountValue === null
+      ? null
+      : Math.max(0, Math.round(ratingCountValue));
+  const responseMinutesValue = readNumber(metadata.response_time_minutes);
+  const responseMinutes =
+    responseMinutesValue === null
+      ? null
+      : Math.max(0, Math.round(responseMinutesValue));
+  const repeatCustomerRateValue = readNumber(metadata.repeat_customer_rate);
+  const repeatCustomerRate =
+    repeatCustomerRateValue === null
+      ? null
+      : clampNumber(Math.round(repeatCustomerRateValue), 0, 100);
+  const completionRateValue = readNumber(metadata.completion_rate);
+  const completionRate =
+    completionRateValue === null
+      ? null
+      : clampNumber(Math.round(completionRateValue), 0, 100);
+  const deliveryEtaMinutes =
+    store.online_order_enabled === false ||
+    readNumber(metadata.delivery_eta_minutes) === null
+      ? null
+      : Math.max(0, Math.round(readNumber(metadata.delivery_eta_minutes) || 0));
+  const establishedYearValue = readNumber(metadata.established_year);
+  const establishedYear =
+    establishedYearValue === null
+      ? null
+      : clampNumber(
+          Math.round(establishedYearValue),
+          1800,
+          new Date().getFullYear(),
+        );
+  const ownerName = readText(metadata.owner_name) || null;
+  const openHours = readText(metadata.open_hours) || null;
   const priceBand =
     readText(metadata.price_band) || inferPriceBand(products, isId);
   const serviceArea =
-    readText(metadata.service_area) ||
-    (isId ? `${store.city} dan sekitarnya` : `${store.city} and nearby`);
+    readText(metadata.service_area) || readText(store.city) || null;
   const businessCategory =
     normalizeUmkmBusinessCategory(metadata.umkm_category) ||
     normalizeUmkmBusinessCategory(metadata.business_type) ||
@@ -734,7 +699,7 @@ function buildStorePublicProfile(
     isId
       ? `Kategori utamanya ${businessCategoryLabel}`
       : `Primary category: ${businessCategoryLabel}`,
-    isId ? `Buka ${openHours}` : `Open ${openHours}`,
+    openHours ? (isId ? `Buka ${openHours}` : `Open ${openHours}`) : '',
     store.online_order_enabled === false
       ? isId
         ? 'Cocok buat datang langsung ke toko'
@@ -766,8 +731,7 @@ function buildStorePublicProfile(
         ? 'Makan di tempat / pickup'
         : 'Dine-in / pickup',
     tables.length > 0 ? (isId ? 'Booking meja' : 'Table reservation') : '',
-    isId ? 'Chat pemilik' : 'Chat owner',
-    isId ? 'Pembayaran QRIS / transfer' : 'QRIS / bank transfer',
+    store.phone ? (isId ? 'Kontak telepon aktif' : 'Phone contact') : '',
   ]).slice(0, 5);
   const serviceModes = uniqueTexts([
     store.online_order_enabled === false
@@ -803,10 +767,7 @@ function buildStorePublicProfile(
     facilities,
     serviceModes,
     featuredProducts: products.slice(0, 3),
-    reviews:
-      reviewsFromMeta.length > 0
-        ? reviewsFromMeta
-        : buildFallbackReviews(store, products, tables, isId, ratingAverage),
+    reviews: reviewsFromMeta,
   };
 }
 
@@ -820,11 +781,10 @@ export function UmkmStorefrontClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { viewerLocation, locating, locationError, requestViewerLocation } =
-    useViewerLocation({
-      isId,
-      autoRequest: false,
-    });
+  const { viewerLocation } = useViewerLocation({
+    isId,
+    autoRequest: false,
+  });
 
   const explicitMode = searchParams.get('mode');
   const tableId = searchParams.get('table_id') || '';
@@ -957,21 +917,18 @@ export function UmkmStorefrontClient({
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatOpened, setChatOpened] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [failedHeroImageSrc, setFailedHeroImageSrc] = useState<string | null>(
+    null,
+  );
   const [activeTab, setActiveTab] = useState<StorefrontTab>(resolvedTab);
   const [activeGalleryIndex, setActiveGalleryIndex] = useState<number | null>(
     null,
   );
   const [checkoutOpen, setCheckoutOpen] = useState(checkoutRequestedFromUrl);
-  const [mapInteractive, setMapInteractive] = useState(false);
-  const [mapTheme, setMapTheme] = useState<UmkmMapTheme>('default');
-  const [showRoute, setShowRoute] = useState(false);
+  const mapTheme: UmkmMapTheme = 'default';
   const [routeSummary, setRouteSummary] = useState<UmkmMapRouteSummary | null>(
     null,
   );
-  const [mapFocusMode, setMapFocusMode] = useState<
-    'stores' | 'viewer' | 'route'
-  >('stores');
-  const [mapFocusNonce, setMapFocusNonce] = useState(0);
 
   const showStorefrontToast = useCallback(
     (
@@ -1028,7 +985,6 @@ export function UmkmStorefrontClient({
   const reservationSectionRef = useRef<HTMLElement | null>(null);
   const tabContentRef = useRef<HTMLElement | null>(null);
   const tabAutoScrollRef = useRef('');
-  const autoMenuStoreIdRef = useRef('');
 
   useEffect(() => {
     let active = true;
@@ -1455,6 +1411,47 @@ export function UmkmStorefrontClient({
   const effectiveMaxTableCapacity =
     store?.max_table_capacity ??
     (tables.length ? Math.max(...tables.map(table => table.capacity)) : 0);
+  const heroMapStores = useMemo(
+    () =>
+      store
+        ? [
+            {
+              id: store.id,
+              slug: store.slug,
+              name: store.name,
+              city: store.city,
+              address: store.address,
+              lat: store.lat,
+              lng: store.lng,
+              description: store.description,
+              phone: store.phone,
+              metadata: store.metadata,
+              recommended_qr: store.recommended_qr,
+              online_order_enabled: store.online_order_enabled,
+              offline_order_enabled: store.offline_order_enabled,
+              reservation_enabled: store.reservation_enabled,
+              table_count: effectiveTableCount,
+              available_table_count: store.available_table_count,
+              max_table_capacity: effectiveMaxTableCapacity,
+            },
+          ]
+        : [],
+    [effectiveMaxTableCapacity, effectiveTableCount, store],
+  );
+  const handleRouteResolved = useCallback((next: UmkmMapRouteSummary) => {
+    setRouteSummary(current => {
+      if (
+        current?.distance_m === next.distance_m &&
+        current?.duration_s === next.duration_s &&
+        current?.used_fallback === next.used_fallback &&
+        current?.provider === next.provider
+      ) {
+        return current;
+      }
+
+      return next;
+    });
+  }, []);
 
   const publicProfile = useMemo(
     () =>
@@ -1484,11 +1481,6 @@ export function UmkmStorefrontClient({
   const isStoreOwner = Boolean(
     store && viewerUserId && resolveOwnerId(store) === viewerUserId,
   );
-  const bumpMapFocus = useCallback((mode: 'stores' | 'viewer' | 'route') => {
-    setMapFocusMode(mode);
-    setMapFocusNonce(current => current + 1);
-  }, []);
-
   const groupedProducts = useMemo(() => {
     const groups = new Map<string, ProductRecord[]>();
     for (const product of products) {
@@ -1627,38 +1619,6 @@ export function UmkmStorefrontClient({
   const reservationTabEnabled = effectiveTableCount > 0;
 
   useEffect(() => {
-    if (
-      loading ||
-      !store ||
-      normalizedTab ||
-      reservationIntent ||
-      checkoutRequestedFromUrl ||
-      !orderTabEnabled ||
-      products.length === 0 ||
-      autoMenuStoreIdRef.current === store.id
-    ) {
-      return;
-    }
-
-    autoMenuStoreIdRef.current = store.id;
-    setActiveTab('menu');
-  }, [
-    checkoutRequestedFromUrl,
-    loading,
-    normalizedTab,
-    orderTabEnabled,
-    products.length,
-    reservationIntent,
-    store,
-  ]);
-
-  useEffect(() => {
-    if (showRoute && viewerLocation && store) {
-      bumpMapFocus('route');
-    }
-  }, [bumpMapFocus, showRoute, store, viewerLocation]);
-
-  useEffect(() => {
     if (!store || hydratedCartStoreId !== store.id) return;
 
     if (Object.keys(currentCartItems).length > 0) {
@@ -1733,7 +1693,9 @@ export function UmkmStorefrontClient({
           );
         }
 
-        setDeliveryDestinationOptions(Array.isArray(payload.data) ? payload.data : []);
+        setDeliveryDestinationOptions(
+          Array.isArray(payload.data) ? payload.data : [],
+        );
         setDeliveryDestinationNotice(payload.notice || null);
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -2489,22 +2451,25 @@ export function UmkmStorefrontClient({
     }
   };
 
-  const updateStorefrontUrl = (
-    mutate: (params: URLSearchParams) => void,
-    historyMode: 'replace' | 'push' = 'replace',
-  ) => {
-    const params = new URLSearchParams(searchParams.toString());
-    mutate(params);
-    const nextSearch = params.toString();
-    const href = nextSearch ? `${pathname}?${nextSearch}` : pathname;
-    if (historyMode === 'push') {
-      router.push(href, { scroll: false });
-      return;
-    }
-    router.replace(href, { scroll: false });
-  };
+  const updateStorefrontUrl = useCallback(
+    (
+      mutate: (params: URLSearchParams) => void,
+      historyMode: 'replace' | 'push' = 'replace',
+    ) => {
+      const params = new URLSearchParams(searchParams.toString());
+      mutate(params);
+      const nextSearch = params.toString();
+      const href = nextSearch ? `${pathname}?${nextSearch}` : pathname;
+      if (historyMode === 'push') {
+        router.push(href, { scroll: false });
+        return;
+      }
+      router.replace(href, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
-  const clearCheckoutParams = (params: URLSearchParams) => {
+  const clearCheckoutParams = useCallback((params: URLSearchParams) => {
     params.delete('checkout');
     params.delete('order');
     if (params.get('intent') === 'order') {
@@ -2513,69 +2478,81 @@ export function UmkmStorefrontClient({
     if (params.get('tab') === 'order') {
       params.delete('tab');
     }
-  };
+  }, []);
 
-  const handleTabChange = (next: StorefrontTab) => {
-    setCheckoutOpen(false);
-    setActiveTab(next);
-    updateStorefrontUrl(params => {
-      clearCheckoutParams(params);
-      params.set('tab', next);
-    }, 'push');
-    window.requestAnimationFrame(() => {
-      tabContentRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
+  const handleTabChange = useCallback(
+    (next: StorefrontTab) => {
+      setCheckoutOpen(false);
+      setActiveTab(next);
+      updateStorefrontUrl(params => {
+        clearCheckoutParams(params);
+        params.set('tab', next);
+      }, 'push');
+      window.requestAnimationFrame(() => {
+        tabContentRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
       });
-    });
-  };
+    },
+    [clearCheckoutParams, updateStorefrontUrl],
+  );
 
   const reviews = publicProfile?.reviews ?? [];
   const primaryReviews = reviews.slice(0, 2);
   const extraReviews = reviews.slice(2);
 
-  const openMenuFlow = (nextMode: 'online' | 'offline' = mode) => {
-    setCheckoutOpen(false);
-    setActiveTab('menu');
-    updateStorefrontUrl(params => {
-      clearCheckoutParams(params);
-      params.set('mode', nextMode);
-      params.set('tab', 'menu');
-    }, 'push');
-    window.requestAnimationFrame(() => {
-      tabContentRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
+  const openMenuFlow = useCallback(
+    (nextMode: 'online' | 'offline' = mode) => {
+      setCheckoutOpen(false);
+      setActiveTab('menu');
+      updateStorefrontUrl(params => {
+        clearCheckoutParams(params);
+        params.set('mode', nextMode);
+        params.set('tab', 'menu');
+      }, 'push');
+      window.requestAnimationFrame(() => {
+        tabContentRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
       });
-    });
-  };
+    },
+    [clearCheckoutParams, mode, updateStorefrontUrl],
+  );
 
-  const openOrderPanel = (nextMode: 'online' | 'offline' = mode) => {
-    setCheckoutOpen(true);
-    setActiveTab('menu');
-    updateStorefrontUrl(params => {
-      clearCheckoutParams(params);
-      params.set('mode', nextMode);
-      params.set('tab', 'menu');
-      params.set('checkout', '1');
-    }, 'push');
-  };
+  const openOrderPanel = useCallback(
+    (nextMode: 'online' | 'offline' = mode) => {
+      setCheckoutOpen(true);
+      setActiveTab('menu');
+      updateStorefrontUrl(params => {
+        clearCheckoutParams(params);
+        params.set('mode', nextMode);
+        params.set('tab', 'menu');
+        params.set('checkout', '1');
+      }, 'push');
+    },
+    [clearCheckoutParams, mode, updateStorefrontUrl],
+  );
 
-  const closeOrderPanel = () => {
+  const closeOrderPanel = useCallback(() => {
     setCheckoutOpen(false);
     updateStorefrontUrl(params => {
       clearCheckoutParams(params);
     });
-  };
+  }, [clearCheckoutParams, updateStorefrontUrl]);
 
-  const startOrderFlow = (nextMode: 'online' | 'offline' = mode) => {
-    if (!orderTabEnabled) return;
-    if (cartItemCount > 0) {
-      openOrderPanel(nextMode);
-      return;
-    }
-    openMenuFlow(nextMode);
-  };
+  const startOrderFlow = useCallback(
+    (nextMode: 'online' | 'offline' = mode) => {
+      if (!orderTabEnabled) return;
+      if (cartItemCount > 0) {
+        openOrderPanel(nextMode);
+        return;
+      }
+      openMenuFlow(nextMode);
+    },
+    [cartItemCount, mode, openMenuFlow, openOrderPanel, orderTabEnabled],
+  );
 
   const executeCartAction = useCallback(
     (action: PendingCartAction) => {
@@ -2609,14 +2586,6 @@ export function UmkmStorefrontClient({
 
   const changeQuantity = (productId: string, delta: number) => {
     handleCartAction({ productId, delta });
-  };
-
-  const handleQuickBuy = (productId: string) => {
-    handleCartAction({
-      productId,
-      delta: 1,
-      openCheckout: true,
-    });
   };
 
   const closeCartSwitchConfirm = useCallback(() => {
@@ -2664,20 +2633,17 @@ export function UmkmStorefrontClient({
             : 'Add to bill';
   const PlaceTypeIcon = placeHeader ? getPlaceIcon(placeHeader.kind) : null;
   const utilityActionClass =
-    'ui-pressable ui-pressable-card inline-flex min-h-[34px] min-w-0 items-center justify-center gap-1.5 rounded-[16px] bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-700 shadow-[0_12px_22px_-20px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-800/80 sm:text-[11px]';
+    'ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/28 bg-slate-950/46 px-3 py-1.5 text-[10px] font-black text-white shadow-[0_14px_24px_-22px_rgba(15,23,42,0.45)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:text-[color:var(--app-text)] sm:text-[11px]';
   const detailActionClass =
-    'ui-pressable ui-pressable-card inline-flex min-h-[36px] min-w-0 items-center justify-center gap-2 rounded-[14px] bg-white px-3 text-[11px] font-semibold text-slate-700 shadow-[0_12px_22px_-20px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:text-slate-100 dark:ring-slate-800/80 sm:text-[12px]';
+    'ui-pressable inline-flex min-h-[42px] min-w-0 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-[11px] font-black text-[color:var(--app-text)] shadow-[0_12px_22px_-21px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950 sm:text-[12px]';
   const heroShellClass =
-    'min-w-0 overflow-hidden rounded-[18px] bg-white p-1.5 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[24px] sm:p-2';
+    'relative min-w-0 overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white shadow-[0_28px_70px_-48px_rgba(15,23,42,0.38)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[28px]';
   const heroContentCardClass =
-    'min-w-0 rounded-[18px] bg-white px-3 py-3 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:px-3.5 sm:py-3.5';
+    'min-w-0 rounded-[20px] border border-[color:var(--app-border)] bg-white px-3.5 py-3.5 shadow-[0_16px_30px_-27px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] sm:rounded-[22px] sm:px-4 sm:py-4';
   const heroStatCardClass =
-    'min-w-0 rounded-[14px] bg-slate-50/92 px-2.5 py-2 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80';
+    'min-w-0 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 dark:border-[color:var(--app-border-strong)]';
   const sectionCardClass =
-    'min-w-0 rounded-[18px] bg-white px-3 py-3 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px] sm:px-3.5 sm:py-3.5';
-  const cycleMapTheme = useCallback(() => {
-    setMapTheme(current => getNextUmkmMapTheme(current));
-  }, []);
+    'min-w-0 rounded-[22px] border border-[color:var(--app-border)] bg-white px-3.5 py-3.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.12)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:px-4 sm:py-4';
   const fullMapHref = store
     ? buildUmkmDiscoveryPath({
         store: store.slug,
@@ -2685,8 +2651,26 @@ export function UmkmStorefrontClient({
         city: store.city,
       })
     : UMKM_DISCOVERY_PATH;
+  const hasRating =
+    publicProfile?.ratingAverage !== null &&
+    publicProfile?.ratingAverage !== undefined;
+  const ratingValueLabel = hasRating
+    ? publicProfile.ratingAverage!.toFixed(1)
+    : isId
+      ? 'Belum ada rating'
+      : 'No rating yet';
+  const reviewCountLabel =
+    publicProfile?.ratingCount !== null &&
+    publicProfile?.ratingCount !== undefined
+      ? `${formatCount(publicProfile.ratingCount)} ${isId ? 'ulasan' : 'reviews'}`
+      : isId
+        ? 'Ulasan backend belum ada'
+        : 'No backend reviews yet';
+  const ratingSummaryLabel = hasRating
+    ? `${ratingValueLabel} (${reviewCountLabel})`
+    : reviewCountLabel;
   const detailSummaryLine = placeHeader
-    ? `${placeHeader.ratingLabel} (${placeHeader.reviewCountLabel}) / ${placeHeader.categoryLabel}`
+    ? `${hasRating ? `${ratingSummaryLabel} / ` : ''}${placeHeader.categoryLabel}`
     : store?.city ||
       (isId
         ? 'Lagi siapin detail lokasinya...'
@@ -2699,50 +2683,60 @@ export function UmkmStorefrontClient({
         ? 'Menyiapkan lokasi...'
         : 'Preparing location...');
   const storeGallery = useMemo<StoreGalleryItem[]>(() => {
-    if (!store || !placeHeader) return [];
+    if (!store) return [];
 
-    const placeItems = placeHeader.gallery
-      .filter(Boolean)
-      .map((src, index) => ({
-        id: `place-${index}`,
-        src,
-        title:
-          index === 0
-            ? isId
-              ? 'Tampak usaha'
-              : 'Business cover'
-            : index === 1
-              ? isId
-                ? 'Suasana usaha'
-                : 'Business atmosphere'
-              : isId
-                ? 'Detail tempat'
-                : 'Business details',
-        caption:
-          index === 0
-            ? `${placeHeader.categoryLabel} / ${store.city}`
-            : index === 1
-              ? placeHeader.addressLine
-              : isId
-                ? 'Cek gaya display, etalase, dan nuansa usaha sebelum chat atau order.'
-                : 'Check the display, storefront, and atmosphere before you chat or order.',
-      }));
-    const productItems = products.slice(0, 4).map(product => {
-      const fallbackImage = localProductImageForCategory(
-        product.category,
-        `${product.id}-${product.name}`,
-      );
-      const src = getProductImage(product) || fallbackImage;
-      return {
-        id: `product-${product.id}`,
-        src,
-        title: product.name,
-        caption: `${formatProductCategory(product.category, isId)} / ${formatIdr(product.price_cents)}`,
-      };
-    });
+    const metadataImages = readStoreImageUrls(store).map((src, index) => ({
+      id: `place-${index}`,
+      src,
+      title:
+        index === 0
+          ? isId
+            ? 'Tampak usaha'
+            : 'Business cover'
+          : isId
+            ? 'Foto usaha'
+            : 'Business photo',
+      caption:
+        index === 0
+          ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
+          : store.address || store.city,
+    }));
+    const placeImages = (placeHeader?.gallery || []).map((src, index) => ({
+      id: `generated-place-${index}`,
+      src,
+      title:
+        index === 0
+          ? isId
+            ? 'Foto utama usaha'
+            : 'Business hero photo'
+          : isId
+            ? 'Suasana dan produk'
+            : 'Atmosphere and product',
+      caption:
+        index === 0
+          ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
+          : store.address || store.city,
+    }));
+    const productItems = products
+      .map(product => {
+        const src =
+          getProductImage(product) ||
+          localProductImageForCategory(
+            product.category,
+            `${store.slug}-${product.id}`,
+          );
+        if (!src) return null;
+        return {
+          id: `product-${product.id}`,
+          src,
+          title: product.name,
+          caption: `${formatProductCategory(product.category, isId)} / ${formatIdr(product.price_cents)}`,
+        };
+      })
+      .filter((item): item is StoreGalleryItem => Boolean(item));
     const seen = new Set<string>();
 
-    return [...placeItems, ...productItems]
+    return [...metadataImages, ...placeImages, ...productItems]
       .filter(item => {
         const key = item.src.trim();
         if (!key || seen.has(key)) return false;
@@ -2750,7 +2744,74 @@ export function UmkmStorefrontClient({
         return true;
       })
       .slice(0, 8);
-  }, [isId, placeHeader, products, store]);
+  }, [isId, placeHeader?.categoryLabel, placeHeader?.gallery, products, store]);
+  const heroCoverItem = storeGallery[0] || null;
+  const heroVisualSrc = heroCoverItem?.src || DEFAULT_STOREFRONT_HERO_IMAGE;
+  const heroDisplaySrc =
+    failedHeroImageSrc === heroVisualSrc
+      ? DEFAULT_STOREFRONT_HERO_IMAGE
+      : heroVisualSrc;
+  const heroVisualAlt =
+    heroCoverItem?.title ||
+    store?.name ||
+    (isId ? 'Foto usaha' : 'Business photo');
+  const storeKeywords = store
+    ? readTextArray(asRecord(store.metadata).keywords).slice(0, 3)
+    : [];
+  const heroBadges = uniqueTexts([
+    publicProfile?.businessCategoryLabel || placeHeader?.categoryLabel || '',
+    publicProfile?.priceBand || '',
+    publicProfile?.openHours
+      ? isId
+        ? `Buka ${publicProfile.openHours}`
+        : `Open ${publicProfile.openHours}`
+      : '',
+    ...storeKeywords,
+  ]).slice(0, 5);
+  const contactPrimaryLabel = products.length
+    ? isId
+      ? 'Pesan sekarang'
+      : 'Order now'
+    : isId
+      ? 'Tanya menu'
+      : 'Ask for menu';
+  const heroModeLabel = isOnline
+    ? isId
+      ? 'Pesan online'
+      : 'Online order'
+    : isId
+      ? 'Scan meja'
+      : 'Table order';
+  const heroFeaturedProducts = (
+    publicProfile?.featuredProducts || products
+  ).slice(0, 3);
+  const heroProofItems = [
+    {
+      id: 'catalog',
+      label: isId ? 'Katalog' : 'Catalog',
+      value: products.length
+        ? `${products.length} ${isId ? 'item' : 'items'}`
+        : isId
+          ? 'Tanya menu'
+          : 'Ask menu',
+      icon: ShoppingBag,
+    },
+    {
+      id: 'status',
+      label: isId ? 'Status' : 'Status',
+      value:
+        placeHeader?.statusLabel ||
+        publicProfile?.openHours ||
+        (isId ? 'Cek jam' : 'Check hours'),
+      icon: Clock3,
+    },
+    {
+      id: 'rating',
+      label: isId ? 'Rating' : 'Rating',
+      value: ratingValueLabel,
+      icon: Star,
+    },
+  ];
   const galleryTabEnabled = storeGallery.length > 0;
   const activeGalleryItem =
     activeGalleryIndex !== null
@@ -2778,103 +2839,53 @@ export function UmkmStorefrontClient({
       ...readTextArray(metadata.video_urls),
       ...readTextArray(metadata.videos),
       ...readTextArray(metadata.reels),
-      ...storeGallery.map(item => item.src),
     ]).slice(0, 4);
-    const featuredProducts = publicProfile?.featuredProducts || products.slice(0, 3);
-    const fallbackHooks = [
-      {
-        title: isId ? 'Proses usaha' : 'Business process',
-        hook: isId
-          ? 'Lihat bagaimana usaha ini bekerja secara real.'
-          : 'See how this business operates in real life.',
-        cta: isId ? 'Cek prosesnya' : 'Watch the process',
-      },
-      {
-        title: isId ? 'Produk unggulan' : 'Hero product',
-        hook: isId
-          ? 'Fokus ke item yang paling sering dicari pembeli.'
-          : 'Focus on the item buyers ask for most.',
-        cta: isId ? 'Lihat produknya' : 'Open the product',
-      },
-      {
-        title: isId ? 'Packing & kirim' : 'Packing and dispatch',
-        hook: isId
-          ? 'Bukti usaha ini benar-benar melayani order.'
-          : 'Proof that this business actively fulfills orders.',
-        cta: isId ? 'Lihat alurnya' : 'See the flow',
-      },
-      {
-        title: isId ? 'Suasana outlet' : 'Outlet atmosphere',
-        hook: isId
-          ? 'Biar calon pembeli cepat kebayang sebelum datang atau chat.'
-          : 'Give buyers a fast picture before they visit or chat.',
-        cta: isId ? 'Preview outlet' : 'Preview the outlet',
-      },
-    ];
+    const featuredProducts =
+      publicProfile?.featuredProducts || products.slice(0, 3);
 
     return rawMedia.map((mediaUrl, index) => {
       const featuredProduct = featuredProducts[index] || featuredProducts[0];
-      const fallback = fallbackHooks[index] || fallbackHooks[fallbackHooks.length - 1];
       const productLabel = featuredProduct
         ? `${featuredProduct.name} / ${formatIdr(featuredProduct.price_cents)}`
         : `${placeHeader.categoryLabel} / ${store.city}`;
 
       return {
         id: `reel-${index}`,
-        title: fallback.title,
+        title:
+          readTextArray(metadata.reel_titles)[index] ||
+          readTextArray(metadata.video_titles)[index] ||
+          (isId ? 'Video usaha' : 'Business video'),
         caption: productLabel,
-        hook: fallback.hook,
-        cta: fallback.cta,
+        hook:
+          readTextArray(metadata.reel_hooks)[index] ||
+          readTextArray(metadata.video_hooks)[index] ||
+          (isId
+            ? 'Konten video yang dikirim dari profil usaha.'
+            : 'Video content provided by this business profile.'),
+        cta:
+          readTextArray(metadata.reel_ctas)[index] ||
+          (isId ? 'Lihat video' : 'Watch video'),
         mediaUrl,
         mediaType: isVideoUrl(mediaUrl) ? 'video' : 'image',
       };
     });
-  }, [isId, placeHeader, products, publicProfile?.featuredProducts, store, storeGallery]);
+  }, [isId, placeHeader, products, publicProfile?.featuredProducts, store]);
   const reelsTabEnabled = storeReels.length > 0;
   const storeForumTopics = useMemo<StoreForumTopic[]>(() => {
-    if (!store || !placeHeader) return [];
+    if (!store) return [];
 
-    const focusLabel =
-      publicProfile?.businessFocus ||
-      publicProfile?.featuredProducts?.[0]?.name ||
-      placeHeader.categoryLabel ||
-      store.name;
-    const locationLabel = store.city || (isId ? 'kota ini' : 'this city');
-
-    return [
-      {
-        id: 'supplier',
-        title: isId ? `Supplier ${focusLabel} yang stabil?` : `Reliable suppliers for ${focusLabel}?`,
-        prompt: isId
-          ? `Ada rekomendasi supplier ${focusLabel} yang responsif, kualitasnya stabil, dan enak buat repeat order di ${locationLabel}?`
-          : `Any recommendations for responsive ${focusLabel} suppliers with stable quality around ${locationLabel}?`,
-        tag: 'growth',
-        categoryHint: 'product-ux',
-      },
-      {
-        id: 'ops',
-        title: isId ? 'Flow operasional biar order rapi' : 'Operational flow to keep orders tidy',
-        prompt: isId
-          ? `SOP apa yang paling rapi buat handle order ${store.name}?`
-          : `What operating SOP works best for ${store.name} so chat, packing, and follow-up stay clean?`,
-        tag: 'marketplace',
-        categoryHint: 'marketplace-projects',
-      },
-      {
-        id: 'channel',
-        title: isId ? 'Channel jual yang paling cocok?' : 'Which sales channel fits best?',
-        prompt: isId
-          ? `Kalau tipe usaha ${placeHeader.categoryLabel} seperti ${store.name}, channel yang paling sehat buat growth sekarang lebih cocok ke WA, marketplace, atau reseller?`
-          : `For a ${placeHeader.categoryLabel} business like ${store.name}, is WhatsApp, marketplace, or reseller the healthiest growth channel right now?`,
-        tag: 'onboarding',
-        categoryHint: 'product-ux',
-      },
-    ];
-  }, [isId, placeHeader, publicProfile?.businessFocus, publicProfile?.featuredProducts, store]);
+    const metadata = asRecord(store.metadata);
+    return parseStoreForumTopics(
+      metadata.forum_topics ||
+        metadata.business_topics ||
+        metadata.discussion_topics,
+      isId,
+    );
+  }, [isId, store]);
   const forumTabEnabled = storeForumTopics.length > 0;
   const tabs: { key: StorefrontTab; label: string; visible: boolean }[] = [
-    { key: 'menu', label: isId ? 'Menu' : 'Menu', visible: true },
     { key: 'overview', label: isId ? 'Info' : 'Info', visible: true },
+    { key: 'menu', label: isId ? 'Menu' : 'Menu', visible: true },
     {
       key: 'reviews',
       label: isId ? 'Ulasan' : 'Reviews',
@@ -2882,17 +2893,17 @@ export function UmkmStorefrontClient({
     },
     {
       key: 'gallery',
-      label: isId ? 'Galeri' : 'Gallery',
+      label: isId ? 'Foto' : 'Photos',
       visible: galleryTabEnabled,
     },
     {
       key: 'reels',
-      label: isId ? 'Reels' : 'Reels',
+      label: isId ? 'Video' : 'Video',
       visible: reelsTabEnabled,
     },
     {
       key: 'forum',
-      label: isId ? 'Forum bisnis' : 'Business forum',
+      label: isId ? 'Diskusi' : 'Discuss',
       visible: forumTabEnabled,
     },
     {
@@ -2907,23 +2918,18 @@ export function UmkmStorefrontClient({
     if (visibleTabs.some(tab => tab.key === activeTab)) return;
     setActiveTab(visibleTabs[0]?.key ?? 'overview');
   }, [activeTab, loading, visibleTabs]);
-  const visibleServiceBadges = placeHeader?.serviceBadges.slice(0, 4) || [];
-  const hiddenServiceBadgeCount = Math.max(
-    0,
-    (placeHeader?.serviceBadges.length || 0) - visibleServiceBadges.length,
-  );
   const tabPanelClass =
-    'min-w-0 overflow-hidden rounded-[18px] bg-white p-2 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[22px] sm:p-2.5';
+    'min-w-0 overflow-hidden rounded-[20px] border border-emerald-100/90 bg-white p-3 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.14)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)] sm:rounded-[22px] sm:p-3.5';
   const mobileSectionClass =
-    'min-w-0 overflow-hidden rounded-[18px] bg-white p-2.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:p-3';
+    'min-w-0 overflow-hidden rounded-[22px] border border-emerald-100/90 bg-white p-3.5 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.12)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:p-4';
   const infoCardClass =
-    'min-w-0 rounded-[14px] bg-slate-50/92 px-3 py-2.5 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80';
+    'min-w-0 rounded-[16px] border border-emerald-100/90 bg-emerald-50/54 px-3 py-2.5 dark:border-emerald-400/14 dark:bg-emerald-400/10';
   const subtleActionClass =
-    'ui-pressable ui-pressable-card inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-xs font-semibold text-[color:var(--app-text)] shadow-[0_14px_24px_-22px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:bg-slate-950 dark:ring-slate-800/80';
+    'ui-pressable inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-emerald-100 bg-white px-3 text-xs font-black text-[color:var(--app-text)] shadow-[0_12px_22px_-21px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]';
   const categoryShellClass =
-    'min-w-0 rounded-[18px] bg-white p-2.5 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:rounded-[20px] sm:p-3';
+    'min-w-0 rounded-[20px] border border-emerald-100/90 bg-white p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.12)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)] sm:rounded-[22px] sm:p-3.5';
   const menuItemCardClass =
-    'min-w-0 rounded-[16px] bg-slate-50/92 p-2.5 ring-1 ring-slate-200/80 dark:bg-slate-900/72 dark:ring-slate-800/80 sm:rounded-[18px] sm:p-3';
+    'min-w-0 rounded-[18px] border border-slate-200/85 bg-white p-2.5 shadow-[0_10px_22px_-21px_rgba(15,23,42,0.14)] dark:border-slate-800/80 dark:bg-slate-950/88 sm:rounded-[20px] sm:p-3';
 
   useEffect(() => {
     if (
@@ -2961,369 +2967,387 @@ export function UmkmStorefrontClient({
     },
     [storeGallery.length],
   );
+  const showTabIntroPanel = Boolean(
+    !loading &&
+      store &&
+      tabHighlights &&
+      activeTab !== 'menu' &&
+      activeTab !== 'overview',
+  );
 
   return (
-    <main className="page-shell overflow-x-hidden py-0 pb-10 sm:pb-0 sm:py-3">
-      <div className="flex w-full min-w-0 flex-col gap-2.5 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-3">
+    <main className="app-cohesive-theme min-h-screen overflow-x-hidden pb-24 pt-1 sm:pb-10 sm:pt-2">
+      <div className="mx-auto flex w-full min-w-0 max-w-[var(--app-max-width)] flex-col gap-2.5 px-3 sm:gap-3 sm:px-4">
         <section>
           <div className={heroShellClass}>
-            <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.04fr)_minmax(300px,0.96fr)] xl:grid-cols-[minmax(0,1.04fr)_minmax(340px,0.96fr)]">
-              <div className="min-w-0 space-y-3">
-                {store ? (
-                  <>
-                    <div className="min-w-0 overflow-hidden rounded-[22px] border border-[color:var(--app-accent-border)] bg-white shadow-[0_24px_48px_-34px_rgba(15,23,42,0.28)] dark:bg-slate-950 sm:rounded-[24px]">
-                      <div className="relative isolate">
-                        <UmkmStoreMap
-                          stores={[
-                            {
-                              id: store.id,
-                              slug: store.slug,
-                              name: store.name,
-                              city: store.city,
-                              address: store.address,
-                              lat: store.lat,
-                              lng: store.lng,
-                              description: store.description,
-                              phone: store.phone,
-                              metadata: store.metadata,
-                              recommended_qr: store.recommended_qr,
-                              online_order_enabled: store.online_order_enabled,
-                              offline_order_enabled:
-                                store.offline_order_enabled,
-                              reservation_enabled: store.reservation_enabled,
-                              table_count: effectiveTableCount,
-                              available_table_count:
-                                store.available_table_count,
-                              max_table_capacity: effectiveMaxTableCapacity,
-                            },
-                          ]}
-                          viewerLocation={viewerLocation}
-                          interactive={mapInteractive}
-                          theme={mapTheme}
-                          routeToStoreId={store.id}
-                          showRoute={showRoute}
-                          onRouteResolved={setRouteSummary}
-                          focusMode={mapFocusMode}
-                          focusNonce={mapFocusNonce}
-                          className="h-[220px] w-full sm:h-[300px] xl:h-[360px]"
-                        />
+            {store ? (
+              <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
+                <div
+                  className="relative isolate min-h-[450px] overflow-hidden bg-slate-950 bg-cover bg-center lg:min-h-[590px]"
+                  style={{
+                    backgroundImage: `url(${DEFAULT_STOREFRONT_HERO_IMAGE})`,
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={heroDisplaySrc}
+                    alt={heroVisualAlt}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    loading="eager"
+                    onError={() => {
+                      if (heroDisplaySrc !== DEFAULT_STOREFRONT_HERO_IMAGE) {
+                        setFailedHeroImageSrc(heroVisualSrc);
+                      }
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.14)_0%,rgba(2,6,23,0.36)_42%,rgba(2,6,23,0.92)_100%)]" />
 
-                        {placeHeader ? (
-                          <>
-                            <div className="pointer-events-none absolute left-3 top-3 z-[1050] inline-flex items-center gap-1.5 rounded-[16px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(239,246,255,0.88))] px-3 py-1.5 text-[11px] font-semibold text-slate-800 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur-sm">
-                              <MapPin className="h-3.5 w-3.5 text-emerald-700" />
-                              {store.city}
-                            </div>
-                            <LocalizedAnchor
-                              href={fullMapHref}
-                              className="absolute right-3 top-3 z-[1100] inline-flex items-center gap-1 rounded-full border border-white/75 bg-slate-950/78 px-3 py-1 text-[11px] font-semibold text-white shadow-[0_16px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur-sm"
-                            >
-                              {isId ? 'Lihat peta penuh' : 'Full map'}
-                              <ArrowRight className="h-3.5 w-3.5" />
-                            </LocalizedAnchor>
-                            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[900] bg-[linear-gradient(180deg,rgba(15,23,42,0.02)_0%,rgba(15,23,42,0.76)_100%)] p-3 pl-[6.25rem] sm:p-4 sm:pl-[8rem]">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/76">
-                                {placeHeader.categoryLabel}
-                              </p>
-                              <p className="mt-1 line-clamp-1 text-base font-bold text-white sm:text-lg">
-                                {store.name}
-                              </p>
-                              <p className="mt-1 line-clamp-1 text-[12px] text-white/76">
-                                {placeHeader.addressLine}
-                              </p>
-                            </div>
-                            <div className="pointer-events-none absolute bottom-3 left-3 z-[1100] sm:bottom-4">
-                              <MapQuickControls
-                                isId={isId}
-                                interactive={mapInteractive}
-                                locating={locating}
-                                locationError={locationError}
-                                routeEnabled={showRoute}
-                                distanceLabel={routeDistanceLabel}
-                                themeLabel={getUmkmMapThemeLabel(
-                                  mapTheme,
-                                  isId,
-                                )}
-                                onCycleTheme={cycleMapTheme}
-                                onToggleInteractive={() =>
-                                  setMapInteractive(current => !current)
-                                }
-                                onFocusViewer={async () => {
-                                  const nextLocation =
-                                    viewerLocation ||
-                                    (await requestViewerLocation());
-                                  if (!nextLocation) return;
-                                  bumpMapFocus('viewer');
-                                }}
-                                onToggleRoute={async () => {
-                                  if (showRoute) {
-                                    setShowRoute(false);
-                                    bumpMapFocus('stores');
-                                    return;
-                                  }
-                                  const nextLocation =
-                                    viewerLocation ||
-                                    (await requestViewerLocation());
-                                  if (!nextLocation) return;
-                                  setShowRoute(true);
-                                  bumpMapFocus('route');
-                                }}
-                              />
-                            </div>
-                          </>
-                        ) : null}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-[color:var(--app-accent-border)] bg-white text-sm text-[color:var(--app-text-soft)] dark:bg-slate-950 sm:rounded-[28px]">
-                    {isId
-                      ? 'Lagi muat detail tempat...'
-                      : 'Loading place details...'}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex min-w-0 flex-col gap-3">
-                <div className="flex flex-wrap gap-2">
-                  <LocalizedAnchor
-                    href={UMKM_DISCOVERY_PATH}
-                    className={utilityActionClass}
-                  >
-                    <ArrowRight className="h-3.5 w-3.5 rotate-180" />
-                    {isId ? 'Balik' : 'Back'}
-                  </LocalizedAnchor>
-                  <LocalizedAnchor
-                    href={buildUmkmScanPath()}
-                    className={utilityActionClass}
-                  >
-                    <QrCode className="h-3.5 w-3.5" />
-                    Scan QR
-                  </LocalizedAnchor>
-                  {isStoreOwner ? (
+                  <div className="absolute left-3 right-3 top-3 z-10 flex flex-wrap items-center gap-2">
                     <LocalizedAnchor
-                      href={buildUsahaPath('home')}
+                      href={UMKM_DISCOVERY_PATH}
                       className={utilityActionClass}
                     >
-                      <LayoutDashboard className="h-3.5 w-3.5" />
-                      {isId ? 'Kelola toko' : 'Manage'}
+                      <ArrowRight className="h-3.5 w-3.5 rotate-180" />
+                      {isId ? 'Balik' : 'Back'}
                     </LocalizedAnchor>
-                  ) : null}
+                    <LocalizedAnchor
+                      href={buildUmkmScanPath()}
+                      className={utilityActionClass}
+                    >
+                      <QrCode className="h-3.5 w-3.5" />
+                      Scan QR
+                    </LocalizedAnchor>
+                    <button
+                      type="button"
+                      onClick={() => void shareStoreProfile()}
+                      className={utilityActionClass}
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      {isId ? 'Bagikan' : 'Share'}
+                    </button>
+                    {isStoreOwner ? (
+                      <LocalizedAnchor
+                        href={buildUsahaPath('home')}
+                        className={utilityActionClass}
+                      >
+                        <LayoutDashboard className="h-3.5 w-3.5" />
+                        {isId ? 'Kelola' : 'Manage'}
+                      </LocalizedAnchor>
+                    ) : null}
+                  </div>
+
+                  <div className="absolute bottom-0 left-0 right-0 z-10 p-4 text-white sm:p-6 lg:p-7">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-white/92 px-3 text-slate-900 shadow-sm">
+                        <MapPin className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                        {store.city}
+                      </span>
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-white/18 px-3 text-white backdrop-blur">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {placeHeader?.statusLabel ||
+                          publicProfile?.openHours ||
+                          (isId ? 'Cek jam buka' : 'Check hours')}
+                      </span>
+                      {hasRating ? (
+                        <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-amber-400 px-3 text-slate-950">
+                          <Star className="h-3.5 w-3.5 fill-current" />
+                          {ratingValueLabel}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 inline-flex min-h-[30px] items-center rounded-full border border-white/18 bg-white/12 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/86 backdrop-blur">
+                      {isId ? 'Toko Lajukan' : 'Lajukan Store'}
+                    </div>
+
+                    <h1 className="mt-3 max-w-3xl text-[2.15rem] font-black leading-[1.02] text-white sm:text-[3rem] lg:text-[3.45rem]">
+                      {store.name}
+                    </h1>
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-white/82 sm:text-base">
+                      {store.description ||
+                        (isId
+                          ? 'Profil usaha, kontak, lokasi, dan katalog dalam satu halaman.'
+                          : 'Business profile, contact, location, and catalog in one page.')}
+                    </p>
+
+                    {heroBadges.length ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {heroBadges.map(item => (
+                          <span
+                            key={item}
+                            className="inline-flex min-h-[30px] items-center rounded-full border border-white/20 bg-white/12 px-3 text-[11px] font-semibold text-white backdrop-blur"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div
+                      className="mt-5 grid max-w-2xl grid-cols-1 overflow-hidden rounded-[20px] border border-white/35 bg-white/90 text-[color:var(--app-text)] shadow-[0_18px_42px_-34px_rgba(0,0,0,0.55)] sm:grid-cols-3"
+                    >
+                      {heroProofItems.map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <div
+                            key={item.id}
+                            className="min-w-0 border-b border-white/55 px-3 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"
+                          >
+                            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                              <Icon className="h-3.5 w-3.5" />
+                              {item.label}
+                            </p>
+                            <p className="mt-1 truncate text-sm font-black">
+                              {item.value}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
-                <div className={heroContentCardClass}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
-                    {isId ? 'Lajukan UMKM' : 'Lajukan UMKM'}
-                  </p>
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    {placeHeader && PlaceTypeIcon ? (
-                      <>
+                <aside className="flex min-w-0 flex-col gap-3 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-3 dark:bg-[color:var(--app-surface-strong)] sm:p-4 lg:p-5">
+                  <div className={heroContentCardClass}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-[color:var(--app-accent)]">
+                          {isId ? 'Siap dipesan' : 'Ready to order'}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold leading-5 text-[color:var(--app-text)]">
+                          {detailSummaryLine}
+                        </p>
+                      </div>
+                      {placeHeader && PlaceTypeIcon ? (
                         <span
-                          className={`inline-flex min-h-[26px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[9.5px] font-semibold ${toneClass(placeHeader.markerTone)}`}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${toneClass(placeHeader.markerTone)}`}
                         >
                           <PlaceTypeIcon className="h-3.5 w-3.5" />
                           {getBusinessModeLabel(placeHeader)}
                         </span>
-                        <span className="inline-flex min-h-[26px] items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[9.5px] font-semibold text-amber-700">
-                          <Star className="h-3.5 w-3.5 fill-current" />
-                          {placeHeader.ratingLabel}
-                        </span>
-                        <span className="inline-flex min-h-[26px] items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9.5px] font-semibold text-slate-700">
-                          <Clock3 className="h-3.5 w-3.5" />
-                          {placeHeader.statusLabel}
-                        </span>
-                        <span className="inline-flex min-h-[26px] items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9.5px] font-semibold text-slate-700">
-                          <BadgeCheck className="h-3.5 w-3.5" />
-                          {publicProfile?.businessCategoryLabel ||
-                            placeHeader.categoryLabel}
-                        </span>
-                      </>
-                    ) : null}
-                  </div>
-
-                  <h1 className="mt-2 text-[1.3rem] font-black leading-tight tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.55rem]">
-                    {store?.name ||
-                      (isId ? 'Lagi muat toko...' : 'Loading business...')}
-                  </h1>
-                  <p className="mt-1.5 text-[12px] text-[color:var(--app-text-soft)]">
-                    {detailSummaryLine}
-                  </p>
-                  <p className="mt-0.5 text-[12px] text-[color:var(--app-text-soft)]">
-                    {detailLocationLine}
-                  </p>
-                  <p className="mt-2 line-clamp-2 max-w-[34rem] text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
-                    {store?.description ||
-                      store?.address ||
-                      (isId
-                        ? 'Lihat info toko, rating, komentar, dan tombol pesan di satu halaman.'
-                        : 'Business profile, ratings, comments, and ordering actions.')}
-                  </p>
-
-                  {visibleServiceBadges.length ? (
-                    <div className="mt-2.5 flex flex-wrap gap-1.5">
-                      {visibleServiceBadges.map(item => (
-                        <span
-                          key={item}
-                          className="inline-flex min-h-[26px] items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9.5px] font-semibold text-slate-700"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                      {hiddenServiceBadgeCount > 0 ? (
-                        <span className="inline-flex min-h-[26px] items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[9.5px] font-semibold text-slate-700">
-                          +{hiddenServiceBadgeCount}
-                        </span>
                       ) : null}
                     </div>
-                  ) : null}
 
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {orderTabEnabled ? (
-                      <button
-                        type="button"
-                        onClick={() => startOrderFlow()}
-                        className="ui-button-primary inline-flex items-center justify-center gap-2 rounded-full px-3.5 text-[12px] font-semibold"
-                      >
-                        {cartItemCount > 0
-                          ? `${cartItemCount} ${isId ? 'item' : 'items'}`
-                          : null}
-                        {cartItemCount > 0 ? (
-                          <span className="opacity-60">/</span>
-                        ) : null}
-                        {cartItemCount > 0
-                          ? isId
-                            ? 'Lanjut checkout'
-                            : 'Continue checkout'
-                          : isId
-                            ? 'Pilih menu'
-                            : 'Pick menu'}
-                      </button>
-                    ) : null}
-                    {reservationTabEnabled ? (
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('reservation')}
-                        className="ui-button-secondary inline-flex items-center justify-center gap-2 rounded-full px-3.5 text-[12px] font-semibold"
-                      >
-                        <Users className="h-4 w-4" />
-                        {isId ? 'Booking meja' : 'Reserve'}
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {orderTabEnabled && hasForeignActiveCart ? (
-                    <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_12%,white)] px-3 py-2.5 text-[11px] leading-5 text-[color:var(--app-text)]">
-                      {isId
-                        ? `Keranjang aktif masih di ${activeSharedCartStoreName}. Kalau pesan di sini, keranjang lama akan direset setelah konfirmasi.`
-                        : `Your active cart is still in ${activeSharedCartStoreName}. Ordering here will reset the old cart after confirmation.`}
+                    <div className="mt-4 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {isId ? 'Ringkasan usaha' : 'Business snapshot'}
+                      </p>
+                      <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text)]">
+                        {store.description || detailLocationLine}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {publicProfile?.serviceModes
+                          .slice(0, 3)
+                          .map(modeItem => (
+                            <span
+                              key={modeItem}
+                              className="inline-flex min-h-[28px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 text-[10px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
+                            >
+                              {modeItem}
+                            </span>
+                          ))}
+                      </div>
                     </div>
-                  ) : null}
 
-                  <div className="mt-2 grid gap-2 min-[420px]:grid-cols-2">
-                    {!orderTabEnabled ? (
-                      <button
-                        type="button"
-                        onClick={() => handleTabChange('menu')}
-                        className={detailActionClass}
-                      >
-                        <ShoppingBag className="h-4 w-4" />
-                        {isId ? 'Lihat menu' : 'Open menu'}
-                      </button>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {heroProofItems.map(item => (
+                        <div key={item.id} className={heroStatCardClass}>
+                          <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                            {item.label}
+                          </p>
+                          <p className="mt-1 truncate text-[13px] font-black text-[color:var(--app-text)]">
+                            {item.value}
+                          </p>
+                        </div>
+                      ))}
+                      <div className={heroStatCardClass}>
+                        <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                          {isId ? 'Mode' : 'Mode'}
+                        </p>
+                        <p className="mt-1 truncate text-[13px] font-black text-[color:var(--app-text)]">
+                          {heroModeLabel}
+                        </p>
+                      </div>
+                    </div>
+
+                    {heroFeaturedProducts.length ? (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                            {isId ? 'Menu unggulan' : 'Featured menu'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleTabChange('menu')}
+                            className="text-[10px] font-black text-[color:var(--app-accent)]"
+                          >
+                            {isId ? 'Lihat semua' : 'See all'}
+                          </button>
+                        </div>
+                        <div className="mt-2 space-y-2">
+                          {heroFeaturedProducts.map(product => (
+                            <div
+                              key={product.id}
+                              className="flex min-w-0 items-center gap-3 rounded-[16px] border border-[color:var(--app-border)] bg-white p-2 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
+                            >
+                              <ProductThumbnail
+                                product={product}
+                                className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[12px] font-black text-[color:var(--app-text)]">
+                                  {product.name}
+                                </p>
+                                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                                  {formatIdr(product.price_cents)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ) : null}
-                    {placeHeader?.whatsappHref ? (
-                      <a
-                        href={placeHeader.whatsappHref}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={detailActionClass}
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        WhatsApp
-                      </a>
-                    ) : placeHeader?.telHref ? (
-                      <a
-                        href={placeHeader.telHref}
-                        className={detailActionClass}
-                      >
-                        <Phone className="h-4 w-4" />
-                        {isId ? 'Telepon' : 'Call'}
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void startChat()}
-                        disabled={chatLoading}
-                        className={`${detailActionClass} disabled:opacity-60`}
-                      >
-                        {chatLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
+
+                    <div className="mt-4 grid gap-2">
+                      {products.length > 0 && orderTabEnabled ? (
+                        <button
+                          type="button"
+                          onClick={() => startOrderFlow()}
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black"
+                        >
+                          <ShoppingBag className="h-4 w-4" />
+                          {cartItemCount > 0
+                            ? `${cartItemCount} ${isId ? 'item' : 'items'} / `
+                            : null}
+                          {contactPrimaryLabel}
+                        </button>
+                      ) : placeHeader?.whatsappHref ? (
+                        <a
+                          href={placeHeader.whatsappHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black"
+                        >
                           <MessageCircle className="h-4 w-4" />
-                        )}
-                        {isId ? 'Chat usaha' : 'Chat business'}
-                      </button>
-                    )}
-                    {placeHeader ? (
-                      <a
-                        href={placeHeader.googleMapsDirectionsUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={detailActionClass}
-                      >
-                        <Navigation className="h-4 w-4" />
-                        {isId ? 'Rute' : 'Directions'}
-                      </a>
+                          {contactPrimaryLabel}
+                        </a>
+                      ) : placeHeader?.telHref ? (
+                        <a
+                          href={placeHeader.telHref}
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black"
+                        >
+                          <Phone className="h-4 w-4" />
+                          {isId ? 'Telepon usaha' : 'Call business'}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void startChat()}
+                          disabled={chatLoading}
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black disabled:opacity-60"
+                        >
+                          {chatLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <MessageCircle className="h-4 w-4" />
+                          )}
+                          {contactPrimaryLabel}
+                        </button>
+                      )}
+
+                      <div className="grid gap-2 min-[420px]:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => handleTabChange('menu')}
+                          className={detailActionClass}
+                        >
+                          <ShoppingBag className="h-4 w-4" />
+                          {isId ? 'Lihat katalog' : 'Open catalog'}
+                        </button>
+                        {placeHeader ? (
+                          <a
+                            href={placeHeader.googleMapsDirectionsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={detailActionClass}
+                          >
+                            <Navigation className="h-4 w-4" />
+                            {isId ? 'Rute' : 'Directions'}
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {orderTabEnabled && hasForeignActiveCart ? (
+                      <div className="mt-3 rounded-[16px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2.5 text-[11px] leading-5 text-[color:var(--app-text)]">
+                        {isId
+                          ? `Keranjang aktif masih di ${activeSharedCartStoreName}. Kalau pesan di sini, keranjang lama akan direset setelah konfirmasi.`
+                          : `Your active cart is still in ${activeSharedCartStoreName}. Ordering here will reset the old cart after confirmation.`}
+                      </div>
+                    ) : null}
+
+                    {shareMessage ? (
+                      <p className="mt-3 text-[11px] font-semibold ui-text-soft">
+                        {shareMessage}
+                      </p>
+                    ) : null}
+                    {chatError ? (
+                      <p className="mt-1 text-[11px] font-semibold ui-warning-text">
+                        {chatError}
+                      </p>
                     ) : null}
                   </div>
 
-                  {shareMessage ? (
-                    <p className="mt-3 text-[11px] font-semibold ui-text-soft">
-                      {shareMessage}
-                    </p>
-                  ) : null}
-                  {chatError ? (
-                    <p className="mt-1 text-[11px] font-semibold ui-warning-text">
-                      {chatError}
-                    </p>
-                  ) : null}
-
-                  {publicProfile ? (
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <div className={heroStatCardClass}>
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-                          {isId ? 'Rating' : 'Rating'}
-                        </p>
-                        <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
-                          {publicProfile.ratingAverage.toFixed(1)}
-                        </p>
-                        <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                          {formatCount(publicProfile.ratingCount)}{' '}
-                          {isId ? 'ulasan' : 'reviews'}
-                        </p>
-                      </div>
-                      <div className={heroStatCardClass}>
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-                          {isId ? 'Respon' : 'Response'}
-                        </p>
-                        <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
-                          {publicProfile.responseMinutes}{' '}
-                          {isId ? 'menit' : 'min'}
-                        </p>
-                        <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                          {publicProfile.repeatCustomerRate}%{' '}
-                          {isId ? 'langganan balik lagi' : 'repeat customers'}
-                        </p>
-                      </div>
+                  <div className="overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]">
+                    <div className="relative">
+                      <UmkmStoreMap
+                        stores={heroMapStores}
+                        viewerLocation={viewerLocation}
+                        isId={isId}
+                        interactive={false}
+                        theme={mapTheme}
+                        routeToStoreId={store.id}
+                        showRoute={false}
+                        onRouteResolved={handleRouteResolved}
+                        className="h-[180px] w-full lg:h-[210px]"
+                      />
+                      <LocalizedAnchor
+                        href={fullMapHref}
+                        className="absolute right-3 top-3 z-[1100] inline-flex min-h-[34px] items-center gap-1 rounded-full border border-white/70 bg-slate-950/78 px-3 text-[11px] font-semibold text-white shadow-[0_16px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur-sm"
+                      >
+                        {isId ? 'Peta penuh' : 'Full map'}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </LocalizedAnchor>
                     </div>
-                  ) : null}
-                </div>
+                    <div className="p-3">
+                      <p className="line-clamp-1 text-xs font-semibold text-[color:var(--app-text)]">
+                        {detailLocationLine}
+                      </p>
+                      <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                        {routeDistanceLabel ||
+                          (isId
+                            ? 'Buka peta untuk cek rute dan area sekitar.'
+                            : 'Open the map to check directions and the area.')}
+                      </p>
+                    </div>
+                  </div>
+                </aside>
               </div>
-            </div>
+            ) : (
+              <div className="flex min-h-[360px] items-center justify-center px-4 text-sm text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Lagi muat profil usaha...'
+                  : 'Loading business profile...'}
+              </div>
+            )}
           </div>
         </section>
 
-        <nav className="sticky top-2 z-20 rounded-[20px] bg-white/94 p-1.5 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 backdrop-blur dark:bg-slate-950/94 dark:ring-slate-800/80 sm:top-4 sm:rounded-[22px]">
-          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto" data-auto-scrollbar>
+        <nav className="sticky top-2 z-20 rounded-[18px] border border-emerald-100/90 bg-white/95 p-1 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.18)] backdrop-blur dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]/94 sm:top-4 sm:rounded-[20px]">
+          <div
+            className="flex flex-nowrap items-center gap-1.5 overflow-x-auto"
+            data-auto-scrollbar
+          >
             {visibleTabs.map(tab => {
               const isActive = activeTab === tab.key;
               return (
@@ -3332,10 +3356,10 @@ export function UmkmStorefrontClient({
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
                   className={cn(
-                    'ui-pressable ui-pressable-card inline-flex min-h-[38px] shrink-0 items-center justify-center rounded-[16px] px-3 text-[11px] font-bold transition sm:min-h-[42px] sm:rounded-[18px] sm:px-4',
+                    'ui-pressable ui-pressable-card inline-flex min-h-[36px] shrink-0 items-center justify-center rounded-[14px] px-3 text-[11px] font-bold transition sm:min-h-[38px] sm:rounded-[16px] sm:px-4',
                     isActive
                       ? 'bg-[color:var(--app-accent)] text-white shadow-[0_18px_30px_-24px_color-mix(in_srgb,var(--app-accent)_36%,transparent)]'
-                      : 'bg-slate-50 text-[color:var(--app-text-soft)] ring-1 ring-slate-200/80 hover:bg-white hover:text-[color:var(--app-text)] dark:bg-slate-900/70 dark:text-slate-300 dark:ring-slate-800/80',
+                      : 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-white hover:text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]',
                   )}
                   aria-current={isActive ? 'page' : undefined}
                 >
@@ -3346,7 +3370,7 @@ export function UmkmStorefrontClient({
           </div>
         </nav>
 
-        {!loading && store && tabHighlights ? (
+        {showTabIntroPanel && tabHighlights ? (
           <section ref={tabContentRef} className={tabPanelClass}>
             <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 max-w-3xl">
@@ -3362,11 +3386,12 @@ export function UmkmStorefrontClient({
 
                 {activeTab === 'overview' ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="inline-flex min-h-[30px] items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-semibold text-amber-700">
-                      <Star className="mr-1.5 h-3.5 w-3.5 fill-current" />
-                      {placeHeader?.ratingLabel} (
-                      {placeHeader?.reviewCountLabel})
-                    </span>
+                    {hasRating ? (
+                      <span className="inline-flex min-h-[30px] items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-semibold text-amber-700">
+                        <Star className="mr-1.5 h-3.5 w-3.5 fill-current" />
+                        {ratingSummaryLabel}
+                      </span>
+                    ) : null}
                     <span className="inline-flex min-h-[30px] items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold text-slate-700">
                       <Clock3 className="mr-1.5 h-3.5 w-3.5" />
                       {placeHeader?.statusLabel}
@@ -3462,10 +3487,10 @@ export function UmkmStorefrontClient({
                         {isId ? 'Rating rata-rata' : 'Average rating'}
                       </p>
                       <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
-                        {placeHeader?.ratingLabel}
+                        {ratingValueLabel}
                       </p>
                       <p className="text-[11px] text-[color:var(--app-text-soft)]">
-                        {placeHeader?.reviewCountLabel}
+                        {reviewCountLabel}
                       </p>
                     </div>
                     <div className={infoCardClass}>
@@ -3565,7 +3590,7 @@ export function UmkmStorefrontClient({
                         {isId ? 'Meja tersedia' : 'Available tables'}
                       </p>
                       <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
-                        {store.available_table_count ??
+                        {store?.available_table_count ??
                           tables.filter(table => table.status === 'available')
                             .length}
                       </p>
@@ -4063,9 +4088,9 @@ export function UmkmStorefrontClient({
                     </h2>
                   </div>
                   <div className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-text)] px-3 py-1 text-[11px] font-semibold">
-                    {publicProfile
-                      ? `${publicProfile.ratingAverage.toFixed(1)} / 5 - ${formatCount(publicProfile.ratingCount)} ${isId ? 'ulasan' : 'reviews'}`
-                      : '-'}
+                    {hasRating
+                      ? `${ratingValueLabel} / 5 - ${reviewCountLabel}`
+                      : reviewCountLabel}
                   </div>
                 </div>
                 {reviews.length === 0 ? (
@@ -4169,11 +4194,71 @@ export function UmkmStorefrontClient({
                 </div>
 
                 {!products.length ? (
-                  <p className="mt-3 text-[11px] text-[color:var(--app-text)]">
-                    {isId
-                      ? 'Belum ada menu atau produk yang bisa dipesan.'
-                      : 'No menu available yet.'}
-                  </p>
+                  <div className="mt-4 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-muted)] p-4 text-[color:var(--app-text)] sm:p-5">
+                    <div className="flex min-w-0 gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white text-[color:var(--app-accent)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.18)] dark:bg-slate-950">
+                        <ShoppingBag className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-black">
+                          {isId
+                            ? 'Katalog toko sedang disiapkan'
+                            : 'The catalog is being prepared'}
+                        </h3>
+                        <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+                          {isId
+                            ? 'Toko ini sudah punya profil, lokasi, dan kontak. Untuk menu terbaru, langsung tanya usaha atau cek lagi nanti.'
+                            : 'This business already has its profile, location, and contact. Ask for the latest menu or check back later.'}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {placeHeader?.whatsappHref ? (
+                            <a
+                              href={placeHeader.whatsappHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-white"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                              {isId ? 'Tanya menu' : 'Ask for menu'}
+                            </a>
+                          ) : placeHeader?.telHref ? (
+                            <a
+                              href={placeHeader.telHref}
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-white"
+                            >
+                              <Phone className="h-4 w-4" />
+                              {isId ? 'Telepon usaha' : 'Call business'}
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void startChat()}
+                              disabled={chatLoading}
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-white disabled:opacity-60"
+                            >
+                              {chatLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MessageCircle className="h-4 w-4" />
+                              )}
+                              {isId ? 'Chat usaha' : 'Chat business'}
+                            </button>
+                          )}
+                          {placeHeader ? (
+                            <a
+                              href={placeHeader.googleMapsDirectionsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] dark:bg-slate-950"
+                            >
+                              <Navigation className="h-4 w-4" />
+                              {isId ? 'Lihat rute' : 'Directions'}
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
 
                 <div className="mt-4 space-y-3">
@@ -4190,7 +4275,7 @@ export function UmkmStorefrontClient({
                           </p>
                         </div>
                       </div>
-                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      <div className="mt-3 grid gap-2">
                         {categoryProducts.map(product => {
                           const quantity = quantities[product.id] || 0;
                           return (
@@ -4198,35 +4283,33 @@ export function UmkmStorefrontClient({
                               key={product.id}
                               className={menuItemCardClass}
                             >
-                              <div className="flex min-w-0 gap-2.5 sm:gap-3">
-                                <ProductThumbnail
-                                  product={product}
-                                  className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-[color:var(--app-accent-border)] sm:h-16 sm:w-16"
-                                />
+                              <div className="flex min-w-0 gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <p className="line-clamp-2 text-[11px] font-semibold text-[color:var(--app-text)]">
-                                        {product.name}
-                                      </p>
-                                      <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                                        {product.description ||
-                                          (isId
-                                            ? 'Siap dipesan.'
-                                            : 'Ready to order.')}
-                                      </p>
-                                    </div>
-                                    <span className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--app-text)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80 sm:px-2.5 sm:text-[11px]">
-                                      {formatIdr(product.price_cents)}
-                                    </span>
-                                  </div>
-                                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-                                    <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                                      {isId
-                                        ? `Stok ${product.stock_qty}`
-                                        : `Stock ${product.stock_qty}`}
-                                    </p>
-                                    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                                  <p className="line-clamp-2 text-[13px] font-black leading-tight text-[color:var(--app-text)]">
+                                    {product.name}
+                                  </p>
+                                  <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                                    {product.description ||
+                                      (isId
+                                        ? 'Siap dipesan.'
+                                        : 'Ready to order.')}
+                                  </p>
+                                  <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+                                    {formatIdr(product.price_cents)}
+                                  </p>
+                                  <p className="mt-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                                    {isId
+                                      ? `Stok ${product.stock_qty}`
+                                      : `Stock ${product.stock_qty}`}
+                                  </p>
+                                </div>
+                                <div className="relative h-[88px] w-[88px] shrink-0 sm:h-[96px] sm:w-[96px]">
+                                  <ProductThumbnail
+                                    product={product}
+                                    className="absolute inset-0 overflow-hidden rounded-[18px] border border-slate-200 bg-slate-50"
+                                  />
+                                  {quantity > 0 ? (
+                                    <div className="absolute bottom-1 right-1 flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-white p-0.5 shadow-[0_12px_18px_-12px_rgba(15,23,42,0.25)] dark:border-emerald-400/14 dark:bg-slate-950">
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -4239,7 +4322,7 @@ export function UmkmStorefrontClient({
                                       >
                                         <Minus className="h-4 w-4" />
                                       </button>
-                                      <span className="min-w-[22px] text-center text-sm font-black text-[color:var(--app-text)]">
+                                      <span className="min-w-[24px] text-center text-sm font-black text-[color:var(--app-text)]">
                                         {quantity}
                                       </span>
                                       <button
@@ -4255,32 +4338,18 @@ export function UmkmStorefrontClient({
                                         <Plus className="h-4 w-4" />
                                       </button>
                                     </div>
-                                  </div>
-                                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  ) : (
                                     <button
                                       type="button"
                                       onClick={() =>
                                         changeQuantity(product.id, 1)
                                       }
-                                      className={subtleActionClass}
+                                      className="ui-pressable absolute bottom-1 right-1 inline-flex h-8 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-accent)] bg-white px-2.5 text-[10px] font-black text-[color:var(--app-accent)] shadow-[0_12px_18px_-12px_rgba(15,23,42,0.25)]"
                                     >
-                                      {quantity > 0
-                                        ? isId
-                                          ? 'Tambah lagi'
-                                          : 'Add more'
-                                        : isId
-                                          ? 'Tambah'
-                                          : 'Add'}
+                                      <Plus className="h-3.5 w-3.5" />
+                                      {isId ? 'Tambah' : 'Add'}
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleQuickBuy(product.id)}
-                                      className="ui-pressable ui-pressable-card inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-white shadow-[0_18px_30px_-24px_color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-                                    >
-                                      <ShoppingBag className="h-4 w-4" />
-                                      {isId ? 'Pesan' : 'Order'}
-                                    </button>
-                                  </div>
+                                  )}
                                 </div>
                               </div>
                             </article>
@@ -4529,7 +4598,10 @@ export function UmkmStorefrontClient({
                   </button>
                 ) : null}
                 {forumTabEnabled ? (
-                  <LocalizedAnchor href={forumPath} className={subtleActionClass}>
+                  <LocalizedAnchor
+                    href={forumPath}
+                    className={subtleActionClass}
+                  >
                     <MessagesSquare className="h-4 w-4" />
                     {isId ? 'Masuk forum bisnis' : 'Open forum'}
                   </LocalizedAnchor>
@@ -5113,21 +5185,21 @@ export function UmkmStorefrontClient({
                         <label className="text-xs font-semibold text-[color:var(--app-text)]">
                           {isId ? 'Alamat lengkap' : 'Full delivery address'}
                         </label>
-                      <textarea
-                        autoComplete="street-address"
-                        maxLength={CHECKOUT_LIMITS.deliveryAddress}
-                        value={deliveryAddress}
-                        onChange={event =>
-                          setDeliveryAddress(event.target.value)
-                        }
-                        rows={3}
-                        className="mt-1 w-full rounded-2xl border border-[color:var(--app-accent-border)] px-3 py-2 text-sm text-[color:var(--app-text)]"
-                        placeholder={
-                          isId
-                            ? 'Tulis alamat lengkap'
-                            : 'Enter the full address'
-                        }
-                      />
+                        <textarea
+                          autoComplete="street-address"
+                          maxLength={CHECKOUT_LIMITS.deliveryAddress}
+                          value={deliveryAddress}
+                          onChange={event =>
+                            setDeliveryAddress(event.target.value)
+                          }
+                          rows={3}
+                          className="mt-1 w-full rounded-2xl border border-[color:var(--app-accent-border)] px-3 py-2 text-sm text-[color:var(--app-text)]"
+                          placeholder={
+                            isId
+                              ? 'Tulis alamat lengkap'
+                              : 'Enter the full address'
+                          }
+                        />
                       </div>
                       <label className="mt-2 flex items-start gap-2 text-xs text-[color:var(--app-text)]">
                         <input
@@ -5210,7 +5282,9 @@ export function UmkmStorefrontClient({
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                     <button
                       type="button"
-                      onClick={() => void startOrderPayment(orderResult.order.id)}
+                      onClick={() =>
+                        void startOrderPayment(orderResult.order.id)
+                      }
                       disabled={orderPaymentLoading}
                       className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -5329,30 +5403,32 @@ function ProductThumbnail({
   product: ProductRecord;
   className?: string;
 }) {
-  const fallbackSrc = localProductImageForCategory(
-    product.category,
-    `${product.id}-${product.name}`,
-  );
   const sourceImage = getProductImage(product);
-  const imageToken = `${product.id}:${sourceImage || fallbackSrc}`;
+  const fallbackImage = localProductImageForCategory(
+    product.category,
+    product.id || product.name,
+  );
+  const imageToken = `${product.id}:${sourceImage || fallbackImage}`;
   const [failedImageToken, setFailedImageToken] = useState<string | null>(null);
   const imageSrc =
-    failedImageToken === imageToken ? fallbackSrc : sourceImage || fallbackSrc;
+    failedImageToken === imageToken ? '' : sourceImage || fallbackImage;
 
   return (
     <div className={className}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={imageSrc}
-        alt={product.name}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        onError={() => {
-          if (imageSrc !== fallbackSrc) {
-            setFailedImageToken(imageToken);
-          }
-        }}
-      />
+      {imageSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageSrc}
+          alt={product.name}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setFailedImageToken(imageToken)}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]">
+          <ImageIcon className="h-5 w-5" />
+        </div>
+      )}
     </div>
   );
 }
