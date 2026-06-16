@@ -31,7 +31,9 @@ compose_cmd() {
 }
 
 image_only_services=(
-  postgres_db
+  identity_db
+  community_db
+  marketplace_db
   redis_cache
   rabbitmq
   meilisearch
@@ -44,7 +46,9 @@ image_only_services=(
 )
 
 core_infra_services=(
-  postgres_db
+  identity_db
+  community_db
+  marketplace_db
   redis_cache
   rabbitmq
   meilisearch

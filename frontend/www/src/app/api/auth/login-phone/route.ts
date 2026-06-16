@@ -14,7 +14,7 @@ import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { z } from 'zod';
 
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
-const LOGIN_PHONE_OTP_REQUIRED = process.env.LOGIN_PHONE_OTP_REQUIRED === 'true';
+const LOGIN_PHONE_OTP_REQUIRED = process.env.LOGIN_PHONE_OTP_REQUIRED !== 'false';
 const LOGIN_RATE_LIMIT_PER_15_MIN = Number.parseInt(
   process.env.LOGIN_RATE_LIMIT_PER_15_MIN || '20',
   10,
@@ -23,7 +23,7 @@ const LOGIN_PHONE_RATE_LIMIT_PER_15_MIN = Number.parseInt(
   process.env.LOGIN_PHONE_RATE_LIMIT_PER_15_MIN || '10',
   10,
 );
-const PHONE_AUTH_ENABLED = process.env.ENABLE_PHONE_AUTH === 'true';
+const PHONE_AUTH_ENABLED = process.env.ENABLE_PHONE_AUTH !== 'false';
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (value == null) return undefined;

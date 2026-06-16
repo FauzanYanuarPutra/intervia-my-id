@@ -5,7 +5,10 @@ import {
   shouldIncludeOwnerProfiles,
 } from '@/lib/content/ownerProfiles';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
-import { DEFAULT_PROFILE_AVATAR } from '@/lib/profile/avatar';
+import {
+  DEFAULT_PROFILE_AVATAR,
+  readProfileAvatarStyle,
+} from '@/lib/profile/avatar';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -47,6 +50,9 @@ type DiscoverUser = {
   username?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  avatar_style?: unknown;
+  avatarStyle?: unknown;
+  metadata?: ContentRecord | null;
   location?: string | null;
   bio?: string | null;
   headline?: string | null;
@@ -363,6 +369,7 @@ function buildPersonSearchRecord({
     title: displayName,
   });
   const createdAt = asString(user.created_at) || null;
+  const avatarStyle = readProfileAvatarStyle(user);
   return {
     id: `${user.id}:${side}:${searchKind}`,
     owner_id: user.id,
@@ -384,7 +391,10 @@ function buildPersonSearchRecord({
       id: user.id,
       username: user.username || null,
       full_name: user.full_name || displayName,
-      avatar_url: DEFAULT_PROFILE_AVATAR,
+      avatar_url: user.avatar_url || DEFAULT_PROFILE_AVATAR,
+      avatar_style: avatarStyle,
+      avatarStyle: avatarStyle,
+      metadata: user.metadata || null,
       location: user.location || userLocation,
       headline: asString(user.headline) || asString(profile?.headline) || null,
       roles: collectUserRoles(user),
@@ -402,6 +412,7 @@ function buildPersonSearchRecord({
       price_unit: priceUnit || defaultPriceUnitForContentType(contentType),
       public_path: publicPath,
       display_name: displayName,
+      avatar_style: avatarStyle,
       location: userLocation,
       headline:
         pickFirstNonEmpty(profile?.headline, user.headline, user.bio) ||
@@ -927,6 +938,7 @@ function mapUserToFreelancerContent(
   const rating = toNumber(user.rating);
   const completedJobs = toNumber(user.completed_jobs);
   const hourlyRate = toNumber(user.hourly_rate);
+  const avatarStyle = readProfileAvatarStyle(user);
 
   return {
     id: user.id,
@@ -957,7 +969,10 @@ function mapUserToFreelancerContent(
       id: user.id,
       username: user.username || null,
       full_name: user.full_name || displayName,
-      avatar_url: DEFAULT_PROFILE_AVATAR,
+      avatar_url: user.avatar_url || DEFAULT_PROFILE_AVATAR,
+      avatar_style: avatarStyle,
+      avatarStyle: avatarStyle,
+      metadata: user.metadata || null,
       location: user.location || null,
       headline: user.headline || null,
       roles: Array.isArray(user.roles) ? user.roles : [],
@@ -978,7 +993,8 @@ function mapUserToFreelancerContent(
       username: user.username || null,
       email: user.email || null,
       phone: user.phone || null,
-      avatar_url: DEFAULT_PROFILE_AVATAR,
+      avatar_url: user.avatar_url || DEFAULT_PROFILE_AVATAR,
+      avatar_style: avatarStyle,
       location: user.location || null,
       headline: user.headline || null,
       roles: Array.isArray(user.roles) ? user.roles : [],

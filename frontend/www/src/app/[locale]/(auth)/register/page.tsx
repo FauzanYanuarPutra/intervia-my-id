@@ -1,7 +1,7 @@
 'use client';
 
-import RegisterWithOTP from './RegisterWithOTP';
+import GoogleAuthOnlyClient from '../GoogleAuthOnlyClient';
 
 export default function RegisterPage() {
-  return <RegisterWithOTP />;
+  return <GoogleAuthOnlyClient mode="register" />;
 }

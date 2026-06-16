@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { type ChangeEvent, useMemo, useState } from 'react';
 import {
   BadgeCheck,
   Camera,
@@ -32,6 +32,18 @@ type DocumentPreview = {
   nik_masked?: string;
   ttl?: string;
 };
+
+const KYC_MAX_UPLOAD_MB = 25;
+const KYC_MAX_UPLOAD_BYTES = KYC_MAX_UPLOAD_MB * 1024 * 1024;
+
+function validateKycImage(file: File): string {
+  if (!file.type.startsWith('image/')) return 'File harus berupa gambar.';
+  if (file.size <= 0) return 'File tidak boleh kosong.';
+  if (file.size > KYC_MAX_UPLOAD_BYTES) {
+    return `Ukuran maksimal ${KYC_MAX_UPLOAD_MB}MB per file.`;
+  }
+  return '';
+}
 
 function kycLabel(
   status: IdentityVerificationRecord['kyc_status'] | undefined,
@@ -217,6 +229,25 @@ export function IdentityVerificationPanel({
     }
   };
 
+  const handleFileSelect =
+    (setter: (file: File | null) => void) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0] || null;
+      event.target.value = '';
+      if (!file) {
+        setter(null);
+        return;
+      }
+      const error = validateKycImage(file);
+      if (error) {
+        setter(null);
+        setMessage(error);
+        return;
+      }
+      setMessage(null);
+      setter(file);
+    };
+
   return (
     <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-sm sm:p-4 sm:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.34)] dark:border-[color:var(--app-border-strong)]">
       <div className="flex flex-col gap-3 rounded-[20px] bg-[linear-gradient(135deg,#f7fff9_0%,#ffffff_64%,#ecfdf5_100%)] p-3 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_62%,#10251e_100%)] sm:flex-row sm:items-start sm:justify-between sm:p-4">
@@ -341,9 +372,7 @@ export function IdentityVerificationPanel({
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  onChange={event =>
-                    setKtpFile(event.target.files?.[0] || null)
-                  }
+                  onChange={handleFileSelect(setKtpFile)}
                   disabled={submitting}
                 />
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
@@ -367,9 +396,7 @@ export function IdentityVerificationPanel({
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  onChange={event =>
-                    setSelfieFile(event.target.files?.[0] || null)
-                  }
+                  onChange={handleFileSelect(setSelfieFile)}
                   disabled={submitting}
                 />
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">

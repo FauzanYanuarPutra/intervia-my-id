@@ -73,7 +73,7 @@ import {
   type LajukanReel,
   type ReelsPageResult,
 } from '../../_data/reels';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
 import {
   openNativeReelsStudio,
@@ -554,31 +554,83 @@ function drawStudioCanvasEffect(
   } else if (effect === 'dog') {
     context.fillStyle = 'rgba(120,53,15,0.92)';
     context.beginPath();
-    context.ellipse(width * 0.3, height * 0.14, width * 0.09, height * 0.055, -0.62, 0, Math.PI * 2);
-    context.ellipse(width * 0.7, height * 0.14, width * 0.09, height * 0.055, 0.62, 0, Math.PI * 2);
+    context.ellipse(
+      width * 0.3,
+      height * 0.14,
+      width * 0.09,
+      height * 0.055,
+      -0.62,
+      0,
+      Math.PI * 2,
+    );
+    context.ellipse(
+      width * 0.7,
+      height * 0.14,
+      width * 0.09,
+      height * 0.055,
+      0.62,
+      0,
+      Math.PI * 2,
+    );
     context.fill();
     context.fillStyle = 'rgba(254,243,199,0.96)';
     context.beginPath();
-    context.ellipse(width * 0.3, height * 0.145, width * 0.044, height * 0.026, -0.62, 0, Math.PI * 2);
-    context.ellipse(width * 0.7, height * 0.145, width * 0.044, height * 0.026, 0.62, 0, Math.PI * 2);
+    context.ellipse(
+      width * 0.3,
+      height * 0.145,
+      width * 0.044,
+      height * 0.026,
+      -0.62,
+      0,
+      Math.PI * 2,
+    );
+    context.ellipse(
+      width * 0.7,
+      height * 0.145,
+      width * 0.044,
+      height * 0.026,
+      0.62,
+      0,
+      Math.PI * 2,
+    );
     context.fill();
     context.fillStyle = 'rgba(17,24,39,0.92)';
     context.beginPath();
-    context.ellipse(width * 0.5, height * 0.41, width * 0.045, height * 0.026, 0, 0, Math.PI * 2);
+    context.ellipse(
+      width * 0.5,
+      height * 0.41,
+      width * 0.045,
+      height * 0.026,
+      0,
+      0,
+      Math.PI * 2,
+    );
     context.fill();
     context.strokeStyle = 'rgba(17,24,39,0.6)';
     context.lineWidth = Math.max(2, width * 0.004);
     [-1, 1].forEach(side => {
       for (let offset = -1; offset <= 1; offset += 1) {
         context.beginPath();
-        context.moveTo(width * 0.5 + side * width * 0.052, height * (0.425 + offset * 0.01));
-        context.lineTo(width * 0.5 + side * width * 0.17, height * (0.41 + offset * 0.026));
+        context.moveTo(
+          width * 0.5 + side * width * 0.052,
+          height * (0.425 + offset * 0.01),
+        );
+        context.lineTo(
+          width * 0.5 + side * width * 0.17,
+          height * (0.41 + offset * 0.026),
+        );
         context.stroke();
       }
     });
     context.fillStyle = 'rgba(244,63,94,0.82)';
     context.beginPath();
-    context.roundRect(width * 0.474, height * 0.443, width * 0.052, height * 0.05, width * 0.026);
+    context.roundRect(
+      width * 0.474,
+      height * 0.443,
+      width * 0.052,
+      height * 0.05,
+      width * 0.026,
+    );
     context.fill();
   } else if (effect === 'grain') {
     context.fillStyle = 'rgba(255,255,255,0.025)';
@@ -886,6 +938,8 @@ function getReelCreatorAvatarSrc(reel: LajukanReel) {
       'avatarUrl',
       'avatar',
     ),
+    readProfileAvatarStyle(reel),
+    reel.creator,
   );
 }
 
@@ -2769,7 +2823,7 @@ function ReelsTopBar({
                   className={cn(
                     'relative h-8 rounded-full px-2.5 text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800 active:scale-95 sm:px-3',
                     feedTab === tab.id &&
-                      'bg-[linear-gradient(135deg,#047857,#16a34a)] text-white shadow-lg shadow-emerald-900/24',
+                    'bg-[linear-gradient(135deg,#047857,#16a34a)] text-white shadow-lg shadow-emerald-900/24',
                   )}
                 >
                   {tab.label}
@@ -2904,7 +2958,7 @@ function ReelsCreateDock({
 
   return (
     <>
-      <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-3 z-50 flex justify-end lg:hidden">
+      <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+20px)] right-3 z-50 flex justify-end lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -2921,7 +2975,9 @@ function ReelsCreateDock({
       <div
         className={cn(
           'absolute inset-0 z-[70] bg-black/58 backdrop-blur-[3px] transition-opacity duration-200',
-          open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+          open
+            ? 'pointer-events-auto opacity-100'
+            : 'pointer-events-none opacity-0',
         )}
         aria-hidden={!open}
         onClick={() => setOpen(false)}
@@ -2946,7 +3002,9 @@ function ReelsCreateDock({
               {isId ? 'Buat di Lajukan' : 'Create on Lajukan'}
             </p>
             <p className="mt-0.5 text-sm font-semibold text-white/58">
-              {isId ? 'Pilih yang ingin kamu bagikan' : 'Choose what you want to share'}
+              {isId
+                ? 'Pilih yang ingin kamu bagikan'
+                : 'Choose what you want to share'}
             </p>
           </div>
 
@@ -2954,9 +3012,11 @@ function ReelsCreateDock({
             {actions.map(action => {
               // 1. Defensively handle the Icon component casing
               const RawIcon = action.icon;
-              const Icon = typeof RawIcon === 'function' || (RawIcon && typeof RawIcon === 'object')
-                ? (RawIcon as LucideIcon)
-                : null;
+              const Icon =
+                typeof RawIcon === 'function' ||
+                  (RawIcon && typeof RawIcon === 'object')
+                  ? (RawIcon as LucideIcon)
+                  : null;
 
               const selected = lastAction === action.key;
 
@@ -3320,7 +3380,7 @@ function ReelSlide({
 
   return (
     <article
-      className="relative flex h-full snap-start overflow-hidden px-2.5 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+70px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
+      className="relative flex h-full snap-start overflow-hidden px-2.5 pb-[env(safe-area-inset-bottom)+20px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+20px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
       style={REEL_SLIDE_LOADED_STYLE}
     >
       {imageMedia ? (
@@ -3423,10 +3483,7 @@ function ReelSlide({
           </button>
 
           <div className="mt-1 text-[14px] leading-5">
-            <ExpandableCaption
-              text={reel.caption}
-              maxLength={90}
-            />
+            <ExpandableCaption text={reel.caption} maxLength={90} />
           </div>
 
           {reel.productName && (
@@ -3450,7 +3507,6 @@ function ReelSlide({
               {reel.productName}
             </button>
           )}
-
         </div>
       </div>
     </article>
@@ -3472,9 +3528,7 @@ function ExpandableCaption({
 
   return (
     <p>
-      {expanded
-        ? text
-        : `${text.slice(0, maxLength)}... `}
+      {expanded ? text : `${text.slice(0, maxLength)}... `}
 
       <button
         type="button"
@@ -3646,9 +3700,7 @@ function ActionRail({
             active:scale-95
             disabled:opacity-60
             `,
-            actionState.followed
-              ? 'bg-emerald-500'
-              : 'bg-[#ff2d55]',
+            actionState.followed ? 'bg-emerald-500' : 'bg-[#ff2d55]',
           )}
         >
           {actionState.loading === 'follow' ? (
@@ -4901,7 +4953,11 @@ function CommentsSheet({
                   <article key={comment.id} className="space-y-2">
                     <div className="flex gap-2.5">
                       <img
-                        src={profileAvatarSrc(comment.authorAvatarUrl)}
+                        src={profileAvatarSrc(
+                          comment.authorAvatarUrl,
+                          readProfileAvatarStyle(comment),
+                          comment.authorName,
+                        )}
                         alt={comment.authorName}
                         className="h-9 w-9 shrink-0 rounded-full object-cover"
                       />
@@ -4939,7 +4995,11 @@ function CommentsSheet({
                         {replies.map(reply => (
                           <div key={reply.id} className="flex gap-2">
                             <img
-                              src={profileAvatarSrc(reply.authorAvatarUrl)}
+                              src={profileAvatarSrc(
+                                reply.authorAvatarUrl,
+                                readProfileAvatarStyle(reply),
+                                reply.authorName,
+                              )}
                               alt={reply.authorName}
                               className="h-7 w-7 shrink-0 rounded-full object-cover"
                             />
@@ -6318,93 +6378,96 @@ function UploadReelSheet({
                           <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                             {studioPanel === 'filters'
                               ? REEL_FILTER_PRESETS.map(filter => {
-                                  const active = form.filterPreset === filter.id;
+                                const active =
+                                  form.filterPreset === filter.id;
+                                return (
+                                  <button
+                                    key={filter.id}
+                                    type="button"
+                                    onClick={() =>
+                                      setField('filterPreset', filter.id)
+                                    }
+                                    className={cn(
+                                      'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
+                                      active
+                                        ? 'bg-white text-slate-950'
+                                        : 'bg-white/9 text-white/72',
+                                    )}
+                                  >
+                                    <span
+                                      className={cn(
+                                        'h-9 w-9 rounded-full ring-1 ring-white/18',
+                                        filter.swatch,
+                                      )}
+                                    />
+                                    <span className="max-w-full truncate">
+                                      {filter.label}
+                                    </span>
+                                  </button>
+                                );
+                              })
+                              : studioPanel === 'effects'
+                                ? REELS_STUDIO_EFFECTS.map(effect => {
+                                  const active = studioEffect === effect.id;
                                   return (
                                     <button
-                                      key={filter.id}
+                                      key={effect.id}
                                       type="button"
                                       onClick={() =>
-                                        setField('filterPreset', filter.id)
+                                        setStudioEffect(effect.id)
                                       }
                                       className={cn(
-                                        'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
+                                        'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
                                         active
-                                          ? 'bg-white text-slate-950'
+                                          ? 'bg-yellow-300 text-slate-950'
                                           : 'bg-white/9 text-white/72',
                                       )}
                                     >
                                       <span
                                         className={cn(
                                           'h-9 w-9 rounded-full ring-1 ring-white/18',
-                                          filter.swatch,
+                                          effect.swatch,
                                         )}
                                       />
                                       <span className="max-w-full truncate">
-                                        {filter.label}
+                                        {effect.label}
                                       </span>
                                     </button>
                                   );
                                 })
-                              : studioPanel === 'effects'
-                                ? REELS_STUDIO_EFFECTS.map(effect => {
-                                    const active = studioEffect === effect.id;
-                                    return (
-                                      <button
-                                        key={effect.id}
-                                        type="button"
-                                        onClick={() => setStudioEffect(effect.id)}
-                                        className={cn(
-                                          'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
-                                          active
-                                            ? 'bg-yellow-300 text-slate-950'
-                                            : 'bg-white/9 text-white/72',
-                                        )}
-                                      >
-                                        <span
-                                          className={cn(
-                                            'h-9 w-9 rounded-full ring-1 ring-white/18',
-                                            effect.swatch,
-                                          )}
-                                        />
-                                        <span className="max-w-full truncate">
-                                          {effect.label}
-                                        </span>
-                                      </button>
-                                    );
-                                  })
                                 : studioPanel === 'music'
                                   ? REELS_MUSIC_TRACKS.map(track => (
-                                      <button
-                                        key={track}
-                                        type="button"
-                                        onClick={() =>
-                                          setField('musicTrack', track)
-                                        }
-                                        className={cn(
-                                          'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-black transition active:scale-95',
-                                          form.musicTrack === track
-                                            ? 'bg-yellow-300 text-slate-950'
-                                            : 'bg-white/9 text-white/72',
-                                        )}
-                                      >
-                                        {track}
-                                      </button>
-                                    ))
+                                    <button
+                                      key={track}
+                                      type="button"
+                                      onClick={() =>
+                                        setField('musicTrack', track)
+                                      }
+                                      className={cn(
+                                        'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-black transition active:scale-95',
+                                        form.musicTrack === track
+                                          ? 'bg-yellow-300 text-slate-950'
+                                          : 'bg-white/9 text-white/72',
+                                      )}
+                                    >
+                                      {track}
+                                    </button>
+                                  ))
                                   : REELS_STUDIO_SPEEDS.map(speed => (
-                                      <button
-                                        key={speed}
-                                        type="button"
-                                        onClick={() => setStudioSpeed(speed)}
-                                        className={cn(
-                                          'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-black transition active:scale-95',
-                                          studioSpeed === speed
-                                            ? 'bg-white text-slate-950'
-                                            : 'bg-white/9 text-white/72',
-                                        )}
-                                      >
-                                        {speed}
-                                      </button>
-                                    ))}
+                                    <button
+                                      key={speed}
+                                      type="button"
+                                      onClick={() => setStudioSpeed(speed)}
+                                      className={cn(
+                                        'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-black transition active:scale-95',
+                                        studioSpeed === speed
+                                          ? 'bg-white text-slate-950'
+                                          : 'bg-white/9 text-white/72',
+                                      )}
+                                    >
+                                      {speed}
+                                    </button>
+                                  ))}
                           </div>
                         </div>
                       ) : recording ? (

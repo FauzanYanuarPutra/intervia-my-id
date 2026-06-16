@@ -12,6 +12,7 @@ import { z } from 'zod';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
+const GOOGLE_OAUTH_STATE_COOKIE = 'google_oauth_state';
 const GoogleCallbackQuerySchema = z.object({
   code: z.string().optional(),
   state: z.string().optional(),
@@ -67,6 +68,16 @@ function sanitizeCallbackPath(input: string | undefined): string {
   return input;
 }
 
+function clearGoogleOAuthState(response: NextResponse, secure: boolean) {
+  response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', {
+    httpOnly: true,
+    secure,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
+}
+
 function getPreferredLocale(
   req: NextRequest,
   callbackUrl?: string,
@@ -107,13 +118,18 @@ export async function GET(req: NextRequest) {
 
     const { code, state, error } = parsedQuery.data;
 
-    // Parse callback URL from state
+    // Parse callback URL from state and validate the nonce stored at start.
     let callbackUrl = '/home';
+    let stateNonce = '';
     if (state) {
       try {
-        const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
+        const stateData = JSON.parse(
+          Buffer.from(state, 'base64url').toString(),
+        );
         callbackUrl = sanitizeCallbackPath(stateData.callbackUrl);
-      } catch {}
+        stateNonce =
+          typeof stateData.nonce === 'string' ? stateData.nonce.trim() : '';
+      } catch { }
     }
 
     const baseUrl = getPublicBaseUrl(req);
@@ -121,21 +137,36 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error('Google OAuth error:', error);
-      return NextResponse.redirect(
+      const response = NextResponse.redirect(
         `${baseUrl}/${preferredLocale}/login?error=oauth_failed`,
       );
+      clearGoogleOAuthState(response, secure);
+      return response;
     }
 
     if (!code) {
-      return NextResponse.redirect(
+      const response = NextResponse.redirect(
         `${baseUrl}/${preferredLocale}/login?error=no_code`,
       );
+      clearGoogleOAuthState(response, secure);
+      return response;
+    }
+
+    const cookieNonce = req.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value || '';
+    if (!stateNonce || !cookieNonce || stateNonce !== cookieNonce) {
+      const response = NextResponse.redirect(
+        `${baseUrl}/${preferredLocale}/login?error=oauth_state_invalid`,
+      );
+      clearGoogleOAuthState(response, secure);
+      return response;
     }
 
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return NextResponse.redirect(
+      const response = NextResponse.redirect(
         `${baseUrl}/${preferredLocale}/login?error=oauth_not_configured`,
       );
+      clearGoogleOAuthState(response, secure);
+      return response;
     }
 
     // Exchange code for tokens
@@ -185,21 +216,26 @@ export async function GET(req: NextRequest) {
         ...authSecurityHeaders(security),
       },
       body: JSON.stringify({
+        id_token: tokens.id_token,
         provider_user_id: googleUser.sub,
         email: googleUser.email,
         email_verified: googleUser.email_verified,
         name: googleUser.name,
-        avatar_url: DEFAULT_PROFILE_AVATAR,
+        avatar_url: googleUser.picture || DEFAULT_PROFILE_AVATAR,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
       }),
     });
 
     if (!backendResponse.ok) {
-      console.error('Backend OAuth failed');
-      return NextResponse.redirect(
-        `${baseUrl}/${preferredLocale}/login?error=backend_failed`,
-      );
+      const backendError = await backendResponse.text().catch(() => '');
+      console.error('Backend OAuth failed', {
+        status: backendResponse.status,
+        body: backendError.slice(0, 500),
+      });
+      // return NextResponse.redirect(
+      //   `${baseUrl}/${preferredLocale}/login?error=backend_failed`,
+      // );
     }
 
     const authData: BackendOAuthResponse = await backendResponse.json();
@@ -257,6 +293,16 @@ export async function GET(req: NextRequest) {
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60, // 30 days
     });
+
+    response.cookies.set('auth_present', '1', {
+      httpOnly: false,
+      secure,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 30 * 24 * 60 * 60,
+    });
+
+    clearGoogleOAuthState(response, secure);
 
     return response;
   } catch (e) {

@@ -24,7 +24,7 @@ import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 
 type OverviewPayload = {
   generated_at: string;
@@ -226,6 +226,8 @@ export function BusinessOsCommandCenter() {
     'User';
   const dashboardAvatar = profileAvatarSrc(
     user?.avatarUrl || user?.avatar_url || user?.metadata?.avatar_url,
+    readProfileAvatarStyle(user),
+    displayName,
   );
 
   const unreadMessages = toInt(payload?.overview.unread_messages);

@@ -28,7 +28,7 @@ import {
   matchAnyFilter,
 } from '@/lib/content/catalog';
 import { normalizePriceUnit } from '@/lib/content/priceUnit';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   buildPublicProfileHref,
   buildPublicProfileHrefFromContent,
@@ -41,6 +41,9 @@ type DiscoverUser = {
   email?: string | null;
   phone?: string | null;
   avatar_url?: string | null;
+  avatar_style?: unknown;
+  avatarStyle?: unknown;
+  metadata?: unknown;
   location?: string | null;
   headline?: string | null;
   roles?: string[] | null;
@@ -184,6 +187,8 @@ function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
           item.cover_image ||
             asString(meta.avatar) ||
             asString(meta.avatar_url),
+          readProfileAvatarStyle(item.owner_profile || item),
+          asString(meta.name) || item.title || 'Avatar',
         ),
         alt: asString(meta.name) || 'Avatar',
       },
@@ -233,7 +238,11 @@ function mapDiscoverUserToFreelancer(user: DiscoverUser): FreelancerCardItem {
   const roleFromList =
     Array.isArray(user.roles) && user.roles.length > 0 ? user.roles[0] : null;
   const level = roleToLabel(user.level || roleFromList);
-  const avatar = profileAvatarSrc(user.avatar_url);
+  const avatar = profileAvatarSrc(
+    user.avatar_url,
+    readProfileAvatarStyle(user),
+    name,
+  );
 
   return {
     id,

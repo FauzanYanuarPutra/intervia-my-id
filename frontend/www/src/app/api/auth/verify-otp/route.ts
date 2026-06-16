@@ -15,7 +15,7 @@ const VerifyOtpSchema = z.object({
   otp: z.string().regex(/^\d{6}$/),
   purpose: z.enum(['register', 'login', 'reset', 'profile']).default('register'),
 });
-const OTP_AUTH_ENABLED = process.env.ENABLE_OTP_AUTH === 'true';
+const OTP_AUTH_ENABLED = process.env.ENABLE_OTP_AUTH !== 'false';
 
 function normalizeTarget(type: 'email' | 'phone', target: string): string {
   if (type === 'email') {

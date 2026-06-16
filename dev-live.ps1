@@ -17,7 +17,8 @@ if (-not (Test-Path $runner)) {
 if (-not (Test-Path $EnvFile)) {
     if ($EnvFile -eq ".env.development" -and (Test-Path ".env")) {
         $EnvFile = ".env"
-    } else {
+    }
+    else {
         throw "Env file not found: $EnvFile"
     }
 }
@@ -26,7 +27,8 @@ function Test-ComposeV2 {
     try {
         & docker compose version *> $null
         return ($LASTEXITCODE -eq 0)
-    } catch {
+    }
+    catch {
         return $false
     }
 }
@@ -39,7 +41,8 @@ function Invoke-ComposeQuiet {
 
     if (Test-ComposeV2) {
         & docker compose --env-file $EnvFile @Args *> $null
-    } else {
+    }
+    else {
         & docker-compose --env-file $EnvFile @Args *> $null
     }
 }
@@ -76,7 +79,9 @@ function Import-EnvFile {
 }
 
 $coreServices = @(
-    "postgres_db",
+    "identity_db",
+    "community_db",
+    "marketplace_db",
     "redis_cache",
     "rabbitmq",
     "meilisearch",
@@ -146,7 +151,8 @@ if (-not $NoInstall -and -not (Test-Path (Join-Path $appPath "node_modules"))) {
         if ($LASTEXITCODE -ne 0) {
             throw "npm install failed in $appPath"
         }
-    } finally {
+    }
+    finally {
         Pop-Location
     }
 }
@@ -160,6 +166,7 @@ Push-Location $appPath
 try {
     npm run dev
     exit $LASTEXITCODE
-} finally {
+}
+finally {
     Pop-Location
 }

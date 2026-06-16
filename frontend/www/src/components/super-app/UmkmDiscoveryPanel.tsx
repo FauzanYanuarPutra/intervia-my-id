@@ -9,8 +9,10 @@ import {
   ChevronUp,
   Clock3,
   Footprints,
+  List,
   MapPin,
   MapPinned,
+  Maximize2,
   MessageCircle,
   Navigation,
   Phone,
@@ -129,6 +131,7 @@ export function UmkmDiscoveryPanel({
   >('stores');
   const [mapFocusNonce, setMapFocusNonce] = useState(0);
   const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [mapOnly, setMapOnly] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -165,11 +168,15 @@ export function UmkmDiscoveryPanel({
             return current;
           }
           if (selectedSlug) {
-            const matchedBySlug = items.find(item => item.slug === selectedSlug);
+            const matchedBySlug = items.find(
+              item => item.slug === selectedSlug,
+            );
             if (matchedBySlug) return matchedBySlug.id;
           }
           if (selectedStoreIdInitial) {
-            const matchedById = items.find(item => item.id === selectedStoreIdInitial);
+            const matchedById = items.find(
+              item => item.id === selectedStoreIdInitial,
+            );
             if (matchedById) return matchedById.id;
           }
           return null;
@@ -236,43 +243,46 @@ export function UmkmDiscoveryPanel({
     selectedContactHref?.startsWith('http') || false;
   const routeModeActions = selectedPlace
     ? [
-      {
-        id: 'driving',
-        label: isId ? 'Mobil' : 'Car',
-        icon: Car,
-        href: selectedPlace.ui.googleMapsDirectionsByMode.driving,
-      },
-      {
-        id: 'two-wheeler',
-        label: isId ? 'Motor' : 'Bike',
-        icon: Bike,
-        href: selectedPlace.ui.googleMapsDirectionsByMode['two-wheeler'],
-      },
-      {
-        id: 'train',
-        label: isId ? 'Kereta' : 'Train',
-        icon: BusFront,
-        href: selectedPlace.ui.googleMapsDirectionsByMode.transit,
-      },
-      {
-        id: 'transit',
-        label: isId ? 'Umum' : 'Transit',
-        icon: BusFront,
-        href: selectedPlace.ui.googleMapsDirectionsByMode.transit,
-      },
-      {
-        id: 'walking',
-        label: isId ? 'Jalan' : 'Walk',
-        icon: Footprints,
-        href: selectedPlace.ui.googleMapsDirectionsByMode.walking,
-      },
-    ]
+        {
+          id: 'driving',
+          label: isId ? 'Mobil' : 'Car',
+          icon: Car,
+          href: selectedPlace.ui.googleMapsDirectionsByMode.driving,
+        },
+        {
+          id: 'two-wheeler',
+          label: isId ? 'Motor' : 'Bike',
+          icon: Bike,
+          href: selectedPlace.ui.googleMapsDirectionsByMode['two-wheeler'],
+        },
+        {
+          id: 'train',
+          label: isId ? 'Kereta' : 'Train',
+          icon: BusFront,
+          href: selectedPlace.ui.googleMapsDirectionsByMode.transit,
+        },
+        {
+          id: 'transit',
+          label: isId ? 'Umum' : 'Transit',
+          icon: BusFront,
+          href: selectedPlace.ui.googleMapsDirectionsByMode.transit,
+        },
+        {
+          id: 'walking',
+          label: isId ? 'Jalan' : 'Walk',
+          icon: Footprints,
+          href: selectedPlace.ui.googleMapsDirectionsByMode.walking,
+        },
+      ]
     : [];
 
   const listedPlaces = visibleStores.filter(
     item => item.store.id !== selectedPlace?.store.id,
   );
-  const paginatedListedPlaces = listedPlaces.slice(0, listPage * LIST_PAGE_SIZE);
+  const paginatedListedPlaces = listedPlaces.slice(
+    0,
+    listPage * LIST_PAGE_SIZE,
+  );
   const canLoadMoreList = paginatedListedPlaces.length < listedPlaces.length;
   useEffect(() => {
     const targetSlug = selectedSlug?.trim();
@@ -316,6 +326,7 @@ export function UmkmDiscoveryPanel({
         : null;
       if (variant === 'immersive') {
         setSheetExpanded(true);
+        setMapOnly(false);
       }
       setShowRoute(false);
       setRouteSummary(null);
@@ -390,8 +401,9 @@ export function UmkmDiscoveryPanel({
         ? 'Memuat'
         : 'Loading'
       : `${totalCount ?? stores.length} ${isId ? 'usaha' : 'businesses'}`;
-  const mapResultLabel = `${visibleStores.length} ${isId ? 'usaha aktif' : 'active businesses'
-    }`;
+  const mapResultLabel = `${visibleStores.length} ${
+    isId ? 'usaha aktif' : 'active businesses'
+  }`;
   const routeDistanceLabel = useMemo(() => {
     if (!routeSummary?.distance_m || routeSummary.used_fallback) return null;
     return formatUmkmPlaceDistance(routeSummary.distance_m / 1000, isId);
@@ -425,8 +437,9 @@ export function UmkmDiscoveryPanel({
 
       return (
         <div
-          className={`relative isolate overflow-hidden ${edgeToEdge ? 'h-full rounded-none' : 'rounded-[20px]'
-            }`}
+          className={`relative isolate overflow-hidden ${
+            edgeToEdge ? 'h-full rounded-none' : 'rounded-[20px]'
+          }`}
         >
           <UmkmStoreMap
             stores={mapStores}
@@ -528,17 +541,37 @@ export function UmkmDiscoveryPanel({
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+7.15rem)] z-[1150] flex justify-center px-3 sm:top-[calc(env(safe-area-inset-top)+6.55rem)] lg:left-[510px] lg:right-4 lg:top-[calc(env(safe-area-inset-top)+6.35rem)] lg:px-0">
-          <button
-            type="button"
-            onClick={() => {
-              setListPage(1);
-              bumpMapFocus('stores');
-            }}
-            className="pointer-events-auto inline-flex min-h-[38px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-black text-slate-800 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.34)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
-          >
-            <Search className="h-4 w-4 text-[color:var(--app-accent)]" />
-            {isId ? 'Cari area ini' : 'Search this area'}
-          </button>
+          <div className="flex min-w-0 flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setListPage(1);
+                bumpMapFocus('stores');
+              }}
+              className="pointer-events-auto inline-flex min-h-[38px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-black text-slate-800 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.34)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
+            >
+              <Search className="h-4 w-4 text-[color:var(--app-accent)]" />
+              {isId ? 'Cari area ini' : 'Search this area'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapOnly(current => !current)}
+              className="pointer-events-auto inline-flex min-h-[38px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-black text-slate-800 shadow-[0_18px_40px_-24px_rgba(15,23,42,0.34)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
+            >
+              {mapOnly ? (
+                <List className="h-4 w-4 text-[color:var(--app-accent)]" />
+              ) : (
+                <Maximize2 className="h-4 w-4 text-[color:var(--app-accent)]" />
+              )}
+              {mapOnly
+                ? isId
+                  ? 'Tampilkan daftar'
+                  : 'Show list'
+                : isId
+                  ? 'Peta full'
+                  : 'Full map'}
+            </button>
+          </div>
         </div>
 
         {error ? (
@@ -549,14 +582,16 @@ export function UmkmDiscoveryPanel({
 
         {loading && !selectedPlace && !error ? (
           <div className="absolute left-3 right-3 top-1/2 z-[1160] mx-auto max-w-sm -translate-y-1/2 rounded-[24px] border border-white/80 bg-white/94 px-5 py-4 text-center text-[13px] font-black text-slate-700 shadow-[0_22px_52px_-34px_rgba(15,23,42,0.36)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100">
-            {isId ? 'Lagi mencari usaha sekitar...' : 'Finding nearby businesses...'}
+            {isId
+              ? 'Lagi mencari usaha sekitar...'
+              : 'Finding nearby businesses...'}
           </div>
         ) : null}
 
-        {!error ? (
+        {!error && !mapOnly ? (
           <div
             className={cn(
-              'absolute inset-x-2 bottom-[calc(0.30rem+env(safe-area-inset-bottom))] z-[1250] mx-auto flex max-w-[760px] flex-col overflow-hidden rounded-[26px] border border-white/86 bg-white/97 p-2 shadow-[0_24px_64px_-40px_rgba(15,23,42,0.48)] backdrop-blur-2xl transition-all duration-300 dark:border-white/10 dark:bg-slate-950/94 sm:inset-x-4 lg:inset-x-auto lg:bottom-3 lg:left-3 lg:top-[calc(env(safe-area-inset-top)+6.85rem)] lg:mx-0 lg:w-[486px] lg:max-w-none lg:overflow-y-auto lg:rounded-[24px] lg:p-3',
+              'absolute inset-x-2 bottom-[calc(0.30rem+env(safe-area-inset-bottom))] z-[1250] mx-auto flex max-w-[760px] flex-col overflow-hidden rounded-[26px] border border-white/86 bg-white/97 p-2 shadow-[0_24px_64px_-40px_rgba(15,23,42,0.48)] backdrop-blur-2xl transition-all duration-300 dark:border-white/10 dark:bg-slate-950/94 sm:inset-x-4 lg:inset-x-auto lg:bottom-3 lg:left-3 lg:top-[calc(env(safe-area-inset-top)+6.85rem)] lg:mx-0 lg:w-[486px] lg:max-w-none lg:rounded-[24px] lg:p-3',
               sheetExpanded
                 ? 'max-h-[82dvh] lg:max-h-[calc(100dvh-1.5rem)]'
                 : 'max-h-[246px] min-h-[214px] lg:max-h-[calc(100dvh-1.5rem)] lg:min-h-0',
@@ -580,7 +615,7 @@ export function UmkmDiscoveryPanel({
               <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-700" />
             </button>
 
-            <div className="flex min-w-0 items-center justify-between gap-2 px-1 pb-1">
+            <div className="flex min-w-0 shrink-0 items-center justify-between gap-2 px-1 pb-1">
               <div className="min-w-0">
                 <p className="line-clamp-1 text-[1rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
                   {sheetTitle}
@@ -618,12 +653,15 @@ export function UmkmDiscoveryPanel({
             </div>
 
             {selectedPlace ? (
-              <div className="contents">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
                 <article className="rounded-[22px] border border-emerald-900/10 bg-[linear-gradient(135deg,#ffffff,#f7fef9)] p-2.5 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.3)] ring-1 ring-white/76 dark:border-slate-800 dark:bg-[linear-gradient(135deg,#0f172a,#061b16)] dark:ring-white/10">
                   <div className="grid min-w-0 grid-cols-[72px_minmax(0,1fr)] gap-2.5 sm:grid-cols-[78px_minmax(0,1fr)]">
                     <div className="relative">
                       <PlaceThumb
-                        src={selectedPlace.ui.gallery[0] || selectedPlace.ui.coverImage}
+                        src={
+                          selectedPlace.ui.gallery[0] ||
+                          selectedPlace.ui.coverImage
+                        }
                         alt={selectedPlace.store.name}
                         className="h-[72px] rounded-[18px] sm:h-[78px]"
                       />
@@ -646,7 +684,8 @@ export function UmkmDiscoveryPanel({
                         <span className="inline-flex min-w-0 items-center gap-1">
                           <MapPin className="h-3 w-3 shrink-0 text-[color:var(--app-accent)]" />
                           <span className="truncate">
-                            {selectedPlace.store.city || selectedPlace.ui.addressLine}
+                            {selectedPlace.store.city ||
+                              selectedPlace.ui.addressLine}
                           </span>
                         </span>
                       </div>
@@ -684,8 +723,12 @@ export function UmkmDiscoveryPanel({
                     {selectedContactHref ? (
                       <a
                         href={selectedContactHref}
-                        target={selectedContactIsExternal ? '_blank' : undefined}
-                        rel={selectedContactIsExternal ? 'noreferrer' : undefined}
+                        target={
+                          selectedContactIsExternal ? '_blank' : undefined
+                        }
+                        rel={
+                          selectedContactIsExternal ? 'noreferrer' : undefined
+                        }
                         className="inline-flex min-h-[38px] min-w-0 items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-black text-[color:var(--app-accent)]"
                       >
                         <MessageCircle className="h-3.5 w-3.5 shrink-0" />
@@ -718,14 +761,16 @@ export function UmkmDiscoveryPanel({
                           <Store className="h-3.5 w-3.5" />
                           {isId ? 'Belanja di toko' : 'In-store'}
                         </span>
-                        {selectedPlace.ui.serviceBadges.slice(0, 3).map(badge => (
-                          <span
-                            key={badge}
-                            className="inline-flex min-h-[27px] shrink-0 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                          >
-                            {badge}
-                          </span>
-                        ))}
+                        {selectedPlace.ui.serviceBadges
+                          .slice(0, 3)
+                          .map(badge => (
+                            <span
+                              key={badge}
+                              className="inline-flex min-h-[27px] shrink-0 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-black text-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                            >
+                              {badge}
+                            </span>
+                          ))}
                       </div>
 
                       <div className="grid gap-1.5 text-[12px] font-semibold leading-5 text-[color:var(--app-text)]">
@@ -734,7 +779,9 @@ export function UmkmDiscoveryPanel({
                           <span className="line-clamp-2">
                             {selectedPlace.ui.addressLine ||
                               selectedPlace.store.city ||
-                              (isId ? 'Alamat belum lengkap' : 'Address not completed yet')}
+                              (isId
+                                ? 'Alamat belum lengkap'
+                                : 'Address not completed yet')}
                           </span>
                         </div>
                         <div className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
@@ -747,18 +794,26 @@ export function UmkmDiscoveryPanel({
                                   : 'font-black text-rose-600 dark:text-rose-300'
                               }
                             >
-                              {getOpenLabel(selectedPlace.ui.openNow !== false, isId)}
+                              {getOpenLabel(
+                                selectedPlace.ui.openNow !== false,
+                                isId,
+                              )}
                             </span>
                             <span className="text-[color:var(--app-text-soft)]">
                               {' '}
-                              · {isId ? 'Chat dulu untuk memastikan jam layanan.' : 'Chat first to confirm service hours.'}
+                              ·{' '}
+                              {isId
+                                ? 'Chat dulu untuk memastikan jam layanan.'
+                                : 'Chat first to confirm service hours.'}
                             </span>
                           </span>
                         </div>
                         {selectedPlace.store.phone ? (
                           <div className="grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-[15px] bg-slate-50 px-2.5 py-2 dark:bg-slate-900/80">
                             <Phone className="mt-0.5 h-4 w-4 text-[color:var(--app-accent)]" />
-                            <span className="truncate">{selectedPlace.store.phone}</span>
+                            <span className="truncate">
+                              {selectedPlace.store.phone}
+                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -788,27 +843,16 @@ export function UmkmDiscoveryPanel({
                     })}
                   </div>
                 ) : null}
-
               </div>
             ) : (
-              <div className="min-h-0 space-y-2">
-                <div className="rounded-[20px] border border-slate-200/80 bg-[linear-gradient(135deg,#ffffff,#f8fafc)] px-3.5 py-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,#0f172a,#020617)]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                        {isId ? 'Pilih dari daftar' : 'Pick from results'}
-                      </p>
-                      <p className="mt-1 text-[15px] font-black leading-tight text-[color:var(--app-text)]">
-                        {sheetTitle}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                        {sheetSubtitle}
-                      </p>
-                    </div>
-                    <span className="inline-flex shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
-                      {totalLabel}
-                    </span>
-                  </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-2">
+                <div className="flex shrink-0 items-center justify-between gap-3 rounded-[18px] border border-slate-200/80 bg-[linear-gradient(135deg,#ffffff,#f8fafc)] px-3 py-2.5 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.2)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,#0f172a,#020617)]">
+                  <p className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                    {isId ? 'Pilih dari daftar' : 'Pick from results'}
+                  </p>
+                  <span className="inline-flex shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">
+                    {totalLabel}
+                  </span>
                 </div>
 
                 {loading ? (
@@ -818,7 +862,7 @@ export function UmkmDiscoveryPanel({
                       : 'Loading business results...'}
                   </div>
                 ) : paginatedListedPlaces.length > 0 ? (
-                  <div className="grid min-w-0 gap-2 overflow-y-auto pr-0.5 lg:max-h-[calc(100dvh-15rem)]">
+                  <div className="grid min-h-0 min-w-0 flex-1 auto-rows-min gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
                     {paginatedListedPlaces.map(item => {
                       const isOpen = item.ui.openNow !== false;
                       return (
@@ -902,7 +946,19 @@ export function UmkmDiscoveryPanel({
           </div>
         ) : null}
 
-
+        {!error && mapOnly ? (
+          <button
+            type="button"
+            onClick={() => {
+              setMapOnly(false);
+              setSheetExpanded(true);
+            }}
+            className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-[1250] inline-flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full border border-white/80 bg-white/95 px-4 text-[12px] font-black text-slate-800 shadow-[0_22px_52px_-32px_rgba(15,23,42,0.42)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/90 dark:text-slate-100"
+          >
+            <List className="h-4 w-4 text-[color:var(--app-accent)]" />
+            {isId ? 'Tampilkan daftar usaha' : 'Show business list'}
+          </button>
+        ) : null}
       </section>
     );
   }
@@ -993,10 +1049,11 @@ export function UmkmDiscoveryPanel({
 
                       <p className="mt-1.5 inline-flex items-center gap-2 text-[12px] font-semibold text-emerald-600 sm:text-[13px]">
                         <span
-                          className={`h-2.5 w-2.5 rounded-full ${selectedPlace.ui.openNow !== false
-                            ? 'bg-emerald-500'
-                            : 'bg-slate-300'
-                            }`}
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            selectedPlace.ui.openNow !== false
+                              ? 'bg-emerald-500'
+                              : 'bg-slate-300'
+                          }`}
                         />
                         {getOpenLabel(selectedPlace.ui.openNow !== false, isId)}
                       </p>
@@ -1224,12 +1281,14 @@ export function UmkmDiscoveryPanel({
                               </div>
 
                               <p
-                                className={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${isOpen ? 'text-emerald-600' : 'text-slate-500'
-                                  }`}
+                                className={`mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold ${
+                                  isOpen ? 'text-emerald-600' : 'text-slate-500'
+                                }`}
                               >
                                 <span
-                                  className={`h-2 w-2 rounded-full ${isOpen ? 'bg-emerald-500' : 'bg-slate-300'
-                                    }`}
+                                  className={`h-2 w-2 rounded-full ${
+                                    isOpen ? 'bg-emerald-500' : 'bg-slate-300'
+                                  }`}
                                 />
                                 {getOpenLabel(isOpen, isId)}
                               </p>

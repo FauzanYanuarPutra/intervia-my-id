@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
+import { fetchWithTimeout } from '@/lib/server/fetchWithTimeout';
+import { validateUploadCandidate } from '@/lib/server/uploadFiles';
 
 const AI_URL = process.env.INTERNAL_AI_URL || 'http://ai_service:8080';
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 45;
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +32,10 @@ export async function POST(req: NextRequest) {
     try {
       formData = await req.formData();
     } catch {
-      return NextResponse.json({ error: 'Invalid multipart form-data payload' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid multipart form-data payload' },
+        { status: 400 },
+      );
     }
 
     const ktp = formData.get('ktp');
@@ -37,15 +47,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const res = await fetch(`${AI_URL}/v1/verify`, {
-      method: 'POST',
-      body: formData,
+    const ktpError = validateUploadCandidate(ktp, {
+      accept: 'image',
+      maxBytes: MAX_UPLOAD_BYTES,
     });
+    const selfieError = validateUploadCandidate(selfie, {
+      accept: 'image',
+      maxBytes: MAX_UPLOAD_BYTES,
+    });
+    if (ktpError || selfieError) {
+      return NextResponse.json(
+        {
+          error: ktpError
+            ? `KTP ${ktpError}`
+            : `Selfie ${selfieError || 'file is invalid'}`,
+        },
+        {
+          status:
+            ktpError?.includes('too large') ||
+            selfieError?.includes('too large')
+              ? 413
+              : 400,
+        },
+      );
+    }
+
+    const res = await fetchWithTimeout(
+      `${AI_URL}/v1/verify`,
+      {
+        method: 'POST',
+        body: formData,
+        cache: 'no-store',
+      },
+      20000,
+    );
 
     const data = await res.json().catch(() => ({}));
     return NextResponse.json(data, { status: res.status });
-  } catch {
-    return NextResponse.json({ error: 'AI service unavailable' }, { status: 503 });
+  } catch (error) {
+    console.error('[FACE_RECOGNITION_ERROR]', error);
+    return NextResponse.json(
+      { error: 'AI service unavailable' },
+      { status: 503 },
+    );
   }
 }
-

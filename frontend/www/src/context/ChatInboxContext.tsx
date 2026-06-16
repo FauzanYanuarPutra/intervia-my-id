@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { ensureSocketConnected } from '@/lib/socket';
 import { joinUserChannel } from '@/lib/chat';
+import { readProfileAvatarStyle } from '@/lib/profile/avatar';
 import type { Channel } from 'phoenix';
 
 export type InboxRoom = {
@@ -41,6 +42,7 @@ type InboxRoomSnapshot = {
   roomId: string;
   roomName: string;
   roomAvatar: string;
+  roomAvatarStyle?: unknown;
   lastMessage: string;
   lastMessageAt: string;
   unreadCount: number;
@@ -53,10 +55,14 @@ type IncomingCallEventPayload = {
   caller_id?: string;
   caller_username?: string;
   caller_avatar?: string;
+  caller_avatar_style?: unknown;
+  avatar_style?: unknown;
   call_type?: 'video' | 'voice';
 };
 
-const ChatInboxContext = createContext<ChatInboxContextValue | undefined>(undefined);
+const ChatInboxContext = createContext<ChatInboxContextValue | undefined>(
+  undefined,
+);
 
 function resolveCurrentLocale(): string {
   if (typeof window === 'undefined') return 'id';
@@ -76,6 +82,7 @@ function buildRoomSnapshot(room: InboxRoom): InboxRoomSnapshot | null {
     roomId,
     roomName: String(room.room_name ?? room.name ?? roomId),
     roomAvatar: String(room.room_avatar ?? room.avatar ?? ''),
+    roomAvatarStyle: readProfileAvatarStyle(room),
     lastMessage: String(room.last_message ?? room.lastMsg ?? ''),
     lastMessageAt: String(room.last_message_at ?? ''),
     unreadCount: Number(room.unread_count ?? 0),
@@ -91,12 +98,14 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const channelRef = useRef<Channel | null>(null);
   const initialLoadedRef = useRef(false);
-  const inboxUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inboxUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const roomSnapshotRef = useRef<Map<string, InboxRoomSnapshot>>(new Map());
 
   const toSignature = useCallback((list: InboxRoom[]) => {
     return list
-      .map((r) => {
+      .map(r => {
         const id = String(r.room_id ?? r.id ?? '');
         const lastAt = String(r.last_message_at ?? '');
         const unread = Number(r.unread_count ?? 0);
@@ -114,7 +123,7 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
       const previous = roomSnapshotRef.current;
       const next = new Map<string, InboxRoomSnapshot>();
 
-      list.forEach((room) => {
+      list.forEach(room => {
         const snapshot = buildRoomSnapshot(room);
         if (!snapshot) return;
 
@@ -139,6 +148,7 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
                 roomId: snapshot.roomId,
                 roomName: snapshot.roomName,
                 roomAvatar: snapshot.roomAvatar || undefined,
+                roomAvatarStyle: snapshot.roomAvatarStyle,
                 message: snapshot.lastMessage || 'Ada pesan baru.',
                 unreadCount: snapshot.unreadCount,
                 lastMessageAt: snapshot.lastMessageAt,
@@ -166,13 +176,15 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
       } else {
         roomSnapshotRef.current = new Map(
           list
-            .map((room) => buildRoomSnapshot(room))
-            .filter((snapshot): snapshot is InboxRoomSnapshot => snapshot !== null)
-            .map((snapshot) => [snapshot.roomId, snapshot]),
+            .map(room => buildRoomSnapshot(room))
+            .filter(
+              (snapshot): snapshot is InboxRoomSnapshot => snapshot !== null,
+            )
+            .map(snapshot => [snapshot.roomId, snapshot]),
         );
       }
 
-      setRooms((prev) => {
+      setRooms(prev => {
         const prevSig = toSignature(prev);
         const nextSig = toSignature(list);
         if (prevSig === nextSig) return prev;
@@ -182,34 +194,40 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
       const total = list.reduce((acc, r) => {
         const unread = Number(r.unread_count ?? 0);
         const lastSender = String(r.last_sender ?? '').toLowerCase();
-        const isOwnLast = Boolean(userId) && lastSender && lastSender === String(userId).toLowerCase();
+        const isOwnLast =
+          Boolean(userId) &&
+          lastSender &&
+          lastSender === String(userId).toLowerCase();
         return acc + (isOwnLast ? 0 : unread);
       }, 0);
-      setTotalUnread((prev) => (prev === total ? prev : total));
+      setTotalUnread(prev => (prev === total ? prev : total));
     },
     [emitChatMessageNotifications, toSignature, userId],
   );
 
-  const refetch = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!userId) return;
-    const silent = opts?.silent ?? false;
-    try {
-      if (!silent && !initialLoadedRef.current) setLoading(true);
-      const res = await authFetch('/api/chat/inbox', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        const list = (data.data || []) as InboxRoom[];
-        applyInbox(list, {
-          emitChatMessageNotifications: silent && initialLoadedRef.current,
-        });
-        initialLoadedRef.current = true;
+  const refetch = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!userId) return;
+      const silent = opts?.silent ?? false;
+      try {
+        if (!silent && !initialLoadedRef.current) setLoading(true);
+        const res = await authFetch('/api/chat/inbox', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          const list = (data.data || []) as InboxRoom[];
+          applyInbox(list, {
+            emitChatMessageNotifications: silent && initialLoadedRef.current,
+          });
+          initialLoadedRef.current = true;
+        }
+      } catch (err) {
+        console.error('ChatInbox refetch failed', err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('ChatInbox refetch failed', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, authFetch, applyInbox]);
+    },
+    [userId, authFetch, applyInbox],
+  );
 
   // Inisialisasi WebSocket begitu user login agar koneksi tampil di Network tab
   useEffect(() => {
@@ -303,6 +321,8 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
                   caller_username: callerUsername,
                   caller_avatar:
                     String(payload.caller_avatar ?? '') || undefined,
+                  caller_avatar_style:
+                    payload.caller_avatar_style ?? payload.avatar_style,
                   call_type: payload.call_type === 'video' ? 'video' : 'voice',
                   url: resolveLocalizedChatHref(roomId),
                 },

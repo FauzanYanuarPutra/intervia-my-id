@@ -54,9 +54,9 @@ export type CreateFlowIntent = 'demand' | 'supply';
 
 export const TOTAL_STEPS = 4;
 export const DOC_ACCEPT =
-  '.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip';
+  '.pdf,.txt,.csv,.rtf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.zip,.rar,.7z';
 export const DOC_MAX_FILES = 8;
-export const DOC_MAX_BYTES = 20 * 1024 * 1024;
+export const DOC_MAX_BYTES = 80 * 1024 * 1024;
 export const DEFAULT_STEP_LABELS_ID = ['Info dasar', 'Detail', 'Foto', 'Promo'];
 export const DEFAULT_STEP_LABELS_EN = [
   'Basic info',
@@ -69,13 +69,19 @@ const DOC_ALLOWED_MIME = new Set([
   'application/pdf',
   'text/plain',
   'text/csv',
+  'application/rtf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.oasis.opendocument.presentation',
   'application/zip',
+  'application/x-rar-compressed',
+  'application/x-7z-compressed',
   'application/x-zip-compressed',
 ]);
 
@@ -83,13 +89,19 @@ const DOC_ALLOWED_EXT = new Set([
   '.pdf',
   '.txt',
   '.csv',
+  '.rtf',
   '.doc',
   '.docx',
+  '.odt',
   '.xls',
   '.xlsx',
+  '.ods',
   '.ppt',
   '.pptx',
+  '.odp',
   '.zip',
+  '.rar',
+  '.7z',
 ]);
 
 export function cleanText(value: unknown): string {

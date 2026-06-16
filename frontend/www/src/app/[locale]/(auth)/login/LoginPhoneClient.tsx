@@ -30,13 +30,15 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  Check,
+  KeyRound,
   Loader2,
   Trash2,
   User,
   Users,
 } from 'lucide-react';
 
-type Mode = 'phone' | 'profile';
+type Mode = 'phone' | 'otp' | 'profile';
 const LOGIN_FLOW_STORAGE_KEY = 'lajukan_auth_login_phone_flow_v2';
 
 export default function LoginPhoneClient() {
@@ -70,7 +72,10 @@ export default function LoginPhoneClient() {
     DEFAULT_AUTH_PHONE_COUNTRY,
   );
   const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
   const [otpToken, setOtpToken] = useState<string | null>(null);
+  const [otpResendAt, setOtpResendAt] = useState(0);
+  const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -88,20 +93,24 @@ export default function LoginPhoneClient() {
   );
   const phoneReady = isPhoneNumberReady(phone, phoneCountryCode);
   const normalizedEmail = email.trim().toLowerCase();
+  const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
+  const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
   const selectedCountry = getPhoneCountry(phoneCountryCode);
   const selectedCountryFlag = getPhoneCountryFlagEmoji(selectedCountry.code);
-  const currentStep = mode === 'phone' ? 1 : 2;
+  const currentStep = mode === 'phone' ? 1 : mode === 'otp' ? 2 : 3;
   const shellCopy = {
     phone: {
       title: locale === 'id' ? 'Masuk' : 'Sign in',
-      description: locale === 'id' ? 'Nomor HP langsung.' : 'Phone number only.',
+      description:
+        locale === 'id' ? 'Nomor HP langsung.' : 'Phone number only.',
       progressLabel: locale === 'id' ? 'Masuk' : 'Sign in',
     },
     otp: {
       title: locale === 'id' ? 'Verifikasi OTP' : 'Verify OTP',
-      description: locale === 'id'
-        ? 'Masukkan kode OTP'
-        : 'Enter OTP code',
+      description:
+        locale === 'id'
+          ? 'Masukkan kode dari WhatsApp/SMS.'
+          : 'Enter the WhatsApp/SMS code.',
       progressLabel: locale === 'id' ? 'OTP' : 'OTP',
     },
     profile: {
@@ -114,39 +123,41 @@ export default function LoginPhoneClient() {
   const shellHighlights =
     locale === 'id'
       ? [
-        {
-          title: 'Nomor aktif',
-          description: 'Pakai nomor yang kamu pakai sekarang.',
-        },
-        {
-          title: 'Akses ringan',
-          description: 'Login dibuat tanpa kode tambahan di layar publik.',
-        },
-        {
-          title: 'Data aman',
-          description: 'Draft, chat, dan transaksi tetap tersimpan.',
-        },
-      ]
+          {
+            title: 'Nomor aktif',
+            description: 'Pakai nomor yang kamu pakai sekarang.',
+          },
+          {
+            title: 'Akses ringan',
+            description: 'Login dibuat tanpa kode tambahan di layar publik.',
+          },
+          {
+            title: 'Data aman',
+            description: 'Draft, chat, dan transaksi tetap tersimpan.',
+          },
+        ]
       : [
-        {
-          title: 'Active phone',
-          description: 'Use the number you use right now.',
-        },
-        {
-          title: 'Light access',
-          description: 'Public login stays free from extra code prompts.',
-        },
-        {
-          title: 'Data stays ready',
-          description: 'Drafts, chats, and transactions stay saved.',
-        },
-      ];
+          {
+            title: 'Active phone',
+            description: 'Use the number you use right now.',
+          },
+          {
+            title: 'Light access',
+            description: 'Public login stays free from extra code prompts.',
+          },
+          {
+            title: 'Data stays ready',
+            description: 'Drafts, chats, and transactions stay saved.',
+          },
+        ];
   const shellHelperText = '';
 
   const authInputClass =
     'w-full min-h-[42px] rounded-[12px] border border-[color:var(--app-border)] bg-white px-3 py-2 text-[14px] text-[color:var(--app-text)] placeholder:text-[color:var(--app-text-soft)] outline-none transition-[border-color,background-color,box-shadow] focus:border-[color:var(--app-accent-border)] focus:bg-[color:var(--app-surface)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] sm:text-[13px] dark:bg-[color:var(--app-surface-strong)]';
   const primaryButtonClass =
     'flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 py-3 text-sm font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]';
+  const utilityButtonClass =
+    'flex min-h-[50px] w-full items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 py-3 text-sm font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] sm:w-auto sm:shrink-0 dark:bg-[color:var(--app-surface-strong)]';
   const statusCardClass =
     'rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 py-3';
   const secondaryTextButtonClass =
@@ -262,10 +273,7 @@ export default function LoginPhoneClient() {
         email?: string;
       };
 
-      if (
-        draft.mode === 'phone' ||
-        draft.mode === 'profile'
-      ) {
+      if (draft.mode === 'phone' || draft.mode === 'otp' || draft.mode === 'profile') {
         setMode(draft.mode);
       }
 
@@ -333,15 +341,85 @@ export default function LoginPhoneClient() {
       );
       return;
     }
+    if (otpCooldownLeft > 0) {
+      setError(
+        locale === 'id'
+          ? `Tunggu ${otpCooldownSeconds} detik sebelum kirim ulang kode.`
+          : `Wait ${otpCooldownSeconds} seconds before resending the code.`,
+      );
+      return;
+    }
+    setSendingOtp(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'phone',
+          target: normalizedPhone,
+          purpose: 'login',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(mapCommonAuthError(data?.error, res.status));
+        return;
+      }
+
+      setOtp('');
+      setOtpToken(null);
+      setOtpResendAt(Date.now() + 30_000);
+      setMode('otp');
+    } catch (err) {
+      setError(
+        locale === 'id'
+          ? 'Gagal kirim OTP nomor HP. Coba lagi.'
+          : 'Failed to send phone OTP. Try again.',
+      );
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const verifyPhoneOtpAndLogin = async () => {
+    if (!phoneReady || normalizedPhone.length < 8 || otp.length !== 6) {
+      setError(
+        locale === 'id'
+          ? 'Masukkan nomor HP dan OTP 6 digit.'
+          : 'Enter phone number and 6-digit OTP.',
+      );
+      return;
+    }
+
     setVerifyingOtp(true);
     setError(null);
 
     try {
+      const verifyRes = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'phone',
+          target: normalizedPhone,
+          otp,
+          purpose: 'login',
+        }),
+      });
+      const verifyData = await verifyRes.json().catch(() => ({}));
+      if (!verifyRes.ok || typeof verifyData?.token !== 'string') {
+        setError(mapCommonAuthError(verifyData?.error, verifyRes.status));
+        return;
+      }
+
+      setOtpToken(verifyData.token);
       const destination = callbackUrl ?? `/${locale}/home`;
       authSuccessTargetRef.current = destination;
       await loginWithPhone(normalizedPhone, {
         silent: true,
         redirectTo: destination,
+        phoneOtpToken: verifyData.token,
       });
       finishLoginRedirect(destination);
     } catch (err) {
@@ -455,10 +533,11 @@ export default function LoginPhoneClient() {
             return (
               <div
                 key={account.id}
-                className={`grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 rounded-[16px] border p-1.5 transition ${selected
-                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
-                  : 'border-[color:var(--app-border)] bg-[color:var(--app-surface)]'
-                  }`}
+                className={`grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 rounded-[16px] border p-1.5 transition ${
+                  selected
+                    ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
+                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface)]'
+                }`}
               >
                 <button
                   type="button"
@@ -467,7 +546,11 @@ export default function LoginPhoneClient() {
                 >
                   <span className="inline-flex h-9 w-9 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
                     <Image
-                      src={profileAvatarSrc(account.avatarUrl)}
+                      src={profileAvatarSrc(
+                        account.avatarUrl,
+                        account.avatarStyle,
+                        account.displayName,
+                      )}
                       alt=""
                       width={36}
                       height={36}
@@ -540,15 +623,97 @@ export default function LoginPhoneClient() {
       <button
         type="button"
         onClick={sendPhoneOtp}
-        disabled={verifyingOtp || !phoneReady}
+        disabled={sendingOtp || !phoneReady}
+        className={primaryButtonClass}
+      >
+        {sendingOtp ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            {locale === 'id' ? 'Masuk' : 'Sign in'}
+            <ArrowRight className="h-4 w-4" />
+          </>
+        )}
+      </button>
+    </motion.div>
+  );
+
+  const renderOtpStep = () => (
+    <motion.div
+      key="otp"
+      initial={{ opacity: 0, x: 8 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -8 }}
+      className="space-y-4"
+    >
+      <button
+        type="button"
+        onClick={() => {
+          setOtp('');
+          setOtpToken(null);
+          setError(null);
+          setMode('phone');
+        }}
+        className={secondaryTextButtonClass}
+      >
+        <ArrowLeft className="h-4 w-4" />
+        {locale === 'id' ? 'Ganti nomor HP' : 'Change phone'}
+      </button>
+
+      <div className={statusCardClass}>
+        <p className="text-xs font-medium text-[color:var(--app-text-soft)]">
+          {locale === 'id' ? 'Kode ke' : 'Code sent to'}
+        </p>
+        <p className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
+          {selectedCountryFlag} {formatPhonePreview(phone, phoneCountryCode)}
+        </p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <span className="relative block">
+          <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
+          <input
+            type="text"
+            autoFocus
+            value={otp}
+            maxLength={6}
+            onChange={event =>
+              setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))
+            }
+            placeholder="000000"
+            inputMode="numeric"
+            enterKeyHint="done"
+            className={`${authInputClass} pl-9 text-center tracking-[0.28em] sm:tracking-[0.4em]`}
+          />
+        </span>
+        <button
+          type="button"
+          onClick={sendPhoneOtp}
+          disabled={sendingOtp || otpCooldownLeft > 0}
+          className={utilityButtonClass}
+        >
+          {sendingOtp
+            ? 'SEND...'
+            : otpCooldownLeft > 0
+              ? `${otpCooldownSeconds}s`
+              : locale === 'id'
+                ? 'Kirim lagi'
+                : 'Resend'}
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={verifyPhoneOtpAndLogin}
+        disabled={verifyingOtp || otp.length !== 6}
         className={primaryButtonClass}
       >
         {verifyingOtp ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <>
-            {locale === 'id' ? 'Masuk' : 'Sign in'}
-            <ArrowRight className="h-4 w-4" />
+            {locale === 'id' ? 'Verifikasi dan masuk' : 'Verify and sign in'}
+            <Check className="h-4 w-4" />
           </>
         )}
       </button>
@@ -637,6 +802,8 @@ export default function LoginPhoneClient() {
     switch (mode) {
       case 'phone':
         return renderPhoneStep();
+      case 'otp':
+        return renderOtpStep();
       case 'profile':
         return renderProfileStep();
       default:
@@ -651,7 +818,7 @@ export default function LoginPhoneClient() {
       title={shellCopy.title}
       description={shellCopy.description}
       currentStep={currentStep}
-      totalSteps={2}
+      totalSteps={3}
       progressLabel={shellCopy.progressLabel}
       highlights={shellHighlights}
       helperText={shellHelperText}

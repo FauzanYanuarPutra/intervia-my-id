@@ -5,6 +5,8 @@ services:
       ENV: production
       APP_ENV: production
       RUST_LOG: ${RUST_LOG:-warn}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
 
   marketplace_service:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-marketplace:${IMAGE_TAG:-latest}

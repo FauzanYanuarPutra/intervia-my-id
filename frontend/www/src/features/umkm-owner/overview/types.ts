@@ -15,6 +15,12 @@ export type OverviewActionCard = OverviewAction & {
   primary?: boolean;
 };
 
+export type OverviewFlowStep = OverviewAction & {
+  desc: string;
+  done: boolean;
+  active: boolean;
+};
+
 export type OverviewStore = {
   id: string;
   name: string;
@@ -67,6 +73,11 @@ export type OverviewModel = {
   activeBadgeTone: OverviewBadgeTone;
   actionCards: OverviewActionCard[];
   addStoreAction: OverviewAction;
+  flowSteps: OverviewFlowStep[];
+  mapAction: OverviewAction & {
+    badge: string;
+    desc: string;
+  };
   nextAction?: OverviewNextAction;
   primaryAction: OverviewAction;
   secondaryAction: OverviewAction;

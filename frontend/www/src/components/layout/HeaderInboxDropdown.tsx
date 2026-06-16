@@ -23,7 +23,7 @@ import {
   isMoneyRelatedNotification,
   notificationPresentation,
 } from '@/lib/notifications/presentation';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 
 type HeaderInboxDropdownKind = 'chat' | 'notifications';
@@ -49,17 +49,13 @@ function toText(value: unknown, fallback = ''): string {
 }
 
 function cleanNotificationText(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function notificationEmoji(item: InboxNotification, label: string): string {
-  const text = [
-    item.category,
-    item.event_type,
-    item.title,
-    item.message,
-    label,
-  ]
+  const text = [item.category, item.event_type, item.title, item.message, label]
     .map(cleanNotificationText)
     .join(' ');
 
@@ -155,7 +151,11 @@ function roomMessage(room: InboxRoom, isId: boolean): string {
 }
 
 function roomAvatar(room: InboxRoom): string {
-  return profileAvatarSrc(toText(room.room_avatar ?? room.avatar));
+  return profileAvatarSrc(
+    toText(room.room_avatar ?? room.avatar),
+    readProfileAvatarStyle(room),
+    roomName(room, true),
+  );
 }
 
 function roomUnread(room: InboxRoom): number {
@@ -176,7 +176,9 @@ function notificationHref(item: InboxNotification): string {
     toText(data.transaction_id) || toText(data.order_id) || toText(data.txn_id);
   if (
     PROMO_ONLY_MODE &&
-    (transactionId || item.category === 'wallet' || item.category === 'transaction')
+    (transactionId ||
+      item.category === 'wallet' ||
+      item.category === 'transaction')
   ) {
     return '/notifications';
   }

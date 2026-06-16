@@ -17,6 +17,7 @@ type ChatMessageNotificationDetail = {
   roomId: string;
   roomName: string;
   roomAvatar?: string;
+  roomAvatarStyle?: unknown;
   message: string;
   unreadCount: number;
   lastMessageAt?: string;
@@ -29,6 +30,7 @@ type IncomingCallNotificationDetail = {
   caller_id: string;
   caller_username: string;
   caller_avatar?: string;
+  caller_avatar_style?: unknown;
   call_type: 'video' | 'voice';
   url: string;
 };
@@ -170,7 +172,11 @@ export function BrowserNotificationBridge() {
       void showBrowserNotification({
         title: detail.roomName || 'Pesan baru',
         body: detail.message || 'Ada pesan baru.',
-        icon: profileAvatarSrc(detail.roomAvatar),
+        icon: profileAvatarSrc(
+          detail.roomAvatar,
+          detail.roomAvatarStyle,
+          detail.roomName,
+        ),
         tag: `chat-message:${detail.id}`,
         url: detail.url,
       });
@@ -198,7 +204,11 @@ export function BrowserNotificationBridge() {
       void showBrowserNotification({
         title,
         body,
-        icon: profileAvatarSrc(detail.caller_avatar),
+        icon: profileAvatarSrc(
+          detail.caller_avatar,
+          detail.caller_avatar_style,
+          detail.caller_username,
+        ),
         tag: `incoming-call:${detail.call_id}`,
         url: detail.url,
         renotify: true,

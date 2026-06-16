@@ -30,6 +30,8 @@ export type User = {
   permissions: string[];
   avatarUrl?: string;
   avatar_url?: string;
+  avatarStyle?: unknown;
+  avatar_style?: unknown;
   sub?: string;
   name?: string;
   username?: string;
@@ -57,7 +59,14 @@ type AuthCtx = {
   login: (
     username: string,
     password: string,
-    options?: { silent?: boolean; redirectTo?: string; captchaToken?: string },
+    options?: {
+      silent?: boolean;
+      redirectTo?: string;
+      captchaToken?: string;
+      otpToken?: string;
+      otpType?: 'email' | 'phone';
+      otpTarget?: string;
+    },
   ) => Promise<void>;
   loginWithPhone: (
     phone: string,
@@ -97,6 +106,31 @@ function normalizeUserPayload(payload: unknown): User {
   if (typeof normalizedHasPassword === 'boolean') {
     base.hasPassword = normalizedHasPassword;
     base.has_password = normalizedHasPassword;
+  }
+
+  const metadata = readPlainRecord(base.metadata);
+  const metadataMedia = readPlainRecord(metadata?.media);
+  const extended = readPlainRecord(metadata?.extended);
+  const normalizedAvatarUrl =
+    readNonEmptyString(base.avatarUrl) ||
+    readNonEmptyString(base.avatar_url) ||
+    readNonEmptyString(metadata?.avatar_url) ||
+    readNonEmptyString(metadataMedia?.avatar_url);
+
+  if (normalizedAvatarUrl) {
+    base.avatarUrl = normalizedAvatarUrl;
+    base.avatar_url = normalizedAvatarUrl;
+  }
+
+  const normalizedAvatarStyle =
+    base.avatarStyle ??
+    base.avatar_style ??
+    metadata?.avatar_style ??
+    extended?.avatar_style;
+
+  if (normalizedAvatarStyle !== undefined && normalizedAvatarStyle !== null) {
+    base.avatarStyle = normalizedAvatarStyle;
+    base.avatar_style = normalizedAvatarStyle;
   }
 
   return base as User;
@@ -368,7 +402,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (
     username: string,
     password: string,
-    options?: { silent?: boolean; redirectTo?: string; captchaToken?: string },
+    options?: {
+      silent?: boolean;
+      redirectTo?: string;
+      captchaToken?: string;
+      otpToken?: string;
+      otpType?: 'email' | 'phone';
+      otpTarget?: string;
+    },
   ) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -378,6 +419,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         ...(options?.captchaToken
           ? { captcha_token: options.captchaToken }
+          : {}),
+        ...(options?.otpToken
+          ? {
+              otp_token: options.otpToken,
+              otp_type: options.otpType || 'email',
+              otp_target: options.otpTarget,
+            }
           : {}),
       }),
       credentials: 'include',

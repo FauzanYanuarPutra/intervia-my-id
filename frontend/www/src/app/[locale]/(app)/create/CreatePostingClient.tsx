@@ -1061,9 +1061,7 @@ function getFieldHelperHint(
   const key = fieldKey.toLowerCase();
 
   if (key === 'title') {
-    return isId
-      ? 'Tulis singkat dan jelas.'
-      : 'Keep it short and clear.';
+    return isId ? 'Tulis singkat dan jelas.' : 'Keep it short and clear.';
   }
 
   if (
@@ -3460,14 +3458,8 @@ export function CreatePostingClient({
     ],
   );
   const step1SecondaryFields = useMemo(
-    () =>
-      isSimpleModeActive
-        ? []
-        : step1OptionalFields,
-    [
-      isSimpleModeActive,
-      step1OptionalFields,
-    ],
+    () => (isSimpleModeActive ? [] : step1OptionalFields),
+    [isSimpleModeActive, step1OptionalFields],
   );
   const parsedPriceCents = useMemo(() => {
     const raw = cleanText(fieldValues.price_cents);
@@ -4112,96 +4104,96 @@ export function CreatePostingClient({
   const supplySupportCards = PROMO_ONLY_MODE
     ? []
     : ([
-      {
-        key: 'property',
-        href: resolveMarketplaceCreatePath(locale, 'property', 'supply'),
-        badge: locale === 'id' ? 'Lokasi' : 'Spaces',
-        title:
-          locale === 'id' ? 'Tawarkan lokasi jualan' : 'Offer selling space',
-        description:
-          locale === 'id'
-            ? 'Untuk booth, kios, ruko, atau area jual.'
-            : 'Use this for booths, kiosks, shophouses, or selling spaces.',
-        example:
-          locale === 'id'
-            ? 'Contoh: sewa booth bazaar weekend di Bekasi'
-            : 'Example: rent a weekend bazaar booth in Bekasi',
-        Icon: MapPin,
-        theme: TYPE_THEMES.property,
-        highlights:
-          locale === 'id'
-            ? ['Booth', 'Kios', 'Traffic']
-            : ['Booth', 'Kiosk', 'Traffic'],
-      },
-      {
-        key: 'tool_rental',
-        href: resolveMarketplaceCreatePath(locale, 'tool_rental', 'supply'),
-        badge: locale === 'id' ? 'Sewa alat' : 'Tool rental',
-        title: locale === 'id' ? 'Sewakan alat usaha' : 'Rent out tools',
-        description:
-          locale === 'id'
-            ? 'Untuk freezer, alat produksi, atau alat konten.'
-            : 'Use this for freezers, production gear, or content tools.',
-        example:
-          locale === 'id'
-            ? 'Contoh: sewa freezer display 7 hari untuk pop-up'
-            : 'Example: rent a display freezer for a seven-day pop-up',
-        Icon: Snowflake,
-        theme: TYPE_THEMES.tool_rental,
-        highlights:
-          locale === 'id'
-            ? ['Alat', 'Durasi', 'Pickup']
-            : ['Tools', 'Duration', 'Pickup'],
-      },
-      {
-        key: 'business_transfer',
-        href: resolveMarketplaceCreatePath(
-          locale,
-          'business_transfer',
-          'supply',
-        ),
-        badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
-        title:
-          locale === 'id' ? 'Tawarkan oper usaha' : 'Offer business transfer',
-        description:
-          locale === 'id'
-            ? 'Usaha berjalan, aset, rating, dan handover.'
-            : 'Sell a running business, assets, ratings, and handover.',
-        example:
-          locale === 'id'
-            ? 'Contoh: oper usaha laundry aktif plus SOP'
-            : 'Example: transfer an active laundry business plus SOP',
-        Icon: Handshake,
-        theme: TYPE_THEMES.business_transfer,
-        highlights:
-          locale === 'id'
-            ? ['Omzet', 'Aset', 'Handover']
-            : ['Revenue', 'Assets', 'Handover'],
-      },
-      {
-        key: 'profile',
-        href: '/profile/edit?focus=talent',
-        badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
-        title:
-          locale === 'id'
-            ? 'Tawarkan skill lewat profil'
-            : 'Offer skills via profile',
-        description:
-          locale === 'id'
-            ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
-            : 'If you want to sell personal skills, polish your user profile.',
-        example:
-          locale === 'id'
-            ? 'Contoh: profil akuntan UMKM freelance'
-            : 'Example: freelance MSME accountant profile',
-        Icon: Users,
-        theme: specialCreateThemes.profile,
-        highlights:
-          locale === 'id'
-            ? ['Headline', 'Skill', 'Rate']
-            : ['Headline', 'Skills', 'Rate'],
-      },
-    ] as const);
+        {
+          key: 'property',
+          href: resolveMarketplaceCreatePath(locale, 'property', 'supply'),
+          badge: locale === 'id' ? 'Lokasi' : 'Spaces',
+          title:
+            locale === 'id' ? 'Tawarkan lokasi jualan' : 'Offer selling space',
+          description:
+            locale === 'id'
+              ? 'Untuk booth, kios, ruko, atau area jual.'
+              : 'Use this for booths, kiosks, shophouses, or selling spaces.',
+          example:
+            locale === 'id'
+              ? 'Contoh: sewa booth bazaar weekend di Bekasi'
+              : 'Example: rent a weekend bazaar booth in Bekasi',
+          Icon: MapPin,
+          theme: TYPE_THEMES.property,
+          highlights:
+            locale === 'id'
+              ? ['Booth', 'Kios', 'Traffic']
+              : ['Booth', 'Kiosk', 'Traffic'],
+        },
+        {
+          key: 'tool_rental',
+          href: resolveMarketplaceCreatePath(locale, 'tool_rental', 'supply'),
+          badge: locale === 'id' ? 'Sewa alat' : 'Tool rental',
+          title: locale === 'id' ? 'Sewakan alat usaha' : 'Rent out tools',
+          description:
+            locale === 'id'
+              ? 'Untuk freezer, alat produksi, atau alat konten.'
+              : 'Use this for freezers, production gear, or content tools.',
+          example:
+            locale === 'id'
+              ? 'Contoh: sewa freezer display 7 hari untuk pop-up'
+              : 'Example: rent a display freezer for a seven-day pop-up',
+          Icon: Snowflake,
+          theme: TYPE_THEMES.tool_rental,
+          highlights:
+            locale === 'id'
+              ? ['Alat', 'Durasi', 'Pickup']
+              : ['Tools', 'Duration', 'Pickup'],
+        },
+        {
+          key: 'business_transfer',
+          href: resolveMarketplaceCreatePath(
+            locale,
+            'business_transfer',
+            'supply',
+          ),
+          badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
+          title:
+            locale === 'id' ? 'Tawarkan oper usaha' : 'Offer business transfer',
+          description:
+            locale === 'id'
+              ? 'Usaha berjalan, aset, rating, dan handover.'
+              : 'Sell a running business, assets, ratings, and handover.',
+          example:
+            locale === 'id'
+              ? 'Contoh: oper usaha laundry aktif plus SOP'
+              : 'Example: transfer an active laundry business plus SOP',
+          Icon: Handshake,
+          theme: TYPE_THEMES.business_transfer,
+          highlights:
+            locale === 'id'
+              ? ['Omzet', 'Aset', 'Handover']
+              : ['Revenue', 'Assets', 'Handover'],
+        },
+        {
+          key: 'profile',
+          href: '/profile/edit?focus=talent',
+          badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
+          title:
+            locale === 'id'
+              ? 'Tawarkan skill lewat profil'
+              : 'Offer skills via profile',
+          description:
+            locale === 'id'
+              ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
+              : 'If you want to sell personal skills, polish your user profile.',
+          example:
+            locale === 'id'
+              ? 'Contoh: profil akuntan UMKM freelance'
+              : 'Example: freelance MSME accountant profile',
+          Icon: Users,
+          theme: specialCreateThemes.profile,
+          highlights:
+            locale === 'id'
+              ? ['Headline', 'Skill', 'Rate']
+              : ['Headline', 'Skills', 'Rate'],
+        },
+      ] as const);
   const typeSelectorGrid = (
     <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
       {supplyCreateCards.map(card => {
@@ -4230,56 +4222,57 @@ export function CreatePostingClient({
       })}
     </div>
   );
-  const supplySupportQuickLinks = supplySupportCards.length > 0 ? (
-    <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-3">
-      {supplySupportCards.map(card => (
-        <button
-          key={card.key}
-          type="button"
-          onClick={() => router.push(card.href)}
-          className={cn(
-            'group relative flex min-h-[124px] flex-col items-start justify-end overflow-hidden rounded-[18px] border px-3 pb-2.5 pt-12 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_34px_-30px_rgba(15,23,42,0.24)] sm:min-h-[150px] sm:px-3.5 sm:pb-3 sm:pt-14',
-            card.theme.cardBase,
-          )}
-        >
-          <span className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-current/20" />
-          <span
+  const supplySupportQuickLinks =
+    supplySupportCards.length > 0 ? (
+      <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-3">
+        {supplySupportCards.map(card => (
+          <button
+            key={card.key}
+            type="button"
+            onClick={() => router.push(card.href)}
             className={cn(
-              'absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-[13px] sm:h-10 sm:w-10 sm:rounded-[15px]',
-              card.theme.cardIcon,
+              'group relative flex min-h-[124px] flex-col items-start justify-end overflow-hidden rounded-[18px] border px-3 pb-2.5 pt-12 text-left shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_20px_34px_-30px_rgba(15,23,42,0.24)] sm:min-h-[150px] sm:px-3.5 sm:pb-3 sm:pt-14',
+              card.theme.cardBase,
             )}
           >
-            <card.Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
-          </span>
-          <span className="mt-auto block min-w-0">
-            <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
-              {card.badge}
+            <span className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-current/20" />
+            <span
+              className={cn(
+                'absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-[13px] sm:h-10 sm:w-10 sm:rounded-[15px]',
+                card.theme.cardIcon,
+              )}
+            >
+              <card.Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
             </span>
-            <span className="mt-1 line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
-              {card.title}
+            <span className="mt-auto block min-w-0">
+              <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
+                {card.badge}
+              </span>
+              <span className="mt-1 line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
+                {card.title}
+              </span>
+              <span className="mt-1 hidden line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] min-[420px]:block">
+                {card.description}
+              </span>
+              <span className="mt-2 block rounded-[12px] bg-white/78 px-2.5 py-1.5 text-[10.5px] font-semibold leading-4 text-[color:var(--app-text)] ring-1 ring-white/80 dark:bg-slate-950/48 dark:ring-white/10 sm:text-[11px]">
+                <span className="font-black text-[color:var(--app-accent)]">
+                  {locale === 'id' ? 'Contoh:' : 'Example:'}
+                </span>{' '}
+                {card.example.replace(/^(Contoh:|Example:)\s*/i, '')}
+              </span>
             </span>
-            <span className="mt-1 hidden line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] min-[420px]:block">
-              {card.description}
+            <span className="mt-2 flex w-full items-center justify-between gap-2">
+              <span className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                {card.highlights[0]}
+              </span>
+              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] sm:h-8 sm:w-8">
+                <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              </span>
             </span>
-            <span className="mt-2 block rounded-[12px] bg-white/78 px-2.5 py-1.5 text-[10.5px] font-semibold leading-4 text-[color:var(--app-text)] ring-1 ring-white/80 dark:bg-slate-950/48 dark:ring-white/10 sm:text-[11px]">
-              <span className="font-black text-[color:var(--app-accent)]">
-                {locale === 'id' ? 'Contoh:' : 'Example:'}
-              </span>{' '}
-              {card.example.replace(/^(Contoh:|Example:)\s*/i, '')}
-            </span>
-          </span>
-          <span className="mt-2 flex w-full items-center justify-between gap-2">
-            <span className="truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-              {card.highlights[0]}
-            </span>
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] sm:h-8 sm:w-8">
-              <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-            </span>
-          </span>
-        </button>
-      ))}
-    </div>
-  ) : null;
+          </button>
+        ))}
+      </div>
+    ) : null;
   const errorDetails = errorMessage
     .split('\n')
     .map(line => line.trim())
@@ -5472,7 +5465,10 @@ export function CreatePostingClient({
       }
     }
     const uniqueActions = Array.from(unique.values());
-    return Array.from(unique.values()).slice(0, field.kind === 'select' ? 4 : 1);
+    return Array.from(unique.values()).slice(
+      0,
+      field.kind === 'select' ? 4 : 1,
+    );
   };
 
   useEffect(() => {
@@ -7487,192 +7483,192 @@ export function CreatePostingClient({
                   {locale === 'id' ? 'Kategori, contoh' : 'Category, samples'}
                 </span>
               </summary>
-            <div className="mt-2 space-y-2">
-              {typePicked && supportsDemandListing(activeType) && (
-                <section className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] dark:border-[color:var(--app-border-strong)]">
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id' ? 'Arah posting' : 'Post direction'}
-                      </p>
-                      <p className="truncate text-xs font-medium text-[color:var(--app-text)]">
-                        {locale === 'id'
-                          ? 'Pilih cepat, detail bisa diedit nanti.'
-                          : 'Pick quickly. Details can be edited later.'}
-                      </p>
-                    </div>
-                    <span className="inline-flex max-w-[54vw] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
-                      <span className="truncate">{selectedTypeLabel}</span>
-                    </span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      aria-pressed={listingSide === 'demand'}
-                      disabled={!canSwitchListingSide}
-                      onClick={() => {
-                        if (listingSide === 'demand') return;
-                        setListingSide('demand');
-                        syncCreateRoute({ sideId: 'demand' });
-                      }}
-                      className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        listingSide === 'demand'
-                          ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-warning-border)_70%,transparent)]'
-                          : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
-                      }`}
-                    >
-                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
-                        {listingSide === 'demand' ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : (
-                          <Target className="h-4 w-4" />
-                        )}
-                      </span>
-                      <span className="min-w-0 text-[13px] font-black leading-4">
-                        <span className="line-clamp-2">
-                          {demandActionTitle}
-                        </span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={listingSide === 'supply'}
-                      disabled={!canSwitchListingSide}
-                      onClick={() => {
-                        if (listingSide === 'supply') return;
-                        setListingSide('supply');
-                        syncCreateRoute({ sideId: 'supply' });
-                      }}
-                      className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        listingSide === 'supply'
-                          ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-accent-border)_70%,transparent)]'
-                          : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
-                      }`}
-                    >
-                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
-                        {listingSide === 'supply' ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : (
-                          <Sparkles className="h-4 w-4" />
-                        )}
-                      </span>
-                      <span className="min-w-0 text-[13px] font-black leading-4">
-                        <span className="line-clamp-2">
-                          {supplyActionTitle}
-                        </span>
-                      </span>
-                    </button>
-                  </div>
-                  {!canSwitchListingSide && (
-                    <p className="px-1 pt-2 text-[11px] text-[color:var(--app-text-soft)]">
-                      {locale === 'id'
-                        ? 'Arah ini udah dikunci.'
-                        : 'Direction is locked.'}
-                    </p>
-                  )}
-                </section>
-              )}
-
-              {typePicked && activeTypeIsProperty && (
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                  <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
-                    {locale === 'id' ? 'Sektor listing' : 'Listing sector'}
-                  </label>
-                  <p className="text-[11px] text-[color:var(--app-text)]">
-                    {locale === 'id'
-                      ? 'Untuk properti, sektornya otomatis Real Estate.'
-                      : 'Property is mapped to Real Estate.'}
-                  </p>
-                </div>
-              )}
-
-              {showSectorPicker && !isSimpleModeActive && (
-                <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? 'Kategori usaha (opsional)'
-                          : 'Industry specialization (optional)'}
-                      </label>
-                      <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
-                        {locale === 'id'
-                          ? 'Boleh kosong. Pakai kalau butuh field yang lebih spesifik.'
-                          : 'Optional. Use it for more specific fields.'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSectorQuery('');
-                        setIsSectorPickerOpen(true);
-                      }}
-                      className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-info-border)] hover:text-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)]"
-                    >
-                      {selectedSectorView
-                        ? locale === 'id'
-                          ? 'Ganti kategori'
-                          : 'Change category'
-                        : locale === 'id'
-                          ? 'Pilih kategori'
-                          : 'Choose category'}
-                    </button>
-                  </div>
-
-                  {selectedSectorView ? (
-                    <div className="mt-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          style={selectedSectorView.colorStyle}
-                          className={cn(
-                            'inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm',
-                            selectedSectorView.colorClass,
-                          )}
-                        >
-                          <selectedSectorView.icon className="h-3.5 w-3.5" />
-                          {getSectorLabel(selectedSectorView, locale)}
-                        </span>
-                        {selectedSubSectorView ? (
-                          <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]">
-                            {getSubSectorName(selectedSubSectorView, locale)}
-                          </span>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSector('');
-                            setSubSector('');
-                            setSectorQuery('');
-                          }}
-                          className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-danger)] dark:border-[color:var(--app-border-strong)]"
-                        >
-                          {locale === 'id' ? 'Hapus' : 'Clear'}
-                        </button>
-                      </div>
-                      {getSectorDescription(selectedSectorView, locale) ? (
-                        <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-                          {getSectorDescription(selectedSectorView, locale)}
+              <div className="mt-2 space-y-2">
+                {typePicked && supportsDemandListing(activeType) && (
+                  <section className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] dark:border-[color:var(--app-border-strong)]">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                          {locale === 'id' ? 'Arah posting' : 'Post direction'}
                         </p>
-                      ) : null}
+                        <p className="truncate text-xs font-medium text-[color:var(--app-text)]">
+                          {locale === 'id'
+                            ? 'Pilih cepat, detail bisa diedit nanti.'
+                            : 'Pick quickly. Details can be edited later.'}
+                        </p>
+                      </div>
+                      <span className="inline-flex max-w-[54vw] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                        <span className="truncate">{selectedTypeLabel}</span>
+                      </span>
                     </div>
-                  ) : (
-                    <p className="mt-3 rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        aria-pressed={listingSide === 'demand'}
+                        disabled={!canSwitchListingSide}
+                        onClick={() => {
+                          if (listingSide === 'demand') return;
+                          setListingSide('demand');
+                          syncCreateRoute({ sideId: 'demand' });
+                        }}
+                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                          listingSide === 'demand'
+                            ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-warning-border)_70%,transparent)]'
+                            : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
+                        }`}
+                      >
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
+                          {listingSide === 'demand' ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <Target className="h-4 w-4" />
+                          )}
+                        </span>
+                        <span className="min-w-0 text-[13px] font-black leading-4">
+                          <span className="line-clamp-2">
+                            {demandActionTitle}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={listingSide === 'supply'}
+                        disabled={!canSwitchListingSide}
+                        onClick={() => {
+                          if (listingSide === 'supply') return;
+                          setListingSide('supply');
+                          syncCreateRoute({ sideId: 'supply' });
+                        }}
+                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                          listingSide === 'supply'
+                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-accent-border)_70%,transparent)]'
+                            : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
+                        }`}
+                      >
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
+                          {listingSide === 'supply' ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <Sparkles className="h-4 w-4" />
+                          )}
+                        </span>
+                        <span className="min-w-0 text-[13px] font-black leading-4">
+                          <span className="line-clamp-2">
+                            {supplyActionTitle}
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                    {!canSwitchListingSide && (
+                      <p className="px-1 pt-2 text-[11px] text-[color:var(--app-text-soft)]">
+                        {locale === 'id'
+                          ? 'Arah ini udah dikunci.'
+                          : 'Direction is locked.'}
+                      </p>
+                    )}
+                  </section>
+                )}
+
+                {typePicked && activeTypeIsProperty && (
+                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                    <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
+                      {locale === 'id' ? 'Sektor listing' : 'Listing sector'}
+                    </label>
+                    <p className="text-[11px] text-[color:var(--app-text)]">
                       {locale === 'id'
-                        ? 'Belum dipilih, tapi tetap bisa lanjut.'
-                        : 'Nothing selected. You can continue.'}
+                        ? 'Untuk properti, sektornya otomatis Real Estate.'
+                        : 'Property is mapped to Real Estate.'}
                     </p>
-                  )}
-                </div>
-              )}
-              {typePicked && !isSimpleModeActive ? (
-                <CreateListingTemplatePicker
-                  locale={localeCode}
-                  listingSide={listingSide}
-                  activeType={activeType as ListingTypeId}
-                  onApplyTemplate={applyListingTemplate}
-                />
-              ) : null}
-            </div>
+                  </div>
+                )}
+
+                {showSectorPicker && !isSimpleModeActive && (
+                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                          {locale === 'id'
+                            ? 'Kategori usaha (opsional)'
+                            : 'Industry specialization (optional)'}
+                        </label>
+                        <p className="mt-1 text-[11px] text-[color:var(--app-text)]">
+                          {locale === 'id'
+                            ? 'Boleh kosong. Pakai kalau butuh field yang lebih spesifik.'
+                            : 'Optional. Use it for more specific fields.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSectorQuery('');
+                          setIsSectorPickerOpen(true);
+                        }}
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-info-border)] hover:text-[color:var(--app-info)] dark:border-[color:var(--app-border-strong)]"
+                      >
+                        {selectedSectorView
+                          ? locale === 'id'
+                            ? 'Ganti kategori'
+                            : 'Change category'
+                          : locale === 'id'
+                            ? 'Pilih kategori'
+                            : 'Choose category'}
+                      </button>
+                    </div>
+
+                    {selectedSectorView ? (
+                      <div className="mt-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            style={selectedSectorView.colorStyle}
+                            className={cn(
+                              'inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm',
+                              selectedSectorView.colorClass,
+                            )}
+                          >
+                            <selectedSectorView.icon className="h-3.5 w-3.5" />
+                            {getSectorLabel(selectedSectorView, locale)}
+                          </span>
+                          {selectedSubSectorView ? (
+                            <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)]">
+                              {getSubSectorName(selectedSubSectorView, locale)}
+                            </span>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSector('');
+                              setSubSector('');
+                              setSectorQuery('');
+                            }}
+                            className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-danger)] dark:border-[color:var(--app-border-strong)]"
+                          >
+                            {locale === 'id' ? 'Hapus' : 'Clear'}
+                          </button>
+                        </div>
+                        {getSectorDescription(selectedSectorView, locale) ? (
+                          <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
+                            {getSectorDescription(selectedSectorView, locale)}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="mt-3 rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                        {locale === 'id'
+                          ? 'Belum dipilih, tapi tetap bisa lanjut.'
+                          : 'Nothing selected. You can continue.'}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {typePicked && !isSimpleModeActive ? (
+                  <CreateListingTemplatePicker
+                    locale={localeCode}
+                    listingSide={listingSide}
+                    activeType={activeType as ListingTypeId}
+                    onApplyTemplate={applyListingTemplate}
+                  />
+                ) : null}
+              </div>
             </details>
           )}
 
@@ -7862,7 +7858,7 @@ export function CreatePostingClient({
                       onChange={setImages}
                       onAddFiles={handleAddImages}
                       maxImages={10}
-                      maxSizeMB={15}
+                      maxSizeMB={25}
                       locale={locale}
                     />
                   </div>
@@ -7896,8 +7892,8 @@ export function CreatePostingClient({
                     </label>
                     <p className="mt-2 text-[11px] text-[color:var(--app-text)]">
                       {locale === 'id'
-                        ? 'PDF, DOC, XLS, CSV, PPT, ZIP. Maksimal 20MB per file.'
-                        : 'PDF, DOC, XLS, CSV, PPT, ZIP. Max 20MB/file.'}
+                        ? 'PDF, DOC, XLS, CSV, PPT, ZIP, RAR, 7Z. Maksimal 80MB per file.'
+                        : 'PDF, DOC, XLS, CSV, PPT, ZIP, RAR, 7Z. Max 80MB/file.'}
                     </p>
                     {documents.length > 0 && (
                       <div className="mt-2 space-y-2">

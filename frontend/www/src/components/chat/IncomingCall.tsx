@@ -10,6 +10,7 @@ interface IncomingCallProps {
   callerId: string;
   callerName: string;
   callerAvatar?: string;
+  callerAvatarStyle?: unknown;
   callType: 'video' | 'voice';
   onAccept: () => void;
   onReject: () => void;
@@ -20,6 +21,7 @@ export function IncomingCall({
   callerId,
   callerName,
   callerAvatar,
+  callerAvatarStyle,
   callType,
   onAccept,
   onReject,
@@ -53,7 +55,11 @@ export function IncomingCall({
           {/* Avatar */}
           <div className="flex justify-center">
             <img
-              src={profileAvatarSrc(callerAvatar)}
+              src={profileAvatarSrc(
+                callerAvatar,
+                callerAvatarStyle,
+                callerName,
+              )}
               alt={callerName}
               className="w-24 h-24 rounded-full object-cover border-4 border-[color:var(--app-accent-border)]"
             />

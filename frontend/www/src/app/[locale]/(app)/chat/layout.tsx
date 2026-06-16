@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAppBack } from '@/lib/navigation/useAppBack';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 
 type DiscoverUser = {
   id: string;
@@ -715,7 +715,9 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                 <div className="grid grid-cols-4 gap-1">
                   <div
                     className="contents"
-                    aria-label={isId ? 'Filter cepat chat' : 'Quick chat filters'}
+                    aria-label={
+                      isId ? 'Filter cepat chat' : 'Quick chat filters'
+                    }
                   >
                     {filterOptions.map(option => {
                       const active = activeFilter === option.value;
@@ -735,7 +737,9 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                           <span className="shrink-0 tabular-nums">
                             {option.count}
                           </span>
-                          <span className="min-w-0 truncate">{option.label}</span>
+                          <span className="min-w-0 truncate">
+                            {option.label}
+                          </span>
                           <span className="sr-only">{option.caption}</span>
                         </button>
                       );
@@ -820,6 +824,10 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                           <img
                             src={profileAvatarSrc(
                               (room.avatar || room.room_avatar) as
+                                | string
+                                | undefined,
+                              readProfileAvatarStyle(room),
+                              (room.name || room.room_name) as
                                 | string
                                 | undefined,
                             )}

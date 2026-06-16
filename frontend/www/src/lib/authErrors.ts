@@ -66,11 +66,22 @@ export function mapCommonAuthError(apiError: string | undefined, status?: number
   if (lower.includes('phone otp verification is required')) {
     return 'Verifikasi OTP nomor HP dulu sebelum lanjut.';
   }
+  if (lower.includes('otp verification is required for login')) {
+    return 'Verifikasi OTP dulu sebelum masuk.';
+  }
+  if (lower.includes('otp verification is required for registration')) {
+    return 'Verifikasi OTP dulu sebelum daftar.';
+  }
   if (
     lower.includes('invalid or expired phone login otp verification token') ||
-    lower.includes('phone otp verification is invalid or expired')
+    lower.includes('phone otp verification is invalid or expired') ||
+    lower.includes('invalid or expired login otp verification token') ||
+    lower.includes('invalid or expired registration otp verification token')
   ) {
-    return 'Sesi OTP nomor HP sudah kedaluwarsa. Kirim kode baru lalu coba lagi.';
+    return 'Sesi OTP sudah kedaluwarsa. Kirim kode baru lalu coba lagi.';
+  }
+  if (lower.includes('otp target does not match this account')) {
+    return 'Email atau nomor OTP tidak cocok dengan akun ini.';
   }
   if (lower.includes('current password is required')) {
     return 'Masukkan password lama dulu.';

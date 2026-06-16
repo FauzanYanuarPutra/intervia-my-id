@@ -54,6 +54,10 @@ import {
   type LajukanSummary,
 } from '@/lib/lajukan-marketplace';
 import {
+  createLajukanAvatarDataUrl,
+  type LajukanAvatarStyle,
+} from '@/lib/profile/avatar2d';
+import {
   extractContentItems,
   formatCurrencyFromCents,
   resolveImageGallery,
@@ -70,7 +74,7 @@ import type {
 } from '@/lib/community/types';
 import { CommunityComposer } from '@/components/community/CommunityFeedClient';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   UMKM_DISCOVERY_PATH,
   buildUmkmDiscoveryPath,
@@ -251,7 +255,34 @@ type HomeUmkmStoresResponse = {
 };
 
 const HERO_TAGS = ['Bahan Lokal', 'Siap Ekspor', 'Kemasan', 'Mesin UMKM'];
-const HOME_HERO_IMAGE = '/images/hero/lajukan.png';
+const HOME_HERO_IMAGE = '/images/hero/lajukan-id-1.png';
+
+type HomeAvatarProp =
+  | 'crate'
+  | 'cart'
+  | 'tool'
+  | 'pin'
+  | 'laptop'
+  | 'chat'
+  | 'camera'
+  | 'route';
+
+type HomeAvatarScene = {
+  id: string;
+  labelId: string;
+  labelEn: string;
+  captionId: string;
+  captionEn: string;
+  tone: Tone;
+  prop: HomeAvatarProp;
+  spec: Partial<LajukanAvatarStyle>;
+};
+
+type HomeHeroAvatar = HomeAvatarScene & {
+  desktopClassName: string;
+  mobileClassName: string;
+  sizeClassName: string;
+};
 
 function buildCommunityPostHref(post: CommunityPost): string {
   if (post.href) return post.href;
@@ -347,6 +378,246 @@ function toneClassNames(tone: Tone) {
     glow: 'bg-emerald-400/16',
     text: 'text-emerald-700',
   };
+}
+
+const HOME_AVATAR_SCENES: Record<string, HomeAvatarScene> = {
+  supplier: {
+    id: 'supplier',
+    labelId: 'Supplier',
+    labelEn: 'Supplier',
+    captionId: 'Stok datang',
+    captionEn: 'Supply ready',
+    tone: 'emerald',
+    prop: 'crate',
+    spec: {
+      skin: 'sawo',
+      hair: 'wave',
+      hairColor: 'espresso',
+      headwear: 'cap',
+      accessory: 'cap',
+      outfit: 'apron',
+      outfitColor: 'emerald',
+      backItem: 'shield',
+      handItem: 'package',
+      aura: 'spark',
+      background: 'mint',
+      mood: 'determined',
+      pose: 'ready',
+      motion: 'full',
+    },
+  },
+  product: {
+    id: 'product',
+    labelId: 'Seller',
+    labelEn: 'Seller',
+    captionId: 'Produk siap',
+    captionEn: 'Products ready',
+    tone: 'orange',
+    prop: 'cart',
+    spec: {
+      body: 'small',
+      skin: 'kuning',
+      hair: 'crop',
+      hairColor: 'black',
+      outfit: 'tee',
+      outfitColor: 'sky',
+      wing: 'crystal',
+      aura: 'energy',
+      backItem: 'shield',
+      handItem: 'package',
+      background: 'neon',
+      mood: 'smile',
+      motion: 'full',
+    },
+  },
+  service: {
+    id: 'service',
+    labelId: 'Jasa Pro',
+    labelEn: 'Service Pro',
+    captionId: 'Bantu beres',
+    captionEn: 'Ops handled',
+    tone: 'violet',
+    prop: 'tool',
+    spec: {
+      body: 'sturdy',
+      skin: 'tan',
+      hair: 'crop',
+      headwear: 'cap',
+      accessory: 'cap',
+      outfit: 'jacket',
+      outfitColor: 'amber',
+      handItem: 'wrench',
+      aura: 'orbit',
+      background: 'mint',
+      mood: 'determined',
+      pose: 'ready',
+    },
+  },
+  location: {
+    id: 'location',
+    labelId: 'Tempat',
+    labelEn: 'Place',
+    captionId: 'Lokasi cocok',
+    captionEn: 'Right spot',
+    tone: 'rose',
+    prop: 'pin',
+    spec: {
+      skin: 'porcelain',
+      hair: 'long',
+      hairColor: 'chestnut',
+      outfit: 'batik',
+      outfitColor: 'rose',
+      backItem: 'shield',
+      handItem: 'phone',
+      aura: 'halo',
+      background: 'rose',
+      mood: 'smile',
+    },
+  },
+  talent: {
+    id: 'talent',
+    labelId: 'Talent',
+    labelEn: 'Talent',
+    captionId: 'Siap bantu',
+    captionEn: 'Ready to help',
+    tone: 'cyan',
+    prop: 'laptop',
+    spec: {
+      skin: 'deep',
+      hair: 'curly',
+      hairColor: 'black',
+      eyewear: 'glasses',
+      accessory: 'glasses',
+      outfit: 'hoodie',
+      outfitColor: 'violet',
+      handItem: 'phone',
+      aura: 'energy',
+      background: 'slate',
+      mood: 'cool',
+    },
+  },
+  community: {
+    id: 'community',
+    labelId: 'Komunitas',
+    labelEn: 'Community',
+    captionId: 'Belajar bareng',
+    captionEn: 'Learn together',
+    tone: 'amber',
+    prop: 'chat',
+    spec: {
+      skin: 'sawo',
+      hair: 'bun',
+      hairColor: 'auburn',
+      headwear: 'hijab',
+      accessory: 'hijab',
+      outfit: 'batik',
+      outfitColor: 'emerald',
+      wing: 'leaf',
+      aura: 'rainbow',
+      handItem: 'coffee',
+      background: 'sky',
+      mood: 'wink',
+      pose: 'wave',
+    },
+  },
+  reels: {
+    id: 'reels',
+    labelId: 'Kreator',
+    labelEn: 'Creator',
+    captionId: 'Konten jalan',
+    captionEn: 'Content moving',
+    tone: 'lime',
+    prop: 'camera',
+    spec: {
+      skin: 'kuning',
+      hair: 'bun',
+      hairColor: 'auburn',
+      eyewear: 'shades',
+      outfit: 'hoodie',
+      outfitColor: 'rose',
+      wing: 'flame',
+      aura: 'rainbow',
+      handItem: 'camera',
+      background: 'neon',
+      mood: 'wink',
+      motion: 'full',
+    },
+  },
+  map: {
+    id: 'map',
+    labelId: 'Kurir Lokal',
+    labelEn: 'Local Courier',
+    captionId: 'Rute dekat',
+    captionEn: 'Nearby route',
+    tone: 'blue',
+    prop: 'route',
+    spec: {
+      skin: 'tan',
+      hair: 'crop',
+      headwear: 'helmet',
+      outfit: 'driver',
+      outfitColor: 'amber',
+      backItem: 'jetpack',
+      handItem: 'package',
+      aura: 'energy',
+      background: 'sky',
+      mood: 'determined',
+      pose: 'ready',
+    },
+  },
+};
+
+const HOME_HERO_AVATARS: HomeHeroAvatar[] = [
+  {
+    ...HOME_AVATAR_SCENES.supplier,
+    desktopClassName: 'left-[4%] bottom-5',
+    mobileClassName: 'left-[4%] bottom-7',
+    sizeClassName: 'h-32 w-32 sm:h-36 sm:w-36',
+  },
+  {
+    ...HOME_AVATAR_SCENES.product,
+    desktopClassName: 'left-[32%] bottom-2',
+    mobileClassName: 'left-[33%] bottom-4',
+    sizeClassName: 'h-36 w-36 sm:h-40 sm:w-40',
+  },
+  {
+    ...HOME_AVATAR_SCENES.map,
+    desktopClassName: 'right-[4%] bottom-5',
+    mobileClassName: 'right-[3%] bottom-8',
+    sizeClassName: 'h-32 w-32 sm:h-36 sm:w-36',
+  },
+  {
+    ...HOME_AVATAR_SCENES.reels,
+    desktopClassName: 'right-[29%] top-4',
+    mobileClassName: 'right-[23%] top-8',
+    sizeClassName: 'h-24 w-24 sm:h-28 sm:w-28',
+  },
+];
+
+const HOME_AVATAR_SRC_CACHE = new Map<string, string>();
+
+function getHomeAvatarScene(id: string): HomeAvatarScene {
+  return HOME_AVATAR_SCENES[id] || HOME_AVATAR_SCENES.supplier;
+}
+
+function homeSceneLabel(scene: HomeAvatarScene, isId: boolean): string {
+  return isId ? scene.labelId : scene.labelEn;
+}
+
+function homeSceneCaption(scene: HomeAvatarScene, isId: boolean): string {
+  return isId ? scene.captionId : scene.captionEn;
+}
+
+function homeAvatarDataUrl(scene: HomeAvatarScene, isId: boolean): string {
+  const key = `${scene.id}:${isId ? 'id' : 'en'}`;
+  const cached = HOME_AVATAR_SRC_CACHE.get(key);
+  if (cached) return cached;
+  const next = createLajukanAvatarDataUrl(
+    scene.spec,
+    homeSceneLabel(scene, isId),
+  );
+  HOME_AVATAR_SRC_CACHE.set(key, next);
+  return next;
 }
 
 function normalizePathname(pathname: string): string {
@@ -481,10 +752,18 @@ function mapUmkmStoreToRecommendation(
   const ui = buildUmkmPlacePresentation(store, isId);
   const detailHref = store.slug
     ? buildUmkmStorefrontPath(store.slug)
-    : buildUmkmDiscoveryPath({ q: store.name, city: store.city, storeId: store.id });
+    : buildUmkmDiscoveryPath({
+      q: store.name,
+      city: store.city,
+      storeId: store.id,
+    });
   const mapHref = store.slug
     ? buildUmkmDiscoveryPath({ store: store.slug, storeId: store.id })
-    : buildUmkmDiscoveryPath({ q: store.name, city: store.city, storeId: store.id });
+    : buildUmkmDiscoveryPath({
+      q: store.name,
+      city: store.city,
+      storeId: store.id,
+    });
   const images = Array.from(
     new Set([ui.coverImage, ...ui.gallery].filter(Boolean)),
   ).slice(0, 4);
@@ -572,7 +851,11 @@ function mapCommunityItemToPost(
     mediaUrl,
     mediaType,
     mediaItems,
-    avatar: profileAvatarSrc(item.author?.avatarUrl),
+    avatar: profileAvatarSrc(
+      item.author?.avatarUrl,
+      readProfileAvatarStyle(item.author),
+      item.author?.name,
+    ),
     tags: item.tags
       .map(tag => tag.name || tag.slug)
       .filter(Boolean)
@@ -801,9 +1084,7 @@ function buildGameSnapshot(
   };
 }
 
-function getQuickCategories(
-  isId: boolean,
-): QuickCategory[] {
+function getQuickCategories(isId: boolean): QuickCategory[] {
   return [
     {
       id: 'supplier',
@@ -904,6 +1185,201 @@ function getHeroMetrics(
       tone: 'blue',
     },
   ];
+}
+
+function HomeAvatarSprite({
+  scene,
+  isId,
+  sizes,
+  className,
+  decorative = false,
+}: {
+  scene: HomeAvatarScene;
+  isId: boolean;
+  sizes: string;
+  className?: string;
+  decorative?: boolean;
+}) {
+  return (
+    <Image
+      src={homeAvatarDataUrl(scene, isId)}
+      alt={decorative ? '' : homeSceneLabel(scene, isId)}
+      fill
+      unoptimized
+      loading="lazy"
+      fetchPriority="low"
+      sizes={sizes}
+      className={cn(
+        'object-contain drop-shadow-[0_18px_18px_rgba(15,23,42,0.2)]',
+        className,
+      )}
+    />
+  );
+}
+
+function HomeCategoryHeaderBadge({ isId }: { isId: boolean }) {
+  const supplier = HOME_AVATAR_SCENES.supplier;
+  const reels = HOME_AVATAR_SCENES.reels;
+
+  return (
+    <span className="relative inline-flex h-11 w-11 shrink-0 items-end justify-center overflow-hidden rounded-[16px] border border-emerald-100 bg-[radial-gradient(circle_at_50%_20%,#dcfce7,#f0fdfa_62%,#ffffff)]">
+      <span className="absolute bottom-0 h-4 w-10 rounded-t-full bg-emerald-200/50" />
+      <span className="relative -mr-2 h-9 w-9">
+        <HomeAvatarSprite
+          scene={supplier}
+          isId={isId}
+          decorative
+          sizes="44px"
+        />
+      </span>
+      <span className="relative -ml-3 h-8 w-8">
+        <HomeAvatarSprite scene={reels} isId={isId} decorative sizes="36px" />
+      </span>
+    </span>
+  );
+}
+
+function renderHomeAvatarProp(prop: HomeAvatarProp) {
+  if (prop === 'crate') {
+    return (
+      <>
+        <span className="absolute bottom-1 left-1 h-3.5 w-4 rounded-[4px] border border-amber-700/20 bg-amber-300 shadow-sm" />
+        <span className="absolute bottom-3 left-3 h-3 w-4 rounded-[4px] border border-orange-800/20 bg-orange-300 shadow-sm" />
+      </>
+    );
+  }
+  if (prop === 'cart') {
+    return (
+      <>
+        <span className="absolute bottom-2 left-1.5 h-3.5 w-6 rounded-[5px] border border-orange-700/20 bg-orange-300" />
+        <span className="absolute bottom-1 left-3 h-1.5 w-1.5 rounded-full bg-slate-700" />
+        <span className="absolute bottom-1 right-2 h-1.5 w-1.5 rounded-full bg-slate-700" />
+      </>
+    );
+  }
+  if (prop === 'tool') {
+    return (
+      <span className="absolute bottom-1.5 left-2 h-2 w-7 -rotate-45 rounded-full bg-slate-500 shadow-sm">
+        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-slate-500 bg-transparent" />
+      </span>
+    );
+  }
+  if (prop === 'pin' || prop === 'route') {
+    return (
+      <span className="absolute bottom-1 left-3 h-6 w-6 rotate-[-45deg] rounded-full rounded-bl-[4px] bg-rose-500 shadow-sm">
+        <span className="absolute left-1.5 top-1.5 h-3 w-3 rounded-full bg-white" />
+      </span>
+    );
+  }
+  if (prop === 'laptop') {
+    return (
+      <span className="absolute bottom-1 left-1 h-4 w-8 rounded-[5px] border border-cyan-700/20 bg-cyan-300 shadow-sm" />
+    );
+  }
+  if (prop === 'chat') {
+    return (
+      <span className="absolute bottom-2 left-2 h-5 w-7 rounded-[8px] rounded-bl-[3px] bg-amber-300 shadow-sm" />
+    );
+  }
+  return (
+    <span className="absolute bottom-1 left-2 h-5 w-6 rounded-[6px] bg-slate-800 shadow-sm" />
+  );
+}
+
+function HomeCategoryAvatar({
+  item,
+  isId,
+  mobile = false,
+}: {
+  item: QuickCategory;
+  isId: boolean;
+  mobile?: boolean;
+}) {
+  const scene = getHomeAvatarScene(item.id);
+  const tone = toneClassNames(scene.tone);
+
+  return (
+    <span
+      className={cn(
+        'relative isolate inline-flex items-end justify-center overflow-hidden rounded-[18px] border bg-white/88 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.28)]',
+        mobile ? 'h-14 w-14' : 'h-[4.5rem] w-[4.5rem]',
+        tone.surface,
+      )}
+    >
+      <span
+        className={cn(
+          'absolute -right-3 -top-3 h-10 w-10 rounded-full blur-xl',
+          tone.glow,
+        )}
+      />
+      <span className="absolute inset-x-2 bottom-1 h-4 rounded-full bg-white/60" />
+      <span
+        className={cn(
+          'relative z-10',
+          mobile ? 'h-[3.8rem] w-[3.8rem]' : 'h-[4.7rem] w-[4.7rem]',
+        )}
+      >
+        <HomeAvatarSprite
+          scene={scene}
+          isId={isId}
+          decorative
+          sizes={mobile ? '56px' : '72px'}
+        />
+      </span>
+      <span className="absolute bottom-0 right-0 z-20 h-8 w-9 motion-safe:animate-pulse">
+        {renderHomeAvatarProp(scene.prop)}
+      </span>
+    </span>
+  );
+}
+
+function HomeHeroCollaborationScene({
+  isId,
+  compact = false,
+}: {
+  isId: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_48%_20%,#ecfeff_0%,#d1fae5_36%,#86efac_72%,#22c55e_120%)]">
+      <span className="absolute inset-x-6 bottom-0 h-[38%] rounded-t-[999px] bg-[linear-gradient(180deg,#bbf7d0,#86efac)] opacity-90" />
+      <span className="absolute left-[12%] top-[45%] h-1 w-[74%] -rotate-6 rounded-full bg-white/60 shadow-[0_0_18px_rgba(255,255,255,0.6)]" />
+      <span className="absolute left-[19%] top-[39%] h-3 w-3 rounded-full bg-white/80" />
+      <span className="absolute right-[20%] top-[31%] h-3 w-3 rounded-full bg-emerald-100/90" />
+      <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 shadow-sm">
+        {isId ? 'Tim UMKM hidup' : 'Live SME team'}
+      </span>
+      <span className="absolute bottom-8 left-[23%] h-8 w-12 rounded-[10px] border border-amber-700/15 bg-amber-300/90 shadow-sm motion-safe:animate-bounce" />
+      <span className="absolute bottom-12 right-[19%] h-10 w-14 rounded-[12px] border border-orange-700/15 bg-orange-300/90 shadow-sm" />
+      {HOME_HERO_AVATARS.map((avatar, index) => (
+        <span
+          key={avatar.id}
+          className={cn(
+            'absolute z-10',
+            compact ? avatar.mobileClassName : avatar.desktopClassName,
+            avatar.sizeClassName,
+            compact && index === 3 ? 'hidden min-[430px]:block' : '',
+          )}
+        >
+          <HomeAvatarSprite
+            scene={avatar}
+            isId={isId}
+            sizes={compact ? '144px' : '160px'}
+          />
+          <span className="absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/88 px-2 py-0.5 text-[9px] font-black text-emerald-700 shadow-sm backdrop-blur">
+            {homeSceneCaption(avatar, isId)}
+          </span>
+        </span>
+      ))}
+      <span className="absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-1 rounded-full bg-white/86 px-3 py-1.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:inline-flex">
+        <span>{isId ? 'Supplier' : 'Supplier'}</span>
+        <ChevronRight className="h-3 w-3" />
+        <span>Chat</span>
+        <ChevronRight className="h-3 w-3" />
+        <span>{isId ? 'Kirim' : 'Deliver'}</span>
+      </span>
+    </div>
+  );
 }
 
 type CommunityTabItem = {
@@ -1129,10 +1605,12 @@ function DesktopSidebar({
 }
 
 function HeroVisualStage({
+  isId,
   metrics,
   compact = false,
   className,
 }: {
+  isId: boolean;
   metrics: HeroMetric[];
   compact?: boolean;
   className?: string;
@@ -1147,7 +1625,7 @@ function HeroVisualStage({
       <div
         className={cn(
           'relative overflow-hidden rounded-[16px] bg-emerald-100',
-          compact ? 'h-[124px]' : 'h-[176px] 2xl:h-[190px]',
+          compact ? 'aspect-[3/2]' : 'aspect-[3/2]',
         )}
       >
         <Image
@@ -1156,15 +1634,13 @@ function HeroVisualStage({
           fill
           loading="lazy"
           fetchPriority="low"
-          quality={58}
-          sizes={
-            compact
-              ? '(max-width: 1023px) 100vw, 240px'
-              : '(max-width: 1535px) 268px, 292px'
-          }
+          quality={1000}
+          sizes="100vw"
           className="object-cover object-center"
         />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,46,26,0.02),rgba(5,46,26,0.36))]" />
+
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,46,26,0.02),rgba(5,46,26,0.24))]" />
+
         <Link
           href="/reels"
           className="absolute bottom-2 right-2 inline-flex min-h-[28px] items-center gap-1.5 rounded-full bg-white/92 px-2.5 text-[10px] font-black text-[color:var(--app-accent)] shadow-[0_14px_24px_-18px_rgba(15,23,42,0.2)]"
@@ -1173,10 +1649,12 @@ function HeroVisualStage({
           Reels
         </Link>
       </div>
+
       <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5">
         {metrics.map((item, index) => {
           const Icon = item.icon;
           const tone = toneClassNames(item.tone);
+
           return (
             <div
               key={item.id}
@@ -1194,10 +1672,12 @@ function HeroVisualStage({
                 >
                   <Icon className="h-3.5 w-3.5" />
                 </span>
+
                 <div className="min-w-0">
                   <p className="text-[0.78rem] font-black leading-4 text-[color:var(--app-text)]">
                     {item.value}
                   </p>
+
                   <p className="text-[9.5px] font-semibold leading-3 text-[color:var(--app-text-soft)]">
                     {item.label}
                   </p>
@@ -1223,7 +1703,7 @@ function MobileHeroVisualBanner({
   return (
     <section
       className={cn(
-        'relative h-[clamp(248px,66vw,338px)] w-full overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_76%,white_16%)] bg-emerald-100 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.22)] sm:h-[clamp(268px,44vw,360px)]',
+        'relative aspect-[3/2] w-full overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_76%,white_16%)] bg-emerald-100 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.22)]',
         className,
       )}
     >
@@ -1233,58 +1713,10 @@ function MobileHeroVisualBanner({
         fill
         loading="lazy"
         fetchPriority="low"
-        quality={62}
-        sizes="(max-width: 1279px) 100vw, 1px"
+        quality={1000}
+        sizes="100vw"
         className="object-cover object-center"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(5,46,26,0.08)_42%,rgba(5,46,26,0.48)_100%)]" />
-      <Link
-        href="/reels"
-        className="absolute right-3 top-3 z-20 inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-white/[0.94] px-3 text-[11px] font-black text-[color:var(--app-accent)] shadow-[0_14px_24px_-18px_rgba(15,23,42,0.35)] backdrop-blur"
-      >
-        <PlayCircle className="h-4 w-4" />
-        Reels
-      </Link>
-      <div className="pointer-events-none absolute inset-0">
-        {metrics.slice(0, 3).map((item, index) => {
-          const Icon = item.icon;
-          const tone = toneClassNames(item.tone);
-          const positionClass =
-            index === 0
-              ? 'left-3 top-3 max-w-[172px]'
-              : index === 1
-                ? 'left-3 bottom-3 max-w-[196px]'
-                : 'right-3 top-[5.1rem] max-w-[176px]';
-          return (
-            <div
-              key={item.id}
-              className={cn(
-                'absolute min-w-[132px] rounded-[15px] border border-white/70 bg-white/[0.92] px-2.5 py-2 shadow-[0_14px_24px_-20px_rgba(15,23,42,0.28)] backdrop-blur-md',
-                positionClass,
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span
-                  className={cn(
-                    'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[11px]',
-                    tone.icon,
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[0.84rem] font-black leading-4 text-[color:var(--app-text)]">
-                    {item.value}
-                  </p>
-                  <p className="text-[10px] font-bold leading-3 text-[color:var(--app-text-soft)]">
-                    {item.label}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </section>
   );
 }
@@ -1410,7 +1842,11 @@ function DesktopHeroSection({
         metrics={metrics}
         className="mt-3 xl:hidden"
       />
-      <HeroVisualStage metrics={metrics} className="mt-3 hidden xl:block" />
+      <HeroVisualStage
+        isId={isId}
+        metrics={metrics}
+        className="mt-3 hidden xl:block"
+      />
     </div>
   );
 }
@@ -1550,12 +1986,13 @@ function GameProgressCard({
       <div className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-amber-400/10 blur-2xl dark:bg-amber-500/5" />
 
       <div className="relative space-y-3.5">
-
         {/* SECTION 1: LEVEL & RANK HEADER */}
         <div className="flex min-w-0 items-center gap-3">
           {/* Badge Level dengan Efek 3D Clean */}
           <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
-            <span className="text-base font-black tracking-tight">{snapshot.level}</span>
+            <span className="text-base font-black tracking-tight">
+              {snapshot.level}
+            </span>
             <div className="absolute -bottom-1 -right-1 rounded-md bg-amber-400 p-0.5 shadow-sm">
               <Trophy className="h-3 w-3 text-emerald-950" />
             </div>
@@ -1626,7 +2063,9 @@ function GameProgressCard({
         <div className="grid grid-cols-2 gap-2">
           {/* Streak Card */}
           <div className="rounded-xl border border-zinc-100 bg-white p-2 shadow-sm dark:border-zinc-900 dark:bg-zinc-900/20">
-            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">Streak</p>
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+              Streak
+            </p>
             <p className="mt-0.5 flex items-center gap-1 text-sm font-bold text-orange-600 dark:text-orange-400">
               <Flame className="h-3.5 w-3.5 fill-orange-500/10" />
               {snapshot.streak}x
@@ -1635,7 +2074,9 @@ function GameProgressCard({
 
           {/* Reward Card */}
           <div className="rounded-xl border border-zinc-100 bg-white p-2 shadow-sm dark:border-zinc-900 dark:bg-zinc-900/20">
-            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">Next Reward</p>
+            <p className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
+              Next Reward
+            </p>
             <p className="mt-0.5 flex items-center gap-1 text-sm font-bold text-amber-600 dark:text-amber-500">
               <Zap className="h-3.5 w-3.5 fill-amber-500/10" />
               {snapshot.nextReward}
@@ -1665,7 +2106,6 @@ function GameProgressCard({
             </span>
           </Link>
         </div>
-
       </div>
     </section>
   );
@@ -2056,12 +2496,12 @@ function CommunityPanel({
     ? post.mediaItems
     : post?.mediaUrl
       ? [
-          {
-            src: post.mediaUrl,
-            type: post.mediaType === 'video' ? 'video' : 'image',
-            alt: post.title,
-          } satisfies MediaPreviewItem,
-        ]
+        {
+          src: post.mediaUrl,
+          type: post.mediaType === 'video' ? 'video' : 'image',
+          alt: post.title,
+        } satisfies MediaPreviewItem,
+      ]
       : [];
   const postMediaUrl =
     postMediaItems.length > 0 ? post?.mediaUrl || post?.image : null;
@@ -2379,12 +2819,12 @@ function CommunityPanel({
               ? item.mediaItems
               : item.mediaUrl
                 ? [
-                    {
-                      src: item.mediaUrl,
-                      type: item.mediaType === 'video' ? 'video' : 'image',
-                      alt: item.title,
-                    } satisfies MediaPreviewItem,
-                  ]
+                  {
+                    src: item.mediaUrl,
+                    type: item.mediaType === 'video' ? 'video' : 'image',
+                    alt: item.title,
+                  } satisfies MediaPreviewItem,
+                ]
                 : [];
             return (
               <Link
@@ -3102,7 +3542,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
       searchButton: 'Search',
     };
 
-  const avatarSrc = profileAvatarSrc(user?.avatarUrl || user?.avatar_url);
+  const avatarSrc = profileAvatarSrc(
+    user?.avatarUrl || user?.avatar_url,
+    readProfileAvatarStyle(user),
+    user?.fullName || user?.full_name || user?.email,
+  );
   const primaryCtaHref = isAuthenticated ? '/create' : '/register';
   const handleSearchSubmit = (submittedQuery: string) => {
     const trimmedQuery = submittedQuery.trim();
@@ -3152,21 +3596,21 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         },
         ...(!PROMO_ONLY_MODE
           ? [
-              {
-                id: 'requests',
-                label: isId ? 'Permintaan' : 'My Requests',
-                caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
-                href: '/my-projects',
-                icon: ClipboardList,
-              },
-              {
-                id: 'transactions',
-                label: isId ? 'Transaksi' : 'Transactions',
-                caption: isId ? 'Status & bayar' : 'Progress and payments',
-                href: '/transactions',
-                icon: CreditCard,
-              },
-            ]
+            {
+              id: 'requests',
+              label: isId ? 'Permintaan' : 'My Requests',
+              caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
+              href: '/my-projects',
+              icon: ClipboardList,
+            },
+            {
+              id: 'transactions',
+              label: isId ? 'Transaksi' : 'Transactions',
+              caption: isId ? 'Status & bayar' : 'Progress and payments',
+              href: '/transactions',
+              icon: CreditCard,
+            },
+          ]
           : []),
       ],
       secondary: [
@@ -3268,23 +3712,23 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         },
         ...(!PROMO_ONLY_MODE
           ? [
-              {
-                id: 'requests',
-                label: isId ? 'Permintaan Saya' : 'My Requests',
-                caption: isId ? 'Login untuk akses' : 'Login to access',
-                href: '/login',
-                icon: ClipboardList,
-                locked: true,
-              },
-              {
-                id: 'transactions',
-                label: isId ? 'Transaksi' : 'Transactions',
-                caption: isId ? 'Login untuk akses' : 'Login to access',
-                href: '/login',
-                icon: CreditCard,
-                locked: true,
-              },
-            ]
+            {
+              id: 'requests',
+              label: isId ? 'Permintaan Saya' : 'My Requests',
+              caption: isId ? 'Login untuk akses' : 'Login to access',
+              href: '/login',
+              icon: ClipboardList,
+              locked: true,
+            },
+            {
+              id: 'transactions',
+              label: isId ? 'Transaksi' : 'Transactions',
+              caption: isId ? 'Login untuk akses' : 'Login to access',
+              href: '/login',
+              icon: CreditCard,
+              locked: true,
+            },
+          ]
           : []),
       ],
     };

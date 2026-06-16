@@ -56,7 +56,7 @@ import { buildContentHref, extractContentId } from '@/lib/content/routes';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { Modal } from '@/components/common/Modal';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import { ContentDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
@@ -681,9 +681,9 @@ export default function ContentDetailPage({ params }: PageProps) {
     const priceLabel =
       typeof item.price_cents === 'number' && item.price_cents > 0
         ? formatPriceWithUnit(
-            formatCurrency(item.price_cents, item.currency || 'IDR'),
-            resolveContentPriceUnitLabel(catalogItem, locale as 'id' | 'en'),
-          )
+          formatCurrency(item.price_cents, item.currency || 'IDR'),
+          resolveContentPriceUnitLabel(catalogItem, locale as 'id' | 'en'),
+        )
         : locale === 'id'
           ? 'Negosiasi'
           : 'Contact';
@@ -709,7 +709,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       location: location || 'Indonesia',
       priceLabel,
       priceCents:
-        typeof item.price_cents === 'number' && Number.isFinite(item.price_cents)
+        typeof item.price_cents === 'number' &&
+          Number.isFinite(item.price_cents)
           ? item.price_cents
           : null,
       storeName: item.owner_profile?.full_name || null,
@@ -786,7 +787,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         if (!res.ok)
           throw new Error(
             (payload as { error?: string }).error ||
-              'Failed to load transactions',
+            'Failed to load transactions',
           );
         const rawList = Array.isArray(payload)
           ? payload
@@ -1054,12 +1055,12 @@ export default function ContentDetailPage({ params }: PageProps) {
             typeof data?.snapshot_listing === 'object'
               ? data.snapshot_listing
               : {
-                  title: item?.title,
-                  cover_image: item?.cover_image,
-                  pricing_mode: pricingMode,
-                  market_side: toMarketSideValue(listingSide),
-                  content_url: listingHref,
-                },
+                title: item?.title,
+                cover_image: item?.cover_image,
+                pricing_mode: pricingMode,
+                market_side: toMarketSideValue(listingSide),
+                content_url: listingHref,
+              },
           safety_checklist: safetyChecklist,
           risk_flags: riskFlags,
           status: resolvedStatus,
@@ -1086,7 +1087,7 @@ export default function ContentDetailPage({ params }: PageProps) {
             Boolean(user?.id) &&
             Boolean(sellerPeerId) &&
             (user?.id || '').trim().toLowerCase() ===
-              sellerPeerId.toLowerCase();
+            sellerPeerId.toLowerCase();
           if (sellerPeerId) {
             if (isSelfSeller) {
               throw new Error(
@@ -1171,8 +1172,8 @@ export default function ContentDetailPage({ params }: PageProps) {
             typeof data?.transaction_meta === 'object'
               ? (data.transaction_meta as Record<string, unknown>)
               : {
-                  ticket: offerPayload.ticket,
-                },
+                ticket: offerPayload.ticket,
+              },
         });
         setShowOfferModal(false);
         setOfferAmount('');
@@ -1308,7 +1309,8 @@ export default function ContentDetailPage({ params }: PageProps) {
 
       const chatDraft = chatStarterDraft.trim();
       if (item) {
-        const itemMeta = (item.metadata as Record<string, unknown> | null) || {};
+        const itemMeta =
+          (item.metadata as Record<string, unknown> | null) || {};
         const listingPayload = {
           source: 'content_detail_chat',
           snapshot_at: new Date().toISOString(),
@@ -1319,14 +1321,14 @@ export default function ContentDetailPage({ params }: PageProps) {
           pricing_mode: PROMO_ONLY_MODE ? 'request' : pricingMode,
           price_cents:
             !PROMO_ONLY_MODE &&
-            typeof item.price_cents === 'number' &&
-            Number.isFinite(item.price_cents)
+              typeof item.price_cents === 'number' &&
+              Number.isFinite(item.price_cents)
               ? item.price_cents
               : 0,
           original_price_cents:
             !PROMO_ONLY_MODE &&
-            typeof displayOriginalPriceCents === 'number' &&
-            Number.isFinite(displayOriginalPriceCents)
+              typeof displayOriginalPriceCents === 'number' &&
+              Number.isFinite(displayOriginalPriceCents)
               ? displayOriginalPriceCents
               : undefined,
           promo_label:
@@ -1351,8 +1353,8 @@ export default function ContentDetailPage({ params }: PageProps) {
               : undefined,
           identity_verified: Boolean(
             !PROMO_ONLY_MODE &&
-              ((item.seller_stats?.completion_rate || 0) > 0.5 ||
-                (item.seller_stats?.total_transactions || 0) > 3),
+            ((item.seller_stats?.completion_rate || 0) > 0.5 ||
+              (item.seller_stats?.total_transactions || 0) > 3),
           ),
           location:
             (typeof itemMeta.location === 'string' && itemMeta.location) ||
@@ -1407,26 +1409,26 @@ export default function ContentDetailPage({ params }: PageProps) {
       }
       const rooms = Array.isArray(payload.data)
         ? payload.data
-            .map(room => ({
-              id:
-                (typeof room.id === 'string' && room.id) ||
-                (typeof room.room_id === 'string' ? room.room_id : ''),
-              room_name:
-                typeof room.room_name === 'string' ? room.room_name : null,
-              room_type:
-                typeof room.room_type === 'string' ? room.room_type : null,
-              room_avatar:
-                typeof room.room_avatar === 'string' ? room.room_avatar : null,
-              last_message:
-                typeof room.last_message === 'string'
-                  ? room.last_message
-                  : null,
-              last_message_at:
-                typeof room.last_message_at === 'string'
-                  ? room.last_message_at
-                  : null,
-            }))
-            .filter((room): room is InboxRoomItem => Boolean(room.id))
+          .map(room => ({
+            id:
+              (typeof room.id === 'string' && room.id) ||
+              (typeof room.room_id === 'string' ? room.room_id : ''),
+            room_name:
+              typeof room.room_name === 'string' ? room.room_name : null,
+            room_type:
+              typeof room.room_type === 'string' ? room.room_type : null,
+            room_avatar:
+              typeof room.room_avatar === 'string' ? room.room_avatar : null,
+            last_message:
+              typeof room.last_message === 'string'
+                ? room.last_message
+                : null,
+            last_message_at:
+              typeof room.last_message_at === 'string'
+                ? room.last_message_at
+                : null,
+          }))
+          .filter((room): room is InboxRoomItem => Boolean(room.id))
         : [];
 
       setShareRooms(rooms);
@@ -1496,14 +1498,14 @@ export default function ContentDetailPage({ params }: PageProps) {
         pricing_mode: PROMO_ONLY_MODE ? 'request' : pricingMode,
         price_cents:
           !PROMO_ONLY_MODE &&
-          typeof item.price_cents === 'number' &&
-          Number.isFinite(item.price_cents)
+            typeof item.price_cents === 'number' &&
+            Number.isFinite(item.price_cents)
             ? item.price_cents
             : 0,
         original_price_cents:
           !PROMO_ONLY_MODE &&
-          typeof displayOriginalPriceCents === 'number' &&
-          Number.isFinite(displayOriginalPriceCents)
+            typeof displayOriginalPriceCents === 'number' &&
+            Number.isFinite(displayOriginalPriceCents)
             ? displayOriginalPriceCents
             : undefined,
         promo_label:
@@ -1526,8 +1528,8 @@ export default function ContentDetailPage({ params }: PageProps) {
             : undefined,
         identity_verified: Boolean(
           !PROMO_ONLY_MODE &&
-            ((item.seller_stats?.completion_rate || 0) > 0.5 ||
-              (item.seller_stats?.total_transactions || 0) > 3),
+          ((item.seller_stats?.completion_rate || 0) > 0.5 ||
+            (item.seller_stats?.total_transactions || 0) > 3),
         ),
         location:
           (typeof itemMeta.location === 'string' && itemMeta.location) ||
@@ -1582,7 +1584,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     }
     const url =
       Array.isArray((data as { files?: Array<{ url?: string }> }).files) &&
-      (data as { files: Array<{ url?: string }> }).files[0]?.url
+        (data as { files: Array<{ url?: string }> }).files[0]?.url
         ? (data as { files: Array<{ url?: string }> }).files[0]?.url
         : Array.isArray((data as { urls?: string[] }).urls)
           ? (data as { urls: string[] }).urls[0]
@@ -1815,8 +1817,8 @@ export default function ContentDetailPage({ params }: PageProps) {
             : rawType.includes('product')
               ? 'product'
               : rawType.includes('profile') ||
-                  rawType.includes('user') ||
-                  rawType.includes('talent')
+                rawType.includes('user') ||
+                rawType.includes('talent')
                 ? 'profile'
                 : 'product';
   const dealKind: DealKind =
@@ -1882,9 +1884,9 @@ export default function ContentDetailPage({ params }: PageProps) {
   const pricingMode =
     String(
       item.pricing_mode ||
-        (typeof item.price_cents === 'number' && item.price_cents > 0
-          ? 'fixed'
-          : 'request'),
+      (typeof item.price_cents === 'number' && item.price_cents > 0
+        ? 'fixed'
+        : 'request'),
     ).toLowerCase() === 'request'
       ? 'request'
       : 'fixed';
@@ -1910,10 +1912,10 @@ export default function ContentDetailPage({ params }: PageProps) {
     displayOriginalPriceCents > (item.price_cents || 0);
   const discountPercent = hasOriginalPrice
     ? Math.round(
-        ((displayOriginalPriceCents - (item.price_cents as number)) /
-          displayOriginalPriceCents) *
-          100,
-      )
+      ((displayOriginalPriceCents - (item.price_cents as number)) /
+        displayOriginalPriceCents) *
+      100,
+    )
     : 0;
   const PromotionIcon =
     promotionSnapshot?.offerType === 'discount'
@@ -1936,21 +1938,20 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? 'Tanya detail'
       : 'Ask details'
     : hasPrice
-    ? formatCurrency(item.price_cents as number, item.currency || 'IDR')
-    : locale === 'id'
-      ? 'Harga menyesuaikan'
-      : 'Price on request';
+      ? formatCurrency(item.price_cents as number, item.currency || 'IDR')
+      : locale === 'id'
+        ? 'Harga menyesuaikan'
+        : 'Price on request';
   const priceLabelWithUnit = hasPrice
     ? formatPriceWithUnit(priceLabel, priceUnitLabel)
     : priceLabel;
   const salaryRange =
     typeof meta.salary_range === 'string' ? meta.salary_range.trim() : '';
-  const priceHeading =
-    PROMO_ONLY_MODE
-      ? locale === 'id'
-        ? 'Info promosi'
-        : 'Promo info'
-      : displayType === 'job'
+  const priceHeading = PROMO_ONLY_MODE
+    ? locale === 'id'
+      ? 'Info promosi'
+      : 'Promo info'
+    : displayType === 'job'
       ? locale === 'id'
         ? 'Kompensasi'
         : 'Compensation'
@@ -1977,18 +1978,17 @@ export default function ContentDetailPage({ params }: PageProps) {
                 : locale === 'id'
                   ? 'Harga'
                   : 'Price';
-  const primaryPrice =
-    PROMO_ONLY_MODE
-      ? locale === 'id'
-        ? 'Tanya detail'
-        : 'Ask details'
-      : displayType === 'job'
+  const primaryPrice = PROMO_ONLY_MODE
+    ? locale === 'id'
+      ? 'Tanya detail'
+      : 'Ask details'
+    : displayType === 'job'
       ? salaryRange ||
-        (hasPrice
-          ? priceLabelWithUnit
-          : locale === 'id'
-            ? 'Nego'
-            : 'Negotiable')
+      (hasPrice
+        ? priceLabelWithUnit
+        : locale === 'id'
+          ? 'Nego'
+          : 'Negotiable')
       : displayType === 'tool_rental'
         ? hasPrice
           ? priceLabelWithUnit
@@ -1997,15 +1997,14 @@ export default function ContentDetailPage({ params }: PageProps) {
             : 'Rate on request'
         : displayType === 'company'
           ? (typeof meta.industry_focus === 'string' && meta.industry_focus) ||
-            (typeof meta.company_size === 'string' && meta.company_size) ||
-            (locale === 'id' ? 'Profil publik' : 'Public profile')
+          (typeof meta.company_size === 'string' && meta.company_size) ||
+          (locale === 'id' ? 'Profil publik' : 'Public profile')
           : priceLabelWithUnit;
-  const displayPriceHeading =
-    PROMO_ONLY_MODE
-      ? locale === 'id'
-        ? 'Mulai dari chat'
-        : 'Start with chat'
-      : displayType === 'service' && priceUnitLabel
+  const displayPriceHeading = PROMO_ONLY_MODE
+    ? locale === 'id'
+      ? 'Mulai dari chat'
+      : 'Start with chat'
+    : displayType === 'service' && priceUnitLabel
       ? `${locale === 'id' ? 'Harga per' : 'Price per'} ${priceUnitLabel}`
       : priceHeading;
   const baseCurrency = item.currency || 'IDR';
@@ -2362,13 +2361,13 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? sellerStats.acceptance_rate
       : sellerTotalTransactions > 0
         ? (sellerCompletedTransactions + sellerAcceptedTransactions) /
-          sellerTotalTransactions
+        sellerTotalTransactions
         : 0;
   const showSellerStats = sellerReviewCount > 0 || sellerTotalTransactions > 0;
   const metadataOwnerProfile =
     meta.owner_profile &&
-    typeof meta.owner_profile === 'object' &&
-    !Array.isArray(meta.owner_profile)
+      typeof meta.owner_profile === 'object' &&
+      !Array.isArray(meta.owner_profile)
       ? (meta.owner_profile as ContentOwnerProfile)
       : null;
   const ownerProfile = item.owner_profile || metadataOwnerProfile;
@@ -2385,21 +2384,21 @@ export default function ContentDetailPage({ params }: PageProps) {
   const ownerProfileHref =
     ownerProfile && (ownerProfile.id || peerUserId)
       ? buildPublicProfileHref({
-          id: ownerProfile.id || peerUserId,
-          username: ownerProfile.username || undefined,
-          full_name: ownerProfile.full_name || ownerDisplayName || item.title,
-          title: ownerDisplayName || item.title,
-        })
+        id: ownerProfile.id || peerUserId,
+        username: ownerProfile.username || undefined,
+        full_name: ownerProfile.full_name || ownerDisplayName || item.title,
+        title: ownerDisplayName || item.title,
+      })
       : peerUserId
         ? buildPublicProfileHref({
-            id: peerUserId,
-            full_name: ownerDisplayName || item.title,
-            title: ownerDisplayName || item.title,
-          })
+          id: peerUserId,
+          full_name: ownerDisplayName || item.title,
+          title: ownerDisplayName || item.title,
+        })
         : null;
   const ownerAvatarUrl = normalizeContentMediaUrl(
     ownerProfile?.avatar_url ||
-      (typeof meta.avatar_url === 'string' ? meta.avatar_url : ''),
+    (typeof meta.avatar_url === 'string' ? meta.avatar_url : ''),
   );
   const workModeValue =
     typeof meta.work_mode === 'string' ? meta.work_mode : '';
@@ -2708,10 +2707,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       const depositCents = Number(meta.deposit_amount_cents);
       const complaintWindowValue =
         meta.complaint_window_hours != null &&
-        String(meta.complaint_window_hours).trim()
-          ? `${meta.complaint_window_hours} ${
-              locale === 'id' ? 'jam' : 'hours'
-            }`
+          String(meta.complaint_window_hours).trim()
+          ? `${meta.complaint_window_hours} ${locale === 'id' ? 'jam' : 'hours'
+          }`
           : '';
       return [
         {
@@ -2742,9 +2740,8 @@ export default function ContentDetailPage({ params }: PageProps) {
           label: locale === 'id' ? 'Durasi minimum' : 'Minimum duration',
           value:
             meta.minimum_rental_days != null
-              ? `${meta.minimum_rental_days} ${
-                  locale === 'id' ? 'hari' : 'days'
-                }`
+              ? `${meta.minimum_rental_days} ${locale === 'id' ? 'hari' : 'days'
+              }`
               : '',
         },
         {
@@ -2954,14 +2951,14 @@ export default function ContentDetailPage({ params }: PageProps) {
             ? 'Profil perusahaan'
             : 'Company profile'
           : (typeof meta.availability === 'string' &&
-              meta.availability.trim()) ||
-            (isDemandListing
-              ? locale === 'id'
-                ? 'Sedang dibuka'
-                : 'Open'
-              : locale === 'id'
-                ? 'Tersedia'
-                : 'Available'),
+            meta.availability.trim()) ||
+          (isDemandListing
+            ? locale === 'id'
+              ? 'Sedang dibuka'
+              : 'Open'
+            : locale === 'id'
+              ? 'Tersedia'
+              : 'Available'),
     },
     {
       key: 'delivery',
@@ -2981,19 +2978,19 @@ export default function ContentDetailPage({ params }: PageProps) {
       value:
         displayType === 'company'
           ? (typeof meta.hiring_focus === 'string' &&
-              meta.hiring_focus.trim()) ||
-            (typeof meta.about_company === 'string' &&
-              meta.about_company.trim()) ||
-            (locale === 'id' ? 'Terbuka untuk intro' : 'Open for introductions')
+            meta.hiring_focus.trim()) ||
+          (typeof meta.about_company === 'string' &&
+            meta.about_company.trim()) ||
+          (locale === 'id' ? 'Terbuka untuk intro' : 'Open for introductions')
           : readMetaText(
-              meta,
-              'delivery_time',
-              'delivery_estimate',
-              'deadline',
-              'preferred_period',
-            ) ||
-            formatDate(String(meta.available_from || '')) ||
-            (locale === 'id' ? 'Sesuai kesepakatan' : 'By agreement'),
+            meta,
+            'delivery_time',
+            'delivery_estimate',
+            'deadline',
+            'preferred_period',
+          ) ||
+          formatDate(String(meta.available_from || '')) ||
+          (locale === 'id' ? 'Sesuai kesepakatan' : 'By agreement'),
     },
     {
       key: 'location',
@@ -3048,8 +3045,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'MOQ yang masih masuk' : 'Acceptable MOQ',
       value:
         isDemandListing &&
-        displayType === 'product' &&
-        !detailFieldKeys.has('min_order_qty')
+          displayType === 'product' &&
+          !detailFieldKeys.has('min_order_qty')
           ? readMetaText(meta, 'moq')
           : '',
     },
@@ -3058,8 +3055,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Catatan budget' : 'Budget notes',
       value:
         !highlightKeys.has('budget_note') &&
-        !detailFieldKeys.has('specs') &&
-        !detailFieldKeys.has('client_requirements')
+          !detailFieldKeys.has('specs') &&
+          !detailFieldKeys.has('client_requirements')
           ? readMetaText(meta, 'budget_note')
           : '',
     },
@@ -3068,8 +3065,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Deadline' : 'Deadline',
       value:
         !detailFieldKeys.has('delivery_time') &&
-        !detailFieldKeys.has('delivery_estimate') &&
-        !detailFieldKeys.has('available_from')
+          !detailFieldKeys.has('delivery_estimate') &&
+          !detailFieldKeys.has('available_from')
           ? readMetaText(meta, 'deadline')
           : '',
     },
@@ -3078,9 +3075,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Output yang diharapkan' : 'Expected output',
       value:
         isDemandListing &&
-        displayType === 'service' &&
-        !highlightKeys.has('output_needed') &&
-        !detailFieldKeys.has('deliverables')
+          displayType === 'service' &&
+          !highlightKeys.has('output_needed') &&
+          !detailFieldKeys.has('deliverables')
           ? formatMetaList(meta.output_needed)
           : '',
     },
@@ -3089,9 +3086,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Periode target' : 'Preferred period',
       value:
         isDemandListing &&
-        (displayType === 'property' || displayType === 'tool_rental') &&
-        !highlightKeys.has('preferred_period') &&
-        !detailFieldKeys.has('available_from')
+          (displayType === 'property' || displayType === 'tool_rental') &&
+          !highlightKeys.has('preferred_period') &&
+          !detailFieldKeys.has('available_from')
           ? readMetaText(meta, 'preferred_period')
           : '',
     },
@@ -3100,9 +3097,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Traffic yang dicari' : 'Target traffic',
       value:
         isDemandListing &&
-        displayType === 'property' &&
-        !highlightKeys.has('traffic_note') &&
-        !detailFieldKeys.has('amenities')
+          displayType === 'property' &&
+          !highlightKeys.has('traffic_note') &&
+          !detailFieldKeys.has('amenities')
           ? readMetaText(meta, 'traffic_note')
           : '',
     },
@@ -3111,9 +3108,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       label: locale === 'id' ? 'Support dibutuhkan' : 'Support needed',
       value:
         isDemandListing &&
-        displayType === 'tool_rental' &&
-        !highlightKeys.has('support_needed') &&
-        !detailFieldKeys.has('usage_restrictions')
+          displayType === 'tool_rental' &&
+          !highlightKeys.has('support_needed') &&
+          !detailFieldKeys.has('usage_restrictions')
           ? formatMetaList(meta.support_needed)
           : '',
     },
@@ -3126,13 +3123,11 @@ export default function ContentDetailPage({ params }: PageProps) {
     heroHighlightLimit,
   );
   const expandedDetailItems = [
-    ...visibleHighlightItems
-      .slice(previewHighlightItems.length)
-      .map(entry => ({
-        key: `highlight-${entry.key}`,
-        label: entry.label,
-        value: entry.value,
-      })),
+    ...visibleHighlightItems.slice(previewHighlightItems.length).map(entry => ({
+      key: `highlight-${entry.key}`,
+      label: entry.label,
+      value: entry.value,
+    })),
     ...supplementalDetailItems,
     ...detailEntries.map(field => {
       const value = meta[field.key];
@@ -3227,234 +3222,233 @@ export default function ContentDetailPage({ params }: PageProps) {
   const serviceGuideSections =
     displayType === 'service'
       ? [
-          {
-            key: 'service_summary',
-            icon: FileText,
-            eyebrow: locale === 'id' ? 'Mulai dari sini' : 'Start here',
-            title: locale === 'id' ? 'Ringkasan Layanan' : 'Service Summary',
-            value:
-              summaryPreview ||
-              (locale === 'id'
-                ? 'Layanan profesional yang bisa dibahas dulu sebelum pekerjaan dimulai.'
-                : 'A professional service that can be aligned before the work starts.'),
-            description: serviceSummaryDescription,
-          },
-          {
-            key: 'service_scope',
-            icon: ListChecks,
-            eyebrow: locale === 'id' ? 'Scope kerja' : 'Work scope',
-            title: locale === 'id' ? 'Ruang lingkup layanan' : 'Service scope',
-            value:
-              readMetaText(meta, 'service_scope') ||
-              (locale === 'id'
-                ? 'Scope mencakup briefing, eksekusi inti, revisi seperlunya, dan handoff yang siap dipakai buyer.'
-                : 'Scope includes briefing, core execution, necessary revisions, and a usable handoff.'),
-          },
-          {
-            key: 'deliverables',
-            icon: Package,
-            eyebrow: locale === 'id' ? 'Hasil akhir' : 'Final output',
-            title: locale === 'id' ? 'Output yang diterima' : 'Deliverables',
-            value:
-              readMetaText(meta, 'deliverables') ||
-              (locale === 'id'
-                ? 'Buyer menerima output kerja utama, ringkasan tindak lanjut, serta file akhir atau checklist eksekusi.'
-                : 'Buyer receives the main work output, follow-up notes, and final files or execution checklist.'),
-          },
-          {
-            key: 'client_requirements',
-            icon: ClipboardCheck,
-            eyebrow: locale === 'id' ? 'Sebelum mulai' : 'Before starting',
-            title:
-              locale === 'id'
-                ? 'Data yang dibutuhkan dari klien'
-                : 'Client requirements',
-            value:
-              readMetaText(meta, 'client_requirements') ||
-              (locale === 'id'
-                ? 'Siapkan brief, referensi, target audience, dan akses dasar yang memang diperlukan untuk eksekusi.'
-                : 'Prepare a brief, references, target audience, and the basic access needed for execution.'),
-          },
-          {
-            key: 'availability_window',
-            icon: Clock3,
-            eyebrow: locale === 'id' ? 'Jadwal' : 'Schedule',
-            title: locale === 'id' ? 'Slot & timeline' : 'Slot & timeline',
-            value:
-              serviceTimelineValue ||
-              (locale === 'id'
-                ? 'Timeline dan slot kerja dikonfirmasi setelah kebutuhan jelas.'
-                : 'Timeline and work slots are confirmed once the requirements are clear.'),
-          },
-        ].filter(section => section.value || section.description)
+        {
+          key: 'service_summary',
+          icon: FileText,
+          eyebrow: locale === 'id' ? 'Mulai dari sini' : 'Start here',
+          title: locale === 'id' ? 'Ringkasan Layanan' : 'Service Summary',
+          value:
+            summaryPreview ||
+            (locale === 'id'
+              ? 'Layanan profesional yang bisa dibahas dulu sebelum pekerjaan dimulai.'
+              : 'A professional service that can be aligned before the work starts.'),
+          description: serviceSummaryDescription,
+        },
+        {
+          key: 'service_scope',
+          icon: ListChecks,
+          eyebrow: locale === 'id' ? 'Scope kerja' : 'Work scope',
+          title: locale === 'id' ? 'Ruang lingkup layanan' : 'Service scope',
+          value:
+            readMetaText(meta, 'service_scope') ||
+            (locale === 'id'
+              ? 'Scope mencakup briefing, eksekusi inti, revisi seperlunya, dan handoff yang siap dipakai buyer.'
+              : 'Scope includes briefing, core execution, necessary revisions, and a usable handoff.'),
+        },
+        {
+          key: 'deliverables',
+          icon: Package,
+          eyebrow: locale === 'id' ? 'Hasil akhir' : 'Final output',
+          title: locale === 'id' ? 'Output yang diterima' : 'Deliverables',
+          value:
+            readMetaText(meta, 'deliverables') ||
+            (locale === 'id'
+              ? 'Buyer menerima output kerja utama, ringkasan tindak lanjut, serta file akhir atau checklist eksekusi.'
+              : 'Buyer receives the main work output, follow-up notes, and final files or execution checklist.'),
+        },
+        {
+          key: 'client_requirements',
+          icon: ClipboardCheck,
+          eyebrow: locale === 'id' ? 'Sebelum mulai' : 'Before starting',
+          title:
+            locale === 'id'
+              ? 'Data yang dibutuhkan dari klien'
+              : 'Client requirements',
+          value:
+            readMetaText(meta, 'client_requirements') ||
+            (locale === 'id'
+              ? 'Siapkan brief, referensi, target audience, dan akses dasar yang memang diperlukan untuk eksekusi.'
+              : 'Prepare a brief, references, target audience, and the basic access needed for execution.'),
+        },
+        {
+          key: 'availability_window',
+          icon: Clock3,
+          eyebrow: locale === 'id' ? 'Jadwal' : 'Schedule',
+          title: locale === 'id' ? 'Slot & timeline' : 'Slot & timeline',
+          value:
+            serviceTimelineValue ||
+            (locale === 'id'
+              ? 'Timeline dan slot kerja dikonfirmasi setelah kebutuhan jelas.'
+              : 'Timeline and work slots are confirmed once the requirements are clear.'),
+        },
+      ].filter(section => section.value || section.description)
       : [];
   const flowSteps = (() => {
     if (PROMO_ONLY_MODE) {
       if (isOwner) {
         return locale === 'id'
           ? [
-              'Pastikan data promosi jelas',
-              'Balas chat calon pembeli',
-              'Kirim katalog atau detail tambahan',
-              'Update posting saat stok berubah',
-            ]
+            'Pastikan data promosi jelas',
+            'Balas chat calon pembeli',
+            'Kirim katalog atau detail tambahan',
+            'Update posting saat stok berubah',
+          ]
           : [
-              'Keep the promo details clear',
-              'Reply to interested chats',
-              'Share catalog or extra details',
-              'Update the post when stock changes',
-            ];
+            'Keep the promo details clear',
+            'Reply to interested chats',
+            'Share catalog or extra details',
+            'Update the post when stock changes',
+          ];
       }
 
       return locale === 'id'
         ? [
-            'Baca ringkasan dan foto',
-            'Chat untuk tanya stok/detail',
-            'Minta katalog atau kontak lanjutan',
-            'Simpan posting kalau cocok',
-          ]
+          'Baca ringkasan dan foto',
+          'Chat untuk tanya stok/detail',
+          'Minta katalog atau kontak lanjutan',
+          'Simpan posting kalau cocok',
+        ]
         : [
-            'Review summary and photos',
-            'Chat to ask stock or details',
-            'Ask for catalog or follow-up contact',
-            'Save the post if it fits',
-          ];
+          'Review summary and photos',
+          'Chat to ask stock or details',
+          'Ask for catalog or follow-up contact',
+          'Save the post if it fits',
+        ];
     }
 
     if (isOwner) {
       return locale === 'id'
         ? [
-            'Bagikan ke room terkait',
-            'Terima apply atau offer',
-            'Lanjut negosiasi',
-            'Pantau sampai selesai',
-          ]
+          'Bagikan ke room terkait',
+          'Terima apply atau offer',
+          'Lanjut negosiasi',
+          'Pantau sampai selesai',
+        ]
         : [
-            'Share to relevant rooms',
-            'Receive applications or offers',
-            'Continue the negotiation',
-            'Track it to completion',
-          ];
+          'Share to relevant rooms',
+          'Receive applications or offers',
+          'Continue the negotiation',
+          'Track it to completion',
+        ];
     }
 
     if (displayType === 'job') {
       return locale === 'id'
         ? [
-            'Cek role dan syarat',
-            'Kirim lamaran',
-            'Chat recruiter',
-            'Lanjut offer',
-          ]
+          'Cek role dan syarat',
+          'Kirim lamaran',
+          'Chat recruiter',
+          'Lanjut offer',
+        ]
         : [
-            'Review the role and requirements',
-            'Send your application',
-            'Chat with the recruiter',
-            'Continue the offer flow',
-          ];
+          'Review the role and requirements',
+          'Send your application',
+          'Chat with the recruiter',
+          'Continue the offer flow',
+        ];
     }
 
     if (displayType === 'company') {
       return locale === 'id'
         ? [
-            'Lihat profil perusahaan',
-            'Buka profil owner atau chat',
-            'Bahas hiring atau partnership',
-            'Lanjut ke listing spesifik bila perlu',
-          ]
+          'Lihat profil perusahaan',
+          'Buka profil owner atau chat',
+          'Bahas hiring atau partnership',
+          'Lanjut ke listing spesifik bila perlu',
+        ]
         : [
-            'Review the company profile',
-            'Open the owner profile or chat',
-            'Discuss hiring or partnerships',
-            'Move to a specific listing if needed',
-          ];
+          'Review the company profile',
+          'Open the owner profile or chat',
+          'Discuss hiring or partnerships',
+          'Move to a specific listing if needed',
+        ];
     }
 
     if (displayType === 'tool_rental') {
       return locale === 'id'
         ? [
-            'Cek rate dan deposit',
-            'Validasi jadwal dan kondisi',
-            'Kirim request sewa',
-            'Catat pickup dan return',
-          ]
+          'Cek rate dan deposit',
+          'Validasi jadwal dan kondisi',
+          'Kirim request sewa',
+          'Catat pickup dan return',
+        ]
         : [
-            'Review the rate and deposit',
-            'Confirm schedule and condition',
-            'Send the rental request',
-            'Document pickup and return',
-          ];
+          'Review the rate and deposit',
+          'Confirm schedule and condition',
+          'Send the rental request',
+          'Document pickup and return',
+        ];
     }
 
     if (isDemandListing) {
       return locale === 'id'
         ? [
-            'Pahami kebutuhan utamanya',
-            'Kirim proposal atau offer',
-            'Samakan scope dan harga',
-            'Lanjut kalau sudah cocok',
-          ]
+          'Pahami kebutuhan utamanya',
+          'Kirim proposal atau offer',
+          'Samakan scope dan harga',
+          'Lanjut kalau sudah cocok',
+        ]
         : [
-            'Understand the core need',
-            'Send a proposal or offer',
-            'Align scope and price',
-            'Proceed when both sides agree',
-          ];
+          'Understand the core need',
+          'Send a proposal or offer',
+          'Align scope and price',
+          'Proceed when both sides agree',
+        ];
     }
 
     if (displayType === 'service' || displayType === 'profile') {
       return locale === 'id'
         ? [
-            'Mulai dari chat brief',
-            'Kirim offer atau counter',
-            'Mulai kerja saat deal',
-            'Tandai selesai',
-          ]
+          'Mulai dari chat brief',
+          'Kirim offer atau counter',
+          'Mulai kerja saat deal',
+          'Tandai selesai',
+        ]
         : [
-            'Start with the project brief chat',
-            'Send an offer or counter',
-            'Start once the deal is set',
-            'Mark it completed',
-          ];
+          'Start with the project brief chat',
+          'Send an offer or counter',
+          'Start once the deal is set',
+          'Mark it completed',
+        ];
     }
 
     if (displayType === 'property') {
       return locale === 'id'
         ? [
-            'Atur survey atau viewing',
-            'Kirim penawaran',
-            'Sepakati syarat deal',
-            'Finalisasi transaksi',
-          ]
+          'Atur survey atau viewing',
+          'Kirim penawaran',
+          'Sepakati syarat deal',
+          'Finalisasi transaksi',
+        ]
         : [
-            'Schedule the viewing',
-            'Submit the offer',
-            'Agree on the terms',
-            'Finalize the transaction',
-          ];
+          'Schedule the viewing',
+          'Submit the offer',
+          'Agree on the terms',
+          'Finalize the transaction',
+        ];
     }
 
     return locale === 'id'
       ? [
-          'Chat untuk cek detail',
-          'Kirim offer atau counter',
-          'Lanjutkan transaksi',
-          'Konfirmasi saat diterima',
-        ]
+        'Chat untuk cek detail',
+        'Kirim offer atau counter',
+        'Lanjutkan transaksi',
+        'Konfirmasi saat diterima',
+      ]
       : [
-          'Chat to confirm the details',
-          'Send an offer or counter',
-          'Continue the transaction',
-          'Confirm after delivery',
-        ];
+        'Chat to confirm the details',
+        'Send an offer or counter',
+        'Continue the transaction',
+        'Confirm after delivery',
+      ];
   })();
   const flowOverviewDescription =
     locale === 'id'
       ? `${flowSteps.length} langkah cepat`
       : `${flowSteps.length} quick steps`;
-  const primaryActionLabel =
-    PROMO_ONLY_MODE
-      ? chatLabel
-      : displayType === 'job'
+  const primaryActionLabel = PROMO_ONLY_MODE
+    ? chatLabel
+    : displayType === 'job'
       ? locale === 'id'
         ? 'Lanjutkan Lamaran'
         : 'Continue Application'
@@ -3477,12 +3471,11 @@ export default function ContentDetailPage({ params }: PageProps) {
               : locale === 'id'
                 ? 'Pilih Respons'
                 : 'Choose Action';
-  const primaryActionHint =
-    PROMO_ONLY_MODE
-      ? locale === 'id'
-        ? 'Fase awal: promosi dan chat dulu.'
-        : 'Early launch: promotion and chat first.'
-      : displayType === 'job'
+  const primaryActionHint = PROMO_ONLY_MODE
+    ? locale === 'id'
+      ? 'Fase awal: promosi dan chat dulu.'
+      : 'Early launch: promotion and chat first.'
+    : displayType === 'job'
       ? locale === 'id'
         ? 'Chat dulu. Lanjut apply.'
         : 'Apply fast or chat the recruiter.'
@@ -3575,12 +3568,11 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? `Halo kak, ${title} masih ada? Stok dan harganya berapa?`
       : `Hi, I saw ${title}. Is it still available? I want to check stock, price, and how to order.`;
   })();
-  const chatFirstLabel =
-    PROMO_ONLY_MODE
-      ? locale === 'id'
-        ? 'Chat tanya detail'
-        : 'Chat for details'
-      : displayType === 'job'
+  const chatFirstLabel = PROMO_ONLY_MODE
+    ? locale === 'id'
+      ? 'Chat tanya detail'
+      : 'Chat for details'
+    : displayType === 'job'
       ? locale === 'id'
         ? 'Chat recruiter dulu'
         : 'Chat recruiter first'
@@ -3599,12 +3591,11 @@ export default function ContentDetailPage({ params }: PageProps) {
             : locale === 'id'
               ? 'Chat dulu'
               : 'Chat first';
-  const chatFirstBody =
-    PROMO_ONLY_MODE
-      ? locale === 'id'
-        ? 'Cek stok, katalog, MOQ, area kirim, atau detail kebutuhan lewat chat.'
-        : 'Confirm stock, catalog, MOQ, delivery area, or need details in chat.'
-      : displayType === 'job'
+  const chatFirstBody = PROMO_ONLY_MODE
+    ? locale === 'id'
+      ? 'Cek stok, katalog, MOQ, area kirim, atau detail kebutuhan lewat chat.'
+      : 'Confirm stock, catalog, MOQ, delivery area, or need details in chat.'
+    : displayType === 'job'
       ? locale === 'id'
         ? 'Masuk chat dulu biar lanjutnya gampang.'
         : 'Open chat first so the next step feels more natural.'
@@ -3701,12 +3692,12 @@ export default function ContentDetailPage({ params }: PageProps) {
   const explicitDeadlineIso = extractDeadlineIso(relatedTx);
   const fallbackDeadlineIso =
     !explicitDeadlineIso &&
-    relatedTx &&
-    (relatedTxStatus === 'pending' || relatedTxStatus === 'accepted') &&
-    typeof relatedTx.created_at === 'string'
+      relatedTx &&
+      (relatedTxStatus === 'pending' || relatedTxStatus === 'accepted') &&
+      typeof relatedTx.created_at === 'string'
       ? new Date(
-          new Date(relatedTx.created_at).getTime() + 24 * 60 * 60 * 1000,
-        ).toISOString()
+        new Date(relatedTx.created_at).getTime() + 24 * 60 * 60 * 1000,
+      ).toISOString()
       : '';
   const activeDeadlineIso = explicitDeadlineIso || fallbackDeadlineIso;
   const deadlineTs = activeDeadlineIso
@@ -3721,8 +3712,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       relatedTxStatus === 'in_progress');
   const relatedTxUpdatedLabel = relatedTx
     ? new Date(
-        relatedTx.updated_at || relatedTx.created_at || Date.now(),
-      ).toLocaleString()
+      relatedTx.updated_at || relatedTx.created_at || Date.now(),
+    ).toLocaleString()
     : '';
   const relatedTxWorkspaceHref = relatedTx
     ? `/transactions?focus_transaction_id=${encodeURIComponent(relatedTx.id)}`
@@ -3730,58 +3721,58 @@ export default function ContentDetailPage({ params }: PageProps) {
   const detailTone =
     displayType === 'job'
       ? {
-          page: 'bg-[linear-gradient(180deg,#fffdf5_0%,#ffffff_34%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#1c1002_0%,#020617_42%,#04110d_100%)]',
-          surface:
-            'border-emerald-200/80 bg-[linear-gradient(135deg,#fffdf5_0%,#ffffff_54%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.22))] dark:ring-emerald-400/15',
-          inset:
-            'bg-amber-50/72 ring-amber-100/80 dark:bg-amber-400/10 dark:ring-amber-300/15',
-          compact:
-            'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
-          row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
-        }
+        page: 'bg-[linear-gradient(180deg,#fffdf5_0%,#ffffff_34%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#1c1002_0%,#020617_42%,#04110d_100%)]',
+        surface:
+          'border-emerald-200/80 bg-[linear-gradient(135deg,#fffdf5_0%,#ffffff_54%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.22))] dark:ring-emerald-400/15',
+        inset:
+          'bg-amber-50/72 ring-amber-100/80 dark:bg-amber-400/10 dark:ring-amber-300/15',
+        compact:
+          'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
+        row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
+      }
       : displayType === 'service' || displayType === 'profile'
         ? {
-            page: 'bg-[linear-gradient(180deg,#f0fdfa_0%,#ffffff_36%,#f0f9ff_100%)] dark:bg-[linear-gradient(180deg,#042f2e_0%,#020617_44%,#082f49_100%)]',
-            surface:
-              'border-teal-200/80 bg-[linear-gradient(135deg,#f0fdfa_0%,#ffffff_54%,#ecfeff_100%)] ring-teal-100/80 dark:border-teal-400/20 dark:bg-[linear-gradient(135deg,rgba(19,78,74,0.28),rgba(2,6,23,0.96)_56%,rgba(8,47,73,0.24))] dark:ring-teal-400/15',
-            inset:
-              'bg-teal-50/72 ring-teal-100/80 dark:bg-teal-400/10 dark:ring-teal-300/15',
-            compact:
-              'bg-white/76 ring-teal-100/80 dark:bg-white/[0.06] dark:ring-teal-300/12',
-            row: 'bg-white/74 ring-teal-100/80 hover:bg-teal-50 dark:bg-white/[0.06] dark:ring-teal-300/12 dark:hover:bg-teal-400/12',
-          }
+          page: 'bg-[linear-gradient(180deg,#f0fdfa_0%,#ffffff_36%,#f0f9ff_100%)] dark:bg-[linear-gradient(180deg,#042f2e_0%,#020617_44%,#082f49_100%)]',
+          surface:
+            'border-teal-200/80 bg-[linear-gradient(135deg,#f0fdfa_0%,#ffffff_54%,#ecfeff_100%)] ring-teal-100/80 dark:border-teal-400/20 dark:bg-[linear-gradient(135deg,rgba(19,78,74,0.28),rgba(2,6,23,0.96)_56%,rgba(8,47,73,0.24))] dark:ring-teal-400/15',
+          inset:
+            'bg-teal-50/72 ring-teal-100/80 dark:bg-teal-400/10 dark:ring-teal-300/15',
+          compact:
+            'bg-white/76 ring-teal-100/80 dark:bg-white/[0.06] dark:ring-teal-300/12',
+          row: 'bg-white/74 ring-teal-100/80 hover:bg-teal-50 dark:bg-white/[0.06] dark:ring-teal-300/12 dark:hover:bg-teal-400/12',
+        }
         : displayType === 'property'
           ? {
-              page: 'bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_36%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#431407_0%,#020617_44%,#04110d_100%)]',
-              surface:
-                'border-orange-200/80 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_54%,#ecfdf5_100%)] ring-orange-100/80 dark:border-orange-400/20 dark:bg-[linear-gradient(135deg,rgba(67,20,7,0.3),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-orange-400/15',
-              inset:
-                'bg-orange-50/72 ring-orange-100/80 dark:bg-orange-400/10 dark:ring-orange-300/15',
-              compact:
-                'bg-white/76 ring-orange-100/80 dark:bg-white/[0.06] dark:ring-orange-300/12',
-              row: 'bg-white/74 ring-orange-100/80 hover:bg-orange-50 dark:bg-white/[0.06] dark:ring-orange-300/12 dark:hover:bg-orange-400/12',
-            }
+            page: 'bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_36%,#f7fff9_100%)] dark:bg-[linear-gradient(180deg,#431407_0%,#020617_44%,#04110d_100%)]',
+            surface:
+              'border-orange-200/80 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_54%,#ecfdf5_100%)] ring-orange-100/80 dark:border-orange-400/20 dark:bg-[linear-gradient(135deg,rgba(67,20,7,0.3),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-orange-400/15',
+            inset:
+              'bg-orange-50/72 ring-orange-100/80 dark:bg-orange-400/10 dark:ring-orange-300/15',
+            compact:
+              'bg-white/76 ring-orange-100/80 dark:bg-white/[0.06] dark:ring-orange-300/12',
+            row: 'bg-white/74 ring-orange-100/80 hover:bg-orange-50 dark:bg-white/[0.06] dark:ring-orange-300/12 dark:hover:bg-orange-400/12',
+          }
           : displayType === 'tool_rental'
             ? {
-                page: 'bg-[linear-gradient(180deg,#f7fee7_0%,#ffffff_36%,#ecfdf5_100%)] dark:bg-[linear-gradient(180deg,#1a2e05_0%,#020617_44%,#04110d_100%)]',
-                surface:
-                  'border-lime-200/80 bg-[linear-gradient(135deg,#f7fee7_0%,#ffffff_54%,#ecfdf5_100%)] ring-lime-100/80 dark:border-lime-400/20 dark:bg-[linear-gradient(135deg,rgba(54,83,20,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-lime-400/15',
-                inset:
-                  'bg-lime-50/72 ring-lime-100/80 dark:bg-lime-400/10 dark:ring-lime-300/15',
-                compact:
-                  'bg-white/76 ring-lime-100/80 dark:bg-white/[0.06] dark:ring-lime-300/12',
-                row: 'bg-white/74 ring-lime-100/80 hover:bg-lime-50 dark:bg-white/[0.06] dark:ring-lime-300/12 dark:hover:bg-lime-400/12',
-              }
+              page: 'bg-[linear-gradient(180deg,#f7fee7_0%,#ffffff_36%,#ecfdf5_100%)] dark:bg-[linear-gradient(180deg,#1a2e05_0%,#020617_44%,#04110d_100%)]',
+              surface:
+                'border-lime-200/80 bg-[linear-gradient(135deg,#f7fee7_0%,#ffffff_54%,#ecfdf5_100%)] ring-lime-100/80 dark:border-lime-400/20 dark:bg-[linear-gradient(135deg,rgba(54,83,20,0.28),rgba(2,6,23,0.96)_56%,rgba(6,78,59,0.2))] dark:ring-lime-400/15',
+              inset:
+                'bg-lime-50/72 ring-lime-100/80 dark:bg-lime-400/10 dark:ring-lime-300/15',
+              compact:
+                'bg-white/76 ring-lime-100/80 dark:bg-white/[0.06] dark:ring-lime-300/12',
+              row: 'bg-white/74 ring-lime-100/80 hover:bg-lime-50 dark:bg-white/[0.06] dark:ring-lime-300/12 dark:hover:bg-lime-400/12',
+            }
             : {
-                page: 'bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_34%,#f0fdfa_100%)] dark:bg-[linear-gradient(180deg,#04110d_0%,#020617_42%,#042f2e_100%)]',
-                surface:
-                  'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_56%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_56%,rgba(20,83,45,0.22))] dark:ring-emerald-400/15',
-                inset:
-                  'bg-emerald-50/72 ring-emerald-100/80 dark:bg-emerald-400/10 dark:ring-emerald-300/15',
-                compact:
-                  'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
-                row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
-              };
+              page: 'bg-[linear-gradient(180deg,#f7fff9_0%,#ffffff_34%,#f0fdfa_100%)] dark:bg-[linear-gradient(180deg,#04110d_0%,#020617_42%,#042f2e_100%)]',
+              surface:
+                'border-emerald-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_56%,#ecfdf5_100%)] ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_56%,rgba(20,83,45,0.22))] dark:ring-emerald-400/15',
+              inset:
+                'bg-emerald-50/72 ring-emerald-100/80 dark:bg-emerald-400/10 dark:ring-emerald-300/15',
+              compact:
+                'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
+              row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
+            };
   const detailPageShellClass = `lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden py-0 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:py-1.5 lg:pb-7 ${detailTone.page}`;
   const detailShellStackClass =
     'mx-auto flex w-full max-w-[1320px] flex-col gap-2 px-2 sm:gap-2.5 sm:px-3 lg:px-0';
@@ -3794,23 +3785,24 @@ export default function ContentDetailPage({ params }: PageProps) {
     'inline-flex min-h-[40px] items-center justify-center gap-1 rounded-full bg-slate-100 px-3.5 text-xs font-black text-slate-700 transition hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:min-h-[42px] sm:px-4 sm:text-sm';
   const detailTextLinkClass =
     'text-sm font-semibold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]';
-  const heroSummaryCard = summaryPreview || bodyPreview ? (
-    <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 text-sm leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800 sm:p-3 sm:leading-6">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-        {locale === 'id' ? 'Ringkasan' : 'Summary'}
-      </p>
-      {summaryPreview ? (
-        <p className="mt-1.5 line-clamp-3 font-medium">{summaryPreview}</p>
-      ) : null}
-      {bodyPreview ? (
-        <p
-          className={`line-clamp-2 ${summaryPreview ? 'mt-1.5 sm:mt-2' : 'mt-1.5'} ${PROMO_ONLY_MODE ? 'hidden sm:block' : ''}`}
-        >
-          {bodyPreview}
+  const heroSummaryCard =
+    summaryPreview || bodyPreview ? (
+      <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 text-sm leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800 sm:p-3 sm:leading-6">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+          {locale === 'id' ? 'Ringkasan' : 'Summary'}
         </p>
-      ) : null}
-    </div>
-  ) : null;
+        {summaryPreview ? (
+          <p className="mt-1.5 line-clamp-3 font-medium">{summaryPreview}</p>
+        ) : null}
+        {bodyPreview ? (
+          <p
+            className={`line-clamp-2 ${summaryPreview ? 'mt-1.5 sm:mt-2' : 'mt-1.5'} ${PROMO_ONLY_MODE ? 'hidden sm:block' : ''}`}
+          >
+            {bodyPreview}
+          </p>
+        ) : null}
+      </div>
+    ) : null;
 
   const actionButtons = (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(118px,1fr))] gap-1.5 sm:gap-2 lg:grid-cols-1">
@@ -3895,7 +3887,11 @@ export default function ContentDetailPage({ params }: PageProps) {
         <div className="flex items-start gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900">
             <NextImage
-              src={profileAvatarSrc(ownerAvatarUrl)}
+              src={profileAvatarSrc(
+                ownerAvatarUrl,
+                readProfileAvatarStyle(ownerProfile || meta),
+                ownerDisplayName,
+              )}
               alt={ownerDisplayName}
               width={48}
               height={48}
@@ -3972,10 +3968,10 @@ export default function ContentDetailPage({ params }: PageProps) {
           {(promotionSnapshot?.promoLabel ||
             (typeof item.promo_label === 'string' &&
               item.promo_label.trim())) && (
-            <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_52%,_white)] px-2 py-0.5 font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_24%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
-              {promotionSnapshot?.promoLabel || item.promo_label}
-            </span>
-          )}
+              <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent-soft)_52%,_white)] px-2 py-0.5 font-semibold text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_24%,rgba(15,23,42,0.96))] dark:text-[color:var(--app-accent)]">
+                {promotionSnapshot?.promoLabel || item.promo_label}
+              </span>
+            )}
         </div>
       )}
       {!PROMO_ONLY_MODE && promotionSnapshot?.offerType && (
@@ -3995,13 +3991,12 @@ export default function ContentDetailPage({ params }: PageProps) {
               </div>
             </div>
             <span
-              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                promotionSnapshot.status === 'safe'
-                  ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_56%,white)] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))]'
-                  : promotionSnapshot.status === 'unsafe'
-                    ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
-                    : 'bg-white text-[color:var(--app-text)] dark:bg-slate-950'
-              }`}
+              className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${promotionSnapshot.status === 'safe'
+                ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_56%,white)] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))]'
+                : promotionSnapshot.status === 'unsafe'
+                  ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
+                  : 'bg-white text-[color:var(--app-text)] dark:bg-slate-950'
+                }`}
             >
               {promotionSnapshot.status === 'safe'
                 ? locale === 'id'
@@ -4033,11 +4028,10 @@ export default function ContentDetailPage({ params }: PageProps) {
             {Array.from({ length: 5 }).map((_, i) => (
               <Star
                 key={`rating-${i}`}
-                className={`h-3.5 w-3.5 ${
-                  i < ratingRounded
-                    ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
-                    : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
-                }`}
+                className={`h-3.5 w-3.5 ${i < ratingRounded
+                  ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
+                  : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
+                  }`}
               />
             ))}
           </div>
@@ -4248,57 +4242,57 @@ export default function ContentDetailPage({ params }: PageProps) {
   const detailVisual =
     displayType === 'property'
       ? {
-          chip: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/12 dark:text-rose-200 dark:ring-rose-400/20',
-          icon: 'bg-rose-50 text-rose-600 dark:bg-rose-500/12 dark:text-rose-300',
-          line: 'from-rose-500 via-orange-400 to-emerald-500',
-          wash: 'bg-[linear-gradient(135deg,rgba(255,241,242,0.86),rgba(255,255,255,0.96)_48%,rgba(240,253,244,0.72))] dark:bg-[linear-gradient(135deg,rgba(76,5,25,0.28),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-          eyebrow: locale === 'id' ? 'Detail properti' : 'Property detail',
-        }
+        chip: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/12 dark:text-rose-200 dark:ring-rose-400/20',
+        icon: 'bg-rose-50 text-rose-600 dark:bg-rose-500/12 dark:text-rose-300',
+        line: 'from-rose-500 via-orange-400 to-emerald-500',
+        wash: 'bg-[linear-gradient(135deg,rgba(255,241,242,0.86),rgba(255,255,255,0.96)_48%,rgba(240,253,244,0.72))] dark:bg-[linear-gradient(135deg,rgba(76,5,25,0.28),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+        eyebrow: locale === 'id' ? 'Detail properti' : 'Property detail',
+      }
       : displayType === 'service' || displayType === 'profile'
         ? {
-            chip: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-500/12 dark:text-teal-200 dark:ring-teal-400/20',
-            icon: 'bg-teal-50 text-teal-700 dark:bg-teal-500/12 dark:text-teal-300',
-            line: 'from-teal-500 via-emerald-400 to-emerald-500',
-            wash: 'bg-[linear-gradient(135deg,rgba(240,249,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.76))] dark:bg-[linear-gradient(135deg,rgba(8,47,73,0.34),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-            eyebrow:
-              displayType === 'profile'
-                ? locale === 'id'
-                  ? 'Detail profil'
-                  : 'Profile detail'
-                : locale === 'id'
-                  ? 'Detail layanan'
-                  : 'Service detail',
-          }
+          chip: 'bg-teal-50 text-teal-700 ring-teal-100 dark:bg-teal-500/12 dark:text-teal-200 dark:ring-teal-400/20',
+          icon: 'bg-teal-50 text-teal-700 dark:bg-teal-500/12 dark:text-teal-300',
+          line: 'from-teal-500 via-emerald-400 to-emerald-500',
+          wash: 'bg-[linear-gradient(135deg,rgba(240,249,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.76))] dark:bg-[linear-gradient(135deg,rgba(8,47,73,0.34),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+          eyebrow:
+            displayType === 'profile'
+              ? locale === 'id'
+                ? 'Detail profil'
+                : 'Profile detail'
+              : locale === 'id'
+                ? 'Detail layanan'
+                : 'Service detail',
+        }
         : displayType === 'job'
           ? {
-              chip: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/12 dark:text-amber-200 dark:ring-amber-400/20',
-              icon: 'bg-amber-50 text-amber-600 dark:bg-amber-500/12 dark:text-amber-300',
-              line: 'from-amber-500 via-orange-400 to-emerald-500',
-              wash: 'bg-[linear-gradient(135deg,rgba(255,251,235,0.9),rgba(255,255,255,0.97)_48%,rgba(240,253,244,0.74))] dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.3),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-              eyebrow: locale === 'id' ? 'Detail lowongan' : 'Job detail',
-            }
+            chip: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/12 dark:text-amber-200 dark:ring-amber-400/20',
+            icon: 'bg-amber-50 text-amber-600 dark:bg-amber-500/12 dark:text-amber-300',
+            line: 'from-amber-500 via-orange-400 to-emerald-500',
+            wash: 'bg-[linear-gradient(135deg,rgba(255,251,235,0.9),rgba(255,255,255,0.97)_48%,rgba(240,253,244,0.74))] dark:bg-[linear-gradient(135deg,rgba(69,26,3,0.3),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+            eyebrow: locale === 'id' ? 'Detail lowongan' : 'Job detail',
+          }
           : displayType === 'tool_rental'
             ? {
-                chip: 'bg-lime-50 text-lime-800 ring-lime-100 dark:bg-lime-500/12 dark:text-lime-200 dark:ring-lime-400/20',
-                icon: 'bg-lime-50 text-lime-700 dark:bg-lime-500/12 dark:text-lime-300',
-                line: 'from-lime-500 via-emerald-400 to-emerald-500',
-                wash: 'bg-[linear-gradient(135deg,rgba(238,242,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.74))] dark:bg-[linear-gradient(135deg,rgba(49,46,129,0.32),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
-                eyebrow: locale === 'id' ? 'Detail sewa alat' : 'Rental detail',
-              }
+              chip: 'bg-lime-50 text-lime-800 ring-lime-100 dark:bg-lime-500/12 dark:text-lime-200 dark:ring-lime-400/20',
+              icon: 'bg-lime-50 text-lime-700 dark:bg-lime-500/12 dark:text-lime-300',
+              line: 'from-lime-500 via-emerald-400 to-emerald-500',
+              wash: 'bg-[linear-gradient(135deg,rgba(238,242,255,0.9),rgba(255,255,255,0.97)_48%,rgba(236,253,245,0.74))] dark:bg-[linear-gradient(135deg,rgba(49,46,129,0.32),rgba(2,6,23,0.96)_54%,rgba(6,78,59,0.2))]',
+              eyebrow: locale === 'id' ? 'Detail sewa alat' : 'Rental detail',
+            }
             : {
-                chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
-                icon: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/12 dark:text-emerald-300',
-                line: 'from-emerald-500 via-teal-400 to-lime-500',
-                wash: 'bg-[linear-gradient(135deg,rgba(236,253,245,0.9),rgba(255,255,255,0.97)_48%,rgba(240,249,255,0.74))] dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_54%,rgba(8,47,73,0.2))]',
-                eyebrow:
-                  displayType === 'company'
-                    ? locale === 'id'
-                      ? 'Detail perusahaan'
-                      : 'Company detail'
-                    : locale === 'id'
-                      ? 'Detail item'
-                      : 'Item detail',
-              };
+              chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
+              icon: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/12 dark:text-emerald-300',
+              line: 'from-emerald-500 via-teal-400 to-lime-500',
+              wash: 'bg-[linear-gradient(135deg,rgba(236,253,245,0.9),rgba(255,255,255,0.97)_48%,rgba(240,249,255,0.74))] dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_54%,rgba(8,47,73,0.2))]',
+              eyebrow:
+                displayType === 'company'
+                  ? locale === 'id'
+                    ? 'Detail perusahaan'
+                    : 'Company detail'
+                  : locale === 'id'
+                    ? 'Detail item'
+                    : 'Item detail',
+            };
   const detailSurfaceClass = `overflow-hidden rounded-[18px] border shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] ring-1 sm:rounded-[22px] ${detailTone.surface}`;
   const reviewBuckets = [5, 4, 3, 2, 1].map(score => ({
     score,
@@ -4567,18 +4561,17 @@ export default function ContentDetailPage({ params }: PageProps) {
                 </div>
 
                 {displayType === 'service' &&
-                serviceGuideSections.length > 0 ? (
+                  serviceGuideSections.length > 0 ? (
                   <div className="mt-2.5 overflow-hidden rounded-[16px] bg-white/74 ring-1 ring-slate-200/70 dark:bg-slate-950/64 dark:ring-slate-800">
                     {serviceGuideSections.slice(0, 2).map((section, index) => {
                       const SectionIcon = section.icon;
                       return (
                         <div
                           key={section.key}
-                          className={`flex gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${
-                            index > 0
-                              ? 'border-t border-slate-200/70 dark:border-slate-800'
-                              : ''
-                          }`}
+                          className={`flex gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${index > 0
+                            ? 'border-t border-slate-200/70 dark:border-slate-800'
+                            : ''
+                            }`}
                         >
                           <span
                             className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
@@ -4798,11 +4791,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                           return (
                             <div
                               key={entry.key}
-                              className={`flex items-start gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${
-                                index > 0
-                                  ? 'border-t border-slate-200/70 dark:border-slate-800'
-                                  : ''
-                              }`}
+                              className={`flex items-start gap-2.5 p-2.5 sm:gap-3 sm:p-3 ${index > 0
+                                ? 'border-t border-slate-200/70 dark:border-slate-800'
+                                : ''
+                                }`}
                             >
                               <span
                                 className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
@@ -4901,11 +4893,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                               {Array.from({ length: 5 }).map((_, i) => (
                                 <Star
                                   key={`reviews-summary-${i}`}
-                                  className={`h-3.5 w-3.5 ${
-                                    i < ratingRounded
-                                      ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
-                                      : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
-                                  }`}
+                                  className={`h-3.5 w-3.5 ${i < ratingRounded
+                                    ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
+                                    : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
+                                    }`}
                                 />
                               ))}
                             </div>
@@ -4958,11 +4949,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                                   {Array.from({ length: 5 }).map((_, i) => (
                                     <Star
                                       key={`review-${review.id}-star-${i}`}
-                                      className={`h-3.5 w-3.5 ${
-                                        i < review.rating
-                                          ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
-                                          : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
-                                      }`}
+                                      className={`h-3.5 w-3.5 ${i < review.rating
+                                        ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
+                                        : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
+                                        }`}
                                     />
                                   ))}
                                 </div>
@@ -5114,13 +5104,31 @@ export default function ContentDetailPage({ params }: PageProps) {
                   onChange={e => setReportReason(e.target.value)}
                   className="h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-warning-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-warning)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)]"
                 >
-                  <option value="spam">{locale === 'id' ? 'Spam / promosi' : 'Spam / promotion'}</option>
-                  <option value="fake">{locale === 'id' ? 'Palsu / tidak asli' : 'Fake / not genuine'}</option>
-                  <option value="scam">{locale === 'id' ? 'Penipuan' : 'Scam'}</option>
-                  <option value="harassment">{locale === 'id' ? 'Pelecehan' : 'Harassment'}</option>
-                  <option value="illegal">{locale === 'id' ? 'Konten ilegal' : 'Illegal content'}</option>
-                  <option value="inaccurate">{locale === 'id' ? 'Informasi tidak akurat' : 'Inaccurate info'}</option>
-                  <option value="other">{locale === 'id' ? 'Lainnya' : 'Other'}</option>
+                  <option value="spam">
+                    {locale === 'id' ? 'Spam / promosi' : 'Spam / promotion'}
+                  </option>
+                  <option value="fake">
+                    {locale === 'id'
+                      ? 'Palsu / tidak asli'
+                      : 'Fake / not genuine'}
+                  </option>
+                  <option value="scam">
+                    {locale === 'id' ? 'Penipuan' : 'Scam'}
+                  </option>
+                  <option value="harassment">
+                    {locale === 'id' ? 'Pelecehan' : 'Harassment'}
+                  </option>
+                  <option value="illegal">
+                    {locale === 'id' ? 'Konten ilegal' : 'Illegal content'}
+                  </option>
+                  <option value="inaccurate">
+                    {locale === 'id'
+                      ? 'Informasi tidak akurat'
+                      : 'Inaccurate info'}
+                  </option>
+                  <option value="other">
+                    {locale === 'id' ? 'Lainnya' : 'Other'}
+                  </option>
                 </select>
               </div>
               <div>
@@ -5704,11 +5712,11 @@ export default function ContentDetailPage({ params }: PageProps) {
                   router.push(
                     createdDealHandoff.flowMode === 'direct'
                       ? `/transactions?transaction_id=${encodeURIComponent(
-                          createdDealHandoff.transactionId,
-                        )}&open_payment=1`
+                        createdDealHandoff.transactionId,
+                      )}&open_payment=1`
                       : `/transactions?focus_transaction_id=${encodeURIComponent(
-                          createdDealHandoff.transactionId,
-                        )}`,
+                        createdDealHandoff.transactionId,
+                      )}`,
                   );
                   setCreatedDealHandoff(null);
                 }}

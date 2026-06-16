@@ -11,6 +11,10 @@ import {
   validatePasswordStrength,
 } from '@/lib/passwordPolicy';
 import { enforceRateLimit } from '@/lib/rateLimit';
+import {
+  consumeOTPVerificationTokenForPurposes,
+  hasOTPVerificationTokenForPurposes,
+} from '@/lib/redis';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { z } from 'zod';
 
@@ -23,6 +27,7 @@ const REGISTER_USERNAME_RATE_LIMIT_PER_HOUR = Number.parseInt(
   process.env.REGISTER_USERNAME_RATE_LIMIT_PER_HOUR || '3',
   10,
 );
+const REGISTER_OTP_REQUIRED = process.env.ENABLE_OTP_AUTH !== 'false';
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (value == null) return undefined;
@@ -57,6 +62,16 @@ const RegisterProxySchema = z
     name: optionalTrimmedString,
     captcha_token: optionalTrimmedString,
     captchaToken: optionalTrimmedString,
+    otp_type: z.enum(['email', 'phone']).optional(),
+    otpType: z.enum(['email', 'phone']).optional(),
+    otp_target: optionalTrimmedString,
+    otpTarget: optionalTrimmedString,
+    otp_token: optionalTrimmedString,
+    otpToken: optionalTrimmedString,
+    email_otp_token: optionalTrimmedString,
+    emailOtpToken: optionalTrimmedString,
+    phone_otp_token: optionalTrimmedString,
+    phoneOtpToken: optionalTrimmedString,
   })
   .passthrough();
 
@@ -99,6 +114,39 @@ function createAuthProxySuccessResponse(
   return response;
 }
 
+function normalizeOtpTarget(type: 'email' | 'phone', value: string): string {
+  if (type === 'email') return value.trim().toLowerCase();
+  return value.replace(/\D/g, '');
+}
+
+async function applyVerifiedContactMetadata(
+  accessToken: string,
+  security: { ip: string; deviceFingerprint: string },
+  contact: { type: 'email' | 'phone'; target: string },
+) {
+  if (!accessToken || !contact.target) return;
+
+  const verification =
+    contact.type === 'phone'
+      ? { phone_verified: true }
+      : { email_verified: true };
+
+  await fetch(`${API_URL}/users/me`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      ...authSecurityHeaders(security),
+    },
+    body: JSON.stringify({
+      ...(contact.type === 'phone' ? { phone: contact.target } : {}),
+      verification,
+    }),
+  }).catch(error => {
+    console.warn('[REGISTER_VERIFY_CONTACT_METADATA_FAILED]', error);
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const security = await enforceAuthRouteSecurity(req, {
@@ -128,6 +176,22 @@ export async function POST(req: NextRequest) {
     const fullName = body.full_name || body.fullName || body.name;
     const username = body.username;
     const captchaToken = body.captcha_token || body.captchaToken;
+    const otpType =
+      body.otp_type ||
+      body.otpType ||
+      (phone || body.phone_otp_token || body.phoneOtpToken ? 'phone' : 'email');
+    const otpTarget = normalizeOtpTarget(
+      otpType,
+      body.otp_target ||
+        body.otpTarget ||
+        (otpType === 'email' ? email || '' : phone),
+    );
+    const otpToken =
+      body.otp_token ||
+      body.otpToken ||
+      (otpType === 'email'
+        ? body.email_otp_token || body.emailOtpToken
+        : body.phone_otp_token || body.phoneOtpToken);
 
     if (!/^[a-z0-9_.]{3,30}$/.test(username) || username.includes('..')) {
       return NextResponse.json(
@@ -177,6 +241,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (REGISTER_OTP_REQUIRED) {
+      if (!otpTarget || !otpToken) {
+        return NextResponse.json(
+          { error: 'OTP verification is required for registration' },
+          { status: 401 },
+        );
+      }
+
+      const validOtpToken = await hasOTPVerificationTokenForPurposes(
+        otpToken,
+        { type: otpType, target: otpTarget },
+        ['register', 'login'],
+      );
+      if (!validOtpToken) {
+        return NextResponse.json(
+          { error: 'Invalid or expired registration OTP verification token' },
+          { status: 401 },
+        );
+      }
+    }
+
     const backendRes = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
@@ -196,6 +281,27 @@ export async function POST(req: NextRequest) {
 
     if (!backendRes.ok) {
       return NextResponse.json(data, { status: backendRes.status });
+    }
+
+    if (REGISTER_OTP_REQUIRED) {
+      const consumed = await consumeOTPVerificationTokenForPurposes(
+        otpToken || '',
+        { type: otpType, target: otpTarget },
+        ['register', 'login'],
+      );
+      if (!consumed) {
+        return NextResponse.json(
+          { error: 'Invalid or expired registration OTP verification token' },
+          { status: 401 },
+        );
+      }
+
+      const accessToken =
+        typeof data.access_token === 'string' ? data.access_token : '';
+      await applyVerifiedContactMetadata(accessToken, security, {
+        type: otpType,
+        target: otpTarget,
+      });
     }
 
     return createAuthProxySuccessResponse(req, backendRes, {

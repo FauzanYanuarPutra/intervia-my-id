@@ -651,7 +651,9 @@ $serviceBaseImages = @{
 }
 
 $defaultDevServices = @(
-    "postgres_db",
+    "identity_db",
+    "community_db",
+    "marketplace_db",
     "redis_cache",
     "rabbitmq",
     "meilisearch",

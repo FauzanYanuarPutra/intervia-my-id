@@ -2,7 +2,12 @@
  * MinIO/S3-compatible upload for chat media.
  * Uses unique keys: chat/{roomId}/{uuid}.{ext} — no overwrites.
  */
-import { CreateBucketCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -12,6 +17,9 @@ const secretKey = process.env.MINIO_SECRET_KEY ?? process.env.MINIO_PASS;
 const bucket = process.env.MINIO_BUCKET ?? 'laju-chat';
 const publicUrl = process.env.MINIO_PUBLIC_URL ?? '';
 
+let cachedClient: S3Client | null = null;
+let bucketReady: Promise<void> | null = null;
+
 function safeRoomKey(id: string): string {
   return id.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
@@ -20,37 +28,55 @@ export function isMinIOConfigured(): boolean {
   return Boolean(endpoint && accessKey && secretKey);
 }
 
-export async function uploadToMinIO(
-  roomId: string,
-  buffer: Buffer,
-  mime: string,
-  originalName: string
-): Promise<{ url: string; key: string }> {
+function getMinioClient(): S3Client {
+  if (cachedClient) return cachedClient;
   if (!endpoint || !accessKey || !secretKey) {
     throw new Error('MinIO not configured');
   }
-
-  const ext = path.extname(originalName || '').toLowerCase() || '.bin';
-  // Support untuk content upload (roomId = 'content') atau chat upload
-  const prefix = roomId === 'content' ? 'content' : roomId === 'forum' ? 'forum' : 'chat';
-  const key = roomId === 'content'
-    ? `content/${randomUUID()}${ext}`
-    : roomId === 'forum'
-      ? `forum/${randomUUID()}${ext}`
-      : `chat/${safeRoomKey(roomId)}/${randomUUID()}${ext}`;
-
-  const client = new S3Client({
+  cachedClient = new S3Client({
     endpoint,
     region: 'us-east-1',
     credentials: { accessKeyId: accessKey, secretAccessKey: secretKey },
     forcePathStyle: true,
   });
+  return cachedClient;
+}
 
-  try {
-    await client.send(new HeadBucketCommand({ Bucket: bucket }));
-  } catch {
-    await client.send(new CreateBucketCommand({ Bucket: bucket }));
+async function ensureBucket(client: S3Client): Promise<void> {
+  if (!bucketReady) {
+    bucketReady = client
+      .send(new HeadBucketCommand({ Bucket: bucket }))
+      .then(() => undefined)
+      .catch(async () => {
+        await client.send(new CreateBucketCommand({ Bucket: bucket }));
+      });
   }
+  try {
+    return await bucketReady;
+  } catch (error) {
+    bucketReady = null;
+    throw error;
+  }
+}
+
+export async function uploadToMinIO(
+  roomId: string,
+  buffer: Buffer,
+  mime: string,
+  originalName: string,
+): Promise<{ url: string; key: string }> {
+  const client = getMinioClient();
+
+  const ext = path.extname(originalName || '').toLowerCase() || '.bin';
+  // Support untuk content upload (roomId = 'content') atau chat upload
+  const key =
+    roomId === 'content'
+      ? `content/${randomUUID()}${ext}`
+      : roomId === 'forum'
+        ? `forum/${randomUUID()}${ext}`
+        : `chat/${safeRoomKey(roomId)}/${randomUUID()}${ext}`;
+
+  await ensureBucket(client);
 
   await client.send(
     new PutObjectCommand({
@@ -58,16 +84,14 @@ export async function uploadToMinIO(
       Key: key,
       Body: buffer,
       ContentType: mime,
-    })
+    }),
   );
 
   // Prefer proxy URL so client fetches via our API (no CORS, MinIO stays internal)
   const url = publicUrl
     ? `${publicUrl.replace(/\/$/, '')}/${bucket}/${key}`
-    : roomId === 'content'
+    : roomId === 'content' || roomId === 'forum'
       ? `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
-      : roomId === 'forum'
-        ? `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
       : `/api/chat/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`;
 
   return { url, key };

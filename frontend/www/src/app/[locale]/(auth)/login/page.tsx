@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import LoginClient from './LoginClient';
+import GoogleAuthOnlyClient from '../GoogleAuthOnlyClient';
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -14,8 +14,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: isId ? 'Masuk - Lajukan' : 'Login - Lajukan',
     description: isId
-      ? 'Masuk ke akun Lajukan dengan username dan password.'
-      : 'Sign in to your Lajukan account with username and password.',
+      ? 'Masuk atau daftar Lajukan dengan Google.'
+      : 'Sign in or register for Lajukan with Google.',
     alternates: {
       canonical: `${baseUrl}/${locale}/login`,
       languages: {
@@ -42,7 +42,7 @@ export default async function LoginPage() {
     '@context': 'https://schema.org',
     '@type': 'LoginPage',
     name: 'Lajukan Login',
-    description: 'Username and password login portal for Lajukan users.',
+    description: 'Google login portal for Lajukan users.',
     publisher: {
       '@type': 'Organization',
       name: 'Lajukan',
@@ -55,7 +55,7 @@ export default async function LoginPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <LoginClient />
+      <GoogleAuthOnlyClient mode="login" />
     </>
   );
 }

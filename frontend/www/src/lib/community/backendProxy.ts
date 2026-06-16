@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeContentMediaUrl } from '@/lib/content/catalog';
+import { fetchWithTimeout } from '@/lib/server/fetchWithTimeout';
 
 function getCommunityBackendBase(): string | null {
   const base =
@@ -11,7 +12,10 @@ function getCommunityBackendBase(): string | null {
 }
 
 function readForwardToken(req: NextRequest): string | null {
-  const bearer = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
+  const bearer = req.headers
+    .get('authorization')
+    ?.replace(/^Bearer\s+/i, '')
+    .trim();
   if (bearer) return bearer;
   return req.cookies.get('access_token')?.value?.trim() || null;
 }
@@ -60,6 +64,7 @@ export async function proxyCommunityBackend(
     includeSearch?: boolean;
     accept?: string;
     cacheControl?: string;
+    timeoutMs?: number;
   } = {},
 ): Promise<NextResponse> {
   const base = getCommunityBackendBase();
@@ -84,7 +89,8 @@ export async function proxyCommunityBackend(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const forwardedFor = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
+  const forwardedFor =
+    req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
   if (forwardedFor) {
     headers['X-Forwarded-For'] = forwardedFor;
   }
@@ -105,15 +111,22 @@ export async function proxyCommunityBackend(
   }
 
   try {
-    const response = await fetch(upstream.toString(), {
-      method,
-      headers,
-      body,
-      cache: 'no-store',
-    });
-    const contentType = response.headers.get('content-type') || 'application/json';
+    const response = await fetchWithTimeout(
+      upstream.toString(),
+      {
+        method,
+        headers,
+        body,
+        cache: 'no-store',
+      },
+      options.timeoutMs || 8000,
+    );
+    const contentType =
+      response.headers.get('content-type') || 'application/json';
     const cacheControl =
-      options.cacheControl || response.headers.get('cache-control') || undefined;
+      options.cacheControl ||
+      response.headers.get('cache-control') ||
+      undefined;
     const bodyBuffer = await response.arrayBuffer();
     let responseBody: ArrayBuffer | string = bodyBuffer;
     const responseHeaders: Record<string, string> = {
@@ -123,9 +136,14 @@ export async function proxyCommunityBackend(
       responseHeaders['cache-control'] = cacheControl;
     }
 
-    if (contentType.toLowerCase().includes('application/json') && bodyBuffer.byteLength) {
+    if (
+      contentType.toLowerCase().includes('application/json') &&
+      bodyBuffer.byteLength
+    ) {
       try {
-        const parsed = JSON.parse(new TextDecoder().decode(bodyBuffer)) as unknown;
+        const parsed = JSON.parse(
+          new TextDecoder().decode(bodyBuffer),
+        ) as unknown;
         responseBody = JSON.stringify(normalizeCommunityPayloadUrls(parsed));
       } catch {
         responseBody = bodyBuffer;
@@ -147,7 +165,12 @@ export async function proxyCommunityBackend(
     console.error('[COMMUNITY_BACKEND_PROXY_ERROR]', error);
     return NextResponse.json(
       { error: 'Community service unavailable' },
-      { status: 503 },
+      {
+        status:
+          error instanceof DOMException && error.name === 'AbortError'
+            ? 504
+            : 503,
+      },
     );
   }
 }

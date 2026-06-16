@@ -27,7 +27,7 @@ import {
   type SavedAccount,
 } from '@/lib/accountVault';
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildUsahaPath } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
@@ -104,6 +104,8 @@ export function AccountDropdown({
     (idLocale ? 'Akun' : 'Account');
   const avatar = profileAvatarSrc(
     avatarSrc || user?.avatarUrl || user?.avatar_url,
+    readProfileAvatarStyle(user),
+    name,
   );
   const subtitle = user?.email || user?.phone || roleLabel || '-';
 
@@ -391,7 +393,11 @@ export function AccountDropdown({
                       >
                         <span className="inline-flex h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
                           <Image
-                            src={profileAvatarSrc(account.avatarUrl)}
+                            src={profileAvatarSrc(
+                              account.avatarUrl,
+                              account.avatarStyle,
+                              account.displayName,
+                            )}
                             alt=""
                             width={32}
                             height={32}

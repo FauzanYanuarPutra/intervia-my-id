@@ -22,7 +22,7 @@ const OTP_LIMIT_PER_IP_PER_HOUR = Number.parseInt(
   process.env.OTP_LIMIT_PER_IP_PER_HOUR || '30',
   10,
 );
-const OTP_AUTH_ENABLED = process.env.ENABLE_OTP_AUTH === 'true';
+const OTP_AUTH_ENABLED = process.env.ENABLE_OTP_AUTH !== 'false';
 
 const SendOtpSchema = z.object({
   type: z.enum(['email', 'phone']),

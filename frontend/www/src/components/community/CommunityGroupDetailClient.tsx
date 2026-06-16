@@ -23,7 +23,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/system/feedback/ToastProvider';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 import type {
   CommunityFeedItem,
@@ -141,7 +141,11 @@ function MemberRow({
     <article className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3">
       <LajukanImage
         alt={member.name}
-        src={profileAvatarSrc(member.avatarUrl)}
+        src={profileAvatarSrc(
+          member.avatarUrl,
+          readProfileAvatarStyle(member),
+          member.name,
+        )}
         width={44}
         height={44}
         className="h-11 w-11 rounded-full object-cover"

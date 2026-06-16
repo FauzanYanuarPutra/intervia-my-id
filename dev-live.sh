@@ -28,7 +28,9 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 core_services=(
-  postgres_db
+  identity_db
+  community_db
+  marketplace_db
   redis_cache
   rabbitmq
   meilisearch

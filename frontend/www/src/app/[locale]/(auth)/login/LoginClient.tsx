@@ -3,10 +3,14 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
+  CheckCircle2,
+  Chrome,
   Eye,
   EyeOff,
+  KeyRound,
   Loader2,
   LockKeyhole,
+  Mail,
   ShieldCheck,
   UserRound,
 } from 'lucide-react';
@@ -37,15 +41,26 @@ export default function LoginClient() {
   );
 
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [otpResendAt, setOtpResendAt] = useState(0);
   const [captchaToken, setCaptchaToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const normalizedUsername = normalizeUsername(username);
+  const normalizedEmail = email.trim().toLowerCase();
+  const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
+  const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
   const canSubmit =
     normalizedUsername.length >= 3 &&
+    normalizedEmail.includes('@') &&
+    otpToken.length > 0 &&
     password.length > 0 &&
     (!needsCaptcha || captchaToken.length > 0);
   const submitHint = !normalizedUsername
@@ -56,6 +71,14 @@ export default function LoginClient() {
       ? isId
         ? 'Isi password dulu'
         : 'Enter password first'
+      : !normalizedEmail.includes('@')
+        ? isId
+          ? 'Isi email akun'
+          : 'Enter account email'
+        : !otpToken
+          ? isId
+            ? 'Verifikasi OTP dulu'
+            : 'Verify OTP first'
       : needsCaptcha && !captchaToken
         ? isId
           ? 'Selesaikan captcha'
@@ -80,6 +103,9 @@ export default function LoginClient() {
     try {
       await login(normalizedUsername, password, {
         captchaToken,
+        otpToken,
+        otpType: 'email',
+        otpTarget: normalizedEmail,
         redirectTo: callbackUrl || `/${locale}/dashboard`,
       });
     } catch (err) {
@@ -90,6 +116,87 @@ export default function LoginClient() {
       setSubmitting(false);
     }
   };
+
+  const sendEmailOtp = async () => {
+    if (!normalizedEmail.includes('@')) {
+      setError(isId ? 'Isi email akun dulu.' : 'Enter your account email first.');
+      return;
+    }
+    if (otpCooldownLeft > 0) {
+      setError(
+        isId
+          ? `Tunggu ${otpCooldownSeconds} detik sebelum kirim ulang kode.`
+          : `Wait ${otpCooldownSeconds} seconds before resending the code.`,
+      );
+      return;
+    }
+
+    setSendingOtp(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'email',
+          target: normalizedEmail,
+          purpose: 'login',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(mapCommonAuthError(data?.error, res.status));
+        return;
+      }
+
+      setOtp('');
+      setOtpToken('');
+      setOtpResendAt(Date.now() + 30_000);
+    } catch {
+      setError(isId ? 'Gagal kirim OTP email.' : 'Failed to send email OTP.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const verifyEmailOtp = async () => {
+    if (!normalizedEmail.includes('@') || otp.length !== 6) {
+      setError(isId ? 'Isi email dan OTP 6 digit.' : 'Enter email and 6-digit OTP.');
+      return;
+    }
+
+    setVerifyingOtp(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'email',
+          target: normalizedEmail,
+          otp,
+          purpose: 'login',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data?.token !== 'string') {
+        setError(mapCommonAuthError(data?.error, res.status));
+        return;
+      }
+
+      setOtpToken(data.token);
+    } catch {
+      setError(isId ? 'Gagal verifikasi OTP.' : 'Failed to verify OTP.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const googleHref = `/api/auth/google?callbackUrl=${encodeURIComponent(
+    callbackUrl || `/${locale}/dashboard`,
+  )}`;
 
   const inputClass =
     'w-full min-h-[48px] rounded-[15px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-semibold text-[color:var(--app-text)] shadow-[inset_0_1px_0_rgba(15,23,42,0.03)] placeholder:text-[color:var(--app-text-soft)] outline-none transition focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_16%,_transparent)] dark:bg-[color:var(--app-surface-strong)]';
@@ -118,6 +225,22 @@ export default function LoginClient() {
       progressLabel={isId ? 'Masuk' : 'Sign in'}
     >
       <form onSubmit={handleSubmit} className="space-y-3.5">
+        <a
+          href={googleHref}
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-strong)]"
+        >
+          <Chrome className="h-4 w-4" />
+          {isId ? 'Masuk / daftar dengan Google' : 'Sign in / register with Google'}
+        </a>
+
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-[color:var(--app-border)]" />
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+            {isId ? 'atau' : 'or'}
+          </span>
+          <span className="h-px flex-1 bg-[color:var(--app-border)]" />
+        </div>
+
         <div className="flex items-start gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-accent)_18%,var(--app-border))] bg-[color:var(--app-accent-soft)] px-3.5 py-3">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]">
             <ShieldCheck className="h-4 w-4" />
@@ -181,6 +304,76 @@ export default function LoginClient() {
             </button>
           </span>
         </label>
+
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+            Email OTP
+          </span>
+          <span className="relative block">
+            <Mail className={iconClass} />
+            <input
+              value={email}
+              onChange={event => {
+                setEmail(event.target.value);
+                setOtpToken('');
+              }}
+              autoComplete="email"
+              inputMode="email"
+              type="email"
+              placeholder={isId ? 'email akun kamu' : 'your account email'}
+              className={`${inputClass} pl-11 pr-4`}
+            />
+          </span>
+        </label>
+
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <span className="relative block">
+            <KeyRound className={iconClass} />
+            <input
+              value={otp}
+              onChange={event => {
+                setOtp(event.target.value.replace(/\D/g, '').slice(0, 6));
+                setOtpToken('');
+              }}
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              className={`${inputClass} pl-11 pr-4 text-center tracking-[0.24em]`}
+            />
+          </span>
+          <button
+            type="button"
+            onClick={sendEmailOtp}
+            disabled={sendingOtp || !normalizedEmail.includes('@') || otpCooldownLeft > 0}
+            className="inline-flex min-h-[48px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
+          >
+            {sendingOtp
+              ? 'SEND...'
+              : otpCooldownLeft > 0
+                ? `${otpCooldownSeconds}s`
+                : isId
+                  ? 'Kirim'
+                  : 'Send'}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={verifyEmailOtp}
+          disabled={verifyingOtp || otp.length !== 6 || !normalizedEmail.includes('@') || Boolean(otpToken)}
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-black text-[color:var(--app-accent-strong)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_70%,white_30%)] disabled:cursor-not-allowed disabled:border-[color:var(--app-border)] disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]"
+        >
+          {verifyingOtp ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : otpToken ? (
+            <>
+              <CheckCircle2 className="h-4 w-4" />
+              {isId ? 'OTP terverifikasi' : 'OTP verified'}
+            </>
+          ) : (
+            isId ? 'Verifikasi OTP' : 'Verify OTP'
+          )}
+        </button>
 
         {needsCaptcha ? (
           <CaptchaField

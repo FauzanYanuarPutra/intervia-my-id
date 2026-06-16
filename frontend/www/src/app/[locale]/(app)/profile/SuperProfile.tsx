@@ -31,7 +31,11 @@ import {
   extractFirstUploadedImageUrl,
   normalizeProfileMediaUrl,
 } from '@/lib/profile/profileMedia';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
+import {
+  saveProfileAvatar,
+  shouldUseGeneratedAvatarUrl,
+} from '@/lib/profile/profileAvatar.service';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   Activity,
@@ -194,19 +198,6 @@ function formatMoneyFromCents(
 function asRecord(value: unknown): MetaRecord | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as MetaRecord;
-}
-
-function readAvatarStyleFromMetadata(value: unknown): LajukanAvatarSpec {
-  const root = asRecord(value);
-  const extended = asRecord(root?.extended);
-  const profile = asRecord(root?.profile);
-  const media = asRecord(root?.media);
-  return readLajukanAvatarSpec(
-    root?.avatar_style ||
-      extended?.avatar_style ||
-      profile?.avatar_style ||
-      media?.avatar_style,
-  );
 }
 
 function readString(value: unknown): string {
@@ -606,7 +597,11 @@ export default function SuperProfile() {
           value.avatar_url || value.avatarUrl || value.metadata?.avatar_url,
         ) || '',
       );
-      setAvatarStyleInput(readAvatarStyleFromMetadata(value.metadata));
+      setAvatarStyleInput(
+        readLajukanAvatarSpec(
+          readProfileAvatarStyle(value) || readProfileAvatarStyle(user),
+        ),
+      );
       const metaMedia = asRecord(value.metadata?.media) || {};
       setCoverUrlInput(
         normalizeProfileMediaUrl(value.cover_image) ||
@@ -615,7 +610,7 @@ export default function SuperProfile() {
           '',
       );
     },
-    [user?.username],
+    [user],
   );
 
   const loadProfile = useCallback(async () => {
@@ -700,6 +695,25 @@ export default function SuperProfile() {
       setQaResumeUrl(saved.resume_url || '');
     }
   }, []);
+
+  const currentAvatarRaw = useMemo(
+    () =>
+      nonEmpty(avatarUrlInput) ||
+      nonEmpty(detail?.avatar_url || detail?.avatarUrl) ||
+      nonEmpty(detail?.metadata?.avatar_url) ||
+      nonEmpty(user?.avatarUrl || user?.avatar_url) ||
+      nonEmpty(user?.metadata?.avatar_url) ||
+      '',
+    [
+      avatarUrlInput,
+      detail?.avatarUrl,
+      detail?.avatar_url,
+      detail?.metadata?.avatar_url,
+      user?.avatarUrl,
+      user?.avatar_url,
+      user?.metadata?.avatar_url,
+    ],
+  );
 
   const uploadResume = async (file: File) => {
     const formData = new FormData();
@@ -809,14 +823,13 @@ export default function SuperProfile() {
               cover_image: cover,
             }
           : null),
-        ...(isGeneratedAvatar
-          ? {
-              metadata: {
-                avatar_style: avatarStyle,
-                avatar_source: 'lajukan_avatar_builder',
-              },
-            }
-          : null),
+        metadata: {
+          avatar_style: avatarStyle,
+          avatar_source: 'lajukan_avatar_builder',
+          ...(isGeneratedAvatar
+            ? { avatar_generated_at: new Date().toISOString() }
+            : null),
+        },
       };
 
       const res = await authFetch('/api/auth/update-profile', {
@@ -838,6 +851,45 @@ export default function SuperProfile() {
       setSaveMessage(
         error instanceof Error ? error.message : 'Failed to save profile',
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveAvatarBuilderStyle = async (
+    nextSpec: LajukanAvatarSpec,
+    nextAvatarUrl: string,
+  ) => {
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const shouldUseGenerated = shouldUseGeneratedAvatarUrl(currentAvatarRaw);
+      const result = await saveProfileAvatar({
+        authFetch,
+        currentAvatarUrl: currentAvatarRaw,
+        label: fullNameInput || user?.full_name || user?.email,
+        style: nextSpec,
+      });
+
+      setAvatarStyleInput(result.avatarStyle);
+      if (shouldUseGenerated || !result.hasUploadedPhoto) {
+        setAvatarUrlInput(result.avatarUrl || nextAvatarUrl || result.src);
+      }
+      setSaveMessage(
+        result.hasUploadedPhoto
+          ? isId
+            ? 'Avatar 2D disimpan. Foto upload tetap jadi foto profil.'
+            : '2D avatar saved. Uploaded photo stays as profile photo.'
+          : isId
+            ? 'Avatar 2D berhasil dipakai.'
+            : '2D avatar is now active.',
+      );
+      await Promise.all([loadProfile(), refreshUser()]);
+    } catch (error) {
+      setSaveMessage(
+        error instanceof Error ? error.message : 'Failed to save avatar',
+      );
+      throw error;
     } finally {
       setSaving(false);
     }
@@ -1008,8 +1060,8 @@ export default function SuperProfile() {
     };
   }, [professionalData]);
 
-  const effectiveAvatarUrl = useMemo(
-    () =>
+  const effectiveAvatarUrl = useMemo(() => {
+    const avatar =
       normalizeProfileMediaUrl(avatarUrlInput) ||
       normalizeProfileMediaUrl(
         detail?.avatar_url || detail?.avatarUrl || detail?.metadata?.avatar_url,
@@ -1019,18 +1071,27 @@ export default function SuperProfile() {
       ) ||
       nonEmpty(
         user?.avatarUrl || user?.avatar_url || user?.metadata?.avatar_url,
-      ) ||
-      '/default-avatar.svg',
-    [
-      avatarUrlInput,
-      detail?.avatarUrl,
-      detail?.avatar_url,
-      detail?.metadata?.avatar_url,
-      user?.avatarUrl,
-      user?.avatar_url,
-      user?.metadata?.avatar_url,
-    ],
-  );
+      );
+
+    return profileAvatarSrc(
+      avatar,
+      avatarStyleInput,
+      fullNameInput || detail?.full_name || user?.full_name || user?.email,
+    );
+  }, [
+    avatarUrlInput,
+    avatarStyleInput,
+    detail?.avatarUrl,
+    detail?.avatar_url,
+    detail?.full_name,
+    detail?.metadata?.avatar_url,
+    fullNameInput,
+    user?.email,
+    user?.full_name,
+    user?.avatarUrl,
+    user?.avatar_url,
+    user?.metadata?.avatar_url,
+  ]);
 
   const effectiveCoverUrl = useMemo(() => {
     const metaMedia =
@@ -1216,8 +1277,11 @@ export default function SuperProfile() {
             value={avatarStyleInput}
             onChange={(nextSpec, nextAvatarUrl) => {
               setAvatarStyleInput(nextSpec);
-              setAvatarUrlInput(nextAvatarUrl);
+              if (shouldUseGeneratedAvatarUrl(currentAvatarRaw)) {
+                setAvatarUrlInput(nextAvatarUrl);
+              }
             }}
+            onConfirm={saveAvatarBuilderStyle}
           />
         }
         coverUploading={coverUploading}

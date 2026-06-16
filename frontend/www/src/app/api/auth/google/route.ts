@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_OAUTH_STATE_COOKIE = 'google_oauth_state';
 
 function getPublicBaseUrl(req: NextRequest): string {
   const envBase =
@@ -46,8 +47,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=oauth_not_configured`);
   }
 
-  // Store callback URL in a cookie for use after OAuth
-  const state = Buffer.from(JSON.stringify({ callbackUrl })).toString('base64');
+  const nonce = crypto.randomUUID();
+  const state = Buffer.from(JSON.stringify({ callbackUrl, nonce })).toString(
+    'base64url',
+  );
 
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
@@ -61,5 +64,14 @@ export async function GET(req: NextRequest) {
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
-  return NextResponse.redirect(url);
+  const response = NextResponse.redirect(url);
+  response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, nonce, {
+    httpOnly: true,
+    secure: baseUrl.startsWith('https://'),
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 10 * 60,
+  });
+
+  return response;
 }

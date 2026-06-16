@@ -4,6 +4,9 @@ export type ContentOwnerProfile = {
   username?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  avatar_style?: unknown;
+  avatarStyle?: unknown;
+  metadata?: ContentMetadata | null;
   location?: string | null;
   headline?: string | null;
   roles?: string[] | null;

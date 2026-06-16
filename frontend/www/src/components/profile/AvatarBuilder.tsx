@@ -1,469 +1,988 @@
 'use client';
 
+import { useMemo, useState, type ReactNode } from 'react';
 import {
+  BadgeCheck,
   Check,
+  Crown,
   Dice5,
+  Feather,
+  Loader2,
   Palette,
+  Shield,
   Shirt,
+  Smile,
   Sparkles,
   UserRound,
+  type LucideIcon,
 } from 'lucide-react';
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { Modal } from '@/components/common/Modal';
+import {
+  AURAS,
+  BACKGROUNDS,
+  BACK_ITEMS,
+  BODY_TYPES,
+  DEFAULT_LAJUKAN_AVATAR,
+  EYEWEAR,
+  FACE_ACCESSORIES,
+  HAIRS,
+  HAIR_COLORS,
+  HAND_ITEMS,
+  HEADWEAR,
+  LAJUKAN_AVATAR_PRESETS,
+  MOODS,
+  MOTIONS,
+  OUTFITS,
+  OUTFIT_COLORS,
+  POSES,
+  SKINS,
+  WINGS,
+  createLajukanAvatarDataUrl,
+  labelOf,
+  normalizeAvatarSpec,
+  sameAvatarSpec,
+  type AvatarOption,
+  type LajukanAvatarPreset,
+  type LajukanAvatarSpec,
+  type LajukanAvatarStyle,
+} from '@/lib/profile/avatar2d';
 import { cn } from '@/lib/utils';
 
-export type AvatarSkinId = 'porcelain' | 'kuning' | 'sawo' | 'tan' | 'deep';
-export type AvatarHairId = 'crop' | 'wave' | 'curly' | 'long' | 'bun';
-export type AvatarAccessoryId = 'none' | 'cap' | 'beanie' | 'hijab' | 'glasses';
-export type AvatarOutfitId = 'tee' | 'hoodie' | 'batik' | 'apron' | 'jacket';
-export type AvatarBackgroundId = 'mint' | 'sky' | 'sunset' | 'rose' | 'slate';
+export {
+  DEFAULT_LAJUKAN_AVATAR,
+  LAJUKAN_AVATAR_PRESETS,
+  createLajukanAvatarDataUrl,
+  readLajukanAvatarSpec,
+} from '@/lib/profile/avatar2d';
+export type {
+  AvatarAccessoryId,
+  AvatarAuraId,
+  AvatarBackItemId,
+  AvatarBackgroundId,
+  AvatarEffectId,
+  AvatarHairId,
+  AvatarHandItemId,
+  AvatarHeadwearId,
+  AvatarMoodId,
+  AvatarOutfitId,
+  AvatarSkinId,
+  AvatarWingId,
+  LajukanAvatarSpec,
+  LajukanAvatarSpecV2,
+} from '@/lib/profile/avatar2d';
 
-export type LajukanAvatarSpec = {
-  skin: AvatarSkinId;
-  hair: AvatarHairId;
-  accessory: AvatarAccessoryId;
-  outfit: AvatarOutfitId;
-  background: AvatarBackgroundId;
+type AvatarTabKey =
+  | 'preset'
+  | 'body'
+  | 'skin'
+  | 'hair'
+  | 'headwear'
+  | 'face'
+  | 'outfit'
+  | 'wing'
+  | 'aura'
+  | 'backItem'
+  | 'handItem'
+  | 'background';
+
+type OptionFocus = 'full' | 'head' | 'body' | 'wide' | 'effect' | 'background';
+
+type AvatarBuilderProps = {
+  className?: string;
+  compact?: boolean;
+  isId?: boolean;
+  locale?: string;
+  onChange: (spec: LajukanAvatarSpec, dataUrl: string) => void;
+  onConfirm?: (
+    spec: LajukanAvatarSpec,
+    dataUrl: string,
+  ) => Promise<void> | void;
+  title?: string;
+  value?: Partial<LajukanAvatarStyle> | null;
 };
 
-type Option<T extends string> = {
-  id: T;
+type AvatarTab = {
+  key: AvatarTabKey;
   labelId: string;
   labelEn: string;
-  color?: string;
+  icon: LucideIcon;
 };
 
-const SKINS: Array<Option<AvatarSkinId>> = [
-  { id: 'porcelain', labelId: 'Cerah', labelEn: 'Light', color: '#f6d8c9' },
+const AVATAR_TABS: ReadonlyArray<AvatarTab> = [
+  { key: 'preset', labelId: 'Saran', labelEn: 'Preset', icon: Crown },
+  { key: 'body', labelId: 'Body', labelEn: 'Body', icon: UserRound },
+  { key: 'skin', labelId: 'Skin', labelEn: 'Skin', icon: Palette },
+  { key: 'hair', labelId: 'Hair', labelEn: 'Hair', icon: Feather },
+  { key: 'headwear', labelId: 'Headwear', labelEn: 'Headwear', icon: Crown },
+  { key: 'face', labelId: 'Face', labelEn: 'Face', icon: Smile },
+  { key: 'outfit', labelId: 'Outfit', labelEn: 'Outfit', icon: Shirt },
+  { key: 'wing', labelId: 'Wings', labelEn: 'Wings', icon: Feather },
+  { key: 'aura', labelId: 'Aura', labelEn: 'Aura', icon: Sparkles },
+  { key: 'backItem', labelId: 'Back Item', labelEn: 'Back Item', icon: Shield },
   {
-    id: 'kuning',
-    labelId: 'Kuning langsat',
-    labelEn: 'Warm',
-    color: '#eec39b',
+    key: 'handItem',
+    labelId: 'Hand Item',
+    labelEn: 'Hand Item',
+    icon: BadgeCheck,
   },
   {
-    id: 'sawo',
-    labelId: 'Sawo matang',
-    labelEn: 'Golden tan',
-    color: '#c88652',
-  },
-  { id: 'tan', labelId: 'Tan', labelEn: 'Tan', color: '#a8683f' },
-  { id: 'deep', labelId: 'Gelap', labelEn: 'Deep', color: '#6f3f2a' },
-];
-
-const HAIRS: Array<Option<AvatarHairId>> = [
-  { id: 'crop', labelId: 'Pendek', labelEn: 'Crop' },
-  { id: 'wave', labelId: 'Wavy', labelEn: 'Wavy' },
-  { id: 'curly', labelId: 'Curly', labelEn: 'Curly' },
-  { id: 'long', labelId: 'Panjang', labelEn: 'Long' },
-  { id: 'bun', labelId: 'Bun', labelEn: 'Bun' },
-];
-
-const ACCESSORIES: Array<Option<AvatarAccessoryId>> = [
-  { id: 'none', labelId: 'Polos', labelEn: 'None' },
-  { id: 'cap', labelId: 'Topi', labelEn: 'Cap' },
-  { id: 'beanie', labelId: 'Beanie', labelEn: 'Beanie' },
-  { id: 'hijab', labelId: 'Hijab', labelEn: 'Hijab' },
-  { id: 'glasses', labelId: 'Kacamata', labelEn: 'Glasses' },
-];
-
-const OUTFITS: Array<Option<AvatarOutfitId>> = [
-  { id: 'tee', labelId: 'Kaos', labelEn: 'Tee', color: '#0f766e' },
-  { id: 'hoodie', labelId: 'Hoodie', labelEn: 'Hoodie', color: '#2563eb' },
-  { id: 'batik', labelId: 'Batik', labelEn: 'Batik', color: '#92400e' },
-  { id: 'apron', labelId: 'Apron', labelEn: 'Apron', color: '#047857' },
-  { id: 'jacket', labelId: 'Jaket', labelEn: 'Jacket', color: '#334155' },
-];
-
-const BACKGROUNDS: Array<Option<AvatarBackgroundId>> = [
-  { id: 'mint', labelId: 'Mint', labelEn: 'Mint', color: '#bbf7d0' },
-  { id: 'sky', labelId: 'Langit', labelEn: 'Sky', color: '#bae6fd' },
-  { id: 'sunset', labelId: 'Senja', labelEn: 'Sunset', color: '#fed7aa' },
-  { id: 'rose', labelId: 'Rose', labelEn: 'Rose', color: '#fecdd3' },
-  { id: 'slate', labelId: 'Slate', labelEn: 'Slate', color: '#cbd5e1' },
-];
-
-export const DEFAULT_LAJUKAN_AVATAR: LajukanAvatarSpec = {
-  skin: 'sawo',
-  hair: 'wave',
-  accessory: 'none',
-  outfit: 'hoodie',
-  background: 'mint',
-};
-
-export const LAJUKAN_AVATAR_PRESETS: LajukanAvatarSpec[] = [
-  DEFAULT_LAJUKAN_AVATAR,
-  {
-    skin: 'kuning',
-    hair: 'crop',
-    accessory: 'cap',
-    outfit: 'apron',
-    background: 'sky',
-  },
-  {
-    skin: 'porcelain',
-    hair: 'long',
-    accessory: 'glasses',
-    outfit: 'jacket',
-    background: 'rose',
-  },
-  {
-    skin: 'tan',
-    hair: 'curly',
-    accessory: 'beanie',
-    outfit: 'tee',
-    background: 'sunset',
-  },
-  {
-    skin: 'deep',
-    hair: 'bun',
-    accessory: 'none',
-    outfit: 'batik',
-    background: 'mint',
-  },
-  {
-    skin: 'sawo',
-    hair: 'crop',
-    accessory: 'hijab',
-    outfit: 'hoodie',
-    background: 'slate',
+    key: 'background',
+    labelId: 'Background',
+    labelEn: 'Background',
+    icon: Palette,
   },
 ];
-
-const SKIN_COLOR: Record<AvatarSkinId, string> = {
-  porcelain: '#f6d8c9',
-  kuning: '#eec39b',
-  sawo: '#c88652',
-  tan: '#a8683f',
-  deep: '#6f3f2a',
-};
-
-const HAIR_COLOR: Record<AvatarHairId, string> = {
-  crop: '#1f2937',
-  wave: '#312218',
-  curly: '#18181b',
-  long: '#3b2416',
-  bun: '#24150f',
-};
-
-const OUTFIT_COLOR: Record<AvatarOutfitId, string> = {
-  tee: '#0f766e',
-  hoodie: '#2563eb',
-  batik: '#92400e',
-  apron: '#047857',
-  jacket: '#334155',
-};
-
-const BG_COLOR: Record<AvatarBackgroundId, [string, string]> = {
-  mint: ['#dcfce7', '#99f6e4'],
-  sky: ['#dbeafe', '#7dd3fc'],
-  sunset: ['#ffedd5', '#fdba74'],
-  rose: ['#ffe4e6', '#f9a8d4'],
-  slate: ['#e2e8f0', '#94a3b8'],
-};
-
-function escapeXml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function normalizeAvatarSpec(
-  value: Partial<LajukanAvatarSpec> | null | undefined,
-): LajukanAvatarSpec {
-  const candidate = value || {};
-  return {
-    skin: SKINS.some(item => item.id === candidate.skin)
-      ? candidate.skin!
-      : DEFAULT_LAJUKAN_AVATAR.skin,
-    hair: HAIRS.some(item => item.id === candidate.hair)
-      ? candidate.hair!
-      : DEFAULT_LAJUKAN_AVATAR.hair,
-    accessory: ACCESSORIES.some(item => item.id === candidate.accessory)
-      ? candidate.accessory!
-      : DEFAULT_LAJUKAN_AVATAR.accessory,
-    outfit: OUTFITS.some(item => item.id === candidate.outfit)
-      ? candidate.outfit!
-      : DEFAULT_LAJUKAN_AVATAR.outfit,
-    background: BACKGROUNDS.some(item => item.id === candidate.background)
-      ? candidate.background!
-      : DEFAULT_LAJUKAN_AVATAR.background,
-  };
-}
-
-export function readLajukanAvatarSpec(value: unknown): LajukanAvatarSpec {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return DEFAULT_LAJUKAN_AVATAR;
-  }
-  return normalizeAvatarSpec(value as Partial<LajukanAvatarSpec>);
-}
-
-export function createLajukanAvatarSvg(
-  value: Partial<LajukanAvatarSpec> = DEFAULT_LAJUKAN_AVATAR,
-  label = 'Lajukan avatar',
-) {
-  const spec = normalizeAvatarSpec(value);
-  const [bgStart, bgEnd] = BG_COLOR[spec.background];
-  const skin = SKIN_COLOR[spec.skin];
-  const hair = HAIR_COLOR[spec.hair];
-  const outfit = OUTFIT_COLOR[spec.outfit];
-  const isHijab = spec.accessory === 'hijab';
-
-  const hairSvg = isHijab
-    ? `<path d="M82 117c2-43 22-73 49-73s48 30 50 73c3 39-13 65-49 65s-53-26-50-65Z" fill="#334155"/>
-       <path d="M100 87c13-20 48-28 64 0-7 16-17 25-32 25s-25-9-32-25Z" fill="#475569"/>`
-    : spec.hair === 'crop'
-      ? `<path d="M81 91c7-31 31-47 60-39 24 7 36 25 37 50-28-20-62-22-97-11Z" fill="${hair}"/>`
-      : spec.hair === 'wave'
-        ? `<path d="M76 103c4-38 31-60 66-53 31 6 45 32 42 66-17-21-36-32-58-29-20 2-34 9-50 16Z" fill="${hair}"/>
-           <path d="M83 91c18-29 59-35 88-8-23-8-45-6-66 7-8 5-15 5-22 1Z" fill="#4a2f1e"/>`
-        : spec.hair === 'curly'
-          ? `<g fill="${hair}"><circle cx="91" cy="83" r="18"/><circle cx="113" cy="64" r="18"/><circle cx="139" cy="61" r="20"/><circle cx="164" cy="78" r="19"/><circle cx="173" cy="104" r="18"/><circle cx="78" cy="108" r="17"/></g>`
-          : spec.hair === 'long'
-            ? `<path d="M76 102c-1-35 22-57 54-57 34 0 57 23 57 60 0 42-20 75-56 75-37 0-56-33-55-78Z" fill="${hair}"/>
-               <path d="M90 87c11-24 54-37 78 0-14 17-29 24-45 24-14 0-24-8-33-24Z" fill="#5b3922"/>`
-            : `<path d="M82 96c6-33 31-51 60-45 28 6 42 29 40 59-25-24-62-24-100-14Z" fill="${hair}"/>
-               <circle cx="149" cy="43" r="19" fill="${hair}"/>`;
-
-  const accessorySvg =
-    spec.accessory === 'cap'
-      ? `<path d="M86 75c14-26 70-30 89 1l-6 20H91l-5-21Z" fill="#0f766e"/>
-         <path d="M111 84c34-2 60 2 78 12-17 8-49 8-82 2l4-14Z" fill="#115e59"/>`
-      : spec.accessory === 'beanie'
-        ? `<path d="M87 80c10-31 74-33 89 0v20H87V80Z" fill="#be123c"/>
-           <path d="M91 94h80v14H91z" fill="#9f1239"/>`
-        : spec.accessory === 'glasses'
-          ? `<g fill="none" stroke="#0f172a" stroke-width="5" stroke-linecap="round"><circle cx="112" cy="103" r="15"/><circle cx="151" cy="103" r="15"/><path d="M127 103h9"/></g>`
-          : '';
-
-  const outfitPattern =
-    spec.outfit === 'batik'
-      ? `<g fill="none" stroke="#facc15" stroke-width="4" opacity=".7"><path d="M82 210c14-22 31-22 45 0s31 22 45 0"/><path d="M87 188c10 12 20 12 30 0s20-12 30 0"/></g>`
-      : spec.outfit === 'apron'
-        ? `<path d="M101 169h61l11 62H90l11-62Z" fill="#f8fafc" opacity=".88"/><path d="M103 183h58" stroke="#047857" stroke-width="5" stroke-linecap="round"/>`
-        : spec.outfit === 'hoodie'
-          ? `<path d="M83 176c15-24 80-25 96 0l-12 55H95l-12-55Z" fill="${outfit}"/><path d="M107 178c8 11 41 11 49 0" fill="none" stroke="#dbeafe" stroke-width="5" stroke-linecap="round"/>`
-          : spec.outfit === 'jacket'
-            ? `<path d="M80 178c18-26 84-26 102 0l-11 53H91l-11-53Z" fill="${outfit}"/><path d="M130 174v57" stroke="#e2e8f0" stroke-width="5"/><path d="M103 190h17M142 190h17" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round"/>`
-            : `<path d="M83 178c18-23 82-24 98 0l-12 53H95l-12-53Z" fill="${outfit}"/>`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="${escapeXml(label)}">
-    <defs>
-      <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-        <stop offset="0" stop-color="${bgStart}"/>
-        <stop offset="1" stop-color="${bgEnd}"/>
-      </linearGradient>
-      <clipPath id="circle"><circle cx="128" cy="128" r="128"/></clipPath>
-    </defs>
-    <g clip-path="url(#circle)">
-      <rect width="256" height="256" fill="url(#bg)"/>
-      <path d="M20 205c38-22 64-18 94 0s70 22 122-4v55H20v-51Z" fill="#ffffff" opacity=".32"/>
-      ${hairSvg}
-      <ellipse cx="84" cy="111" rx="12" ry="17" fill="${skin}"/>
-      <ellipse cx="172" cy="111" rx="12" ry="17" fill="${skin}"/>
-      <rect x="108" y="137" width="40" height="45" rx="18" fill="${skin}"/>
-      ${outfitPattern}
-      <circle cx="128" cy="105" r="45" fill="${skin}"/>
-      <path d="M96 83c12-30 61-37 76 4-18-5-30-8-45-6-13 2-21 6-31 2Z" fill="${isHijab ? '#475569' : hair}" opacity="${isHijab ? '.92' : '.96'}"/>
-      ${accessorySvg}
-      <circle cx="112" cy="105" r="4" fill="#111827"/>
-      <circle cx="146" cy="105" r="4" fill="#111827"/>
-      <path d="M121 124c7 6 17 6 24 0" fill="none" stroke="#7f1d1d" stroke-width="4" stroke-linecap="round"/>
-      <path d="M129 108l-4 12h10" fill="none" stroke="#9a5c3b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>
-    </g>
-  </svg>`;
-}
-
-export function createLajukanAvatarDataUrl(
-  spec: Partial<LajukanAvatarSpec> = DEFAULT_LAJUKAN_AVATAR,
-  label?: string,
-) {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-    createLajukanAvatarSvg(spec, label),
-  )}`;
-}
 
 export function AvatarBuilder({
   className,
   compact = false,
-  isId,
+  isId: isIdProp,
+  locale,
   onChange,
+  onConfirm,
   title,
-  value,
-}: {
-  className?: string;
-  compact?: boolean;
-  isId: boolean;
-  onChange: (spec: LajukanAvatarSpec, dataUrl: string) => void;
-  title?: string;
-  value: LajukanAvatarSpec;
-}) {
-  const spec = normalizeAvatarSpec(value);
-  const dataUrl = createLajukanAvatarDataUrl(spec, title || 'Lajukan avatar');
+  value = DEFAULT_LAJUKAN_AVATAR,
+}: AvatarBuilderProps) {
+  const [customizerOpen, setCustomizerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<AvatarTabKey>('preset');
+  const [confirming, setConfirming] = useState(false);
+  const isId =
+    typeof isIdProp === 'boolean'
+      ? isIdProp
+      : locale
+        ? locale.toLowerCase().startsWith('id')
+        : true;
+  const spec = useMemo(() => normalizeAvatarSpec(value), [value]);
+  const avatarLabel = title || 'Lajukan avatar';
+  const dataUrl = useMemo(
+    () => createLajukanAvatarDataUrl(spec, avatarLabel),
+    [avatarLabel, spec],
+  );
+  const rarity = getRarity(spec);
 
-  const update = (patch: Partial<LajukanAvatarSpec>) => {
+  const update = (patch: Partial<LajukanAvatarStyle>) => {
     const next = normalizeAvatarSpec({ ...spec, ...patch });
-    onChange(next, createLajukanAvatarDataUrl(next, title || 'Lajukan avatar'));
+    onChange(next, createLajukanAvatarDataUrl(next, avatarLabel));
   };
 
-  const randomize = () => {
-    const pick = <T extends string>(items: Array<Option<T>>) =>
-      items[Math.floor(Math.random() * items.length)]!.id;
-    const next = normalizeAvatarSpec({
-      skin: pick(SKINS),
-      hair: pick(HAIRS),
-      accessory: pick(ACCESSORIES),
-      outfit: pick(OUTFITS),
-      background: pick(BACKGROUNDS),
-    });
-    onChange(next, createLajukanAvatarDataUrl(next, title || 'Lajukan avatar'));
+  const randomize = () => update(randomAvatarSpec(spec));
+  const confirmAvatar = async () => {
+    if (!onConfirm) {
+      setCustomizerOpen(false);
+      return;
+    }
+    setConfirming(true);
+    try {
+      await onConfirm(spec, dataUrl);
+      setCustomizerOpen(false);
+    } finally {
+      setConfirming(false);
+    }
   };
 
   return (
-    <section
+    <>
+      <section
+        className={cn(
+          'overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_20%_0%,rgba(20,184,166,0.18),transparent_34%),linear-gradient(135deg,#ffffff,#f8fafc_45%,#ecfeff)] p-3 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.42)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_20%_0%,rgba(45,212,191,0.16),transparent_34%),linear-gradient(135deg,#020617,#0f172a_52%,#111827)]',
+          compact ? 'sm:p-3' : 'sm:p-4',
+          className,
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)] sm:items-center">
+          <AvatarPreview
+            alt={avatarLabel}
+            dataUrl={dataUrl}
+            isId={isId}
+            rarity={rarity}
+            size="compact"
+          />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="min-w-0 truncate text-sm font-black text-slate-950 dark:text-white">
+                {title || (isId ? 'Avatar Lajukan' : 'Lajukan Avatar')}
+              </p>
+              <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-white dark:bg-white dark:text-slate-950">
+                Chibi Game
+              </span>
+            </div>
+            <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300">
+              {isId
+                ? 'Pilih karakter. Bisa ganti kulit, rambut, topi, pakaian, warna, sayap, aura, dan item.'
+                : 'Pick a character. Customize skin, hair, hats, outfit, colors, wings, aura, and items.'}
+            </p>
+            <LoadoutSummary isId={isId} spec={spec} />
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <AvatarActionButton onClick={randomize} variant="secondary">
+                <Dice5 className="h-3.5 w-3.5" />
+                {isId ? 'Acak gaya' : 'Shuffle'}
+              </AvatarActionButton>
+              <AvatarActionButton onClick={() => setCustomizerOpen(true)}>
+                <Sparkles className="h-3.5 w-3.5" />
+                {isId ? 'Atur avatar' : 'Customize'}
+              </AvatarActionButton>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Modal
+        open={customizerOpen}
+        title={isId ? 'Atur Avatar 2D' : 'Customize 2D Avatar'}
+        onClose={() => setCustomizerOpen(false)}
+        className="sm:max-w-5xl"
+        footer={
+          <>
+            <AvatarActionButton
+              disabled={confirming}
+              onClick={randomize}
+              variant="secondary"
+            >
+              <Dice5 className="h-4 w-4" />
+              {isId ? 'Acak gaya' : 'Shuffle style'}
+            </AvatarActionButton>
+            <AvatarActionButton disabled={confirming} onClick={confirmAvatar}>
+              {confirming ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              {confirming
+                ? isId
+                  ? 'Menyimpan...'
+                  : 'Saving...'
+                : isId
+                  ? 'Pakai avatar ini'
+                  : 'Use this avatar'}
+            </AvatarActionButton>
+          </>
+        }
+      >
+        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="lg:sticky lg:top-0 lg:self-start">
+            <AvatarPreview
+              alt={avatarLabel}
+              dataUrl={dataUrl}
+              isId={isId}
+              rarity={rarity}
+              size="large"
+            />
+            <LoadoutSummary isId={isId} spec={spec} variant="panel" />
+          </aside>
+
+          <section className="min-w-0 rounded-[28px] border border-slate-200 bg-white/80 p-3 shadow-inner dark:border-white/10 dark:bg-white/8">
+            <AvatarTabStrip
+              activeTab={activeTab}
+              isId={isId}
+              onSelect={setActiveTab}
+            />
+            <div className="mt-4">
+              <PartPanel
+                activeTab={activeTab}
+                avatarLabel={avatarLabel}
+                isId={isId}
+                onChange={update}
+                spec={spec}
+              />
+            </div>
+          </section>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function AvatarPreview({
+  alt,
+  dataUrl,
+  isId,
+  rarity,
+  size,
+}: {
+  alt: string;
+  dataUrl: string;
+  isId: boolean;
+  rarity: string;
+  size: 'compact' | 'large';
+}) {
+  const large = size === 'large';
+  return (
+    <div
       className={cn(
-        'rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.2)] dark:border-white/10 dark:bg-slate-900',
-        compact ? 'sm:p-3' : 'sm:p-4',
-        className,
+        'relative mx-auto aspect-square overflow-hidden border border-emerald-200 bg-slate-100 shadow-inner ring-4 ring-amber-100/80 dark:border-emerald-400/20 dark:bg-slate-950 dark:ring-emerald-400/10',
+        large
+          ? 'w-full max-w-[320px] rounded-[34px]'
+          : 'w-full max-w-[156px] rounded-[24px]',
       )}
     >
-      <div className="grid gap-3 sm:grid-cols-[132px_minmax(0,1fr)]">
-        <div className="min-w-0">
-          <div className="mx-auto aspect-square w-full max-w-[132px] overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-slate-950">
-            <Image
-              src={dataUrl}
-              alt={title || 'Avatar'}
-              width={132}
-              height={132}
-              className="h-full w-full object-cover"
-              unoptimized
-            />
-          </div>
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.72),transparent_35%,rgba(20,184,166,0.16))]" />
+      <Image
+        src={dataUrl}
+        alt={alt}
+        width={large ? 320 : 156}
+        height={large ? 320 : 156}
+        className="relative h-full w-full object-cover"
+        unoptimized
+      />
+      <span className="absolute left-2 top-2 inline-flex min-h-6 items-center gap-1 rounded-full bg-slate-950/82 px-2 text-[10px] font-black text-white shadow-sm backdrop-blur dark:bg-white/85 dark:text-slate-950">
+        <Crown className="h-3 w-3" />
+        {rarity}
+      </span>
+      <span className="absolute bottom-2 left-2 right-2 rounded-2xl bg-white/82 px-3 py-2 text-center text-[10px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm backdrop-blur dark:bg-slate-950/72 dark:text-slate-100">
+        {isId ? 'Preview hidup' : 'Live preview'}
+      </span>
+    </div>
+  );
+}
+
+function AvatarTabStrip({
+  activeTab,
+  isId,
+  onSelect,
+}: {
+  activeTab: AvatarTabKey;
+  isId: boolean;
+  onSelect: (tab: AvatarTabKey) => void;
+}) {
+  return (
+    <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {AVATAR_TABS.map(tab => {
+        const Icon = tab.icon;
+        const active = activeTab === tab.key;
+        return (
           <button
+            key={tab.key}
             type="button"
-            onClick={randomize}
-            className="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-3 text-xs font-black text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+            onClick={() => onSelect(tab.key)}
+            className={cn(
+              'inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 text-xs font-black transition',
+              active
+                ? 'border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/15 dark:border-white dark:bg-white dark:text-slate-950'
+                : 'border-slate-200 bg-white/80 text-slate-700 hover:border-[color:var(--app-accent-border)] dark:border-white/10 dark:bg-white/8 dark:text-slate-200',
+            )}
           >
-            <Dice5 className="h-3.5 w-3.5" />
-            {isId ? 'Acak gaya' : 'Shuffle'}
+            <Icon className="h-3.5 w-3.5" />
+            {isId ? tab.labelId : tab.labelEn}
           </button>
-        </div>
+        );
+      })}
+    </div>
+  );
+}
 
-        <div className="min-w-0 space-y-3">
-          <div>
-            <p className="flex items-center gap-1.5 text-[12px] font-black text-slate-900 dark:text-white">
-              <Sparkles className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-              {isId ? 'Avatar 2D' : '2D avatar'}
-            </p>
-            <p className="mt-0.5 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-              {isId
-                ? 'Pilih karakter. Bisa ganti kulit, rambut, topi, pakaian, dan warna.'
-                : 'Pick a character. Customize skin, hair, accessories, outfit, and color.'}
-            </p>
-          </div>
-
-          <OptionRow
-            icon={Palette}
-            isId={isId}
-            labelId="Kulit"
-            labelEn="Skin"
-            options={SKINS}
-            selected={spec.skin}
-            onSelect={skin => update({ skin })}
-          />
-          <OptionRow
-            icon={UserRound}
-            isId={isId}
-            labelId="Rambut"
-            labelEn="Hair"
-            options={HAIRS}
-            selected={spec.hair}
-            onSelect={hair => update({ hair })}
-          />
-          <OptionRow
-            icon={Sparkles}
-            isId={isId}
-            labelId="Aksesori"
-            labelEn="Accessory"
-            options={ACCESSORIES}
-            selected={spec.accessory}
-            onSelect={accessory => update({ accessory })}
-          />
-          <OptionRow
-            icon={Shirt}
-            isId={isId}
-            labelId="Pakaian"
-            labelEn="Outfit"
-            options={OUTFITS}
-            selected={spec.outfit}
-            onSelect={outfit => update({ outfit })}
-          />
-          <OptionRow
-            icon={Palette}
-            isId={isId}
-            labelId="Warna"
-            labelEn="Color"
-            options={BACKGROUNDS}
-            selected={spec.background}
-            onSelect={background => update({ background })}
-          />
+function PartPanel({
+  activeTab,
+  avatarLabel,
+  isId,
+  onChange,
+  spec,
+}: {
+  activeTab: AvatarTabKey;
+  avatarLabel: string;
+  isId: boolean;
+  onChange: (patch: Partial<LajukanAvatarStyle>) => void;
+  spec: LajukanAvatarSpec;
+}) {
+  const title = AVATAR_TABS.find(tab => tab.key === activeTab);
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            {title ? (isId ? title.labelId : title.labelEn) : activeTab}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {activeTab === 'preset'
+              ? isId
+                ? 'Pilih 1 dari 10 saran default, lalu custom setiap bagian.'
+                : 'Pick 1 of 10 defaults, then customize every part.'
+              : isId
+                ? 'Klik kartu visual untuk mengganti bagian ini.'
+                : 'Click a visual card to swap this part.'}
+          </p>
         </div>
+        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-amber-800 dark:bg-amber-300/15 dark:text-amber-200">
+          {LAJUKAN_AVATAR_PRESETS.length} {isId ? 'preset' : 'presets'}
+        </span>
+      </div>
+
+      {activeTab === 'preset' ? (
+        <PresetGrid
+          avatarLabel={avatarLabel}
+          isId={isId}
+          onSelect={preset => onChange(preset)}
+          selected={spec}
+        />
+      ) : (
+        <TabContent
+          avatarLabel={avatarLabel}
+          isId={isId}
+          onChange={onChange}
+          spec={spec}
+          tab={activeTab}
+        />
+      )}
+    </div>
+  );
+}
+
+function TabContent({
+  avatarLabel,
+  isId,
+  onChange,
+  spec,
+  tab,
+}: {
+  avatarLabel: string;
+  isId: boolean;
+  onChange: (patch: Partial<LajukanAvatarStyle>) => void;
+  spec: LajukanAvatarSpec;
+  tab: Exclude<AvatarTabKey, 'preset'>;
+}) {
+  if (tab === 'body') {
+    return (
+      <div className="space-y-4">
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="body"
+          isId={isId}
+          label={isId ? 'Bentuk tubuh' : 'Body shape'}
+          onSelect={body => onChange({ body })}
+          options={BODY_TYPES}
+          patch={body => ({ body })}
+          selected={spec.body}
+          spec={spec}
+        />
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="body"
+          isId={isId}
+          label={isId ? 'Pose' : 'Pose'}
+          onSelect={pose => onChange({ pose })}
+          options={POSES}
+          patch={pose => ({ pose })}
+          selected={spec.pose}
+          spec={spec}
+        />
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="effect"
+          isId={isId}
+          label={isId ? 'Animasi' : 'Motion'}
+          onSelect={motion => onChange({ motion })}
+          options={MOTIONS}
+          patch={motion => ({ motion })}
+          selected={spec.motion}
+          spec={spec}
+        />
+      </div>
+    );
+  }
+  if (tab === 'hair') {
+    return (
+      <div className="space-y-4">
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="head"
+          isId={isId}
+          label={isId ? 'Model rambut' : 'Hair style'}
+          onSelect={hair => onChange({ hair })}
+          options={HAIRS}
+          patch={hair => ({ hair })}
+          selected={spec.hair}
+          spec={spec}
+        />
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="head"
+          isId={isId}
+          label={isId ? 'Warna rambut' : 'Hair color'}
+          onSelect={hairColor => onChange({ hairColor })}
+          options={HAIR_COLORS}
+          patch={hairColor => ({ hairColor })}
+          selected={spec.hairColor}
+          spec={spec}
+        />
+      </div>
+    );
+  }
+  if (tab === 'face') {
+    return (
+      <div className="space-y-4">
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="head"
+          isId={isId}
+          label={isId ? 'Ekspresi' : 'Expression'}
+          onSelect={mood => onChange({ mood })}
+          options={MOODS}
+          patch={mood => ({ mood })}
+          selected={spec.mood}
+          spec={spec}
+        />
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="head"
+          isId={isId}
+          label={isId ? 'Kacamata' : 'Eyewear'}
+          onSelect={eyewear => onChange({ eyewear })}
+          options={EYEWEAR}
+          patch={eyewear => ({ eyewear })}
+          selected={spec.eyewear}
+          spec={spec}
+        />
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="head"
+          isId={isId}
+          label={isId ? 'Detail wajah' : 'Face detail'}
+          onSelect={faceAccessory => onChange({ faceAccessory })}
+          options={FACE_ACCESSORIES}
+          patch={faceAccessory => ({ faceAccessory })}
+          selected={spec.faceAccessory}
+          spec={spec}
+        />
+      </div>
+    );
+  }
+  if (tab === 'outfit') {
+    return (
+      <div className="space-y-4">
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="body"
+          isId={isId}
+          label={isId ? 'Model baju' : 'Outfit'}
+          onSelect={outfit => onChange({ outfit })}
+          options={OUTFITS}
+          patch={outfit => ({ outfit })}
+          selected={spec.outfit}
+          spec={spec}
+        />
+        <OptionSection
+          avatarLabel={avatarLabel}
+          focus="body"
+          isId={isId}
+          label={isId ? 'Warna baju' : 'Outfit color'}
+          onSelect={outfitColor => onChange({ outfitColor })}
+          options={OUTFIT_COLORS}
+          patch={outfitColor => ({ outfitColor })}
+          selected={spec.outfitColor}
+          spec={spec}
+        />
+      </div>
+    );
+  }
+  return (
+    <OptionSection
+      avatarLabel={avatarLabel}
+      focus={focusForTab(tab)}
+      isId={isId}
+      label={sectionLabel(tab, isId)}
+      onSelect={id => onChange(patchForTab(tab, id))}
+      options={optionsForTab(tab)}
+      patch={id => patchForTab(tab, id)}
+      selected={spec[tab]}
+      spec={spec}
+    />
+  );
+}
+
+function OptionSection<T extends string>({
+  avatarLabel,
+  focus,
+  isId,
+  label,
+  onSelect,
+  options,
+  patch,
+  selected,
+  spec,
+}: {
+  avatarLabel: string;
+  focus: OptionFocus;
+  isId: boolean;
+  label: string;
+  onSelect: (id: T) => void;
+  options: ReadonlyArray<AvatarOption<T>>;
+  patch: (id: T) => Partial<LajukanAvatarStyle>;
+  selected: T;
+  spec: LajukanAvatarSpec;
+}) {
+  return (
+    <section>
+      <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+        {label}
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        {options.map(option => {
+          const previewSpec = normalizeAvatarSpec({
+            ...spec,
+            ...patch(option.id),
+          });
+          return (
+            <AvatarOptionTile
+              key={option.id}
+              active={selected === option.id}
+              color={option.color}
+              focus={focus}
+              label={isId ? option.labelId : option.labelEn}
+              onClick={() => onSelect(option.id)}
+              preview={createLajukanAvatarDataUrl(previewSpec, avatarLabel)}
+            />
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function OptionRow<T extends string>({
-  icon: Icon,
-  isId,
-  labelEn,
-  labelId,
-  onSelect,
-  options,
-  selected,
+function AvatarOptionTile({
+  active,
+  color,
+  focus,
+  label,
+  onClick,
+  preview,
 }: {
-  icon: typeof Palette;
-  isId: boolean;
-  labelEn: string;
-  labelId: string;
-  onSelect: (value: T) => void;
-  options: Array<Option<T>>;
-  selected: T;
+  active: boolean;
+  color?: string;
+  focus: OptionFocus;
+  label: string;
+  onClick: () => void;
+  preview: string;
 }) {
   return (
-    <div className="min-w-0">
-      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-        <Icon className="h-3.5 w-3.5" />
-        {isId ? labelId : labelEn}
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group min-w-0 rounded-[18px] border bg-white p-2 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-lg dark:bg-white/8',
+        active
+          ? 'border-[color:var(--app-accent)] ring-2 ring-[color:var(--app-accent)]/15'
+          : 'border-slate-200 dark:border-white/10',
+      )}
+    >
+      <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-[14px] bg-slate-100 dark:bg-slate-950">
+        <Image
+          src={preview}
+          alt={label}
+          width={130}
+          height={130}
+          className={cn(
+            'h-full w-full object-cover transition duration-200 group-hover:scale-105',
+            focusClass(focus),
+          )}
+          unoptimized
+        />
+        {color ? (
+          <span
+            className="absolute bottom-1.5 left-1.5 h-5 w-5 rounded-full border-2 border-white shadow-sm ring-1 ring-black/10 dark:border-slate-950"
+            style={{ backgroundColor: color }}
+          />
+        ) : null}
+        {active ? (
+          <span className="absolute right-1.5 top-1.5 rounded-full bg-[color:var(--app-accent)] p-1 text-white shadow-sm">
+            <Check className="h-3.5 w-3.5" />
+          </span>
+        ) : null}
+      </div>
+      <span className="mt-2 block truncate text-[11px] font-black text-slate-800 dark:text-white">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function PresetGrid({
+  avatarLabel,
+  isId,
+  onSelect,
+  selected,
+}: {
+  avatarLabel: string;
+  isId: boolean;
+  onSelect: (spec: LajukanAvatarSpec) => void;
+  selected: LajukanAvatarSpec;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      {LAJUKAN_AVATAR_PRESETS.map(preset => {
+        const active = sameAvatarSpec(selected, preset.spec);
+        return (
+          <PresetButton
+            key={preset.key}
+            active={active}
+            avatarLabel={avatarLabel}
+            isId={isId}
+            onClick={() => onSelect(preset.spec)}
+            preset={preset}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PresetButton({
+  active,
+  avatarLabel,
+  isId,
+  onClick,
+  preset,
+}: {
+  active: boolean;
+  avatarLabel: string;
+  isId: boolean;
+  onClick: () => void;
+  preset: LajukanAvatarPreset;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group min-w-0 rounded-[20px] border bg-white p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-lg dark:bg-white/8',
+        active
+          ? 'border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/20'
+          : 'border-slate-200 dark:border-white/10',
+      )}
+    >
+      <div className="relative overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-950">
+        <Image
+          src={createLajukanAvatarDataUrl(preset.spec, avatarLabel)}
+          alt={isId ? preset.labelId : preset.labelEn}
+          width={126}
+          height={126}
+          className="aspect-square w-full object-cover transition group-hover:scale-105"
+          unoptimized
+        />
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-slate-950/80 px-1.5 py-0.5 text-[9px] font-black text-white backdrop-blur">
+          {preset.rarity}
+        </span>
+        {active ? (
+          <span className="absolute right-1.5 top-1.5 rounded-full bg-slate-950 p-1 text-white dark:bg-white dark:text-slate-950">
+            <Check className="h-3.5 w-3.5" />
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-2 truncate text-[11px] font-black text-slate-900 dark:text-white">
+        {isId ? preset.labelId : preset.labelEn}
       </p>
-      <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {options.map(option => {
-          const active = option.id === selected;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onSelect(option.id)}
-              className={cn(
-                'inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-black transition',
-                active
-                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-[color:var(--app-accent-border)] dark:border-white/10 dark:bg-slate-950 dark:text-slate-200',
-              )}
-            >
-              {option.color ? (
-                <span
-                  className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10"
-                  style={{ backgroundColor: option.color }}
-                />
-              ) : null}
-              <span>{isId ? option.labelId : option.labelEn}</span>
-              {active ? <Check className="h-3.5 w-3.5" /> : null}
-            </button>
-          );
-        })}
+      <p className="mt-0.5 line-clamp-2 text-[10px] font-semibold leading-4 text-slate-500 dark:text-slate-400">
+        {isId ? preset.captionId : preset.captionEn}
+      </p>
+    </button>
+  );
+}
+
+function LoadoutSummary({
+  isId,
+  spec,
+  variant = 'compact',
+}: {
+  isId: boolean;
+  spec: LajukanAvatarSpec;
+  variant?: 'compact' | 'panel';
+}) {
+  const chips = buildChips(spec, isId);
+  return (
+    <div
+      className={cn(
+        'rounded-[20px] border border-slate-200 bg-white/82 p-3 shadow-sm dark:border-white/10 dark:bg-white/8',
+        variant === 'panel' ? 'mt-3' : 'mt-2',
+      )}
+    >
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+        {isId ? 'Build sekarang' : 'Current build'}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {chips.map(chip => (
+          <span
+            key={chip}
+            className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black text-slate-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200"
+          >
+            {chip}
+          </span>
+        ))}
       </div>
     </div>
   );
+}
+
+function AvatarActionButton({
+  children,
+  disabled = false,
+  onClick,
+  variant = 'primary',
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary';
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-black transition disabled:cursor-wait disabled:opacity-60',
+        variant === 'primary'
+          ? 'bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950'
+          : 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function optionsForTab(
+  tab: Exclude<AvatarTabKey, 'preset' | 'body' | 'hair' | 'face' | 'outfit'>,
+) {
+  if (tab === 'skin') return SKINS;
+  if (tab === 'headwear') return HEADWEAR;
+  if (tab === 'wing') return WINGS;
+  if (tab === 'aura') return AURAS;
+  if (tab === 'backItem') return BACK_ITEMS;
+  if (tab === 'handItem') return HAND_ITEMS;
+  return BACKGROUNDS;
+}
+
+function patchForTab(
+  tab: AvatarTabKey,
+  id: string,
+): Partial<LajukanAvatarStyle> {
+  if (tab === 'skin') return { skin: id as LajukanAvatarSpec['skin'] };
+  if (tab === 'headwear')
+    return { headwear: id as LajukanAvatarSpec['headwear'] };
+  if (tab === 'wing') return { wing: id as LajukanAvatarSpec['wing'] };
+  if (tab === 'aura') return { aura: id as LajukanAvatarSpec['aura'] };
+  if (tab === 'backItem')
+    return { backItem: id as LajukanAvatarSpec['backItem'] };
+  if (tab === 'handItem')
+    return { handItem: id as LajukanAvatarSpec['handItem'] };
+  if (tab === 'background')
+    return { background: id as LajukanAvatarSpec['background'] };
+  return {};
+}
+
+function focusForTab(tab: AvatarTabKey): OptionFocus {
+  if (tab === 'skin' || tab === 'headwear' || tab === 'face') return 'head';
+  if (tab === 'outfit' || tab === 'body' || tab === 'handItem') return 'body';
+  if (tab === 'wing' || tab === 'backItem') return 'wide';
+  if (tab === 'aura') return 'effect';
+  if (tab === 'background') return 'background';
+  return 'full';
+}
+
+function focusClass(focus: OptionFocus): string {
+  if (focus === 'head') return 'scale-[1.62] translate-y-8';
+  if (focus === 'body') return 'scale-[1.28] -translate-y-2';
+  if (focus === 'wide') return 'scale-110';
+  if (focus === 'effect') return 'scale-105';
+  if (focus === 'background') return 'scale-90';
+  return '';
+}
+
+function sectionLabel(tab: AvatarTabKey, isId: boolean): string {
+  const labels: Record<string, [string, string]> = {
+    skin: ['Warna kulit', 'Skin tone'],
+    headwear: ['Topi dan hijab', 'Headwear'],
+    wing: ['Sayap', 'Wings'],
+    aura: ['Aura', 'Aura'],
+    backItem: ['Item belakang', 'Back item'],
+    handItem: ['Item tangan', 'Hand item'],
+    background: ['Background', 'Background'],
+  };
+  const value = labels[tab] || [tab, tab];
+  return isId ? value[0] : value[1];
+}
+
+function buildChips(spec: LajukanAvatarSpec, isId: boolean): string[] {
+  const chips = [
+    labelOf(BODY_TYPES, spec.body, isId),
+    labelOf(HAIRS, spec.hair, isId),
+    labelOf(OUTFITS, spec.outfit, isId),
+    labelOf(MOODS, spec.mood, isId),
+  ];
+  if (spec.headwear !== 'none')
+    chips.push(labelOf(HEADWEAR, spec.headwear, isId));
+  if (spec.eyewear !== 'none') chips.push(labelOf(EYEWEAR, spec.eyewear, isId));
+  if (spec.wing !== 'none') chips.push(labelOf(WINGS, spec.wing, isId));
+  if (spec.aura !== 'none') chips.push(labelOf(AURAS, spec.aura, isId));
+  if (spec.backItem !== 'none')
+    chips.push(labelOf(BACK_ITEMS, spec.backItem, isId));
+  if (spec.handItem !== 'none')
+    chips.push(labelOf(HAND_ITEMS, spec.handItem, isId));
+  return chips.slice(0, 9);
+}
+
+function getRarity(spec: LajukanAvatarSpec): string {
+  const preset = LAJUKAN_AVATAR_PRESETS.find(item =>
+    sameAvatarSpec(spec, item.spec),
+  );
+  if (preset) return preset.rarity;
+  const score = [
+    spec.headwear !== 'none',
+    spec.eyewear !== 'none',
+    spec.faceAccessory !== 'none',
+    spec.wing !== 'none',
+    spec.aura !== 'none',
+    spec.backItem !== 'none',
+    spec.handItem !== 'none',
+  ].filter(Boolean).length;
+  if (score >= 5) return 'Legend';
+  if (score >= 3) return 'Epic';
+  if (score >= 1) return 'Rare';
+  return 'Basic';
+}
+
+function randomAvatarSpec(
+  base: LajukanAvatarSpec,
+): Partial<LajukanAvatarStyle> {
+  return {
+    ...base,
+    body: pickRandom(BODY_TYPES),
+    skin: pickRandom(SKINS),
+    hair: pickRandom(HAIRS),
+    hairColor: pickRandom(HAIR_COLORS),
+    headwear: maybeNone(HEADWEAR, 0.28),
+    eyewear: maybeNone(EYEWEAR, 0.48),
+    faceAccessory: maybeNone(FACE_ACCESSORIES, 0.42),
+    outfit: pickRandom(OUTFITS),
+    outfitColor: pickRandom(OUTFIT_COLORS),
+    wing: maybeNone(WINGS, 0.24),
+    aura: maybeNone(AURAS, 0.24),
+    backItem: maybeNone(BACK_ITEMS, 0.38),
+    handItem: maybeNone(HAND_ITEMS, 0.24),
+    mood: pickRandom(MOODS),
+    background: pickRandom(BACKGROUNDS),
+    pose: pickRandom(POSES),
+    motion: Math.random() > 0.18 ? 'full' : pickRandom(MOTIONS),
+  };
+}
+
+function pickRandom<T extends string>(
+  options: ReadonlyArray<AvatarOption<T>>,
+  skipNone = false,
+): T {
+  const candidates = skipNone
+    ? options.filter(option => option.id !== 'none')
+    : options;
+  const index = Math.floor(Math.random() * candidates.length);
+  return (candidates[index] || options[0]).id;
+}
+
+function maybeNone<T extends string>(
+  options: ReadonlyArray<AvatarOption<T>>,
+  noneChance: number,
+): T {
+  if (Math.random() < noneChance) {
+    const none = options.find(option => option.id === 'none');
+    if (none) return none.id;
+  }
+  return pickRandom(options, true);
 }

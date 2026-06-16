@@ -9,7 +9,7 @@ import { IdentityVerificationPanel } from '@/components/profile/IdentityVerifica
 import { LocalizedLink } from '@/components/ui-kit';
 import { readIdentityVerification } from '@/lib/identityVerification';
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   buildPublicProfileHref,
   normalizePublicProfileHandleInput,
@@ -194,6 +194,9 @@ type DiscoverUser = {
   fullName?: string | null;
   avatar_url?: string | null;
   avatarUrl?: string | null;
+  avatar_style?: unknown;
+  avatarStyle?: unknown;
+  metadata?: unknown;
   location?: string | null;
   headline?: string | null;
   bio?: string | null;
@@ -387,6 +390,8 @@ function mapDiscoverUserToSocialUser(
     href: buildSocialUserProfileHref({ id, username, name }),
     avatarUrl: profileAvatarSrc(
       readSocialText(item.avatar_url) || readSocialText(item.avatarUrl),
+      readProfileAvatarStyle(item),
+      name,
     ),
     subtitle,
     meta,
@@ -412,7 +417,14 @@ function mapRecordToSocialUser(
         readSocialText(record.avatar_url) ||
           readSocialText(record.avatarUrl) ||
           readSocialText(record.avatar),
+        readProfileAvatarStyle(record),
+        readSocialText(record.full_name) ||
+          readSocialText(record.fullName) ||
+          readSocialText(record.name),
       ),
+      avatar_style: record.avatar_style,
+      avatarStyle: record.avatarStyle,
+      metadata: record.metadata,
       location: readSocialText(record.location),
       headline:
         readSocialText(record.headline) || readSocialText(record.subtitle),

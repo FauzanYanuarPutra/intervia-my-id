@@ -21,7 +21,7 @@ import {
   readTransactionVerification,
   type TransactionVerificationState,
 } from '@/lib/identityVerification';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   AlertTriangle,
   BadgeDollarSign,
@@ -607,7 +607,13 @@ function resolveCounterparty(
   txn: Transaction,
   userId: string | null | undefined,
   locale: string,
-): { id: string; name: string; avatar: string; role: string } {
+): {
+  id: string;
+  name: string;
+  avatar: string;
+  avatarStyle?: unknown;
+  role: string;
+} {
   const isBuyer = Boolean(
     userId && normalizeId(txn.buyer_id) === normalizeId(userId),
   );
@@ -651,8 +657,14 @@ function resolveCounterparty(
     snapshot[`${side}_avatar_url`],
     side === 'seller' ? owner.avatar_url || owner.avatarUrl : '',
   );
+  const avatarStyle =
+    readProfileAvatarStyle(profile) ||
+    readProfileAvatarStyle(meta[`${side}_profile`]) ||
+    readProfileAvatarStyle(meta[side]) ||
+    readProfileAvatarStyle(snapshot[`${side}_profile`]) ||
+    (side === 'seller' ? readProfileAvatarStyle(owner) : undefined);
 
-  return { id, name, avatar, role };
+  return { id, name, avatar, avatarStyle, role };
 }
 
 type WalletTopupListResponse = {
@@ -3378,7 +3390,11 @@ export default function TransactionsPage() {
                         <div className="mt-2 flex min-w-0 items-center gap-2">
                           <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[11px] font-black text-[color:var(--app-accent)]">
                             <Image
-                              src={profileAvatarSrc(counterparty.avatar)}
+                              src={profileAvatarSrc(
+                                counterparty.avatar,
+                                counterparty.avatarStyle,
+                                counterparty.name,
+                              )}
                               alt={counterparty.name}
                               fill
                               unoptimized
@@ -3609,7 +3625,11 @@ export default function TransactionsPage() {
                       <div className="mt-3 flex items-center gap-2">
                         <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-xs font-black text-[color:var(--app-accent)]">
                           <Image
-                            src={profileAvatarSrc(counterparty.avatar)}
+                            src={profileAvatarSrc(
+                              counterparty.avatar,
+                              counterparty.avatarStyle,
+                              counterparty.name,
+                            )}
                             alt={counterparty.name}
                             fill
                             unoptimized

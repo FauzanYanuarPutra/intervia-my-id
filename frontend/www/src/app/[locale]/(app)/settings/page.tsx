@@ -29,7 +29,7 @@ import {
   getPasswordMinLength,
   validatePasswordStrength,
 } from '@/lib/passwordPolicy';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   AlertTriangle,
   BadgeCheck,
@@ -1022,7 +1022,11 @@ export default function SettingsPage() {
             <div className="flex min-w-0 items-center gap-3">
               <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[18px] bg-[color:var(--app-surface-muted)] ring-1 ring-[color:var(--app-border)]">
                 <Image
-                  src={profileAvatarSrc(user?.avatarUrl || user?.avatar_url)}
+                  src={profileAvatarSrc(
+                    user?.avatarUrl || user?.avatar_url,
+                    readProfileAvatarStyle(user),
+                    user?.fullName || user?.full_name || user?.email,
+                  )}
                   alt=""
                   fill
                   sizes="56px"
@@ -1263,7 +1267,11 @@ export default function SettingsPage() {
                           <div className="flex min-w-0 items-center gap-2.5">
                             <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
                               <Image
-                                src={profileAvatarSrc(account.avatarUrl)}
+                                src={profileAvatarSrc(
+                                  account.avatarUrl,
+                                  account.avatarStyle,
+                                  account.displayName,
+                                )}
                                 alt=""
                                 fill
                                 sizes="44px"

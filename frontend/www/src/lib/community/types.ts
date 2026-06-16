@@ -18,6 +18,9 @@ export type CommunityFeedAuthor = {
   name: string;
   title: string;
   avatarUrl: string;
+  avatar_style?: unknown;
+  avatarStyle?: unknown;
+  metadata?: Record<string, unknown> | null;
   reputation?: number;
 };
 
@@ -60,6 +63,9 @@ export type CommunityGroupMember = {
   username: string;
   name: string;
   avatarUrl: string;
+  avatar_style?: unknown;
+  avatarStyle?: unknown;
+  metadata?: Record<string, unknown> | null;
   title: string;
   reputation: number;
   badges: string[];

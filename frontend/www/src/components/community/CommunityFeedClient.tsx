@@ -37,7 +37,7 @@ import {
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   isPreviewableContentMediaUrl,
   normalizeContentMediaUrl,
@@ -162,23 +162,23 @@ const TABS: Array<{
   captionEn: string;
   icon: typeof Users;
 }> = [
-    {
-      id: 'for-you',
-      labelId: 'Diskusi',
-      labelEn: 'Discussions',
-      captionId: 'Pertanyaan, jawaban, dan update usaha',
-      captionEn: 'Business questions, answers, and updates',
-      icon: MessageCircle,
-    },
-    {
-      id: 'community',
-      labelId: 'Grup',
-      labelEn: 'Groups',
-      captionId: 'Ruang diskusi per topik',
-      captionEn: 'Topic-based discussion rooms',
-      icon: Users,
-    },
-  ];
+  {
+    id: 'for-you',
+    labelId: 'Diskusi',
+    labelEn: 'Discussions',
+    captionId: 'Pertanyaan, jawaban, dan update usaha',
+    captionEn: 'Business questions, answers, and updates',
+    icon: MessageCircle,
+  },
+  {
+    id: 'community',
+    labelId: 'Grup',
+    labelEn: 'Groups',
+    captionId: 'Ruang diskusi per topik',
+    captionEn: 'Topic-based discussion rooms',
+    icon: Users,
+  },
+];
 
 const SEARCH_TABS: Array<{
   id: CommunitySearchKind;
@@ -186,11 +186,11 @@ const SEARCH_TABS: Array<{
   labelEn: string;
   icon: typeof Search;
 }> = [
-    { id: 'all', labelId: 'Semua', labelEn: 'All', icon: Search },
-    { id: 'posts', labelId: 'Postingan', labelEn: 'Posts', icon: MessageCircle },
-    { id: 'people', labelId: 'Orang', labelEn: 'People', icon: UserCog },
-    { id: 'groups', labelId: 'Grup', labelEn: 'Groups', icon: Users },
-  ];
+  { id: 'all', labelId: 'Semua', labelEn: 'All', icon: Search },
+  { id: 'posts', labelId: 'Postingan', labelEn: 'Posts', icon: MessageCircle },
+  { id: 'people', labelId: 'Orang', labelEn: 'People', icon: UserCog },
+  { id: 'groups', labelId: 'Grup', labelEn: 'Groups', icon: Users },
+];
 
 function resolveCommunityMediaSrc(value?: string | null): string {
   const clean = normalizeContentMediaUrl(String(value || '').trim());
@@ -201,7 +201,9 @@ function resolveCommunityMediaSrc(value?: string | null): string {
 }
 
 function isCommunityPlaceholderMedia(value?: string | null): boolean {
-  const clean = String(value || '').trim().toLowerCase();
+  const clean = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!clean) return true;
   return (
     clean.startsWith('/images/company/') ||
@@ -213,7 +215,9 @@ function isCommunityPlaceholderMedia(value?: string | null): boolean {
   );
 }
 
-function firstCommunityMediaUrl(...sources: Array<Array<string | null | undefined> | undefined>) {
+function firstCommunityMediaUrl(
+  ...sources: Array<Array<string | null | undefined> | undefined>
+) {
   for (const source of sources) {
     for (const value of source || []) {
       const resolved = resolveCommunityMediaSrc(value);
@@ -238,7 +242,11 @@ function normalizeCommunityMediaItems(
     if (seen.has(key)) return;
     seen.add(key);
     result.push({
-      type: isVideoMedia(src) ? 'video' : typeof item === 'string' ? 'image' : item?.type || 'image',
+      type: isVideoMedia(src)
+        ? 'video'
+        : typeof item === 'string'
+          ? 'image'
+          : item?.type || 'image',
       src,
       alt: typeof item === 'string' ? fallbackAlt : item?.alt || fallbackAlt,
       sourceUrl: typeof item === 'string' ? undefined : item?.sourceUrl,
@@ -488,6 +496,8 @@ function buildLoginHref(pathname: string | null, search: string) {
 export function readCommunityAvatar(user: ReturnType<typeof useAuth>['user']) {
   return profileAvatarSrc(
     user?.avatarUrl || user?.avatar_url || user?.metadata?.avatar_url,
+    readProfileAvatarStyle(user),
+    user?.fullName || user?.full_name || user?.username || user?.email,
   );
 }
 
@@ -648,7 +658,9 @@ function CommunityVideoFrame({
             <PlayCircle className="h-5 w-5" />
           </span>
           <p className="mt-2 line-clamp-2 text-xs font-black text-[color:var(--app-text)]">
-            {isId ? 'Preview video belum tersedia' : 'Video preview unavailable'}
+            {isId
+              ? 'Preview video belum tersedia'
+              : 'Video preview unavailable'}
           </p>
         </div>
       </div>
@@ -821,9 +833,7 @@ function CommunityMediaGalleryPreview({
       : cn(
           'grid w-full gap-1 bg-slate-200 p-1 dark:bg-slate-900',
           'aspect-[4/3] sm:aspect-[16/9]',
-          items.length === 2
-            ? 'grid-cols-2'
-            : 'grid-cols-2 grid-rows-2',
+          items.length === 2 ? 'grid-cols-2' : 'grid-cols-2 grid-rows-2',
         );
 
   return (
@@ -904,7 +914,8 @@ function CommunityMediaPreview({
   title: string;
   isId: boolean;
 }) {
-  const galleryItems = mediaItems && mediaItems.length > 0 ? mediaItems : [media];
+  const galleryItems =
+    mediaItems && mediaItems.length > 0 ? mediaItems : [media];
   if (galleryItems.filter(Boolean).length > 1) {
     return (
       <CommunityMediaGalleryPreview
@@ -1300,16 +1311,16 @@ export function CommunityComposer({
     const selectedTags = [
       mode === 'poll'
         ? overview?.trendingTags?.find(tag =>
-          /poll|survey|event|support/i.test(`${tag.slug} ${tag.name}`),
-        )?.slug || 'polling'
+            /poll|survey|event|support/i.test(`${tag.slug} ${tag.name}`),
+          )?.slug || 'polling'
         : mode === 'feeling'
           ? overview?.trendingTags?.find(tag =>
-            /growth|support|community/i.test(`${tag.slug} ${tag.name}`),
-          )?.slug || 'perasaan'
+              /growth|support|community/i.test(`${tag.slug} ${tag.name}`),
+            )?.slug || 'perasaan'
           : mode === 'photo'
             ? overview?.trendingTags?.find(tag =>
-              /market|produk|supply/i.test(`${tag.slug} ${tag.name}`),
-            )?.slug
+                /market|produk|supply/i.test(`${tag.slug} ${tag.name}`),
+              )?.slug
             : overview?.trendingTags?.[0]?.slug,
     ].filter((item): item is string => Boolean(item));
 
@@ -1782,7 +1793,11 @@ export function CommunityPostCard({
               width={44}
               height={44}
               className="h-10 w-10 rounded-full object-cover"
-              src={profileAvatarSrc(item.author.avatarUrl)}
+              src={profileAvatarSrc(
+                item.author.avatarUrl,
+                readProfileAvatarStyle(item.author),
+                item.author.name,
+              )}
             />
             <div className="min-w-0">
               <button
@@ -2094,7 +2109,11 @@ export function CommunityDetailModal({
       <div className="flex items-center gap-2.5">
         <Image
           alt={post.author?.name || 'Author'}
-          src={profileAvatarSrc(post.author?.avatarUrl)}
+          src={profileAvatarSrc(
+            post.author?.avatarUrl,
+            readProfileAvatarStyle(post.author),
+            post.author?.name,
+          )}
           width={32}
           height={32}
           className="h-8 w-8 rounded-full object-cover"
@@ -2176,7 +2195,11 @@ export function CommunityDetailModal({
                 <div className="flex items-center gap-3">
                   <Image
                     alt={thread.author?.name || 'Author'}
-                    src={profileAvatarSrc(thread.author?.avatarUrl)}
+                    src={profileAvatarSrc(
+                      thread.author?.avatarUrl,
+                      readProfileAvatarStyle(thread.author),
+                      thread.author?.name,
+                    )}
                     width={44}
                     height={44}
                     className="h-11 w-11 rounded-full object-cover"
@@ -2234,7 +2257,7 @@ export function CommunityDetailModal({
                     className={cn(
                       'inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[12px] hover:bg-slate-50',
                       thread.viewerVote === 1 &&
-                      'text-[color:var(--app-accent)]',
+                        'text-[color:var(--app-accent)]',
                     )}
                   >
                     <ThumbsUp className="h-4 w-4" />
@@ -2682,7 +2705,11 @@ function GroupLeadershipPreview({
             >
               <Image
                 alt={member.name}
-                src={profileAvatarSrc(member.avatarUrl)}
+                src={profileAvatarSrc(
+                  member.avatarUrl,
+                  readProfileAvatarStyle(member),
+                  member.name,
+                )}
                 width={32}
                 height={32}
                 className="h-8 w-8 rounded-full object-cover"
@@ -2784,12 +2811,12 @@ export function GroupMembersModal({
     value: CommunityGroupMember['role'];
     label: string;
   }> = [
-      ...(canPromoteAdmin
-        ? [{ value: 'owner' as const, label: isId ? 'Admin' : 'Admin' }]
-        : []),
-      { value: 'moderator', label: isId ? 'Moderator' : 'Moderator' },
-      { value: 'member', label: isId ? 'Member' : 'Member' },
-    ];
+    ...(canPromoteAdmin
+      ? [{ value: 'owner' as const, label: isId ? 'Admin' : 'Admin' }]
+      : []),
+    { value: 'moderator', label: isId ? 'Moderator' : 'Moderator' },
+    { value: 'member', label: isId ? 'Member' : 'Member' },
+  ];
 
   const updateRole = async (
     member: CommunityGroupMember,
@@ -2932,7 +2959,11 @@ export function GroupMembersModal({
               >
                 <Image
                   alt={member.name}
-                  src={profileAvatarSrc(member.avatarUrl)}
+                  src={profileAvatarSrc(
+                    member.avatarUrl,
+                    readProfileAvatarStyle(member),
+                    member.name,
+                  )}
                   width={44}
                   height={44}
                   className="h-11 w-11 rounded-full object-cover"
@@ -3587,7 +3618,11 @@ function SearchPersonResult({
   return (
     <article className="flex items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3">
       <Image
-        src={profileAvatarSrc(person.avatarUrl)}
+        src={profileAvatarSrc(
+          person.avatarUrl,
+          readProfileAvatarStyle(person),
+          person.name,
+        )}
         alt={person.name}
         width={48}
         height={48}
@@ -3742,10 +3777,10 @@ function CommunitySearchPanel({
   );
   const resultSummary = results?.counts
     ? [
-      `${compactNumber(results.counts.posts)} ${isId ? 'postingan' : 'posts'}`,
-      `${compactNumber(results.counts.groups)} ${isId ? 'grup' : 'groups'}`,
-      `${compactNumber(results.counts.people)} ${isId ? 'orang' : 'people'}`,
-    ].join(' - ')
+        `${compactNumber(results.counts.posts)} ${isId ? 'postingan' : 'posts'}`,
+        `${compactNumber(results.counts.groups)} ${isId ? 'grup' : 'groups'}`,
+        `${compactNumber(results.counts.people)} ${isId ? 'orang' : 'people'}`,
+      ].join(' - ')
     : isId
       ? 'Mencari diskusi, grup, dan orang.'
       : 'Searching discussions, groups, and people.';
@@ -3875,43 +3910,43 @@ function LeftRail({
           <div className="mt-3 space-y-1">
             {searchMode
               ? SEARCH_TABS.map(tab => (
-                <SearchFilterButton
-                  key={tab.id}
-                  tab={tab}
-                  isId={isId}
-                  active={searchKind === tab.id}
-                  count={searchCountFor(searchCounts, tab.id)}
-                  onClick={() => onSearchKindChange(tab.id)}
-                />
-              ))
-              : TABS.map(tab => {
-                const Icon = tab.icon;
-                const active = activeTab === tab.id;
-
-                return (
-                  <button
+                  <SearchFilterButton
                     key={tab.id}
-                    type="button"
-                    onClick={() => onTabChange(tab.id)}
-                    className={cn(
-                      'flex min-h-[52px] w-full items-center gap-2.5 rounded-[14px] px-3 text-left',
-                      active
-                        ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                        : 'text-[color:var(--app-text-soft)] hover:bg-slate-50',
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-black">
-                        {isId ? tab.labelId : tab.labelEn}
+                    tab={tab}
+                    isId={isId}
+                    active={searchKind === tab.id}
+                    count={searchCountFor(searchCounts, tab.id)}
+                    onClick={() => onSearchKindChange(tab.id)}
+                  />
+                ))
+              : TABS.map(tab => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.id;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => onTabChange(tab.id)}
+                      className={cn(
+                        'flex min-h-[52px] w-full items-center gap-2.5 rounded-[14px] px-3 text-left',
+                        active
+                          ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                          : 'text-[color:var(--app-text-soft)] hover:bg-slate-50',
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-black">
+                          {isId ? tab.labelId : tab.labelEn}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11px] font-semibold opacity-75">
+                          {isId ? tab.captionId : tab.captionEn}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] font-semibold opacity-75">
-                        {isId ? tab.captionId : tab.captionEn}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
           </div>
         </section>
 
@@ -4310,13 +4345,13 @@ export default function CommunityFeedClient({
     setOverview(current =>
       current
         ? {
-          ...current,
-          stats: {
-            ...current.stats,
-            totalThreads: current.stats.totalThreads + 1,
-            totalPosts: current.stats.totalPosts + 1,
-          },
-        }
+            ...current,
+            stats: {
+              ...current.stats,
+              totalThreads: current.stats.totalThreads + 1,
+              totalPosts: current.stats.totalPosts + 1,
+            },
+          }
         : current,
     );
   };
@@ -4326,10 +4361,9 @@ export default function CommunityFeedClient({
     const params = new URLSearchParams(searchParams.toString());
     params.delete('thread');
     const queryString = params.toString();
-    const cleanPath = (pathname || '/community').replace(
-      /^\/(id|en)(?=\/|$)/,
-      '',
-    ) || '/community';
+    const cleanPath =
+      (pathname || '/community').replace(/^\/(id|en)(?=\/|$)/, '') ||
+      '/community';
     router.replace(queryString ? `${cleanPath}?${queryString}` : cleanPath);
   };
 

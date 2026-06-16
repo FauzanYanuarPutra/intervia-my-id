@@ -51,7 +51,7 @@ import {
 } from '@/lib/profile/profileContentTabs';
 import type { CommunityFeedItem } from '@/lib/community/types';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import type { LajukanReel } from '../../../_data/reels';
 
@@ -65,6 +65,7 @@ type PublicUserProfile = {
   username?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  metadata?: unknown;
   bio?: string | null;
   location?: string | null;
   headline?: string | null;
@@ -211,6 +212,7 @@ function normalizePublicUserProfile(
     username: readString(body?.username) || null,
     full_name: readString(body?.full_name) || null,
     avatar_url: readString(body?.avatar_url) || null,
+    metadata: body?.metadata,
     bio: readString(body?.bio) || null,
     location: readString(body?.location) || null,
     headline: readString(body?.headline) || null,
@@ -252,7 +254,11 @@ function mapProfileToSocialUser(
     id: profile.id,
     name,
     handle,
-    avatarUrl: profileAvatarSrc(profile.avatar_url),
+    avatarUrl: profileAvatarSrc(
+      profile.avatar_url,
+      readProfileAvatarStyle(profile),
+      name,
+    ),
     badge:
       roles.length > 0
         ? roles.slice(0, 1).map(formatRole).join('')
@@ -457,7 +463,8 @@ function buildPublicListingChatQuestion(
     category: item.category,
     metadata: item.metadata || null,
   });
-  const greeting = localeCode === 'id' ? `Halo ${displayName},` : `Hi ${displayName},`;
+  const greeting =
+    localeCode === 'id' ? `Halo ${displayName},` : `Hi ${displayName},`;
 
   if (kind === 'product') {
     return localeCode === 'id'
@@ -1043,7 +1050,11 @@ export default function PublicProfileClient({
     );
   }
 
-  const avatarUrl = profileAvatarSrc(profile.avatar_url);
+  const avatarUrl = profileAvatarSrc(
+    profile.avatar_url,
+    readProfileAvatarStyle(profile),
+    profile.full_name || profile.username || 'Lajukan avatar',
+  );
   const numberLocale = localeCode === 'id' ? 'id-ID' : 'en-US';
   const publicActivityCount =
     profileReels.length + profileCommunityItems.length;
@@ -1439,8 +1450,7 @@ export default function PublicProfileClient({
       key: 'location',
       label: localeCode === 'id' ? 'Lokasi' : 'Location',
       value:
-        profile.location ||
-        (localeCode === 'id' ? 'Indonesia' : 'Indonesia'),
+        profile.location || (localeCode === 'id' ? 'Indonesia' : 'Indonesia'),
       icon: MapPin,
     },
     {
@@ -1568,7 +1578,9 @@ export default function PublicProfileClient({
         data?: { room_id?: string };
         error?: string;
       };
-      const roomId = String(payload.room_id || payload.data?.room_id || '').trim();
+      const roomId = String(
+        payload.room_id || payload.data?.room_id || '',
+      ).trim();
       if (!res.ok || !roomId) {
         throw new Error(
           payload.error ||
@@ -1585,25 +1597,31 @@ export default function PublicProfileClient({
           profile,
           localeCode,
         );
-        await authFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: messageText,
-            type: 'listing',
-            attachments: [JSON.stringify(cardPayload)],
-          }),
-        }).catch(() => null);
+        await authFetch(
+          `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: messageText,
+              type: 'listing',
+              attachments: [JSON.stringify(cardPayload)],
+            }),
+          },
+        ).catch(() => null);
       } else {
-        await authFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: messageText,
-            type: 'text',
-            attachments: [],
-          }),
-        }).catch(() => null);
+        await authFetch(
+          `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: messageText,
+              type: 'text',
+              attachments: [],
+            }),
+          },
+        ).catch(() => null);
       }
 
       router.push(`/chat/${encodeURIComponent(roomId)}`);
@@ -1764,7 +1782,10 @@ export default function PublicProfileClient({
                       className={`min-h-[30px] max-w-full shrink-0 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-[11px] font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] ${index > 0 ? 'hidden sm:inline-flex' : 'inline-flex'}`}
                     >
                       <span className="max-w-[220px] truncate">
-                        {prompt.replace(/^Halo\s+[^,]+,\s+|^Hi\s+[^,]+,\s+/i, '')}
+                        {prompt.replace(
+                          /^Halo\s+[^,]+,\s+|^Hi\s+[^,]+,\s+/i,
+                          '',
+                        )}
                       </span>
                     </button>
                   ))}

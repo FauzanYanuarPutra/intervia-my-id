@@ -15,10 +15,16 @@ import {
   readString,
   readStringArray,
 } from '@/lib/identityVerification';
+import { fetchWithTimeout } from '@/lib/server/fetchWithTimeout';
+import { validateUploadCandidate } from '@/lib/server/uploadFiles';
 
 const AI_URL = process.env.INTERNAL_AI_URL || 'http://ai_service:8080';
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function maskNik(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -35,12 +41,12 @@ function hashNik(value: string | undefined): string | undefined {
 }
 
 function dedupeStrings(values: string[]): string[] {
-  return Array.from(
-    new Set(values.map(value => value.trim()).filter(Boolean)),
-  );
+  return Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
 }
 
-function isApproved(record: Pick<IdentityVerificationRecord, 'status' | 'kyc_status'> | null) {
+function isApproved(
+  record: Pick<IdentityVerificationRecord, 'status' | 'kyc_status'> | null,
+) {
   if (!record) return false;
   return (
     record.status === 'approved' ||
@@ -130,9 +136,7 @@ function mergeVerificationRecord(
   const useCases = dedupeStrings([...existing.use_cases, ...next.use_cases]);
   const benefits = dedupeStrings([...existing.benefits, ...next.benefits]);
   const riskFlags = dedupeStrings(
-    next.risk_flags.length > 0
-      ? next.risk_flags
-      : existing.risk_flags,
+    next.risk_flags.length > 0 ? next.risk_flags : existing.risk_flags,
   );
 
   if (existingApproved && !nextApproved) {
@@ -169,7 +173,8 @@ function mergeVerificationRecord(
     transaction_eligible:
       existing.transaction_eligible || next.transaction_eligible,
     kyc_status: mergedKyc,
-    trust_score: Math.max(existing.trust_score || 0, next.trust_score || 0) || undefined,
+    trust_score:
+      Math.max(existing.trust_score || 0, next.trust_score || 0) || undefined,
     verified_at: nextApproved
       ? next.verified_at
       : existing.verified_at || next.verified_at,
@@ -239,17 +244,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (ktp.size <= 0 || selfie.size <= 0) {
+    const ktpError = validateUploadCandidate(ktp, {
+      accept: 'image',
+      maxBytes: MAX_UPLOAD_BYTES,
+    });
+    const selfieError = validateUploadCandidate(selfie, {
+      accept: 'image',
+      maxBytes: MAX_UPLOAD_BYTES,
+    });
+    if (ktpError || selfieError) {
       return NextResponse.json(
-        { error: 'Uploaded files must not be empty' },
-        { status: 400 },
-      );
-    }
-
-    if (ktp.size > MAX_UPLOAD_BYTES || selfie.size > MAX_UPLOAD_BYTES) {
-      return NextResponse.json(
-        { error: 'Each upload must be 10 MB or smaller' },
-        { status: 413 },
+        {
+          error: ktpError
+            ? `KTP ${ktpError}`
+            : `Selfie ${selfieError || 'file is invalid'}`,
+        },
+        {
+          status:
+            ktpError?.includes('too large') ||
+            selfieError?.includes('too large')
+              ? 413
+              : 400,
+        },
       );
     }
 
@@ -257,11 +273,15 @@ export async function POST(req: NextRequest) {
     upstreamForm.set('ktp', ktp);
     upstreamForm.set('selfie', selfie);
 
-    const aiRes = await fetch(`${AI_URL}/v1/verify`, {
-      method: 'POST',
-      body: upstreamForm,
-      cache: 'no-store',
-    });
+    const aiRes = await fetchWithTimeout(
+      `${AI_URL}/v1/verify`,
+      {
+        method: 'POST',
+        body: upstreamForm,
+        cache: 'no-store',
+      },
+      25000,
+    );
     const aiPayload = (await aiRes.json().catch(() => ({}))) as Record<
       string,
       unknown
@@ -269,23 +289,29 @@ export async function POST(req: NextRequest) {
 
     if (!aiRes.ok) {
       return NextResponse.json(
-        { error: readString(aiPayload.message) || 'Identity verification failed' },
+        {
+          error:
+            readString(aiPayload.message) || 'Identity verification failed',
+        },
         { status: aiRes.status },
       );
     }
 
-    const currentProfileRes = await fetch(`${API_URL}/users/me`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${auth.ctx.token}`,
-        ...authSecurityHeaders(security),
+    const currentProfileRes = await fetchWithTimeout(
+      `${API_URL}/users/me`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${auth.ctx.token}`,
+          ...authSecurityHeaders(security),
+        },
+        cache: 'no-store',
       },
-      cache: 'no-store',
-    });
-    const currentProfile = (await currentProfileRes.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
+      10000,
+    );
+    const currentProfile = (await currentProfileRes
+      .json()
+      .catch(() => ({}))) as Record<string, unknown>;
     const currentVerification = readIdentityVerification(
       currentProfile.verification || currentProfile.metadata,
     );
@@ -296,22 +322,25 @@ export async function POST(req: NextRequest) {
       nextVerification,
     );
 
-    const persistRes = await fetch(`${API_URL}/users/me`, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${auth.ctx.token}`,
-        'Content-Type': 'application/json',
-        ...authSecurityHeaders(security),
+    const persistRes = await fetchWithTimeout(
+      `${API_URL}/users/me`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${auth.ctx.token}`,
+          'Content-Type': 'application/json',
+          ...authSecurityHeaders(security),
+        },
+        body: JSON.stringify({
+          verification: mergedVerification,
+        }),
+        cache: 'no-store',
       },
-      body: JSON.stringify({
-        verification: mergedVerification,
-      }),
-      cache: 'no-store',
-    });
-    const persistedProfile = (await persistRes.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
+      10000,
+    );
+    const persistedProfile = (await persistRes
+      .json()
+      .catch(() => ({}))) as Record<string, unknown>;
 
     if (!persistRes.ok) {
       return NextResponse.json(

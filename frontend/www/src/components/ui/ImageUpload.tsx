@@ -48,50 +48,78 @@ export function ImageUpload({
   onChange,
   onAddFiles,
   maxImages = 10,
-  maxSizeMB = 5,
+  maxSizeMB = 25,
   locale = 'id',
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
-  const handleFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
+  const handleFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files) return;
 
-    const acceptedFiles: File[] = [];
-    const remainingSlots = maxImages - images.length;
+      const acceptedFiles: File[] = [];
+      const rejectedReasons: string[] = [];
+      const remainingSlots = maxImages - images.length;
 
-    Array.from(files).slice(0, remainingSlots).forEach((file) => {
-      // Validate file type
-      if (!isImageFile(file)) {
+      if (remainingSlots <= 0) {
+        setUploadError(
+          locale === 'id'
+            ? `Maksimal ${maxImages} gambar.`
+            : `Maximum ${maxImages} images.`,
+        );
         return;
       }
 
-      // Validate file size
-      if (file.size > maxSizeMB * 1024 * 1024) {
+      Array.from(files)
+        .slice(0, remainingSlots)
+        .forEach(file => {
+          // Validate file type
+          if (!isImageFile(file)) {
+            rejectedReasons.push(
+              locale === 'id'
+                ? `${file.name} bukan gambar.`
+                : `${file.name} is not an image.`,
+            );
+            return;
+          }
+
+          // Validate file size
+          if (file.size > maxSizeMB * 1024 * 1024) {
+            rejectedReasons.push(
+              locale === 'id'
+                ? `${file.name} lebih dari ${maxSizeMB}MB.`
+                : `${file.name} is larger than ${maxSizeMB}MB.`,
+            );
+            return;
+          }
+
+          acceptedFiles.push(file);
+        });
+
+      setUploadError(rejectedReasons[0] || '');
+
+      if (acceptedFiles.length === 0) {
         return;
       }
 
-      acceptedFiles.push(file);
-    });
+      if (onAddFiles) {
+        void onAddFiles(acceptedFiles);
+        return;
+      }
 
-    if (acceptedFiles.length === 0) {
-      return;
-    }
+      const newImages: ImageFile[] = acceptedFiles.map(file => ({
+        file,
+        preview: URL.createObjectURL(file),
+      }));
 
-    if (onAddFiles) {
-      void onAddFiles(acceptedFiles);
-      return;
-    }
-
-    const newImages: ImageFile[] = acceptedFiles.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-
-    if (newImages.length > 0) {
-      onChange([...images, ...newImages]);
-    }
-  }, [images, maxImages, maxSizeMB, onAddFiles, onChange]);
+      if (newImages.length > 0) {
+        onChange([...images, ...newImages]);
+      }
+    },
+    [images, locale, maxImages, maxSizeMB, onAddFiles, onChange],
+  );
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFiles(e.target.files);
@@ -148,7 +176,7 @@ export function ImageUpload({
             'relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300',
             dragActive
               ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)] scale-[1.02]'
-              : 'border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] dark:hover:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_50%,_transparent)]'
+              : 'border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-muted)] dark:hover:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_50%,_transparent)]',
           )}
         >
           <input
@@ -165,21 +193,32 @@ export function ImageUpload({
             className="w-full flex flex-col items-center gap-3"
           >
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[color:var(--app-accent)] to-[color:var(--app-accent)] flex items-center justify-center shadow-lg">
-              <Icon name={IconEnum.Zap} className="w-8 h-8 text-[color:var(--app-text-inverse)]" />
+              <Icon
+                name={IconEnum.Zap}
+                className="w-8 h-8 text-[color:var(--app-text-inverse)]"
+              />
             </div>
             <div>
               <p className="text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {locale === 'id' ? 'Klik untuk upload atau drag & drop' : 'Click to upload or drag & drop'}
+                {locale === 'id'
+                  ? 'Klik untuk upload atau drag & drop'
+                  : 'Click to upload or drag & drop'}
               </p>
               <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mt-1">
-                {locale === 'id' 
-                  ? `PNG, JPG, WEBP hingga ${maxSizeMB}MB (maks ${maxImages} gambar)`
-                  : `PNG, JPG, WEBP up to ${maxSizeMB}MB (max ${maxImages} images)`}
+                {locale === 'id'
+                  ? `PNG, JPG, WEBP, GIF, HEIC hingga ${maxSizeMB}MB (maks ${maxImages} gambar)`
+                  : `PNG, JPG, WEBP, GIF, HEIC up to ${maxSizeMB}MB (max ${maxImages} images)`}
               </p>
             </div>
           </button>
         </div>
       )}
+
+      {uploadError ? (
+        <div className="rounded-xl border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--app-danger)]">
+          {uploadError}
+        </div>
+      ) : null}
 
       {/* Image Preview Grid */}
       {images.length > 0 && (
@@ -208,7 +247,10 @@ export function ImageUpload({
                     className="p-2 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] rounded-lg hover:bg-[color:var(--app-surface-strong)] transition-colors"
                     title={locale === 'id' ? 'Pindah kiri' : 'Move left'}
                   >
-                    <Icon name={IconEnum.ChevronDown} className="w-4 h-4 text-[color:var(--app-text)] rotate-90" />
+                    <Icon
+                      name={IconEnum.ChevronDown}
+                      className="w-4 h-4 text-[color:var(--app-text)] rotate-90"
+                    />
                   </button>
                 )}
 
@@ -219,7 +261,9 @@ export function ImageUpload({
                   className="p-2 bg-[color:var(--app-danger)] rounded-lg hover:bg-[color:var(--app-danger)] transition-colors"
                   title={locale === 'id' ? 'Hapus' : 'Remove'}
                 >
-                  <span className="text-[color:var(--app-text-inverse)] font-bold text-lg leading-none">×</span>
+                  <span className="text-[color:var(--app-text-inverse)] font-bold text-lg leading-none">
+                    ×
+                  </span>
                 </button>
 
                 {/* Move Right */}
@@ -230,7 +274,10 @@ export function ImageUpload({
                     className="p-2 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] rounded-lg hover:bg-[color:var(--app-surface-strong)] transition-colors"
                     title={locale === 'id' ? 'Pindah kanan' : 'Move right'}
                   >
-                    <Icon name={IconEnum.ChevronDown} className="w-4 h-4 text-[color:var(--app-text)] -rotate-90" />
+                    <Icon
+                      name={IconEnum.ChevronDown}
+                      className="w-4 h-4 text-[color:var(--app-text)] -rotate-90"
+                    />
                   </button>
                 )}
               </div>
@@ -268,7 +315,7 @@ export function ImageUpload({
       {/* Info Text */}
       {images.length > 0 && (
         <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-          {locale === 'id' 
+          {locale === 'id'
             ? `Gambar pertama akan menjadi cover. Drag untuk mengubah urutan.`
             : `First image will be the cover. Drag to reorder.`}
         </p>

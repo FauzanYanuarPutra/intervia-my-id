@@ -18,7 +18,7 @@ import {
   normalizeProfileMediaList,
   normalizeProfileMediaUrl,
 } from '@/lib/profile/profileMedia';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import { ArrowLeft, Globe2, Loader2, Save, Upload } from 'lucide-react';
 
@@ -1800,7 +1800,12 @@ export default function EditProfilePage() {
                   <div className="h-16 w-16 overflow-hidden rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={profileAvatarSrc(avatarUrl)}
+                      src={profileAvatarSrc(
+                        avatarUrl,
+                        readProfileAvatarStyle(baseMetadata) ||
+                          readProfileAvatarStyle(user),
+                        fullName || user?.full_name || user?.email,
+                      )}
                       alt="Avatar preview"
                       className="h-full w-full object-cover"
                     />

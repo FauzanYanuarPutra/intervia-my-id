@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { readProfileAvatarStyle } from '@/lib/profile/avatar';
 
 type ContentRecord = Record<string, unknown>;
 
@@ -7,6 +8,9 @@ export type PublicOwnerProfile = {
   username?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  avatar_style?: unknown;
+  avatarStyle?: unknown;
+  metadata?: Record<string, unknown> | null;
   location?: string | null;
   headline?: string | null;
   roles?: string[] | null;
@@ -50,7 +54,7 @@ function asBoolean(value: unknown): boolean | null {
 function asStringArray(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   const values = value
-    .map((entry) => asString(entry))
+    .map(entry => asString(entry))
     .filter(Boolean)
     .slice(0, 12);
   return values.length > 0 ? values : [];
@@ -66,7 +70,9 @@ function getOwnerId(item: ContentRecord): string {
   return asString(item.owner_id);
 }
 
-export function shouldIncludeOwnerProfiles(searchParams: URLSearchParams): boolean {
+export function shouldIncludeOwnerProfiles(
+  searchParams: URLSearchParams,
+): boolean {
   const raw = asString(searchParams.get('include_owner'));
   return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
 }
@@ -85,12 +91,17 @@ function normalizeOwnerProfile(payload: unknown): PublicOwnerProfile | null {
 
   const id = asString(body.id);
   if (!id) return null;
+  const metadata = asObject(body.metadata);
+  const avatarStyle = readProfileAvatarStyle(body);
 
   return {
     id,
     username: asString(body.username) || null,
     full_name: asString(body.full_name) || null,
     avatar_url: asString(body.avatar_url) || null,
+    avatar_style: avatarStyle ?? null,
+    avatarStyle: avatarStyle ?? null,
+    metadata,
     location: asString(body.location) || null,
     headline: asString(body.headline) || null,
     roles: asStringArray(body.roles),
@@ -112,11 +123,7 @@ export async function fetchOwnerPublicProfiles(args: {
 }): Promise<Map<string, PublicOwnerProfile>> {
   const { req, identityBase, items } = args;
   const ownerIds = Array.from(
-    new Set(
-      items
-        .map((item) => getOwnerId(item))
-        .filter(Boolean),
-    ),
+    new Set(items.map(item => getOwnerId(item)).filter(Boolean)),
   ).slice(0, 24);
 
   if (ownerIds.length === 0) {
@@ -128,7 +135,7 @@ export async function fetchOwnerPublicProfiles(args: {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const results = await Promise.allSettled(
-    ownerIds.map(async (ownerId) => {
+    ownerIds.map(async ownerId => {
       const response = await fetch(
         `${identityBase}/users/public/${encodeURIComponent(ownerId)}`,
         {
@@ -158,7 +165,7 @@ export function attachOwnerProfilesToContent(
 ): ContentRecord[] {
   if (items.length === 0 || profiles.size === 0) return items;
 
-  return items.map((item) => {
+  return items.map(item => {
     const ownerId = getOwnerId(item);
     const ownerProfile = ownerId ? profiles.get(ownerId) : null;
     if (!ownerProfile) return item;

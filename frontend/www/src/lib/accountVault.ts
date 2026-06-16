@@ -6,6 +6,7 @@ import {
   stripCountryDialCode,
   type PhoneCountryCode,
 } from '@/lib/phoneCountry';
+import { readProfileAvatarStyle } from '@/lib/profile/avatar';
 
 export const MAX_SAVED_ACCOUNTS = 8;
 
@@ -19,6 +20,7 @@ export type SavedAccount = {
   identifier: string;
   identifierType: SavedAccountIdentifierType;
   avatarUrl?: string | null;
+  avatarStyle?: unknown;
   addedAt: number;
   lastUsedAt: number;
 };
@@ -85,6 +87,7 @@ function normalizeAccounts(value: unknown): SavedAccount[] {
         ? account.lastUsedAt
         : Date.now(),
       avatarUrl: account.avatarUrl || null,
+      avatarStyle: account.avatarStyle,
     }))
     .filter(account => {
       if (seen.has(account.id)) return false;
@@ -147,6 +150,7 @@ export function buildSavedAccountFromUser(
     readString(source.avatarUrl) ||
     readString(source.avatar_url) ||
     readMetadataString(source, 'avatar_url');
+  const avatarStyle = readProfileAvatarStyle(source);
   const now = Date.now();
 
   return {
@@ -155,6 +159,7 @@ export function buildSavedAccountFromUser(
     identifier,
     identifierType: phone ? 'phone' : 'email',
     avatarUrl,
+    avatarStyle,
     addedAt: now,
     lastUsedAt: now,
   };
@@ -179,7 +184,9 @@ export function saveAccountSnapshot(
 }
 
 export function removeSavedAccount(id: string): SavedAccount[] {
-  return writeAccounts(readSavedAccounts().filter(account => account.id !== id));
+  return writeAccounts(
+    readSavedAccounts().filter(account => account.id !== id),
+  );
 }
 
 export function clearSavedAccounts(): SavedAccount[] {

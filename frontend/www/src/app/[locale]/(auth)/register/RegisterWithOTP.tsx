@@ -6,8 +6,10 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  KeyRound,
   Loader2,
   LockKeyhole,
+  Mail,
   ShieldCheck,
   UserRound,
 } from 'lucide-react';
@@ -67,6 +69,10 @@ export default function RegisterWithOTP() {
 
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpToken, setOtpToken] = useState('');
+  const [otpResendAt, setOtpResendAt] = useState(0);
   const [avatarSpec, setAvatarSpec] = useState<LajukanAvatarSpec>(
     DEFAULT_LAJUKAN_AVATAR,
   );
@@ -75,11 +81,16 @@ export default function RegisterWithOTP() {
   const [captchaToken, setCaptchaToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState('');
 
   const normalizedUsername = normalizeUsername(username);
+  const normalizedEmail = email.trim().toLowerCase();
+  const otpCooldownLeft = Math.max(0, otpResendAt - Date.now());
+  const otpCooldownSeconds = Math.ceil(otpCooldownLeft / 1000);
   const avatarLabel = fullName.trim() || normalizedUsername || 'Lajukan avatar';
   const avatarUrl = useMemo(
     () => createLajukanAvatarDataUrl(avatarSpec, avatarLabel),
@@ -101,6 +112,8 @@ export default function RegisterWithOTP() {
   const canSubmit =
     fullName.trim().length >= 2 &&
     usernameValid &&
+    normalizedEmail.includes('@') &&
+    otpToken.length > 0 &&
     !passwordBlockingError &&
     password === confirmPassword &&
     (!needsCaptcha || captchaToken.length > 0);
@@ -129,7 +142,9 @@ export default function RegisterWithOTP() {
       await register({
         full_name: fullName.trim(),
         username: normalizedUsername,
+        email: normalizedEmail,
         password,
+        email_otp_token: otpToken,
         avatar_url: avatarUrl,
         metadata: {
           avatar_style: avatarSpec,
@@ -146,6 +161,83 @@ export default function RegisterWithOTP() {
       setCaptchaToken('');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const sendEmailOtp = async () => {
+    if (!normalizedEmail.includes('@')) {
+      setError(isId ? 'Isi email aktif dulu.' : 'Enter an active email first.');
+      return;
+    }
+    if (otpCooldownLeft > 0) {
+      setError(
+        isId
+          ? `Tunggu ${otpCooldownSeconds} detik sebelum kirim ulang kode.`
+          : `Wait ${otpCooldownSeconds} seconds before resending the code.`,
+      );
+      return;
+    }
+
+    setSendingOtp(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'email',
+          target: normalizedEmail,
+          purpose: 'register',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(mapCommonAuthError(data?.error, res.status));
+        return;
+      }
+
+      setOtp('');
+      setOtpToken('');
+      setOtpResendAt(Date.now() + 30_000);
+    } catch {
+      setError(isId ? 'Gagal kirim OTP email.' : 'Failed to send email OTP.');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const verifyEmailOtp = async () => {
+    if (!normalizedEmail.includes('@') || otp.length !== 6) {
+      setError(isId ? 'Isi email dan OTP 6 digit.' : 'Enter email and 6-digit OTP.');
+      return;
+    }
+
+    setVerifyingOtp(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'email',
+          target: normalizedEmail,
+          otp,
+          purpose: 'register',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data?.token !== 'string') {
+        setError(mapCommonAuthError(data?.error, res.status));
+        return;
+      }
+
+      setOtpToken(data.token);
+    } catch {
+      setError(isId ? 'Gagal verifikasi OTP.' : 'Failed to verify OTP.');
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -234,6 +326,76 @@ export default function RegisterWithOTP() {
               : '3-30 chars, lowercase letters, numbers, dot, or underscore.'}
           </span>
         </label>
+
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+            Email OTP
+          </span>
+          <span className="relative block">
+            <Mail className={iconClass} />
+            <input
+              value={email}
+              onChange={event => {
+                setEmail(event.target.value);
+                setOtpToken('');
+              }}
+              autoComplete="email"
+              inputMode="email"
+              type="email"
+              placeholder={isId ? 'email aktif kamu' : 'your active email'}
+              className={`${inputClass} pl-11 pr-4`}
+            />
+          </span>
+        </label>
+
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <span className="relative block">
+            <KeyRound className={iconClass} />
+            <input
+              value={otp}
+              onChange={event => {
+                setOtp(event.target.value.replace(/\D/g, '').slice(0, 6));
+                setOtpToken('');
+              }}
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              className={`${inputClass} pl-11 pr-4 text-center tracking-[0.24em]`}
+            />
+          </span>
+          <button
+            type="button"
+            onClick={sendEmailOtp}
+            disabled={sendingOtp || !normalizedEmail.includes('@') || otpCooldownLeft > 0}
+            className="inline-flex min-h-[48px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
+          >
+            {sendingOtp
+              ? 'SEND...'
+              : otpCooldownLeft > 0
+                ? `${otpCooldownSeconds}s`
+                : isId
+                  ? 'Kirim'
+                  : 'Send'}
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={verifyEmailOtp}
+          disabled={verifyingOtp || otp.length !== 6 || !normalizedEmail.includes('@') || Boolean(otpToken)}
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-black text-[color:var(--app-accent-strong)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_70%,white_30%)] disabled:cursor-not-allowed disabled:border-[color:var(--app-border)] disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]"
+        >
+          {verifyingOtp ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : otpToken ? (
+            <>
+              <CheckCircle2 className="h-4 w-4" />
+              {isId ? 'OTP terverifikasi' : 'OTP verified'}
+            </>
+          ) : (
+            isId ? 'Verifikasi OTP' : 'Verify OTP'
+          )}
+        </button>
 
         <AvatarBuilder
           compact

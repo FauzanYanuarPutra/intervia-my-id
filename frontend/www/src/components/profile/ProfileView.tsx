@@ -20,7 +20,7 @@ import {
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { useRouter } from '@/i18n/navigation';
 import { Link } from '@/i18n/navigation';
-import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 
 export default function ProfileView() {
   const { user, logout } = useAuth();
@@ -71,7 +71,11 @@ export default function ProfileView() {
             <div className="relative shrink-0">
               <div className="relative w-20 h-20 sm:w-24 sm:h-24">
                 <Image
-                  src={profileAvatarSrc(user.avatarUrl)}
+                  src={profileAvatarSrc(
+                    user.avatarUrl || user.avatar_url,
+                    readProfileAvatarStyle(user),
+                    user.username || user.email,
+                  )}
                   alt={user.username || 'User'}
                   width={96}
                   height={96}
@@ -182,10 +186,11 @@ export default function ProfileView() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${activeTab === tab.id
-                  ? 'text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]'
-                  : 'text-[color:var(--app-text)] hover:text-[color:var(--app-text)] dark:hover:text-[color:var(--app-text-soft)]'
-                  }`}
+                className={`flex-1 py-2.5 text-xs font-semibold transition-colors relative ${
+                  activeTab === tab.id
+                    ? 'text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]'
+                    : 'text-[color:var(--app-text)] hover:text-[color:var(--app-text)] dark:hover:text-[color:var(--app-text-soft)]'
+                }`}
               >
                 {tab.label}
                 {activeTab === tab.id && (

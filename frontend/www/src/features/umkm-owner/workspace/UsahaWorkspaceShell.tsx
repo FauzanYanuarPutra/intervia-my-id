@@ -36,7 +36,7 @@ export function UsahaWorkspaceShell({
         selectedStore={selectedStore}
         stats={stats}
       />
-      <WorkspaceNavGrid items={navItems} />
+      <WorkspaceNavGrid isId={isId} items={navItems} />
       <p className="sr-only">
         {isId ? 'Alur usaha dibuat ringkas.' : 'Business flow is simplified.'}
       </p>

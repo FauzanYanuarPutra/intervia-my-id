@@ -2,11 +2,8 @@ services:
   # ---------------- Identity Service (Rust) ----------------
   identity_service:
     build:
-      context: ./backend/rust_apps
+      context: ./services/identity_service
       dockerfile: Dockerfile
-      args:
-        SERVICE_NAME: identity_service
-        INSTALL_SQLX: "true"
     container_name: laju_identity_service
     environment:
       # --- Base Config ---
@@ -17,8 +14,8 @@ services:
       RUST_LOG: ${RUST_LOG:-info} # Default info lebih baik untuk tracking error awal
 
       # --- Database & Cache ---
-      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@postgres_db:5432/${DB_NAME}
-      POSTGRES_HOST: postgres_db
+      IDENTITY_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@identity_db:5432/identity_db
+      POSTGRES_HOST: identity_db
       POSTGRES_USER: ${DB_USER}
 
       REDIS_URL: redis://:${REDIS_PASS}@redis_cache:6379
@@ -35,6 +32,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ISSUER: ${JWT_ISSUER:-laju}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-laju_users}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
 
       # Gunakan variabel yang sama dengan struct Config di Rust
       ACCESS_TOKEN_EXP_HOURS: "1"
@@ -59,7 +58,7 @@ services:
       start_period: 10s
 
     depends_on:
-      postgres_db: { condition: service_healthy }
+      identity_db: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
 
@@ -81,46 +80,95 @@ services:
     restart: unless-stopped
 
   # ---------------- PostgreSQL ----------------
-  postgres_db:
+  # postgres_db:
+  #   image: postgres:16-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: ${DB_USER}
+  #     POSTGRES_PASSWORD: ${DB_PASS}
+  #     POSTGRES_DB: ${DB_NAME}
+  #   command: [ "postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "max_connections=100", "-c", "shared_buffers=128MB" ]
+  #   volumes:
+  #     - ./postgres/00-create-databases.sh:/docker-entrypoint-initdb.d/00-create-databases.sh:ro
+  #     - ./postgres/marketplace.sql:/docker-entrypoint-initdb.d/marketplace.sql:ro
+  #     - ./postgres/community.sql:/docker-entrypoint-initdb.d/community.sql:ro
+  #     - ./postgres/identity.sql:/docker-entrypoint-initdb.d/identity.sql:ro
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "${PORT_POSTGRES:-5432}:5432"
+  #   healthcheck:
+  #     test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     web:
+  #       aliases:
+  #         - compreface-postgres-db
+
+  identity_db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
-    command: [ "postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "max_connections=100", "-c", "shared_buffers=128MB" ]
+      POSTGRES_DB: identity_db
+    command: [ "postgres", "-c", "shared_preload_libraries=pg_stat_statements" ]
     volumes:
-      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
-      - postgres_data:/var/lib/postgresql/data
+      - identity_postgres_data:/var/lib/postgresql/data
     ports:
-      - "${PORT_POSTGRES:-5432}:5432"
+      - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d identity_db" ]
     networks:
-      web:
-        aliases:
-          - compreface-postgres-db
+      - web
+
+  community_db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: community_db
+    volumes:
+      - community_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d community_db" ]
+    networks:
+      - web
+
+  marketplace_db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: marketplace_db
+    volumes:
+      - marketplace_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d marketplace_db" ]
+    networks:
+      - web
 
   # ---------------- Redis ----------------
   redis_cache:
     image: redis:7-alpine
     restart: unless-stopped
-    command: [ "redis-server", "--requirepass", "${REDIS_PASS}", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru" ]
+    command: [ "redis-server", "--requirepass", "${REDIS_PASS}" ]
     volumes:
       - redis_data:/data
-    ports:
-      - "${PORT_REDIS:-6379}:6379"
     healthcheck:
-      test: [ "CMD-SHELL", "redis-cli -a ${REDIS_PASS} ping | grep PONG" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASS}", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
     networks:
       - web
-
   # ---------------- RabbitMQ ----------------
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -129,7 +177,7 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBIT_PASS}
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq/mnesia
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
@@ -162,7 +210,7 @@ services:
   scylla_keyspace_setup:
     image: scylladb/scylla:2025.2
     volumes:
-      - ./scylladb:/scylladb
+      - ./services/chat_service/priv/scylladb:/scylladb
     networks:
       - web
     depends_on:
@@ -177,7 +225,7 @@ services:
   # ---------------- Chat Service (Elixir) ----------------
   chat_service:
     build:
-      context: ./backend/chat_service
+      context: ./services/chat_service
       dockerfile: Dockerfile
     ports:
       - "4000:4000"
@@ -212,16 +260,13 @@ services:
   # ---------------- Marketplace Service (Rust) ----------------
   marketplace_service:
     build:
-      context: ./backend/rust_apps
+      context: ./services/marketplace_service
       dockerfile: Dockerfile
-      args:
-        SERVICE_NAME: marketplace_service
-        INSTALL_SQLX: "true"
     ports:
       - "${PORT_MARKETPLACE:-8081}:8081"
     environment:
       APP_PORT: "8081"
-      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@postgres_db:5432/${DB_NAME}
+      MARKETPLACE_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db
       MEILI_URL: http://meilisearch:7700
       MEILI_MASTER_KEY: ${MEILI_KEY}
       REDIS_URL: redis://:${REDIS_PASS}@redis_cache:6379
@@ -258,7 +303,7 @@ services:
       WALLET_MIDTRANS_ERROR_REDIRECT_URL: ${WALLET_MIDTRANS_ERROR_REDIRECT_URL:-}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS_MARKETPLACE:-true}
     depends_on:
-      postgres_db: { condition: service_healthy }
+      marketplace_db: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
       meilisearch: { condition: service_healthy }
@@ -278,18 +323,15 @@ services:
   # ---------------- Community Service (Rust) ----------------
   community_service:
     build:
-      context: ./backend/rust_apps
+      context: ./services/community_service
       dockerfile: Dockerfile
-      args:
-        SERVICE_NAME: community_service
-        INSTALL_SQLX: "true"
     ports:
       - "${PORT_COMMUNITY:-8082}:8082"
     environment:
       ENV: ${ENV:-development}
       APP_NAME: ${APP_NAME:-community_service}
       APP_PORT: "8082"
-      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@postgres_db:5432/${DB_NAME}
+      COMMUNITY_DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@community_db:5432/community_db
       REDIS_URL: redis://:${REDIS_PASS}@redis_cache:6379
       REDIS_HOST: redis_cache
       REDIS_PASSWORD: ${REDIS_PASS}
@@ -306,7 +348,7 @@ services:
     volumes:
       - community_uploads:/app/uploads/forum
     depends_on:
-      postgres_db: { condition: service_healthy }
+      community_db: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
     healthcheck:
@@ -374,15 +416,15 @@ services:
   #     - /bin/sh
   #     - -c
   #     - |
-  #       until pg_isready -h postgres_db -p 5432 -U ${DB_USER}; do
-  #         echo "Waiting for postgres_db..."
+  #       until pg_isready -h identity_db -p 5432 -U ${DB_USER}; do
+  #         echo "Waiting for identity_db..."
   #         sleep 2
   #       done
-  #       psql -h postgres_db -U ${DB_USER} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='frs'" | grep -q 1 || \
-  #       psql -h postgres_db -U ${DB_USER} -d postgres -c "CREATE DATABASE frs"
+  #       psql -h identity_db -U ${DB_USER} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='frs'" | grep -q 1 || \
+  #       psql -h identity_db -U ${DB_USER} -d postgres -c "CREATE DATABASE frs"
   #       echo "CompreFace database is ready"
   #   depends_on:
-  #     postgres_db: { condition: service_healthy }
+  #     identity_db: { condition: service_healthy }
   #   restart: "no"
   #   networks:
   #     - web
@@ -392,7 +434,7 @@ services:
   #   environment:
   #     - POSTGRES_USER=${DB_USER}
   #     - POSTGRES_PASSWORD=${DB_PASS}
-  #     - POSTGRES_URL=jdbc:postgresql://postgres_db:5432/frs
+  #     - POSTGRES_URL=jdbc:postgresql://identity_db:5432/frs
   #   depends_on:
   #     compreface-db-init: { condition: service_completed_successfully }
   #   networks:
@@ -421,7 +463,7 @@ services:
 
   # ai_service:
   #   build:
-  #     context: ./backend/rust_apps
+  #     context: ./services/identity_service
   #     dockerfile: Dockerfile
   #     args:
   #       SERVICE_NAME: ai_service
@@ -562,6 +604,9 @@ services:
       NEXT_PUBLIC_HCAPTCHA_SITE_KEY: ${NEXT_PUBLIC_HCAPTCHA_SITE_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
     volumes:
       - ./.runtime:/app/www/.runtime:ro
     healthcheck:
@@ -729,7 +774,7 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
     networks:
       - web
 
@@ -799,7 +844,7 @@ services:
       - mailserver
 
 volumes:
-  postgres_data:
+  # postgres_data:
   redis_data:
   rabbitmq_data:
   caddy_data:
@@ -809,6 +854,9 @@ volumes:
   pgadmin_data:
   meili_data:
   community_uploads:
+  identity_postgres_data:
+  community_postgres_data:
+  marketplace_postgres_data:
 
 networks:
   web:
