@@ -17,6 +17,7 @@ import {
 import { usePathname } from 'next/navigation';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { useAuth } from '@/context/AuthContext';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 
@@ -99,21 +100,34 @@ function buildOrientationConfig(
       eyebrow: isId ? 'Notifikasi' : 'Notifications',
       title: isId ? 'Cek yang baru dulu.' : 'Check the important ones first.',
       body: isId
-        ? 'Lihat update penting, lalu lanjut ke transaksi atau saldo.'
-        : 'Read the latest updates, then continue into transactions or funds.',
+        ? PROMO_ONLY_MODE
+          ? 'Lihat chat, komentar, dan update profil usaha yang perlu dibalas.'
+          : 'Lihat update penting, lalu lanjut ke transaksi atau saldo.'
+        : PROMO_ONLY_MODE
+          ? 'Read chats, comments, and business profile updates that need a reply.'
+          : 'Read the latest updates, then continue into transactions or funds.',
       icon: Bell,
       panelClass:
         'border-emerald-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_42%,rgba(187,247,208,0.92)_100%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(5,23,17,0.96)_0%,rgba(8,46,33,0.94)_46%,rgba(5,150,105,0.58)_100%)]',
       iconWrapClass:
         'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
-      actions: [
-        {
-          href: '/transactions',
-          label: isId ? 'Transaksi' : 'Transactions',
-          icon: ReceiptText,
-          primary: true,
-        },
-      ],
+      actions: PROMO_ONLY_MODE
+        ? [
+            {
+              href: '/chat',
+              label: isId ? 'Chat' : 'Chat',
+              icon: Bell,
+              primary: true,
+            },
+          ]
+        : [
+            {
+              href: '/transactions',
+              label: isId ? 'Transaksi' : 'Transactions',
+              icon: ReceiptText,
+              primary: true,
+            },
+          ],
     };
   }
 
@@ -230,26 +244,44 @@ function buildOrientationConfig(
         ? 'Fokus ke yang paling dekat hasilnya.'
         : 'Focus on what is closest to results today.',
       body: isId
-        ? 'Balas chat, cek transaksi, lalu lanjutkan yang hampir jadi.'
-        : 'Reply to chats, check transactions, and continue the drafts that are almost done.',
+        ? PROMO_ONLY_MODE
+          ? 'Balas chat, rapikan listing, lalu lanjutkan postingan yang hampir siap.'
+          : 'Balas chat, cek transaksi, lalu lanjutkan yang hampir jadi.'
+        : PROMO_ONLY_MODE
+          ? 'Reply to chats, polish listings, and continue posts that are almost ready.'
+          : 'Reply to chats, check transactions, and continue the drafts that are almost done.',
       icon: LayoutDashboard,
       panelClass:
         'border-emerald-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98)_0%,rgba(236,253,245,0.98)_42%,rgba(187,247,208,0.92)_100%)] dark:border-emerald-500/20 dark:bg-[linear-gradient(135deg,rgba(5,23,17,0.96)_0%,rgba(8,46,33,0.94)_46%,rgba(5,150,105,0.58)_100%)]',
       iconWrapClass:
         'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
-      actions: [
-        {
-          href: '/transactions',
-          label: isId ? 'Transaksi' : 'Transactions',
-          icon: ReceiptText,
-          primary: true,
-        },
-        {
-          href: '/payments',
-          label: isId ? 'Saldo' : 'Balance',
-          icon: Wallet,
-        },
-      ],
+      actions: PROMO_ONLY_MODE
+        ? [
+            {
+              href: '/chat',
+              label: isId ? 'Chat' : 'Chat',
+              icon: Bell,
+              primary: true,
+            },
+            {
+              href: '/my-listings',
+              label: isId ? 'Postingan' : 'Listings',
+              icon: FolderKanban,
+            },
+          ]
+        : [
+            {
+              href: '/transactions',
+              label: isId ? 'Transaksi' : 'Transactions',
+              icon: ReceiptText,
+              primary: true,
+            },
+            {
+              href: '/payments',
+              label: isId ? 'Saldo' : 'Balance',
+              icon: Wallet,
+            },
+          ],
     };
   }
 

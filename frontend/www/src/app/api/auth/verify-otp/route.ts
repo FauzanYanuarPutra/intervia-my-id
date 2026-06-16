@@ -15,6 +15,7 @@ const VerifyOtpSchema = z.object({
   otp: z.string().regex(/^\d{6}$/),
   purpose: z.enum(['register', 'login', 'reset', 'profile']).default('register'),
 });
+const OTP_AUTH_ENABLED = process.env.ENABLE_OTP_AUTH === 'true';
 
 function normalizeTarget(type: 'email' | 'phone', target: string): string {
   if (type === 'email') {
@@ -38,6 +39,13 @@ export async function POST(req: NextRequest) {
 
     const { type, target, otp, purpose } = parsed.data;
     const normalizedTarget = normalizeTarget(type, target);
+
+    if (!OTP_AUTH_ENABLED && (purpose === 'register' || purpose === 'login')) {
+      return NextResponse.json(
+        { error: 'OTP login/register is disabled. Use username and password.' },
+        { status: 410 },
+      );
+    }
 
     const ip = security.ip;
     const rlByIp = await enforceRateLimit({

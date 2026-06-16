@@ -95,6 +95,8 @@ export type CommunityFeedItem = {
   group?: CommunityGroup | null;
   tags: CommunityFeedTag[];
   media?: CommunityFeedMedia | null;
+  mediaItems?: CommunityFeedMedia[];
+  imageUrls?: string[];
   stats: {
     reactions: number;
     comments: number;

@@ -55,9 +55,9 @@ type AuthCtx = {
   accessToken: string | null; // Digunakan frontend untuk Authorization Header di Dev
   isAuthenticated: boolean;
   login: (
-    email: string,
+    username: string,
     password: string,
-    options?: { silent?: boolean; redirectTo?: string; emailOtpToken?: string },
+    options?: { silent?: boolean; redirectTo?: string; captchaToken?: string },
   ) => Promise<void>;
   loginWithPhone: (
     phone: string,
@@ -77,14 +77,16 @@ function readNonEmptyString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readPlainRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined;
+  return value as Record<string, unknown>;
+}
+
 function normalizeUserPayload(payload: unknown): User {
   if (!payload || typeof payload !== 'object') return payload as User;
 
   const base = payload as Record<string, unknown>;
-  const metadata =
-    base.metadata && typeof base.metadata === 'object'
-      ? (base.metadata as Record<string, unknown>)
-      : undefined;
 
   const normalizedHasPassword =
     typeof base.hasPassword === 'boolean'
@@ -364,18 +366,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /* ================= ACTIONS ================= */
   const login = async (
-    email: string,
+    username: string,
     password: string,
-    options?: { silent?: boolean; redirectTo?: string; emailOtpToken?: string },
+    options?: { silent?: boolean; redirectTo?: string; captchaToken?: string },
   ) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email,
+        username,
         password,
-        ...(options?.emailOtpToken
-          ? { email_otp_token: options.emailOtpToken }
+        ...(options?.captchaToken
+          ? { captcha_token: options.captchaToken }
           : {}),
       }),
       credentials: 'include',
@@ -455,22 +457,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(readNonEmptyString(data.error) || 'Register failed');
     }
 
-    const accessToken = readNonEmptyString(data.access_token);
+    const issuedAccessToken = readNonEmptyString(data.access_token);
     const refreshToken = readNonEmptyString(data.refresh_token);
     const sessionId = readNonEmptyString(data.session_id);
+    const initialAvatarUrl =
+      readNonEmptyString(payload.avatar_url) ||
+      readNonEmptyString(payload.avatarUrl);
+    const initialMetadata = readPlainRecord(payload.metadata);
+
+    const persistInitialProfile = async (token: string) => {
+      if (!initialAvatarUrl) return;
+      await fetch('/api/auth/update-profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          avatar_url: initialAvatarUrl,
+          ...(initialMetadata ? { metadata: initialMetadata } : {}),
+        }),
+      }).catch(() => null);
+    };
 
     if (IS_DEV) {
-      if (accessToken) localStorage.setItem('access_token', accessToken);
+      if (issuedAccessToken)
+        localStorage.setItem('access_token', issuedAccessToken);
       if (refreshToken) localStorage.setItem('refresh_token', refreshToken);
       if (sessionId) localStorage.setItem('session_id', sessionId);
     }
 
-    if (accessToken) {
-      setAccessToken(accessToken);
-      await fetchMe(accessToken);
+    if (issuedAccessToken) {
+      setAccessToken(issuedAccessToken);
+      await persistInitialProfile(issuedAccessToken);
+      await fetchMe(issuedAccessToken);
     } else {
       const token = await refresh();
       if (token) {
+        await persistInitialProfile(token);
         await fetchMe(token);
       }
     }

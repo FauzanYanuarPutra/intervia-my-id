@@ -16,10 +16,11 @@ export function mapCommonAuthError(apiError: string | undefined, status?: number
   if (
     status === 409 ||
     lower.includes('email already registered') ||
+    lower.includes('username already registered') ||
     lower.includes('already exists') ||
     lower.includes('duplicate')
   ) {
-    return 'Data ini sudah terdaftar. Coba masuk pakai nomor HP atau gunakan data lain.';
+    return 'Username atau data ini sudah terdaftar. Coba masuk, atau pakai username lain.';
   }
 
   // Validation
@@ -31,7 +32,12 @@ export function mapCommonAuthError(apiError: string | undefined, status?: number
     if (lower.includes('number')) return 'Password harus punya angka.';
     if (lower.includes('symbol')) return 'Password harus punya simbol.';
     if (lower.includes('spaces')) return 'Password tidak boleh mengandung spasi.';
-    if (lower.includes('too short')) return 'Password minimal 10 karakter.';
+    if (lower.includes('username or name')) {
+      return 'Password jangan mengandung username, nama, atau nama usaha.';
+    }
+    if (lower.includes('too short') || lower.includes('least')) {
+      return 'Password belum cukup panjang.';
+    }
     if (lower.includes('invalid')) return 'Data tidak valid. Periksa kembali.';
   }
 
@@ -40,7 +46,13 @@ export function mapCommonAuthError(apiError: string | undefined, status?: number
     lower.includes('invalid credential') ||
     lower.includes('wrong password')
   ) {
-    return 'Data login tidak cocok. Coba lagi.';
+    return 'Username atau password tidak cocok. Demi keamanan, kami tidak kasih tahu bagian mana yang salah.';
+  }
+  if (lower.includes('account locked')) {
+    return 'Akun dikunci sementara karena terlalu banyak percobaan gagal. Coba lagi beberapa menit lagi.';
+  }
+  if (lower.includes('account deactivated')) {
+    return 'Akun ini sedang tidak aktif. Hubungi support kalau ini tidak sesuai.';
   }
   if (lower.includes('phone login is not available')) {
     return 'Nomor HP ini belum punya akun. Lanjut daftar saja.';
@@ -78,7 +90,11 @@ export function mapCommonAuthError(apiError: string | undefined, status?: number
 
   // Rate limit / too many attempts
   if (status === 429 || lower.includes('too many') || lower.includes('try again later')) {
-    return 'Terlalu banyak percobaan. Coba lagi nanti (mis. 1 jam).';
+    return 'Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.';
+  }
+
+  if (lower.includes('captcha')) {
+    return 'Verifikasi keamanan belum lolos. Muat ulang captcha lalu coba lagi.';
   }
 
   // OTP

@@ -150,6 +150,74 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     },
   },
   {
+    id: 'supply-service-mentor-umkm-growth',
+    listingSide: 'supply',
+    typeId: 'service',
+    listingMode: 'detail',
+    sector: 'consulting',
+    titleId: 'Paket mentoring UMKM 1-on-1',
+    titleEn: '1-on-1 SME mentoring package',
+    summaryId:
+      'Template untuk mentor, konsultan, atau praktisi yang menjual sesi pendampingan.',
+    summaryEn:
+      'Template for mentors, consultants, or operators selling guidance sessions.',
+    badgeId: 'Jadi mentor',
+    badgeEn: 'Offer mentoring',
+    fields: {
+      title: 'Paket mentoring UMKM 1-on-1: katalog, operasional, dan growth',
+      summary:
+        'Sesi pendampingan praktis untuk rapikan katalog, pricing, promosi, dan ritme operasional.',
+      body: 'Cocok untuk owner UMKM yang ingin dibantu membaca masalah utama, menyusun prioritas, dan pulang dengan action plan yang bisa langsung dikerjakan.',
+      price_cents: '350000',
+      location: 'Online',
+      work_mode: 'remote',
+      service_scope:
+        'Audit singkat kondisi usaha, diskusi 60 menit, dan action plan 7 hari.',
+      deliverables:
+        'Ringkasan masalah, prioritas perbaikan, checklist eksekusi, dan follow up singkat via chat.',
+      rate_type: 'session',
+      availability: 'Slot mentoring minggu ini',
+      area_served: 'Indonesia / remote',
+      delivery_time: '1 sesi 60 menit',
+      tags: 'mentor umkm, konsultasi bisnis, growth, katalog, pricing',
+    },
+  },
+  {
+    id: 'demand-service-find-mentor',
+    listingSide: 'demand',
+    typeId: 'service',
+    listingMode: 'detail',
+    sector: 'consulting',
+    titleId: 'Cari mentor untuk rapikan usaha',
+    titleEn: 'Find a mentor to improve the business',
+    summaryId:
+      'Template untuk founder/owner yang butuh arahan praktis sebelum eksekusi.',
+    summaryEn:
+      'Template for founders/owners who need practical guidance before execution.',
+    badgeId: 'Cari mentor',
+    badgeEn: 'Find mentor',
+    fields: {
+      title: 'Cari mentor UMKM untuk rapikan katalog dan strategi jualan',
+      summary:
+        'Butuh mentor yang bisa bantu cek posisi usaha, produk unggulan, harga, dan rencana action 7 hari.',
+      body: 'Saya ingin konsultasi praktis, bukan teori panjang. Mohon jelaskan pengalaman, format sesi, harga, dan contoh output yang akan saya dapat.',
+      price_cents: '500000',
+      location: 'Online',
+      work_mode: 'remote',
+      service_scope:
+        'Mentoring katalog, pricing, promosi, operasional, dan prioritas eksekusi.',
+      deliverables:
+        'Action plan singkat, checklist, dan arahan langkah pertama.',
+      client_requirements:
+        'Punya usaha berjalan atau ide produk yang ingin dirapikan.',
+      rate_type: 'session',
+      availability: 'Minggu ini',
+      area_served: 'Indonesia / remote',
+      delivery_time: '1-2 sesi',
+      tags: 'cari mentor, mentor bisnis, konsultasi umkm, strategi jualan',
+    },
+  },
+  {
     id: 'supply-business-transfer-laundry-running',
     listingSide: 'supply',
     typeId: 'business_transfer',

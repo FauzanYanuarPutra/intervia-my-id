@@ -123,15 +123,53 @@ export function backupImageForTopic(
 }
 
 export function normalizeContentMediaUrl(raw?: string): string {
-  const value = asString(raw);
+  let value = asString(raw);
   if (!value) return '';
-  if (value.startsWith('/api/content/media/') || value.startsWith('/uploads/'))
+  value = value
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\\/g, '/');
+  if (!value) return '';
+  if (value.startsWith('public/uploads/')) {
+    value = value.replace(/^public\//, '/');
+  }
+  if (
+    value.startsWith('uploads/') ||
+    value.startsWith('api/content/media/') ||
+    value.startsWith('api/chat/media/') ||
+    value.startsWith('api/forum/media/')
+  ) {
+    value = `/${value}`;
+  }
+  if (value.startsWith('//')) return `https:${value}`;
+  if (
+    value.startsWith('/api/content/media/') ||
+    value.startsWith('/api/chat/media/') ||
+    value.startsWith('/api/forum/media/') ||
+    value.startsWith('/uploads/') ||
+    value.startsWith('data:') ||
+    value.startsWith('blob:')
+  ) {
     return value;
+  }
+
+  const relativeSegments = value.replace(/^\/+/, '').split('/').filter(Boolean);
+  if (
+    !/^[a-z][a-z0-9+.-]*:/i.test(value) &&
+    relativeSegments.length >= 3 &&
+    relativeSegments[1] === 'content'
+  ) {
+    const bucket = relativeSegments[0];
+    const key = relativeSegments.slice(1).map(encodeURIComponent).join('/');
+    return `/api/content/media/${encodeURIComponent(bucket)}/${key}`;
+  }
 
   try {
     const parsed = new URL(value);
     if (
       parsed.pathname.startsWith('/api/content/media/') ||
+      parsed.pathname.startsWith('/api/chat/media/') ||
+      parsed.pathname.startsWith('/api/forum/media/') ||
       parsed.pathname.startsWith('/uploads/')
     ) {
       return `${parsed.pathname}${parsed.search}`;
@@ -177,6 +215,139 @@ export function asNumber(value: unknown): number | undefined {
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
+}
+
+const MEDIA_VALUE_KEYS = [
+  'url',
+  'src',
+  'secure_url',
+  'public_url',
+  'image',
+  'image_url',
+  'imageUrl',
+  'cover_image',
+  'coverImage',
+  'cover_image_url',
+  'coverImageUrl',
+  'thumbnail',
+  'thumbnail_url',
+  'thumbnailUrl',
+  'media',
+  'media_url',
+  'mediaUrl',
+  'photo',
+  'photo_url',
+  'photoUrl',
+  'preview',
+  'preview_url',
+  'previewUrl',
+  'poster',
+  'poster_url',
+  'posterUrl',
+  'logo',
+  'logo_url',
+  'logoUrl',
+  'avatar',
+  'avatar_url',
+  'avatarUrl',
+  'banner',
+  'banner_url',
+  'bannerUrl',
+] as const;
+
+const MEDIA_LIST_KEYS = [
+  'urls',
+  'files',
+  'images',
+  'image_urls',
+  'imageUrls',
+  'gallery',
+  'gallery_images',
+  'galleryImages',
+  'media_urls',
+  'mediaUrls',
+  'media_gallery',
+  'mediaGallery',
+  'photos',
+  'photo_urls',
+  'photoUrls',
+  'attachments',
+  'detail_images',
+  'detailImages',
+  'portfolio_images',
+  'portfolioImages',
+  'property_images',
+  'propertyImages',
+  'listing_images',
+  'listingImages',
+] as const;
+
+const PREVIEWABLE_MEDIA_EXT_RE =
+  /\.(avif|bmp|gif|jpe?g|m4v|mov|mp4|ogg|ogv|png|svg|webm|webp|heic|heif)(?:[?#].*)?$/i;
+const NON_PREVIEWABLE_MEDIA_EXT_RE =
+  /\.(7z|csv|doc|docx|json|pdf|ppt|pptx|rar|rtf|txt|xls|xlsx|xml|zip)(?:[?#].*)?$/i;
+
+function cleanMediaCandidate(value: string): string {
+  return value
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\\/g, '/');
+}
+
+function looksLikeMediaString(value: string): boolean {
+  const cleaned = cleanMediaCandidate(value);
+  if (!cleaned) return false;
+  return (
+    /^(https?:|\/\/|\/|uploads\/|api\/|blob:|data:image\/|data:video\/)/i.test(
+      cleaned,
+    ) ||
+    PREVIEWABLE_MEDIA_EXT_RE.test(cleaned) ||
+    NON_PREVIEWABLE_MEDIA_EXT_RE.test(cleaned) ||
+    /^[a-z0-9._-]+\/content\/.+/i.test(cleaned)
+  );
+}
+
+function splitMediaString(value: string): string[] {
+  const cleaned = cleanMediaCandidate(value);
+  if (!cleaned) return [];
+  if (cleaned.startsWith('data:')) return [cleaned];
+
+  const lineParts = cleaned
+    .split(/\r?\n|;/)
+    .map(part => cleanMediaCandidate(part))
+    .filter(Boolean);
+  if (lineParts.length > 1 && lineParts.every(looksLikeMediaString)) {
+    return lineParts;
+  }
+
+  const commaParts = cleaned
+    .split(',')
+    .map(part => cleanMediaCandidate(part))
+    .filter(Boolean);
+  if (commaParts.length > 1 && commaParts.every(looksLikeMediaString)) {
+    return commaParts;
+  }
+
+  return [cleaned];
+}
+
+export function isPreviewableContentMediaUrl(url?: string): boolean {
+  const value = asString(url)?.toLowerCase();
+  if (!value) return false;
+  if (/^data:(image|video)\//.test(value) || value.startsWith('blob:')) {
+    return true;
+  }
+  if (NON_PREVIEWABLE_MEDIA_EXT_RE.test(value)) return false;
+  if (PREVIEWABLE_MEDIA_EXT_RE.test(value)) return true;
+  return (
+    value.startsWith('/api/content/media/') ||
+    value.startsWith('/api/chat/media/') ||
+    value.startsWith('/api/forum/media/') ||
+    value.startsWith('/uploads/') ||
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('//')
+  );
 }
 
 export function isPlaceholderLikeContentImage(url?: string): boolean {
@@ -270,33 +441,35 @@ export function matchAnyFilter(item: ContentItem, query: string): boolean {
   return haystack.includes(q);
 }
 
-function extractImageArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
+function extractImageArray(value: unknown, depth = 0): string[] {
+  if (depth > 5) return [];
 
-  return value.flatMap(entry => {
-    const direct = asString(entry);
-    if (direct) return [direct];
+  const direct = asString(value);
+  if (direct) {
+    const cleaned = cleanMediaCandidate(direct);
+    if (!cleaned) return [];
 
-    const record = asRecord(entry);
-    if (!record) return [];
+    if (cleaned.startsWith('[') || cleaned.startsWith('{')) {
+      try {
+        return extractImageArray(JSON.parse(cleaned) as unknown, depth + 1);
+      } catch {
+        return splitMediaString(cleaned);
+      }
+    }
 
-    return [
-      asString(record.url),
-      asString(record.src),
-      asString(record.image),
-      asString(record.image_url),
-      asString(record.imageUrl),
-      asString(record.cover_image),
-      asString(record.coverImage),
-      asString(record.thumbnail),
-      asString(record.thumbnail_url),
-      asString(record.thumbnailUrl),
-      asString(record.media_url),
-      asString(record.mediaUrl),
-      asString(record.photo_url),
-      asString(record.photoUrl),
-    ].filter((candidate): candidate is string => Boolean(candidate));
-  });
+    return splitMediaString(cleaned);
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(entry => extractImageArray(entry, depth + 1));
+  }
+
+  const record = asRecord(value);
+  if (!record) return [];
+
+  return [...MEDIA_VALUE_KEYS, ...MEDIA_LIST_KEYS].flatMap(key =>
+    extractImageArray(record[key], depth + 1),
+  );
 }
 
 export function parseImages(item: ContentItem): string[] {
@@ -360,6 +533,7 @@ export function parseImages(item: ContentItem): string[] {
     .map(entry => asString(entry))
     .filter((entry): entry is string => Boolean(entry))
     .map(entry => normalizeContentMediaUrl(entry))
+    .filter(entry => isPreviewableContentMediaUrl(entry))
     .filter(entry => !isPlaceholderLikeContentImage(entry))
     .filter(entry => {
       const key = entry.toLowerCase();
@@ -393,6 +567,7 @@ export function parseImages(item: ContentItem): string[] {
   ]
     .filter((entry): entry is string => Boolean(entry))
     .map(entry => normalizeContentMediaUrl(entry))
+    .filter(entry => isPreviewableContentMediaUrl(entry))
     .filter(entry => !isPlaceholderLikeContentImage(entry));
 
   if (extraMetaCandidates.length > 0) {
@@ -402,7 +577,8 @@ export function parseImages(item: ContentItem): string[] {
   if (
     item.cover_image &&
     item.cover_image.trim() &&
-    !isPlaceholderLikeContentImage(item.cover_image)
+    !isPlaceholderLikeContentImage(item.cover_image) &&
+    isPreviewableContentMediaUrl(normalizeContentMediaUrl(item.cover_image))
   ) {
     return [normalizeContentMediaUrl(item.cover_image)];
   }

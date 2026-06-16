@@ -7,22 +7,20 @@ import {
 import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { verifyCaptchaToken } from '@/lib/captcha';
 import {
-  consumeOTPVerificationTokenForPurposes,
-  hasOTPVerificationTokenForPurposes,
-} from '@/lib/redis';
+  passwordContainsIdentityHint,
+  validatePasswordStrength,
+} from '@/lib/passwordPolicy';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { z } from 'zod';
 
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
-const REGISTER_PHONE_OTP_REQUIRED =
-  process.env.REGISTER_PHONE_OTP_REQUIRED !== 'false';
 const REGISTER_RATE_LIMIT_PER_HOUR = Number.parseInt(
-  process.env.REGISTER_RATE_LIMIT_PER_HOUR || '20',
+  process.env.REGISTER_RATE_LIMIT_PER_HOUR || '12',
   10,
 );
-const REGISTER_PHONE_RATE_LIMIT_PER_HOUR = Number.parseInt(
-  process.env.REGISTER_PHONE_RATE_LIMIT_PER_HOUR || '5',
+const REGISTER_USERNAME_RATE_LIMIT_PER_HOUR = Number.parseInt(
+  process.env.REGISTER_USERNAME_RATE_LIMIT_PER_HOUR || '3',
   10,
 );
 
@@ -41,10 +39,15 @@ const optionalEmailString = z.preprocess((value) => {
 const normalizedPhoneString = z.preprocess((value) => {
   const normalized = String(value ?? '').replace(/\D/g, '');
   return normalized.length > 0 ? normalized : undefined;
-}, z.string().min(8));
+}, z.string().min(8).optional());
 
 const RegisterProxySchema = z
   .object({
+    username: z.preprocess(
+      (value) => String(value ?? '').trim().replace(/^@+/, '').toLowerCase(),
+      z.string().min(3).max(30),
+    ),
+    password: z.string().min(1).max(256),
     phone: normalizedPhoneString,
     phone_number: optionalTrimmedString,
     phoneNumber: optionalTrimmedString,
@@ -52,9 +55,6 @@ const RegisterProxySchema = z
     full_name: optionalTrimmedString,
     fullName: optionalTrimmedString,
     name: optionalTrimmedString,
-    username: optionalTrimmedString,
-    phone_otp_token: optionalTrimmedString,
-    phoneOtpToken: optionalTrimmedString,
     captcha_token: optionalTrimmedString,
     captchaToken: optionalTrimmedString,
   })
@@ -126,12 +126,27 @@ export async function POST(req: NextRequest) {
       '';
     const email = body.email;
     const fullName = body.full_name || body.fullName || body.name;
-    const phoneOtpToken = body.phone_otp_token || body.phoneOtpToken;
+    const username = body.username;
     const captchaToken = body.captcha_token || body.captchaToken;
 
-    if (phone.length < 8) {
+    if (!/^[a-z0-9_.]{3,30}$/.test(username) || username.includes('..')) {
       return NextResponse.json(
-        { error: 'Phone number is required' },
+        { error: 'Username format is invalid' },
+        { status: 400 },
+      );
+    }
+
+    const passwordPolicyError = validatePasswordStrength(body.password);
+    if (passwordPolicyError) {
+      return NextResponse.json(
+        { error: passwordPolicyError },
+        { status: 400 },
+      );
+    }
+
+    if (passwordContainsIdentityHint(body.password, [username, fullName])) {
+      return NextResponse.json(
+        { error: 'Password cannot contain username or name' },
         { status: 400 },
       );
     }
@@ -143,12 +158,12 @@ export async function POST(req: NextRequest) {
     });
     if (!registerRateByIp.ok) return registerRateByIp.response;
 
-    const registerRateByPhone = await enforceRateLimit({
-      key: `auth:register:phone:${phone}`,
-      limit: REGISTER_PHONE_RATE_LIMIT_PER_HOUR,
+    const registerRateByUsername = await enforceRateLimit({
+      key: `auth:register:username:${username}`,
+      limit: REGISTER_USERNAME_RATE_LIMIT_PER_HOUR,
       windowSeconds: 3600,
     });
-    if (!registerRateByPhone.ok) return registerRateByPhone.response;
+    if (!registerRateByUsername.ok) return registerRateByUsername.response;
 
     const captcha = await verifyCaptchaToken({
       token: captchaToken,
@@ -162,31 +177,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (REGISTER_PHONE_OTP_REQUIRED && !phoneOtpToken) {
-      return NextResponse.json(
-        { error: 'Phone OTP verification is required for registration' },
-        { status: 401 },
-      );
-    }
-
-    if (phoneOtpToken) {
-      const validPhoneVerification =
-        await hasOTPVerificationTokenForPurposes(
-          phoneOtpToken,
-          {
-            type: 'phone',
-            target: phone,
-          },
-          ['register', 'login'],
-        );
-      if (!validPhoneVerification) {
-        return NextResponse.json(
-          { error: 'Phone OTP verification is invalid or expired' },
-          { status: 401 },
-        );
-      }
-    }
-
     const backendRes = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
@@ -194,78 +184,18 @@ export async function POST(req: NextRequest) {
         ...authSecurityHeaders(security),
       },
       body: JSON.stringify({
-        phone,
+        username,
+        password: body.password,
+        ...(phone ? { phone } : {}),
         email,
         full_name: fullName,
-        username: body.username,
       }),
     });
 
     const data = await readJsonResponse(backendRes);
-    const normalizedError =
-      typeof data.error === 'string' ? data.error.toLowerCase() : '';
 
     if (!backendRes.ok) {
-      const canRecoverByPhoneLogin =
-        Boolean(phoneOtpToken) &&
-        (backendRes.status === 409 ||
-          normalizedError.includes('already registered') ||
-          normalizedError.includes('already exists') ||
-          normalizedError.includes('duplicate'));
-
-      if (canRecoverByPhoneLogin) {
-        const recoveryLoginRes = await fetch(`${API_URL}/auth/login-phone`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authSecurityHeaders(security),
-          },
-          body: JSON.stringify({ phone }),
-        });
-
-        const recoveryData = await readJsonResponse(recoveryLoginRes);
-
-        if (recoveryLoginRes.ok) {
-          if (phoneOtpToken) {
-            await consumeOTPVerificationTokenForPurposes(
-              phoneOtpToken,
-              {
-                type: 'phone',
-                target: phone,
-              },
-              ['register', 'login'],
-            );
-          }
-
-          return createAuthProxySuccessResponse(req, recoveryLoginRes, {
-            ...recoveryData,
-            recovery_action: 'login',
-            recovered_from: 'duplicate_register',
-          });
-        }
-
-        return NextResponse.json(
-          {
-            ...data,
-            next_step: 'login',
-            recovery_action: 'login_required',
-          },
-          { status: backendRes.status },
-        );
-      }
-
       return NextResponse.json(data, { status: backendRes.status });
-    }
-
-    if (phoneOtpToken) {
-      await consumeOTPVerificationTokenForPurposes(
-        phoneOtpToken,
-        {
-          type: 'phone',
-          target: phone,
-        },
-        ['register', 'login'],
-      );
     }
 
     return createAuthProxySuccessResponse(req, backendRes, {

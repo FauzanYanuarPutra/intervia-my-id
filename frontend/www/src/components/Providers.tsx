@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { AuthProvider } from '@/context/AuthContext';
 import { ChatInboxProvider } from '@/context/ChatInboxContext';
 import { NotificationInboxProvider } from '@/context/NotificationInboxContext';
@@ -14,12 +14,15 @@ import { ToastProvider } from '@/components/system/feedback/ToastProvider';
 import { ClientSecurityGuards } from '@/components/common/ClientSecurityGuards';
 import { GlobalImageFallback } from '@/components/common/GlobalImageFallback';
 import { LajukanEventBridge } from '@/components/analytics/LajukanEventBridge';
+import { WebVitalsReporter } from '@/components/analytics/WebVitalsReporter';
 
 type Props = {
   children: React.ReactNode;
 };
 
 export function Providers({ children }: Props) {
+  const [deferredBridgesReady, setDeferredBridgesReady] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (process.env.NEXT_PUBLIC_DISABLE_PWA === 'false') return;
@@ -62,6 +65,26 @@ export function Providers({ children }: Props) {
     void unregisterStaleWorkers();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let idleCallbackId: number | undefined;
+    const schedule = () => {
+      setDeferredBridgesReady(true);
+    };
+
+    const browserWindow = globalThis.window;
+    if ('requestIdleCallback' in browserWindow) {
+      idleCallbackId = browserWindow.requestIdleCallback(schedule, {
+        timeout: 1500,
+      });
+      return () => browserWindow.cancelIdleCallback(idleCallbackId as number);
+    }
+
+    const timeoutId = globalThis.setTimeout(schedule, 800);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, []);
+
   return (
     <ThemeProvider>
       <ClientSecurityGuards />
@@ -70,14 +93,18 @@ export function Providers({ children }: Props) {
         <ToastProvider>
           <DialogProvider>
             <AuthProvider>
-              <BrowserNotificationBridge />
               <ChatInboxProvider>
                 <NotificationInboxProvider>
                   <SectorProvider>
                     <PageMetaProviderWrapper>
+                      <WebVitalsReporter />
                       <Suspense fallback={null}>
-                        <LajukanEventBridge />
+                        {deferredBridgesReady ? <LajukanEventBridge /> : null}
                       </Suspense>
+                      {deferredBridgesReady ? <GlobalImageFallback /> : null}
+                      {deferredBridgesReady ? (
+                        <BrowserNotificationBridge />
+                      ) : null}
                       {children}
                     </PageMetaProviderWrapper>
                   </SectorProvider>

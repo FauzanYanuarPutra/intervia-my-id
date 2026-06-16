@@ -3,10 +3,11 @@
 import { useMemo, useState } from 'react';
 import {
   ArrowRight,
+  BookmarkCheck,
+  BookmarkPlus,
   LocateFixed,
   MapPin,
   MapPinned,
-  ShoppingCart,
   Store,
 } from 'lucide-react';
 import {
@@ -251,16 +252,21 @@ export function SearchUmkmPreview({
                               : onAddStoreToCart(store)
                           }
                           aria-label={
-                            isId ? 'Tambah ke keranjang' : 'Add to cart'
+                            cartQuantity > 0
+                              ? isId
+                                ? 'Buka referensi tersimpan'
+                                : 'Open saved references'
+                              : isId
+                                ? 'Simpan referensi'
+                                : 'Save reference'
                           }
                           className="ui-pressable relative inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white transition hover:brightness-[1.03]"
                         >
-                          <ShoppingCart className="h-3.5 w-3.5" />
                           {cartQuantity > 0 ? (
-                            <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-[color:var(--app-text)] px-1 text-[10px] font-black text-white">
-                              {cartQuantity}
-                            </span>
-                          ) : null}
+                            <BookmarkCheck className="h-3.5 w-3.5" />
+                          ) : (
+                            <BookmarkPlus className="h-3.5 w-3.5" />
+                          )}
                         </button>
                       ) : null}
                     </div>

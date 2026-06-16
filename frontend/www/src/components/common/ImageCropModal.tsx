@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent, WheelEvent } from 'react';
 import { Loader2, X } from 'lucide-react';
 
 type CropTargetShape = 'round' | 'rect';
@@ -55,10 +56,10 @@ export function ImageCropModal({
   useEffect(() => {
     if (!open) return;
     const updateFrame = () => {
-      const maxWidth = Math.min(560, window.innerWidth - 32);
+      const maxWidth = Math.min(720, Math.max(280, window.innerWidth - 24));
       let width = maxWidth;
       let height = width / aspect;
-      const maxHeight = Math.min(420, window.innerHeight * 0.6);
+      const maxHeight = Math.min(520, Math.max(240, window.innerHeight * 0.56));
       if (height > maxHeight) {
         height = maxHeight;
         width = height * aspect;
@@ -76,12 +77,7 @@ export function ImageCropModal({
       frameSize.width / naturalSize.width,
       frameSize.height / naturalSize.height,
     );
-  }, [
-    frameSize.height,
-    frameSize.width,
-    naturalSize.height,
-    naturalSize.width,
-  ]);
+  }, [frameSize.height, frameSize.width, naturalSize.height, naturalSize.width]);
 
   const maxScale = baseScale * 3;
   const zoomPercent = Math.round(
@@ -94,29 +90,26 @@ export function ImageCropModal({
     setPosition({ x: 0, y: 0 });
   }, [baseScale, open]);
 
-  const clampPosition = (nextX: number, nextY: number, nextScale = scale) => {
-    if (!naturalSize.width || !naturalSize.height) return { x: 0, y: 0 };
-    const displayedWidth = naturalSize.width * nextScale;
-    const displayedHeight = naturalSize.height * nextScale;
-    const maxOffsetX = Math.max(0, (displayedWidth - frameSize.width) / 2);
-    const maxOffsetY = Math.max(0, (displayedHeight - frameSize.height) / 2);
-    return {
-      x: clamp(nextX, -maxOffsetX, maxOffsetX),
-      y: clamp(nextY, -maxOffsetY, maxOffsetY),
-    };
-  };
+  const clampPosition = useCallback(
+    (nextX: number, nextY: number, nextScale = scale) => {
+      if (!naturalSize.width || !naturalSize.height) return { x: 0, y: 0 };
+      const displayedWidth = naturalSize.width * nextScale;
+      const displayedHeight = naturalSize.height * nextScale;
+      const maxOffsetX = Math.max(0, (displayedWidth - frameSize.width) / 2);
+      const maxOffsetY = Math.max(0, (displayedHeight - frameSize.height) / 2);
+      return {
+        x: clamp(nextX, -maxOffsetX, maxOffsetX),
+        y: clamp(nextY, -maxOffsetY, maxOffsetY),
+      };
+    },
+    [frameSize.height, frameSize.width, naturalSize.height, naturalSize.width, scale],
+  );
 
   useEffect(() => {
     setPosition(prev => clampPosition(prev.x, prev.y, scale));
-  }, [
-    frameSize.height,
-    frameSize.width,
-    naturalSize.height,
-    naturalSize.width,
-    scale,
-  ]);
+  }, [clampPosition, scale]);
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!open) return;
     event.preventDefault();
     dragRef.current = {
@@ -129,9 +122,8 @@ export function ImageCropModal({
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId)
-      return;
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
     const dx = event.clientX - dragRef.current.startX;
     const dy = event.clientY - dragRef.current.startY;
     const next = clampPosition(
@@ -141,17 +133,25 @@ export function ImageCropModal({
     setPosition(next);
   };
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId)
-      return;
+  const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
     dragRef.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   const handleZoomChange = (value: number) => {
     const nextScale = clamp(value, baseScale, maxScale);
     setScale(nextScale);
     setPosition(prev => clampPosition(prev.x, prev.y, nextScale));
+  };
+
+  const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
+    if (!open) return;
+    event.preventDefault();
+    const step = event.deltaY > 0 ? -0.045 : 0.045;
+    handleZoomChange(scale + step * maxScale);
   };
 
   const handleConfirm = async () => {
@@ -212,9 +212,9 @@ export function ImageCropModal({
   const frameClass = shape === 'round' ? 'rounded-full' : 'rounded-2xl';
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-3 sm:items-center sm:p-4">
-      <div className="max-h-[92svh] w-full max-w-[720px] overflow-hidden rounded-[30px] border border-white/15 bg-[color:var(--app-surface-strong)] shadow-[0_24px_90px_-30px_rgba(0,0,0,0.55)]">
-        <div className="border-b border-[color:var(--app-border)] px-4 pb-4 pt-3 sm:px-5">
+    <div className="ui-layer-modal fixed inset-0 z-[1400] flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-2 backdrop-blur-md sm:items-center sm:p-4">
+      <div className="flex max-h-[95svh] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[24px] border border-white/15 bg-[color:var(--app-surface-strong)] shadow-[0_24px_90px_-30px_rgba(0,0,0,0.55)] sm:max-w-[920px] sm:rounded-[30px]">
+        <div className="border-b border-[color:var(--app-border)] px-3 pb-3 pt-3 sm:px-5">
           <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-[color:var(--app-surface-muted)]" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -225,7 +225,7 @@ export function ImageCropModal({
                 {title}
               </h3>
               <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                Geser gambar di area crop, lalu atur zoom kalau perlu.
+                Geser gambar, zoom pakai slider atau scroll mouse di area crop.
               </p>
             </div>
             <button
@@ -239,12 +239,16 @@ export function ImageCropModal({
           </div>
         </div>
 
-        <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_280px] sm:p-5">
-          <div className="space-y-3">
-            <div className="overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-black/5 p-2">
+        <div className="grid min-h-0 gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_300px] sm:gap-4 sm:p-4">
+          <div className="min-h-0 space-y-3">
+            <div className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-black/5 p-2 sm:rounded-[28px]">
               <div
                 className="relative mx-auto select-none touch-none"
-                style={{ width: frameSize.width, height: frameSize.height }}
+                style={{
+                  width: 'min(100%, 100%)',
+                  maxWidth: `${frameSize.width}px`,
+                  height: `${frameSize.height}px`,
+                }}
               >
                 <div
                   className={`relative h-full w-full overflow-hidden ${frameClass} bg-[linear-gradient(135deg,rgba(15,23,42,0.06),rgba(15,23,42,0.12))]`}
@@ -253,8 +257,10 @@ export function ImageCropModal({
                   onPointerUp={handlePointerUp}
                   onPointerCancel={handlePointerUp}
                   onPointerLeave={handlePointerUp}
+                  onWheel={handleWheel}
                   style={{ touchAction: 'none', cursor: 'grab' }}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={imageRef}
                     src={imageSrc}
@@ -282,12 +288,11 @@ export function ImageCropModal({
             </div>
 
             <p className="text-xs text-[color:var(--app-text-soft)]">
-              Tarik gambar untuk menggeser posisi crop. Slidernya buat zoom,
-              bukan untuk mengganti foto.
+              Drag image untuk geser crop. Scroll mouse di area crop juga bisa zoom.
             </p>
           </div>
 
-          <div className="space-y-4 rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4">
+          <div className="space-y-4 rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 sm:rounded-[24px] sm:p-4">
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
@@ -311,9 +316,9 @@ export function ImageCropModal({
             <div className="rounded-[20px] bg-white/60 p-3 text-xs leading-6 text-[color:var(--app-text)]">
               <p className="font-bold text-[color:var(--app-text)]">Tips cepat</p>
               <ul className="mt-2 space-y-1.5">
-                <li>• Geser gambar untuk pasin wajah atau logo di tengah.</li>
-                <li>• Zoom sedikit kalau crop terlalu longgar.</li>
-                <li>• Avatar lebih enak kalau objeknya agak di tengah.</li>
+                <li>- Geser gambar untuk pasin wajah atau logo di tengah.</li>
+                <li>- Zoom sedikit kalau crop terlalu longgar.</li>
+                <li>- Avatar lebih enak kalau objeknya agak di tengah.</li>
               </ul>
             </div>
 

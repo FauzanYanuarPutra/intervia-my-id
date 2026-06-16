@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildForwardAuthHeaders, withProtectedRoute } from '@/lib/api/withProtectedRoute';
 import { errorResponse } from '@/lib/api/errorResponse';
 import { requireAuth } from '@/lib/serverAuth';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   checkoutUmkmOrder,
   getUmkmOrderById,
@@ -70,6 +71,12 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<{ orderId: string }> },
 ) {
+  if (PROMO_ONLY_MODE) {
+    return NextResponse.json(
+      { error: 'Order payment sync is disabled for now' },
+      { status: 404 },
+    );
+  }
   const auth = await requireAuth(req);
   if (!auth.ok) return auth.res;
 

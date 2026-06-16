@@ -9,7 +9,7 @@ const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
 
 const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(1).optional(),
-  newPassword: z.string().min(8),
+  newPassword: z.string().min(1).max(256),
 });
 
 export async function POST(req: NextRequest) {

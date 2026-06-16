@@ -6,6 +6,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { ArrowRight, MessageSquarePlus, Search, Send, Sparkles } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
+import { isPreviewableContentMediaUrl, normalizeContentMediaUrl } from '@/lib/content/catalog';
 
 type Cat = { id: string; name: string; slug: string; description: string; threadCount: number; postCount: number };
 type Tag = { id: string; name: string; slug: string; usageCount: number; color?: string };
@@ -19,6 +20,10 @@ type Overview = { stats: { totalThreads: number; totalPosts: number; totalUsers:
 
 const fmtTime = (value: string, isId: boolean) => new Intl.DateTimeFormat(isId ? 'id-ID' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
 const plain = (value?: string | null) => (value || '').replace(/[#>*_`-]/g, '').trim();
+const forumImageSrc = (value?: string | null) => {
+  const normalized = normalizeContentMediaUrl(value || '');
+  return isPreviewableContentMediaUrl(normalized) ? normalized : '';
+};
 
 export default function ForumHubClient({ isId }: { isId: boolean }) {
   const router = useRouter();
@@ -342,7 +347,24 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
                     <p className="text-xs text-[color:var(--app-text-soft)]">{fmtTime(post.createdAt, isId)}</p>
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[color:var(--app-text-soft)]">{plain(post.content) || post.content}</p>
-                  {post.imageUrls?.length ? <div className="mt-3 flex flex-wrap gap-2">{post.imageUrls.map(src => (<div key={src}><img src={src} alt="forum" className="h-20 w-20 rounded-2xl object-cover" /></div>))}</div> : null}
+                  {post.imageUrls?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {post.imageUrls.map(src => {
+                        const resolvedSrc = forumImageSrc(src);
+                        if (!resolvedSrc) return null;
+
+                        return (
+                          <div key={resolvedSrc}>
+                            <img
+                              src={resolvedSrc}
+                              alt="forum"
+                              className="h-20 w-20 rounded-2xl object-cover"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>

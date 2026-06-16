@@ -23,6 +23,7 @@ import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
 
 type OverviewPayload = {
@@ -228,7 +229,9 @@ export function BusinessOsCommandCenter() {
   );
 
   const unreadMessages = toInt(payload?.overview.unread_messages);
-  const activeTransactions = toInt(payload?.overview.active_transactions);
+  const activeTransactions = PROMO_ONLY_MODE
+    ? 0
+    : toInt(payload?.overview.active_transactions);
   const activeLeads = toInt(payload?.overview.active_leads);
   const openSupportTickets = toInt(payload?.overview.open_support_tickets);
   const publishedContent = toInt(payload?.overview.published_content);
@@ -251,7 +254,7 @@ export function BusinessOsCommandCenter() {
       });
     }
 
-    if (activeTransactions > 0) {
+    if (!PROMO_ONLY_MODE && activeTransactions > 0) {
       items.push({
         id: 'transactions',
         count: activeTransactions,
@@ -316,16 +319,20 @@ export function BusinessOsCommandCenter() {
           ? 'Lihat pesan dan balas cepat.'
           : 'Open inbox and reply fast.',
       },
-      {
-        id: 'transactions',
-        href: '/transactions',
-        icon: Workflow,
-        tone: 'amber',
-        title: isId ? 'Transaksi' : 'Transactions',
-        description: isId
-          ? 'Pantau order yang masih jalan.'
-          : 'Review orders that are still moving.',
-      },
+      ...(!PROMO_ONLY_MODE
+        ? [
+            {
+              id: 'transactions',
+              href: '/transactions',
+              icon: Workflow,
+              tone: 'amber' as Tone,
+              title: isId ? 'Transaksi' : 'Transactions',
+              description: isId
+                ? 'Pantau order yang masih jalan.'
+                : 'Review orders that are still moving.',
+            },
+          ]
+        : []),
       {
         id: 'listings',
         href: '/my-listings',
@@ -366,15 +373,30 @@ export function BusinessOsCommandCenter() {
   );
   const operatingSystem = payload?.operating_system;
   const topRelations = useMemo(
-    () => (operatingSystem?.system_relations || []).slice(0, 3),
+    () =>
+      (operatingSystem?.system_relations || [])
+        .filter(item =>
+          PROMO_ONLY_MODE ? !item.href.startsWith('/transactions') : true,
+        )
+        .slice(0, 3),
     [operatingSystem?.system_relations],
   );
   const topAutomations = useMemo(
-    () => (operatingSystem?.automation_queue || []).slice(0, 3),
+    () =>
+      (operatingSystem?.automation_queue || [])
+        .filter(item =>
+          PROMO_ONLY_MODE ? !item.href.startsWith('/transactions') : true,
+        )
+        .slice(0, 3),
     [operatingSystem?.automation_queue],
   );
   const topAiActions = useMemo(
-    () => (operatingSystem?.ai_copilot_actions || []).slice(0, 3),
+    () =>
+      (operatingSystem?.ai_copilot_actions || [])
+        .filter(item =>
+          PROMO_ONLY_MODE ? !item.href.startsWith('/transactions') : true,
+        )
+        .slice(0, 3),
     [operatingSystem?.ai_copilot_actions],
   );
   const topTrustControls = useMemo(
@@ -449,8 +471,12 @@ export function BusinessOsCommandCenter() {
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
               {isId
-                ? 'Dashboard ini sengaja dipadatkan. Fokus ke chat, transaksi, postingan, dan langkah berikutnya yang paling dekat hasilnya.'
-                : 'This dashboard is intentionally compact. Focus on chats, transactions, listings, and the next action closest to results.'}
+                ? PROMO_ONLY_MODE
+                  ? 'Dashboard ini dipadatkan untuk launch awal. Fokus ke chat, postingan, profil usaha, dan data yang bikin promosi makin kuat.'
+                  : 'Dashboard ini sengaja dipadatkan. Fokus ke chat, transaksi, postingan, dan langkah berikutnya yang paling dekat hasilnya.'
+                : PROMO_ONLY_MODE
+                  ? 'This launch dashboard focuses on chats, listings, business profiles, and data that strengthens promotion.'
+                  : 'This dashboard is intentionally compact. Focus on chats, transactions, listings, and the next action closest to results.'}
             </p>
           </div>
 
@@ -491,13 +517,17 @@ export function BusinessOsCommandCenter() {
             icon: MessageCircle,
             tone: 'sky' as Tone,
           },
-          {
-            id: 'stat-transactions',
-            label: isId ? 'Transaksi aktif' : 'Active transactions',
-            value: activeTransactions,
-            icon: Workflow,
-            tone: 'amber' as Tone,
-          },
+          ...(!PROMO_ONLY_MODE
+            ? [
+                {
+                  id: 'stat-transactions',
+                  label: isId ? 'Transaksi aktif' : 'Active transactions',
+                  value: activeTransactions,
+                  icon: Workflow,
+                  tone: 'amber' as Tone,
+                },
+              ]
+            : []),
           {
             id: 'stat-content',
             label: isId ? 'Posting tayang' : 'Live listings',

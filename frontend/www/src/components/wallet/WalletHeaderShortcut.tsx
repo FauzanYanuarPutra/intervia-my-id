@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, Loader2, ReceiptText, ShieldCheck, Wallet } from 'lucide-react';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { useAuth } from '@/context/AuthContext';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 type WalletAccount = {
   id: string;
@@ -73,9 +74,15 @@ export function WalletHeaderShortcut({
   const isId = locale === 'id';
   const { user, authFetch } = useAuth();
   const [balances, setBalances] = useState<WalletBalancesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!PROMO_ONLY_MODE);
 
   useEffect(() => {
+    if (PROMO_ONLY_MODE) {
+      setBalances(null);
+      setLoading(false);
+      return;
+    }
+
     let active = true;
 
     async function loadBalance() {
@@ -124,6 +131,7 @@ export function WalletHeaderShortcut({
       ? 'Dev'
       : 'Dev';
 
+  if (PROMO_ONLY_MODE) return null;
   if (!user) return null;
 
   if (variant === 'drawer') {

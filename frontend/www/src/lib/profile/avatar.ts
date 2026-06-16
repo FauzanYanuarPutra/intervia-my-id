@@ -1,3 +1,5 @@
+import { normalizeContentMediaUrl } from '@/lib/content/catalog';
+
 export const DEFAULT_PROFILE_AVATAR = '/default-avatar.svg';
 
 export function profileAvatarSrc(value?: string | null) {
@@ -15,12 +17,13 @@ export function profileAvatarSrc(value?: string | null) {
     return DEFAULT_PROFILE_AVATAR;
   }
 
+  const mediaUrl = normalizeContentMediaUrl(clean);
   if (
-    clean.startsWith('/') ||
-    clean.startsWith('https://') ||
-    clean.startsWith('data:image/')
+    mediaUrl.startsWith('/') ||
+    mediaUrl.startsWith('https://') ||
+    mediaUrl.startsWith('data:image/')
   ) {
-    return clean;
+    return mediaUrl;
   }
 
   return DEFAULT_PROFILE_AVATAR;

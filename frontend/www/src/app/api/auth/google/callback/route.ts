@@ -11,9 +11,6 @@ import { z } from 'zod';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-const GOOGLE_REDIRECT_URI =
-  process.env.GOOGLE_REDIRECT_URI || `${BASE_URL}/api/auth/google/callback`;
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
 const GoogleCallbackQuerySchema = z.object({
   code: z.string().optional(),
@@ -46,6 +43,20 @@ interface BackendOAuthResponse {
   user?: {
     id?: string;
   };
+}
+
+function getPublicBaseUrl(req: NextRequest): string {
+  const envBase =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL || '';
+  if (envBase.trim()) return envBase.replace(/\/$/, '');
+  return req.nextUrl.origin || 'https://www.lajukan.com';
+}
+
+function getGoogleRedirectUri(req: NextRequest): string {
+  return (
+    process.env.GOOGLE_REDIRECT_URI ||
+    `${getPublicBaseUrl(req)}/api/auth/google/callback`
+  );
 }
 
 function sanitizeCallbackPath(input: string | undefined): string {
@@ -105,7 +116,7 @@ export async function GET(req: NextRequest) {
       } catch {}
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = getPublicBaseUrl(req);
     const preferredLocale = getPreferredLocale(req, callbackUrl);
 
     if (error) {
@@ -135,7 +146,7 @@ export async function GET(req: NextRequest) {
         code,
         client_id: GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: GOOGLE_REDIRECT_URI,
+        redirect_uri: getGoogleRedirectUri(req),
         grant_type: 'authorization_code',
       }),
     });
@@ -250,7 +261,7 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (e) {
     console.error('Google OAuth callback error:', e);
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = getPublicBaseUrl(req);
     const preferredLocale = getPreferredLocale(req);
     return NextResponse.redirect(
       `${baseUrl}/${preferredLocale}/login?error=oauth_error`,

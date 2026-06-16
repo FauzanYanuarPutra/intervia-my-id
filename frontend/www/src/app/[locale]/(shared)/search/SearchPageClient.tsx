@@ -3,7 +3,7 @@
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { Modal } from '@/components/common/Modal';
 import { AuthCtaLink } from '@/components/home/AuthCtaLink';
@@ -12,21 +12,22 @@ import { SearchUmkmPreview, type UmkmPreviewStore } from './SearchUmkmPreview';
 import {
   ArrowRight,
   BadgeCheck,
+  BookmarkCheck,
+  BookmarkPlus,
   Briefcase,
   ChevronLeft,
   Clock3,
+  Eye,
   Filter,
   Handshake,
   Layers3,
   MapPin,
-  Minus,
   MoreHorizontal,
   Package,
   Plus,
   RefreshCcw,
   Search,
   ShieldCheck,
-  ShoppingCart,
   Store,
   Trash2,
   UserRound,
@@ -45,15 +46,10 @@ import {
   removeSearchCartItem,
   subscribeSearchCartSession,
   upsertSearchCartItem,
-  type SearchCartItem,
   type SearchCartItemInput,
   type SearchCartItemKind,
   type SearchCartSession,
 } from '@/lib/searchCartSession';
-import {
-  readUmkmCartSession,
-  writeUmkmCartSession,
-} from '@/lib/super-app/umkmCartSession';
 import {
   asString,
   type ContentItem,
@@ -205,8 +201,8 @@ const SORT_OPTIONS: Array<{
 }> = [
   { value: 'relevance', labelId: 'Paling relevan', labelEn: 'Most relevant' },
   { value: 'newest', labelId: 'Terbaru', labelEn: 'Newest' },
-  { value: 'price_low', labelId: 'Harga terendah', labelEn: 'Lowest price' },
-  { value: 'price_high', labelId: 'Harga tertinggi', labelEn: 'Highest price' },
+  { value: 'price_low', labelId: 'Kisaran rendah', labelEn: 'Lower range' },
+  { value: 'price_high', labelId: 'Kisaran tinggi', labelEn: 'Higher range' },
 ];
 
 type CategoryVisual = {
@@ -862,24 +858,24 @@ function getSearchCartActionLabel(
   locale: 'id' | 'en',
 ): string {
   if (locale !== 'id') {
-    if (kind === 'product') return 'Checkout / chat';
+    if (kind === 'product') return 'Ask seller';
     if (kind === 'service') return 'Discuss service';
-    if (kind === 'property') return 'Schedule visit';
-    if (kind === 'job') return 'Apply';
+    if (kind === 'property') return 'Open location';
+    if (kind === 'job') return 'View job';
     if (kind === 'freelancer') return 'Chat talent';
-    if (kind === 'tool_rental') return 'Arrange rental';
-    if (kind === 'business_transfer') return 'Check handover';
+    if (kind === 'tool_rental') return 'Ask availability';
+    if (kind === 'business_transfer') return 'Ask handover';
     if (kind === 'umkm') return 'Open business';
     return 'Open detail';
   }
 
-  if (kind === 'product') return 'Checkout / chat';
+  if (kind === 'product') return 'Tanya penjual';
   if (kind === 'service') return 'Bahas jasa';
-  if (kind === 'property') return 'Atur survey';
-  if (kind === 'job') return 'Lamar';
+  if (kind === 'property') return 'Cek lokasi';
+  if (kind === 'job') return 'Lihat lowongan';
   if (kind === 'freelancer') return 'Chat talent';
-  if (kind === 'tool_rental') return 'Atur sewa';
-  if (kind === 'business_transfer') return 'Cek oper usaha';
+  if (kind === 'tool_rental') return 'Tanya stok sewa';
+  if (kind === 'business_transfer') return 'Tanya oper usaha';
   if (kind === 'umkm') return 'Buka usaha';
   return 'Buka detail';
 }
@@ -992,7 +988,7 @@ function SearchFilterTabs({
   return (
     <div
       className={cn(
-        'flex max-w-full gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'flex max-w-full gap-2 overflow-x-auto pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className,
       )}
       role="tablist"
@@ -1010,10 +1006,10 @@ function SearchFilterTabs({
             aria-selected={active}
             onClick={() => onSelect(tab.value)}
             className={cn(
-              'inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-full border px-3 text-[12px] font-bold transition',
+              'inline-flex min-h-[40px] shrink-0 items-center gap-2 rounded-full border px-3.5 text-[12px] font-bold transition hover:-translate-y-0.5',
               active
-                ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-22px_rgba(22,163,74,0.42)]'
-                : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]',
+                ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_18px_30px_-22px_rgba(22,163,74,0.46)]'
+                : 'border-[color:var(--app-border)] bg-white/92 text-[color:var(--app-text-soft)] shadow-[0_10px_24px_-24px_rgba(15,23,42,0.18)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]',
             )}
           >
             <Icon className="h-4 w-4" />
@@ -1095,31 +1091,49 @@ function SearchResultListingCard({
   const updatedLabel = formatShortDate(item.updatedAt, locale);
   const visual = getCategoryVisual(item.typeKey);
   const CategoryIcon = visual.icon;
+  const isSaved = cartQuantity > 0;
   const badgeTone =
     'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] border-[color:var(--app-border)]';
-  const openLabel = isId ? 'Buka' : 'Open';
-  const cartAriaLabel =
-    cartQuantity > 0
+  const detailLabel = isId ? 'Detail / chat' : 'Details / chat';
+  const savedLabel = isSaved
+    ? isId
+      ? 'Tersimpan'
+      : 'Saved'
+    : isId
+      ? 'Simpan'
+      : 'Save';
+  const saveAriaLabel = isSaved
+    ? isId
+      ? 'Buka referensi tersimpan'
+      : 'Open saved references'
+    : isId
+      ? 'Simpan sebagai referensi'
+      : 'Save as reference';
+  const ownerLabel = item.storeName || item.ownerName || null;
+  const mediaLabel =
+    previewImages.length > 1
       ? isId
-        ? 'Buka keranjang'
-        : 'Open cart'
-      : isId
-        ? 'Tambah ke keranjang'
-        : 'Add to cart';
+        ? `${previewImages.length} foto`
+        : `${previewImages.length} photos`
+      : item.hasMedia
+        ? isId
+          ? 'Ada foto'
+          : 'Has media'
+        : null;
 
   return (
     <article
       data-testid="search-result-card"
       className={cn(
-        'overflow-hidden rounded-[18px] border shadow-[0_14px_32px_-28px_rgba(15,23,42,0.16)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_48px_-40px_rgba(15,23,42,0.22)] sm:rounded-[20px]',
+        'group/card overflow-hidden rounded-[22px] border shadow-[0_18px_38px_-30px_rgba(15,23,42,0.2)] ring-1 ring-white/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_58px_-40px_rgba(15,23,42,0.28)]',
         visual.cardClass,
       )}
     >
-      <div className="grid min-w-0 grid-cols-[104px_minmax(0,1fr)] gap-0 sm:grid-cols-[132px_minmax(0,1fr)] xl:grid-cols-[148px_minmax(0,1fr)_158px] 2xl:grid-cols-[156px_minmax(0,1fr)_170px]">
+      <div className="grid min-w-0 grid-cols-[112px_minmax(0,1fr)] items-stretch gap-0 sm:grid-cols-[148px_minmax(0,1fr)] xl:grid-cols-[172px_minmax(0,1fr)_176px] 2xl:grid-cols-[184px_minmax(0,1fr)_190px]">
         <Link
           href={item.href}
           className={cn(
-            'relative min-h-full overflow-hidden',
+            'relative h-full min-h-[112px] w-full self-stretch overflow-hidden sm:min-h-[148px] xl:min-h-full',
             visual.imageClass,
           )}
           aria-label={isId ? 'Buka detail' : 'Open details'}
@@ -1128,10 +1142,10 @@ function SearchResultListingCard({
             <MediaPreviewCarousel
               items={previewImages}
               alt={item.title}
-              aspectClassName="h-full min-h-[150px] w-full sm:min-h-[170px]"
-              className="h-full w-full bg-transparent"
-              mediaClassName="transition duration-500 hover:scale-[1.035]"
-              sizes="(max-width: 640px) 112px, 160px"
+              aspectClassName="h-full w-full"
+              className="absolute inset-0 h-full w-full bg-transparent"
+              mediaClassName="transition duration-500 group-hover/card:scale-[1.035]"
+              sizes="(max-width: 640px) 112px, (max-width: 1280px) 148px, 184px"
               controls={false}
               lightbox={false}
               showCounter={previewImages.length > 1}
@@ -1149,10 +1163,11 @@ function SearchResultListingCard({
               </span>
             </div>
           )}
-          <div className="absolute left-1.5 top-1.5 sm:left-2.5 sm:top-2.5">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/20 to-transparent" />
+          <div className="absolute left-2 top-2 sm:left-3 sm:top-3">
             <span
               className={cn(
-                'inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold sm:px-2.5 sm:py-1 sm:text-[10px]',
+                'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-black shadow-sm backdrop-blur sm:text-[10px]',
                 visual.chipClass,
               )}
             >
@@ -1160,11 +1175,18 @@ function SearchResultListingCard({
               <span className="truncate">{item.typeLabel}</span>
             </span>
           </div>
+          {mediaLabel ? (
+            <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3">
+              <span className="inline-flex max-w-full items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-black text-slate-700 shadow-sm backdrop-blur">
+                {mediaLabel}
+              </span>
+            </div>
+          ) : null}
         </Link>
 
-        <div className="min-w-0 border-l border-[color:var(--app-border)] p-2.5 sm:p-3 xl:p-3.5">
+        <div className="min-w-0 border-l border-[color:var(--app-border)] bg-white/58 p-3 backdrop-blur-sm sm:p-4">
           <div className="min-w-0">
-            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:mb-2">
               <span
                 className={cn(
                   'inline-flex min-h-[22px] items-center rounded-full border px-2 py-0.5 text-[9px] font-bold',
@@ -1181,11 +1203,16 @@ function SearchResultListingCard({
               ) : null}
             </div>
             <Link href={item.href} className="group block">
-              <h3 className="line-clamp-2 text-[0.9rem] font-black leading-snug tracking-[-0.025em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1rem]">
+              <h3 className="line-clamp-2 text-[0.92rem] font-black leading-[1.08] tracking-[-0.035em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.1rem]">
                 {item.title}
               </h3>
             </Link>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-[color:var(--app-text-soft)] sm:mt-1.5 sm:gap-x-3 sm:text-[11px]">
+            {ownerLabel ? (
+              <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[11px]">
+                {ownerLabel}
+              </p>
+            ) : null}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:mt-1.5 sm:gap-x-3 sm:text-[11px]">
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5" />
                 {item.location}
@@ -1199,18 +1226,21 @@ function SearchResultListingCard({
             </div>
           </div>
 
-          <p className="mt-1.5 line-clamp-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
+          <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:mt-2 sm:text-[12px]">
             {item.summary ||
               (isId
                 ? 'Siap dibuka. Lanjut chat.'
                 : 'Listing ready to open and follow up.')}
           </p>
 
-          <div className="mt-2 flex items-end justify-between gap-2 xl:hidden">
-            <div className="min-w-0">
+          <div className="mt-2 xl:hidden">
+            <div className="rounded-[14px] border border-white/70 bg-white/76 px-2.5 py-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)] sm:rounded-[16px] sm:px-3">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                {isId ? 'Info' : 'Info'}
+              </p>
               <p
                 className={cn(
-                  'truncate text-[0.98rem] font-black sm:text-[1.12rem]',
+                  'mt-0.5 truncate text-[0.88rem] font-black leading-tight sm:text-[0.95rem]',
                   visual.priceClass,
                 )}
               >
@@ -1218,34 +1248,51 @@ function SearchResultListingCard({
               </p>
               {item.priceUnitLabel ? (
                 <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                  {isId ? 'Harga per' : 'Price per'} {item.priceUnitLabel}
+                  {isId ? 'Per' : 'Per'} {item.priceUnitLabel}
                 </p>
               ) : null}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+
+            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <Link
+                href={item.profileHref || item.href}
+                className={cn(
+                  'inline-flex min-h-[40px] min-w-0 items-center justify-center gap-2 rounded-[14px] border px-3 text-[12px] font-black',
+                  visual.outlineButtonClass,
+                )}
+              >
+                <Eye className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{detailLabel}</span>
+              </Link>
               <button
                 type="button"
                 onClick={() =>
-                  cartQuantity > 0 ? onOpenCart() : onAddToCart(item)
+                  isSaved ? onOpenCart() : onAddToCart(item)
                 }
-                aria-label={cartAriaLabel}
+                aria-label={saveAriaLabel}
                 className={cn(
-                  'relative inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[12px] text-[11px] font-semibold sm:h-[38px] sm:w-[38px]',
+                  'relative inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-black',
                   visual.solidButtonClass,
                 )}
               >
-                {cartQuantity > 0 ? (
-                  <ShoppingCart className="h-3.5 w-3.5" />
+                {isSaved ? (
+                  <BookmarkCheck className="h-3.5 w-3.5" />
                 ) : (
-                  <Plus className="h-3.5 w-3.5" />
+                  <BookmarkPlus className="h-3.5 w-3.5" />
                 )}
-                {cartQuantity > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-[color:var(--app-text)] px-1 text-[10px] font-black text-white">
-                    {cartQuantity}
-                  </span>
-                ) : null}
+                <span className="hidden sm:inline">{savedLabel}</span>
               </button>
             </div>
+            {isSaved ? (
+              <button
+                type="button"
+                onClick={() => onRemoveFromCart(item.id)}
+                className="mt-2 inline-flex min-h-[28px] items-center gap-1.5 rounded-full px-1 text-[10px] font-bold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+              >
+                <X className="h-3 w-3" />
+                {isId ? 'Hapus dari referensi' : 'Remove reference'}
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -1256,9 +1303,12 @@ function SearchResultListingCard({
           )}
         >
           <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+              {isId ? 'Info' : 'Info'}
+            </p>
             <p
               className={cn(
-                'text-[1.04rem] font-black leading-tight',
+                'mt-1 text-[1.06rem] font-black leading-tight',
                 visual.priceClass,
               )}
             >
@@ -1279,37 +1329,36 @@ function SearchResultListingCard({
               <button
                 type="button"
                 onClick={() =>
-                  cartQuantity > 0 ? onOpenCart() : onAddToCart(item)
+                  isSaved ? onOpenCart() : onAddToCart(item)
                 }
+                aria-label={saveAriaLabel}
                 className={cn(
                   'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] px-3 text-[12px] font-semibold',
                   visual.solidButtonClass,
                 )}
               >
-                {cartQuantity > 0 ? (
-                  <ShoppingCart className="h-3.5 w-3.5" />
+                {isSaved ? (
+                  <BookmarkCheck className="h-3.5 w-3.5" />
                 ) : (
-                  <Plus className="h-3.5 w-3.5" />
+                  <BookmarkPlus className="h-3.5 w-3.5" />
                 )}
-                {cartQuantity > 0
-                  ? `${cartQuantity} ${isId ? 'item' : 'items'}`
-                  : isId
-                    ? 'Tambah'
-                    : 'Add'}
+                {savedLabel}
               </button>
-              {cartQuantity > 0 ? (
+              {isSaved ? (
                 <button
                   type="button"
                   onClick={() => onRemoveFromCart(item.id)}
                   aria-label={
-                    isId ? 'Kurangi dari keranjang' : 'Remove from cart'
+                    isId
+                      ? 'Hapus dari referensi'
+                      : 'Remove from saved references'
                   }
                   className={cn(
                     'inline-flex h-[38px] w-[38px] items-center justify-center rounded-[12px] border text-[12px] font-semibold',
                     visual.outlineButtonClass,
                   )}
                 >
-                  <Minus className="h-3.5 w-3.5" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               ) : null}
             </div>
@@ -1320,7 +1369,8 @@ function SearchResultListingCard({
                 visual.outlineButtonClass,
               )}
             >
-              {openLabel}
+              <Eye className="h-3.5 w-3.5" />
+              {detailLabel}
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -1335,29 +1385,25 @@ function SearchCartDock({
   isId,
   open,
   onOpenChange,
-  onIncrement,
-  onDecrement,
+  onRemove,
   onClear,
 }: {
   cart: SearchCartSession;
   isId: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onIncrement: (item: SearchCartItem) => void;
-  onDecrement: (itemId: string) => void;
+  onRemove: (itemId: string) => void;
   onClear: () => void;
 }) {
-  if (cart.itemCount <= 0) return null;
+  if (cart.items.length <= 0) return null;
 
   const visibleItems = cart.items;
   const previewItems = cart.items.slice(0, 3);
   const firstItem = cart.items[0];
-  const countLabel = `${cart.itemCount} ${isId ? 'item' : 'items'}`;
-  const subtotalCents = cart.items.reduce(
-    (sum, item) => sum + (item.priceCents || 0) * item.quantity,
-    0,
-  );
-  const hasSubtotal = subtotalCents > 0;
+  const savedCount = cart.items.length;
+  const countLabel = `${savedCount} ${
+    isId ? 'referensi tersimpan' : 'saved references'
+  }`;
 
   return (
     <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-[70] lg:bottom-5 lg:left-auto lg:right-5 lg:w-[390px]">
@@ -1369,14 +1415,14 @@ function SearchCartDock({
         >
           <span className="inline-flex min-w-0 items-center gap-3">
             <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent)] text-white shadow-[0_14px_26px_-18px_rgba(22,163,74,0.58)]">
-              <ShoppingCart className="h-4.5 w-4.5" />
+              <BookmarkCheck className="h-4.5 w-4.5" />
               <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[color:var(--app-text)] px-1 text-[10px] font-black text-white">
-                {cart.itemCount}
+                {savedCount}
               </span>
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[13px] font-black text-[color:var(--app-text)]">
-                {isId ? 'Keranjang pencarian' : 'Search cart'}
+                {isId ? 'Referensi tersimpan' : 'Saved references'}
               </span>
               <span className="block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                 {firstItem?.title || countLabel}
@@ -1409,7 +1455,7 @@ function SearchCartDock({
               </span>
             ) : null}
             <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
-              {isId ? 'Cek' : 'View'}
+              {isId ? 'Buka' : 'Open'}
             </span>
           </span>
         </button>
@@ -1418,11 +1464,11 @@ function SearchCartDock({
           <div className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)] px-3.5 py-3.5">
             <div className="flex min-w-0 items-center gap-3">
               <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                <ShoppingCart className="h-4.5 w-4.5" />
+                <BookmarkCheck className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
                 <p className="text-[14px] font-black text-[color:var(--app-text)]">
-                  {isId ? 'Keranjang pencarian' : 'Search cart'}
+                  {isId ? 'Referensi tersimpan' : 'Saved references'}
                 </p>
                 <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                   {countLabel}
@@ -1433,7 +1479,7 @@ function SearchCartDock({
               type="button"
               onClick={() => onOpenChange(false)}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
-              aria-label={isId ? 'Tutup keranjang' : 'Close cart'}
+              aria-label={isId ? 'Tutup referensi' : 'Close references'}
             >
               <X className="h-4 w-4" />
             </button>
@@ -1442,19 +1488,15 @@ function SearchCartDock({
           <div className="grid grid-cols-2 gap-2 px-3.5 py-3">
             <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2">
               <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                {isId ? 'Estimasi total' : 'Estimated total'}
+                {isId ? 'Siap ditanya' : 'Ready to ask'}
               </p>
               <p className="mt-0.5 truncate text-[13px] font-black text-[color:var(--app-text)]">
-                {hasSubtotal
-                  ? formatIDRFromCents(subtotalCents)
-                  : isId
-                    ? 'Cek di detail'
-                    : 'See details'}
+                {countLabel}
               </p>
             </div>
             <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2">
               <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                {isId ? 'Lanjut dari' : 'Continue from'}
+                {isId ? 'Mulai dari' : 'Start from'}
               </p>
               <p className="mt-0.5 truncate text-[13px] font-black text-[color:var(--app-text)]">
                 {firstItem?.typeLabel || (isId ? 'Item pertama' : 'First item')}
@@ -1511,29 +1553,21 @@ function SearchCartDock({
                       href={item.href}
                       className="inline-flex min-h-[32px] items-center justify-center rounded-full bg-white px-3 text-[11px] font-bold text-[color:var(--app-text)]"
                     >
-                      {isId ? 'Detail' : 'Details'}
+                      {isId ? 'Detail / chat' : 'Details / chat'}
                     </Link>
-                    <div className="inline-flex items-center rounded-full bg-white p-1 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-border)_86%,transparent)]">
-                      <button
-                        type="button"
-                        onClick={() => onDecrement(item.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)]"
-                        aria-label={isId ? 'Kurangi item' : 'Decrease item'}
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="min-w-[26px] text-center text-[12px] font-black text-[color:var(--app-text)]">
-                        {item.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onIncrement(item)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--app-accent)] text-white"
-                        aria-label={isId ? 'Tambah item' : 'Increase item'}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onRemove(item.id)}
+                      className="inline-flex min-h-[32px] items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
+                      aria-label={
+                        isId
+                          ? 'Hapus dari referensi'
+                          : 'Remove from saved references'
+                      }
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      {isId ? 'Hapus' : 'Remove'}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1740,6 +1774,11 @@ export default function SearchPageClient() {
   );
   const [cartOpen, setCartOpen] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [searchSuggestionsLoading, setSearchSuggestionsLoading] = useState(false);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const searchSuggestionsId = useId();
+  const searchSuggestionsTimeoutRef = useRef<number | undefined>(undefined);
 
   const canToggleUmkmView = type === 'all' || type === 'umkm';
   const shouldShowUmkmPreview = resultsView === 'umkm' || type === 'umkm';
@@ -1757,49 +1796,34 @@ export default function SearchPageClient() {
     ) as Record<string, number>;
   }, [searchCart.items]);
 
-  const mirrorSearchItemToUmkmCart = useCallback(
-    (input: SearchCartItemInput) => {
-      if (!input.storeId || !input.storeSlug || !input.productId) return;
-
-      const existing = readUmkmCartSession();
-      const sameStore = existing?.storeId === input.storeId;
-      const existingItems = sameStore ? existing.items : {};
-      const nextQuantity = Math.min(
-        99,
-        Math.max(1, (existingItems[input.productId] || 0) + 1),
-      );
-
-      writeUmkmCartSession({
-        storeId: input.storeId,
-        storeSlug: input.storeSlug,
-        storeName: input.storeName || input.title,
-        mode: 'online',
-        items: {
-          ...existingItems,
-          [input.productId]: nextQuantity,
-        },
-      });
-    },
-    [],
-  );
-
   const addSearchCardToCart = useCallback(
     (item: SearchCard) => {
+      const currentCart = readSearchCartSession();
+      if (currentCart.items.some(existing => existing.id === item.id)) {
+        setSearchCart(currentCart);
+        setCartOpen(true);
+        return;
+      }
+
       const input = buildSearchCartInput(item, locale);
       const nextCart = upsertSearchCartItem(input, 1);
       setSearchCart(nextCart);
-      mirrorSearchItemToUmkmCart(input);
       setCartOpen(true);
     },
-    [locale, mirrorSearchItemToUmkmCart],
+    [locale],
   );
 
   const addUmkmStoreToCart = useCallback(
     (store: UmkmPreviewStore) => {
-      const nextCart = upsertSearchCartItem(
-        buildStoreCartInput(store, locale),
-        1,
-      );
+      const input = buildStoreCartInput(store, locale);
+      const currentCart = readSearchCartSession();
+      if (currentCart.items.some(existing => existing.id === input.id)) {
+        setSearchCart(currentCart);
+        setCartOpen(true);
+        return;
+      }
+
+      const nextCart = upsertSearchCartItem(input, 1);
       setSearchCart(nextCart);
       setCartOpen(true);
     },
@@ -1807,26 +1831,10 @@ export default function SearchPageClient() {
   );
 
   const removeSearchItemFromCart = useCallback((itemId: string) => {
-    const currentCart = readSearchCartSession();
-    const existing = currentCart.items.find(item => item.id === itemId);
-
-    const nextCart =
-      existing && existing.quantity > 1
-        ? upsertSearchCartItem(existing, -1)
-        : removeSearchCartItem(itemId);
-
+    const nextCart = removeSearchCartItem(itemId);
     setSearchCart(nextCart);
     if (nextCart.itemCount === 0) setCartOpen(false);
   }, []);
-
-  const incrementSearchCartItem = useCallback(
-    (item: SearchCartItem) => {
-      const nextCart = upsertSearchCartItem(item, 1);
-      setSearchCart(nextCart);
-      mirrorSearchItemToUmkmCart(item);
-    },
-    [mirrorSearchItemToUmkmCart],
-  );
 
   const clearSearchCart = useCallback(() => {
     const nextCart = clearSearchCartSession();
@@ -1843,6 +1851,60 @@ export default function SearchPageClient() {
     if (type === 'umkm') setResultsView('umkm');
     if (resultsView !== 'umkm') setResultsView('results');
   }, [locationInput, queryInput, resultsView, type]);
+
+  const fetchSearchSuggestions = useCallback(async (searchQuery: string) => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 3) {
+      setSearchSuggestions([]);
+      setShowSearchSuggestions(false);
+      return;
+    }
+
+    setSearchSuggestionsLoading(true);
+    try {
+      const res = await fetch('/api/ai/search-suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: trimmed }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { suggestions?: unknown };
+      const suggestions = Array.isArray(payload.suggestions)
+        ? payload.suggestions
+            .filter((item): item is string => typeof item === 'string')
+            .map(item => item.trim())
+            .filter(Boolean)
+            .slice(0, 5)
+        : [];
+      setSearchSuggestions(suggestions);
+      setShowSearchSuggestions(suggestions.length > 0);
+    } catch {
+      setSearchSuggestions([]);
+      setShowSearchSuggestions(false);
+    } finally {
+      setSearchSuggestionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (searchSuggestionsTimeoutRef.current) {
+      window.clearTimeout(searchSuggestionsTimeoutRef.current);
+    }
+
+    if (queryInput.trim().length >= 3) {
+      searchSuggestionsTimeoutRef.current = window.setTimeout(() => {
+        void fetchSearchSuggestions(queryInput);
+      }, 420);
+    } else {
+      setSearchSuggestions([]);
+      setShowSearchSuggestions(false);
+    }
+
+    return () => {
+      if (searchSuggestionsTimeoutRef.current) {
+        window.clearTimeout(searchSuggestionsTimeoutRef.current);
+      }
+    };
+  }, [fetchSearchSuggestions, queryInput]);
 
   const resetAllFilters = useCallback(() => {
     setQueryInput('');
@@ -2149,7 +2211,7 @@ export default function SearchPageClient() {
                 event.preventDefault();
                 applyFilters();
               }}
-              className="min-w-0 flex-1"
+              className="relative min-w-0 flex-1"
               data-testid="search-mobile-form"
             >
               <label className="ui-navbar-search-field">
@@ -2160,15 +2222,63 @@ export default function SearchPageClient() {
                   name="q"
                   enterKeyHint="search"
                   value={queryInput}
-                  onChange={event => setQueryInput(event.target.value)}
+                  onChange={event => {
+                    setQueryInput(event.target.value);
+                    setShowSearchSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (searchSuggestions.length > 0) setShowSearchSuggestions(true);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => setShowSearchSuggestions(false), 160);
+                  }}
                   placeholder={
                     isId
                       ? 'Cari supplier, jasa, lokasi...'
                       : 'Search suppliers, places, services...'
                   }
                   className="ui-navbar-search-input"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={showSearchSuggestions && searchSuggestions.length > 0}
+                  aria-controls={searchSuggestionsId}
+                  aria-busy={searchSuggestionsLoading}
                 />
               </label>
+              {showSearchSuggestions && searchSuggestions.length > 0 ? (
+                <div
+                  id={searchSuggestionsId}
+                  role="listbox"
+                  className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[82] overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_20px_48px_-30px_rgba(15,23,42,0.3)] dark:border-[color:var(--app-border-strong)]"
+                >
+                  <div className="flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                    <span>{isId ? 'Saran pencarian' : 'Search suggestions'}</span>
+                    {searchSuggestionsLoading ? (
+                      <span>{isId ? 'Memuat...' : 'Loading...'}</span>
+                    ) : null}
+                  </div>
+                  <div className="p-1.5 pt-0">
+                    {searchSuggestions.map(suggestion => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        role="option"
+                        aria-selected="false"
+                        className="flex w-full items-start gap-2 rounded-[16px] px-3 py-2 text-left text-[13px] font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
+                        onMouseDown={event => event.preventDefault()}
+                        onClick={() => {
+                          setQueryInput(suggestion);
+                          setShowSearchSuggestions(false);
+                          applyFilters();
+                        }}
+                      >
+                        <Search className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                        <span className="line-clamp-2">{suggestion}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </form>
             <AuthCtaLink
               hrefWhenAuth={briefCreateHref}
@@ -2223,7 +2333,7 @@ export default function SearchPageClient() {
                   </div>
 
                   <div className="grid gap-1">
-                    {searchCart.itemCount > 0 ? (
+                    {searchCart.items.length > 0 ? (
                       <button
                         type="button"
                         role="menuitem"
@@ -2234,13 +2344,13 @@ export default function SearchPageClient() {
                         className="flex min-h-[46px] items-center justify-between gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
                       >
                         <span className="inline-flex min-w-0 items-center gap-3">
-                          <ShoppingCart className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                          <BookmarkCheck className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
                           <span className="truncate">
-                            {isId ? 'Buka keranjang' : 'Open cart'}
+                            {isId ? 'Buka referensi' : 'Open references'}
                           </span>
                         </span>
                         <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
-                          {searchCart.itemCount}
+                          {searchCart.items.length}
                         </span>
                       </button>
                     ) : null}
@@ -2381,7 +2491,7 @@ export default function SearchPageClient() {
                 {Array.from({ length: 4 }).map((_, index) => (
                   <div
                     key={`mobile-loading-${index}`}
-                    className="ui-skeleton ui-skeleton-pulse h-[136px] rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:h-[156px] sm:rounded-[20px]"
+                    className="ui-skeleton ui-skeleton-pulse h-[190px] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] sm:h-[210px]"
                   />
                 ))}
               </div>
@@ -2398,11 +2508,17 @@ export default function SearchPageClient() {
                 </button>
               </div>
             ) : visibleItems.length === 0 ? (
-              <div className="rounded-[26px] border border-[color:var(--app-border)] bg-white px-5 py-8 text-center shadow-[0_18px_36px_-28px_rgba(15,23,42,0.12)]">
-                <p className="text-[15px] text-[color:var(--app-text-soft)]">
+              <div className="rounded-[28px] border border-[color:var(--app-border)] bg-[radial-gradient(circle_at_top,#ecfdf5_0%,#ffffff_46%,#f8fafc_100%)] px-5 py-8 text-center shadow-[0_20px_42px_-30px_rgba(15,23,42,0.18)]">
+                <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-[20px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <Search className="h-5 w-5" />
+                </span>
+                <p className="mt-3 text-[17px] font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+                  {isId ? 'Belum ketemu yang pas' : 'No good match yet'}
+                </p>
+                <p className="mx-auto mt-1 max-w-[26rem] text-[13px] leading-5 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Belum ada hasil yang cocok.'
-                    : 'No matching results yet.'}
+                    ? 'Coba longgarkan filter, pakai kata kunci lain, atau jadilah listing pertama untuk kebutuhan ini.'
+                    : 'Try broader filters, another keyword, or become the first listing for this need.'}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                   <AuthCtaLink
@@ -2416,7 +2532,7 @@ export default function SearchPageClient() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-3">
                 {visibleItems.map(item => (
                   <SearchResultListingCard
                     key={item.id}
@@ -2784,11 +2900,11 @@ export default function SearchPageClient() {
 
                 {shouldShowResultCards ? (
                   loading ? (
-                    <div className="space-y-1.5">
+                    <div className="space-y-3">
                       {Array.from({ length: 5 }).map((_, index) => (
                         <div
                           key={`desktop-loading-${index}`}
-                          className="ui-skeleton ui-skeleton-pulse h-[132px] rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]"
+                          className="ui-skeleton ui-skeleton-pulse h-[196px] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]"
                         />
                       ))}
                     </div>
@@ -2805,11 +2921,17 @@ export default function SearchPageClient() {
                       </button>
                     </div>
                   ) : visibleItems.length === 0 ? (
-                    <div className="rounded-[28px] border border-[color:var(--app-border)] bg-white px-6 py-10 text-center shadow-[0_18px_36px_-28px_rgba(15,23,42,0.12)]">
-                      <p className="text-[16px] text-[color:var(--app-text-soft)]">
+                    <div className="rounded-[30px] border border-[color:var(--app-border)] bg-[radial-gradient(circle_at_top,#ecfdf5_0%,#ffffff_44%,#f8fafc_100%)] px-6 py-11 text-center shadow-[0_22px_48px_-32px_rgba(15,23,42,0.18)]">
+                      <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-[22px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                        <Search className="h-6 w-6" />
+                      </span>
+                      <p className="mt-3 text-[20px] font-black tracking-[-0.045em] text-[color:var(--app-text)]">
+                        {isId ? 'Belum ketemu yang pas' : 'No good match yet'}
+                      </p>
+                      <p className="mx-auto mt-1 max-w-[34rem] text-[14px] leading-6 text-[color:var(--app-text-soft)]">
                         {isId
-                          ? 'Belum ada hasil yang pas.'
-                          : 'No perfect match yet.'}
+                          ? 'Coba longgarkan filter, pakai kata kunci lain, atau jadilah listing pertama untuk kebutuhan ini.'
+                          : 'Try broader filters, another keyword, or become the first listing for this need.'}
                       </p>
                       <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                         <AuthCtaLink
@@ -2823,7 +2945,7 @@ export default function SearchPageClient() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-3">
                       {visibleItems.map(item => (
                         <SearchResultListingCard
                           key={item.id}
@@ -2894,8 +3016,7 @@ export default function SearchPageClient() {
         isId={isId}
         open={cartOpen}
         onOpenChange={setCartOpen}
-        onIncrement={incrementSearchCartItem}
-        onDecrement={removeSearchItemFromCart}
+        onRemove={removeSearchItemFromCart}
         onClear={clearSearchCart}
       />
 

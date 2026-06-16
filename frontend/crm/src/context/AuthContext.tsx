@@ -8,12 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  authApi,
-  securityApi,
-  type AuthMeResponse,
-  type OtpSendResponse,
-} from '@/lib/api';
+import { authApi, type AuthMeResponse } from '@/lib/api';
 
 const ALLOWED_ROLES = ['sales', 'admin', 'support', 'super_admin'];
 const ACCESS_TOKEN_KEY = 'crm_access_token';
@@ -24,12 +19,18 @@ const PENDING_AUTH_KEY = 'crm_pending_auth';
 
 type User = AuthMeResponse;
 
-type PendingAuth = {
+type AuthBundle = {
   accessToken: string;
   refreshToken: string;
   sessionId: string;
   user: User;
-  createdAt: number;
+};
+
+type SessionConfirmationResponse = {
+  success: boolean;
+  message?: string;
+  purpose?: string;
+  delivery?: string;
 };
 
 type AuthContextType = {
@@ -37,46 +38,20 @@ type AuthContextType = {
   loading: boolean;
   accessToken: string | null;
   isAuthenticated: boolean;
-  pendingEmail: string | null;
   stepUpVerifiedAt: number | null;
-  login: (email: string, password: string) => Promise<OtpSendResponse | void>;
-  resendLoginOtp: () => Promise<OtpSendResponse | null>;
-  completeLoginOtp: (otp: string) => Promise<void>;
-  cancelPendingLogin: () => void;
-  requestStepUp: () => Promise<OtpSendResponse | null>;
-  verifyStepUp: (otp: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  requestStepUp: () => Promise<SessionConfirmationResponse | null>;
+  verifyStepUp: (confirmation: string) => Promise<void>;
   isStepUpFresh: (maxAgeMs?: number) => boolean;
   logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function safeParsePendingAuth(raw: string | null): PendingAuth | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<PendingAuth>;
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (!parsed.accessToken || !parsed.refreshToken || !parsed.sessionId || !parsed.user) {
-      return null;
-    }
-    return {
-      accessToken: String(parsed.accessToken),
-      refreshToken: String(parsed.refreshToken),
-      sessionId: String(parsed.sessionId),
-      user: parsed.user as User,
-      createdAt:
-        typeof parsed.createdAt === 'number' ? parsed.createdAt : Date.now(),
-    };
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
   const [stepUpVerifiedAt, setStepUpVerifiedAt] = useState<number | null>(null);
   const router = useRouter();
 
@@ -87,7 +62,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearPendingLogin = useCallback(() => {
-    setPendingAuth(null);
     localStorage.removeItem(PENDING_AUTH_KEY);
   }, []);
 
@@ -101,32 +75,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(STEP_UP_KEY);
   }, []);
 
-  const persistPendingAuth = useCallback((bundle: PendingAuth) => {
-    setPendingAuth(bundle);
-    localStorage.setItem(PENDING_AUTH_KEY, JSON.stringify(bundle));
-  }, []);
+  const persistActiveAuth = useCallback(
+    (bundle: AuthBundle, verifiedAt: number) => {
+      setUser(bundle.user);
+      setAccessToken(bundle.accessToken);
+      setStepUpVerifiedAt(verifiedAt);
+      localStorage.setItem(ACCESS_TOKEN_KEY, bundle.accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, bundle.refreshToken);
+      localStorage.setItem(SESSION_ID_KEY, bundle.sessionId);
+      localStorage.setItem(STEP_UP_KEY, String(verifiedAt));
+    },
+    [],
+  );
 
-  const persistActiveAuth = useCallback((bundle: PendingAuth, verifiedAt: number) => {
-    setUser(bundle.user);
-    setAccessToken(bundle.accessToken);
+  const markSessionConfirmed = useCallback(() => {
+    const verifiedAt = Date.now();
     setStepUpVerifiedAt(verifiedAt);
-    localStorage.setItem(ACCESS_TOKEN_KEY, bundle.accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, bundle.refreshToken);
-    localStorage.setItem(SESSION_ID_KEY, bundle.sessionId);
     localStorage.setItem(STEP_UP_KEY, String(verifiedAt));
+    return verifiedAt;
   }, []);
 
   const loadUser = useCallback(async () => {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-    const pending = safeParsePendingAuth(localStorage.getItem(PENDING_AUTH_KEY));
     const storedStepUp = Number(localStorage.getItem(STEP_UP_KEY) || '');
 
-    if (pending) {
-      setPendingAuth(pending);
-    } else {
-      setPendingAuth(null);
-    }
-
+    localStorage.removeItem(PENDING_AUTH_KEY);
     setStepUpVerifiedAt(Number.isFinite(storedStepUp) ? storedStepUp : null);
 
     if (!token) {
@@ -169,59 +142,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
       }
 
-      clearActiveAuth();
-      const nextPending: PendingAuth = {
+      const activeBundle: AuthBundle = {
         accessToken: response.access_token,
         refreshToken: response.refresh_token,
         sessionId: response.session_id,
         user: userData,
-        createdAt: Date.now(),
       };
-      persistPendingAuth(nextPending);
 
-      const otpResult = await securityApi.sendOtp(userData.email, 'login');
-      router.push('/login');
-      return otpResult;
-    },
-    [checkAccess, clearActiveAuth, persistPendingAuth, router],
-  );
-
-  const resendLoginOtp = useCallback(async () => {
-    if (!pendingAuth?.user.email) return null;
-    return securityApi.sendOtp(pendingAuth.user.email, 'login');
-  }, [pendingAuth?.user.email]);
-
-  const completeLoginOtp = useCallback(
-    async (otp: string) => {
-      if (!pendingAuth?.user.email) {
-        throw new Error('No pending CRM login to verify.');
-      }
-
-      await securityApi.verifyOtp(pendingAuth.user.email, otp, 'login');
-      const verifiedAt = Date.now();
-      persistActiveAuth(pendingAuth, verifiedAt);
       clearPendingLogin();
+      persistActiveAuth(activeBundle, Date.now());
       router.push('/');
     },
-    [clearPendingLogin, pendingAuth, persistActiveAuth, router],
+    [checkAccess, clearPendingLogin, persistActiveAuth, router],
   );
 
   const requestStepUp = useCallback(async () => {
     if (!user?.email) return null;
-    return securityApi.sendOtp(user.email, 'login');
+    return {
+      success: true,
+      message:
+        'Aksi sensitif akan dikonfirmasi dari sesi agent aktif dan masuk audit trail.',
+      purpose: 'login',
+      delivery: 'session',
+    };
   }, [user?.email]);
 
   const verifyStepUp = useCallback(
-    async (otp: string) => {
+    async () => {
       if (!user?.email) {
-        throw new Error('No authenticated CRM user for step-up verification.');
+        throw new Error('No authenticated CRM user for session confirmation.');
       }
-      await securityApi.verifyOtp(user.email, otp, 'login');
-      const verifiedAt = Date.now();
-      setStepUpVerifiedAt(verifiedAt);
-      localStorage.setItem(STEP_UP_KEY, String(verifiedAt));
+      markSessionConfirmed();
     },
-    [user?.email],
+    [markSessionConfirmed, user?.email],
   );
 
   const isStepUpFresh = useCallback(
@@ -253,12 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         accessToken,
         isAuthenticated: !!user,
-        pendingEmail: pendingAuth?.user.email || null,
         stepUpVerifiedAt,
         login,
-        resendLoginOtp,
-        completeLoginOtp,
-        cancelPendingLogin: clearPendingLogin,
         requestStepUp,
         verifyStepUp,
         isStepUpFresh,

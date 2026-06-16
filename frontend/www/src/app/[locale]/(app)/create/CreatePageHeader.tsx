@@ -33,6 +33,7 @@ type CreatePageHeaderProps = {
   listingMode: 'simple' | 'detail';
   onListingModeChange: (mode: 'simple' | 'detail') => void;
   hideModeSwitch?: boolean;
+  minimal?: boolean;
   canChangeTypeBeforeDraft: boolean;
   onChangeType: () => void;
   typeSelectionLocked: boolean;
@@ -68,12 +69,14 @@ export function CreatePageHeader({
   listingMode,
   onListingModeChange,
   hideModeSwitch = false,
+  minimal = false,
   canChangeTypeBeforeDraft,
   onChangeType,
   typeSelectionLocked,
 }: CreatePageHeaderProps) {
   const isId = locale === 'id';
   const isCompact = uiVariant === 'compact';
+  const isMinimal = minimal;
   const isQuickMode = supportsSimpleMode && listingMode === 'simple';
   const stepProgress = Math.round((currentStep / totalSteps) * 100);
   const steps = Array.from({ length: totalSteps }, (_, index) => index + 1);
@@ -112,12 +115,14 @@ export function CreatePageHeader({
   return (
     <div
       data-section-shell-hero="true"
-      className="min-w-0 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_18px_38px_-36px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:p-4"
+      className={`min-w-0 rounded-[16px] border border-[color:var(--app-border)] bg-white shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] ${
+        isMinimal ? 'p-2 sm:p-2.5' : 'p-2.5 sm:p-3'
+      }`}
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {typePicked ? (
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
               <ActiveTypeIcon className="h-4 w-4" />
             </span>
           ) : null}
@@ -125,58 +130,79 @@ export function CreatePageHeader({
             <p className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
               {typePicked ? compactSummary : formEyebrow}
             </p>
-            <h1 className="mt-0.5 truncate text-[1.08rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.32rem]">
+            <h1 className="truncate text-[1.02rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.2rem]">
               {formTitle}
             </h1>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {isMinimal ? (
+            <span className="inline-flex min-h-[26px] items-center rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)]">
+              {currentStep}/{totalSteps}
+            </span>
+          ) : null}
           <span
-            className={`inline-flex min-h-[30px] items-center rounded-full border px-2.5 text-[10px] font-black ${statusToneClass}`}
+            className={`inline-flex min-h-[26px] items-center rounded-full border px-2 text-[10px] font-black ${statusToneClass}`}
           >
             {statusLabel}
           </span>
-          <span
-            className={`inline-flex min-h-[30px] items-center gap-1 rounded-full border px-2.5 text-[10px] font-black ${
-              publishBlockersCount > 0
-                ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
-                : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-            }`}
-          >
-            {publishBlockersCount > 0 ? (
-              <AlertTriangle className="h-3.5 w-3.5" />
-            ) : (
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            )}
-            {publishBlockersCount > 0
-              ? isId
-                ? `${publishBlockersCount} cek`
-                : `${publishBlockersCount} check`
-              : readinessLabel}
-          </span>
+          {!isMinimal ? (
+            <span
+              className={`inline-flex min-h-[26px] items-center gap-1 rounded-full border px-2 text-[10px] font-black ${
+                publishBlockersCount > 0
+                  ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
+                  : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+              }`}
+            >
+              {publishBlockersCount > 0 ? (
+                <AlertTriangle className="h-3.5 w-3.5" />
+              ) : (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              )}
+              {publishBlockersCount > 0
+                ? isId
+                  ? `${publishBlockersCount} cek`
+                  : `${publishBlockersCount} check`
+                : readinessLabel}
+            </span>
+          ) : null}
         </div>
       </div>
 
-      <p className="mt-2 line-clamp-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
-        {isQuickMode
-          ? isId
-            ? 'Mode cepat: isi inti dulu, detail bisa diedit nanti.'
-            : 'Quick mode: fill the essentials first, edit details later.'
-          : formSubtitle}
-      </p>
-
-      <div className="mt-3 rounded-[14px] bg-[color:var(--app-surface-muted)] p-2 dark:bg-slate-950/45">
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <p className="min-w-0 truncate text-[12px] font-black text-[color:var(--app-text)]">
-            {currentStep}/{totalSteps} {activeStepLabel}
-          </p>
-          <span className="shrink-0 text-[10px] font-bold text-[color:var(--app-text-soft)]">
-            {stepProgress}%
-          </span>
+      {isMinimal ? (
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-slate-950/55">
+          <div
+            className="h-full rounded-full bg-[color:var(--app-accent)] transition-all"
+            style={{ width: `${stepProgress}%` }}
+          />
         </div>
+      ) : (
+        <div className="mt-2 flex min-w-0 items-center gap-2 rounded-[12px] bg-[color:var(--app-surface-muted)] px-2 py-1.5 dark:bg-slate-950/45">
+          <span className="inline-flex h-7 min-w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-2 text-[10px] font-black text-white">
+            {currentStep}/{totalSteps}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-[11px] font-black text-[color:var(--app-text)]">
+                {activeStepLabel}
+              </p>
+              <span className="shrink-0 text-[10px] font-bold text-[color:var(--app-text-soft)]">
+                {stepProgress}%
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/90 ring-1 ring-[color:var(--app-border)] dark:bg-slate-900 dark:ring-[color:var(--app-border-strong)]">
+              <div
+                className="h-full rounded-full bg-[color:var(--app-accent)] transition-all"
+                style={{ width: `${stepProgress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
+      {!isMinimal ? (
+        <div className="mt-2 flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {steps.map(step => {
             const active = currentStep === step;
             const done = currentStep > step;
@@ -192,7 +218,7 @@ export function CreatePageHeader({
                 onClick={() => {
                   if (clickable) onStepSelect(step);
                 }}
-                className={`min-w-0 rounded-full border px-2 py-1.5 text-center text-[10px] font-black transition ${
+                className={`min-h-[28px] shrink-0 rounded-full border px-2.5 text-center text-[10px] font-black transition ${
                   active
                     ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
                     : done
@@ -202,7 +228,7 @@ export function CreatePageHeader({
               >
                 <span className="inline-flex items-center justify-center gap-1">
                   {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : step}
-                  <span className="hidden truncate min-[420px]:inline">
+                  <span className={active ? 'max-w-[8rem] truncate' : 'hidden truncate sm:inline'}>
                     {label}
                   </span>
                 </span>
@@ -210,35 +236,17 @@ export function CreatePageHeader({
             );
           })}
         </div>
+      ) : null}
 
-        <div className="mt-3 grid grid-cols-4 gap-1.5" aria-hidden="true">
-          {steps.map(step => {
-            const active = currentStep === step;
-            const done = currentStep > step;
-            return (
-              <div
-                key={`meter-${step}`}
-                className={`h-2 rounded-full transition ${
-                  active
-                    ? 'bg-[color:var(--app-accent)] shadow-[0_8px_18px_-12px_color-mix(in_srgb,var(--app-accent)_70%,transparent)]'
-                    : done
-                      ? 'bg-[color:color-mix(in_srgb,var(--app-accent)_70%,white_30%)]'
-                      : 'bg-white/80 ring-1 ring-[color:var(--app-border)] dark:bg-slate-900'
-                }`}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+      {!isMinimal ? (
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {showModeSwitch ? (
             <div className="inline-flex rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-0.5 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
               <button
                 type="button"
                 onClick={() => onListingModeChange('simple')}
-                className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${
                   listingMode === 'simple'
                     ? 'bg-[color:var(--app-accent)] text-white'
                     : 'text-[color:var(--app-text)]'
@@ -249,7 +257,7 @@ export function CreatePageHeader({
               <button
                 type="button"
                 onClick={() => onListingModeChange('detail')}
-                className={`rounded-full px-3 py-1.5 text-[10px] font-black transition ${
+                className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${
                   listingMode === 'detail'
                     ? 'bg-[color:var(--app-accent)] text-white'
                     : 'text-[color:var(--app-text)]'
@@ -264,19 +272,26 @@ export function CreatePageHeader({
             <button
               type="button"
               onClick={onChangeType}
-              className="inline-flex min-h-[32px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-3 text-[10px] font-black text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
+              className="inline-flex min-h-[28px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 text-[10px] font-black text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
             >
-              {isId ? 'Ganti tipe' : 'Change category'}
+              {isId ? 'Tipe' : 'Category'}
             </button>
           ) : null}
         </div>
 
         <details className="group relative">
-          <summary className="inline-flex min-h-[32px] cursor-pointer list-none items-center rounded-full bg-[color:var(--app-surface-muted)] px-3 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)] [&::-webkit-details-marker]:hidden">
-            {isId ? 'Detail status' : 'Status details'}
+          <summary className="inline-flex min-h-[28px] cursor-pointer list-none items-center rounded-full bg-[color:var(--app-surface-muted)] px-2.5 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)] [&::-webkit-details-marker]:hidden">
+            {isId ? 'Status' : 'Status'}
           </summary>
           <div className="absolute right-0 z-30 mt-2 w-[min(88vw,280px)] rounded-[16px] border border-[color:var(--app-border)] bg-white p-3 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">
             <div className="grid gap-2">
+              <span>
+                {isQuickMode
+                  ? isId
+                    ? 'Mode cepat: detail bisa diedit nanti.'
+                    : 'Quick mode: details can be edited later.'
+                  : formSubtitle}
+              </span>
               <span>{progressText}</span>
               <span>{mediaText}</span>
               {!isCompact ? <span>{promoText}</span> : null}
@@ -287,9 +302,10 @@ export function CreatePageHeader({
             </div>
           </div>
         </details>
-      </div>
+        </div>
+      ) : null}
 
-      {typeSelectionLocked ? (
+      {!isMinimal && typeSelectionLocked ? (
         <p className="mt-2 text-[11px] text-[color:var(--app-warning)]">
           {isId
             ? 'Kalau sudah tayang, tipenya tidak bisa diganti.'

@@ -1,25 +1,25 @@
 'use client';
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
-import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
+import {
+  MediaPreviewCarousel,
+  type MediaPreviewItem,
+} from '@/components/common/MediaPreviewCarousel';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
   BriefcaseBusiness,
   Award,
-  ChevronLeft,
   ChevronRight,
   CircleHelp,
   ClipboardList,
   Clapperboard,
   CreditCard,
   Flame,
-  Gift,
   Globe2,
   Heart,
   Home,
-  LayoutGrid,
   LockKeyhole,
   MapPin,
   MessageCircle,
@@ -42,9 +42,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { HomeUmkmMapPreview } from '@/components/home/HomeUmkmMapPreview';
+import { Footer } from '@/components/layout/Footer';
 import { DailyLoginRewardCard } from '@/components/rewards/DailyLoginRewardCard';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { useAuth } from '@/context/AuthContext';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { useChatInbox } from '@/context/ChatInboxContext';
 import { Link, useRouter } from '@/i18n/navigation';
 import {
@@ -111,7 +113,6 @@ type QuickCategory = {
   href: string;
   icon: LucideIcon;
   tone: Tone;
-  countLabel: string;
 };
 
 type RecommendationItem = {
@@ -136,7 +137,7 @@ type RecommendationItem = {
   secondaryEventName?: string;
 };
 
-type CommunityTab = 'for-you' | 'following' | 'community' | 'reels';
+type CommunityTab = 'for-you' | 'following' | 'community';
 
 type CommunityPost = {
   id: string;
@@ -151,6 +152,7 @@ type CommunityPost = {
   image?: string;
   mediaUrl?: string;
   mediaType?: string;
+  mediaItems: MediaPreviewItem[];
   avatar?: string;
   tags: string[];
   likes: string;
@@ -261,7 +263,6 @@ function buildCommunityPostHref(post: CommunityPost): string {
 }
 
 function buildCommunityTabHref(tab: CommunityTab): string {
-  if (tab === 'reels') return '/reels';
   const params = new URLSearchParams();
   params.set('tab', tab);
   return `/community?${params.toString()}`;
@@ -480,10 +481,10 @@ function mapUmkmStoreToRecommendation(
   const ui = buildUmkmPlacePresentation(store, isId);
   const detailHref = store.slug
     ? buildUmkmStorefrontPath(store.slug)
-    : buildUmkmDiscoveryPath({ q: store.name, city: store.city });
+    : buildUmkmDiscoveryPath({ q: store.name, city: store.city, storeId: store.id });
   const mapHref = store.slug
-    ? buildUmkmDiscoveryPath({ store: store.slug })
-    : buildUmkmDiscoveryPath({ q: store.name, city: store.city });
+    ? buildUmkmDiscoveryPath({ store: store.slug, storeId: store.id })
+    : buildUmkmDiscoveryPath({ q: store.name, city: store.city, storeId: store.id });
   const images = Array.from(
     new Set([ui.coverImage, ...ui.gallery].filter(Boolean)),
   ).slice(0, 4);
@@ -535,11 +536,20 @@ function mapCommunityItemToPost(
   isId: boolean,
   activeTab: CommunityTab,
 ): CommunityPost {
-  const isReel = item.kind === 'reel' || activeTab === 'reels';
-  const mediaUrl = item.media?.src;
+  const isReel = item.kind === 'reel';
+  const mediaItems = buildCommunityMediaItems(item);
+  const firstMedia = mediaItems[0];
+  const mediaUrl =
+    typeof firstMedia === 'string'
+      ? firstMedia
+      : firstMedia?.src || item.media?.src;
+  const mediaType =
+    typeof firstMedia === 'string'
+      ? item.media?.type
+      : firstMedia?.type || item.media?.type;
   return {
     id: item.id,
-    tab: isReel ? 'reels' : activeTab,
+    tab: activeTab,
     href: item.href || undefined,
     kind: isReel ? 'reel' : 'discussion',
     community:
@@ -558,9 +568,10 @@ function mapCommunityItemToPost(
           ? 'Diskusi komunitas'
           : 'Community discussion'),
     body: item.body || '',
-    image: item.media?.type === 'image' ? mediaUrl : undefined,
+    image: mediaType === 'image' ? mediaUrl : undefined,
     mediaUrl,
-    mediaType: item.media?.type,
+    mediaType,
+    mediaItems,
     avatar: profileAvatarSrc(item.author?.avatarUrl),
     tags: item.tags
       .map(tag => tag.name || tag.slug)
@@ -571,6 +582,36 @@ function mapCommunityItemToPost(
     shares: formatCompactCount(item.stats?.shares, '0'),
     views: formatCompactCount(item.stats?.views, '0'),
   };
+}
+
+function buildCommunityMediaItems(item: CommunityFeedItem): MediaPreviewItem[] {
+  const seen = new Set<string>();
+  const mediaItems: MediaPreviewItem[] = [];
+
+  const addMedia = (
+    src: string | null | undefined,
+    type: 'image' | 'video' = 'image',
+    alt = item.title || item.communityName || 'Community media',
+  ) => {
+    const cleanSrc = String(src || '').trim();
+    if (!cleanSrc) return;
+    const key = cleanSrc.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    mediaItems.push({ src: cleanSrc, type, alt });
+  };
+
+  for (const media of item.mediaItems || []) {
+    addMedia(media.src, media.type, media.alt);
+  }
+  if (item.media) {
+    addMedia(item.media.src, item.media.type, item.media.alt);
+  }
+  for (const imageUrl of item.imageUrls || []) {
+    addMedia(imageUrl, 'image');
+  }
+
+  return mediaItems;
 }
 
 type ReelsFeedItem = {
@@ -762,8 +803,6 @@ function buildGameSnapshot(
 
 function getQuickCategories(
   isId: boolean,
-  isAuthenticated: boolean,
-  summary: LajukanSummary | null,
 ): QuickCategory[] {
   return [
     {
@@ -773,7 +812,6 @@ function getQuickCategories(
       href: '/search?type=product&q=supplier',
       icon: ShoppingBag,
       tone: 'emerald',
-      countLabel: resolveCountLabel(summary?.categories?.supplier, '0'),
     },
     {
       id: 'product',
@@ -782,7 +820,6 @@ function getQuickCategories(
       href: '/search?q=produk%20reseller',
       icon: Package,
       tone: 'orange',
-      countLabel: resolveCountLabel(summary?.categories?.product, '0'),
     },
     {
       id: 'service',
@@ -791,7 +828,6 @@ function getQuickCategories(
       href: '/search?type=service&q=jasa%20usaha',
       icon: BriefcaseBusiness,
       tone: 'violet',
-      countLabel: resolveCountLabel(summary?.categories?.service, '0'),
     },
     {
       id: 'location',
@@ -800,7 +836,6 @@ function getQuickCategories(
       href: '/search?type=property&q=lokasi%20usaha',
       icon: MapPin,
       tone: 'rose',
-      countLabel: resolveCountLabel(summary?.categories?.location, '0'),
     },
     {
       id: 'talent',
@@ -809,16 +844,6 @@ function getQuickCategories(
       href: '/search?type=freelancer&q=talent',
       icon: UserRound,
       tone: 'cyan',
-      countLabel: resolveCountLabel(summary?.categories?.talent, '0'),
-    },
-    {
-      id: 'request',
-      label: isId ? 'Peluang Usaha' : 'Opportunities',
-      description: isId ? 'Peluang aktif' : 'Promising opportunities',
-      href: isAuthenticated ? '/my-projects' : '/register',
-      icon: TrendingUp,
-      tone: 'lime',
-      countLabel: resolveCountLabel(summary?.requests?.total, '0'),
     },
     {
       id: 'community',
@@ -829,7 +854,22 @@ function getQuickCategories(
       href: '/community',
       icon: MessageCircle,
       tone: 'amber',
-      countLabel: resolveCountLabel(summary?.requests?.active, '0'),
+    },
+    {
+      id: 'reels',
+      label: 'Reels',
+      description: isId ? 'Video usaha' : 'Business videos',
+      href: '/reels',
+      icon: Clapperboard,
+      tone: 'lime',
+    },
+    {
+      id: 'map',
+      label: isId ? 'Peta Usaha' : 'Business Map',
+      description: isId ? 'Usaha sekitar' : 'Nearby businesses',
+      href: UMKM_DISCOVERY_PATH,
+      icon: Globe2,
+      tone: 'blue',
     },
   ];
 }
@@ -918,18 +958,6 @@ function getCommunityTabs(isId: boolean): CommunityTabItem[] {
         : 'Loading group discussions...',
       icon: Users,
       tone: 'teal',
-    },
-    {
-      id: 'reels',
-      label: 'Reels',
-      caption: isId ? 'Video singkat bisnis' : 'Short business videos',
-      actionLabel: isId ? 'Buka Reels' : 'Open Reels',
-      emptyLabel: isId
-        ? 'Belum ada reels dari database.'
-        : 'No database reels yet.',
-      loadingLabel: isId ? 'Memuat reels...' : 'Loading reels...',
-      icon: Clapperboard,
-      tone: 'orange',
     },
   ];
 }
@@ -1458,6 +1486,10 @@ function GameProgressCard({
   walletLoading?: boolean;
   compact?: boolean;
 }) {
+  if (PROMO_ONLY_MODE) {
+    return null;
+  }
+
   if (!isAuthenticated) {
     return (
       <section
@@ -1641,28 +1673,12 @@ function GameProgressCard({
 
 function QuickCategoriesSection({
   isId,
-  isAuthenticated,
-  summary,
   mobile = false,
 }: {
   isId: boolean;
-  isAuthenticated: boolean;
-  summary: LajukanSummary | null;
   mobile?: boolean;
 }) {
-  const categories = getQuickCategories(isId, isAuthenticated, summary);
-  const exploreItems: QuickCategory[] = [
-    ...categories,
-    {
-      id: 'all',
-      label: isId ? 'Lihat Semua' : 'See all',
-      description: isId ? 'Buka semua kategori' : 'Open every category',
-      href: UMKM_DISCOVERY_PATH,
-      icon: LayoutGrid,
-      tone: 'blue',
-      countLabel: isId ? 'Semua' : 'All',
-    },
-  ];
+  const categories = getQuickCategories(isId);
 
   if (mobile) {
     return (
@@ -1683,9 +1699,8 @@ function QuickCategoriesSection({
           </div>
         </div>
         <div className="grid grid-cols-4 gap-1">
-          {exploreItems.map(item => {
+          {categories.map(item => {
             const tone = toneClassNames(item.tone);
-            const isAll = item.id === 'all';
             const Icon = item.icon;
 
             return (
@@ -1698,17 +1713,13 @@ function QuickCategoriesSection({
                 )}
               >
                 <span
-                  className={cn(
-                    'absolute -right-5 -top-5 h-20 w-20 rounded-full blur-xl transition group-hover:scale-125',
-                    isAll ? 'bg-slate-200/45' : 'hidden',
-                  )}
+                  className="absolute -right-5 -top-5 hidden h-20 w-20 rounded-full blur-xl transition group-hover:scale-125"
                 />
                 <span
                   className={cn(
                     'relative inline-flex h-12 w-12 items-center justify-center rounded-[15px] bg-white/88 shadow-[0_14px_24px_-20px_rgba(15,23,42,0.36)] ring-1 ring-white/70',
-                    isAll
-                      ? 'bg-white text-[color:var(--app-accent)] ring-slate-100'
-                      : [tone.surface, tone.text],
+                    tone.surface,
+                    tone.text,
                   )}
                 >
                   <Icon className="h-6 w-6" />
@@ -1716,19 +1727,6 @@ function QuickCategoriesSection({
                 <span className="relative mt-2 line-clamp-2 max-w-full text-[11.5px] font-black leading-[1.1] text-[color:var(--app-text)]">
                   {item.label}
                 </span>
-                {/* <span
-                  className={cn(
-                    'relative mt-1 max-w-full truncate text-[9.5px] font-bold leading-3',
-                    isAll
-                      ? 'text-white/80'
-                      : 'text-[color:var(--app-text-soft)]',
-                  )}
-                >
-                  {item.countLabel}
-                </span> */}
-                {/* {isAll ? (
-                  <ChevronRight className="absolute bottom-2 right-2 h-3.5 w-3.5 text-white/86" />
-                ) : null} */}
               </Link>
             );
           })}
@@ -1754,9 +1752,8 @@ function QuickCategoriesSection({
           </div>
         </div>
         <div className="mt-2.5 grid grid-cols-4 gap-1">
-          {exploreItems.map(item => {
+          {categories.map(item => {
             const tone = toneClassNames(item.tone);
-            const isAll = item.id === 'all';
             const Icon = item.icon;
 
             return (
@@ -1771,16 +1768,15 @@ function QuickCategoriesSection({
                 <span
                   className={cn(
                     'absolute -right-7 -top-7 h-16 w-16 rounded-full blur-2xl transition group-hover:scale-125',
-                    isAll ? 'bg-slate-200/45' : tone.glow,
+                    tone.glow,
                   )}
                 />
                 <div className="relative flex h-full flex-col items-center text-center">
                   <span
                     className={cn(
                       'inline-flex h-14 w-14 items-center justify-center rounded-[17px] border bg-white/88 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.28)]',
-                      isAll
-                        ? 'border-slate-100 bg-white text-[color:var(--app-accent)]'
-                        : [tone.surface, tone.text],
+                      tone.surface,
+                      tone.text,
                     )}
                   >
                     <Icon className="h-6 w-6" />
@@ -1791,16 +1787,6 @@ function QuickCategoriesSection({
                   <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-4 text-[color:var(--app-text-soft)]">
                     {item.description}
                   </p>
-                  {/* <span
-                    className={cn(
-                      'mt-auto inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black',
-                      isAll
-                        ? 'bg-white/20 text-white'
-                        : 'bg-white/76 text-[color:var(--app-text-soft)]',
-                    )}
-                  >
-                    {item.countLabel}
-                  </span> */}
                 </div>
               </Link>
             );
@@ -2066,7 +2052,19 @@ function CommunityPanel({
   const morePosts = post
     ? visiblePosts.filter(item => item.id !== post.id)
     : visiblePosts.slice(1);
-  const postMediaUrl = post?.mediaUrl || post?.image;
+  const postMediaItems = post?.mediaItems?.length
+    ? post.mediaItems
+    : post?.mediaUrl
+      ? [
+          {
+            src: post.mediaUrl,
+            type: post.mediaType === 'video' ? 'video' : 'image',
+            alt: post.title,
+          } satisfies MediaPreviewItem,
+        ]
+      : [];
+  const postMediaUrl =
+    postMediaItems.length > 0 ? post?.mediaUrl || post?.image : null;
   const postIsVideo = post?.mediaType === 'video';
   const postStatsLabel = post
     ? post.kind === 'reel'
@@ -2125,10 +2123,7 @@ function CommunityPanel({
         actionLabel={activeTabMeta.actionLabel}
         actionHref={activeTabHref}
       />
-      <div
-        className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4"
-        data-auto-scrollbar
-      >
+      <div className="mt-3 grid grid-cols-3 gap-2" data-auto-scrollbar>
         {tabs.map(tab => {
           const Icon = tab.icon;
           const tone = toneClassNames(tab.tone);
@@ -2298,7 +2293,7 @@ function CommunityPanel({
               ))}
             </div>
           </div>
-          {postMediaUrl ? (
+          {postMediaItems.length > 0 ? (
             <Link
               href={communityPostHref}
               className={cn(
@@ -2308,9 +2303,9 @@ function CommunityPanel({
                   : 'h-[140px] sm:h-[190px]',
               )}
             >
-              {postIsVideo ? (
+              {postIsVideo && postMediaItems.length === 1 ? (
                 <video
-                  src={postMediaUrl}
+                  src={postMediaUrl || ''}
                   muted
                   playsInline
                   preload="metadata"
@@ -2318,7 +2313,7 @@ function CommunityPanel({
                 />
               ) : (
                 <MediaPreviewCarousel
-                  items={[postMediaUrl]}
+                  items={postMediaItems}
                   alt={post.community}
                   aspectClassName="h-full w-full"
                   className="h-full w-full bg-transparent"
@@ -2380,11 +2375,22 @@ function CommunityPanel({
         <div className="mt-3 space-y-2">
           {morePosts.map(item => {
             const href = buildCommunityPostHref(item);
+            const itemMediaItems = item.mediaItems?.length
+              ? item.mediaItems
+              : item.mediaUrl
+                ? [
+                    {
+                      src: item.mediaUrl,
+                      type: item.mediaType === 'video' ? 'video' : 'image',
+                      alt: item.title,
+                    } satisfies MediaPreviewItem,
+                  ]
+                : [];
             return (
               <Link
                 key={item.id}
                 href={href}
-                className="flex min-w-0 items-start gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]/40"
+                className="group flex min-w-0 items-start gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)]/40"
               >
                 <Image
                   src={profileAvatarSrc(item.avatar)}
@@ -2406,7 +2412,33 @@ function CommunityPanel({
                     {item.body}
                   </span>
                 </span>
-                <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                {itemMediaItems.length > 0 ? (
+                  <span className="relative h-16 w-[86px] shrink-0 overflow-hidden rounded-[14px] bg-slate-100">
+                    <MediaPreviewCarousel
+                      items={itemMediaItems}
+                      alt={item.title}
+                      aspectClassName="h-full w-full"
+                      className="h-full w-full bg-transparent"
+                      mediaClassName="transition duration-300 group-hover:scale-[1.03]"
+                      sizes="86px"
+                      controls={false}
+                      lightbox={false}
+                      showCounter={false}
+                      showDots={false}
+                    />
+                    {item.kind === 'reel' ? (
+                      <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/16 text-white">
+                        <PlayCircle className="h-7 w-7 drop-shadow" />
+                      </span>
+                    ) : itemMediaItems.length > 1 ? (
+                      <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-full bg-black/58 px-1.5 py-0.5 text-[10px] font-black text-white">
+                        +{itemMediaItems.length - 1}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : (
+                  <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                )}
               </Link>
             );
           })}
@@ -2600,7 +2632,6 @@ function RightRail({
   walletModeLabel?: string | null;
   walletLoading?: boolean;
 }) {
-  const [activeSlide, setActiveSlide] = useState(0);
   const pulseItems = [
     {
       id: 'verified',
@@ -2624,52 +2655,16 @@ function RightRail({
       tone: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900/60',
     },
   ];
-  const benefitPoints = isId
-    ? ['Semua fitur', 'Nego langsung', 'Transaksi aman', 'Jaringan luas']
-    : [
-      'Unlock every Lajukan feature',
-      'Negotiate directly with suppliers',
-      'Safer and trusted transactions',
-      'Build a wider business network',
-    ];
-  const slideCount = 2;
-
-  useEffect(() => {
-    let timer: number | null = null;
-
-    const stopTimer = () => {
-      if (timer === null) return;
-      window.clearInterval(timer);
-      timer = null;
-    };
-
-    const startTimer = () => {
-      if (timer !== null || document.visibilityState === 'hidden') return;
-      timer = window.setInterval(() => {
-        setActiveSlide(current => (current + 1) % slideCount);
-      }, 5200);
-    };
-
-    const syncTimer = () => {
-      if (document.visibilityState === 'hidden') {
-        stopTimer();
-      } else {
-        startTimer();
-      }
-    };
-
-    startTimer();
-    document.addEventListener('visibilitychange', syncTimer);
-
-    return () => {
-      document.removeEventListener('visibilitychange', syncTimer);
-      stopTimer();
-    };
-  }, [slideCount]);
-
-  const goToSlide = (nextIndex: number) => {
-    setActiveSlide((nextIndex + slideCount) % slideCount);
-  };
+  const pulseCtaLabel = isAuthenticated
+    ? isId
+      ? 'Posting sekarang'
+      : 'Post now'
+    : isId
+      ? 'Mulai gratis'
+      : 'Start free';
+  const pulseHelperText = isId
+    ? 'Upload listing, update info, lalu lanjut chat.'
+    : 'Upload listings, keep them fresh, then continue in chat.';
 
   return (
     <aside className="lajukan-home-right-rail hidden min-w-0 xl:flex xl:h-full xl:max-h-full xl:min-h-0 xl:flex-col xl:overflow-hidden xl:pt-2">
@@ -2687,152 +2682,61 @@ function RightRail({
           compact
         />
         <DailyLoginRewardCard locale={locale} compact />
-        <section className="lajukan-home-pulse-card flex max-h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)]">
-          <div className="lajukan-home-pulse-header flex items-center justify-between gap-2 border-b border-[color:var(--app-border)] px-3 py-2.5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
-                {activeSlide === 0 ? (
-                  <BarChart3 className="h-4 w-4" />
-                ) : (
-                  <TrendingUp className="h-4 w-4" />
-                )}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
-                  {activeSlide === 0
-                    ? isId
-                      ? 'Pasar Hari Ini'
-                      : 'Marketplace Pulse'
-                    : isId
-                      ? 'Panel Growth'
-                      : 'Growth Panel'}
-                </p>
-                <p className="lajukan-home-pulse-header-subtitle mt-0.5 truncate text-xs text-[color:var(--app-text-soft)]">
-                  {activeSlide === 0
-                    ? isId
-                      ? 'Ringkasan pasar terkini'
-                      : 'Current marketplace snapshot'
-                    : isId
-                      ? 'Dorong reach dan peluang baru'
-                      : 'Push reach and unlock new opportunities'}
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => goToSlide(activeSlide - 1)}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
-                aria-label="Previous slide"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => goToSlide(activeSlide + 1)}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
-                aria-label="Next slide"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div
-            className="lajukan-home-pulse-track flex w-full transition-transform duration-500 ease-out"
-            style={{ transform: `translateX(-${activeSlide * 100}%)` }}
-          >
-            <div className="lajukan-home-pulse-slide w-full shrink-0 p-3">
-              <div className="lajukan-home-pulse-list space-y-2">
-                {pulseItems.map(item => {
-                  const Icon = item.icon;
-                  return (
-                    <div
-                      key={item.id}
-                      className="lajukan-home-pulse-row flex min-w-0 items-center justify-between gap-2 rounded-[15px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff,#fbfffd)] px-2.5 py-2"
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          className={cn(
-                            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] ring-1',
-                            item.tone,
-                          )}
-                        >
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <span className="min-w-0 truncate text-xs font-semibold text-[color:var(--app-text)]">
-                          {item.label}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-sm font-black tracking-[-0.03em] text-[color:var(--app-text)]">
-                        {item.value}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="lajukan-home-pulse-slide lajukan-home-pulse-growth w-full shrink-0 bg-[linear-gradient(180deg,#f4fff8_0%,#ffffff_62%,#eefbf4_100%)] p-3">
-              <h2 className="lajukan-home-pulse-title text-[1.02rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
-                {isAuthenticated
-                  ? isId
-                    ? 'Naikkan jangkauan, dapatkan lebih banyak peluang'
-                    : 'Increase reach and unlock more opportunities'
-                  : isId
-                    ? 'Gabung sekarang, dapatkan lebih banyak peluang'
-                    : 'Join now and unlock more opportunities'}
+        <section className="lajukan-home-pulse-card flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fffb_100%)] p-3 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)] dark:bg-[color:var(--app-surface)]">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                {isId ? 'Hari ini' : 'Today'}
+              </p>
+              <h2 className="mt-1 line-clamp-2 text-[1rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+                {isId
+                  ? 'Lihat peluang, lalu lanjut chat.'
+                  : 'Find opportunities, then continue in chat.'}
               </h2>
-              <ul className="lajukan-home-pulse-benefits mt-3 space-y-2">
-                {benefitPoints.map(point => (
-                  <li
-                    key={point}
-                    className="lajukan-home-pulse-benefit flex items-start gap-2 text-xs leading-4 text-[color:var(--app-text-soft)]"
-                  >
-                    <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                      <ShieldCheck className="h-3 w-3" />
-                    </span>
-                    {point}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href={primaryCtaHref}
-                className="lajukan-home-pulse-cta mt-4 inline-flex min-h-[40px] w-full items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-xs font-semibold text-[color:var(--app-text-inverse)]"
-              >
-                {isAuthenticated
-                  ? isId
-                    ? 'Buat Permintaan'
-                    : 'Create Request'
-                  : isId
-                    ? 'Daftar Gratis'
-                    : 'Join Free'}
-              </Link>
-              <div className="lajukan-home-pulse-visual relative mt-3 flex h-24 items-center justify-center rounded-[18px] bg-[radial-gradient(circle_at_top,#ddffe9,transparent_64%)]">
-                <div className="lajukan-home-pulse-visual-glow absolute h-16 w-16 rounded-full bg-emerald-100 blur-3xl" />
-                <div className="lajukan-home-pulse-visual-icon relative flex h-14 w-14 items-center justify-center rounded-[18px] border border-emerald-200 bg-white shadow-[0_18px_32px_-24px_rgba(15,23,42,0.16)]">
-                  <Gift className="lajukan-home-pulse-gift h-7 w-7 text-emerald-500" />
-                </div>
-              </div>
             </div>
+            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
+              <BarChart3 className="h-4.5 w-4.5" />
+            </span>
           </div>
 
-          <div className="lajukan-home-pulse-dots flex items-center justify-center gap-2 border-t border-[color:var(--app-border)] px-3 py-2.5">
-            {Array.from({ length: slideCount }).map((_, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => goToSlide(index)}
-                className={cn(
-                  'h-2.5 rounded-full transition',
-                  activeSlide === index
-                    ? 'w-6 bg-emerald-500'
-                    : 'w-2.5 bg-slate-200',
-                )}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
+          <div className="mt-3 grid grid-cols-3 gap-1.5">
+            {pulseItems.map(item => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.id}
+                  className="min-w-0 rounded-[15px] border border-[color:var(--app-border)] bg-white/86 px-2 py-2 text-center shadow-[0_10px_22px_-24px_rgba(15,23,42,0.16)] dark:bg-slate-950/42"
+                >
+                  <span
+                    className={cn(
+                      'mx-auto inline-flex h-7 w-7 items-center justify-center rounded-[11px] ring-1',
+                      item.tone,
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <p className="mt-1 text-[15px] font-black leading-none tracking-[-0.04em] text-[color:var(--app-text)]">
+                    {item.value}
+                  </p>
+                  <p className="mt-1 truncate text-[10px] font-semibold leading-tight text-[color:var(--app-text-soft)]">
+                    {item.label}
+                  </p>
+                </div>
+              );
+            })}
           </div>
+
+          <p className="mt-3 rounded-[15px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11.5px] font-semibold leading-4 text-[color:var(--app-accent)]">
+            {pulseHelperText}
+          </p>
+
+          <Link
+            href={primaryCtaHref}
+            className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[12px] font-black text-[color:var(--app-text-inverse)] shadow-[0_16px_30px_-24px_color-mix(in_srgb,var(--app-accent)_50%,transparent)] transition hover:brightness-105"
+          >
+            <Package className="h-4 w-4" />
+            {pulseCtaLabel}
+          </Link>
         </section>
       </div>
     </aside>
@@ -3069,7 +2973,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           .json()
           .catch(() => null)) as CommunityFeedResponse | null;
         if (!response.ok) return;
-        const mapped = (payload?.items || []).map(item =>
+        const discussionItems = (payload?.items || []).filter(
+          item => item.kind !== 'reel',
+        );
+        const mapped = discussionItems.map(item =>
           mapCommunityItemToPost(item, isId, activeTab),
         );
         setCommunityOverview(payload?.overview || null);
@@ -3116,9 +3023,12 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         return;
       }
 
-      const nextTab = createdItem.kind === 'reel' ? 'reels' : activeTab;
-      const nextPost = mapCommunityItemToPost(createdItem, isId, nextTab);
-      if (nextTab !== activeTab) setActiveTab(nextTab);
+      if (createdItem.kind === 'reel') {
+        void loadCommunityPostsPage(0);
+        return;
+      }
+
+      const nextPost = mapCommunityItemToPost(createdItem, isId, activeTab);
       setCommunityPosts(current => [
         nextPost,
         ...current.filter(item => item.id !== nextPost.id),
@@ -3221,12 +3131,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         },
         {
           id: 'explore',
-          label: isId ? 'Jelajah' : 'Explore',
-          caption: isId
-            ? 'Supplier, produk, jasa'
-            : 'Suppliers, products, services',
+          label: isId ? 'Peta Usaha' : 'Business Map',
+          caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
           href: UMKM_DISCOVERY_PATH,
-          icon: LayoutGrid,
+          icon: MapPin,
         },
         {
           id: 'community',
@@ -3242,20 +3150,24 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           href: '/reels',
           icon: PlayCircle,
         },
-        {
-          id: 'requests',
-          label: isId ? 'Permintaan' : 'My Requests',
-          caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
-          href: '/my-projects',
-          icon: ClipboardList,
-        },
-        {
-          id: 'transactions',
-          label: isId ? 'Transaksi' : 'Transactions',
-          caption: isId ? 'Status & bayar' : 'Progress and payments',
-          href: '/transactions',
-          icon: CreditCard,
-        },
+        ...(!PROMO_ONLY_MODE
+          ? [
+              {
+                id: 'requests',
+                label: isId ? 'Permintaan' : 'My Requests',
+                caption: isId ? 'Kebutuhan aktif' : 'Active briefs and needs',
+                href: '/my-projects',
+                icon: ClipboardList,
+              },
+              {
+                id: 'transactions',
+                label: isId ? 'Transaksi' : 'Transactions',
+                caption: isId ? 'Status & bayar' : 'Progress and payments',
+                href: '/transactions',
+                icon: CreditCard,
+              },
+            ]
+          : []),
       ],
       secondary: [
         {
@@ -3298,12 +3210,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
         },
         {
           id: 'explore',
-          label: isId ? 'Jelajah' : 'Explore',
-          caption: isId
-            ? 'Supplier, produk, jasa'
-            : 'Suppliers, products, services',
+          label: isId ? 'Peta Usaha' : 'Business Map',
+          caption: isId ? 'Usaha sekitar' : 'Nearby businesses',
           href: UMKM_DISCOVERY_PATH,
-          icon: LayoutGrid,
+          icon: MapPin,
         },
         {
           id: 'supplier',
@@ -3356,22 +3266,26 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           href: '/reels',
           icon: PlayCircle,
         },
-        {
-          id: 'requests',
-          label: isId ? 'Permintaan Saya' : 'My Requests',
-          caption: isId ? 'Login untuk akses' : 'Login to access',
-          href: '/login',
-          icon: ClipboardList,
-          locked: true,
-        },
-        {
-          id: 'transactions',
-          label: isId ? 'Transaksi' : 'Transactions',
-          caption: isId ? 'Login untuk akses' : 'Login to access',
-          href: '/login',
-          icon: CreditCard,
-          locked: true,
-        },
+        ...(!PROMO_ONLY_MODE
+          ? [
+              {
+                id: 'requests',
+                label: isId ? 'Permintaan Saya' : 'My Requests',
+                caption: isId ? 'Login untuk akses' : 'Login to access',
+                href: '/login',
+                icon: ClipboardList,
+                locked: true,
+              },
+              {
+                id: 'transactions',
+                label: isId ? 'Transaksi' : 'Transactions',
+                caption: isId ? 'Login untuk akses' : 'Login to access',
+                href: '/login',
+                icon: CreditCard,
+                locked: true,
+              },
+            ]
+          : []),
       ],
     };
 
@@ -3381,7 +3295,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
   return (
     <MarketplacePageFrame>
-      <div className="mx-auto w-full max-w-[720px] space-y-3.5 sm:space-y-4 lg:hidden">
+      <main className="mx-auto w-full max-w-[720px] space-y-3.5 sm:space-y-4 lg:hidden">
         <MobileHeroSection
           isId={isId}
           isAuthenticated={isAuthenticated}
@@ -3397,12 +3311,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           compact
         />
         <DailyLoginRewardCard locale={locale} compact />
-        <QuickCategoriesSection
-          isId={isId}
-          isAuthenticated={isAuthenticated}
-          summary={summary}
-          mobile
-        />
+        <QuickCategoriesSection isId={isId} mobile />
 
         <HomeUmkmMapPreview locale={locale} />
         <RecommendationsSection isId={isId} items={recommendations} mobile />
@@ -3420,7 +3329,8 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           onLoadMore={loadMoreCommunityPosts}
           onCreated={handleCommunityComposerCreated}
         />
-      </div>
+        <Footer />
+      </main>
 
       <div className="lajukan-home-desktop-shell hidden min-h-0 min-w-0 lg:flex lg:flex-1 lg:flex-col">
         <div className="lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 min-w-0 max-w-[1700px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_288px] 2xl:grid-cols-[280px_minmax(0,1fr)_320px]">
@@ -3461,11 +3371,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   <DailyLoginRewardCard locale={locale} />
                 </div>
               </div>
-              <QuickCategoriesSection
-                isId={isId}
-                isAuthenticated={isAuthenticated}
-                summary={summary}
-              />
+              <QuickCategoriesSection isId={isId} />
               <HomeUmkmMapPreview locale={locale} />
               <RecommendationsSection isId={isId} items={recommendations} />
               <div className="grid gap-4">
@@ -3484,6 +3390,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   onCreated={handleCommunityComposerCreated}
                 />
               </div>
+              <Footer />
             </div>
           </main>
           <RightRail

@@ -2,8 +2,17 @@
 
 import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
-import { MapPinned, ShieldCheck, Store, Wallet } from 'lucide-react';
+import {
+  MapPinned,
+  MessageCircle,
+  Phone,
+  ReceiptText,
+  ShieldCheck,
+  Store,
+  Wallet,
+} from 'lucide-react';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   UMKM_DISCOVERY_PATH,
   UMKM_OWNER_PATH,
@@ -45,6 +54,9 @@ export function Footer() {
   const locale = detectLocale(pathname || '');
   const year = new Date().getFullYear();
   const surfaceCopy = getUmkmSurfaceCopy(locale);
+  const businessPhoneDisplay = '0821 1714 8623';
+  const businessPhoneHref = 'tel:+6282117148623';
+  const businessWhatsappHref = 'https://wa.me/6282117148623';
 
   const text = useMemo(
     () => ({
@@ -65,6 +77,16 @@ export function Footer() {
       trust: locale === 'id' ? 'Bantuan & aman' : 'Trust and support',
       copyright:
         locale === 'id' ? 'Hak cipta dilindungi.' : 'All rights reserved.',
+      businessContact:
+        locale === 'id' ? 'Kontak bisnis resmi' : 'Official business contact',
+      rupiahPayment:
+        locale === 'id'
+          ? 'Harga dan transaksi memakai Rupiah (IDR).'
+          : 'Prices and transactions use Indonesian Rupiah (IDR).',
+      checkoutNote:
+        locale === 'id'
+          ? 'Pembayaran diproses dari halaman Lajukan, bukan instruksi transfer luar platform.'
+          : 'Payments are processed from Lajukan pages, not through off-platform transfer instructions.',
     }),
     [locale],
   );
@@ -106,13 +128,21 @@ export function Footer() {
       label: 'Learn',
     },
     {
+      href: '/blog',
+      label: locale === 'id' ? 'Blog UMKM' : 'SME blog',
+    },
+    {
       href: '/education',
       label: 'Education',
     },
-    {
-      href: '/payments',
-      label: locale === 'id' ? 'Pembayaran' : 'Payments',
-    },
+    ...(!PROMO_ONLY_MODE
+      ? [
+          {
+            href: '/payments',
+            label: locale === 'id' ? 'Pembayaran' : 'Payments',
+          },
+        ]
+      : []),
     {
       href: UMKM_OWNER_PATH,
       label: surfaceCopy.owner,
@@ -125,12 +155,21 @@ export function Footer() {
 
   const legalLinks: FooterLink[] = [
     { href: '/support', label: locale === 'id' ? 'Bantuan' : 'Support' },
+    { href: '/contact', label: locale === 'id' ? 'Kontak' : 'Contact' },
     {
       href: '/trust',
       label: locale === 'id' ? 'Trust center' : 'Trust center',
     },
     { href: '/privacy', label: locale === 'id' ? 'Privasi' : 'Privacy' },
     { href: '/terms', label: locale === 'id' ? 'Ketentuan' : 'Terms' },
+    {
+      href: '/refund-policy',
+      label: locale === 'id' ? 'Refund & retur' : 'Refunds & returns',
+    },
+    {
+      href: '/cookie-policy',
+      label: locale === 'id' ? 'Cookie' : 'Cookies',
+    },
   ];
 
   const trustSignals = [
@@ -138,9 +177,24 @@ export function Footer() {
       icon: ShieldCheck,
       label: locale === 'id' ? 'Verifikasi mitra' : 'Partner verification',
     },
+    ...(!PROMO_ONLY_MODE
+      ? [
+          {
+            icon: Wallet,
+            label:
+              locale === 'id' ? 'Pembayaran & escrow' : 'Payments and escrow',
+          },
+        ]
+      : [
+          {
+            icon: MessageCircle,
+            label:
+              locale === 'id' ? 'Chat antar pengguna' : 'User-to-user chat',
+          },
+        ]),
     {
-      icon: Wallet,
-      label: locale === 'id' ? 'Pembayaran & escrow' : 'Payments and escrow',
+      icon: ReceiptText,
+      label: locale === 'id' ? 'Rupiah (IDR)' : 'Rupiah (IDR)',
     },
     {
       icon: MapPinned,
@@ -149,7 +203,7 @@ export function Footer() {
     {
       icon: Store,
       label:
-        locale === 'id' ? 'QR & order storefront' : 'QR and storefront orders',
+        locale === 'id' ? 'Etalase usaha aktif' : 'Active business showcases',
     },
   ];
 
@@ -197,6 +251,36 @@ export function Footer() {
                   {signal.label}
                 </span>
               ))}
+            </div>
+
+            <div className="mt-4 grid gap-2 rounded-[20px] border border-[color:var(--app-border)] bg-white/72 p-3 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/36 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+              <div>
+                <p className="font-black text-[color:var(--app-text)]">
+                  {text.businessContact}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <a
+                    href={businessPhoneHref}
+                    className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)]"
+                  >
+                    <Phone className="h-3 w-3" />
+                    {businessPhoneDisplay}
+                  </a>
+                  <a
+                    href={businessWhatsappHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 font-semibold text-[color:var(--app-accent)]"
+                  >
+                    <MessageCircle className="h-3 w-3" />
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
+              <div className="leading-5">
+                <p>{text.rupiahPayment}</p>
+                <p>{text.checkoutNote}</p>
+              </div>
             </div>
           </section>
 

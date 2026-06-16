@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeContentMediaUrl } from '@/lib/content/catalog';
 
 function getCommunityBackendBase(): string | null {
   const base =
@@ -21,12 +22,44 @@ function appendSearch(req: NextRequest, upstream: URL) {
   });
 }
 
+function normalizeCommunityMediaString(value: string): string {
+  const normalized = normalizeContentMediaUrl(value);
+  if (
+    normalized.startsWith('/api/forum/media/') ||
+    normalized.startsWith('/api/content/media/') ||
+    normalized.startsWith('/api/chat/media/') ||
+    normalized.startsWith('/uploads/')
+  ) {
+    return normalized;
+  }
+  return value;
+}
+
+function normalizeCommunityPayloadUrls(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return normalizeCommunityMediaString(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(entry => normalizeCommunityPayloadUrls(entry));
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+      key,
+      normalizeCommunityPayloadUrls(entry),
+    ]),
+  );
+}
+
 export async function proxyCommunityBackend(
   req: NextRequest,
   path: string,
   options: {
     method?: string;
     includeSearch?: boolean;
+    accept?: string;
+    cacheControl?: string;
   } = {},
 ): Promise<NextResponse> {
   const base = getCommunityBackendBase();
@@ -43,7 +76,7 @@ export async function proxyCommunityBackend(
   }
 
   const headers: Record<string, string> = {
-    Accept: 'application/json',
+    Accept: options.accept || 'application/json',
   };
 
   const token = readForwardToken(req);
@@ -79,12 +112,36 @@ export async function proxyCommunityBackend(
       cache: 'no-store',
     });
     const contentType = response.headers.get('content-type') || 'application/json';
+    const cacheControl =
+      options.cacheControl || response.headers.get('cache-control') || undefined;
     const bodyBuffer = await response.arrayBuffer();
-    return new NextResponse(bodyBuffer.byteLength ? bodyBuffer : '{}', {
+    let responseBody: ArrayBuffer | string = bodyBuffer;
+    const responseHeaders: Record<string, string> = {
+      'content-type': contentType,
+    };
+    if (cacheControl) {
+      responseHeaders['cache-control'] = cacheControl;
+    }
+
+    if (contentType.toLowerCase().includes('application/json') && bodyBuffer.byteLength) {
+      try {
+        const parsed = JSON.parse(new TextDecoder().decode(bodyBuffer)) as unknown;
+        responseBody = JSON.stringify(normalizeCommunityPayloadUrls(parsed));
+      } catch {
+        responseBody = bodyBuffer;
+      }
+    }
+
+    const finalBody =
+      typeof responseBody === 'string'
+        ? responseBody || '{}'
+        : responseBody.byteLength
+          ? responseBody
+          : '{}';
+
+    return new NextResponse(finalBody, {
       status: response.status,
-      headers: {
-        'content-type': contentType,
-      },
+      headers: responseHeaders,
     });
   } catch (error) {
     console.error('[COMMUNITY_BACKEND_PROXY_ERROR]', error);

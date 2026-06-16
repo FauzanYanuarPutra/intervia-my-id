@@ -6,6 +6,7 @@ import {
   type BusinessModuleStatus,
 } from '@/lib/business/moduleCatalog';
 import { buildBusinessOperatingSystemSnapshot } from '@/lib/business/operatingSystem';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -182,10 +183,12 @@ export async function GET(req: NextRequest) {
       `${MARKETPLACE_URL}/v1/content?limit=200&offset=0`,
       token,
     ),
-    fetchListFromUpstream(
-      `${MARKETPLACE_URL}/v1/transactions?limit=200&offset=0`,
-      token,
-    ),
+    PROMO_ONLY_MODE
+      ? { ok: true, items: [] }
+      : fetchListFromUpstream(
+          `${MARKETPLACE_URL}/v1/transactions?limit=200&offset=0`,
+          token,
+        ),
     fetchListFromUpstream(
       `${MARKETPLACE_URL}/v1/crm/leads?limit=200&offset=0`,
       token,
@@ -204,9 +207,11 @@ export async function GET(req: NextRequest) {
   const supportItems = supportResult.items;
   const inboxRooms = inboxResult.items;
 
-  const activeTransactions = transactionItems.filter(item =>
-    isActiveTransaction(normalizeStatus(item.status)),
-  ).length;
+  const activeTransactions = PROMO_ONLY_MODE
+    ? 0
+    : transactionItems.filter(item =>
+        isActiveTransaction(normalizeStatus(item.status)),
+      ).length;
   const activeLeads = leadItems.filter(
     item =>
       !new Set(['won', 'lost', 'closed']).has(
@@ -226,9 +231,11 @@ export async function GET(req: NextRequest) {
   const weeklyContent = contentItems.filter(item =>
     isWithinDays(normalizeTimestamp(item.created_at ?? item.updated_at), 7),
   ).length;
-  const weeklyTransactions = transactionItems.filter(item =>
-    isWithinDays(normalizeTimestamp(item.created_at ?? item.updated_at), 7),
-  ).length;
+  const weeklyTransactions = PROMO_ONLY_MODE
+    ? 0
+    : transactionItems.filter(item =>
+        isWithinDays(normalizeTimestamp(item.created_at ?? item.updated_at), 7),
+      ).length;
   const weeklyLeads = leadItems.filter(item =>
     isWithinDays(normalizeTimestamp(item.created_at ?? item.updated_at), 7),
   ).length;
@@ -253,10 +260,18 @@ export async function GET(req: NextRequest) {
     trend: activeLeads > 15 ? 'rising' : 'stable',
   };
   moduleMetrics.erp = {
-    status: activeTransactions > 0 ? 'live' : 'partial',
+    status: PROMO_ONLY_MODE
+      ? 'planned'
+      : activeTransactions > 0
+        ? 'live'
+        : 'partial',
     value: activeTransactions,
-    label: 'Open transactions',
-    trend: activeTransactions > 20 ? 'busy' : 'stable',
+    label: PROMO_ONLY_MODE ? 'Transactions parked' : 'Open transactions',
+    trend: PROMO_ONLY_MODE
+      ? 'paused'
+      : activeTransactions > 20
+        ? 'busy'
+        : 'stable',
   };
   moduleMetrics.cms = {
     status: publishedContent > 0 ? 'partial' : 'planned',
@@ -277,10 +292,18 @@ export async function GET(req: NextRequest) {
     trend: 'stable',
   };
   moduleMetrics.fms = {
-    status: activeTransactions > 0 ? 'partial' : 'planned',
+    status: PROMO_ONLY_MODE
+      ? 'planned'
+      : activeTransactions > 0
+        ? 'partial'
+        : 'planned',
     value: activeTransactions,
-    label: 'Tracked money flow',
-    trend: activeTransactions > 15 ? 'rising' : 'stable',
+    label: PROMO_ONLY_MODE ? 'Finance parked for promo launch' : 'Tracked money flow',
+    trend: PROMO_ONLY_MODE
+      ? 'paused'
+      : activeTransactions > 15
+        ? 'rising'
+        : 'stable',
   };
   moduleMetrics.bi = {
     status: weeklyThroughput > 0 ? 'partial' : 'planned',
@@ -301,10 +324,14 @@ export async function GET(req: NextRequest) {
     trend: contentItems.length > 50 ? 'scaled' : 'growing',
   };
   moduleMetrics.pos = {
-    status: activeTransactions > 0 ? 'partial' : 'planned',
+    status: PROMO_ONLY_MODE
+      ? 'planned'
+      : activeTransactions > 0
+        ? 'partial'
+        : 'planned',
     value: activeTransactions,
-    label: 'Checkout operations',
-    trend: 'stable',
+    label: PROMO_ONLY_MODE ? 'Checkout parked' : 'Checkout operations',
+    trend: PROMO_ONLY_MODE ? 'paused' : 'stable',
   };
   moduleMetrics.hris = {
     status: leadItems.length > 0 ? 'partial' : 'planned',
@@ -319,10 +346,18 @@ export async function GET(req: NextRequest) {
     trend: 'steady',
   };
   moduleMetrics.pms = {
-    status: transactionItems.length > 0 ? 'live' : 'partial',
-    value: weeklyTransactions,
-    label: 'Weekly execution load',
-    trend: weeklyTransactions > 10 ? 'high' : 'normal',
+    status: PROMO_ONLY_MODE
+      ? 'planned'
+      : transactionItems.length > 0
+        ? 'live'
+        : 'partial',
+    value: PROMO_ONLY_MODE ? 0 : weeklyTransactions,
+    label: PROMO_ONLY_MODE ? 'Promo launch parking lot' : 'Weekly execution load',
+    trend: PROMO_ONLY_MODE
+      ? 'paused'
+      : weeklyTransactions > 10
+        ? 'high'
+        : 'normal',
   };
   moduleMetrics.ma = {
     status: activeLeads > 0 ? 'partial' : 'planned',
@@ -337,10 +372,16 @@ export async function GET(req: NextRequest) {
     trend: 'stable',
   };
   moduleMetrics.tms = {
-    status: transactionItems.length > 0 ? 'partial' : 'planned',
-    value: Math.max(0, activeTransactions - openSupportTickets),
-    label: 'Shipment candidates',
-    trend: 'building',
+    status: PROMO_ONLY_MODE
+      ? 'planned'
+      : transactionItems.length > 0
+        ? 'partial'
+        : 'planned',
+    value: PROMO_ONLY_MODE
+      ? 0
+      : Math.max(0, activeTransactions - openSupportTickets),
+    label: PROMO_ONLY_MODE ? 'Fulfillment parked' : 'Shipment candidates',
+    trend: PROMO_ONLY_MODE ? 'paused' : 'building',
   };
   moduleMetrics.scm = {
     status: 'planned',
@@ -394,14 +435,23 @@ export async function GET(req: NextRequest) {
       {
         id: 'flow-revenue',
         status: 'high-priority',
-        title: 'Lead to revenue flow',
-        description:
-          'Capture lead in CRM, close via chat, and execute via transactions.',
-        steps: [
-          'Capture inbound lead from chat/support in CRM',
-          'Qualify, negotiate, and send offer in chat',
-          'Lock commitment in transaction and monitor progress',
-        ],
+        title: PROMO_ONLY_MODE
+          ? 'Lead to promotion data flow'
+          : 'Lead to revenue flow',
+        description: PROMO_ONLY_MODE
+          ? 'Capture lead in CRM, enrich listing data from chat, and improve discovery.'
+          : 'Capture lead in CRM, close via chat, and execute via transactions.',
+        steps: PROMO_ONLY_MODE
+          ? [
+              'Capture inbound lead from chat/support in CRM',
+              'Tag category, city, need, and profile completeness',
+              'Improve listing copy and search matching from those signals',
+            ]
+          : [
+              'Capture inbound lead from chat/support in CRM',
+              'Qualify, negotiate, and send offer in chat',
+              'Lock commitment in transaction and monitor progress',
+            ],
         href: '/crm',
       },
       {
@@ -435,7 +485,9 @@ export async function GET(req: NextRequest) {
       'JWT-gated aggregation endpoint with server-side auth validation',
       'Leaky-bucket rate limiting per user and IP for API stability',
       'Role-oriented module routing through app-level auth guard',
-      'Support and transaction workflows designed with status integrity checks',
+      PROMO_ONLY_MODE
+        ? 'Promo launch keeps transaction workflows parked behind feature flags'
+        : 'Support and transaction workflows designed with status integrity checks',
     ],
     performance_guardrails: [
       'Parallel upstream calls with timeout to prevent slow dependency lock',

@@ -57,7 +57,7 @@ type UmkmStoreMapProps = {
   routeToStoreId?: string | null;
   showRoute?: boolean;
   onRouteResolved?: (route: UmkmMapRouteSummary) => void;
-  focusMode?: 'stores' | 'viewer' | 'route';
+  focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
   focusNonce?: number;
 };
 

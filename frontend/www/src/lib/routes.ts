@@ -1,4 +1,5 @@
 // src/lib/routes.ts
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 export enum Role {
   GUEST = 'GUEST',
@@ -11,6 +12,7 @@ export enum Role {
 export enum RoutePath {
   HOME = '/home',
   ABOUT = '/about',
+  BLOG = '/blog',
   CHAT = '/chat',
   COMMUNITY = '/community',
   CONTACT = '/contact',
@@ -35,6 +37,7 @@ export enum RoutePath {
   PRIVACY = '/privacy',
   PROFILE = '/profile',
   PROPERTY = '/property',
+  REFUND_POLICY = '/refund-policy',
   REELS = '/reels',
   REGISTER = '/register',
   RESET_PASSWORD = '/reset-password',
@@ -213,6 +216,7 @@ export const routes: RouteConfig[] = [
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
     },
     access: AUTH_ACCESS,
+    isDisabled: PROMO_ONLY_MODE,
   },
   {
     path: `${RoutePath.CONTENT}/:id`,
@@ -266,16 +270,24 @@ export const routes: RouteConfig[] = [
       {
         path: `${RoutePath.CREATE}/:flow`,
         name: 'Create Flow',
-        meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } },
-        access: AUTH_ACCESS
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
       },
       {
         path: `${RoutePath.CREATE}/:flow/:listing`,
         name: 'Create Listing Detail',
-        meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } },
-        access: AUTH_ACCESS
-      }
-    ]
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+    ],
   },
   {
     path: RoutePath.PROFILE,
@@ -302,10 +314,14 @@ export const routes: RouteConfig[] = [
       {
         path: `${RoutePath.PROFILE}/:slug`,
         name: 'Public Profile',
-        meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: false } },
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+        },
         access: PUBLIC_ACCESS,
-        shared: true
-      }
+        shared: true,
+      },
     ],
   },
   {
@@ -329,6 +345,7 @@ export const routes: RouteConfig[] = [
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
     },
     access: AUTH_ACCESS,
+    isDisabled: PROMO_ONLY_MODE,
     children: [
       {
         path: `${RoutePath.TRANSACTIONS}/:id`,
@@ -340,6 +357,7 @@ export const routes: RouteConfig[] = [
           footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
         },
         access: AUTH_ACCESS,
+        isDisabled: PROMO_ONLY_MODE,
       },
       {
         path: `${RoutePath.TRANSACTIONS}/:id/review`,
@@ -351,6 +369,7 @@ export const routes: RouteConfig[] = [
           footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
         },
         access: AUTH_ACCESS,
+        isDisabled: PROMO_ONLY_MODE,
       },
     ],
   },
@@ -386,6 +405,7 @@ export const routes: RouteConfig[] = [
       footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
     },
     access: AUTH_ACCESS,
+    isDisabled: PROMO_ONLY_MODE,
   },
   {
     path: RoutePath.REELS,
@@ -417,8 +437,9 @@ export const routes: RouteConfig[] = [
     meta: {
       topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
-      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      immersive: true,
     },
     access: AUTH_ACCESS,
     children: [
@@ -430,6 +451,7 @@ export const routes: RouteConfig[] = [
           navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          immersive: true,
         },
         access: AUTH_ACCESS,
       },
@@ -440,119 +462,233 @@ export const routes: RouteConfig[] = [
   {
     path: RoutePath.ABOUT,
     name: 'About',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
-    shared: true
+    shared: true,
   },
   {
     path: RoutePath.CONTACT,
     name: 'Contact',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
-    shared: true
+    shared: true,
   },
   {
     path: RoutePath.COMMUNITY,
     name: 'Community',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: false } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+    },
     access: AUTH_ACCESS,
     children: [
       {
         path: `${RoutePath.COMMUNITY}/groups/:slug`,
         name: 'Community Group Detail',
-        meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } },
-        access: AUTH_ACCESS
-      }
-    ]
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+    ],
   },
   {
     path: RoutePath.CRM,
     name: 'CRM',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+    },
     access: AUTH_ACCESS,
     isDisabled: true, // 🚧 Ubah jadi true jika ingin menendang halaman ini ke Home
-
+  },
+  {
+    path: RoutePath.BLOG,
+    name: 'Blog',
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
+    access: PUBLIC_ACCESS,
+    shared: true,
+    children: [
+      {
+        path: `${RoutePath.BLOG}/:slug`,
+        name: 'Blog Article',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+        },
+        access: PUBLIC_ACCESS,
+        shared: true,
+      },
+    ],
   },
   {
     path: RoutePath.EDUCATION,
     name: 'Education',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
     shared: true,
     isDisabled: true, // 🚧 Ubah jadi true jika ingin menendang halaman ini ke Home
-
   },
   {
     path: RoutePath.LEARN,
     name: 'Learn',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: AUTH_ACCESS,
     isDisabled: true, // 🚧 Ubah jadi true jika ingin menendang halaman ini ke Home
     children: [
       {
         path: `${RoutePath.LEARN}/:slug`,
         name: 'Lesson Detail',
-        meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
-        access: AUTH_ACCESS
-      }
-    ]
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+        },
+        access: AUTH_ACCESS,
+      },
+    ],
   },
   {
     path: RoutePath.LAINNYA,
     name: 'Lainnya',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: false, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+    },
     access: PUBLIC_ACCESS,
     isDisabled: true, // 🚧 Ubah jadi true jika ingin menendang halaman ini ke Home
-    shared: true
+    shared: true,
   },
   {
     path: RoutePath.UMKM,
     name: 'UMKM Portal',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      immersive: true,
+      routeIntent: 'map-discovery',
+    },
     access: PUBLIC_ACCESS,
-    shared: true
+    shared: true,
   },
   {
     path: RoutePath.COOKIE_POLICY,
     name: 'Cookie Policy',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
-    shared: true
+    shared: true,
   },
   {
     path: RoutePath.PRIVACY,
     name: 'Privacy Policy',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
-    shared: true
+    shared: true,
+  },
+  {
+    path: RoutePath.REFUND_POLICY,
+    name: 'Refund & Return Policy',
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
+    access: PUBLIC_ACCESS,
+    shared: true,
   },
   {
     path: RoutePath.TERMS,
     name: 'Terms',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
-    shared: true
+    shared: true,
   },
   {
     path: RoutePath.TRUST,
     name: 'Trust',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
     shared: true,
     children: [
       {
         path: `${RoutePath.TRUST}/:topic`,
         name: 'Trust Topic',
-        meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+        },
         access: PUBLIC_ACCESS,
-        shared: true
-      }
-    ]
+        shared: true,
+      },
+    ],
   },
   {
     path: RoutePath.TOKO,
     name: 'Toko',
-    meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+    meta: {
+      topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+      footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+    },
     access: PUBLIC_ACCESS,
     shared: true,
     isDisabled: true, // 🚧 Ubah jadi true jika ingin menendang halaman ini ke Home
@@ -560,17 +696,27 @@ export const routes: RouteConfig[] = [
       {
         path: `${RoutePath.TOKO}/scan`,
         name: 'Scan QR Toko',
-        meta: { topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false }, navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } },
-        access: AUTH_ACCESS
+        meta: {
+          topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
       },
       {
         path: `${RoutePath.TOKO}/:slug`,
         name: 'Storefront View',
-        meta: { topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true }, footer: { isVisibleOnWeb: true, isVisibleOnMobile: true } },
+        meta: {
+          topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
+          footer: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+        },
         access: PUBLIC_ACCESS,
-        shared: true
-      }
-    ]
+        shared: true,
+      },
+    ],
   },
 
   // Portal Manajemen Usaha / Merchant Dashboard (`/[locale]/usaha/...`)
@@ -585,19 +731,127 @@ export const routes: RouteConfig[] = [
     },
     access: AUTH_ACCESS,
     children: [
-      { path: `${RoutePath.USAHA}/analytics`, name: 'Analytics Usaha', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/asisten`, name: 'Asisten AI Usaha', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/dashboard`, name: 'Dashboard Usaha Core', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/katalog`, name: 'Katalog Produk Usaha', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/onboarding`, name: 'Onboarding Usaha Baru', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/operasional`, name: 'Operasional Toko', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/order`, name: 'Order Management', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/profil`, name: 'Profil Management', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/qr`, name: 'QR Settings', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/tim`, name: 'Team Access', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/toko/:storeId`, name: 'Outlet Control', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS },
-      { path: `${RoutePath.USAHA}/toko/:storeId/:workspace`, name: 'Workspace Outlet', meta: { navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false }, bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false }, footer: { isVisibleOnWeb: false, isVisibleOnMobile: false } }, access: AUTH_ACCESS }
-    ]
+      {
+        path: `${RoutePath.USAHA}/analytics`,
+        name: 'Analytics Usaha',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/asisten`,
+        name: 'Asisten AI Usaha',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/dashboard`,
+        name: 'Dashboard Usaha Core',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/katalog`,
+        name: 'Katalog Produk Usaha',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/onboarding`,
+        name: 'Onboarding Usaha Baru',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/operasional`,
+        name: 'Operasional Toko',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/order`,
+        name: 'Order Management',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/profil`,
+        name: 'Profil Management',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/qr`,
+        name: 'QR Settings',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/tim`,
+        name: 'Team Access',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/toko/:storeId`,
+        name: 'Outlet Control',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+      {
+        path: `${RoutePath.USAHA}/toko/:storeId/:workspace`,
+        name: 'Workspace Outlet',
+        meta: {
+          navbar: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+        },
+        access: AUTH_ACCESS,
+      },
+    ],
   },
 
   // Auth routes (guest only)
@@ -626,6 +880,17 @@ export const routes: RouteConfig[] = [
     guestOnly: true,
     shared: true,
     access: [Role.GUEST],
+  },
+  {
+    path: RoutePath.ONBOARDING,
+    name: 'Account Onboarding',
+    meta: {
+      topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+    },
+    access: AUTH_ACCESS,
   },
   {
     path: RoutePath.FORGOT_PASSWORD,

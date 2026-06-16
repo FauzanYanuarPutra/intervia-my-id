@@ -12,6 +12,8 @@ import {
 } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+import { isMoneyRelatedNotification } from '@/lib/notifications/presentation';
 
 export type InboxNotification = {
   id: string;
@@ -129,6 +131,24 @@ function dedupeNotifications(items: InboxNotification[]): InboxNotification[] {
   return result;
 }
 
+function shouldShowNotification(item: InboxNotification): boolean {
+  if (!PROMO_ONLY_MODE) return true;
+  return !isMoneyRelatedNotification({
+    category: item.category,
+    eventType: item.event_type,
+    title: item.title,
+    message: item.message,
+  });
+}
+
+function visibleNotifications(items: InboxNotification[]): InboxNotification[] {
+  return PROMO_ONLY_MODE ? items.filter(shouldShowNotification) : items;
+}
+
+function unreadNotificationCount(items: InboxNotification[]): number {
+  return items.reduce((total, item) => total + Number(!item.is_read), 0);
+}
+
 export function NotificationInboxProvider({ children }: { children: ReactNode }) {
   const { user, accessToken, authFetch } = useAuth();
   const { notify } = useToast();
@@ -180,9 +200,13 @@ export function NotificationInboxProvider({ children }: { children: ReactNode })
       if (!res.ok) {
         throw new Error('Failed to load notifications');
       }
-      const nextItems = Array.isArray(payload.items) ? payload.items : [];
-      setItems(dedupeNotifications(nextItems));
-      if (typeof payload.unread_count === 'number') {
+      const nextItems = visibleNotifications(
+        dedupeNotifications(Array.isArray(payload.items) ? payload.items : []),
+      );
+      setItems(nextItems);
+      if (PROMO_ONLY_MODE) {
+        setUnreadCount(unreadNotificationCount(nextItems));
+      } else if (typeof payload.unread_count === 'number') {
         setUnreadCount(Math.max(0, payload.unread_count));
       }
     } catch (error) {
@@ -194,6 +218,27 @@ export function NotificationInboxProvider({ children }: { children: ReactNode })
 
   const refreshUnreadCount = useCallback(async () => {
     if (!userId) return;
+    if (PROMO_ONLY_MODE) {
+      try {
+        const res = await authFetch('/api/notifications?limit=30&offset=0', {
+          cache: 'no-store',
+        });
+        const payload = (await res
+          .json()
+          .catch(() => ({}))) as ListNotificationsResponse;
+        if (!res.ok) {
+          throw new Error('Failed to load notification unread count');
+        }
+        const nextItems = visibleNotifications(
+          dedupeNotifications(Array.isArray(payload.items) ? payload.items : []),
+        );
+        setItems(nextItems);
+        setUnreadCount(unreadNotificationCount(nextItems));
+      } catch (error) {
+        logNetworkIssue('[NotificationInbox] promo unread-count error', error);
+      }
+      return;
+    }
     try {
       const res = await authFetch('/api/notifications/unread-count', {
         cache: 'no-store',
@@ -228,7 +273,9 @@ export function NotificationInboxProvider({ children }: { children: ReactNode })
             : item,
         ),
       );
-      if (typeof payload.unread_count === 'number') {
+      if (PROMO_ONLY_MODE) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } else if (typeof payload.unread_count === 'number') {
         setUnreadCount(Math.max(0, payload.unread_count));
       } else {
         setUnreadCount((prev) => Math.max(0, prev - 1));
@@ -250,7 +297,9 @@ export function NotificationInboxProvider({ children }: { children: ReactNode })
           : { ...item, is_read: true, read_at: new Date().toISOString() },
       ),
     );
-    if (typeof payload.unread_count === 'number') {
+    if (PROMO_ONLY_MODE) {
+      setUnreadCount(0);
+    } else if (typeof payload.unread_count === 'number') {
       setUnreadCount(Math.max(0, payload.unread_count));
     } else {
       setUnreadCount(0);
@@ -318,12 +367,14 @@ export function NotificationInboxProvider({ children }: { children: ReactNode })
           }
           if (!payload || typeof payload !== 'object') return;
 
-          if (typeof payload.unread_count === 'number') {
+          if (!PROMO_ONLY_MODE && typeof payload.unread_count === 'number') {
             setUnreadCount(Math.max(0, payload.unread_count));
           }
 
           if (payload.event === 'notification.created' && payload.notification) {
             const notification = payload.notification;
+            if (!shouldShowNotification(notification)) return;
+
             setItems((prev) =>
               dedupeNotifications([notification, ...prev]).sort(
                 (a, b) =>

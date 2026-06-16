@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -12,6 +13,12 @@ export async function GET(
   const { id } = await context.params;
 
   try {
+    if (PROMO_ONLY_MODE) {
+      return NextResponse.json([], {
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+
     const res = await fetch(`${MARKETPLACE_URL}/v1/content/${id}/reviews`);
 
     const data = await res.json().catch(() => []);

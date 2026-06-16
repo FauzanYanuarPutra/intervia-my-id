@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext';
 import { Link } from '@/i18n/navigation';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
 import { ArrowUpRight, Loader2, Plus, ReceiptText, Wallet } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -167,10 +168,18 @@ export function HomeWalletQuickPanel({
 
   const [balances, setBalances] = useState<WalletBalancesResponse | null>(null);
   const [latestTopup, setLatestTopup] = useState<WalletTopupLite | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!PROMO_ONLY_MODE);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (PROMO_ONLY_MODE) {
+      setBalances(null);
+      setLatestTopup(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function loadWalletSummary() {
@@ -241,6 +250,8 @@ export function HomeWalletQuickPanel({
   }, [authFetch, authLoading, isId, user]);
 
   const account = useMemo(() => pickDefaultAccount(balances), [balances]);
+
+  if (PROMO_ONLY_MODE) return null;
 
   if (authLoading || loading) {
     return (

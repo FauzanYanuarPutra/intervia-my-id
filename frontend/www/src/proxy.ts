@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { routes, Role } from '@/lib/routes';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   AUTH_ROUTE_PATHS,
   isAuthRoutePath,
@@ -56,7 +57,7 @@ const CANONICAL_INDEX_REDIRECTS: Record<string, string> = {
 const LEGACY_EXACT_REDIRECTS: Record<string, string> = {
   '/help': '/support',
   '/forum': '/community',
-  '/projects': '/my-projects',
+  '/projects': PROMO_ONLY_MODE ? '/home' : '/my-projects',
   '/my-applications': '/dashboard',
   '/property/create': '/create/jual/properti',
   '/jobs/create': '/create/butuh/lowongan',
@@ -65,7 +66,7 @@ const LEGACY_EXACT_REDIRECTS: Record<string, string> = {
   '/super-app': '/home',
 };
 const LEGACY_PREFIX_REDIRECTS: Record<string, string> = {
-  '/finance': '/payments',
+  '/finance': PROMO_ONLY_MODE ? '/home' : '/payments',
   '/collaboration': '/chat',
   '/spatial': '/umkm',
 };
@@ -812,6 +813,10 @@ export async function proxy(req: NextRequest) {
   }
 
   const route = findRouteConfig(routePath, routes);
+  if (route?.isDisabled) {
+    return redirectToLocalizedTarget(req, locale, '/home');
+  }
+
   const auth = await getUserRole(req);
   const hasSessionMarker = auth.valid || auth.recoverable;
   const finalizeLocalizedResponse = (res: NextResponse) => {

@@ -29,6 +29,7 @@ import {
   persistTermsAcceptance,
   type TrustPolicy,
 } from '@/lib/super-app/trust-policy';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 const ORDER_TTL_SECONDS = 24 * 60 * 60;
 const MIN_SCHEDULE_LEAD_MINUTES = 3;
@@ -438,6 +439,12 @@ function buildTemplatePayload(input: {
 
 export async function POST(req: NextRequest) {
   try {
+    if (PROMO_ONLY_MODE) {
+      return NextResponse.json(
+        { error: 'Orders are disabled for now' },
+        { status: 404 },
+      );
+    }
     const auth = await requireAuth(req);
     if (!auth.ok) return auth.res;
 
@@ -968,6 +975,12 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    if (PROMO_ONLY_MODE) {
+      return NextResponse.json(
+        { error: 'Orders are disabled for now' },
+        { status: 404 },
+      );
+    }
     const auth = await requireAuth(req);
     if (!auth.ok) return auth.res;
 

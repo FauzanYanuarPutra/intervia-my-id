@@ -43,6 +43,7 @@ export type StoreRecord = {
   phone: string | null;
   recommended_qr?: 'online' | 'offline' | null;
   metadata: Record<string, unknown>;
+  is_active?: boolean;
   online_order_enabled: boolean;
   offline_order_enabled: boolean;
   access_role?: 'owner' | 'manager' | 'cashier' | 'stock' | 'ops' | 'finance';
@@ -265,7 +266,9 @@ export const ALL_BUSINESS_CAPABILITIES: UmkmBusinessCapabilityId[] = [
 export function createStoreFormState(
   businessCategory: UmkmBusinessCategoryId = 'culinary',
 ): StoreFormState {
-  const supportsTables = supportsDineIn(getUmkmDefaultCapabilities(businessCategory));
+  const supportsTables = supportsDineIn(
+    getUmkmDefaultCapabilities(businessCategory),
+  );
   return {
     name: '',
     description: '',
@@ -287,7 +290,8 @@ export function createStoreFormState(
 export function createVerificationFormState(
   businessCategory: UmkmBusinessCategoryId = 'culinary',
 ): VerificationFormState {
-  const recommendedServices = getUmkmRecommendedPublishServices(businessCategory);
+  const recommendedServices =
+    getUmkmRecommendedPublishServices(businessCategory);
   return {
     business_type: businessCategory,
     business_focus: '',
@@ -295,7 +299,7 @@ export function createVerificationFormState(
     location_mode: 'fixed',
     live_now: false,
     auto_live_schedule_enabled: false,
-    live_schedule_days: UMKM_LIVE_SCHEDULE_DAY_OPTIONS.map((item) => item.id),
+    live_schedule_days: UMKM_LIVE_SCHEDULE_DAY_OPTIONS.map(item => item.id),
     live_schedule_start: '08:00',
     live_schedule_end: '21:00',
     custom_fields: buildDefaultCustomFieldsForBusiness(businessCategory),
@@ -328,8 +332,12 @@ export function createVerificationFormState(
 
 export function createProductFormState(
   businessCategory: UmkmBusinessCategoryId = 'culinary',
-  capabilities: UmkmBusinessCapabilityId[] = getUmkmDefaultCapabilities(businessCategory),
-  publishServices: UmkmPublishService[] = getUmkmRecommendedPublishServices(businessCategory),
+  capabilities: UmkmBusinessCapabilityId[] = getUmkmDefaultCapabilities(
+    businessCategory,
+  ),
+  publishServices: UmkmPublishService[] = getUmkmRecommendedPublishServices(
+    businessCategory,
+  ),
 ): ProductFormState {
   const defaultChannels = getUmkmDefaultChannelsForBusiness(businessCategory);
   const defaultKind = getUmkmDefaultProductKindForBusiness(businessCategory);
@@ -345,8 +353,10 @@ export function createProductFormState(
     sku: '',
     product_kind: defaultKind,
     weight_grams: shippingEnabled ? '500' : '0',
-    allow_pickup: defaultKind === 'physical' ? capabilities.includes('pickup') : false,
-    allow_courier_shipping: defaultKind === 'physical' ? shippingEnabled : false,
+    allow_pickup:
+      defaultKind === 'physical' ? capabilities.includes('pickup') : false,
+    allow_courier_shipping:
+      defaultKind === 'physical' ? shippingEnabled : false,
     digital_delivery_note:
       defaultKind === 'digital'
         ? 'Hasil dikirim online setelah pembayaran dan brief diterima.'
@@ -387,7 +397,11 @@ export function formatDateTime(value: string, locale: string): string {
 
 export function statusTone(status: string): string {
   const normalized = status.toLowerCase();
-  if (normalized === 'paid' || normalized === 'served' || normalized === 'completed') {
+  if (
+    normalized === 'paid' ||
+    normalized === 'served' ||
+    normalized === 'completed'
+  ) {
     return ' ui-success-border ui-success-text';
   }
   if (
@@ -413,7 +427,10 @@ export function statusTone(status: string): string {
   return 'ui-border ui-text-soft';
 }
 
-export function teamRoleLabel(role: TeamMemberRecord['role'], isId: boolean): string {
+export function teamRoleLabel(
+  role: TeamMemberRecord['role'],
+  isId: boolean,
+): string {
   if (role === 'owner') return isId ? 'Pemilik' : 'Owner';
   if (role === 'manager') return isId ? 'Admin toko' : 'Manager';
   if (role === 'cashier') return isId ? 'Kasir' : 'Cashier';
@@ -423,7 +440,10 @@ export function teamRoleLabel(role: TeamMemberRecord['role'], isId: boolean): st
   return role;
 }
 
-export function formatPaymentStage(stage: string | undefined, isId: boolean): string {
+export function formatPaymentStage(
+  stage: string | undefined,
+  isId: boolean,
+): string {
   const normalized = (stage || '').toLowerCase();
   if (normalized === 'awaiting_confirmation') {
     return isId ? 'Bill belum dicek' : 'Awaiting bill confirmation';
@@ -443,20 +463,28 @@ export function formatPaymentMethod(
   timing?: 'prepay' | 'postpay',
 ): string {
   const normalized = (method || '').toLowerCase();
-  if (normalized === 'bank_transfer') return isId ? 'Transfer / QRIS' : 'Bank transfer / QRIS';
-  if (normalized === 'wallet') return isId ? 'Saldo / wallet' : 'Wallet balance';
+  if (normalized === 'bank_transfer')
+    return isId ? 'Transfer / QRIS' : 'Bank transfer / QRIS';
+  if (normalized === 'wallet')
+    return isId ? 'Saldo / wallet' : 'Wallet balance';
   if (normalized === 'cash') {
-    if (timing === 'postpay') return isId ? 'Tunai (bayar belakangan)' : 'Cash (Pay later)';
+    if (timing === 'postpay')
+      return isId ? 'Tunai (bayar belakangan)' : 'Cash (Pay later)';
     return isId ? 'Tunai' : 'Cash';
   }
   return method || '-';
 }
 
-export function formatOrderFulfillmentLabel(mode: string | undefined, isId: boolean): string {
+export function formatOrderFulfillmentLabel(
+  mode: string | undefined,
+  isId: boolean,
+): string {
   const normalized = (mode || '').toLowerCase();
   if (normalized === 'pickup') return isId ? 'Ambil di toko' : 'Store pickup';
-  if (normalized === 'digital') return isId ? 'File digital / instan' : 'Digital / instant';
-  if (normalized === 'dine_in') return isId ? 'Makan di tempat' : 'Dine-in / table';
+  if (normalized === 'digital')
+    return isId ? 'File digital / instan' : 'Digital / instant';
+  if (normalized === 'dine_in')
+    return isId ? 'Makan di tempat' : 'Dine-in / table';
   return isId ? 'Dikirim kurir' : 'Courier / shipping';
 }
 
@@ -475,7 +503,10 @@ export function readPaymentFlow(meta: Record<string, unknown>): {
       : typeof meta.payment_timing === 'string'
         ? meta.payment_timing
         : '';
-  const timing = timingValue === 'postpay' || flow.prepay_required === false ? 'postpay' : 'prepay';
+  const timing =
+    timingValue === 'postpay' || flow.prepay_required === false
+      ? 'postpay'
+      : 'prepay';
   return {
     prepayRequired: flow.prepay_required !== false,
     timing,
@@ -494,7 +525,11 @@ export function readMetaNumber(meta: Record<string, unknown>, key: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function readMetaBool(meta: Record<string, unknown>, key: string, fallback = false) {
+export function readMetaBool(
+  meta: Record<string, unknown>,
+  key: string,
+  fallback = false,
+) {
   if (meta[key] === true) return true;
   if (meta[key] === false) return false;
   return fallback;
@@ -511,11 +546,15 @@ export function normalizeServiceList(value: unknown) {
       ? value.split(/[,\s]+/)
       : [];
   return tokens
-    .map((item) => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
-    .filter((item): item is UmkmPublishService => item === 'food' || item === 'mart');
+    .map(item => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
+    .filter(
+      (item): item is UmkmPublishService => item === 'food' || item === 'mart',
+    );
 }
 
-export function readBusinessCategory(meta: Record<string, unknown>): UmkmBusinessCategoryId | null {
+export function readBusinessCategory(
+  meta: Record<string, unknown>,
+): UmkmBusinessCategoryId | null {
   return (
     normalizeUmkmBusinessCategory(meta.umkm_category) ||
     normalizeUmkmBusinessCategory(meta.business_type) ||
@@ -527,20 +566,28 @@ export function readBusinessCategory(meta: Record<string, unknown>): UmkmBusines
   );
 }
 
-export function derivePublishServices(meta: Record<string, unknown>): UmkmPublishService[] {
+export function derivePublishServices(
+  meta: Record<string, unknown>,
+): UmkmPublishService[] {
   const hasDirectServices =
-    hasMetaKey(meta, 'publish_services') || hasMetaKey(meta, 'publish_service') || hasMetaKey(meta, 'services');
-  const direct = normalizeServiceList(meta.publish_services ?? meta.publish_service ?? meta.services);
+    hasMetaKey(meta, 'publish_services') ||
+    hasMetaKey(meta, 'publish_service') ||
+    hasMetaKey(meta, 'services');
+  const direct = normalizeServiceList(
+    meta.publish_services ?? meta.publish_service ?? meta.services,
+  );
   if (hasDirectServices) return direct;
 
   const toggles: UmkmPublishService[] = [];
   if (meta.publish_food === true) toggles.push('food');
   if (meta.publish_mart === true) toggles.push('mart');
-  if (hasMetaKey(meta, 'publish_food') || hasMetaKey(meta, 'publish_mart')) return toggles;
+  if (hasMetaKey(meta, 'publish_food') || hasMetaKey(meta, 'publish_mart'))
+    return toggles;
 
   const businessCategory = readBusinessCategory(meta);
   if (businessCategory) {
-    const fromCategory = getDefaultPublishServicesForBusinessCategory(businessCategory);
+    const fromCategory =
+      getDefaultPublishServicesForBusinessCategory(businessCategory);
     if (fromCategory.length > 0) return fromCategory;
   }
 

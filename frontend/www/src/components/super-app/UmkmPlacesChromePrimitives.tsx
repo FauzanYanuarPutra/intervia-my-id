@@ -58,6 +58,63 @@ export function toneClass(tone: UmkmPlacePresentation['markerTone']): string {
   return 'bg-teal-50 text-teal-700';
 }
 
+export function RatingStars({
+  rating,
+  countLabel,
+  isId,
+  className,
+  compact = false,
+  showScore = false,
+}: {
+  rating: number;
+  countLabel: string;
+  isId: boolean;
+  className?: string;
+  compact?: boolean;
+  showScore?: boolean;
+}) {
+  const safeRating = Number.isFinite(rating)
+    ? Math.max(0, Math.min(5, rating))
+    : 0;
+  const filledStars = safeRating > 0 ? Math.round(safeRating) : 0;
+  const countText = `${countLabel} ${isId ? 'penilai' : 'ratings'}`;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex min-w-0 items-center gap-1.5 text-amber-600',
+        className,
+      )}
+      aria-label={`${safeRating.toFixed(1)} dari 5, ${countText}`}
+    >
+      <span className="inline-flex shrink-0 items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, index) => {
+          const active = index < filledStars;
+          return (
+            <Star
+              key={index}
+              className={cn(
+                compact ? 'h-3 w-3' : 'h-3.5 w-3.5',
+                active
+                  ? 'fill-current text-amber-500'
+                  : 'fill-transparent text-amber-300',
+              )}
+            />
+          );
+        })}
+      </span>
+      {showScore ? (
+        <span className="shrink-0 text-[10px] font-black text-amber-700">
+          {safeRating.toFixed(1)}
+        </span>
+      ) : null}
+      <span className="shrink-0 text-[10px] font-black text-[color:var(--app-text-soft)]">
+        {countText}
+      </span>
+    </span>
+  );
+}
+
 export function getBusinessModeLabel(
   ui: Pick<UmkmPlacePresentation, 'kindLabel'>,
 ): string {
@@ -158,6 +215,7 @@ export function MapQuickControls({
   onFocusViewer,
   onToggleRoute,
   onCycleTheme,
+  compact = false,
 }: {
   isId: boolean;
   interactive: boolean;
@@ -170,11 +228,20 @@ export function MapQuickControls({
   onFocusViewer: () => void | Promise<void>;
   onToggleRoute: () => void | Promise<void>;
   onCycleTheme?: (() => void | Promise<void>) | null;
+  compact?: boolean;
 }) {
-  const pillButtonClassName =
-    'pointer-events-auto inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-[14px] border px-2.5 text-[10px] font-semibold shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)] backdrop-blur-md transition sm:h-8 sm:px-3';
-  const iconButtonClassName =
-    'pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[14px] border shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)] backdrop-blur-md transition sm:h-8 sm:w-8';
+  const pillButtonClassName = cn(
+    'pointer-events-auto inline-flex shrink-0 items-center justify-center border font-semibold shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)] backdrop-blur-md transition',
+    compact
+      ? 'h-10 w-10 rounded-full px-0 text-[0px]'
+      : 'h-8 gap-1.5 rounded-[14px] px-2.5 text-[10px] sm:h-8 sm:px-3',
+  );
+  const iconButtonClassName = cn(
+    'pointer-events-auto inline-flex shrink-0 items-center justify-center border shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)] backdrop-blur-md transition',
+    compact
+      ? 'h-10 w-10 rounded-full'
+      : 'h-8 w-8 rounded-[14px] sm:h-8 sm:w-8',
+  );
   const statusChipClassName =
     'pointer-events-none inline-flex min-h-[28px] items-center rounded-[14px] border px-2.5 py-1 text-[10px] font-semibold shadow-[0_12px_24px_-18px_rgba(15,23,42,0.3)] backdrop-blur-md';
   const runAction = (action: () => void | Promise<void>, label: string) => {
@@ -191,7 +258,14 @@ export function MapQuickControls({
   };
 
   return (
-    <div className="relative z-[1100] flex max-w-[min(84vw,250px)] flex-col items-start gap-1.5 sm:max-w-none sm:items-end">
+    <div
+      className={cn(
+        'relative z-[1100] flex flex-col gap-1.5 sm:max-w-none sm:items-end',
+        compact
+          ? 'max-w-[44px] items-end'
+          : 'max-w-[min(84vw,250px)] items-start',
+      )}
+    >
       {locationError ? (
         <span
           className={cn(
@@ -212,7 +286,14 @@ export function MapQuickControls({
           {distanceLabel}
         </span>
       ) : null}
-      <div className="inline-flex items-center gap-1 rounded-[18px] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))] p-1.5 shadow-[0_16px_30px_-22px_rgba(15,23,42,0.3)] backdrop-blur-md">
+      <div
+        className={cn(
+          'inline-flex bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))] shadow-[0_16px_30px_-22px_rgba(15,23,42,0.3)] backdrop-blur-md',
+          compact
+            ? 'flex-col gap-1 rounded-[24px] p-1'
+            : 'items-center gap-1 rounded-[18px] p-1.5',
+        )}
+      >
         <button
           type="button"
           onClick={() => runAction(onToggleInteractive, 'TOGGLE_INTERACTIVE')}
@@ -228,13 +309,15 @@ export function MapQuickControls({
           ) : (
             <LockOpen className="h-3 w-3" />
           )}
-          {interactive
-            ? isId
-              ? 'Kunci peta'
-              : 'Lock'
-            : isId
-              ? 'Geser peta'
-              : 'Unlock'}
+          {compact
+            ? null
+            : interactive
+              ? isId
+                ? 'Kunci peta'
+                : 'Lock'
+              : isId
+                ? 'Geser peta'
+                : 'Unlock'}
         </button>
         <button
           type="button"
@@ -411,10 +494,13 @@ export function SelectedPlaceCard<T extends UmkmMapStore>({
             <PlaceKindIcon kind={item.ui.kind} className="h-3.5 w-3.5" />
             {getBusinessModeLabel(item.ui)}
           </span>
-          <span className="inline-flex min-h-[26px] items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-amber-700 shadow-[0_10px_20px_-16px_rgba(245,158,11,0.5)] ring-1 ring-amber-200/80">
-            <Star className="h-3.5 w-3.5 fill-current" />
-            {item.ui.ratingLabel}
-          </span>
+          <RatingStars
+            rating={item.ui.ratingNumber}
+            countLabel={item.ui.reviewCountLabel}
+            isId={isId}
+            compact
+            className="min-h-[26px] rounded-full bg-white px-2.5 py-1 shadow-[0_10px_20px_-16px_rgba(245,158,11,0.5)] ring-1 ring-amber-200/80"
+          />
         </div>
 
         <div>
@@ -502,10 +588,13 @@ export function PlaceListButton<T extends UmkmMapStore>({
               <PlaceKindIcon kind={item.ui.kind} className="h-3 w-3" />
               {getBusinessModeLabel(item.ui)}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-amber-700 shadow-[0_8px_16px_-12px_rgba(245,158,11,0.38)] ring-1 ring-amber-200/80">
-              <Star className="h-3.5 w-3.5 fill-current" />
-              {item.ui.ratingLabel}
-            </span>
+            <RatingStars
+              rating={item.ui.ratingNumber}
+              countLabel={item.ui.reviewCountLabel}
+              isId={isId}
+              compact
+              className="rounded-full bg-white px-2 py-0.5 shadow-[0_8px_16px_-12px_rgba(245,158,11,0.38)] ring-1 ring-amber-200/80"
+            />
           </div>
 
           <h4 className="mt-1.5 line-clamp-1 text-[0.94rem] font-black text-[color:var(--app-text)] sm:mt-2 sm:text-[0.98rem]">

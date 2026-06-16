@@ -106,9 +106,6 @@ const nextConfig = {
   outputFileTracingRoot: path.resolve(process.cwd(), '..'),
   poweredByHeader: false,
   compress: true,
-  eslint: {
-    ignoreDuringBuilds: FAST_DOCKER_BUILD,
-  },
   typescript: {
     ignoreBuildErrors: FAST_DOCKER_BUILD,
   },
@@ -192,6 +189,9 @@ const nextConfig = {
       {
         pathname: '/api/chat/media/**',
       },
+      {
+        pathname: '/api/forum/media/**',
+      },
       { pathname: '/default-avatar.svg' },
     ],
     remotePatterns: [
@@ -212,13 +212,16 @@ const nextConfig = {
 };
 
 const withNextIntl = createNextIntlPlugin();
-const pwaNextConfig = withPWA({
-  ...nextConfig,
-  dest: 'out',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.DISABLE_PWA !== 'false',
-});
+const shouldEnablePwa = process.env.DISABLE_PWA === 'false';
+const pwaNextConfig = shouldEnablePwa
+  ? withPWA({
+      ...nextConfig,
+      dest: 'out',
+      register: true,
+      skipWaiting: true,
+      disable: false,
+    })
+  : nextConfig;
 
 const config = withNextIntl(pwaNextConfig);
 const originalWebpack = config.webpack;

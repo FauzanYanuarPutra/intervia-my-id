@@ -23,6 +23,7 @@ const LOGIN_PHONE_RATE_LIMIT_PER_15_MIN = Number.parseInt(
   process.env.LOGIN_PHONE_RATE_LIMIT_PER_15_MIN || '10',
   10,
 );
+const PHONE_AUTH_ENABLED = process.env.ENABLE_PHONE_AUTH === 'true';
 
 const optionalTrimmedString = z.preprocess((value) => {
   if (value == null) return undefined;
@@ -42,6 +43,13 @@ const PhoneLoginProxySchema = z
 
 export async function POST(req: NextRequest) {
   try {
+    if (!PHONE_AUTH_ENABLED) {
+      return NextResponse.json(
+        { error: 'Phone login is disabled. Use username and password.' },
+        { status: 410 },
+      );
+    }
+
     const security = await enforceAuthRouteSecurity(req, {
       routeKey: 'login-phone',
       ipLimit: 180,

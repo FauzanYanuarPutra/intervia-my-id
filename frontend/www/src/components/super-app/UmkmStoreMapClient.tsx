@@ -2,14 +2,34 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, MapPin, Star } from 'lucide-react';
-import { MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, ZoomControl, useMapEvents } from 'react-leaflet';
-import { divIcon, latLngBounds, type DivIcon, type LatLngBoundsExpression } from 'leaflet';
+import {
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+  Tooltip,
+  useMap,
+  ZoomControl,
+  useMapEvents,
+} from 'react-leaflet';
+import {
+  divIcon,
+  latLngBounds,
+  type DivIcon,
+  type FitBoundsOptions,
+  type LatLngBoundsExpression,
+} from 'leaflet';
 import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import type { LatLng } from '@/lib/super-app/maps';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
 import { LajukanImage } from '@/components/common/LajukanImage';
-import type { UmkmMapRouteSummary, UmkmMapStore, UmkmMapTheme } from './UmkmStoreMap';
+import type {
+  UmkmMapRouteSummary,
+  UmkmMapStore,
+  UmkmMapTheme,
+} from './UmkmStoreMap';
 
 type UmkmStoreMapClientProps = {
   stores: UmkmMapStore[];
@@ -23,7 +43,7 @@ type UmkmStoreMapClientProps = {
   routeToStoreId?: string | null;
   showRoute?: boolean;
   onRouteResolved?: (route: UmkmMapRouteSummary) => void;
-  focusMode?: 'stores' | 'viewer' | 'route';
+  focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
   focusNonce?: number;
 };
 
@@ -50,6 +70,9 @@ const MARKER_FOCUS_DURATION = 0.45;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
 const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
+const ONLINE_TRACKER_INTERVAL_MS = 3200;
+const STORE_MARKER_ICON_CACHE = new Map<string, DivIcon>();
+const CLUSTER_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 
 type MarkerFocusTarget = {
   lat: number;
@@ -88,7 +111,10 @@ type StoreMarkerLayerItem =
       cluster: StoreCluster;
     };
 
-const MAP_THEME_CONFIG: Record<UmkmMapTheme, { url: string; attribution: string }> = {
+const MAP_THEME_CONFIG: Record<
+  UmkmMapTheme,
+  { url: string; attribution: string }
+> = {
   default: {
     url: FALLBACK_TILE_URL,
     attribution: FALLBACK_TILE_ATTRIBUTION,
@@ -112,7 +138,9 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-function getMarkerPalette(tone: ReturnType<typeof buildUmkmPlacePresentation>['markerTone']) {
+function getMarkerPalette(
+  tone: ReturnType<typeof buildUmkmPlacePresentation>['markerTone'],
+) {
   if (tone === 'food') {
     return { badge: '#d93025', border: '#ef4444', text: '#7f1d1d' };
   }
@@ -220,12 +248,27 @@ function buildStoreMarkerIcon(input: {
   liveNow: boolean | null;
   selected?: boolean;
 }): DivIcon {
+  const cacheKey = [
+    input.kind,
+    input.ratingLabel,
+    input.markerTone,
+    input.locationMode,
+    input.liveNow === null ? 'null' : input.liveNow ? '1' : '0',
+    input.selected ? '1' : '0',
+  ].join('|');
+  const cached = STORE_MARKER_ICON_CACHE.get(cacheKey);
+  if (cached) return cached;
+
   const palette = getMarkerPalette(input.markerTone);
-  const height = input.selected ? 44 : 40;
-  const badgeSize = input.selected ? 24 : 22;
-  const fontSize = input.selected ? 12.5 : 11.5;
+  const height = input.selected ? 38 : 34;
+  const badgeSize = input.selected ? 20 : 18;
+  const fontSize = input.selected ? 11 : 10;
   const borderColor =
-    input.liveNow === false && !input.selected ? '#cbd5e1' : input.selected ? '#111827' : '#d1d5db';
+    input.liveNow === false && !input.selected
+      ? '#cbd5e1'
+      : input.selected
+        ? '#111827'
+        : '#d1d5db';
   const overlayBg =
     input.locationMode === 'mobile'
       ? input.liveNow === false
@@ -255,9 +298,9 @@ function buildStoreMarkerIcon(input: {
 
   return divIcon({
     className: 'leaflet-superapp-marker-host',
-    iconSize: [82, 54],
-    iconAnchor: [41, 50],
-    tooltipAnchor: [0, -36],
+    iconSize: [72, 48],
+    iconAnchor: [36, 44],
+    tooltipAnchor: [0, -30],
     html: `
       <span
         style="
@@ -266,8 +309,8 @@ function buildStoreMarkerIcon(input: {
           flex-direction:column;
           align-items:center;
           justify-content:flex-start;
-          width:82px;
-          height:54px;
+          width:72px;
+          height:48px;
           font-family:ui-sans-serif,system-ui,sans-serif;
         "
       >
@@ -275,13 +318,13 @@ function buildStoreMarkerIcon(input: {
           style="
             display:inline-flex;
             align-items:center;
-            gap:6px;
+            gap:4px;
             min-height:${height}px;
-            padding:0 12px 0 8px;
+            padding:0 9px 0 6px;
             border-radius:999px;
             border:1px solid ${borderColor};
             background:#ffffff;
-            box-shadow:${input.selected ? '0 16px 30px rgba(15,23,42,0.28)' : '0 10px 20px rgba(15,23,42,0.18)'};
+            box-shadow:${input.selected ? '0 12px 24px rgba(15,23,42,0.24)' : '0 8px 16px rgba(15,23,42,0.16)'};
           "
         >
           <span
@@ -294,7 +337,7 @@ function buildStoreMarkerIcon(input: {
               justify-content:center;
               background:${palette.badge};
               color:#ffffff;
-              font-size:10px;
+              font-size:9px;
               font-weight:800;
               letter-spacing:0.02em;
             "
@@ -343,7 +386,11 @@ function buildStoreMarkerIcon(input: {
 }
 
 function buildViewerMarkerIcon(): DivIcon {
-  return divIcon({
+  const cacheKey = 'viewer';
+  const cached = STORE_MARKER_ICON_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const icon = divIcon({
     className: 'leaflet-superapp-viewer-marker-host',
     iconSize: [24, 24],
     iconAnchor: [12, 12],
@@ -374,6 +421,167 @@ function buildViewerMarkerIcon(): DivIcon {
       </span>
     `,
   });
+  STORE_MARKER_ICON_CACHE.set(cacheKey, icon);
+  return icon;
+}
+
+function readMetadataBoolean(
+  metadata: Record<string, unknown> | null | undefined,
+  keys: string[],
+): boolean {
+  if (!metadata) return false;
+
+  return keys.some(key => {
+    const value = metadata[key];
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value > 0;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      return ['1', 'true', 'yes', 'ya', 'online', 'active', 'aktif'].includes(
+        normalized,
+      );
+    }
+    return false;
+  });
+}
+
+function metadataIncludesAny(
+  metadata: Record<string, unknown> | null | undefined,
+  keys: string[],
+  tokens: string[],
+): boolean {
+  if (!metadata) return false;
+
+  return keys.some(key => {
+    const value = metadata[key];
+    if (typeof value !== 'string') return false;
+    const normalized = value.toLowerCase();
+    return tokens.some(token => normalized.includes(token));
+  });
+}
+
+function isOnlineTrackableStore(store: UmkmMapStore): boolean {
+  return Boolean(
+    store.online_order_enabled ||
+    store.recommended_qr === 'online' ||
+    readMetadataBoolean(store.metadata, [
+      'online_order_enabled',
+      'delivery_enabled',
+      'accepts_online_orders',
+      'is_online',
+      'live_tracking_enabled',
+      'mobile_service_enabled',
+    ]) ||
+    metadataIncludesAny(
+      store.metadata,
+      ['fulfillment_mode', 'service_mode', 'location_mode', 'presence_mode'],
+      ['online', 'delivery', 'mobile', 'keliling', 'antar'],
+    ),
+  );
+}
+
+function buildOnlineTrackerIcon(isId: boolean): DivIcon {
+  const label = escapeHtml(isId ? 'Online' : 'Online');
+
+  return divIcon({
+    className: 'leaflet-superapp-online-tracker-host',
+    iconSize: [96, 58],
+    iconAnchor: [48, 49],
+    tooltipAnchor: [0, -42],
+    html: `
+      <span
+        style="
+          position:relative;
+          display:inline-flex;
+          width:96px;
+          height:58px;
+          align-items:center;
+          justify-content:center;
+          font-family:ui-sans-serif,system-ui,sans-serif;
+          pointer-events:none;
+        "
+      >
+        <style>
+          @keyframes umkmOnlineTrackerBob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+          }
+          @keyframes umkmOnlineTrackerPulse {
+            0% { transform: scale(.74); opacity:.35; }
+            70% { transform: scale(1.45); opacity:.08; }
+            100% { transform: scale(1.55); opacity:0; }
+          }
+        </style>
+        <span
+          style="
+            position:absolute;
+            bottom:3px;
+            left:31px;
+            width:34px;
+            height:12px;
+            border-radius:999px;
+            background:rgba(15,23,42,0.2);
+            filter:blur(4px);
+          "
+        ></span>
+        <span
+          style="
+            position:absolute;
+            bottom:9px;
+            left:30px;
+            width:36px;
+            height:36px;
+            border-radius:999px;
+            background:rgba(14,165,233,0.24);
+            animation:umkmOnlineTrackerPulse 1.9s ease-out infinite;
+          "
+        ></span>
+        <span
+          style="
+            position:relative;
+            display:inline-flex;
+            align-items:center;
+            gap:5px;
+            min-height:38px;
+            border-radius:999px;
+            border:2px solid #ffffff;
+            background:linear-gradient(135deg,#0284c7,#0f766e);
+            box-shadow:0 18px 30px rgba(15,23,42,0.28);
+            color:#ffffff;
+            padding:0 10px 0 7px;
+            animation:umkmOnlineTrackerBob 1.8s ease-in-out infinite;
+          "
+        >
+          <span
+            style="
+              display:inline-flex;
+              width:24px;
+              height:24px;
+              align-items:center;
+              justify-content:center;
+              border-radius:999px;
+              background:rgba(255,255,255,0.18);
+            "
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M13 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+              <path d="M10 7.5 8 13l4 2 2-4 4 1.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="m9 15-2 5M14 15l3 5" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span
+            style="
+              font-size:11px;
+              font-weight:900;
+              letter-spacing:.01em;
+              line-height:1;
+              text-shadow:0 1px 1px rgba(15,23,42,.25);
+            "
+          >${label}</span>
+        </span>
+      </span>
+    `,
+  });
 }
 
 function StoreKindChip({
@@ -388,7 +596,9 @@ function StoreKindChip({
   return (
     <span
       className={`inline-flex items-center rounded-full border font-semibold ${
-        compact ? 'gap-1 px-1.5 py-1 text-[10px]' : 'gap-1.5 px-2 py-1 text-[11px]'
+        compact
+          ? 'gap-1 px-1.5 py-1 text-[10px]'
+          : 'gap-1.5 px-2 py-1 text-[11px]'
       }`}
       style={{
         borderColor: palette.border,
@@ -428,7 +638,7 @@ function StorePreviewCard({
   onClick?: () => void;
   isId: boolean;
 }) {
-  const cardClass = `w-full rounded-2xl border p-2 text-left transition ${
+  const cardClass = `w-full rounded-2xl border p-1.5 text-left transition ${
     active
       ? 'border-emerald-500 bg-emerald-50/90 text-emerald-950'
       : 'border-slate-200 bg-white text-slate-800'
@@ -436,35 +646,35 @@ function StorePreviewCard({
 
   return (
     <div className={cardClass}>
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1.5">
         <LajukanImage
           src={ui.coverImage || ui.gallery[0]}
           alt={store.name}
           width={48}
           height={48}
-          className={`${compact ? 'h-10 w-10 rounded-xl' : 'h-12 w-12 rounded-2xl'} shrink-0 border border-slate-200 object-cover`}
+          className={`${compact ? 'h-9 w-9 rounded-lg' : 'h-11 w-11 rounded-xl'} shrink-0 border border-slate-200 object-cover`}
         />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start justify-between gap-2">
-            <p className="line-clamp-2 text-[12px] font-black leading-tight text-slate-950">
+            <p className="line-clamp-1 text-[11px] font-black leading-tight text-slate-950">
               {store.name}
             </p>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-              <Star className="h-3 w-3 fill-current" />
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+              <Star className="h-2.5 w-2.5 fill-current" />
               {ui.ratingLabel}
             </span>
           </div>
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10.5px] font-semibold text-slate-500">
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[9.5px] font-semibold text-slate-500">
             <StoreKindChip ui={ui} compact />
             <span className="truncate">{store.city}</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5">
+      <div className="mt-1.5 grid grid-cols-2 gap-1">
         <a
           href={buildUmkmStorefrontPath(store.slug)}
-          className="inline-flex min-h-[30px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[10.5px] font-black text-white transition hover:bg-emerald-700"
+          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-black text-white transition hover:bg-emerald-700"
         >
           {isId ? 'Detail' : 'Details'}
         </a>
@@ -473,20 +683,26 @@ function StorePreviewCard({
             type="button"
             onClick={onClick}
             disabled={!onClick}
-            className={`inline-flex min-h-[30px] items-center justify-center rounded-full border px-2 text-[10.5px] font-black transition ${
+            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-black transition ${
               active
                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                 : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
             }`}
           >
-            {active ? (isId ? 'Terpilih' : 'Selected') : isId ? 'Pilih' : 'Select'}
+            {active
+              ? isId
+                ? 'Terpilih'
+                : 'Selected'
+              : isId
+                ? 'Pilih'
+                : 'Select'}
           </button>
         ) : (
           <a
             href={ui.googleMapsPlaceUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-[30px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[10.5px] font-black text-slate-700 transition hover:border-slate-300"
+            className="inline-flex min-h-[28px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-black text-slate-700 transition hover:border-slate-300"
           >
             {isId ? 'Rute' : 'Route'}
           </a>
@@ -512,25 +728,25 @@ function StorePopupSummary({
   isId: boolean;
 }) {
   return (
-    <div className="w-[min(72vw,255px)] space-y-2">
+    <div className="w-[min(68vw,225px)] space-y-1.5">
       <div className="min-w-0">
         <div className="flex min-w-0 items-start justify-between gap-2">
-          <p className="line-clamp-2 text-[13px] font-black leading-tight text-slate-950">
+          <p className="line-clamp-1 text-[12px] font-black leading-tight text-slate-950">
             {store.name}
           </p>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">
-            <Star className="h-3.5 w-3.5 fill-current" />
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-700">
+            <Star className="h-3 w-3 fill-current" />
             {ui.ratingLabel}
           </span>
         </div>
 
-        <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
           <StoreKindChip ui={ui} compact />
-          <span className="inline-flex min-h-[22px] items-center rounded-full bg-slate-100 px-2 text-[10.5px] font-bold text-slate-600">
+          <span className="inline-flex min-h-[20px] items-center rounded-full bg-slate-100 px-1.5 text-[9.5px] font-bold text-slate-600">
             {store.city}
           </span>
           <span
-            className={`inline-flex min-h-[22px] items-center rounded-full px-2 text-[10.5px] font-bold ${
+            className={`inline-flex min-h-[20px] items-center rounded-full px-1.5 text-[9.5px] font-bold ${
               ui.openNow !== false
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-slate-100 text-slate-500'
@@ -546,9 +762,11 @@ function StorePopupSummary({
           </span>
         </div>
 
-        <p className="mt-1.5 flex min-w-0 items-center gap-1 text-[11px] leading-4 text-slate-500">
-          <MapPin className="h-3.5 w-3.5 shrink-0" />
-          <span className="line-clamp-1">{ui.addressLine || store.address}</span>
+        <p className="mt-1 flex min-w-0 items-center gap-1 text-[10px] leading-4 text-slate-500">
+          <MapPin className="h-3 w-3 shrink-0" />
+          <span className="line-clamp-1">
+            {ui.addressLine || store.address}
+          </span>
         </p>
       </div>
 
@@ -557,7 +775,7 @@ function StorePopupSummary({
       >
         <a
           href={buildUmkmStorefrontPath(store.slug)}
-          className="inline-flex min-h-[32px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[11px] font-black text-white transition hover:bg-emerald-700"
+          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-black text-white transition hover:bg-emerald-700"
         >
           {isId ? 'Detail' : 'Details'}
         </a>
@@ -565,22 +783,28 @@ function StorePopupSummary({
           href={ui.googleMapsPlaceUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex min-h-[32px] items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 text-[11px] font-black text-slate-700 transition hover:border-slate-300"
+          className="inline-flex min-h-[28px] items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-black text-slate-700 transition hover:border-slate-300"
         >
           {isId ? 'Rute' : 'Route'}
-          <ExternalLink className="h-3 w-3" />
+          <ExternalLink className="h-2.5 w-2.5" />
         </a>
         {selectable ? (
           <button
             type="button"
             onClick={onSelect}
-            className={`inline-flex min-h-[32px] items-center justify-center rounded-full border px-2 text-[11px] font-black transition ${
+            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-black transition ${
               active
                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                 : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
             }`}
           >
-            {active ? (isId ? 'Dipilih' : 'Selected') : isId ? 'Pilih' : 'Select'}
+            {active
+              ? isId
+                ? 'Dipilih'
+                : 'Selected'
+              : isId
+                ? 'Pilih'
+                : 'Select'}
           </button>
         ) : null}
       </div>
@@ -588,13 +812,25 @@ function StorePopupSummary({
   );
 }
 
-function buildClusterMarkerIcon(input: { count: number; selected?: boolean; tight?: boolean }): DivIcon {
+function buildClusterMarkerIcon(input: {
+  count: number;
+  selected?: boolean;
+  tight?: boolean;
+}): DivIcon {
+  const cacheKey = `${input.count}|${input.selected ? '1' : '0'}|${input.tight ? '1' : '0'}`;
+  const cached = CLUSTER_MARKER_ICON_CACHE.get(cacheKey);
+  if (cached) return cached;
+
   const size = input.count >= 100 ? 56 : input.count >= 10 ? 50 : 46;
   const coreColor = input.selected ? '#1d4ed8' : '#4285f4';
-  const haloColor = input.tight ? 'rgba(29,78,216,0.18)' : 'rgba(66,133,244,0.18)';
-  const shadowColor = input.selected ? 'rgba(29,78,216,0.34)' : 'rgba(66,133,244,0.32)';
+  const haloColor = input.tight
+    ? 'rgba(29,78,216,0.18)'
+    : 'rgba(66,133,244,0.18)';
+  const shadowColor = input.selected
+    ? 'rgba(29,78,216,0.34)'
+    : 'rgba(66,133,244,0.32)';
 
-  return divIcon({
+  const icon = divIcon({
     className: 'leaflet-superapp-cluster-host',
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
@@ -640,6 +876,8 @@ function buildClusterMarkerIcon(input: { count: number; selected?: boolean; tigh
       </span>
     `,
   });
+  CLUSTER_MARKER_ICON_CACHE.set(cacheKey, icon);
+  return icon;
 }
 
 function hasValidLatLng(
@@ -652,22 +890,48 @@ function toMapPoint(point: Pick<LatLng, 'lat' | 'lng'>): [number, number] {
   return [point.lat, point.lng];
 }
 
+function getMapFitBoundsOptions(
+  mapWidth: number,
+  maxZoom = 14,
+): FitBoundsOptions {
+  if (mapWidth >= 1024) {
+    return {
+      paddingTopLeft: [456, 70],
+      paddingBottomRight: [86, 86],
+      maxZoom,
+    };
+  }
+
+  return {
+    padding: [48, 48],
+    maxZoom,
+  };
+}
+
 function isValidRoutePoint(point: [number, number]): boolean {
   return isCoordinateValid({ lat: point[0], lng: point[1] });
 }
 
 function formatCoordKey(value: unknown): string {
-  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(3) : 'invalid';
+  return typeof value === 'number' && Number.isFinite(value)
+    ? value.toFixed(3)
+    : 'invalid';
 }
 
-function projectLatLngToWorld(point: Pick<LatLng, 'lat' | 'lng'>, zoom: number): ProjectedPoint {
+function projectLatLngToWorld(
+  point: Pick<LatLng, 'lat' | 'lng'>,
+  zoom: number,
+): ProjectedPoint {
   const scale = 256 * 2 ** zoom;
   const sinLat = Math.sin((point.lat * Math.PI) / 180);
   const clampedSinLat = Math.min(Math.max(sinLat, -0.9999), 0.9999);
 
   return {
     x: ((point.lng + 180) / 360) * scale,
-    y: (0.5 - Math.log((1 + clampedSinLat) / (1 - clampedSinLat)) / (4 * Math.PI)) * scale,
+    y:
+      (0.5 -
+        Math.log((1 + clampedSinLat) / (1 - clampedSinLat)) / (4 * Math.PI)) *
+      scale,
   };
 }
 
@@ -678,7 +942,9 @@ function distanceSquared(a: ProjectedPoint, b: ProjectedPoint): number {
 function isTightCluster(items: StorePresentation[]): boolean {
   if (items.length < 2) return false;
 
-  const projected = items.map(({ store }) => projectLatLngToWorld(store, MARKER_CLUSTER_MAX_ZOOM));
+  const projected = items.map(({ store }) =>
+    projectLatLngToWorld(store, MARKER_CLUSTER_MAX_ZOOM),
+  );
   let maxDistanceSquared = 0;
 
   for (let index = 0; index < projected.length; index += 1) {
@@ -693,7 +959,10 @@ function isTightCluster(items: StorePresentation[]): boolean {
   return maxDistanceSquared <= MARKER_CLUSTER_TIGHT_DISTANCE_PX ** 2;
 }
 
-function resolveClusterAnchor(items: StorePresentation[], selectedStoreId?: string | null): Pick<LatLng, 'lat' | 'lng'> {
+function resolveClusterAnchor(
+  items: StorePresentation[],
+  selectedStoreId?: string | null,
+): Pick<LatLng, 'lat' | 'lng'> {
   const selectedItem = selectedStoreId
     ? items.find(({ store }) => store.id === selectedStoreId)
     : null;
@@ -723,11 +992,13 @@ function buildStoreMarkerLayer(
   if (!storePresentations.length) return [];
 
   const sorted = storePresentations
-    .map((item) => ({
+    .map(item => ({
       ...item,
       projected: projectLatLngToWorld(item.store, zoom),
     }))
-    .sort((a, b) => a.projected.y - b.projected.y || a.projected.x - b.projected.x);
+    .sort(
+      (a, b) => a.projected.y - b.projected.y || a.projected.x - b.projected.x,
+    );
 
   const clustered: Array<{
     center: ProjectedPoint;
@@ -736,8 +1007,9 @@ function buildStoreMarkerLayer(
 
   for (const item of sorted) {
     const target = clustered.find(
-      (cluster) =>
-        distanceSquared(cluster.center, item.projected) <= MARKER_CLUSTER_DISTANCE_PX ** 2,
+      cluster =>
+        distanceSquared(cluster.center, item.projected) <=
+        MARKER_CLUSTER_DISTANCE_PX ** 2,
     );
 
     if (!target) {
@@ -750,12 +1022,16 @@ function buildStoreMarkerLayer(
 
     target.items.push(item);
     target.center = {
-      x: target.items.reduce((sum, entry) => sum + entry.projected.x, 0) / target.items.length,
-      y: target.items.reduce((sum, entry) => sum + entry.projected.y, 0) / target.items.length,
+      x:
+        target.items.reduce((sum, entry) => sum + entry.projected.x, 0) /
+        target.items.length,
+      y:
+        target.items.reduce((sum, entry) => sum + entry.projected.y, 0) /
+        target.items.length,
     };
   }
 
-  return clustered.map((cluster) => {
+  return clustered.map(cluster => {
     const items = cluster.items.map(({ store, ui }) => ({ store, ui }));
     if (items.length === 1) {
       return {
@@ -778,13 +1054,18 @@ function buildStoreMarkerLayer(
         selected: items.some(({ store }) => store.id === selectedStoreId),
         tight: isTightCluster(items),
         items,
-        bounds: items.map(({ store }) => [store.lat, store.lng] as [number, number]),
+        bounds: items.map(
+          ({ store }) => [store.lat, store.lng] as [number, number],
+        ),
       },
     };
   });
 }
 
-function getClusterFramePadding(mapWidth: number, mapHeight: number): [number, number] {
+function getClusterFramePadding(
+  mapWidth: number,
+  mapHeight: number,
+): [number, number] {
   return [
     Math.max(28, Math.min(72, Math.round(mapWidth * 0.12))),
     Math.max(36, Math.min(88, Math.round(mapHeight * 0.14))),
@@ -798,18 +1079,22 @@ function getClusterFocusZoom(
   mapHeight: number,
   padding: [number, number],
 ): number {
-  const projected = cluster.items.map(({ store }) => projectLatLngToWorld(store, zoom));
-  const minX = Math.min(...projected.map((point) => point.x));
-  const maxX = Math.max(...projected.map((point) => point.x));
-  const minY = Math.min(...projected.map((point) => point.y));
-  const maxY = Math.max(...projected.map((point) => point.y));
+  const projected = cluster.items.map(({ store }) =>
+    projectLatLngToWorld(store, zoom),
+  );
+  const minX = Math.min(...projected.map(point => point.x));
+  const maxX = Math.max(...projected.map(point => point.x));
+  const minY = Math.min(...projected.map(point => point.y));
+  const maxY = Math.max(...projected.map(point => point.y));
   const width = Math.max(1, maxX - minX);
   const height = Math.max(1, maxY - minY);
   const availableWidth = Math.max(140, mapWidth - padding[0] * 2);
   const availableHeight = Math.max(140, mapHeight - padding[1] * 2);
   const targetWidth = availableWidth * MARKER_CLUSTER_FRAME_WIDTH_RATIO;
   const targetHeight = availableHeight * MARKER_CLUSTER_FRAME_HEIGHT_RATIO;
-  const zoomDelta = Math.log2(Math.max(1, Math.min(targetWidth / width, targetHeight / height)));
+  const zoomDelta = Math.log2(
+    Math.max(1, Math.min(targetWidth / width, targetHeight / height)),
+  );
 
   return Math.min(
     MARKER_CLUSTER_PICKER_ZOOM,
@@ -829,7 +1114,10 @@ function FitToStores({
 
   const key = useMemo(() => {
     const storeKey = stores
-      .map((store) => `${store.id}:${formatCoordKey(store.lat)}:${formatCoordKey(store.lng)}`)
+      .map(
+        store =>
+          `${store.id}:${formatCoordKey(store.lat)}:${formatCoordKey(store.lng)}`,
+      )
       .join('|');
     const viewerKey = viewerLocation
       ? `${formatCoordKey(viewerLocation.lat)}:${formatCoordKey(viewerLocation.lng)}`
@@ -839,10 +1127,14 @@ function FitToStores({
 
   useEffect(() => {
     const validStores = stores.filter(hasValidLatLng);
-    const validViewerLocation = hasValidLatLng(viewerLocation) ? viewerLocation : null;
+    const validViewerLocation = hasValidLatLng(viewerLocation)
+      ? viewerLocation
+      : null;
     if (!validStores.length) return;
     if (fittedRef.current === key) return;
-    const points: Array<[number, number]> = validStores.map((store) => toMapPoint(store));
+    const points: Array<[number, number]> = validStores.map(store =>
+      toMapPoint(store),
+    );
     if (validViewerLocation) {
       points.push(toMapPoint(validViewerLocation));
     }
@@ -853,7 +1145,10 @@ function FitToStores({
         fittedRef.current = key;
         return;
       }
-      map.fitBounds(points as LatLngBoundsExpression, { padding: [48, 48], maxZoom: 14 });
+      map.fitBounds(
+        points as LatLngBoundsExpression,
+        getMapFitBoundsOptions(map.getSize().x, 14),
+      );
       fittedRef.current = key;
     } catch (error) {
       console.error('[UMKM_MAP_FIT_TO_STORES_ERROR]', error, { points });
@@ -865,6 +1160,7 @@ function FitToStores({
 
 function MapFocusController({
   stores,
+  selectedStoreId,
   viewerLocation,
   routeDestination,
   routePoints,
@@ -872,10 +1168,11 @@ function MapFocusController({
   focusNonce,
 }: {
   stores: UmkmMapStore[];
+  selectedStoreId?: string | null;
   viewerLocation?: LatLng | null;
   routeDestination?: UmkmMapStore | null;
   routePoints?: Array<[number, number]> | null;
-  focusMode?: 'stores' | 'viewer' | 'route';
+  focusMode?: 'stores' | 'viewer' | 'route' | 'selected';
   focusNonce?: number;
 }) {
   const map = useMap();
@@ -884,40 +1181,75 @@ function MapFocusController({
   useEffect(() => {
     const focusKey = focusMode ? `${focusMode}:${focusNonce}` : null;
     const validStores = stores.filter(hasValidLatLng);
-    const validViewerLocation = hasValidLatLng(viewerLocation) ? viewerLocation : null;
-    const validRouteDestination = hasValidLatLng(routeDestination) ? routeDestination : null;
+    const validSelectedStore = selectedStoreId
+      ? validStores.find(store => store.id === selectedStoreId) || null
+      : null;
+    const validViewerLocation = hasValidLatLng(viewerLocation)
+      ? viewerLocation
+      : null;
+    const validRouteDestination = hasValidLatLng(routeDestination)
+      ? routeDestination
+      : null;
     const validRoutePoints = routePoints?.filter(isValidRoutePoint) || null;
-    if (!focusMode || !focusKey || handledFocusKeyRef.current === focusKey) return;
+    if (!focusMode || !focusKey || handledFocusKeyRef.current === focusKey)
+      return;
 
     try {
+      if (focusMode === 'selected' && validSelectedStore) {
+        map.flyTo(
+          [validSelectedStore.lat, validSelectedStore.lng],
+          Math.max(map.getZoom(), 16),
+          { duration: 0.55 },
+        );
+        handledFocusKeyRef.current = focusKey;
+        return;
+      }
+
       if (focusMode === 'viewer' && validViewerLocation) {
-        map.flyTo([validViewerLocation.lat, validViewerLocation.lng], Math.max(map.getZoom(), 15), {
-          duration: 0.55,
-        });
+        map.flyTo(
+          [validViewerLocation.lat, validViewerLocation.lng],
+          Math.max(map.getZoom(), 15),
+          {
+            duration: 0.55,
+          },
+        );
         handledFocusKeyRef.current = focusKey;
         return;
       }
 
-      if (focusMode === 'route' && validRoutePoints && validRoutePoints.length > 1) {
-        map.fitBounds(validRoutePoints as LatLngBoundsExpression, { padding: [64, 64], maxZoom: 14 });
+      if (
+        focusMode === 'route' &&
+        validRoutePoints &&
+        validRoutePoints.length > 1
+      ) {
+        map.fitBounds(
+          validRoutePoints as LatLngBoundsExpression,
+          getMapFitBoundsOptions(map.getSize().x, 14),
+        );
         handledFocusKeyRef.current = focusKey;
         return;
       }
 
-      if (focusMode === 'route' && validViewerLocation && validRouteDestination) {
+      if (
+        focusMode === 'route' &&
+        validViewerLocation &&
+        validRouteDestination
+      ) {
         map.fitBounds(
           [
             toMapPoint(validViewerLocation),
             toMapPoint(validRouteDestination),
           ] as LatLngBoundsExpression,
-          { padding: [64, 64], maxZoom: 14 },
+          getMapFitBoundsOptions(map.getSize().x, 14),
         );
         handledFocusKeyRef.current = focusKey;
         return;
       }
 
       if (focusMode === 'stores' && validStores.length > 0) {
-        const points: Array<[number, number]> = validStores.map((store) => toMapPoint(store));
+        const points: Array<[number, number]> = validStores.map(store =>
+          toMapPoint(store),
+        );
         if (validViewerLocation) points.push(toMapPoint(validViewerLocation));
         if (points.length === 1) {
           const [lat, lng] = points[0];
@@ -925,18 +1257,31 @@ function MapFocusController({
           handledFocusKeyRef.current = focusKey;
           return;
         }
-        map.fitBounds(points as LatLngBoundsExpression, { padding: [48, 48], maxZoom: 14 });
+        map.fitBounds(
+          points as LatLngBoundsExpression,
+          getMapFitBoundsOptions(map.getSize().x, 14),
+        );
         handledFocusKeyRef.current = focusKey;
       }
     } catch (error) {
       console.error('[UMKM_MAP_FOCUS_ERROR]', error, {
         focusMode,
+        selectedStoreId,
         viewerLocation,
         routeDestination,
         routePoints,
       });
     }
-  }, [focusMode, focusNonce, map, routeDestination, routePoints, stores, viewerLocation]);
+  }, [
+    focusMode,
+    focusNonce,
+    map,
+    routeDestination,
+    routePoints,
+    selectedStoreId,
+    stores,
+    viewerLocation,
+  ]);
 
   return null;
 }
@@ -945,7 +1290,9 @@ function MapInteractivityController({ interactive }: { interactive: boolean }) {
   const map = useMap();
 
   useEffect(() => {
-    const toggle = (handler: { enable: () => void; disable: () => void } | undefined) => {
+    const toggle = (
+      handler: { enable: () => void; disable: () => void } | undefined,
+    ) => {
       if (!handler) return;
       if (interactive) {
         handler.enable();
@@ -968,7 +1315,11 @@ function MapInteractivityController({ interactive }: { interactive: boolean }) {
   return null;
 }
 
-function ManualMarkerFocusController({ target }: { target: MarkerFocusTarget | null }) {
+function ManualMarkerFocusController({
+  target,
+}: {
+  target: MarkerFocusTarget | null;
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -1034,7 +1385,10 @@ function StoreMarkersLayer({
   const handleClusterClick = useCallback(
     (cluster: StoreCluster) => {
       if (cluster.tight || zoom >= MARKER_CLUSTER_PICKER_ZOOM) {
-        const targetZoom = Math.min(MARKER_CLUSTER_MAX_ZOOM, Math.max(MARKER_CLUSTER_PICKER_ZOOM, zoom + 1));
+        const targetZoom = Math.min(
+          MARKER_CLUSTER_MAX_ZOOM,
+          Math.max(MARKER_CLUSTER_PICKER_ZOOM, zoom + 1),
+        );
 
         onMarkerFocus?.({
           lat: cluster.lat,
@@ -1051,7 +1405,13 @@ function StoreMarkersLayer({
       const { x: mapWidth, y: mapHeight } = map.getSize();
       const padding = getClusterFramePadding(mapWidth, mapHeight);
       const bounds = latLngBounds(cluster.bounds).pad(0.16);
-      const targetZoom = getClusterFocusZoom(cluster, zoom, mapWidth, mapHeight, padding);
+      const targetZoom = getClusterFocusZoom(
+        cluster,
+        zoom,
+        mapWidth,
+        mapHeight,
+        padding,
+      );
 
       map.fitBounds(bounds as LatLngBoundsExpression, {
         padding,
@@ -1063,7 +1423,7 @@ function StoreMarkersLayer({
 
   return (
     <>
-      {markerLayer.map((layer) => {
+      {markerLayer.map(layer => {
         if (layer.kind === 'single') {
           const { store, ui } = layer.item;
           const active = selectedStoreId === store.id;
@@ -1081,19 +1441,17 @@ function StoreMarkersLayer({
                 selected: selectedStoreId === store.id,
               })}
               zIndexOffset={active ? 480 : 220}
-              eventHandlers={
-                {
-                  click: () => {
-                    focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
-                    onSelectStore?.(store.id);
-                  },
-                }
-              }
+              eventHandlers={{
+                click: () => {
+                  focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
+                  onSelectStore?.(store.id);
+                },
+              }}
             >
               <Tooltip direction="top" offset={[0, -8]}>
                 {store.name}
               </Tooltip>
-              <Popup className="umkm-store-map-popup" maxWidth={270}>
+              <Popup className="umkm-store-map-popup" maxWidth={240}>
                 <StorePopupSummary
                   store={store}
                   ui={ui}
@@ -1148,10 +1506,10 @@ function StoreMarkersLayer({
             </Tooltip>
 
             {allowPicker ? (
-              <Popup className="umkm-store-map-popup" maxWidth={300}>
-                <div className="w-[min(76vw,280px)] space-y-2.5">
+              <Popup className="umkm-store-map-popup" maxWidth={250}>
+                <div className="w-[min(72vw,240px)] space-y-2">
                   <div>
-                    <p className="text-[13px] font-black leading-tight text-slate-950">
+                    <p className="text-[12px] font-black leading-tight text-slate-950">
                       {cluster.tight
                         ? isId
                           ? `${cluster.items.length} usaha di titik ini`
@@ -1160,13 +1518,13 @@ function StoreMarkersLayer({
                           ? `${cluster.items.length} usaha dekat sini`
                           : `${cluster.items.length} nearby businesses`}
                     </p>
-                    <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                    <p className="mt-0.5 text-[10px] leading-4 text-slate-500">
                       {isId
                         ? 'Pilih satu untuk lihat detail, chat, atau rute.'
                         : 'Pick one for details, chat, or route.'}
                     </p>
                   </div>
-                  <div className="max-h-[284px] space-y-2 overflow-y-auto pr-1">
+                  <div className="max-h-[220px] space-y-1.5 overflow-y-auto pr-1">
                     {visibleClusterItems.map(({ store, ui }) => {
                       const active = selectedStoreId === store.id;
 
@@ -1192,7 +1550,7 @@ function StoreMarkersLayer({
                     })}
                   </div>
                   {hiddenClusterCount > 0 ? (
-                    <p className="rounded-2xl bg-slate-50 px-3 py-2 text-[11px] font-semibold leading-4 text-slate-500">
+                    <p className="rounded-2xl bg-slate-50 px-2.5 py-2 text-[10px] font-semibold leading-4 text-slate-500">
                       {isId
                         ? `+${hiddenClusterCount} usaha lagi. Gunakan daftar di bawah peta atau zoom sedikit.`
                         : `+${hiddenClusterCount} more businesses. Use the list below the map or zoom in.`}
@@ -1232,11 +1590,24 @@ export function UmkmStoreMapClient({
     theme === 'default'
       ? process.env.NEXT_PUBLIC_OSM_TILE_ATTRIBUTION || activeTheme.attribution
       : activeTheme.attribution;
-  const validViewerLocation = hasValidLatLng(viewerLocation) ? viewerLocation : null;
+  const validViewerLocation = hasValidLatLng(viewerLocation)
+    ? viewerLocation
+    : null;
   const validStores = useMemo(
-    () => stores.filter((store) => hasValidLatLng(store)),
+    () => stores.filter(store => hasValidLatLng(store)),
     [stores],
   );
+  const onlineTrackerStores = useMemo(() => {
+    const explicitOnlineStores = validStores.filter(isOnlineTrackableStore);
+    const fallbackStores = validStores.slice(
+      0,
+      Math.min(validStores.length, 5),
+    );
+    return (
+      explicitOnlineStores.length ? explicitOnlineStores : fallbackStores
+    ).slice(0, 12);
+  }, [validStores]);
+  const [onlineTrackerIndex, setOnlineTrackerIndex] = useState(0);
 
   const storePresentations = useMemo(
     () =>
@@ -1249,20 +1620,43 @@ export function UmkmStoreMapClient({
 
   const defaultCenter = useMemo<[number, number]>(() => {
     if (validStores[0]) return [validStores[0].lat, validStores[0].lng];
-    if (validViewerLocation) return [validViewerLocation.lat, validViewerLocation.lng];
+    if (validViewerLocation)
+      return [validViewerLocation.lat, validViewerLocation.lng];
     return [-6.2, 106.816666];
   }, [validStores, validViewerLocation]);
   const routeDestination =
-    validStores.find((store) => store.id === (routeToStoreId || selectedStoreId)) || null;
-  const [routePositions, setRoutePositions] = useState<Array<[number, number]> | null>(null);
-  const [manualMarkerFocus, setManualMarkerFocus] = useState<MarkerFocusTarget | null>(null);
+    validStores.find(
+      store => store.id === (routeToStoreId || selectedStoreId),
+    ) || null;
+  const [routePositions, setRoutePositions] = useState<Array<
+    [number, number]
+  > | null>(null);
+  const [manualMarkerFocus, setManualMarkerFocus] =
+    useState<MarkerFocusTarget | null>(null);
+  const onlineTrackerStore =
+    onlineTrackerStores.length > 0
+      ? onlineTrackerStores[onlineTrackerIndex % onlineTrackerStores.length]
+      : null;
 
-  const handleMarkerFocus = useCallback((target: Omit<MarkerFocusTarget, 'nonce'>) => {
-    setManualMarkerFocus((current) => ({
-      ...target,
-      nonce: (current?.nonce || 0) + 1,
-    }));
-  }, []);
+  useEffect(() => {
+    if (onlineTrackerStores.length < 2) return;
+
+    const intervalId = window.setInterval(() => {
+      setOnlineTrackerIndex(current => current + 1);
+    }, ONLINE_TRACKER_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [onlineTrackerStores.length]);
+
+  const handleMarkerFocus = useCallback(
+    (target: Omit<MarkerFocusTarget, 'nonce'>) => {
+      setManualMarkerFocus(current => ({
+        ...target,
+        nonce: (current?.nonce || 0) + 1,
+      }));
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -1315,7 +1709,7 @@ export function UmkmStoreMapClient({
         }
 
         const nextRoutePositions = payload.data.points
-          .map((point) => [point.lat, point.lng] as [number, number])
+          .map(point => [point.lat, point.lng] as [number, number])
           .filter(isValidRoutePoint);
         if (nextRoutePositions.length < 2) {
           setRoutePositions(null);
@@ -1375,6 +1769,7 @@ export function UmkmStoreMapClient({
       <FitToStores stores={validStores} viewerLocation={validViewerLocation} />
       <MapFocusController
         stores={validStores}
+        selectedStoreId={selectedStoreId}
         viewerLocation={validViewerLocation}
         routeDestination={routeDestination}
         routePoints={routePositions}
@@ -1403,6 +1798,21 @@ export function UmkmStoreMapClient({
         onMarkerFocus={handleMarkerFocus}
         isId={isId}
       />
+
+      {onlineTrackerStore ? (
+        <Marker
+          key={`online-tracker-${onlineTrackerStore.id}`}
+          position={[onlineTrackerStore.lat, onlineTrackerStore.lng]}
+          icon={buildOnlineTrackerIcon(isId)}
+          zIndexOffset={760}
+        >
+          <Tooltip direction="top" offset={[0, -12]}>
+            {isId
+              ? `Usaha online aktif: ${onlineTrackerStore.name}`
+              : `Active online business: ${onlineTrackerStore.name}`}
+          </Tooltip>
+        </Marker>
+      ) : null}
 
       {routePositions ? (
         <Polyline

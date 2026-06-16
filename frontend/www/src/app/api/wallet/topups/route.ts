@@ -4,6 +4,7 @@ import { buildForwardAuthHeaders, withProtectedRoute } from '@/lib/api/withProte
 import { withValidatedBody } from '@/lib/api/withValidatedBody';
 import { errorResponse } from '@/lib/api/errorResponse';
 import { CreateWalletTopupSchema } from '@/lib/walletSchemas';
+import { paymentsEnabled } from '@/lib/server/paymentFeature';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -12,6 +13,12 @@ const MARKETPLACE_URL =
 
 export async function GET(req: NextRequest) {
   try {
+    if (!paymentsEnabled()) {
+      return NextResponse.json(
+        { error: 'Wallet topups are disabled for now' },
+        { status: 404 },
+      );
+    }
     return withProtectedRoute(
       req,
       {
@@ -44,6 +51,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!paymentsEnabled()) {
+      return NextResponse.json(
+        { error: 'Wallet topups are disabled for now' },
+        { status: 404 },
+      );
+    }
     const body = await withValidatedBody(req, CreateWalletTopupSchema);
     if (!body.ok) return body.response;
 

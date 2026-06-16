@@ -2649,6 +2649,7 @@ export function UmkmStorefrontClient({
         store: store.slug,
         q: store.name,
         city: store.city,
+        storeId: store.id,
       })
     : UMKM_DISCOVERY_PATH;
   const hasRating =

@@ -30,6 +30,7 @@ import { resolveLocaleFromPathname } from '@/lib/locale';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { buildUsahaPath } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 type AccountDropdownVariant =
   | 'avatar-name'
@@ -125,8 +126,12 @@ export function AccountDropdown({
     { href: '/profile', label: text.account, icon: UserRound },
     { href: '/settings', label: text.settings, icon: Settings },
     { href: '/my-listings', label: text.listings, icon: ShoppingBag },
-    { href: '/transactions', label: text.transactions, icon: CreditCard },
-    { href: '/payments', label: text.wallet, icon: Wallet },
+    ...(!PROMO_ONLY_MODE
+      ? [
+          { href: '/transactions', label: text.transactions, icon: CreditCard },
+          { href: '/payments', label: text.wallet, icon: Wallet },
+        ]
+      : []),
     { href: buildUsahaPath('home'), label: text.usaha, icon: ShieldCheck },
   ];
 

@@ -5,19 +5,18 @@ import {
   shouldUseSecureCookies,
 } from '@/lib/server/forwardCookies';
 import { authSecurityHeaders, enforceAuthRouteSecurity } from '@/lib/authSecurity';
-import { consumeOTPVerificationToken } from '@/lib/redis';
+import { verifyCaptchaToken } from '@/lib/captcha';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { z } from 'zod';
 
 const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
-const LOGIN_OTP_REQUIRED = process.env.LOGIN_OTP_REQUIRED === 'true';
 const LOGIN_RATE_LIMIT_PER_15_MIN = Number.parseInt(
-  process.env.LOGIN_RATE_LIMIT_PER_15_MIN || '20',
+  process.env.LOGIN_RATE_LIMIT_PER_15_MIN || '15',
   10,
 );
-const LOGIN_EMAIL_RATE_LIMIT_PER_15_MIN = Number.parseInt(
-  process.env.LOGIN_EMAIL_RATE_LIMIT_PER_15_MIN || '10',
+const LOGIN_USERNAME_RATE_LIMIT_PER_15_MIN = Number.parseInt(
+  process.env.LOGIN_USERNAME_RATE_LIMIT_PER_15_MIN || '5',
   10,
 );
 
@@ -28,14 +27,17 @@ const optionalTrimmedString = z.preprocess((value) => {
 }, z.string().min(1).optional());
 
 const LoginProxySchema = z.object({
-  email: z.preprocess(
-    (value) => String(value ?? '').trim().toLowerCase(),
-    z.string().email(),
-  ),
+  username: optionalTrimmedString,
+  identifier: optionalTrimmedString,
+  email: optionalTrimmedString,
   password: z.string().min(1),
-  email_otp_token: optionalTrimmedString,
-  emailOtpToken: optionalTrimmedString,
+  captcha_token: optionalTrimmedString,
+  captchaToken: optionalTrimmedString,
 }).passthrough();
+
+function normalizeLoginIdentifier(value: string): string {
+  return value.trim().trimStart().replace(/^@+/, '').toLowerCase();
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,9 +58,18 @@ export async function POST(req: NextRequest) {
     }
 
     const body = parsed.data;
-    const email = body.email;
-    const emailOtpToken = body.email_otp_token || body.emailOtpToken;
+    const identifier = normalizeLoginIdentifier(
+      body.username || body.identifier || body.email || '',
+    );
+    const captchaToken = body.captcha_token || body.captchaToken;
     const ip = security.ip;
+
+    if (!identifier) {
+      return NextResponse.json(
+        { error: 'Username is required' },
+        { status: 400 },
+      );
+    }
 
     const loginRateByIp = await enforceRateLimit({
       key: `auth:login:ip:${ip}`,
@@ -67,35 +78,23 @@ export async function POST(req: NextRequest) {
     });
     if (!loginRateByIp.ok) return loginRateByIp.response;
 
-    const loginRateByEmail = await enforceRateLimit({
-      key: `auth:login:email:${email}`,
-      limit: LOGIN_EMAIL_RATE_LIMIT_PER_15_MIN,
+    const loginRateByUsername = await enforceRateLimit({
+      key: `auth:login:username:${identifier}`,
+      limit: LOGIN_USERNAME_RATE_LIMIT_PER_15_MIN,
       windowSeconds: 900,
     });
-    if (!loginRateByEmail.ok) return loginRateByEmail.response;
+    if (!loginRateByUsername.ok) return loginRateByUsername.response;
 
-    if (LOGIN_OTP_REQUIRED) {
-      if (!emailOtpToken) {
-        return NextResponse.json(
-          { error: 'Email OTP verification is required for login' },
-          { status: 401 },
-        );
-      }
-
-      const validOtpToken = await consumeOTPVerificationToken(
-        emailOtpToken,
-        {
-          type: 'email',
-          target: email,
-          purpose: 'login',
-        },
+    const captcha = await verifyCaptchaToken({
+      token: captchaToken,
+      ip,
+      action: 'other',
+    });
+    if (!captcha.ok) {
+      return NextResponse.json(
+        { error: captcha.error },
+        { status: 400 },
       );
-      if (!validOtpToken) {
-        return NextResponse.json(
-          { error: 'Invalid or expired login OTP verification token' },
-          { status: 401 },
-        );
-      }
     }
 
     const backendRes = await fetch(`${API_URL}/auth/login`, {
@@ -104,7 +103,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         ...authSecurityHeaders(security),
       },
-      body: JSON.stringify({ email, password: body.password }),
+      body: JSON.stringify({ username: identifier, password: body.password }),
     });
 
     const text = await backendRes.text();

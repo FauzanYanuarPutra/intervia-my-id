@@ -39,6 +39,8 @@ const MAX_REEL_COMMENT_LEN: usize = 520;
 const MAX_REEL_COMMENT_LIMIT: i64 = 50;
 const MAX_PAGE_SIZE: i64 = 50;
 const MAX_FEED_LIMIT: i64 = 24;
+const POLL_OPTION_TARGET_TYPE: &str = "thread_poll_option";
+const MAX_POLL_OPTION_INDEX: i32 = 20;
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -405,6 +407,13 @@ struct VoteRequest {
     value: Value,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PollVoteRequest {
+    option_index: i32,
+    option_count: Option<i32>,
+}
+
 #[derive(Debug, Deserialize, Default)]
 struct SolutionRequest {
     #[serde(rename = "postId")]
@@ -512,6 +521,23 @@ struct VotePostResponse {
     post: EnrichedPost,
     previous_vote: i32,
     current_vote: i32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PollOptionVoteStat {
+    option_index: i32,
+    votes: i32,
+    viewer_voted: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PollVoteResponse {
+    thread_id: String,
+    total_votes: i32,
+    viewer_option_index: Option<i32>,
+    options: Vec<PollOptionVoteStat>,
 }
 
 #[derive(Debug, Serialize)]
@@ -997,6 +1023,10 @@ async fn main() -> anyhow::Result<()> {
             get(list_posts).post(create_post),
         )
         .route("/v1/forum/threads/{thread_id}/vote", post(vote_thread))
+        .route(
+            "/v1/forum/threads/{thread_id}/poll-vote",
+            get(get_poll_votes).post(vote_poll_option),
+        )
         .route("/v1/forum/threads/{thread_id}/solution", post(set_solution))
         .route(
             "/v1/forum/posts/{post_id}",
@@ -1784,11 +1814,7 @@ fn is_allowed_video_type(content_type: &str, file_name: Option<&str>) -> bool {
     false
 }
 
-fn is_allowed_media_type(
-    content_type: &str,
-    allow_video: bool,
-    file_name: Option<&str>,
-) -> bool {
+fn is_allowed_media_type(content_type: &str, allow_video: bool, file_name: Option<&str>) -> bool {
     is_allowed_image_type(content_type, file_name)
         || (allow_video && is_allowed_video_type(content_type, file_name))
 }
@@ -1803,6 +1829,36 @@ fn is_video_url(value: &str) -> bool {
         || lower.ends_with(".avi")
         || lower.ends_with(".mkv")
         || lower.ends_with(".3gp")
+}
+
+fn clean_feed_media_url(value: &str) -> Option<String> {
+    let clean = value.trim();
+    if clean.is_empty() || clean.len() > 2_000 {
+        return None;
+    }
+
+    let lower = clean.to_ascii_lowercase();
+    if lower.contains("/images/company/")
+        || lower.contains("placeholder")
+        || lower.contains("no-image")
+        || lower.contains("image-not-available")
+        || lower.contains("default_image")
+    {
+        return None;
+    }
+
+    Some(clean.to_string())
+}
+
+fn first_feed_media_url(thread_urls: &[String], root_post: Option<&PostRow>) -> Option<String> {
+    thread_urls
+        .iter()
+        .chain(
+            root_post
+                .into_iter()
+                .flat_map(|post| post.image_urls.iter()),
+        )
+        .find_map(|url| clean_feed_media_url(url))
 }
 
 fn safety_check(text: &str, allow_external_links: bool) -> ApiResult<()> {
@@ -3992,6 +4048,178 @@ async fn vote_post(
     }))
 }
 
+async fn get_poll_votes(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(thread_id): Path<String>,
+) -> ApiResult<Json<PollVoteResponse>> {
+    let _thread = get_thread_row(&state.db, &thread_id).await?;
+    let actor = optional_actor(&headers, &state);
+    let viewer_id = actor.as_ref().map(forum_user_id);
+    let stats = fetch_poll_vote_stats(&state.db, &thread_id, viewer_id.as_deref()).await?;
+    Ok(Json(stats))
+}
+
+async fn vote_poll_option(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(thread_id): Path<String>,
+    Json(payload): Json<PollVoteRequest>,
+) -> ApiResult<Json<PollVoteResponse>> {
+    let actor = require_actor(&headers, &state)?;
+    mutation_rate_limit(&state, &headers, &actor, "forum:poll-vote", 300, 120).await?;
+    let forum_user = ensure_forum_user(&state.db, &actor).await?;
+    let _thread = get_thread_row(&state.db, &thread_id).await?;
+    if payload.option_index < 0 || payload.option_index > MAX_POLL_OPTION_INDEX {
+        return Err(ApiError::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid poll option",
+        ));
+    }
+    if let Some(option_count) = payload.option_count {
+        if option_count < 2
+            || option_count > MAX_POLL_OPTION_INDEX + 1
+            || payload.option_index >= option_count
+        {
+            return Err(ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid poll option",
+            ));
+        }
+    }
+
+    let target_id = poll_option_target_id(&thread_id, payload.option_index);
+    let mut tx = state.db.begin().await.map_err(internal_error)?;
+    sqlx::query(
+        r#"
+        DELETE FROM lajukan_forum_votes
+        WHERE target_type = $1
+          AND split_part(target_id, ':', 1) = $2
+          AND user_id = $3
+        "#,
+    )
+    .bind(POLL_OPTION_TARGET_TYPE)
+    .bind(&thread_id)
+    .bind(&forum_user.id)
+    .execute(&mut *tx)
+    .await
+    .map_err(internal_error)?;
+    sqlx::query(
+        r#"
+        INSERT INTO lajukan_forum_votes
+          (id, target_type, target_id, user_id, value, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, 1, now(), now())
+        ON CONFLICT (target_type, target_id, user_id) DO UPDATE
+        SET value = 1, updated_at = now()
+        "#,
+    )
+    .bind(create_id("pv"))
+    .bind(POLL_OPTION_TARGET_TYPE)
+    .bind(&target_id)
+    .bind(&forum_user.id)
+    .execute(&mut *tx)
+    .await
+    .map_err(internal_error)?;
+    record_audit(
+        &mut tx,
+        &forum_user.id,
+        "vote.poll_option",
+        "thread",
+        &thread_id,
+        json!({"optionIndex": payload.option_index, "optionCount": payload.option_count}),
+    )
+    .await?;
+    tx.commit().await.map_err(internal_error)?;
+
+    let stats = fetch_poll_vote_stats(&state.db, &thread_id, Some(&forum_user.id)).await?;
+    Ok(Json(stats))
+}
+
+async fn fetch_poll_vote_stats(
+    db: &PgPool,
+    thread_id: &str,
+    viewer_id: Option<&str>,
+) -> ApiResult<PollVoteResponse> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+          target_id,
+          COALESCE(SUM(CASE WHEN value = 1 THEN 1 ELSE 0 END), 0)::int AS votes
+        FROM lajukan_forum_votes
+        WHERE target_type = $1
+          AND split_part(target_id, ':', 1) = $2
+        GROUP BY target_id
+        "#,
+    )
+    .bind(POLL_OPTION_TARGET_TYPE)
+    .bind(thread_id)
+    .fetch_all(db)
+    .await
+    .map_err(internal_error)?;
+
+    let viewer_option_index = if let Some(viewer_id) = viewer_id {
+        sqlx::query(
+            r#"
+            SELECT target_id
+            FROM lajukan_forum_votes
+            WHERE target_type = $1
+              AND split_part(target_id, ':', 1) = $2
+              AND user_id = $3
+            LIMIT 1
+            "#,
+        )
+        .bind(POLL_OPTION_TARGET_TYPE)
+        .bind(thread_id)
+        .bind(viewer_id)
+        .fetch_optional(db)
+        .await
+        .map_err(internal_error)?
+        .and_then(|row| {
+            row.try_get::<String, _>("target_id")
+                .ok()
+                .and_then(|target_id| poll_option_index(thread_id, &target_id))
+        })
+    } else {
+        None
+    };
+
+    let mut options = Vec::new();
+    for row in rows {
+        let target_id = row
+            .try_get::<String, _>("target_id")
+            .map_err(internal_error)?;
+        let Some(option_index) = poll_option_index(thread_id, &target_id) else {
+            continue;
+        };
+        let votes = row.try_get::<i32, _>("votes").map_err(internal_error)?;
+        options.push(PollOptionVoteStat {
+            option_index,
+            votes,
+            viewer_voted: viewer_option_index == Some(option_index),
+        });
+    }
+    options.sort_by_key(|item| item.option_index);
+    let total_votes = options.iter().map(|item| item.votes).sum();
+
+    Ok(PollVoteResponse {
+        thread_id: thread_id.to_string(),
+        total_votes,
+        viewer_option_index,
+        options,
+    })
+}
+
+fn poll_option_target_id(thread_id: &str, option_index: i32) -> String {
+    format!("{}:{}", thread_id, option_index)
+}
+
+fn poll_option_index(thread_id: &str, target_id: &str) -> Option<i32> {
+    let prefix = format!("{}:", thread_id);
+    target_id
+        .strip_prefix(&prefix)
+        .and_then(|value| value.parse::<i32>().ok())
+}
+
 fn parse_vote_value(value: &Value) -> ApiResult<i32> {
     if value == &json!(1) || value == &json!("1") {
         return Ok(1);
@@ -4306,11 +4534,7 @@ async fn handle_media_upload(
             .content_type()
             .map(str::to_string)
             .unwrap_or_else(|| "application/octet-stream".to_string());
-        if !is_allowed_media_type(
-            &content_type,
-            allow_video,
-            file_name.as_deref(),
-        ) {
+        if !is_allowed_media_type(&content_type, allow_video, file_name.as_deref()) {
             continue;
         }
 
@@ -5949,11 +6173,7 @@ async fn build_feed_items(
                 root.map(|post| post.content.as_str())
                     .unwrap_or(&thread.title),
             );
-            let media_src = thread
-                .image_urls
-                .first()
-                .cloned()
-                .or_else(|| root.and_then(|post| post.image_urls.first().cloned()));
+            let media_src = first_feed_media_url(&thread.image_urls, root);
             let author = thread.author.clone().unwrap_or_else(system_user);
             let category = thread.category.clone();
             let group = thread
@@ -5979,15 +6199,9 @@ async fn build_feed_items(
                 category: category.map(map_feed_category),
                 group,
                 tags: thread.tags.into_iter().map(map_feed_tag).collect(),
-                media: Some(CommunityFeedMedia {
-                    media_type: media_src
-                        .as_deref()
-                        .map(|src| if is_video_url(src) { "video" } else { "image" })
-                        .unwrap_or("image")
-                        .to_string(),
-                    src: media_src
-                        .clone()
-                        .unwrap_or_else(|| "/images/company/company-1.svg".to_string()),
+                media: media_src.as_ref().map(|src| CommunityFeedMedia {
+                    media_type: if is_video_url(src) { "video" } else { "image" }.to_string(),
+                    src: src.clone(),
                     alt: thread.title.clone(),
                 }),
                 stats: CommunityFeedStats {

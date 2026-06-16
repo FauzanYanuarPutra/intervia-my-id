@@ -16,6 +16,7 @@ import {
   UMKM_OWNER_PATH,
 } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 export type PrimaryNavItem = {
   key: 'home' | 'search' | 'create' | 'umkm' | 'account';
@@ -72,7 +73,6 @@ export function buildPrimaryNavItems(
 ): PrimaryNavItem[] {
   const createHref = isAuthenticated ? '/create' : '/register';
   const categoryHref = '/search';
-  const requestHref = isAuthenticated ? '/my-projects' : '/login';
   const accountHref = isAuthenticated ? '/profile' : '/login';
   const text = {
     home: locale === 'id' ? 'Beranda' : 'Home',
@@ -82,7 +82,7 @@ export function buildPrimaryNavItems(
     account: locale === 'id' ? 'Akun' : 'Account',
   };
 
-  return [
+  const items: PrimaryNavItem[] = [
     {
       key: 'home',
       label: text.home,
@@ -111,13 +111,19 @@ export function buildPrimaryNavItems(
       icon: PlusCircle,
       matchers: ['/create', '/register'],
     },
-    {
+  ];
+
+  if (!PROMO_ONLY_MODE) {
+    items.push({
       key: 'umkm',
       label: text.umkm,
-      href: requestHref,
+      href: isAuthenticated ? '/my-projects' : '/login',
       icon: ClipboardList,
       matchers: ['/my-projects'],
-    },
+    });
+  }
+
+  items.push(
     {
       key: 'account',
       label: text.account,
@@ -130,17 +136,18 @@ export function buildPrimaryNavItems(
             '/settings',
             '/dashboard',
             '/my-listings',
-            '/transactions',
-            '/payments',
+            ...(PROMO_ONLY_MODE ? [] : ['/transactions', '/payments']),
             '/chat',
             '/notifications',
-            '/my-projects',
+            ...(PROMO_ONLY_MODE ? [] : ['/my-projects']),
             UMKM_OWNER_PATH,
             LEGACY_UMKM_OWNER_PATH,
           ]
         : ['/login', '/forgot-password', '/reset-password'],
     },
-  ];
+  );
+
+  return items;
 }
 
 type PrimaryNavProps = {

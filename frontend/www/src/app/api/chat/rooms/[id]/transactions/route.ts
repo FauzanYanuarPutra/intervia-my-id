@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseTransactionDelivery } from '@/lib/transactionDelivery';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -265,6 +266,12 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    if (PROMO_ONLY_MODE) {
+      return NextResponse.json(
+        { error: 'Room transactions are disabled for now' },
+        { status: 404 },
+      );
+    }
     const auth = await requireAuth(req);
     if (!auth.ok) return auth.res;
     const { token, userId } = auth.ctx;

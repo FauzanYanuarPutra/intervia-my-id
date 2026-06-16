@@ -14,6 +14,7 @@ import {
   Home,
   LayoutGrid,
   Languages,
+  LogIn,
   LogOut,
   MapPinned,
   Menu,
@@ -48,6 +49,7 @@ import { useChatInbox } from '@/context/ChatInboxContext';
 import LajuloLogo from '@/components/logo/LajuloLogo';
 import { HeaderInboxDropdown } from '@/components/layout/HeaderInboxDropdown';
 import { SearchInput } from '@/components/ui/SearchInput';
+import AISearchBar from '@/components/search/AISearchBar';
 import {
   buildPrimaryNavItems,
   resolveActivePrimaryNavKey,
@@ -61,6 +63,7 @@ import {
   getUmkmSurfaceCopy,
 } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 function normalizePathname(pathname: string): string {
   const clean = pathname.replace(/^\/(id|en)(?=\/|$)/, '');
@@ -146,7 +149,7 @@ export function Header() {
     support: locale === 'id' ? 'Bantuan' : 'Get help',
     searchMenu: locale === 'id' ? 'Cari Menu' : 'Search Menu',
     social: locale === 'id' ? 'Sosial' : 'Social',
-    business: locale === 'id' ? 'Belanja & Usaha' : 'Shopping and Business',
+    business: locale === 'id' ? 'Cari & Promosi' : 'Search and Promote',
     professional: locale === 'id' ? 'Profesional' : 'Professional',
     createSection: locale === 'id' ? 'Buat' : 'Create',
     preferences: locale === 'id' ? 'Tampilan' : 'Display',
@@ -205,16 +208,20 @@ export function Header() {
           icon: Heart,
           matchers: ['/my-listings'],
         },
-        {
-          href: '/payments',
-          label: localeKey === 'id' ? 'Saldo' : 'Balance',
-          caption:
-            localeKey === 'id'
-              ? 'Top up dan pembayaran'
-              : 'Top up and payments',
-          icon: Wallet,
-          matchers: ['/payments'],
-        },
+        ...(!PROMO_ONLY_MODE
+          ? [
+              {
+                href: '/payments',
+                label: localeKey === 'id' ? 'Saldo' : 'Balance',
+                caption:
+                  localeKey === 'id'
+                    ? 'Top up dan pembayaran'
+                    : 'Top up and payments',
+                icon: Wallet,
+                matchers: ['/payments'],
+              },
+            ]
+          : []),
         {
           href: manageHref,
           label: drawerSurfaceCopy.owner,
@@ -225,16 +232,20 @@ export function Header() {
           icon: MapPinned,
           matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
         },
-        {
-          href: '/transactions',
-          label: localeKey === 'id' ? 'Transaksi' : 'Transactions',
-          caption:
-            localeKey === 'id'
-              ? 'Deal, escrow, riwayat'
-              : 'Deals, escrow, history',
-          icon: Store,
-          matchers: ['/transactions'],
-        },
+        ...(!PROMO_ONLY_MODE
+          ? [
+              {
+                href: '/transactions',
+                label: localeKey === 'id' ? 'Transaksi' : 'Transactions',
+                caption:
+                  localeKey === 'id'
+                    ? 'Deal, escrow, riwayat'
+                    : 'Deals, escrow, history',
+                icon: Store,
+                matchers: ['/transactions'],
+              },
+            ]
+          : []),
         {
           href: '/settings',
           label: localeKey === 'id' ? 'Pengaturan' : 'Settings',
@@ -252,8 +263,8 @@ export function Header() {
           label: localeKey === 'id' ? 'Masuk' : 'Login',
           caption:
             localeKey === 'id'
-              ? 'Akses chat dan transaksi'
-              : 'Access chats and transactions',
+              ? 'Akses chat dan profil'
+              : 'Access chats and profile',
           icon: UserRound,
           matchers: ['/login'],
         },
@@ -320,8 +331,12 @@ export function Header() {
             label: localeKey === 'id' ? 'Chat' : 'Chat',
             caption:
               localeKey === 'id'
-                ? 'Pesan dan negosiasi'
-                : 'Messages and negotiation',
+                ? PROMO_ONLY_MODE
+                  ? 'Tanya jawab langsung'
+                  : 'Pesan dan negosiasi'
+                : PROMO_ONLY_MODE
+                  ? 'Direct questions'
+                  : 'Messages and negotiation',
             icon: MessageCircle,
             matchers: ['/chat'],
           },
@@ -337,7 +352,7 @@ export function Header() {
       },
       {
         id: 'business',
-        title: localeKey === 'id' ? 'Belanja & Usaha' : 'Shopping and Business',
+        title: text.business,
         items: [
           {
             href: '/search',
@@ -435,18 +450,24 @@ export function Header() {
             icon: Building2,
             matchers: ['/search'],
           },
-          {
-            href: guarded('/my-projects'),
-            label: localeKey === 'id' ? 'Proyek Saya' : 'My Projects',
-            caption:
-              localeKey === 'id' ? 'Brief dan penawaran' : 'Briefs and offers',
-            icon: ClipboardList,
-            matchers: ['/my-projects'],
-          },
+          ...(!PROMO_ONLY_MODE
+            ? [
+                {
+                  href: guarded('/my-projects'),
+                  label: localeKey === 'id' ? 'Proyek Saya' : 'My Projects',
+                  caption:
+                    localeKey === 'id'
+                      ? 'Brief dan penawaran'
+                      : 'Briefs and offers',
+                  icon: ClipboardList,
+                  matchers: ['/my-projects'],
+                },
+              ]
+            : []),
         ],
       },
     ];
-  }, [chatHref, isAuthenticated, localeKey]);
+  }, [chatHref, isAuthenticated, localeKey, text.business]);
 
   const createDrawerItems = useMemo<DrawerItem[]>(() => {
     const createNeedHref = isAuthenticated
@@ -552,6 +573,42 @@ export function Header() {
     );
   }, [createDrawerItems, menuSearchNeedle]);
 
+  const drawerQuickLinks = useMemo<DrawerItem[]>(
+    () => [
+      {
+        href: '/search',
+        label: localeKey === 'id' ? 'Cari cepat' : 'Quick search',
+        caption:
+          localeKey === 'id'
+            ? 'Supplier, jasa, lokasi'
+            : 'Suppliers, services, places',
+        icon: SearchIcon,
+        matchers: ['/search'],
+      },
+      {
+        href: chatHref,
+        label: localeKey === 'id' ? 'Chat' : 'Chat',
+        caption:
+          localeKey === 'id'
+            ? 'Tanya user atau admin'
+            : 'Ask users or admin',
+        icon: MessageCircle,
+        matchers: ['/chat'],
+      },
+      {
+        href: manageHref,
+        label: localeKey === 'id' ? 'Promosi usaha' : 'Promote business',
+        caption:
+          localeKey === 'id'
+            ? 'Profil, katalog, etalase'
+            : 'Profile, catalog, showcase',
+        icon: Store,
+        matchers: ['/usaha', LEGACY_UMKM_OWNER_PATH],
+      },
+    ],
+    [chatHref, localeKey, manageHref],
+  );
+
   const closeAll = useCallback(() => {
     setProfileOpen(false);
     setMobileOpen(false);
@@ -647,20 +704,20 @@ export function Header() {
   ) => (
     <section
       className={cn(
-        'rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.3)] dark:border-[color:var(--app-border-strong)]',
+        'overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.32)] dark:border-[color:var(--app-border-strong)]',
         options?.compact &&
-        'border-[color:color-mix(in_srgb,var(--app-accent-border)_64%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_42%,var(--app-surface-strong))]',
+          'border-[color:color-mix(in_srgb,var(--app-accent-border)_54%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_28%,var(--app-surface-strong))]',
       )}
     >
-      <div className="flex items-center justify-between gap-3 px-1 pb-2">
-        <p className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+      <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+        <p className="min-w-0 truncate text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
           {title}
         </p>
-        <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]">
+        <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]">
           {items.length}
         </span>
       </div>
-      <div className="grid gap-1.5">
+      <div className="space-y-1">
         {items.map(item => {
           const Icon = item.icon;
           const active = (
@@ -674,28 +731,28 @@ export function Header() {
               onClick={closeAll}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'ui-pressable group flex min-h-[58px] min-w-0 items-center gap-3 rounded-[16px] border px-2.5 py-2 text-left transition',
+                'ui-pressable group flex min-h-[56px] min-w-0 items-center gap-3 rounded-[16px] px-2.5 py-2 text-left transition',
                 active
-                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[0_14px_28px_-26px_rgba(15,118,110,0.55)]'
-                  : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface)]',
+                  ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                  : 'text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
               )}
             >
               <span
                 className={cn(
-                  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border',
+                  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] border transition',
                   active
-                    ? 'border-[color:color-mix(in_srgb,var(--app-accent-border)_72%,transparent)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]'
-                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)] group-hover:text-[color:var(--app-accent)]',
+                    ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] dark:bg-white/10'
+                    : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] group-hover:text-[color:var(--app-accent)]',
                 )}
               >
                 <Icon className="h-4.5 w-4.5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-black leading-tight">
+                <span className="line-clamp-1 block text-[13px] font-black leading-tight">
                   {item.label}
                 </span>
                 {item.caption ? (
-                  <span className="mt-0.5 block truncate text-[11px] font-semibold leading-tight text-[color:var(--app-text-soft)]">
+                  <span className="mt-0.5 line-clamp-1 block text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
                     {item.caption}
                   </span>
                 ) : null}
@@ -723,20 +780,23 @@ export function Header() {
             type="button"
             aria-label="Close mobile menu overlay"
             onClick={() => setMobileOpen(false)}
-            className="ui-layer-popover fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_45%,_transparent)] backdrop-blur-sm"
+            className="ui-layer-popover fixed inset-0 bg-slate-950/32 backdrop-blur-sm"
           />
-          <aside className="ui-layer-drawer fixed inset-y-0 right-0 flex h-[100dvh] max-h-[100dvh] w-[min(94vw,400px)] flex-col bg-[color:var(--app-surface-strong)] shadow-[0_28px_80px_-36px_rgba(15,23,42,0.48)] ring-1 ring-black/[0.05] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-white/10 lg:inset-y-4 lg:right-4 lg:h-[calc(100dvh-2rem)] lg:w-[min(440px,calc(100vw-2rem))] lg:rounded-[26px] lg:border">
-            <div className="shrink-0 border-b border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,var(--app-surface-muted))] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.875rem)] dark:border-[color:var(--app-border-strong)]">
+          <aside className="ui-layer-drawer fixed inset-y-0 right-0 flex h-[100dvh] max-h-[100dvh] w-[min(92vw,390px)] flex-col overflow-hidden border-l border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_86px_-34px_rgba(15,23,42,0.56)] ring-1 ring-black/[0.04] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-white/10 lg:inset-y-4 lg:right-4 lg:h-[calc(100dvh-2rem)] lg:w-[min(400px,calc(100vw-2rem))] lg:rounded-[28px] lg:border">
+            <div className="shrink-0 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.85rem)] dark:border-[color:var(--app-border-strong)]">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]">
+                    <LajuloLogo className="h-6 w-6" textClassName="hidden" />
+                  </span>
                   <div className="min-w-0">
-                    <p className="truncate text-[17px] font-black text-[color:var(--app-text)]">
-                      {locale === 'id' ? 'Menu Lajukan' : 'Lajukan Menu'}
-                    </p>
-                    <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                    <h2 className="truncate text-[18px] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)]">
+                      {locale === 'id' ? 'Menu Lajukan' : 'Lajukan menu'}
+                    </h2>
+                    <p className="truncate text-[12px] font-semibold text-[color:var(--app-text-soft)]">
                       {locale === 'id'
-                        ? 'Akun, transaksi, komunitas'
-                        : 'Account, commerce, community'}
+                        ? 'Cari, posting, chat, dan kelola akun.'
+                        : 'Search, post, chat, and manage account.'}
                     </p>
                   </div>
                 </div>
@@ -744,44 +804,80 @@ export function Header() {
                   type="button"
                   onClick={() => setMobileOpen(false)}
                   aria-label="Close menu"
-                  className="ui-pressable inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] shadow-[0_12px_28px_-24px_rgba(15,23,42,0.45)] hover:bg-[color:var(--app-surface-muted)]"
+                  className="ui-pressable inline-flex min-h-10 min-w-10 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-strong)]"
                 >
                   <X className="h-4.5 w-4.5" />
                 </button>
               </div>
+
+              <div className="relative mt-4">
+                <AISearchBar
+                  className="w-full"
+                  placeholder={text.searchMenu}
+                  onSearch={(nextQuery) => {
+                    setMenuSearch(nextQuery);
+                    handleGlobalSearchSubmit(nextQuery);
+                    setMobileOpen(false);
+                  }}
+                />
+              </div>
             </div>
 
-            <form
-              onSubmit={event => event.preventDefault()}
-              className="px-4 pt-3"
-            >
-              <label className="ui-navbar-search-field ui-field-shell bg-[color:var(--app-surface-muted)] shadow-inner shadow-black/[0.02]">
-                <SearchIcon className="ui-navbar-search-icon" />
-                <input
-                  data-testid="app-menu-search-input"
-                  type="search"
-                  value={menuSearch}
-                  onChange={event => setMenuSearch(event.target.value)}
-                  placeholder={text.searchMenu}
-                  className="ui-navbar-search-input"
-                />
-              </label>
-            </form>
+            <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain bg-[color:var(--app-surface-muted)] p-3 pb-4">
+              <section className="grid grid-cols-3 gap-1.5">
+                {drawerQuickLinks.map(item => {
+                  const Icon = item.icon;
+                  const active = (
+                    item.matchers?.length ? item.matchers : [hrefPath(item.href)]
+                  ).some(matcher => matchesRoute(cleanPath, matcher));
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 pb-5">
-              <div className="rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-accent-border)_58%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_34%,var(--app-surface-strong))] p-3 shadow-[0_20px_48px_-36px_rgba(15,118,110,0.42)] dark:border-[color:var(--app-border-strong)]">
+                  return (
+                    <Link
+                      key={`quick-${item.href}-${item.label}`}
+                      href={item.href}
+                      onClick={closeAll}
+                      className={cn(
+                        'ui-pressable group flex min-h-[68px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[18px] border px-2 py-2 text-center transition',
+                        active
+                          ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                          : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'inline-flex h-8 w-8 items-center justify-center rounded-[12px] border transition',
+                          active
+                            ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)]'
+                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] group-hover:text-[color:var(--app-accent)]',
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="block max-w-full truncate text-[11px] font-black leading-tight">
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </section>
+
+              <div className="relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.32)] dark:border-[color:var(--app-border-strong)]">
+                <div
+                  aria-hidden="true"
+                  className="hidden"
+                />
                 {isAuthenticated ? (
-                  <div>
+                  <div className="relative">
                     <div className="flex min-w-0 items-center gap-3">
                       <Image
                         src={profileAvatarSrc(user?.avatarUrl)}
                         alt="Profile avatar"
-                        width={52}
-                        height={52}
-                        className="h-[52px] w-[52px] shrink-0 rounded-full border-2 border-[color:var(--app-surface-strong)] object-cover shadow-[0_14px_28px_-24px_rgba(15,23,42,0.55)]"
+                        width={44}
+                        height={44}
+                        className="h-11 w-11 shrink-0 rounded-full border border-[color:var(--app-border)] object-cover"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[15px] font-black text-[color:var(--app-text)]">
+                        <p className="truncate text-sm font-black text-[color:var(--app-text)]">
                           {user?.username || user?.fullName || 'User'}
                         </p>
                         <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -794,7 +890,7 @@ export function Header() {
                       <Link
                         href="/profile"
                         onClick={closeAll}
-                        className="ui-pressable inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]"
+                        className="ui-pressable inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
                         aria-label={
                           locale === 'id' ? 'Buka profil' : 'Open profile'
                         }
@@ -802,27 +898,36 @@ export function Header() {
                         <UserRound className="h-4 w-4" />
                       </Link>
                     </div>
-                    <div className="mt-3 grid grid-cols-3 gap-1.5">
-                      <Link
-                        href="/payments"
-                        onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 text-xs font-black text-[color:var(--app-text)]"
-                      >
-                        <Wallet className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-                        {locale === 'id' ? 'Saldo' : 'Balance'}
-                      </Link>
-                      <Link
-                        href="/transactions"
-                        onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 text-xs font-black text-[color:var(--app-text)]"
-                      >
-                        <Store className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
-                        {locale === 'id' ? 'Transaksi' : 'Deals'}
-                      </Link>
+                    <div
+                      className={cn(
+                        'mt-3 grid gap-1.5',
+                        PROMO_ONLY_MODE ? 'grid-cols-1' : 'grid-cols-3',
+                      )}
+                    >
+                      {!PROMO_ONLY_MODE ? (
+                        <>
+                          <Link
+                            href="/payments"
+                            onClick={closeAll}
+                            className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                          >
+                            <Wallet className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                            {locale === 'id' ? 'Saldo' : 'Balance'}
+                          </Link>
+                          <Link
+                            href="/transactions"
+                            onClick={closeAll}
+                            className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                          >
+                            <Store className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                            {locale === 'id' ? 'Transaksi' : 'Deals'}
+                          </Link>
+                        </>
+                      ) : null}
                       <Link
                         href={manageHref}
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center gap-1.5 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                        className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-black text-[color:var(--app-text)]"
                       >
                         <MapPinned className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                         {locale === 'id' ? 'Usaha' : 'Business'}
@@ -830,27 +935,31 @@ export function Header() {
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <p className="text-[15px] font-black text-[color:var(--app-text)]">
+                  <div className="relative">
+                    <p className="text-sm font-black text-[color:var(--app-text)]">
                       {locale === 'id' ? 'Masuk ke akun' : 'Sign in'}
                     </p>
                     <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       {locale === 'id'
-                        ? 'Chat, transaksi, dan draft jadi tersimpan.'
-                        : 'Keep chats, transactions, and drafts saved.'}
+                        ? PROMO_ONLY_MODE
+                          ? 'Chat, profil, dan draft promosi jadi tersimpan.'
+                          : 'Chat, transaksi, dan draft jadi tersimpan.'
+                        : PROMO_ONLY_MODE
+                          ? 'Keep chats, profiles, and promotion drafts saved.'
+                          : 'Keep chats, transactions, and drafts saved.'}
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       <Link
                         href="/login"
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-text)]"
+                        className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text)]"
                       >
                         {text.login}
                       </Link>
                       <Link
                         href="/register"
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-10 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-black text-[color:var(--app-text-inverse)]"
+                        className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-black text-[color:var(--app-text-inverse)]"
                       >
                         {text.register}
                       </Link>
@@ -859,15 +968,15 @@ export function Header() {
                 )}
               </div>
 
-              <section className="rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)]">
+              <section className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)]">
                 <p className="px-1 pb-2 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                   {text.preferences}
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={openLanguageFromDrawer}
-                    className="ui-pressable inline-flex min-h-12 items-center gap-2 rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)]"
+                    className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)]"
                   >
                     <Languages className="h-4 w-4 text-[color:var(--app-accent)]" />
                     <span className="min-w-0">
@@ -882,7 +991,7 @@ export function Header() {
                     type="button"
                     onClick={toggleDrawerTheme}
                     disabled={!isReady}
-                    className="ui-pressable inline-flex min-h-12 items-center gap-2 rounded-[15px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)] disabled:opacity-50"
+                    className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)] disabled:opacity-50"
                   >
                     {isDark ? (
                       <Sun className="h-4 w-4 text-[color:var(--app-accent)]" />
@@ -901,7 +1010,7 @@ export function Header() {
                 </div>
               </section>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {visibleCreateDrawerItems.length > 0
                   ? renderDrawerGroup(
                     text.createSection,
@@ -925,12 +1034,12 @@ export function Header() {
               </div>
             </div>
 
-            <div className="shrink-0 border-t border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-muted)_62%,var(--app-surface-strong))] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-[color:var(--app-border-strong)]">
-              <div className="grid grid-cols-2 gap-2">
+            <div className="shrink-0 border-t border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-[color:var(--app-border-strong)]">
+              <div className="grid grid-cols-2 gap-1.5">
                 <Link
                   href="/support"
                   onClick={closeAll}
-                  className="ui-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-text)]"
+                  className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text)]"
                 >
                   <CircleHelp className="h-4 w-4" />
                   {text.support}
@@ -938,7 +1047,7 @@ export function Header() {
                 <Link
                   href="/settings"
                   onClick={closeAll}
-                  className="ui-pressable inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-text)]"
+                  className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text)]"
                 >
                   <Settings className="h-4 w-4" />
                   {locale === 'id' ? 'Setelan' : 'Settings'}
@@ -951,7 +1060,7 @@ export function Header() {
                     closeAll();
                     void logout();
                   }}
-                  className="ui-pressable mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_58%,_transparent)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-black text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
+                  className="ui-pressable mt-1.5 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[13px] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_58%,_transparent)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
                 >
                   <LogOut className="h-4 w-4" />
                   {text.logout}
@@ -1041,14 +1150,14 @@ export function Header() {
             })}
           </nav>
 
-          <div className="hidden min-w-0 flex-1 shrink-0 items-center justify-end gap-1.5 lg:flex xl:gap-2">
+          <div className="hidden min-w-0 flex-1 shrink-0 items-center justify-end gap-2 lg:flex xl:gap-2.5">
             <button
               type="button"
               onClick={toggleMobileMenu}
               aria-expanded={mobileOpen}
               aria-label={text.menu}
               className={cn(
-                'ui-pressable inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border transition',
+                'ui-pressable inline-flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full border shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition',
                 mobileOpen
                   ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                   : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-strong)]',
@@ -1076,7 +1185,7 @@ export function Header() {
 
             <Link
               href={createHref}
-              className="ui-pressable inline-flex !min-h-[44px] items-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-2.5 text-sm font-semibold text-[color:var(--app-text-inverse)] shadow-[var(--app-shadow)] xl:px-4"
+              className="ui-pressable inline-flex h-11 min-h-11 items-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-2.5 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_14px_28px_-18px_color-mix(in_srgb,var(--app-accent)_72%,transparent)] transition hover:brightness-105 xl:px-4"
               onClick={closeAll}
               aria-label={text.createLong}
               title={text.createLong}
@@ -1100,14 +1209,15 @@ export function Header() {
                   aria-haspopup="menu"
                   aria-expanded={profileOpen}
                   className={cn(
-                    'ui-pressable inline-flex h-10 items-center gap-0 rounded-full border px-1.5 transition xl:gap-2 xl:px-2 xl:pr-3',
+                    'ui-pressable inline-flex h-11 min-h-11 items-center gap-0 rounded-full border px-2 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition xl:gap-2 xl:px-2 xl:pr-3',
                     matchesRoute(cleanPath, '/profile$') ||
                       matchesRoute(cleanPath, '/profile/edit') ||
                       matchesRoute(cleanPath, '/usaha') ||
                       matchesRoute(cleanPath, LEGACY_UMKM_OWNER_PATH) ||
                       matchesRoute(cleanPath, '/settings') ||
-                      matchesRoute(cleanPath, '/transactions') ||
-                      matchesRoute(cleanPath, '/payments')
+                      (!PROMO_ONLY_MODE &&
+                        (matchesRoute(cleanPath, '/transactions') ||
+                          matchesRoute(cleanPath, '/payments')))
                       ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                       : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
                   )}
@@ -1118,7 +1228,7 @@ export function Header() {
                     alt="Profile avatar"
                     width={28}
                     height={28}
-                    className="h-7 w-7 rounded-full object-cover"
+                    className="h-8 w-8 rounded-full object-cover"
                   />
                   <span className="hidden max-w-[84px] truncate text-sm font-semibold 2xl:inline">
                     {user?.username || user?.fullName || 'User'}
@@ -1239,10 +1349,13 @@ export function Header() {
                 <ThemeToggle />
                 <Link
                   href="/login"
-                  className="ui-pressable inline-flex min-h-[42px] items-center rounded-full border border-[color:var(--app-border)] px-4 text-sm font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
+                  className="ui-pressable inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-sm font-bold text-[color:var(--app-text)] shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
                   onClick={closeAll}
                   data-tour="www-login"
                 >
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]">
+                    <LogIn className="h-3.5 w-3.5" />
+                  </span>
                   {text.login}
                 </Link>
               </div>

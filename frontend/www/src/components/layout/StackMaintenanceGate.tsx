@@ -148,8 +148,12 @@ export function StackMaintenanceGate({
   useEffect(() => {
     let cancelled = false;
     let wasActive = active;
+    let timeoutId: number | undefined;
 
     const load = async () => {
+      if (document.visibilityState === 'hidden' && !wasActive) {
+        return;
+      }
       try {
         const response = await fetch('/api/system/startup', {
           cache: 'no-store',
@@ -169,10 +173,17 @@ export function StackMaintenanceGate({
     };
 
     void load();
-    const interval = window.setInterval(load, active ? 2500 : 6500);
+    const scheduleNext = () => {
+      const delay = active ? 2500 : document.visibilityState === 'visible' ? 9000 : 15000;
+      timeoutId = window.setTimeout(async () => {
+        await load();
+        if (!cancelled) scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [active]);
 

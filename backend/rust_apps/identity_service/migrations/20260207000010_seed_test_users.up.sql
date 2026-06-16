@@ -56,7 +56,7 @@ END;
 $func$ LANGUAGE plpgsql;
 
 INSERT INTO users (
-    id, email, password_hash,
+    id, email, password_hash, phone,
     email_verified, status, created_at, updated_at
 ) VALUES
 -- Super Admin Account
@@ -64,6 +64,7 @@ INSERT INTO users (
     '00000000-0000-0000-0000-000000000001',
     'admin@lajukan.com',
     '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068', -- Test123!@#
+    '6282117148623',
     TRUE,
     'active',
     NOW(),
@@ -74,6 +75,7 @@ INSERT INTO users (
     '00000000-0000-0000-0000-000000000002',
     'user@lajukan.com',
     '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068', -- Test123!@#
+    '6281100000002',
     TRUE,
     'active',
     NOW(),
@@ -84,6 +86,7 @@ INSERT INTO users (
     '00000000-0000-0000-0000-000000000003',
     'freelancer@lajukan.com',
     '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068', -- Test123!@#
+    '6281100000003',
     TRUE,
     'active',
     NOW(),
@@ -94,6 +97,7 @@ INSERT INTO users (
     '00000000-0000-0000-0000-000000000004',
     'employer@lajukan.com',
     '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068', -- Test123!@#
+    '6281100000004',
     TRUE,
     'active',
     NOW(),
@@ -104,6 +108,7 @@ INSERT INTO users (
     '00000000-0000-0000-0000-000000000005',
     'agent@lajukan.com',
     '$argon2id$v=19$m=19456,t=2,p=1$HBsn6bApIb0qf8ZiPScfkw$mu19wnRAn+pogPsv4/HyqTilWQtOEFxnAFgZktdH068', -- Test123!@#
+    '6281100000005',
     TRUE,
     'active',
     NOW(),

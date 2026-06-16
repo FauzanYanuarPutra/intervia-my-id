@@ -17,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 import { useRouteLayout } from '@/lib/useRouteLayout';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 type MobileNavItem = {
   key: 'home' | 'explore' | 'chat' | 'profile';
@@ -117,8 +118,7 @@ export default function ClientBottomNav() {
             '/settings',
             '/dashboard',
             '/my-listings',
-            '/transactions',
-            '/payments',
+            ...(PROMO_ONLY_MODE ? [] : ['/transactions', '/payments']),
           ]
           : ['/login', '/register'],
       },
@@ -176,6 +176,7 @@ export default function ClientBottomNav() {
     dragStartY.current = null;
     if (deltaY > 58) setSheetOpen(false);
   };
+  const createLabel = locale === 'id' ? 'Buat' : 'Create';
 
   return (
     <>
@@ -232,17 +233,27 @@ export default function ClientBottomNav() {
               );
             })}
 
-            <li className="min-w-0 flex items-center justify-center" aria-hidden="true">
+            <li className="min-w-0">
               <button
                 type="button"
                 onClick={() => setSheetOpen(true)}
-                className="ui-pressable flex h-[45px] min-h-[45px] w-[45px] min-w-[45px] touch-manipulation items-center justify-center rounded-full bg-[#6cd698] text-white shadow-[0_16px_34px_-14px_rgba(16,185,129,0.72),0_6px_14px_-8px_rgba(15,23,42,0.48)] ring-4 ring-[color:var(--app-surface-strong)]  active:scale-95 dark:ring-slate-950"
+                className={cn(
+                  'ui-pressable relative z-10 flex min-h-[58px] w-full touch-manipulation select-none flex-col items-center justify-center gap-1 rounded-[16px] px-0.5 py-1 text-[10.5px] font-bold leading-none text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent-soft)] active:scale-95',
+                  sheetOpen
+                    ? 'bg-[color:var(--app-accent-soft)]'
+                    : 'bg-transparent',
+                )}
                 aria-haspopup="dialog"
                 aria-expanded={sheetOpen}
                 aria-label={locale === 'id' ? 'Buat di Lajukan' : 'Create on Lajukan'}
                 data-testid="mobile-create-fab"
               >
-                <Plus className="h-8 w-8 stroke-[3]" aria-hidden="true" />
+                <span className="pointer-events-none inline-flex h-[34px] w-[34px] items-center justify-center rounded-[15px] bg-[linear-gradient(135deg,#0f8f4d,#16a34a)] text-white shadow-[0_14px_26px_-18px_rgba(22,163,74,0.86)]">
+                  <Plus className="h-[20px] w-[20px] stroke-[3]" aria-hidden="true" />
+                </span>
+                <span className="pointer-events-none max-w-full truncate leading-none">
+                  {createLabel}
+                </span>
               </button>
             </li>
 

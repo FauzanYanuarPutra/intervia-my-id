@@ -12,6 +12,7 @@ import {
   Landmark,
   LoaderCircle,
   Search,
+  ShieldCheck,
   ShoppingBag,
   Sparkles,
   Store,
@@ -178,7 +179,22 @@ export default function OnboardingPage() {
 
   const remainingRequired =
     Number(!fullName.trim()) + Number(roles.length === 0);
+  const readyToContinue = remainingRequired === 0;
   const completionPercent = ((2 - remainingRequired) / 2) * 100;
+  const primaryActionLabel = readyToContinue
+    ? isId
+      ? 'Lanjut'
+      : 'Continue'
+    : isId
+      ? 'Lengkapi dulu'
+      : 'Complete first';
+  const primaryActionHint = readyToContinue
+    ? isId
+      ? 'Profil dasar siap. Lanjut ke dashboard.'
+      : 'Basic profile is ready. Continue to dashboard.'
+    : isId
+      ? `${remainingRequired} bagian wajib belum diisi.`
+      : `${remainingRequired} required item${remainingRequired > 1 ? 's' : ''} left.`;
   const sectorSummary = summarizeSelections(
     SECTOR_OPTIONS,
     sectors,
@@ -186,9 +202,9 @@ export default function OnboardingPage() {
     isId ? 'Belum dipilih' : 'Not selected yet',
   );
   const fieldClass =
-    'ui-control min-h-[46px] w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-sm text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)]';
+    'ui-control min-h-[44px] w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-sm text-[color:var(--app-text)] outline-none focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)]';
   const sectionClass =
-    'rounded-[22px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,white_6%)] p-4 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.28)] sm:p-5';
+    'rounded-[20px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,white_6%)] p-3.5 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.28)] sm:p-4';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -267,12 +283,12 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-svh bg-[color:color-mix(in_srgb,var(--app-bg)_90%,var(--app-accent-soft)_10%)] px-4 py-5 text-[color:var(--app-text)] sm:px-6 sm:py-8">
-      <main className="mx-auto w-full max-w-[760px]">
-        <header className="mb-4 flex items-center justify-between gap-3">
+    <div className="min-h-svh bg-[color:color-mix(in_srgb,var(--app-bg)_90%,var(--app-accent-soft)_10%)] px-4 py-4 text-[color:var(--app-text)] sm:px-6 sm:py-6">
+      <main className="mx-auto w-full max-w-[680px]">
+        <header className="mb-3 flex items-center justify-between gap-3">
           <Link
             href="/dashboard"
-            className="inline-flex min-h-[38px] items-center rounded-full px-3 text-sm font-semibold text-[color:var(--app-text-soft)]"
+            className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold text-[color:var(--app-text-soft)]"
           >
             {isId ? 'Lewati' : 'Skip'}
           </Link>
@@ -289,23 +305,34 @@ export default function OnboardingPage() {
           </div>
         </header>
 
-        <div className="mb-5">
+        <div className="mb-4 rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent)_16%,var(--app-border))] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_54px_-42px_rgba(15,23,42,0.38)]">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
             {isId ? 'Mulai cepat' : 'Quick setup'}
           </p>
-          <h1 className="mt-2 text-[2rem] font-black leading-[1.02] tracking-[-0.05em] text-[color:var(--app-text)] sm:text-[2.45rem]">
+          <h1 className="mt-2 text-[1.65rem] font-black leading-[1.04] tracking-[-0.045em] text-[color:var(--app-text)] sm:text-[2rem]">
             {isId
-              ? 'Biar Lajukan langsung pas buat kamu.'
-              : 'Make Lajukan fit you faster.'}
+              ? 'Bikin Lajukan langsung ngerti kebutuhanmu.'
+              : 'Help Lajukan understand your needs.'}
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[color:var(--app-text-soft)]">
             {isId
-              ? 'Cukup nama dan tujuan utama. Detail usaha bisa diisi nanti.'
+              ? 'Cukup nama dan tujuan utama. Detail usaha bisa nanti, biar tidak pusing di awal.'
               : 'Just your name and main purpose. Business details can wait.'}
           </p>
+          <div className="mt-3 flex items-start gap-2 rounded-[16px] bg-[color:var(--app-accent-soft)] px-3 py-2">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent-strong)]" />
+            <p className="text-[11px] font-bold leading-5 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Username bisa dilihat orang. Jangan pakai nama, brand, atau username sebagai password.'
+                : 'Usernames can be visible. Do not use your name, brand, or username as your password.'}
+            </p>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3 pb-24">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-2.5 pb-[calc(9rem+env(safe-area-inset-bottom))]"
+        >
           <section className={sectionClass}>
             <div className="flex items-start gap-3">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent)] text-sm font-black text-[color:var(--app-text-inverse)]">
@@ -360,7 +387,7 @@ export default function OnboardingPage() {
                       setRoles(current => toggleValue(current, option.value));
                       setError('');
                     }}
-                    className={`flex min-h-[92px] items-start gap-3 rounded-[18px] border p-3 text-left transition active:scale-[0.99] ${
+                    className={`flex min-h-[78px] items-start gap-2.5 rounded-[17px] border p-3 text-left transition active:scale-[0.99] ${
                       selected
                         ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
                         : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] hover:border-[color:var(--app-accent-border)]'
@@ -401,7 +428,7 @@ export default function OnboardingPage() {
                 </span>
                 <span className="mt-1 block truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
                   {sectors.length > 0 || company.trim()
-                    ? [sectorSummary, company.trim()].filter(Boolean).join(' · ')
+                    ? [sectorSummary, company.trim()].filter(Boolean).join(' / ')
                     : isId
                       ? 'Buka kalau mau isi bidang, nama usaha, atau bio.'
                       : 'Open to add sector, company, or bio.'}
@@ -496,17 +523,31 @@ export default function OnboardingPage() {
             </div>
           ) : null}
 
-          <div className="fixed inset-x-4 bottom-4 z-20 mx-auto flex max-w-[760px] gap-2 rounded-[22px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] p-2 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.35)] backdrop-blur">
+          <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[120] mx-auto max-w-[680px] rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent)_20%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] p-2 shadow-[0_22px_64px_-34px_rgba(15,23,42,0.48)] backdrop-blur-xl sm:inset-x-6 sm:p-2.5">
+            <div className="mb-2 flex items-center justify-between gap-3 px-1.5">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-black text-[color:var(--app-text)]">
+                  {isId ? 'Siap mulai?' : 'Ready to start?'}
+                </p>
+                <p className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                  {primaryActionHint}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-black text-[color:var(--app-accent-strong)]">
+                {Math.round(completionPercent)}%
+              </span>
+            </div>
+            <div className="flex gap-2">
             <Link
               href="/dashboard"
-              className="inline-flex min-h-[48px] w-[34%] items-center justify-center rounded-[16px] px-3 text-sm font-black text-[color:var(--app-text-soft)]"
+              className="inline-flex min-h-[50px] w-[34%] items-center justify-center rounded-[17px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-strong)]"
             >
               {isId ? 'Lewati' : 'Skip'}
             </Link>
             <button
               type="submit"
               disabled={loading}
-              className="ui-button-primary inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+              className="ui-button-primary inline-flex min-h-[50px] flex-1 items-center justify-center gap-2 rounded-[17px] px-4 text-sm font-black shadow-[0_18px_36px_-24px_rgba(22,163,74,0.86)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? (
                 <>
@@ -515,17 +556,12 @@ export default function OnboardingPage() {
                 </>
               ) : (
                 <>
-                  {remainingRequired === 0
-                    ? isId
-                      ? 'Masuk'
-                      : 'Continue'
-                    : isId
-                      ? `${remainingRequired} lagi`
-                      : `${remainingRequired} left`}
+                  {primaryActionLabel}
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>
+            </div>
           </div>
         </form>
       </main>

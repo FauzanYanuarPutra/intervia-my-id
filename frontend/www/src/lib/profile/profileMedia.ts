@@ -34,6 +34,10 @@ function uniqueStrings(values: Array<string | undefined>): string[] {
   return result;
 }
 
+function isInlineSvgDataUrl(value: string): boolean {
+  return /^data:image\/svg\+xml/i.test(value.trim());
+}
+
 export function normalizeProfileMediaUrl(value: unknown): string | undefined {
   const raw = readNonEmptyString(value);
   if (!raw) return undefined;
@@ -135,8 +139,10 @@ export function normalizeProfilePayloadMedia(payload: unknown): unknown {
   if (avatar) {
     body.avatarUrl = avatar;
     body.avatar_url = avatar;
-    if (metadata) metadata.avatar_url = avatar;
-    media.avatar_url = avatar;
+    if (!isInlineSvgDataUrl(avatar)) {
+      if (metadata) metadata.avatar_url = avatar;
+      media.avatar_url = avatar;
+    }
   }
 
   const cover =

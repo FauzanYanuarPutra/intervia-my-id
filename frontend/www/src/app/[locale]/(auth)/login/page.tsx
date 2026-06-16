@@ -12,10 +12,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = 'https://www.lajukan.com';
 
   return {
-    title: isId ? 'Masuk Nomor HP - Lajukan' : 'Phone Login - Lajukan',
+    title: isId ? 'Masuk - Lajukan' : 'Login - Lajukan',
     description: isId
-      ? 'Masuk ke akun Lajukan cukup pakai nomor HP dan OTP.'
-      : 'Sign in to your Lajukan account with your phone number and OTP.',
+      ? 'Masuk ke akun Lajukan dengan username dan password.'
+      : 'Sign in to your Lajukan account with username and password.',
     alternates: {
       canonical: `${baseUrl}/${locale}/login`,
       languages: {
@@ -41,8 +41,8 @@ export default async function LoginPage() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'LoginPage',
-    name: 'Lajukan Phone Login',
-    description: 'Phone-first login portal for Lajukan users.',
+    name: 'Lajukan Login',
+    description: 'Username and password login portal for Lajukan users.',
     publisher: {
       '@type': 'Organization',
       name: 'Lajukan',

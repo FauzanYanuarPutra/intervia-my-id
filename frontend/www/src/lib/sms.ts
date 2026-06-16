@@ -1,59 +1,97 @@
+import {
+  getFonnteConfigured,
+  sendOtpViaFonnteWhatsApp,
+} from '@/lib/fonnte';
+import {
+  getWhatsAppMetaConfigured,
+  sendOtpViaWhatsAppMeta,
+} from '@/lib/whatsappMeta';
+
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const IS_DEV = APP_ENV === 'development';
 
-// For production, you can use:
-// - Twilio (has free trial)
-// - Vonage/Nexmo
-// - AWS SNS
-// - MessageBird
+export type PhoneOtpDeliveryResult = {
+  ok: boolean;
+  delivery:
+    | 'whatsapp_meta'
+    | 'whatsapp_fonnte'
+    | 'sms_twilio'
+    | 'console'
+    | 'unconfigured';
+};
 
-export async function sendOTPSMS(phone: string, otp: string): Promise<boolean> {
+async function sendOtpViaTwilio(
+  phone: string,
+  otp: string,
+): Promise<boolean> {
+  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+  const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!twilioSid || !twilioToken || !twilioPhone) return false;
+
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64')}`,
+      },
+      body: new URLSearchParams({
+        To: phone.startsWith('+') ? phone : `+${phone}`,
+        From: twilioPhone,
+        Body: `Kode verifikasi Lajukan: ${otp}. Berlaku 5 menit.`,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    console.error('Twilio OTP delivery failed:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function sendPhoneOTP(
+  phone: string,
+  otp: string,
+): Promise<PhoneOtpDeliveryResult> {
   try {
+    if (getWhatsAppMetaConfigured()) {
+      const sent = await sendOtpViaWhatsAppMeta(phone, otp);
+      if (sent) return { ok: true, delivery: 'whatsapp_meta' };
+    }
+
+    if (getFonnteConfigured()) {
+      const sent = await sendOtpViaFonnteWhatsApp(phone, otp);
+      if (sent) return { ok: true, delivery: 'whatsapp_fonnte' };
+    }
+
     if (IS_DEV) {
-      // In development, just log to console
-      console.log('\n📱 ========== SMS OTP ==========');
+      console.log('\n========== PHONE OTP ==========');
       console.log(`To: ${phone}`);
       console.log(`OTP Code: ${otp}`);
       console.log('================================\n');
-      return true;
+      return { ok: true, delivery: 'console' };
     }
 
-    // Production: Use Twilio or other SMS provider
-    const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID;
-    const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-    const TWILIO_PHONE = process.env.TWILIO_PHONE_NUMBER;
-
-    if (TWILIO_SID && TWILIO_TOKEN && TWILIO_PHONE) {
-      const response = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Authorization: `Basic ${Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString('base64')}`,
-          },
-          body: new URLSearchParams({
-            To: phone.startsWith('+') ? phone : `+${phone}`,
-            From: TWILIO_PHONE,
-            Body: `Your Lajukan verification code is: ${otp}. Valid for 5 minutes.`,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Twilio error:', error);
-        return false;
-      }
-
-      return true;
+    const sentViaTwilio = await sendOtpViaTwilio(phone, otp);
+    if (sentViaTwilio) {
+      return { ok: true, delivery: 'sms_twilio' };
     }
 
-    // Fallback: log to console if no SMS provider configured
-    console.log(`[SMS] Would send OTP ${otp} to ${phone}`);
-    return true;
+    console.error('No phone OTP provider configured');
+    return { ok: false, delivery: 'unconfigured' };
   } catch (error) {
-    console.error('Failed to send SMS:', error);
-    return false;
+    console.error('Failed to send phone OTP:', error);
+    return { ok: false, delivery: 'unconfigured' };
   }
+}
+
+export async function sendOTPSMS(phone: string, otp: string): Promise<boolean> {
+  const result = await sendPhoneOTP(phone, otp);
+  return result.ok;
 }

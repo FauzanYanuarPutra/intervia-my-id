@@ -4,6 +4,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 type Step = {
   id: string;
@@ -28,7 +29,9 @@ const DEFAULT_STEPS: Step[] = [
   {
     id: 'verification',
     title: 'Verify identity',
-    desc: 'Upload ID and pass liveness to unlock transactions.',
+    desc: PROMO_ONLY_MODE
+      ? 'Complete trust details so people can contact you with confidence.'
+      : 'Upload ID and pass liveness to unlock transactions.',
     href: '/settings',
   },
   {
@@ -39,9 +42,11 @@ const DEFAULT_STEPS: Step[] = [
   },
   {
     id: 'trust',
-    title: 'Build trust score',
-    desc: 'Complete your first transaction and get rated.',
-    href: '/transactions',
+    title: PROMO_ONLY_MODE ? 'Build profile trust' : 'Build trust score',
+    desc: PROMO_ONLY_MODE
+      ? 'Publish a clear listing and keep your public profile updated.'
+      : 'Complete your first transaction and get rated.',
+    href: PROMO_ONLY_MODE ? '/my-listings' : '/transactions',
   },
 ];
 

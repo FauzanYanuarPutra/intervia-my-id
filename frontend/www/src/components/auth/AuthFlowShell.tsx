@@ -35,7 +35,7 @@ export default function AuthFlowShell({
   children,
 }: AuthFlowShellProps) {
   const isId = locale === 'id';
-  const hasProgress = Boolean(currentStep && totalSteps);
+  const hasProgress = Boolean(currentStep && totalSteps && totalSteps > 1);
   const safeStep =
     hasProgress && totalSteps
       ? Math.min(Math.max(currentStep ?? 1, 1), totalSteps)
@@ -43,15 +43,13 @@ export default function AuthFlowShell({
   const progressValue =
     hasProgress && totalSteps ? Math.max((safeStep / totalSteps) * 100, 16) : 0;
   const safeTotalSteps = totalSteps ?? 1;
-  void helperText;
-  void highlights;
   const mobileHomeLabel = isId ? 'Beranda' : 'Home';
   const desktopHomeLabel = isId ? 'Beranda' : 'Home';
 
   return (
-    <main className="min-h-svh bg-[color:var(--app-surface-muted)] px-3 py-4 text-[color:var(--app-text)] sm:grid sm:place-items-center sm:py-7">
-      <section className="mx-auto flex w-full max-w-[400px] flex-col">
-        <div className="mb-4 flex items-center justify-between gap-3">
+    <main className="min-h-svh overflow-hidden bg-[radial-gradient(circle_at_top_left,color-mix(in_srgb,var(--app-accent-soft)_55%,transparent),transparent_34%),var(--app-surface-muted)] px-3 py-4 text-[color:var(--app-text)] sm:grid sm:place-items-center sm:py-7">
+      <section className="mx-auto flex w-full max-w-[430px] flex-col">
+        <div className="mb-4 flex items-center justify-between gap-3 px-1">
           <Link
             href="/home"
             className="inline-flex min-w-0 items-center rounded-full px-1 py-1 transition hover:opacity-85"
@@ -70,8 +68,13 @@ export default function AuthFlowShell({
           </Link>
         </div>
 
-        <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_22px_54px_-42px_rgba(15,23,42,0.42)] sm:p-5">
-          <div className={badge ? 'mt-2' : ''}>
+        <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent)_18%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,white_4%)] p-4 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.48)] sm:p-5">
+          <div>
+            {badge ? (
+              <span className="mb-3 inline-flex min-h-7 items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent-strong)]">
+                {badge}
+              </span>
+            ) : null}
             <h1 className="text-[1.48rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.62rem]">
               {title}
             </h1>
@@ -79,6 +82,12 @@ export default function AuthFlowShell({
             {description ? (
               <p className="mt-1 text-[12px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
                 {description}
+              </p>
+            ) : null}
+
+            {helperText ? (
+              <p className="mt-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[11px] font-bold leading-5 text-[color:var(--app-text-soft)]">
+                {helperText}
               </p>
             ) : null}
           </div>
@@ -107,6 +116,24 @@ export default function AuthFlowShell({
                   style={{ width: `${progressValue}%` }}
                 />
               </div>
+            </div>
+          ) : null}
+
+          {highlights.length > 0 ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {highlights.slice(0, 4).map(item => (
+                <div
+                  key={`${item.title}-${item.description}`}
+                  className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2"
+                >
+                  <p className="text-xs font-black text-[color:var(--app-text)]">
+                    {item.title}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+                    {item.description}
+                  </p>
+                </div>
+              ))}
             </div>
           ) : null}
 

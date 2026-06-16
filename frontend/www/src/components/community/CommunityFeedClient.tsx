@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Crown,
   Earth,
+  Expand,
   ImageIcon,
   Loader2,
   Lock,
@@ -37,9 +38,14 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
+import {
+  isPreviewableContentMediaUrl,
+  normalizeContentMediaUrl,
+} from '@/lib/content/catalog';
 import { cn } from '@/lib/utils';
 import type {
   CommunityFeedItem,
+  CommunityFeedMedia,
   CommunityFeedCategory,
   CommunityFeedOverview,
   CommunityFeedResponse,
@@ -69,6 +75,7 @@ type ForumThreadDetail = {
   author: CommunityFeedItem['author'] | null;
   category: CommunityFeedCategory | null;
   tags: CommunityFeedTag[];
+  imageUrls?: string[];
 };
 
 type ForumPostDetail = {
@@ -121,6 +128,26 @@ type CreatedThreadPayload = {
   };
 };
 
+type ParsedPoll = {
+  question: string;
+  body: string;
+  options: string[];
+};
+
+type PollOptionVoteStat = {
+  optionIndex: number;
+  votes: number;
+  viewerVoted?: boolean;
+};
+
+type PollVoteResponse = {
+  threadId: string;
+  totalVotes: number;
+  viewerOptionIndex?: number | null;
+  options: PollOptionVoteStat[];
+  error?: string;
+};
+
 const COMMUNITY_MODAL_SHELL_CLASS =
   'ui-layer-modal fixed inset-0 z-[10000] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4';
 
@@ -166,10 +193,75 @@ const SEARCH_TABS: Array<{
   ];
 
 function resolveCommunityMediaSrc(value?: string | null): string {
-  const clean = String(value || '').trim();
+  const clean = normalizeContentMediaUrl(String(value || '').trim());
   if (!clean) return '';
-  if (clean.startsWith('/images/company/')) return '';
+  if (isCommunityPlaceholderMedia(clean)) return '';
+  if (!isPreviewableContentMediaUrl(clean)) return '';
   return clean;
+}
+
+function isCommunityPlaceholderMedia(value?: string | null): boolean {
+  const clean = String(value || '').trim().toLowerCase();
+  if (!clean) return true;
+  return (
+    clean.startsWith('/images/company/') ||
+    clean.includes('/images/company/') ||
+    clean.includes('placeholder') ||
+    clean.includes('no-image') ||
+    clean.includes('image-not-available') ||
+    clean.includes('default_image')
+  );
+}
+
+function firstCommunityMediaUrl(...sources: Array<Array<string | null | undefined> | undefined>) {
+  for (const source of sources) {
+    for (const value of source || []) {
+      const resolved = resolveCommunityMediaSrc(value);
+      if (resolved) return resolved;
+    }
+  }
+  return '';
+}
+
+function normalizeCommunityMediaItems(
+  items: Array<CommunityFeedMedia | string | null | undefined>,
+  fallbackAlt: string,
+): CommunityFeedMedia[] {
+  const seen = new Set<string>();
+  const result: CommunityFeedMedia[] = [];
+
+  items.forEach(item => {
+    const raw = typeof item === 'string' ? item : item?.src;
+    const src = resolveCommunityMediaSrc(raw);
+    if (!src) return;
+    const key = src.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push({
+      type: isVideoMedia(src) ? 'video' : typeof item === 'string' ? 'image' : item?.type || 'image',
+      src,
+      alt: typeof item === 'string' ? fallbackAlt : item?.alt || fallbackAlt,
+      sourceUrl: typeof item === 'string' ? undefined : item?.sourceUrl,
+    });
+  });
+
+  return result;
+}
+
+function getFeedMediaItems(item: CommunityFeedItem): CommunityFeedMedia[] {
+  const directItems = normalizeCommunityMediaItems(
+    item.mediaItems || [],
+    item.title,
+  );
+  if (directItems.length > 0) return directItems;
+
+  const imageItems = normalizeCommunityMediaItems(
+    item.imageUrls || [],
+    item.title,
+  );
+  if (imageItems.length > 0) return imageItems;
+
+  return normalizeCommunityMediaItems([item.media], item.title);
 }
 
 function readCommunitySearchKind(value: string | null): CommunitySearchKind {
@@ -217,6 +309,54 @@ function communityDiscussionItems(items?: CommunityFeedItem[]) {
   return (items || []).filter(item => item.kind !== 'reel');
 }
 
+function pollVoteUrl(threadId: string) {
+  return `/api/forum/threads/${encodeURIComponent(threadId)}/poll-vote`;
+}
+
+function parseCommunityPoll(
+  title: string,
+  body: string,
+  tags: CommunityFeedTag[] = [],
+): ParsedPoll | null {
+  const source = String(body || '').replace(/\r\n/g, '\n');
+  const hasPollTag = tags.some(tag =>
+    /poll|polling|survey|jajak|voting/i.test(`${tag.slug} ${tag.name}`),
+  );
+  const lines = source.split('\n');
+  const markerIndex = lines.findIndex(line =>
+    /^\s*(polling|poll|jajak pendapat)\s*:?\s*$/i.test(line),
+  );
+
+  if (markerIndex < 0 && !hasPollTag) return null;
+
+  const optionLines =
+    markerIndex >= 0 ? lines.slice(markerIndex + 1) : lines.slice(1);
+  const options = optionLines
+    .map(line =>
+      line
+        .trim()
+        .replace(/^[-*•]\s*/, '')
+        .replace(/^\d+[\).]\s*/, '')
+        .trim(),
+    )
+    .filter(Boolean)
+    .slice(0, 8)
+    .map(option => option.replace(/^(?:[-*]|\u2022)\s*/, '').trim());
+
+  if (options.length < 2) return null;
+
+  const cleanBody =
+    markerIndex >= 0
+      ? lines.slice(0, markerIndex).join('\n').trim()
+      : lines[0]?.trim() || '';
+
+  return {
+    question: cleanBody || title,
+    body: cleanBody,
+    options,
+  };
+}
+
 function sanitizeCommunitySearchResults(
   payload: Partial<CommunitySearchResponse>,
 ): CommunitySearchResponse {
@@ -250,7 +390,7 @@ function sanitizeCommunitySearchResults(
 }
 
 function isVideoMedia(src: string) {
-  return /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(src);
+  return /\.(mp4|webm|mov|m4v|ogv|ogg|3gp)([?#].*)?$/i.test(src);
 }
 
 function timeAgo(value: string, isId: boolean) {
@@ -366,8 +506,11 @@ function createdThreadToFeedItem(
     overview?.groups?.find(item => item.id === selectedGroupId) ||
     overview?.groups?.find(item => item.categoryId === category?.id) ||
     null;
-  const mediaSrc =
-    (thread.imageUrls || [])[0] || (post?.imageUrls || [])[0] || null;
+  const mediaSrc = firstCommunityMediaUrl(thread.imageUrls, post?.imageUrls);
+  const mediaItems = normalizeCommunityMediaItems(
+    [...(thread.imageUrls || []), ...(post?.imageUrls || [])],
+    thread.title,
+  );
 
   return {
     id: `discussion-${thread.id}`,
@@ -385,11 +528,13 @@ function createdThreadToFeedItem(
     tags: thread.tags || [],
     media: mediaSrc
       ? {
-        type: isVideoMedia(mediaSrc) ? 'video' : 'image',
-        src: mediaSrc,
-        alt: thread.title,
-      }
+          type: isVideoMedia(mediaSrc) ? 'video' : 'image',
+          src: mediaSrc,
+          alt: thread.title,
+        }
       : null,
+    mediaItems,
+    imageUrls: mediaItems.map(item => item.src),
     stats: {
       reactions: Math.max(thread.voteScore || thread.likeCount || 0, 0),
       comments: thread.replyCount || 0,
@@ -436,7 +581,7 @@ function CommunityImageFrame({
   const [failed, setFailed] = useState(false);
   const resolvedSrc = resolveCommunityMediaSrc(src);
 
-  if (failed) {
+  if (!resolvedSrc || failed) {
     return (
       <div
         className={cn(
@@ -468,6 +613,553 @@ function CommunityImageFrame({
         onError={() => setFailed(true)}
       />
     </div>
+  );
+}
+
+function CommunityVideoFrame({
+  src,
+  alt,
+  isId,
+  variant = 'feed',
+  className,
+}: {
+  src?: string | null;
+  alt: string;
+  isId: boolean;
+  variant?: 'feed' | 'tile' | 'thumb';
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const resolvedSrc = resolveCommunityMediaSrc(src);
+  const isFeed = variant === 'feed';
+  const isThumb = variant === 'thumb';
+
+  if (!resolvedSrc || failed) {
+    return (
+      <div
+        className={cn(
+          'grid place-items-center bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_48%,#eef2ff_100%)] text-center',
+          isFeed ? 'min-h-[220px]' : 'h-full w-full',
+          className,
+        )}
+      >
+        <div className="px-5">
+          <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-[color:var(--app-accent)] shadow-sm ring-1 ring-emerald-100">
+            <PlayCircle className="h-5 w-5" />
+          </span>
+          <p className="mt-2 line-clamp-2 text-xs font-black text-[color:var(--app-text)]">
+            {isId ? 'Preview video belum tersedia' : 'Video preview unavailable'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'relative overflow-hidden bg-slate-950',
+        isFeed
+          ? 'border-y border-slate-900/5 px-2 py-2 sm:px-4'
+          : 'h-full w-full rounded-[18px]',
+        className,
+      )}
+    >
+      {isFeed ? (
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_20%,rgba(16,185,129,0.24),transparent_34%),radial-gradient(circle_at_76%_78%,rgba(59,130,246,0.22),transparent_32%),linear-gradient(135deg,#020617,#08111f)]"
+          aria-hidden="true"
+        />
+      ) : null}
+      <div
+        className={cn(
+          'relative z-10 overflow-hidden bg-black shadow-[0_18px_44px_-30px_rgba(2,6,23,0.8)]',
+          isFeed
+            ? 'mx-auto aspect-[4/5] max-h-[540px] w-full max-w-[430px] rounded-[22px] sm:aspect-[9/16]'
+            : 'h-full w-full',
+        )}
+      >
+        <video
+          src={resolvedSrc}
+          className={cn(
+            'h-full w-full bg-black',
+            isFeed ? 'object-cover object-left' : 'object-contain',
+          )}
+          controls={!isThumb}
+          muted={isThumb}
+          playsInline
+          preload="metadata"
+          onError={() => setFailed(true)}
+        />
+        <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/62 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur-md">
+          <PlayCircle className="h-3.5 w-3.5" />
+          {isThumb ? 'Video' : isId ? 'Putar video' : 'Play video'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CommunityMediaTile({
+  item,
+  title,
+  isId,
+  index,
+  total,
+  extraCount,
+  onOpen,
+  className,
+  imageFit = 'cover',
+}: {
+  item: CommunityFeedMedia;
+  title: string;
+  isId: boolean;
+  index: number;
+  total: number;
+  extraCount?: number;
+  onOpen: () => void;
+  className?: string;
+  imageFit?: 'cover' | 'contain';
+}) {
+  const isVideo = item.type === 'video' || isVideoMedia(item.src);
+  const label =
+    total > 1
+      ? isId
+        ? `Buka media ${index + 1} dari ${total}`
+        : `Open media ${index + 1} of ${total}`
+      : isId
+        ? 'Buka preview media'
+        : 'Open media preview';
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={cn(
+        'group/media relative block h-full min-h-0 w-full overflow-hidden bg-slate-100 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] dark:bg-slate-950',
+        className,
+      )}
+      aria-label={label}
+    >
+      {isVideo ? (
+        <>
+          <video
+            src={item.src}
+            muted
+            playsInline
+            preload="metadata"
+            className="h-full w-full bg-slate-950 object-cover"
+          />
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/62 px-2 py-1 text-[10px] font-black text-white backdrop-blur-md">
+            <PlayCircle className="h-3.5 w-3.5" />
+            Video
+          </span>
+        </>
+      ) : (
+        <Image
+          src={item.src}
+          alt={item.alt || title}
+          fill
+          sizes="(max-width: 640px) 100vw, 720px"
+          className={cn(
+            'transition duration-500 group-hover/media:scale-[1.025]',
+            imageFit === 'contain' ? 'object-contain' : 'object-cover',
+          )}
+        />
+      )}
+
+      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/24 via-transparent to-transparent opacity-80" />
+      <span className="pointer-events-none absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/44 text-white opacity-0 backdrop-blur transition group-hover/media:opacity-100">
+        <Expand className="h-4 w-4" />
+      </span>
+
+      {extraCount && extraCount > 0 ? (
+        <span className="absolute inset-0 grid place-items-center bg-black/54 text-xl font-black text-white backdrop-blur-[1px] sm:text-2xl">
+          +{extraCount}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function CommunityMediaGalleryPreview({
+  mediaItems,
+  title,
+  isId,
+  variant = 'feed',
+}: {
+  mediaItems: Array<CommunityFeedMedia | string | null | undefined>;
+  title: string;
+  isId: boolean;
+  variant?: 'feed' | 'detail';
+}) {
+  const items = useMemo(
+    () => normalizeCommunityMediaItems(mediaItems, title),
+    [mediaItems, title],
+  );
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  if (items.length === 0) return null;
+
+  const isDetail = variant === 'detail';
+  const visibleItems = items.slice(0, 3);
+  const extraCount = Math.max(0, items.length - visibleItems.length);
+  const shellClass = cn(
+    'relative overflow-hidden bg-slate-100 dark:bg-slate-950',
+    isDetail
+      ? 'rounded-[22px] ring-1 ring-slate-900/5'
+      : 'border-y border-slate-900/5',
+  );
+  const frameClass =
+    items.length === 1
+      ? cn(
+          'relative w-full',
+          isDetail
+            ? 'aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9]'
+            : 'aspect-[4/3] sm:aspect-[16/9]',
+        )
+      : cn(
+          'grid w-full gap-1 bg-slate-200 p-1 dark:bg-slate-900',
+          'aspect-[4/3] sm:aspect-[16/9]',
+          items.length === 2
+            ? 'grid-cols-2'
+            : 'grid-cols-2 grid-rows-2',
+        );
+
+  return (
+    <>
+      <div className={shellClass}>
+        <div className={frameClass}>
+          {visibleItems.map((item, index) => (
+            <CommunityMediaTile
+              key={`${item.src}-${index}`}
+              item={item}
+              title={title}
+              isId={isId}
+              index={index}
+              total={items.length}
+              extraCount={
+                index === visibleItems.length - 1 ? extraCount : undefined
+              }
+              onOpen={() => setLightboxIndex(index)}
+              className={cn(
+                items.length === 1 && 'absolute inset-0',
+                items.length >= 3 && index === 0 && 'row-span-2',
+                items.length >= 3 && index > 0 && 'min-h-0',
+                items.length > 1 && 'rounded-[14px]',
+              )}
+              imageFit={isDetail && items.length === 1 ? 'contain' : 'cover'}
+            />
+          ))}
+        </div>
+
+        {items.length > 1 ? (
+          <span className="absolute left-3 top-3 rounded-full bg-black/62 px-2.5 py-1 text-[11px] font-black text-white shadow-sm backdrop-blur-md">
+            {items.length} {isId ? 'media' : 'media'}
+          </span>
+        ) : null}
+      </div>
+
+      {lightboxIndex != null ? (
+        <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/95 p-3 backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            className="absolute right-4 top-4 z-[10060] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            aria-label={isId ? 'Tutup preview' : 'Close preview'}
+          >
+            <X className="h-6 w-6" />
+          </button>
+
+          <div className="h-[86svh] w-full max-w-6xl">
+            <MediaPreviewCarousel
+              items={items}
+              alt={title}
+              aspectClassName="h-full w-full"
+              className="rounded-[24px] bg-black"
+              viewportClassName="rounded-[24px]"
+              sizes="100vw"
+              controls
+              lightbox={false}
+              showCounter
+              showDots
+              objectFit="contain"
+              initialIndex={lightboxIndex}
+            />
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function CommunityMediaPreview({
+  media,
+  mediaItems,
+  title,
+  isId,
+}: {
+  media?: CommunityFeedMedia | null;
+  mediaItems?: CommunityFeedMedia[];
+  title: string;
+  isId: boolean;
+}) {
+  const galleryItems = mediaItems && mediaItems.length > 0 ? mediaItems : [media];
+  if (galleryItems.filter(Boolean).length > 1) {
+    return (
+      <CommunityMediaGalleryPreview
+        mediaItems={galleryItems}
+        title={title}
+        isId={isId}
+      />
+    );
+  }
+
+  if (!media) return null;
+
+  if (media.type === 'video') {
+    return (
+      <CommunityVideoFrame
+        src={media.src}
+        alt={media.alt || title}
+        isId={isId}
+        variant="feed"
+      />
+    );
+  }
+
+  return (
+    <CommunityMediaGalleryPreview
+      mediaItems={galleryItems}
+      title={title}
+      isId={isId}
+    />
+  );
+}
+
+function CommunityPoll({
+  threadId,
+  poll,
+  isId,
+  loginHref,
+}: {
+  threadId: string;
+  poll: ParsedPoll;
+  isId: boolean;
+  loginHref: string;
+}) {
+  const { isAuthenticated, authFetch } = useAuth();
+  const router = useRouter();
+  const { notify } = useToast();
+  const [stats, setStats] = useState<PollVoteResponse | null>(null);
+  const [votingIndex, setVotingIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    fetch(pollVoteUrl(threadId), {
+      cache: 'no-store',
+      credentials: 'include',
+    })
+      .then(response => response.json())
+      .then((payload: PollVoteResponse) => {
+        if (!alive || payload?.error) return;
+        setStats(payload);
+      })
+      .catch(() => {
+        if (alive) setStats(null);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [threadId, poll.options.length]);
+
+  const voteMap = useMemo(() => {
+    return new Map(
+      (stats?.options || []).map(option => [option.optionIndex, option]),
+    );
+  }, [stats?.options]);
+  const selectedIndex =
+    typeof stats?.viewerOptionIndex === 'number'
+      ? stats.viewerOptionIndex
+      : null;
+  const totalVotes = Math.max(Number(stats?.totalVotes || 0), 0);
+  const pollHint = isAuthenticated
+    ? selectedIndex == null
+      ? isId
+        ? 'Pilih satu jawaban. Kamu bisa ubah pilihan nanti.'
+        : 'Pick one answer. You can change it later.'
+      : isId
+        ? 'Pilihan kamu sudah tersimpan.'
+        : 'Your vote has been saved.'
+    : isId
+      ? 'Login untuk ikut vote. Hasil tetap bisa kamu lihat.'
+      : 'Sign in to vote. You can still see the results.';
+
+  const handleVote = async (optionIndex: number) => {
+    if (!isAuthenticated) {
+      notify({
+        title: isId ? 'Login dulu untuk vote' : 'Sign in to vote',
+        description: isId
+          ? 'Biar satu akun cuma punya satu suara di polling ini.'
+          : 'This keeps every poll limited to one vote per account.',
+        variant: 'error',
+      });
+      router.push(loginHref);
+      return;
+    }
+
+    setVotingIndex(optionIndex);
+    const response = await authFetch(pollVoteUrl(threadId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ optionIndex, optionCount: poll.options.length }),
+    });
+    const payload = (await response
+      .json()
+      .catch(() => ({}))) as PollVoteResponse;
+    setVotingIndex(null);
+
+    if (!response.ok) {
+      notify({
+        title: isId ? 'Vote belum tersimpan' : 'Vote was not saved',
+        description: payload.error || '',
+        variant: 'error',
+      });
+      return;
+    }
+
+    setStats(payload);
+    notify({
+      title: isId ? 'Vote tersimpan' : 'Vote saved',
+      variant: 'success',
+    });
+  };
+
+  return (
+    <section className="mt-3 rounded-[22px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_58%,#eff6ff_100%)] p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.22)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
+            <BarChart3 className="h-3.5 w-3.5" />
+            {isId ? 'Polling' : 'Poll'}
+          </p>
+          <h3 className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)]">
+            {poll.question}
+          </h3>
+          <p className="mt-1 text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
+            {pollHint}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)]">
+          {totalVotes > 0
+            ? `${compactNumber(totalVotes)} ${isId ? 'suara' : 'votes'}`
+            : isId
+              ? 'Belum ada suara'
+              : 'No votes yet'}
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {poll.options.map((option, index) => {
+          const stat = voteMap.get(index);
+          const votes = Math.max(Number(stat?.votes || 0), 0);
+          const percent = totalVotes
+            ? Math.round((votes / totalVotes) * 100)
+            : 0;
+          const selected = selectedIndex === index;
+          const voting = votingIndex === index;
+          const actionLabel = !isAuthenticated
+            ? isId
+              ? 'Login'
+              : 'Sign in'
+            : totalVotes === 0
+              ? isId
+                ? 'Pilih'
+                : 'Vote'
+              : `${percent}%`;
+
+          return (
+            <button
+              key={`${option}-${index}`}
+              type="button"
+              onClick={() => void handleVote(index)}
+              disabled={votingIndex !== null}
+              className={cn(
+                'group relative w-full overflow-hidden rounded-[16px] border bg-white p-3 text-left transition hover:border-[color:var(--app-accent-border)] disabled:cursor-wait',
+                selected
+                  ? 'border-[color:var(--app-accent)] shadow-[0_14px_26px_-24px_rgba(4,120,87,0.72)]'
+                  : 'border-[color:var(--app-border)]',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute inset-y-0 left-0 bg-emerald-100/75 transition-all',
+                  selected && 'bg-emerald-200/80',
+                )}
+                style={{ width: `${percent}%` }}
+                aria-hidden="true"
+              />
+              <span className="relative flex items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)]">
+                    {option}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                    {votes > 0
+                      ? `${compactNumber(votes)} ${isId ? 'orang memilih' : 'people voted'}`
+                      : isId
+                        ? 'Belum dipilih'
+                        : 'No votes yet'}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'inline-flex h-9 min-w-12 shrink-0 items-center justify-center rounded-full px-2 text-xs font-black',
+                    selected
+                      ? 'bg-[color:var(--app-accent)] text-white'
+                      : 'bg-slate-50 text-[color:var(--app-text-soft)]',
+                  )}
+                >
+                  {voting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : selected ? (
+                    <span className="inline-flex items-center gap-1">
+                      <ShieldCheck className="h-4 w-4" />
+                      {totalVotes > 0 ? `${percent}%` : ''}
+                    </span>
+                  ) : (
+                    actionLabel
+                  )}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
+        <span>
+          {isAuthenticated
+            ? isId
+              ? 'Satu akun hanya dihitung satu suara.'
+              : 'One account counts as one vote.'
+            : isId
+              ? 'Vote butuh akun agar tidak dobel.'
+              : 'Voting requires an account to avoid duplicates.'}
+        </span>
+        {!isAuthenticated ? (
+          <button
+            type="button"
+            onClick={() => router.push(loginHref)}
+            className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[color:var(--app-accent)] ring-1 ring-emerald-100"
+          >
+            {isId ? 'Masuk untuk vote' : 'Sign in to vote'}
+          </button>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -692,7 +1384,12 @@ export function CommunityComposer({
       return;
     }
 
-    setMediaUrls(current => [...current, ...payload.urls].slice(0, 6));
+    const uploadedUrls = payload.urls
+      .map((url: unknown) =>
+        typeof url === 'string' ? resolveCommunityMediaSrc(url) : '',
+      )
+      .filter(Boolean);
+    setMediaUrls(current => [...current, ...uploadedUrls].slice(0, 6));
   };
 
   const handleMediaDrop = (event: DragEvent<HTMLLabelElement>) => {
@@ -821,7 +1518,7 @@ export function CommunityComposer({
               >
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
                   multiple
                   className="sr-only"
                   onChange={event => {
@@ -838,41 +1535,55 @@ export function CommunityComposer({
                 </span>
                 <span className="mt-3 block text-sm font-black text-[color:var(--app-text)]">
                   {isId
-                    ? 'Tarik foto ke sini atau pilih file'
-                    : 'Drop photos here or choose files'}
+                    ? 'Tarik foto/video ke sini atau pilih file'
+                    : 'Drop photos/videos here or choose files'}
                 </span>
                 <span className="mt-1 block text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Foto ada di atas dulu, baru isi judul dan cerita di bawah.'
-                    : 'Add photos first, then fill in the discussion below.'}
+                    ? 'Media ada di atas dulu, baru isi judul dan cerita di bawah.'
+                    : 'Add media first, then fill in the discussion below.'}
                 </span>
                 {mediaUrls.length > 0 ? (
                   <span className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                    {mediaUrls.map(url => (
-                      <span
-                        key={url}
-                        className="relative aspect-square overflow-hidden rounded-[14px] bg-white ring-1 ring-[color:var(--app-border)]"
-                      >
-                        <CommunityImageFrame
-                          src={url}
-                          alt="Media"
-                          className="h-full w-full"
-                        />
-                        <button
-                          type="button"
-                          onClick={event => {
-                            event.preventDefault();
-                            setMediaUrls(current =>
-                              current.filter(item => item !== url),
-                            );
-                          }}
-                          className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/62 text-white backdrop-blur"
-                          aria-label={isId ? 'Hapus media' : 'Remove media'}
+                    {mediaUrls.map(url => {
+                      const resolvedUrl = resolveCommunityMediaSrc(url);
+
+                      return (
+                        <span
+                          key={url}
+                          className="relative aspect-square overflow-hidden rounded-[14px] bg-white ring-1 ring-[color:var(--app-border)]"
                         >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </span>
-                    ))}
+                          {isVideoMedia(url) && resolvedUrl ? (
+                            <CommunityVideoFrame
+                              src={resolvedUrl}
+                              alt="Video"
+                              isId={isId}
+                              variant="thumb"
+                              className="h-full w-full"
+                            />
+                          ) : (
+                            <CommunityImageFrame
+                              src={url}
+                              alt="Media"
+                              className="h-full w-full"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={event => {
+                              event.preventDefault();
+                              setMediaUrls(current =>
+                                current.filter(item => item !== url),
+                              );
+                            }}
+                            className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/62 text-white backdrop-blur"
+                            aria-label={isId ? 'Hapus media' : 'Remove media'}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </span>
                 ) : null}
               </label>
@@ -1006,6 +1717,13 @@ export function CommunityPostCard({
   const [localVote, setLocalVote] = useState(item.viewerVote || 0);
   const [reactionCount, setReactionCount] = useState(item.stats.reactions);
   const loginHref = buildLoginHref(pathname, searchParams.toString());
+  const poll = useMemo(
+    () => parseCommunityPoll(item.title, item.body, item.tags),
+    [item.body, item.tags, item.title],
+  );
+  const displayBody = poll ? poll.body : item.body;
+  const feedMediaItems = getFeedMediaItems(item);
+  const safeMedia = feedMediaItems[0] || null;
 
   const handleLike = async () => {
     if (item.kind !== 'discussion' || !item.threadId) return;
@@ -1055,7 +1773,7 @@ export function CommunityPostCard({
   };
 
   return (
-    <article className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_30px_-28px_rgba(15,23,42,0.13)]">
+    <article className="overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white shadow-[0_18px_36px_-32px_rgba(15,23,42,0.18)]">
       <div className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -1089,40 +1807,47 @@ export function CommunityPostCard({
           <h2 className="mt-3 line-clamp-2 text-[0.98rem] font-bold leading-5 text-[color:var(--app-text)]">
             {item.title}
           </h2>
-          <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-[color:var(--app-text)]">
-            {item.body}
-          </p>
+          {displayBody ? (
+            <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-[color:var(--app-text)]">
+              {displayBody}
+            </p>
+          ) : null}
         </button>
+        {item.tags.length > 0 ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {item.tags.slice(0, 3).map(tag => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={openDetail}
+                className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] transition hover:bg-emerald-50 hover:text-[color:var(--app-accent)]"
+              >
+                #{tag.slug || tag.name}
+              </button>
+            ))}
+            {item.tags.length > 3 ? (
+              <span className="rounded-full bg-white px-2 py-1 text-[11px] font-bold text-[color:var(--app-text-muted)] ring-1 ring-[color:var(--app-border)]">
+                +{item.tags.length - 3}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        {poll && item.threadId ? (
+          <CommunityPoll
+            threadId={item.threadId}
+            poll={poll}
+            isId={isId}
+            loginHref={loginHref}
+          />
+        ) : null}
       </div>
 
-      {item.media ? (
-        <MediaPreviewCarousel
-          items={[
-            {
-              src:
-                item.media.type === 'video'
-                  ? resolveCommunityMediaSrc(item.media.src)
-                  : item.media.src,
-              type: item.media.type,
-              alt: item.media.alt,
-            },
-          ]}
-          alt={item.media.alt || item.title}
-          aspectClassName="aspect-[4/3] w-full sm:aspect-[16/9]"
-          className="bg-slate-950"
-          sizes="(max-width: 640px) 100vw, 720px"
-          controls={item.media.type === 'video'}
-          lightbox
-          showCounter={false}
-          showDots={false}
-          overlay={
-            item.media.type === 'video' ? (
-              <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/58 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-md">
-                <PlayCircle className="h-3.5 w-3.5" />
-                Video
-              </span>
-            ) : null
-          }
+      {feedMediaItems.length > 0 ? (
+        <CommunityMediaPreview
+          media={safeMedia}
+          mediaItems={feedMediaItems}
+          title={item.title}
+          isId={isId}
         />
       ) : null}
 
@@ -1197,6 +1922,22 @@ export function CommunityDetailModal({
 
   useEffect(() => {
     if (!threadId) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose, threadId]);
+
+  useEffect(() => {
+    if (!threadId) return;
     let alive = true;
     queueMicrotask(() => {
       if (!alive) return;
@@ -1253,6 +1994,19 @@ export function CommunityDetailModal({
   const topLevelComments = comments.filter(
     post => !post.replyToPostId || post.replyToPostId === rootPost?.id,
   );
+  const detailPoll =
+    thread && rootPost
+      ? parseCommunityPoll(thread.title, rootPost.content, thread.tags)
+      : null;
+  const rootPostBody = detailPoll ? detailPoll.body : rootPost?.content || '';
+  const rootMediaUrls = [
+    ...(thread?.imageUrls || []),
+    ...(rootPost?.imageUrls || []),
+  ]
+    .map(url => resolveCommunityMediaSrc(url))
+    .filter(
+      (url, index, source) => Boolean(url) && source.indexOf(url) === index,
+    );
 
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1380,6 +2134,9 @@ export function CommunityDetailModal({
       role="dialog"
       aria-modal="true"
       data-testid="community-detail-modal"
+      onClick={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <section
         className={cn(COMMUNITY_MODAL_SURFACE_CLASS, 'bg-white sm:max-w-2xl')}
@@ -1437,32 +2194,27 @@ export function CommunityDetailModal({
                 <h1 className="mt-3 text-[1.2rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
                   {thread.title}
                 </h1>
-                {rootPost ? (
+                {rootPostBody ? (
                   <p className="mt-3 whitespace-pre-wrap text-[15px] leading-7 text-[color:var(--app-text)]">
-                    {rootPost.content}
+                    {rootPostBody}
                   </p>
                 ) : null}
-                {rootPost?.imageUrls?.length ? (
-                  <div className="mt-3 grid gap-2 overflow-hidden rounded-[18px] sm:grid-cols-2">
-                    {rootPost.imageUrls.map(url => (
-                      <div key={url} className="relative h-52 bg-slate-100">
-                        {isVideoMedia(url) ? (
-                          <video
-                            src={resolveCommunityMediaSrc(url)}
-                            className="h-full w-full object-cover"
-                            controls
-                            playsInline
-                            preload="metadata"
-                          />
-                        ) : (
-                          <CommunityImageFrame
-                            src={url}
-                            alt={thread.title}
-                            className="h-full w-full"
-                          />
-                        )}
-                      </div>
-                    ))}
+                {detailPoll ? (
+                  <CommunityPoll
+                    threadId={thread.id}
+                    poll={detailPoll}
+                    isId={isId}
+                    loginHref={loginHref}
+                  />
+                ) : null}
+                {rootMediaUrls.length ? (
+                  <div className="mt-3">
+                    <CommunityMediaGalleryPreview
+                      mediaItems={rootMediaUrls}
+                      title={thread.title}
+                      isId={isId}
+                      variant="detail"
+                    />
                   </div>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -2370,6 +3122,11 @@ function GroupCard({
   const loginHref = buildLoginHref(pathname, searchParams.toString());
   const joined = group.viewerMembershipStatus === 'active';
   const pending = group.viewerMembershipStatus === 'pending';
+  const initial = group.name.trim().charAt(0).toUpperCase() || 'G';
+  const highlightedRole =
+    group.viewerRole === 'owner' || group.viewerRole === 'moderator'
+      ? groupRoleLabel(group.viewerRole, isId)
+      : null;
 
   const joinOrLeave = async () => {
     if (!isAuthenticated) {
@@ -2418,11 +3175,11 @@ function GroupCard({
   return (
     <article
       className={cn(
-        'group relative flex h-full flex-col overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white text-center shadow-[0_18px_34px_-32px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_40px_-34px_rgba(15,23,42,0.28)]',
+        'group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white text-left shadow-[0_18px_34px_-32px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_40px_-34px_rgba(15,23,42,0.28)]',
         compact && 'min-w-0',
       )}
     >
-      <div className="relative h-20 overflow-hidden bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_52%,#fff7ed_100%)]">
+      <div className="relative h-24 overflow-hidden bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_52%,#fff7ed_100%)]">
         {group.coverUrl ? (
           <Image
             src={group.coverUrl}
@@ -2447,20 +3204,20 @@ function GroupCard({
       <div className="relative flex flex-1 flex-col px-3 pb-3 pt-0">
         <Link
           href={communityGroupHref(group)}
-          className="mx-auto -mt-8 grid h-16 w-16 place-items-center rounded-[22px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[0_18px_28px_-24px_rgba(15,23,42,0.4)] transition group-hover:scale-[1.03]"
+          className="-mt-9 grid h-16 w-16 place-items-center rounded-[22px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-xl font-black text-[color:var(--app-accent)] shadow-[0_18px_28px_-24px_rgba(15,23,42,0.4)] transition group-hover:scale-[1.03]"
           aria-label={group.name}
         >
-          <Users className="h-7 w-7" />
+          {initial}
         </Link>
 
-        <div className="mx-auto mt-2 max-w-[240px]">
+        <div className="mt-2 min-w-0">
           <Link
             href={communityGroupHref(group)}
-            className="line-clamp-2 min-h-[40px] text-[0.95rem] font-black leading-5 tracking-[-0.02em] text-[color:var(--app-text)]"
+            className="line-clamp-2 text-[0.98rem] font-black leading-5 tracking-[-0.02em] text-[color:var(--app-text)]"
           >
             {group.name}
           </Link>
-          <p className="mx-auto mt-1 line-clamp-2 min-h-[32px] text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+          <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
             {group.description}
           </p>
         </div>
@@ -2469,7 +3226,7 @@ function GroupCard({
           <button
             type="button"
             onClick={() => onOpenMembers(group)}
-            className="rounded-[15px] bg-slate-50 px-2 py-2 text-center transition hover:bg-emerald-50"
+            className="rounded-[16px] bg-slate-50 px-2 py-2 text-left transition hover:bg-emerald-50"
           >
             <span className="block text-sm font-black text-[color:var(--app-text)]">
               {compactNumber(group.memberCount)}
@@ -2478,7 +3235,7 @@ function GroupCard({
               {isId ? 'member' : 'members'}
             </span>
           </button>
-          <div className="rounded-[15px] bg-slate-50 px-2 py-2 text-center">
+          <div className="rounded-[16px] bg-slate-50 px-2 py-2 text-left">
             <span className="block text-sm font-black text-[color:var(--app-text)]">
               {compactNumber(group.postCount)}
             </span>
@@ -2488,16 +3245,18 @@ function GroupCard({
           </div>
         </div>
 
-        <div className="mt-2 flex justify-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
-            <Crown className="h-3 w-3" />
-            Admin
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-700">
-            <UserCog className="h-3 w-3" />
-            Moderator
-          </span>
-        </div>
+        {highlightedRole ? (
+          <div className="mt-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
+              {group.viewerRole === 'owner' ? (
+                <Crown className="h-3 w-3" />
+              ) : (
+                <UserCog className="h-3 w-3" />
+              )}
+              {highlightedRole}
+            </span>
+          </div>
+        ) : null}
 
         <div className="mt-auto pt-3">
           <button
@@ -2562,8 +3321,7 @@ function GroupStrip({
 
   return (
     <section className="rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_100%)] p-3.5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] sm:p-4">
-      {/* Bagian Header Konten */}
-      <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
             {isId ? 'Ruang diskusi' : 'Discussion rooms'}
@@ -2587,21 +3345,16 @@ function GroupStrip({
         </button>
       </div>
 
-      {/* BAGIAN SLIDER (UBAH DARI GRID KE FLEX CAROUSEL) */}
-      <div className="mt-3 flex w-full items-stretch gap-3 overflow-x-auto pb-2 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
         {groups.map(group => (
-          <div
+          <GroupCard
             key={group.id}
-            className="w-[260px] sm:w-[300px] shrink-0 flex snap-start"
-          >
-            <GroupCard
-              group={group}
-              isId={isId}
-              compact
-              onChanged={onChanged}
-              onOpenMembers={onOpenMembers}
-            />
-          </div>
+            group={group}
+            isId={isId}
+            compact
+            onChanged={onChanged}
+            onOpenMembers={onOpenMembers}
+          />
         ))}
       </div>
     </section>
@@ -2689,6 +3442,7 @@ function SearchGroupResult({
   const joined = group.viewerMembershipStatus === 'active';
   const pending = group.viewerMembershipStatus === 'pending';
   const loginHref = buildLoginHref(pathname, searchParams.toString());
+  const initial = group.name.trim().charAt(0).toUpperCase() || 'G';
 
   const joinOrLeave = async () => {
     if (!isAuthenticated) {
@@ -2735,9 +3489,9 @@ function SearchGroupResult({
   };
 
   return (
-    <article className="rounded-[18px] border border-[color:var(--app-border)] bg-white p-3 hover:border-[color:var(--app-accent-soft)]">
+    <article className="overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-white shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)]">
       <div className="flex gap-3">
-        <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[18px] bg-[color:var(--app-accent-soft)]">
+        <div className="relative h-[112px] w-[96px] shrink-0 overflow-hidden bg-[linear-gradient(135deg,#dcfce7,#eff6ff)] sm:w-[112px]">
           {group.coverUrl ? (
             <Image
               src={group.coverUrl}
@@ -2746,12 +3500,22 @@ function SearchGroupResult({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="grid h-full w-full place-items-center text-[color:var(--app-accent)]">
-              <Users className="h-7 w-7" />
+            <div className="grid h-full w-full place-items-center text-2xl font-black text-[color:var(--app-accent)]">
+              {initial}
             </div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 py-3 pr-3">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
+              {groupPrivacyLabel(group, isId)}
+            </span>
+            {joined ? (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-[color:var(--app-text-soft)]">
+                {isId ? 'Sudah join' : 'Joined'}
+              </span>
+            ) : null}
+          </div>
           <Link
             href={communityGroupHref(group)}
             className="line-clamp-1 text-sm font-black text-[color:var(--app-text)]"
@@ -2762,9 +3526,6 @@ function SearchGroupResult({
             {group.description}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
-            <span className="rounded-full bg-slate-50 px-2 py-1">
-              {groupPrivacyLabel(group, isId)}
-            </span>
             <button
               type="button"
               onClick={() => onOpenMembers(group)}
@@ -2778,7 +3539,7 @@ function SearchGroupResult({
           </div>
         </div>
       </div>
-      <div className="mt-3 flex items-center gap-2">
+      <div className="flex items-center gap-2 border-t border-[color:var(--app-border)] p-3 pt-2.5">
         <Link
           href={communityGroupHref(group)}
           className="inline-flex min-h-[36px] flex-1 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] text-xs font-bold text-[color:var(--app-text)]"
@@ -2979,17 +3740,32 @@ function CommunitySearchPanel({
   const hasAnyResult = Boolean(
     (results?.counts.all || 0) > 0 || showMarketplace,
   );
+  const resultSummary = results?.counts
+    ? [
+      `${compactNumber(results.counts.posts)} ${isId ? 'postingan' : 'posts'}`,
+      `${compactNumber(results.counts.groups)} ${isId ? 'grup' : 'groups'}`,
+      `${compactNumber(results.counts.people)} ${isId ? 'orang' : 'people'}`,
+    ].join(' - ')
+    : isId
+      ? 'Mencari diskusi, grup, dan orang.'
+      : 'Searching discussions, groups, and people.';
 
   return (
     <div className="space-y-3">
-      <section className="rounded-[22px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.13)] sm:p-4">
+      <section className="rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_56%,#eff6ff_100%)] p-3.5 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.2)] sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+            <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
+              {isId ? 'Pencarian komunitas' : 'Community search'}
+            </p>
+            <h2 className="mt-1 text-base font-black tracking-[-0.035em] text-[color:var(--app-text)]">
               {isId ? 'Hasil pencarian' : 'Search results'}
             </h2>
-            <p className="mt-1 line-clamp-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
-              {query}
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+              {isId ? `Kata kunci: "${query}"` : `Keyword: "${query}"`}
+            </p>
+            <p className="mt-1 text-[11px] font-bold text-[color:var(--app-text-soft)]">
+              {resultSummary}
             </p>
           </div>
           {loading ? (
@@ -3205,15 +3981,23 @@ function RightRail({
             </h2>
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            {trendingTags.slice(0, 10).map(tag => (
-              <Link
-                key={tag.id}
-                href={`/community?tag=${encodeURIComponent(tag.slug)}`}
-                className="rounded-full border border-[color:var(--app-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]"
-              >
-                #{tag.slug}
-              </Link>
-            ))}
+            {trendingTags.length ? (
+              trendingTags.slice(0, 10).map(tag => (
+                <Link
+                  key={tag.id}
+                  href={`/community?tag=${encodeURIComponent(tag.slug)}`}
+                  className="rounded-full border border-[color:var(--app-border)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]"
+                >
+                  #{tag.slug}
+                </Link>
+              ))
+            ) : (
+              <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Tag ramai akan muncul setelah komunitas mulai aktif.'
+                  : 'Trending tags will appear once the community is active.'}
+              </p>
+            )}
           </div>
         </section>
 
@@ -3222,25 +4006,33 @@ function RightRail({
             {isId ? 'Rekomendasi grup' : 'Recommended groups'}
           </h2>
           <div className="mt-3 space-y-2">
-            {recommendedGroups.slice(0, 4).map(group => (
-              <Link
-                key={group.id}
-                href={communityGroupHref(group)}
-                className="flex items-center gap-2 rounded-[14px] p-2 hover:bg-slate-50"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                  <Users className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">
-                    {group.name}
+            {recommendedGroups.length ? (
+              recommendedGroups.slice(0, 4).map(group => (
+                <Link
+                  key={group.id}
+                  href={communityGroupHref(group)}
+                  className="flex items-center gap-2 rounded-[14px] p-2 hover:bg-slate-50"
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                    <Users className="h-4 w-4" />
                   </span>
-                  <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">
-                    {compactNumber(group.memberCount)} member
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">
+                      {group.name}
+                    </span>
+                    <span className="block truncate text-[10px] text-[color:var(--app-text-soft)]">
+                      {compactNumber(group.memberCount)} member
+                    </span>
                   </span>
-                </span>
-              </Link>
-            ))}
+                </Link>
+              ))
+            ) : (
+              <p className="rounded-[16px] bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Rekomendasi grup akan muncul setelah ada aktivitas.'
+                  : 'Recommended groups will appear after more activity.'}
+              </p>
+            )}
           </div>
         </section>
       </div>
@@ -3252,6 +4044,7 @@ export default function CommunityFeedClient({
   isId,
 }: CommunityFeedClientProps) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<CommunityFeedTab>(
@@ -3279,9 +4072,14 @@ export default function CommunityFeedClient({
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [membersModalGroup, setMembersModalGroup] =
     useState<CommunityGroup | null>(null);
+  const [dismissedThreadId, setDismissedThreadId] = useState<string | null>(
+    null,
+  );
 
   const avatar = readCommunityAvatar(user);
-  const selectedThreadId = searchParams.get('thread');
+  const threadParam = searchParams.get('thread');
+  const selectedThreadId =
+    threadParam && threadParam !== dismissedThreadId ? threadParam : null;
   const selectedGroupParam =
     searchParams.get('group') || searchParams.get('category');
   const isSearchMode = submittedQuery.trim().length > 0;
@@ -3493,6 +4291,7 @@ export default function CommunityFeedClient({
   };
 
   const openThreadDetail = (threadId: string) => {
+    setDismissedThreadId(null);
     const params = new URLSearchParams(searchParams.toString());
     params.set('thread', threadId);
     router.push(`/community?${params.toString()}`);
@@ -3523,10 +4322,15 @@ export default function CommunityFeedClient({
   };
 
   const closeThreadDetail = () => {
+    if (threadParam) setDismissedThreadId(threadParam);
     const params = new URLSearchParams(searchParams.toString());
     params.delete('thread');
     const queryString = params.toString();
-    router.push(queryString ? `/community?${queryString}` : '/community');
+    const cleanPath = (pathname || '/community').replace(
+      /^\/(id|en)(?=\/|$)/,
+      '',
+    ) || '/community';
+    router.replace(queryString ? `${cleanPath}?${queryString}` : cleanPath);
   };
 
   return (
@@ -3549,23 +4353,54 @@ export default function CommunityFeedClient({
             className="min-w-0 space-y-3 pt-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
             data-auto-scrollbar
           >
-            <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-1.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)] sm:p-2">
-              <div className="flex items-center justify-between gap-3">
+            <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_48%,#eff6ff_100%)] p-3.5 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.25)] sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <h1 className="text-[1.08rem] font-black tracking-[-0.035em] text-[color:var(--app-text)] sm:text-[1.22rem]">
+                  <p className="inline-flex rounded-full bg-white/82 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
+                    {isId ? 'Forum Lajukan' : 'Lajukan Forum'}
+                  </p>
+                  <h1 className="mt-2 text-[1.28rem] font-black tracking-[-0.045em] text-[color:var(--app-text)] sm:text-[1.55rem]">
                     {isId ? 'Komunitas Usaha' : 'Business Community'}
                   </h1>
                   {!isSearchMode ? (
-                    <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                    <p className="mt-1 max-w-xl text-sm font-semibold leading-6 text-[color:var(--app-text-soft)]">
                       {isId ? activeFeedTab.captionId : activeFeedTab.captionEn}
                     </p>
                   ) : null}
+                </div>
+                <div className="grid grid-cols-3 gap-2 sm:min-w-[260px]">
+                  {[
+                    {
+                      label: isId ? 'Diskusi' : 'Threads',
+                      value: overview?.stats.totalThreads,
+                    },
+                    {
+                      label: isId ? 'Jawaban' : 'Replies',
+                      value: overview?.stats.totalPosts,
+                    },
+                    {
+                      label: isId ? 'Member' : 'Members',
+                      value: overview?.stats.totalUsers,
+                    },
+                  ].map(item => (
+                    <div
+                      key={item.label}
+                      className="rounded-[16px] bg-white/88 px-2.5 py-2 text-center ring-1 ring-emerald-100"
+                    >
+                      <span className="block text-sm font-black text-[color:var(--app-text)]">
+                        {compactNumber(item.value)}
+                      </span>
+                      <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <form
                 onSubmit={handleSearch}
-                className="mt-3 flex min-h-[42px] items-center gap-2 rounded-full bg-slate-50 px-3 lg:hidden"
+                className="mt-3 flex min-h-[46px] items-center gap-2 rounded-full bg-white/90 px-3 ring-1 ring-emerald-100"
               >
                 <Search className="h-4 w-4 text-[color:var(--app-text-soft)]" />
                 <input
@@ -3580,7 +4415,7 @@ export default function CommunityFeedClient({
                 />
                 <button
                   type="submit"
-                  className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]"
+                  className="rounded-full bg-[color:var(--app-accent)] px-3 py-1.5 text-[11px] font-bold text-white"
                 >
                   {isId ? 'Cari' : 'Search'}
                 </button>
@@ -3604,7 +4439,7 @@ export default function CommunityFeedClient({
                 </div>
               ) : (
                 <div
-                  className="mt-3 flex items-center gap-4 overflow-x-auto border-b border-[color:var(--app-border)] pb-1.5"
+                  className="mt-3 flex items-center gap-2 overflow-x-auto pb-1.5"
                   data-auto-scrollbar
                 >
                   {TABS.map(tab => {
@@ -3619,8 +4454,8 @@ export default function CommunityFeedClient({
                         className={cn(
                           'relative flex min-h-[46px] min-w-[118px] shrink-0 flex-col justify-center rounded-[15px] border px-3 text-left transition',
                           active
-                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                            : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)]',
+                            ? 'border-[color:var(--app-accent)] bg-white text-[color:var(--app-accent)] shadow-[0_14px_26px_-24px_rgba(4,120,87,0.6)]'
+                            : 'border-white/70 bg-white/72 text-[color:var(--app-text-soft)] hover:bg-white',
                         )}
                       >
                         <span className="flex min-w-0 items-center gap-1.5 text-xs font-black">
@@ -3676,13 +4511,24 @@ export default function CommunityFeedClient({
 
                 {loading ? <CommunityFeedSkeleton /> : null}
                 {!loading && items.length === 0 ? (
-                  <section className="rounded-[22px] border border-[color:var(--app-border)] bg-white p-6 text-center shadow-[0_16px_30px_-28px_rgba(15,23,42,0.13)]">
-                    <p className="text-sm font-semibold text-[color:var(--app-text)]">
+                  <section className="overflow-hidden rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_54%,#eff6ff_100%)] p-5 text-center shadow-[0_20px_40px_-32px_rgba(15,23,42,0.22)]">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[color:var(--app-accent)] shadow-[0_16px_30px_-24px_rgba(15,23,42,0.3)] ring-1 ring-emerald-100">
+                      <MessageCircle className="h-5 w-5" />
+                    </div>
+                    <p className="mt-3 text-base font-black text-[color:var(--app-text)]">
                       {emptyFeedTitle}
                     </p>
-                    <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                    <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[color:var(--app-text-soft)]">
                       {emptyFeedDescription}
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/community?compose=post')}
+                      className="mt-4 inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-black text-white shadow-[0_18px_30px_-22px_rgba(16,185,129,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(16,185,129,0.95)]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      {isId ? 'Mulai diskusi' : 'Start a discussion'}
+                    </button>
                   </section>
                 ) : null}
 

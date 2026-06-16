@@ -1,3 +1,5 @@
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+
 export type BusinessModuleStatus = 'live' | 'partial' | 'planned';
 
 export type BusinessModuleCategory =
@@ -61,12 +63,12 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     acronym: 'ERP',
     name: 'Enterprise Resource Planning',
     category: 'Core Platform',
-    status: 'partial',
+    status: PROMO_ONLY_MODE ? 'planned' : 'partial',
     summary:
       'Cross-functional operations snapshot for finance, sales, and fulfillment.',
     valueStatement:
       'Single operational truth from transaction to delivery and support.',
-    primaryPath: '/transactions',
+    primaryPath: PROMO_ONLY_MODE ? '/dashboard' : '/transactions',
     integrations: ['CRM', 'Finance stack', 'Support and dispute workflow'],
     securityFocus: [
       'Transaction integrity checks',
@@ -180,12 +182,12 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     acronym: 'PMS',
     name: 'Project Management System',
     category: 'People and Knowledge',
-    status: 'live',
+    status: PROMO_ONLY_MODE ? 'planned' : 'live',
     summary:
       'Project progress, delivery checkpoints, and execution visibility.',
     valueStatement:
       'Connect planning to execution without leaving the platform.',
-    primaryPath: '/my-projects',
+    primaryPath: PROMO_ONLY_MODE ? '/home' : '/my-projects',
     integrations: ['Chat', 'Transactions', 'KMS'],
     securityFocus: ['Workspace member roles', 'Project activity logs'],
     kpis: ['On-time completion', 'Blocked task age', 'Scope change frequency'],
@@ -233,11 +235,11 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     acronym: 'FMS',
     name: 'Financial Management System',
     category: 'Finance',
-    status: 'partial',
+    status: PROMO_ONLY_MODE ? 'planned' : 'partial',
     summary: 'Financial oversight, cash movement, and operational accounting.',
     valueStatement:
       'Track business cash flow and transaction health from one place.',
-    primaryPath: '/payments',
+    primaryPath: PROMO_ONLY_MODE ? '/dashboard' : '/payments',
     integrations: ['ERP', 'POS', 'Transactions'],
     securityFocus: [
       'Monetary mutation protection',
@@ -250,11 +252,11 @@ export const BUSINESS_MODULES: BusinessModuleDefinition[] = [
     acronym: 'POS',
     name: 'Point of Sale',
     category: 'Finance',
-    status: 'partial',
+    status: PROMO_ONLY_MODE ? 'planned' : 'partial',
     summary:
       'Checkout and payment operations for online and assisted channels.',
     valueStatement: 'Unify checkout data with CRM and finance reporting.',
-    primaryPath: '/payments',
+    primaryPath: PROMO_ONLY_MODE ? '/dashboard' : '/payments',
     integrations: ['FMS', 'ERP', 'CDP'],
     securityFocus: [
       'Payment tokenization strategy',

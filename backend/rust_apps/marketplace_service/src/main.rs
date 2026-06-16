@@ -1352,25 +1352,31 @@ async fn main() -> anyhow::Result<()> {
     let app_env = env::var("ENV").unwrap_or_else(|_| "development".to_string());
     let strict_migrations =
         app_env.eq_ignore_ascii_case("production") || app_env.eq_ignore_ascii_case("staging");
+    let entrypoint_runs_migrations = env::var("RUN_MIGRATIONS")
+        .map(|value| value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
 
-    let mut migrator = sqlx::migrate!("./migrations");
-    if !strict_migrations {
-        migrator.set_ignore_missing(true);
-    }
-    if let Err(error) = migrator.run(&db).await {
-        let message = error.to_string();
-        let checksum_mismatch = message.contains("was previously applied but has been modified");
-        let missing_migration =
-            message.contains("was previously applied but is missing in the resolved migrations");
+    if !entrypoint_runs_migrations {
+        let mut migrator = sqlx::migrate!("./migrations");
+        if !strict_migrations {
+            migrator.set_ignore_missing(true);
+        }
+        if let Err(error) = migrator.run(&db).await {
+            let message = error.to_string();
+            let checksum_mismatch =
+                message.contains("was previously applied but has been modified");
+            let missing_migration = message
+                .contains("was previously applied but is missing in the resolved migrations");
 
-        if !strict_migrations && (checksum_mismatch || missing_migration) {
-            tracing::warn!(
-                "Shared DB migration drift in {} (ignored): {}",
-                app_env,
-                message
-            );
-        } else {
-            return Err(error.into());
+            if !strict_migrations && (checksum_mismatch || missing_migration) {
+                tracing::warn!(
+                    "Shared DB migration drift in {} (ignored): {}",
+                    app_env,
+                    message
+                );
+            } else {
+                return Err(error.into());
+            }
         }
     }
 
@@ -3881,13 +3887,51 @@ fn build_external_reference(environment: &str, provider: &str, user_id: Uuid) ->
     format!("{prefix}-{provider_tag}-{user_tag}-{random_tag}")
 }
 
+fn clean_env_value(key: &str) -> Option<String> {
+    env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| {
+            let lowered = value.to_lowercase();
+            !value.is_empty()
+                && !lowered.starts_with("replace_with_")
+                && !matches!(
+                    lowered.as_str(),
+                    "change_me" | "changeme" | "your_key_here" | "your_server_key"
+                )
+        })
+}
+
+fn app_env_is_production() -> bool {
+    env::var("ENV")
+        .or_else(|_| env::var("APP_ENV"))
+        .map(|value| value.eq_ignore_ascii_case("production"))
+        .unwrap_or(false)
+}
+
 fn midtrans_server_key_for_environment(environment: &str) -> Option<String> {
-    let fallback = env::var("MIDTRANS_SERVER_KEY").ok();
     if environment == "live" {
-        env::var("MIDTRANS_SERVER_KEY_LIVE").ok().or(fallback)
-    } else {
-        env::var("MIDTRANS_SERVER_KEY_SANDBOX").ok().or(fallback)
+        let live_key = clean_env_value("MIDTRANS_SERVER_KEY_LIVE").or_else(|| {
+            if app_env_is_production() {
+                None
+            } else {
+                clean_env_value("MIDTRANS_SERVER_KEY")
+            }
+        })?;
+        if live_key.starts_with("SB-") {
+            tracing::error!("MIDTRANS_SERVER_KEY_LIVE appears to be a sandbox key");
+            return None;
+        }
+        return Some(live_key);
     }
+
+    let sandbox_key = clean_env_value("MIDTRANS_SERVER_KEY_SANDBOX")
+        .or_else(|| clean_env_value("MIDTRANS_SERVER_KEY"))?;
+    if sandbox_key.starts_with("Mid-server-") {
+        tracing::error!("MIDTRANS_SERVER_KEY_SANDBOX appears to be a live key");
+        return None;
+    }
+    Some(sandbox_key)
 }
 
 fn midtrans_notification_url() -> Option<String> {
@@ -3935,18 +3979,33 @@ fn midtrans_redirect_url(topup_id: Uuid, kind: &str) -> Option<String> {
         return None;
     }
 
-    let mut url = if base.contains("/payments") {
+    let url = if base.contains("/payments") {
         base
     } else {
         format!("{base}/payments")
     };
-    let joiner = if url.contains('?') { '&' } else { '?' };
-    url.push(joiner);
-    url.push_str("topup_status=");
-    url.push_str(status_value);
-    url.push_str("&topup_id=");
-    url.push_str(&topup_id.to_string());
-    Some(url)
+    Some(midtrans_redirect_url_with_status(
+        url,
+        topup_id,
+        status_value,
+    ))
+}
+
+fn midtrans_redirect_url_with_status(url: String, topup_id: Uuid, status_value: &str) -> String {
+    let (base, query) = url.split_once('?').unwrap_or((url.as_str(), ""));
+    let mut params = query
+        .split('&')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .filter(|part| {
+            let key = part.split_once('=').map(|(key, _)| key).unwrap_or(*part);
+            !matches!(key, "topup_status" | "topup_id")
+        })
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    params.push(format!("topup_status={status_value}"));
+    params.push(format!("topup_id={topup_id}"));
+    format!("{base}?{}", params.join("&"))
 }
 
 fn midtrans_enabled_payments(payment_method: Option<&str>) -> Vec<String> {
@@ -7839,11 +7898,8 @@ async fn create_content(
             Err(e) => {
                 tracing::error!("generate_unique_slug error: {:?}", e);
 
-                return err(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "failed to generate slug",
-                )
-                .into_response();
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to generate slug")
+                    .into_response();
             }
         },
     };
@@ -8030,10 +8086,7 @@ async fn create_content(
     }
 }
 
-async fn generate_unique_slug(
-    db: &PgPool,
-    title: &str,
-) -> Result<String, sqlx::Error> {
+async fn generate_unique_slug(db: &PgPool, title: &str) -> Result<String, sqlx::Error> {
     let base = make_slug(title);
 
     let exists: bool = sqlx::query_scalar(
@@ -8078,11 +8131,7 @@ async fn generate_unique_slug(
         counter += 1;
 
         if counter > 10_000 {
-            return Ok(format!(
-                "{}-{}",
-                base,
-                chrono::Utc::now().timestamp()
-            ));
+            return Ok(format!("{}-{}", base, chrono::Utc::now().timestamp()));
         }
     }
 }

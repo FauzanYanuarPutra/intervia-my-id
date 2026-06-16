@@ -11,6 +11,29 @@ services:
     environment:
       ENV: production
       APP_ENV: production
+      APP_PORT: "8081"
+      FRONTEND_URL: ${FRONTEND_URL:-https://www.lajukan.com}
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
+      WALLET_DEFAULT_ENV: ${WALLET_DEFAULT_ENV:-live}
+      WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-true}
+      WALLET_DEFAULT_PROVIDER: ${WALLET_DEFAULT_PROVIDER:-midtrans}
+      WALLET_DEV_AUTO_SETTLE: ${WALLET_DEV_AUTO_SETTLE:-false}
+      WALLET_ALLOW_LIVE_IN_NON_PROD: ${WALLET_ALLOW_LIVE_IN_NON_PROD:-false}
+      WALLET_ALLOW_MOCK_IN_LIVE: ${WALLET_ALLOW_MOCK_IN_LIVE:-false}
+      WALLET_MIDTRANS_FALLBACK_TO_MOCK: ${WALLET_MIDTRANS_FALLBACK_TO_MOCK:-false}
+      MIDTRANS_MERCHANT_ID: ${MIDTRANS_MERCHANT_ID:-}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MIDTRANS_SERVER_KEY_SANDBOX: ${MIDTRANS_SERVER_KEY_SANDBOX:-}
+      MIDTRANS_SERVER_KEY_LIVE: ${MIDTRANS_SERVER_KEY_LIVE:-}
+      MIDTRANS_PAYMENT_NOTIFICATION_URL: ${MIDTRANS_PAYMENT_NOTIFICATION_URL:-https://www.lajukan.com/api/wallet/providers/midtrans/notify}
+      WALLET_MIDTRANS_NOTIFICATION_URL: ${WALLET_MIDTRANS_NOTIFICATION_URL:-https://www.lajukan.com/api/wallet/providers/midtrans/notify}
+      MIDTRANS_FINISH_REDIRECT_URL: ${MIDTRANS_FINISH_REDIRECT_URL:-https://www.lajukan.com/id/payments}
+      MIDTRANS_UNFINISH_REDIRECT_URL: ${MIDTRANS_UNFINISH_REDIRECT_URL:-https://www.lajukan.com/id/payments}
+      MIDTRANS_ERROR_REDIRECT_URL: ${MIDTRANS_ERROR_REDIRECT_URL:-https://www.lajukan.com/id/payments}
+      WALLET_MIDTRANS_FINISH_REDIRECT_URL: ${WALLET_MIDTRANS_FINISH_REDIRECT_URL:-https://www.lajukan.com/id/payments}
+      WALLET_MIDTRANS_UNFINISH_REDIRECT_URL: ${WALLET_MIDTRANS_UNFINISH_REDIRECT_URL:-https://www.lajukan.com/id/payments}
+      WALLET_MIDTRANS_ERROR_REDIRECT_URL: ${WALLET_MIDTRANS_ERROR_REDIRECT_URL:-https://www.lajukan.com/id/payments}
 
   community_service:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-community:${IMAGE_TAG:-latest}
@@ -46,6 +69,12 @@ services:
       APP_ENV: production
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://www.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
+      PAYMENTS_ENABLED: ${PAYMENTS_ENABLED:-true}
+      WALLET_LIVE_ENABLED: ${WALLET_LIVE_ENABLED:-true}
+      INTERNAL_MARKETPLACE_URL: http://marketplace_service:8081
+      MARKETPLACE_URL: http://marketplace_service:8081
       INTERNAL_COMMUNITY_URL: http://community_service:8082
       COMMUNITY_SERVICE_URL: http://community_service:8082
 
@@ -56,6 +85,9 @@ services:
       APP_ENV: production
       NODE_ENV: production
       NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://usaha.lajukan.com}
       INTERNAL_COMMUNITY_URL: http://community_service:8082
       COMMUNITY_SERVICE_URL: http://community_service:8082
 
@@ -68,3 +100,8 @@ services:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-crm:${IMAGE_TAG:-latest}
     environment:
       NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
+      NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-https://crm.lajukan.com}
+      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-https://api.lajukan.com}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://www.lajukan.com}

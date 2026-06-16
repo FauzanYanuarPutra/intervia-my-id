@@ -12,14 +12,14 @@ const API_URL = process.env.INTERNAL_API_URL || 'http://identity_service:8080';
 const ResetWithLinkSchema = z.object({
   mode: z.literal('link').default('link'),
   token: z.string().min(1),
-  password: z.string().min(10),
+  password: z.string().min(1).max(256),
 });
 
 const ResetWithOtpSchema = z.object({
   mode: z.literal('otp'),
   email: z.string().email(),
   otp: z.string().regex(/^\d{6}$/),
-  password: z.string().min(10),
+  password: z.string().min(1).max(256),
 });
 
 const ResetPasswordSchema = z.union([ResetWithLinkSchema, ResetWithOtpSchema]);

@@ -7,7 +7,7 @@ export default function ScrollToTop() {
 
   useEffect(() => {
     // always reset page scroll
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    window.scrollTo(0, 0);
   }, [pathname]);
 
   return null;

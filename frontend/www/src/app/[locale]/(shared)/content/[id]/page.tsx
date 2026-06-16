@@ -45,6 +45,7 @@ import {
 import {
   normalizeContentMediaUrl,
   resolveImageGallery,
+  type ContentItem as CatalogContentItem,
   type ContentOwnerProfile,
 } from '@/lib/content/catalog';
 import {
@@ -53,6 +54,7 @@ import {
 } from '@/lib/content/priceUnit';
 import { buildContentHref, extractContentId } from '@/lib/content/routes';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { Modal } from '@/components/common/Modal';
@@ -66,6 +68,7 @@ import {
   readTransactionVerification,
   type TransactionVerificationState,
 } from '@/lib/identityVerification';
+import { recordListingView } from '@/lib/listingViewHistory';
 
 type ContentItem = {
   id: string;
@@ -540,6 +543,11 @@ export default function ContentDetailPage({ params }: PageProps) {
   );
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('spam');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [applyFullName, setApplyFullName] = useState('');
   const [applyEmail, setApplyEmail] = useState('');
   const [applyPhone, setApplyPhone] = useState('');
@@ -656,6 +664,59 @@ export default function ContentDetailPage({ params }: PageProps) {
   }, [item]);
 
   useEffect(() => {
+    if (!item || !resolvedContentId) return;
+
+    const metadata =
+      item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+    const contentType = item.content_type || item.type || 'other';
+    const matchedType = CONTENT_TYPES.find(type => type.id === contentType);
+    const catalogItem = {
+      ...item,
+      summary: item.summary || undefined,
+      body: item.body || undefined,
+    } as CatalogContentItem;
+    const typeLabel = matchedType
+      ? getContentTypeName(matchedType, locale)
+      : humanizeToken(contentType) || 'Listing';
+    const priceLabel =
+      typeof item.price_cents === 'number' && item.price_cents > 0
+        ? formatPriceWithUnit(
+            formatCurrency(item.price_cents, item.currency || 'IDR'),
+            resolveContentPriceUnitLabel(catalogItem, locale as 'id' | 'en'),
+          )
+        : locale === 'id'
+          ? 'Negosiasi'
+          : 'Contact';
+    const gallery = resolveImageGallery(catalogItem);
+    const location = [
+      metadata.location,
+      metadata.city,
+      metadata.region,
+      metadata.address,
+    ]
+      .map(value => (typeof value === 'string' ? value.trim() : ''))
+      .find(Boolean);
+
+    recordListingView({
+      id: resolvedContentId,
+      title: item.title || 'Listing',
+      summary: item.summary || item.body || '',
+      href: buildContentHref(resolvedContentId, item.title, item.slug),
+      image: item.cover_image || gallery[0] || null,
+      kind: contentType,
+      typeLabel,
+      actionLabel: locale === 'id' ? 'Buka lagi' : 'Open again',
+      location: location || 'Indonesia',
+      priceLabel,
+      priceCents:
+        typeof item.price_cents === 'number' && Number.isFinite(item.price_cents)
+          ? item.price_cents
+          : null,
+      storeName: item.owner_profile?.full_name || null,
+    });
+  }, [item, locale, resolvedContentId]);
+
+  useEffect(() => {
     if (showApplyModal) setApplyError(null);
   }, [showApplyModal]);
 
@@ -664,6 +725,15 @@ export default function ContentDetailPage({ params }: PageProps) {
   }, [showOfferModal]);
 
   useEffect(() => {
+    if (showReportModal) setReportError(null);
+  }, [showReportModal]);
+
+  useEffect(() => {
+    if (PROMO_ONLY_MODE) {
+      setReviews([]);
+      setReviewsLoading(false);
+      return;
+    }
     if (!resolvedContentId) return;
     let active = true;
     const loadReviews = async () => {
@@ -702,8 +772,9 @@ export default function ContentDetailPage({ params }: PageProps) {
   }, []);
 
   useEffect(() => {
-    if (!resolvedContentId || !user) {
+    if (PROMO_ONLY_MODE || !resolvedContentId || !user) {
       setRelatedTx(null);
+      setRelatedTxLoading(false);
       return;
     }
     let active = true;
@@ -1203,7 +1274,7 @@ export default function ContentDetailPage({ params }: PageProps) {
         source: 'content',
         name: item?.title || 'Listing',
         sector: sectorId,
-        value_cents: item?.price_cents,
+        value_cents: PROMO_ONLY_MODE ? undefined : item?.price_cents,
         currency: item?.currency,
         metadata: {
           content_type: item?.type || item?.content_type,
@@ -1236,11 +1307,78 @@ export default function ContentDetailPage({ params }: PageProps) {
       }
 
       const chatDraft = chatStarterDraft.trim();
-      router.push(
-        `/chat/${encodeURIComponent(roomId)}${
-          chatDraft ? `?draft=${encodeURIComponent(chatDraft)}` : ''
-        }`,
-      );
+      if (item) {
+        const itemMeta = (item.metadata as Record<string, unknown> | null) || {};
+        const listingPayload = {
+          source: 'content_detail_chat',
+          snapshot_at: new Date().toISOString(),
+          content_id: resolvedContentId || item.id,
+          content_title: item.title,
+          summary: item.summary || '',
+          cover_image: item.cover_image || '',
+          pricing_mode: PROMO_ONLY_MODE ? 'request' : pricingMode,
+          price_cents:
+            !PROMO_ONLY_MODE &&
+            typeof item.price_cents === 'number' &&
+            Number.isFinite(item.price_cents)
+              ? item.price_cents
+              : 0,
+          original_price_cents:
+            !PROMO_ONLY_MODE &&
+            typeof displayOriginalPriceCents === 'number' &&
+            Number.isFinite(displayOriginalPriceCents)
+              ? displayOriginalPriceCents
+              : undefined,
+          promo_label:
+            promotionSnapshot?.promoLabel ||
+            (typeof item.promo_label === 'string'
+              ? item.promo_label
+              : undefined),
+          currency: item.currency || 'IDR',
+          content_type: item.type || item.content_type || 'content',
+          market_side: toMarketSideValue(listingSide),
+          deal_kind: dealKind,
+          slug: item.slug || null,
+          content_url: listingHref,
+          owner_id: peerUserId || null,
+          rating:
+            !PROMO_ONLY_MODE && typeof item.rating === 'number'
+              ? item.rating
+              : undefined,
+          review_count:
+            !PROMO_ONLY_MODE && typeof item.review_count === 'number'
+              ? item.review_count
+              : undefined,
+          identity_verified: Boolean(
+            !PROMO_ONLY_MODE &&
+              ((item.seller_stats?.completion_rate || 0) > 0.5 ||
+                (item.seller_stats?.total_transactions || 0) > 3),
+          ),
+          location:
+            (typeof itemMeta.location === 'string' && itemMeta.location) ||
+            (typeof itemMeta.city === 'string' && itemMeta.city) ||
+            (typeof itemMeta.region === 'string' ? itemMeta.region : ''),
+        };
+
+        await authFetch(
+          `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content:
+                chatDraft ||
+                (locale === 'id'
+                  ? `Halo kak, saya mau tanya soal ${item.title}.`
+                  : `Hi, I want to ask about ${item.title}.`),
+              type: 'listing',
+              attachments: [JSON.stringify(listingPayload)],
+            }),
+          },
+        ).catch(() => null);
+      }
+
+      router.push(`/chat/${encodeURIComponent(roomId)}`);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : 'Failed to start chat');
     } finally {
@@ -1308,6 +1446,42 @@ export default function ContentDetailPage({ params }: PageProps) {
     }
   };
 
+  const openReportListingModal = () => {
+    if (!item) return;
+    setReportReason('spam');
+    setReportDetails('');
+    setReportError(null);
+    setShowReportModal(true);
+  };
+
+  const submitListingReport = async () => {
+    if (!resolvedContentId) return;
+    setReportSubmitting(true);
+    setReportError(null);
+    try {
+      const normalizedDetails = reportDetails.trim();
+      const res = await authFetch(`/api/content/${resolvedContentId}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: reportReason,
+          details: normalizedDetails,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.error || 'Failed to submit report');
+      }
+      setShowReportModal(false);
+    } catch (err) {
+      setReportError(
+        err instanceof Error ? err.message : 'Failed to submit report',
+      );
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
   const handleShareListingToRoom = async () => {
     if (!item || !shareRoomId) return;
     setShareSubmitting(true);
@@ -1319,13 +1493,15 @@ export default function ContentDetailPage({ params }: PageProps) {
         content_title: item.title,
         summary: item.summary || '',
         cover_image: item.cover_image || '',
-        pricing_mode: pricingMode,
+        pricing_mode: PROMO_ONLY_MODE ? 'request' : pricingMode,
         price_cents:
+          !PROMO_ONLY_MODE &&
           typeof item.price_cents === 'number' &&
           Number.isFinite(item.price_cents)
             ? item.price_cents
             : 0,
         original_price_cents:
+          !PROMO_ONLY_MODE &&
           typeof displayOriginalPriceCents === 'number' &&
           Number.isFinite(displayOriginalPriceCents)
             ? displayOriginalPriceCents
@@ -1340,12 +1516,18 @@ export default function ContentDetailPage({ params }: PageProps) {
         slug: item.slug || null,
         content_url: listingHref,
         owner_id: peerUserId || null,
-        rating: typeof item.rating === 'number' ? item.rating : undefined,
+        rating:
+          !PROMO_ONLY_MODE && typeof item.rating === 'number'
+            ? item.rating
+            : undefined,
         review_count:
-          typeof item.review_count === 'number' ? item.review_count : undefined,
+          !PROMO_ONLY_MODE && typeof item.review_count === 'number'
+            ? item.review_count
+            : undefined,
         identity_verified: Boolean(
-          (item.seller_stats?.completion_rate || 0) > 0.5 ||
-          (item.seller_stats?.total_transactions || 0) > 3,
+          !PROMO_ONLY_MODE &&
+            ((item.seller_stats?.completion_rate || 0) > 0.5 ||
+              (item.seller_stats?.total_transactions || 0) > 3),
         ),
         location:
           (typeof itemMeta.location === 'string' && itemMeta.location) ||
@@ -1717,10 +1899,12 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? item.original_price_cents
       : undefined);
   const hasPrice =
+    !PROMO_ONLY_MODE &&
     pricingMode === 'fixed' &&
     typeof item.price_cents === 'number' &&
     item.price_cents > 0;
   const hasOriginalPrice =
+    !PROMO_ONLY_MODE &&
     hasPrice &&
     typeof displayOriginalPriceCents === 'number' &&
     displayOriginalPriceCents > (item.price_cents || 0);
@@ -1747,7 +1931,11 @@ export default function ContentDetailPage({ params }: PageProps) {
     },
     localeCode,
   );
-  const priceLabel = hasPrice
+  const priceLabel = PROMO_ONLY_MODE
+    ? locale === 'id'
+      ? 'Tanya detail'
+      : 'Ask details'
+    : hasPrice
     ? formatCurrency(item.price_cents as number, item.currency || 'IDR')
     : locale === 'id'
       ? 'Harga menyesuaikan'
@@ -1758,7 +1946,11 @@ export default function ContentDetailPage({ params }: PageProps) {
   const salaryRange =
     typeof meta.salary_range === 'string' ? meta.salary_range.trim() : '';
   const priceHeading =
-    displayType === 'job'
+    PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Info promosi'
+        : 'Promo info'
+      : displayType === 'job'
       ? locale === 'id'
         ? 'Kompensasi'
         : 'Compensation'
@@ -1786,7 +1978,11 @@ export default function ContentDetailPage({ params }: PageProps) {
                   ? 'Harga'
                   : 'Price';
   const primaryPrice =
-    displayType === 'job'
+    PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Tanya detail'
+        : 'Ask details'
+      : displayType === 'job'
       ? salaryRange ||
         (hasPrice
           ? priceLabelWithUnit
@@ -1805,7 +2001,11 @@ export default function ContentDetailPage({ params }: PageProps) {
             (locale === 'id' ? 'Profil publik' : 'Public profile')
           : priceLabelWithUnit;
   const displayPriceHeading =
-    displayType === 'service' && priceUnitLabel
+    PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Mulai dari chat'
+        : 'Start with chat'
+      : displayType === 'service' && priceUnitLabel
       ? `${locale === 'id' ? 'Harga per' : 'Price per'} ${priceUnitLabel}`
       : priceHeading;
   const baseCurrency = item.currency || 'IDR';
@@ -2133,17 +2333,20 @@ export default function ContentDetailPage({ params }: PageProps) {
           : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]';
   const updatedLabel = formatDate(item.updated_at);
   const createdLabel = formatDate(item.created_at);
-  const ratingValue = typeof item.rating === 'number' ? item.rating : 0;
+  const ratingValue =
+    !PROMO_ONLY_MODE && typeof item.rating === 'number' ? item.rating : 0;
   const ratingRounded = Math.round(ratingValue);
   const sellerStats = item.seller_stats || null;
   const sellerRating =
-    typeof sellerStats?.rating === 'number' ? sellerStats.rating : 0;
+    !PROMO_ONLY_MODE && typeof sellerStats?.rating === 'number'
+      ? sellerStats.rating
+      : 0;
   const sellerReviewCount =
-    typeof sellerStats?.review_count === 'number'
+    !PROMO_ONLY_MODE && typeof sellerStats?.review_count === 'number'
       ? sellerStats.review_count
       : 0;
   const sellerTotalTransactions =
-    typeof sellerStats?.total_transactions === 'number'
+    !PROMO_ONLY_MODE && typeof sellerStats?.total_transactions === 'number'
       ? sellerStats.total_transactions
       : 0;
   const sellerCompletedTransactions =
@@ -2808,11 +3011,24 @@ export default function ContentDetailPage({ params }: PageProps) {
         (locale === 'id' ? 'Indonesia' : 'Indonesia'),
     },
   ];
-  const highlightKeys = new Set(highlightItems.map(item => item.key));
+  const isMoneyDetail = (entry: { key: string; label?: string }) =>
+    PROMO_ONLY_MODE &&
+    /(price|harga|budget|rate|tarif|salary|kompensasi|nominal|fee|deposit|payment|saldo|wallet)/i.test(
+      `${entry.key} ${entry.label || ''}`,
+    );
+  const visibleHighlightItems = highlightItems.filter(
+    entry => !isMoneyDetail(entry),
+  );
+  const highlightKeys = new Set(visibleHighlightItems.map(item => item.key));
   const detailFields = displayFields.filter(f => f.key !== 'work_mode');
   const detailEntries = detailFields.filter(field => {
     const value = meta[field.key];
-    return value != null && value !== '' && !highlightKeys.has(field.key);
+    return (
+      value != null &&
+      value !== '' &&
+      !highlightKeys.has(field.key) &&
+      !isMoneyDetail(field)
+    );
   });
   const detailFieldKeys = new Set(detailEntries.map(field => field.key));
   const supplementalDetailItems = [
@@ -2901,15 +3117,22 @@ export default function ContentDetailPage({ params }: PageProps) {
           ? formatMetaList(meta.support_needed)
           : '',
     },
-  ].filter(item => item.value);
+  ].filter(item => item.value && !isMoneyDetail(item));
   const tags = item.tags ?? [];
-  const previewHighlightItems = highlightItems.slice(0, 4);
+  const heroHighlightLimit = PROMO_ONLY_MODE ? 1 : 2;
+  const heroTagLimit = PROMO_ONLY_MODE ? 2 : 3;
+  const previewHighlightItems = visibleHighlightItems.slice(
+    0,
+    heroHighlightLimit,
+  );
   const expandedDetailItems = [
-    ...highlightItems.slice(previewHighlightItems.length).map(entry => ({
-      key: `highlight-${entry.key}`,
-      label: entry.label,
-      value: entry.value,
-    })),
+    ...visibleHighlightItems
+      .slice(previewHighlightItems.length)
+      .map(entry => ({
+        key: `highlight-${entry.key}`,
+        label: entry.label,
+        value: entry.value,
+      })),
     ...supplementalDetailItems,
     ...detailEntries.map(field => {
       const value = meta[field.key];
@@ -2923,15 +3146,30 @@ export default function ContentDetailPage({ params }: PageProps) {
       };
     }),
   ];
-  const previewTags = tags.slice(0, 4);
+  const visibleExpandedDetailItems = PROMO_ONLY_MODE
+    ? expandedDetailItems.slice(0, 6)
+    : expandedDetailItems;
+  const hiddenExpandedDetailCount = Math.max(
+    0,
+    expandedDetailItems.length - visibleExpandedDetailItems.length,
+  );
+  const previewTags = tags.slice(0, heroTagLimit);
   const extraTagCount = Math.max(0, tags.length - previewTags.length);
+  const detailTags = PROMO_ONLY_MODE ? tags.slice(0, 8) : tags;
+  const hiddenDetailTagCount = Math.max(0, tags.length - detailTags.length);
   const summaryPreview =
     collapseWhitespace(item.summary) ||
-    buildPreviewText(undefined, item.body, 110);
+    buildPreviewText(undefined, item.body, PROMO_ONLY_MODE ? 62 : 110);
   const bodyPreview = buildPreviewText(
     item.summary,
     item.body,
-    displayType === 'product' || displayType === 'property' ? 120 : 140,
+    PROMO_ONLY_MODE
+      ? displayType === 'product' || displayType === 'property'
+        ? 72
+        : 84
+      : displayType === 'product' || displayType === 'property'
+        ? 120
+        : 140,
   );
   const deliveryDaysLabel =
     meta.delivery_days != null && String(meta.delivery_days).trim()
@@ -3051,6 +3289,38 @@ export default function ContentDetailPage({ params }: PageProps) {
         ].filter(section => section.value || section.description)
       : [];
   const flowSteps = (() => {
+    if (PROMO_ONLY_MODE) {
+      if (isOwner) {
+        return locale === 'id'
+          ? [
+              'Pastikan data promosi jelas',
+              'Balas chat calon pembeli',
+              'Kirim katalog atau detail tambahan',
+              'Update posting saat stok berubah',
+            ]
+          : [
+              'Keep the promo details clear',
+              'Reply to interested chats',
+              'Share catalog or extra details',
+              'Update the post when stock changes',
+            ];
+      }
+
+      return locale === 'id'
+        ? [
+            'Baca ringkasan dan foto',
+            'Chat untuk tanya stok/detail',
+            'Minta katalog atau kontak lanjutan',
+            'Simpan posting kalau cocok',
+          ]
+        : [
+            'Review summary and photos',
+            'Chat to ask stock or details',
+            'Ask for catalog or follow-up contact',
+            'Save the post if it fits',
+          ];
+    }
+
     if (isOwner) {
       return locale === 'id'
         ? [
@@ -3182,7 +3452,9 @@ export default function ContentDetailPage({ params }: PageProps) {
       ? `${flowSteps.length} langkah cepat`
       : `${flowSteps.length} quick steps`;
   const primaryActionLabel =
-    displayType === 'job'
+    PROMO_ONLY_MODE
+      ? chatLabel
+      : displayType === 'job'
       ? locale === 'id'
         ? 'Lanjutkan Lamaran'
         : 'Continue Application'
@@ -3206,7 +3478,11 @@ export default function ContentDetailPage({ params }: PageProps) {
                 ? 'Pilih Respons'
                 : 'Choose Action';
   const primaryActionHint =
-    displayType === 'job'
+    PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Fase awal: promosi dan chat dulu.'
+        : 'Early launch: promotion and chat first.'
+      : displayType === 'job'
       ? locale === 'id'
         ? 'Chat dulu. Lanjut apply.'
         : 'Apply fast or chat the recruiter.'
@@ -3240,6 +3516,24 @@ export default function ContentDetailPage({ params }: PageProps) {
   const chatStarterDraft = (() => {
     const title =
       item?.title?.trim() || (locale === 'id' ? 'listing ini' : 'this listing');
+
+    if (PROMO_ONLY_MODE) {
+      if (isDemandListing) {
+        return locale === 'id'
+          ? `Halo kak, saya melihat kebutuhan ${title}. Boleh tahu detail kebutuhan dan kriteria utamanya?`
+          : `Hi, I saw the need for ${title}. Can you share the key details and criteria first?`;
+      }
+
+      if (displayType === 'product') {
+        return locale === 'id'
+          ? `Halo kak, apakah ${title} masih tersedia? Boleh info stok, varian, MOQ, dan area kirimnya?`
+          : `Hi, is ${title} still available? Can you share stock, variants, MOQ, and delivery area?`;
+      }
+
+      return locale === 'id'
+        ? `Halo kak, apakah ${title} masih tersedia? Saya mau tanya detail dan info terbarunya.`
+        : `Hi, is ${title} still available? I want to ask for the latest details.`;
+    }
 
     if (displayType === 'job') {
       return locale === 'id'
@@ -3282,7 +3576,11 @@ export default function ContentDetailPage({ params }: PageProps) {
       : `Hi, I saw ${title}. Is it still available? I want to check stock, price, and how to order.`;
   })();
   const chatFirstLabel =
-    displayType === 'job'
+    PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Chat tanya detail'
+        : 'Chat for details'
+      : displayType === 'job'
       ? locale === 'id'
         ? 'Chat recruiter dulu'
         : 'Chat recruiter first'
@@ -3302,7 +3600,11 @@ export default function ContentDetailPage({ params }: PageProps) {
               ? 'Chat dulu'
               : 'Chat first';
   const chatFirstBody =
-    displayType === 'job'
+    PROMO_ONLY_MODE
+      ? locale === 'id'
+        ? 'Cek stok, katalog, MOQ, area kirim, atau detail kebutuhan lewat chat.'
+        : 'Confirm stock, catalog, MOQ, delivery area, or need details in chat.'
+      : displayType === 'job'
       ? locale === 'id'
         ? 'Masuk chat dulu biar lanjutnya gampang.'
         : 'Open chat first so the next step feels more natural.'
@@ -3480,10 +3782,10 @@ export default function ContentDetailPage({ params }: PageProps) {
                   'bg-white/76 ring-emerald-100/80 dark:bg-white/[0.06] dark:ring-emerald-300/12',
                 row: 'bg-white/74 ring-emerald-100/80 hover:bg-emerald-50 dark:bg-white/[0.06] dark:ring-emerald-300/12 dark:hover:bg-emerald-400/12',
               };
-  const detailPageShellClass = `lajukan-market-page lajukan-market-detail page-shell overflow-x-hidden py-0 pb-20 sm:py-1.5 lg:pb-7 ${detailTone.page}`;
+  const detailPageShellClass = `lajukan-market-page lajukan-market-detail page-shell max-lg:!px-0 lg:!px-4 xl:!px-6 overflow-x-hidden py-0 pb-[calc(6.25rem+env(safe-area-inset-bottom))] sm:py-1.5 lg:pb-7 ${detailTone.page}`;
   const detailShellStackClass =
-    'flex w-full flex-col gap-2 sm:mx-auto sm:max-w-[1360px] sm:gap-2.5';
-  const detailSectionClass = `relative overflow-hidden rounded-[18px] border px-3 py-3 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.16)] ring-1 sm:rounded-[20px] sm:p-3.5 ${detailTone.surface}`;
+    'mx-auto flex w-full max-w-[1320px] flex-col gap-2 px-2 sm:gap-2.5 sm:px-3 lg:px-0';
+  const detailSectionClass = `relative overflow-hidden rounded-[16px] border px-3 py-3 shadow-[0_14px_26px_-24px_rgba(15,23,42,0.16)] ring-1 sm:rounded-[20px] sm:p-3.5 ${detailTone.surface}`;
   const detailInsetClass = `rounded-[16px] px-2.5 py-2.5 ring-1 sm:px-3 sm:py-3 ${detailTone.inset}`;
   const detailInsetCompactClass = `rounded-[14px] px-2.5 py-2 ring-1 sm:rounded-[16px] sm:px-3 sm:py-2.5 ${detailTone.compact}`;
   const detailPrimaryButtonClass =
@@ -3492,6 +3794,23 @@ export default function ContentDetailPage({ params }: PageProps) {
     'inline-flex min-h-[40px] items-center justify-center gap-1 rounded-full bg-slate-100 px-3.5 text-xs font-black text-slate-700 transition hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 sm:min-h-[42px] sm:px-4 sm:text-sm';
   const detailTextLinkClass =
     'text-sm font-semibold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]';
+  const heroSummaryCard = summaryPreview || bodyPreview ? (
+    <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 text-sm leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800 sm:p-3 sm:leading-6">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+        {locale === 'id' ? 'Ringkasan' : 'Summary'}
+      </p>
+      {summaryPreview ? (
+        <p className="mt-1.5 line-clamp-3 font-medium">{summaryPreview}</p>
+      ) : null}
+      {bodyPreview ? (
+        <p
+          className={`line-clamp-2 ${summaryPreview ? 'mt-1.5 sm:mt-2' : 'mt-1.5'} ${PROMO_ONLY_MODE ? 'hidden sm:block' : ''}`}
+        >
+          {bodyPreview}
+        </p>
+      ) : null}
+    </div>
+  ) : null;
 
   const actionButtons = (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(118px,1fr))] gap-1.5 sm:gap-2 lg:grid-cols-1">
@@ -3523,6 +3842,29 @@ export default function ContentDetailPage({ params }: PageProps) {
       {!isOwner && (
         <button
           type="button"
+          onClick={openReportListingModal}
+          className={detailSecondaryButtonClass}
+        >
+          {locale === 'id' ? 'Report listing' : 'Report listing'}
+        </button>
+      )}
+      {!isOwner && PROMO_ONLY_MODE && (
+        <button
+          type="button"
+          onClick={() => void handleStartChat()}
+          disabled={!peerUserId || chatStarting}
+          className={detailPrimaryButtonClass}
+        >
+          {chatStarting
+            ? locale === 'id'
+              ? 'Membuka chat...'
+              : 'Opening chat...'
+            : primaryActionLabel}
+        </button>
+      )}
+      {!isOwner && !PROMO_ONLY_MODE && (
+        <button
+          type="button"
           onClick={openDealFlowPicker}
           disabled={!peerUserId}
           className={detailPrimaryButtonClass}
@@ -3530,7 +3872,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           {primaryActionLabel}
         </button>
       )}
-      {!isOwner && displayType !== 'company' && (
+      {!isOwner && !PROMO_ONLY_MODE && displayType !== 'company' && (
         <button
           type="button"
           onClick={() => void handleStartChat()}
@@ -3636,7 +3978,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           )}
         </div>
       )}
-      {promotionSnapshot?.offerType && (
+      {!PROMO_ONLY_MODE && promotionSnapshot?.offerType && (
         <div className="mt-3 rounded-[20px] bg-[color:var(--app-warning-soft)] p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
@@ -3733,7 +4075,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           {shareError}
         </p>
       )}
-      {user && !isOwner && displayType !== 'company' && (
+      {!PROMO_ONLY_MODE && user && !isOwner && displayType !== 'company' && (
         <div className={`mt-3 ${detailInsetClass}`}>
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
@@ -3875,19 +4217,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     </section>
   );
 
-  const mobileActionCard = (
-    <section className={`${detailSectionClass} lg:hidden`}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-          {locale === 'id' ? 'Lanjutkan' : 'Continue'}
-        </span>
-        <span className="rounded-full bg-white/82 px-2.5 py-1 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200/70 dark:bg-slate-950/70 dark:text-slate-200 dark:ring-slate-800">
-          {listingSideContextLabel}
-        </span>
-      </div>
-      {actionButtons}
-    </section>
-  );
+  const mobileActionCard = null;
 
   const typeLabel = ct
     ? getContentTypeName(ct, locale)
@@ -3969,7 +4299,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                       ? 'Detail item'
                       : 'Item detail',
               };
-  const detailSurfaceClass = `overflow-hidden rounded-[20px] border shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] ring-1 sm:rounded-[22px] ${detailTone.surface}`;
+  const detailSurfaceClass = `overflow-hidden rounded-[18px] border shadow-[0_16px_34px_-32px_rgba(15,23,42,0.28)] ring-1 sm:rounded-[22px] ${detailTone.surface}`;
   const reviewBuckets = [5, 4, 3, 2, 1].map(score => ({
     score,
     count: reviews.filter(review => Math.round(review.rating) === score).length,
@@ -3986,8 +4316,8 @@ export default function ContentDetailPage({ params }: PageProps) {
         onShare={() => void handleNativeShare()}
       />
       <div className={detailShellStackClass}>
-        <section className="ui-page-section px-1 sm:px-2">
-          <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-2.5">
+        <section className="ui-page-section w-full px-0">
+          <div className="mx-auto flex w-full flex-col gap-2.5">
             <div className="hidden items-center justify-between gap-3 px-1 text-xs text-[color:var(--app-text-soft)] lg:flex">
               <div className="flex min-w-0 items-center gap-2">
                 <button
@@ -4025,16 +4355,16 @@ export default function ContentDetailPage({ params }: PageProps) {
               </button>
             </div>
 
-            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.34fr)] lg:items-start xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.34fr)]">
+            <div className="grid min-w-0 gap-2.5 sm:gap-3 lg:grid-cols-12 lg:items-start xl:gap-4">
               <section
-                className={`${detailSurfaceClass} p-1 sm:p-1.5 lg:col-start-1 lg:row-start-1`}
+                className={`${detailSurfaceClass} p-1 lg:col-span-7 lg:col-start-1 lg:row-start-1 xl:col-span-8`}
               >
-                <div className="relative overflow-hidden rounded-[18px] bg-slate-100 dark:bg-slate-900">
+                <div className="relative overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-900 sm:rounded-[18px]">
                   <MediaPreviewCarousel
                     items={images}
                     alt={item.title}
-                    aspectClassName="aspect-[16/9] w-full lg:aspect-[16/10] xl:aspect-[16/9]"
-                    sizes="(min-width: 1280px) 1080px, (min-width: 1024px) 64vw, 100vw"
+                    aspectClassName="aspect-[4/3] w-full min-[480px]:aspect-[16/10] sm:aspect-[16/9] lg:aspect-[4/3] xl:aspect-[16/10]"
+                    sizes="(min-width: 1280px) 820px, (min-width: 1024px) 58vw, 100vw"
                     priority
                     controls
                     lightbox
@@ -4043,7 +4373,13 @@ export default function ContentDetailPage({ params }: PageProps) {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold">
                             <CheckCircle2 className="h-3.5 w-3.5" />
-                            {locale === 'id' ? 'Terverifikasi' : 'Verified'}
+                            {PROMO_ONLY_MODE
+                              ? locale === 'id'
+                                ? 'Siap ditanya'
+                                : 'Ready to ask'
+                              : locale === 'id'
+                                ? 'Terverifikasi'
+                                : 'Verified'}
                           </span>
                           <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
                             {listingSideContextLabel}
@@ -4056,7 +4392,7 @@ export default function ContentDetailPage({ params }: PageProps) {
               </section>
 
               <section
-                className={`${detailSurfaceClass} ${detailVisual.wash} p-3 sm:p-3.5 lg:col-start-2 lg:row-start-1`}
+                className={`${detailSurfaceClass} ${detailVisual.wash} p-3 sm:p-3.5 lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:self-start xl:col-span-4 xl:col-start-9`}
               >
                 <div
                   className={`h-1 w-20 rounded-full bg-gradient-to-r ${detailVisual.line}`}
@@ -4080,7 +4416,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                   ) : null}
                 </div>
 
-                <h1 className="mt-2.5 text-[21px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[26px] lg:text-[25px] xl:text-[29px]">
+                <h1 className="mt-2.5 line-clamp-3 break-words text-[20px] font-black leading-[1.08] tracking-[-0.035em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[25px] lg:text-[23px] xl:text-[26px]">
                   {item.title}
                 </h1>
 
@@ -4099,7 +4435,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                     {locationLabel}
                   </span>
                   {updatedLabel ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/78 px-2.5 py-1.5 font-semibold ring-1 ring-slate-200/70 dark:bg-slate-950/70 dark:ring-slate-800">
+                    <span className="hidden items-center gap-1.5 rounded-full bg-white/78 px-2.5 py-1.5 font-semibold ring-1 ring-slate-200/70 dark:bg-slate-950/70 dark:ring-slate-800 sm:inline-flex">
                       <Calendar className="h-3.5 w-3.5" />
                       {locale === 'id' ? 'Update' : 'Updated'} {updatedLabel}
                     </span>
@@ -4107,18 +4443,22 @@ export default function ContentDetailPage({ params }: PageProps) {
                 </div>
 
                 <div className="mt-2.5 rounded-[16px] bg-white/82 p-2.5 ring-1 ring-slate-200/70 dark:bg-slate-950/72 dark:ring-slate-800 sm:p-3">
-                  <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex flex-col gap-2.5 min-[520px]:flex-row min-[520px]:items-end min-[520px]:justify-between lg:flex-col lg:items-stretch xl:flex-row xl:items-end">
                     <div className="flex min-w-0 items-start gap-2.5">
                       <span
                         className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ${detailVisual.icon}`}
                       >
-                        <Coins className="h-4.5 w-4.5" />
+                        {PROMO_ONLY_MODE ? (
+                          <MessageCircle className="h-4.5 w-4.5" />
+                        ) : (
+                          <Coins className="h-4.5 w-4.5" />
+                        )}
                       </span>
                       <div className="min-w-0">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                           {displayPriceHeading}
                         </p>
-                        <p className="mt-1 text-[22px] font-semibold leading-none text-[color:var(--app-accent)] sm:text-[26px]">
+                        <p className="mt-1 text-[22px] font-black leading-none text-[color:var(--app-accent)] sm:text-[25px] lg:text-[22px] xl:text-[25px]">
                           {primaryPrice}
                         </p>
                         {hasOriginalPrice ? (
@@ -4136,17 +4476,74 @@ export default function ContentDetailPage({ params }: PageProps) {
                         ) : null}
                       </div>
                     </div>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      {primaryActionHint}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-stretch gap-2 min-[520px]:items-end lg:items-stretch xl:items-end">
+                      <span
+                        className={`inline-flex items-center justify-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ${detailVisual.chip}`}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        {primaryActionHint}
+                      </span>
+                      {!isOwner ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleStartChat()}
+                          disabled={!peerUserId || chatStarting}
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-sm font-black text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_60%,transparent)] transition hover:brightness-[1.04] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          {chatStarting
+                            ? locale === 'id'
+                              ? 'Membuka chat...'
+                              : 'Opening chat...'
+                            : chatLabel}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-2.5 grid grid-cols-3 gap-1.5 sm:gap-2">
-                  {quickSpecs.slice(0, 3).map(spec => {
+                {heroSummaryCard}
+
+                {PROMO_ONLY_MODE && !isOwner ? (
+                  <div className="mt-2.5 hidden rounded-[16px] bg-white/86 p-2.5 ring-1 ring-emerald-100/80 dark:bg-slate-950/72 dark:ring-emerald-400/20 lg:block">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                          {locale === 'id'
+                            ? 'Mulai lewat chat'
+                            : 'Start with chat'}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                          {locale === 'id'
+                            ? 'Tanya stok, katalog, MOQ, area kirim, atau detail kebutuhan tanpa transaksi dulu.'
+                            : 'Ask about stock, catalog, MOQ, delivery area, or needs before any transaction.'}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${detailVisual.icon}`}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </span>
+                    </div>
+                    <div className="mt-2">{actionButtons}</div>
+                    <div className="mt-2 grid gap-1.5 xl:grid-cols-2">
+                      {flowSteps.slice(0, 4).map((step, index) => (
+                        <div
+                          key={`promo-step-${step}-${index}`}
+                          className="flex items-start gap-2 rounded-[13px] bg-emerald-50/78 px-2.5 py-2 text-[11px] font-semibold leading-4 text-emerald-900 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-400/20"
+                        >
+                          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white">
+                            {index + 1}
+                          </span>
+                          <span>{step}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:gap-2">
+                  {quickSpecs.slice(0, 4).map(spec => {
                     const SpecIcon = spec.icon;
                     return (
                       <div
@@ -4172,7 +4569,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                 {displayType === 'service' &&
                 serviceGuideSections.length > 0 ? (
                   <div className="mt-2.5 overflow-hidden rounded-[16px] bg-white/74 ring-1 ring-slate-200/70 dark:bg-slate-950/64 dark:ring-slate-800">
-                    {serviceGuideSections.map((section, index) => {
+                    {serviceGuideSections.slice(0, 2).map((section, index) => {
                       const SectionIcon = section.icon;
                       return (
                         <div
@@ -4208,21 +4605,12 @@ export default function ContentDetailPage({ params }: PageProps) {
                       );
                     })}
                   </div>
-                ) : summaryPreview || bodyPreview ? (
-                  <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 text-sm leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800 sm:p-3 sm:leading-6">
-                    {summaryPreview ? (
-                      <p className="font-medium">{summaryPreview}</p>
-                    ) : null}
-                    {bodyPreview ? (
-                      <p className={summaryPreview ? 'mt-2' : ''}>
-                        {bodyPreview}
-                      </p>
-                    ) : null}
-                  </div>
                 ) : null}
 
                 {previewHighlightItems.length > 0 ? (
-                  <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:gap-2">
+                  <div
+                    className={`mt-2.5 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2 ${PROMO_ONLY_MODE ? 'hidden sm:grid' : 'grid'}`}
+                  >
                     {previewHighlightItems.map(entry => {
                       const EntryIcon = getDetailEntryIcon(
                         entry.key,
@@ -4255,7 +4643,9 @@ export default function ContentDetailPage({ params }: PageProps) {
                 ) : null}
 
                 {previewTags.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
+                  <div
+                    className={`mt-3 flex-wrap gap-1.5 ${PROMO_ONLY_MODE ? 'hidden sm:flex' : 'flex'}`}
+                  >
                     {previewTags.map(tag => (
                       <span
                         key={tag}
@@ -4280,9 +4670,9 @@ export default function ContentDetailPage({ params }: PageProps) {
                 {ownerProfileCard}
               </div>
 
-              <aside className="hidden lg:col-start-2 lg:row-start-2 lg:block">
-                <div className="sticky top-20 space-y-2.5">
-                  {actionCard}
+              <aside className="hidden lg:col-span-4 lg:col-start-9 lg:row-start-2 lg:block">
+                <div className="sticky top-[calc(4.75rem+env(safe-area-inset-top))] space-y-2.5">
+                  {!PROMO_ONLY_MODE ? actionCard : null}
                   {ownerProfileCard}
                   <section className={`${detailSurfaceClass} p-3.5`}>
                     <div className="flex items-center justify-between gap-2">
@@ -4328,7 +4718,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                 </div>
               </aside>
 
-              <div className="space-y-2.5 lg:col-start-1 lg:row-start-2">
+              <div className="min-w-0 space-y-2.5 lg:col-span-8 lg:col-start-1 lg:row-start-2">
                 <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -4336,9 +4726,13 @@ export default function ContentDetailPage({ params }: PageProps) {
                         {detailHeading}
                       </p>
                       <h2 className="mt-1 text-lg font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
-                        {locale === 'id'
-                          ? 'Informasi lengkap'
-                          : 'Full information'}
+                        {PROMO_ONLY_MODE
+                          ? locale === 'id'
+                            ? 'Ringkasan promosi'
+                            : 'Promo summary'
+                          : locale === 'id'
+                            ? 'Informasi lengkap'
+                            : 'Full information'}
                       </h2>
                     </div>
                     <span
@@ -4367,18 +4761,36 @@ export default function ContentDetailPage({ params }: PageProps) {
                                 : 'Service Summary'
                               : highlightHeading}
                           </h3>
-                          <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
-                            {item.body}
-                          </div>
+                          {PROMO_ONLY_MODE ? (
+                            <>
+                              <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                                {summaryPreview || bodyPreview || item.body}
+                              </p>
+                              <details className="group mt-2">
+                                <summary className="cursor-pointer list-none text-xs font-black text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]">
+                                  {locale === 'id'
+                                    ? 'Lihat detail lengkap'
+                                    : 'View full details'}
+                                </summary>
+                                <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
+                                  {item.body}
+                                </div>
+                              </details>
+                            </>
+                          ) : (
+                            <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
+                              {item.body}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
                   ) : null}
 
-                  {expandedDetailItems.length > 0 ? (
+                  {visibleExpandedDetailItems.length > 0 ? (
                     displayType === 'service' ? (
                       <div className="mt-3 overflow-hidden rounded-[16px] bg-white/66 ring-1 ring-slate-200/70 dark:bg-slate-950/58 dark:ring-slate-800">
-                        {expandedDetailItems.map((entry, index) => {
+                        {visibleExpandedDetailItems.map((entry, index) => {
                           const DetailIcon = getDetailEntryIcon(
                             entry.key,
                             entry.label,
@@ -4410,8 +4822,8 @@ export default function ContentDetailPage({ params }: PageProps) {
                         })}
                       </div>
                     ) : (
-                      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:gap-2.5 xl:grid-cols-3">
-                        {expandedDetailItems.map(entry => {
+                      <div className="mt-3 grid grid-cols-1 gap-1.5 min-[560px]:grid-cols-2 sm:gap-2.5 xl:grid-cols-2">
+                        {visibleExpandedDetailItems.map(entry => {
                           const DetailIcon = getDetailEntryIcon(
                             entry.key,
                             entry.label,
@@ -4442,10 +4854,17 @@ export default function ContentDetailPage({ params }: PageProps) {
                       </div>
                     )
                   ) : null}
+                  {hiddenExpandedDetailCount > 0 ? (
+                    <p className="mt-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
+                      {locale === 'id'
+                        ? `+${hiddenExpandedDetailCount} info lain bisa ditanyakan lewat chat.`
+                        : `+${hiddenExpandedDetailCount} more details can be asked in chat.`}
+                    </p>
+                  ) : null}
 
-                  {tags.length > 0 ? (
+                  {detailTags.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {tags.map(tag => (
+                      {detailTags.map(tag => (
                         <span
                           key={tag}
                           className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
@@ -4453,118 +4872,119 @@ export default function ContentDetailPage({ params }: PageProps) {
                           {tag}
                         </span>
                       ))}
+                      {hiddenDetailTagCount > 0 ? (
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold ring-1 ${detailVisual.chip}`}
+                        >
+                          +{hiddenDetailTagCount}
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
                 </section>
 
-                <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
-                  <div className="grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id'
-                          ? 'Ulasan pelanggan'
-                          : 'Customer reviews'}
-                      </p>
-                      <div className="mt-3 flex items-end gap-2">
-                        <span className="text-3xl font-semibold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {ratingValue > 0 ? ratingValue.toFixed(1) : '0.0'}
-                        </span>
-                        <div className="pb-1">
-                          <div className="flex items-center gap-0.5">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={`reviews-summary-${i}`}
-                                className={`h-3.5 w-3.5 ${
-                                  i < ratingRounded
-                                    ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
-                                    : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
-                            {item.review_count || reviews.length}{' '}
-                            {locale === 'id' ? 'review' : 'reviews'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-4 space-y-1.5">
-                        {reviewBuckets.map(bucket => (
-                          <div
-                            key={bucket.score}
-                            className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]"
-                          >
-                            <span className="w-3">{bucket.score}</span>
-                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-900">
-                              <div
-                                className="h-full rounded-full bg-[color:var(--app-accent)]"
-                                style={{
-                                  width: `${(bucket.count / reviewBucketTotal) * 100}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="w-5 text-right">
-                              {bucket.count}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {reviewsLoading ? (
-                        <div
-                          className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                        >
+                {reviewsLoading || reviews.length > 0 || ratingValue > 0 ? (
+                  <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
+                    <div className="grid gap-3 md:grid-cols-[170px_minmax(0,1fr)]">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                           {locale === 'id'
-                            ? 'Memuat ulasan...'
-                            : 'Loading reviews...'}
-                        </div>
-                      ) : reviews.length === 0 ? (
-                        <div
-                          className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                        >
-                          {locale === 'id'
-                            ? 'Belum ada ulasan untuk listing ini.'
-                            : 'No reviews for this listing yet.'}
-                        </div>
-                      ) : (
-                        reviews.slice(0, 4).map(review => (
-                          <div
-                            key={review.id}
-                            className={`rounded-[18px] p-3 text-sm text-[color:var(--app-text)] ring-1 dark:text-[color:var(--app-text-soft)] ${detailTone.row}`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star
-                                    key={`review-${review.id}-star-${i}`}
-                                    className={`h-3.5 w-3.5 ${
-                                      i < review.rating
-                                        ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
-                                        : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                              <span className="text-[11px] text-[color:var(--app-text-soft)]">
-                                {formatDate(review.created_at || '')}
-                              </span>
+                            ? 'Ulasan pelanggan'
+                            : 'Customer reviews'}
+                        </p>
+                        <div className="mt-3 flex items-end gap-2">
+                          <span className="text-3xl font-semibold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {ratingValue > 0 ? ratingValue.toFixed(1) : '0.0'}
+                          </span>
+                          <div className="pb-1">
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={`reviews-summary-${i}`}
+                                  className={`h-3.5 w-3.5 ${
+                                    i < ratingRounded
+                                      ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
+                                      : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
+                                  }`}
+                                />
+                              ))}
                             </div>
-                            <p className="mt-2 leading-6">
-                              {review.comment ||
-                                (locale === 'id'
-                                  ? 'Tanpa komentar.'
-                                  : 'No comment provided.')}
+                            <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">
+                              {item.review_count || reviews.length}{' '}
+                              {locale === 'id' ? 'review' : 'reviews'}
                             </p>
                           </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </section>
+                        </div>
+                        <div className="mt-4 space-y-1.5">
+                          {reviewBuckets.map(bucket => (
+                            <div
+                              key={bucket.score}
+                              className="flex items-center gap-2 text-[11px] text-[color:var(--app-text-soft)]"
+                            >
+                              <span className="w-3">{bucket.score}</span>
+                              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-900">
+                                <div
+                                  className="h-full rounded-full bg-[color:var(--app-accent)]"
+                                  style={{
+                                    width: `${(bucket.count / reviewBucketTotal) * 100}%`,
+                                  }}
+                                />
+                              </div>
+                              <span className="w-5 text-right">
+                                {bucket.count}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
-                {showSellerStats ? (
+                      <div className="space-y-3">
+                        {reviewsLoading ? (
+                          <div
+                            className={`${detailInsetClass} text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
+                          >
+                            {locale === 'id'
+                              ? 'Memuat ulasan...'
+                              : 'Loading reviews...'}
+                          </div>
+                        ) : (
+                          reviews.slice(0, 4).map(review => (
+                            <div
+                              key={review.id}
+                              className={`rounded-[18px] p-3 text-sm text-[color:var(--app-text)] ring-1 dark:text-[color:var(--app-text-soft)] ${detailTone.row}`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star
+                                      key={`review-${review.id}-star-${i}`}
+                                      className={`h-3.5 w-3.5 ${
+                                        i < review.rating
+                                          ? 'fill-[color:var(--app-warning)] text-[color:var(--app-warning)]'
+                                          : 'text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]'
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-[11px] text-[color:var(--app-text-soft)]">
+                                  {formatDate(review.created_at || '')}
+                                </span>
+                              </div>
+                              <p className="mt-2 leading-6">
+                                {review.comment ||
+                                  (locale === 'id'
+                                    ? 'Tanpa komentar.'
+                                    : 'No comment provided.')}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+
+                {!PROMO_ONLY_MODE && showSellerStats ? (
                   <section
                     className={`${detailSurfaceClass} p-3.5 sm:p-4 lg:hidden`}
                   >
@@ -4648,14 +5068,117 @@ export default function ContentDetailPage({ params }: PageProps) {
         </section>
 
         <div
-          className="fixed inset-x-0 bottom-0 z-40 px-3 pt-2 lg:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 px-2 pt-2 lg:hidden"
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
         >
-          <div className="mx-auto max-w-md rounded-[22px] border border-slate-200/80 bg-white/96 p-2 shadow-[0_18px_44px_-26px_rgba(15,23,42,0.36)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/94">
+          <div className="mx-auto max-w-md rounded-[20px] border border-slate-200/80 bg-white/96 p-1.5 shadow-[0_18px_44px_-26px_rgba(15,23,42,0.36)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/94">
             {actionButtons}
           </div>
         </div>
       </div>
+
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
+          <div className="max-h-[80svh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-warning)]">
+                  {locale === 'id' ? 'Report listing' : 'Report listing'}
+                </p>
+                <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {item.title}
+                </h2>
+                <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  {locale === 'id'
+                    ? 'Laporan ini akan masuk ke CRM moderation queue dan bisa ditinjau oleh tim.'
+                    : 'This report will enter the CRM moderation queue for review by the team.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
+              >
+                X
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[color:var(--app-text)]">
+                  {locale === 'id' ? 'Alasan' : 'Reason'}
+                </label>
+                <select
+                  value={reportReason}
+                  onChange={e => setReportReason(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm focus:border-[color:var(--app-warning-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-warning)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)]"
+                >
+                  <option value="spam">{locale === 'id' ? 'Spam / promosi' : 'Spam / promotion'}</option>
+                  <option value="fake">{locale === 'id' ? 'Palsu / tidak asli' : 'Fake / not genuine'}</option>
+                  <option value="scam">{locale === 'id' ? 'Penipuan' : 'Scam'}</option>
+                  <option value="harassment">{locale === 'id' ? 'Pelecehan' : 'Harassment'}</option>
+                  <option value="illegal">{locale === 'id' ? 'Konten ilegal' : 'Illegal content'}</option>
+                  <option value="inaccurate">{locale === 'id' ? 'Informasi tidak akurat' : 'Inaccurate info'}</option>
+                  <option value="other">{locale === 'id' ? 'Lainnya' : 'Other'}</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[color:var(--app-text)]">
+                  {locale === 'id' ? 'Detail tambahan' : 'Extra details'}
+                </label>
+                <textarea
+                  rows={4}
+                  value={reportDetails}
+                  onChange={e => setReportDetails(e.target.value)}
+                  placeholder={
+                    locale === 'id'
+                      ? 'Contoh: foto bukan milik listing, jam salah, nomor tidak aktif.'
+                      : 'Example: unrelated photo, wrong hours, inactive number.'
+                  }
+                  className="w-full rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-sm focus:border-[color:var(--app-warning-border)] focus:outline-none focus:ring-2 focus:ring-[color:var(--app-warning)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-inverse)]"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-[color:color-mix(in_srgb,_var(--app-warning-soft)_35%,_white)] px-3 py-2 text-[11px] leading-5 text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,_var(--app-warning)_12%,_rgba(2,6,23,0.94))] dark:text-[color:var(--app-text-soft)]">
+              {locale === 'id'
+                ? 'Setelah terkirim, laporan masuk ke queue CRM moderation. Tim bisa lihat alasan, detail, siapa yang report, lalu pilih warn, flag, restrict, atau ban bila berulang.'
+                : 'After submission, the report enters the CRM moderation queue. The team can review reasons, details, reporters, then choose warn, flag, restrict, or ban if abuse repeats.'}
+            </div>
+
+            {reportError ? (
+              <p className="mt-3 text-xs font-semibold text-[color:var(--app-danger)]">
+                {reportError}
+              </p>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="rounded-full border border-[color:var(--app-border)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+              >
+                {locale === 'id' ? 'Batal' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void submitListingReport()}
+                disabled={reportSubmitting}
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-[color:var(--app-warning)] px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-warning)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reportSubmitting
+                  ? locale === 'id'
+                    ? 'Mengirim...'
+                    : 'Sending...'
+                  : locale === 'id'
+                    ? 'Kirim report'
+                    : 'Submit report'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showShareModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">

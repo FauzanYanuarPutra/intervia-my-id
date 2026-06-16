@@ -155,21 +155,14 @@ impl IntoResponse for OrderEngineError {
             OrderEngineError::Validation(msg) => (StatusCode::BAD_REQUEST, msg),
             OrderEngineError::Db(err) => {
                 tracing::error!("order engine db error: {:?}", err);
-                (StatusCode::INTERNAL_SERVER_ERROR, "database error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database error".to_string(),
+                )
             }
         };
 
         (status, Json(json!({ "error": message }))).into_response()
-    }
-}
-
-fn parse_category_type(value: &str) -> Option<OrderCategoryType> {
-    match value {
-        "PHYSICAL_GOODS" => Some(OrderCategoryType::PhysicalGoods),
-        "SUPPLY_CHAIN" => Some(OrderCategoryType::SupplyChain),
-        "SERVICE_MARKETPLACE" => Some(OrderCategoryType::ServiceMarketplace),
-        "CULINARY_INSTANT" => Some(OrderCategoryType::CulinaryInstant),
-        _ => None,
     }
 }
 
@@ -236,7 +229,10 @@ fn allowed_transitions() -> HashMap<OrderBaseStatus, Vec<OrderBaseStatus>> {
         (Draft, vec![PendingPayment, Cancelled]),
         (PendingPayment, vec![Paid, Expired, Cancelled, Rejected]),
         (Paid, vec![Processing, Cancelled, Refunded]),
-        (Processing, vec![Shipped, InService, Delivered, Cancelled, Refunded]),
+        (
+            Processing,
+            vec![Shipped, InService, Delivered, Cancelled, Refunded],
+        ),
         (Shipped, vec![Delivered, Completed, Refunded]),
         (InService, vec![Delivered, Completed, Cancelled, Refunded]),
         (Delivered, vec![Completed, Refunded]),
@@ -248,10 +244,11 @@ fn allowed_transitions() -> HashMap<OrderBaseStatus, Vec<OrderBaseStatus>> {
     ])
 }
 
-fn assert_transition_allowed(from: OrderBaseStatus, to: OrderBaseStatus) -> Result<(), OrderEngineError> {
-    let allowed = allowed_transitions()
-        .remove(&from)
-        .unwrap_or_default();
+fn assert_transition_allowed(
+    from: OrderBaseStatus,
+    to: OrderBaseStatus,
+) -> Result<(), OrderEngineError> {
+    let allowed = allowed_transitions().remove(&from).unwrap_or_default();
     if allowed.contains(&to) {
         Ok(())
     } else {
@@ -321,18 +318,10 @@ async fn insert_state_transition(
 }
 
 trait OrderCategoryStrategy: Send + Sync {
-    fn category(&self) -> OrderCategoryType;
     fn validate_on_create(&self, input: &CreateOrderRequest) -> Result<(), OrderEngineError>;
     fn enrich_metadata(&self, input: &CreateOrderRequest) -> Value;
     fn payment_status_on_create(&self, input: &CreateOrderRequest) -> OrderPaymentStatus;
     fn base_status_on_create(&self, input: &CreateOrderRequest) -> OrderBaseStatus;
-    fn event_names_for_paid(&self) -> Vec<&'static str>;
-    fn event_names_for_completed(&self) -> Vec<&'static str> {
-        vec!["order.completed"]
-    }
-    fn event_names_for_expired(&self) -> Vec<&'static str> {
-        vec!["order.expired"]
-    }
 }
 
 struct PhysicalGoodsStrategy;
@@ -341,10 +330,6 @@ struct ServiceMarketplaceStrategy;
 struct CulinaryInstantStrategy;
 
 impl OrderCategoryStrategy for PhysicalGoodsStrategy {
-    fn category(&self) -> OrderCategoryType {
-        OrderCategoryType::PhysicalGoods
-    }
-
     fn validate_on_create(&self, input: &CreateOrderRequest) -> Result<(), OrderEngineError> {
         if input.items.is_empty() {
             return Err(OrderEngineError::Validation("items are required".into()));
@@ -353,7 +338,10 @@ impl OrderCategoryStrategy for PhysicalGoodsStrategy {
     }
 
     fn enrich_metadata(&self, input: &CreateOrderRequest) -> Value {
-        let mut meta = input.category_specific_metadata.clone().unwrap_or_else(|| json!({}));
+        let mut meta = input
+            .category_specific_metadata
+            .clone()
+            .unwrap_or_else(|| json!({}));
         meta["fulfillment_mode"] = json!("shipping");
         meta
     }
@@ -365,17 +353,9 @@ impl OrderCategoryStrategy for PhysicalGoodsStrategy {
     fn base_status_on_create(&self, _input: &CreateOrderRequest) -> OrderBaseStatus {
         OrderBaseStatus::PendingPayment
     }
-
-    fn event_names_for_paid(&self) -> Vec<&'static str> {
-        vec!["order.paid", "inventory.lock_requested", "shipping.prepare_requested"]
-    }
 }
 
 impl OrderCategoryStrategy for SupplyChainStrategy {
-    fn category(&self) -> OrderCategoryType {
-        OrderCategoryType::SupplyChain
-    }
-
     fn validate_on_create(&self, input: &CreateOrderRequest) -> Result<(), OrderEngineError> {
         let total_qty: f64 = input.items.iter().map(|item| item.quantity).sum();
         let moq = input
@@ -394,14 +374,17 @@ impl OrderCategoryStrategy for SupplyChainStrategy {
     }
 
     fn enrich_metadata(&self, input: &CreateOrderRequest) -> Value {
-        let mut meta = input.category_specific_metadata.clone().unwrap_or_else(|| json!({}));
-        meta["commercial_mode"] = json!(
-            if meta.get("payment_terms").and_then(|v| v.as_str()) == Some("TOP") {
-                "invoice"
-            } else {
-                "instant"
-            }
-        );
+        let mut meta = input
+            .category_specific_metadata
+            .clone()
+            .unwrap_or_else(|| json!({}));
+        meta["commercial_mode"] = json!(if meta.get("payment_terms").and_then(|v| v.as_str())
+            == Some("TOP")
+        {
+            "invoice"
+        } else {
+            "instant"
+        });
         meta
     }
 
@@ -432,17 +415,9 @@ impl OrderCategoryStrategy for SupplyChainStrategy {
             OrderBaseStatus::PendingPayment
         }
     }
-
-    fn event_names_for_paid(&self) -> Vec<&'static str> {
-        vec!["order.paid", "invoice.generated", "allocation.requested"]
-    }
 }
 
 impl OrderCategoryStrategy for ServiceMarketplaceStrategy {
-    fn category(&self) -> OrderCategoryType {
-        OrderCategoryType::ServiceMarketplace
-    }
-
     fn validate_on_create(&self, input: &CreateOrderRequest) -> Result<(), OrderEngineError> {
         let booking = input
             .category_specific_metadata
@@ -461,7 +436,10 @@ impl OrderCategoryStrategy for ServiceMarketplaceStrategy {
     }
 
     fn enrich_metadata(&self, input: &CreateOrderRequest) -> Value {
-        let mut meta = input.category_specific_metadata.clone().unwrap_or_else(|| json!({}));
+        let mut meta = input
+            .category_specific_metadata
+            .clone()
+            .unwrap_or_else(|| json!({}));
         meta["fulfillment_mode"] = json!("escrow_booking");
         meta
     }
@@ -473,17 +451,9 @@ impl OrderCategoryStrategy for ServiceMarketplaceStrategy {
     fn base_status_on_create(&self, _input: &CreateOrderRequest) -> OrderBaseStatus {
         OrderBaseStatus::PendingPayment
     }
-
-    fn event_names_for_paid(&self) -> Vec<&'static str> {
-        vec!["order.paid", "escrow.hold_requested", "calendar.reserve_requested"]
-    }
 }
 
 impl OrderCategoryStrategy for CulinaryInstantStrategy {
-    fn category(&self) -> OrderCategoryType {
-        OrderCategoryType::CulinaryInstant
-    }
-
     fn validate_on_create(&self, input: &CreateOrderRequest) -> Result<(), OrderEngineError> {
         let minutes = input
             .category_specific_metadata
@@ -501,7 +471,10 @@ impl OrderCategoryStrategy for CulinaryInstantStrategy {
     }
 
     fn enrich_metadata(&self, input: &CreateOrderRequest) -> Value {
-        let mut meta = input.category_specific_metadata.clone().unwrap_or_else(|| json!({}));
+        let mut meta = input
+            .category_specific_metadata
+            .clone()
+            .unwrap_or_else(|| json!({}));
         meta["fulfillment_mode"] = json!("instant_driver");
         meta
     }
@@ -512,10 +485,6 @@ impl OrderCategoryStrategy for CulinaryInstantStrategy {
 
     fn base_status_on_create(&self, _input: &CreateOrderRequest) -> OrderBaseStatus {
         OrderBaseStatus::PendingPayment
-    }
-
-    fn event_names_for_paid(&self) -> Vec<&'static str> {
-        vec!["order.paid", "merchant.acceptance_timer_started", "driver.dispatch_requested"]
     }
 }
 
@@ -634,18 +603,22 @@ pub async fn create_order(
     let currency = payload.currency.as_deref().unwrap_or("IDR").to_string();
     let category_meta = strategy.enrich_metadata(&payload);
 
-    let subtotal = payload.items.iter().try_fold(
-        rust_decimal::Decimal::ZERO,
-        |sum, item| {
+    let subtotal = payload
+        .items
+        .iter()
+        .try_fold(rust_decimal::Decimal::ZERO, |sum, item| {
             let qty = decimal_from_f64(item.quantity)?;
             let unit = decimal_from_f64(item.unit_price)?;
             Ok::<_, OrderEngineError>(sum + round_money(qty * unit))
-        },
-    )?;
+        })?;
     let shipping = rust_decimal::Decimal::ZERO;
     let total = round_money(subtotal + shipping);
 
-    let order_number = format!("ORD-{}-{}", Utc::now().format("%Y%m%d%H%M%S"), payload.user_id.simple());
+    let order_number = format!(
+        "ORD-{}-{}",
+        Utc::now().format("%Y%m%d%H%M%S"),
+        payload.user_id.simple()
+    );
     let base_status = strategy.base_status_on_create(&payload);
     let payment_status = strategy.payment_status_on_create(&payload);
 

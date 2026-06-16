@@ -4,6 +4,7 @@ import Image, { type ImageProps } from 'next/image';
 import { ImageOff } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { normalizeContentMediaUrl } from '@/lib/content/catalog';
 
 type LajukanImageProps = Omit<ImageProps, 'src'> & {
   src?: ImageProps['src'] | null;
@@ -15,8 +16,31 @@ function shouldBypassOptimizer(src: ImageProps['src'] | null | undefined) {
     (/^(https?:)?\/\/|^data:|^blob:/i.test(src) ||
       src.startsWith('/uploads/') ||
       src.startsWith('/api/content/media/') ||
-      src.startsWith('/api/chat/media/'))
+      src.startsWith('/api/chat/media/') ||
+      src.startsWith('/api/forum/media/'))
   );
+}
+
+function normalizeImageSrc(
+  src: ImageProps['src'] | null | undefined,
+): ImageProps['src'] | null | undefined {
+  if (typeof src !== 'string') return src;
+  let value = normalizeContentMediaUrl(src);
+  if (!value) return value;
+  value = value.trim().replace(/^["'`]+|["'`]+$/g, '');
+  if (!value) return value;
+
+  if (value.startsWith('//')) return `https:${value}`;
+  if (
+    /^(https?:|data:|blob:)/i.test(value) ||
+    value.startsWith('/')
+  ) {
+    return value;
+  }
+  if (/^[a-z0-9.-]+\.[a-z]{2,}\//i.test(value)) {
+    return `https://${value}`;
+  }
+  return `/${value.replace(/^\/+/, '')}`;
 }
 
 function imageKey(src: ImageProps['src'] | null | undefined) {
@@ -69,11 +93,12 @@ export function LajukanImage({
   ...props
 }: LajukanImageProps) {
   const [failedKey, setFailedKey] = useState('');
-  const key = useMemo(() => imageKey(src), [src]);
-  const bypassOptimizer = shouldBypassOptimizer(src);
-  const failed = !src || failedKey === key;
+  const normalizedSrc = useMemo(() => normalizeImageSrc(src), [src]);
+  const key = useMemo(() => imageKey(normalizedSrc), [normalizedSrc]);
+  const bypassOptimizer = shouldBypassOptimizer(normalizedSrc);
+  const failed = !normalizedSrc || failedKey === key;
 
-  if (!src || failed) {
+  if (!normalizedSrc || failed) {
     return (
       <FallbackImage
         alt={alt}
@@ -88,7 +113,7 @@ export function LajukanImage({
   return (
     <Image
       {...props}
-      src={src}
+      src={normalizedSrc}
       alt={alt}
       unoptimized={unoptimized ?? bypassOptimizer}
       onError={event => {

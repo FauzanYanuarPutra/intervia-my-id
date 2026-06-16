@@ -4,6 +4,7 @@ import { useState, type CSSProperties } from 'react';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { useAuth } from '@/context/AuthContext';
 import { Link, useRouter } from '@/i18n/navigation';
+import { normalizeContentMediaUrl } from '@/lib/content/catalog';
 import { cn } from '@/lib/utils';
 import {
   BadgeCheck,
@@ -248,13 +249,15 @@ function uniqueMediaCandidates(item: any): string[] {
     item.image_urls ||
     item.metadata?.images ||
     (item.cover_image ? [item.cover_image] : []);
+  const entries = Array.isArray(raw) ? raw : [raw];
 
   const seen = new Set<string>();
 
-  return raw
+  return entries
     .map((e: string) => (e || '').trim())
     .filter(Boolean)
-    .map((e: string) => (e.startsWith('http') ? e : `${process.env.NEXT_PUBLIC_API_URL}${e}`))
+    .map((e: string) => normalizeContentMediaUrl(e))
+    .filter(Boolean)
     .filter((entry: string) => {
       const key = entry.toLowerCase();
       if (seen.has(key)) return false;

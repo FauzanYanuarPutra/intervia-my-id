@@ -17,7 +17,12 @@ import {
   type UmkmLocationMode,
 } from './umkm-live-ops';
 import { haversineKm } from './location-guard';
-import { buildGoogleMapsDirectionsUrl, buildGoogleMapsPlaceUrl, type LatLng } from './maps';
+import {
+  buildGoogleMapsDirectionsUrl,
+  buildGoogleMapsPlaceUrl,
+  type GoogleMapsTravelMode,
+  type LatLng,
+} from './maps';
 
 export type UmkmPlaceLike = {
   id?: string;
@@ -78,6 +83,7 @@ export type UmkmPlacePresentation = {
   mapsLabel: string;
   googleMapsPlaceUrl: string;
   googleMapsDirectionsUrl: string;
+  googleMapsDirectionsByMode: Record<GoogleMapsTravelMode, string>;
   telHref: string | null;
   whatsappHref: string | null;
 };
@@ -651,6 +657,15 @@ export function buildUmkmPlacePresentation(
         : null;
   const distanceLabel = formatUmkmPlaceDistance(effectiveDistanceKm, isId);
   const mapsLabel = buildMapsLabel(place);
+  const destination = { lat: place.lat, lng: place.lng };
+  const origin = viewerLocation || undefined;
+  const googleMapsDirectionsByMode = {
+    driving: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'driving'),
+    'two-wheeler': buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'two-wheeler'),
+    transit: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'transit'),
+    walking: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'walking'),
+    bicycling: buildGoogleMapsDirectionsUrl(destination, origin, undefined, 'bicycling'),
+  } satisfies Record<GoogleMapsTravelMode, string>;
   const openStatus = {
     statusLabel: [presenceStatus.statusLabel, presenceStatus.scheduleSummary || '']
       .filter(Boolean)
@@ -669,9 +684,7 @@ export function buildUmkmPlacePresentation(
     ratingNumber,
     ratingLabel:
       rawRating === null
-        ? isId
-          ? 'Belum ada rating'
-          : 'No ratings yet'
+        ? '0.0'
         : ratingNumber.toFixed(1),
     ratingCount,
     reviewCountLabel: formatCount(ratingCount),
@@ -691,11 +704,9 @@ export function buildUmkmPlacePresentation(
     addressLine: place.address || place.city || (isId ? 'Alamatnya belum lengkap' : 'Address unavailable'),
     secondaryLine: [openStatus.statusLabel, place.city || '', distanceLabel || ''].filter(Boolean).join(' · '),
     mapsLabel,
-    googleMapsPlaceUrl: buildGoogleMapsPlaceUrl({ lat: place.lat, lng: place.lng }, mapsLabel),
-    googleMapsDirectionsUrl: buildGoogleMapsDirectionsUrl(
-      { lat: place.lat, lng: place.lng },
-      viewerLocation || undefined,
-    ),
+    googleMapsPlaceUrl: buildGoogleMapsPlaceUrl(destination, mapsLabel),
+    googleMapsDirectionsUrl: googleMapsDirectionsByMode.driving,
+    googleMapsDirectionsByMode,
     telHref: buildTelHref(place.phone),
     whatsappHref: buildWhatsAppHref(place.phone, place.name),
   };

@@ -17,4 +17,13 @@ describe('profileAvatarSrc', () => {
       'https://images.unsplash.com/avatar.jpg',
     );
   });
+
+  it('keeps same-origin media when an internal URL is accidentally absolute', () => {
+    expect(
+      profileAvatarSrc('http://localhost:3000/uploads/avatar.webp'),
+    ).toBe('/uploads/avatar.webp');
+    expect(
+      profileAvatarSrc('https://www.lajukan.com/api/forum/media/avatar.png'),
+    ).toBe('/api/forum/media/avatar.png');
+  });
 });

@@ -19,6 +19,7 @@ import { useLocale } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { resolveMarketplaceCreatePath } from '@/lib/createRoutes';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
 import { buildCreateBasePath } from './createPageUtils';
 
@@ -73,15 +74,25 @@ function CreateDesktopSidebar({
     {
       href: supplyCreateHref,
       label: isId ? 'Tawarkan' : 'Offer',
-      caption: isId ? 'Produk, jasa, lokasi' : 'Products, services, spaces',
+      caption: PROMO_ONLY_MODE
+        ? isId
+          ? 'Produk dan jasa'
+          : 'Products and services'
+        : isId
+          ? 'Produk, jasa, lokasi'
+          : 'Products, services, spaces',
       icon: ClipboardList,
     },
     {
       href: demandCreateHref,
       label: isId ? 'Cari Kebutuhan' : 'Need Something',
-      caption: isId
-        ? 'Supplier, jasa, talent'
-        : 'Find suppliers, services, talent',
+      caption: PROMO_ONLY_MODE
+        ? isId
+          ? 'Supplier dan jasa'
+          : 'Find suppliers and services'
+        : isId
+          ? 'Supplier, jasa, talent'
+          : 'Find suppliers, services, talent',
       icon: Target,
     },
     {
@@ -92,12 +103,6 @@ function CreateDesktopSidebar({
     },
   ];
   const businessItems: CreateNavItem[] = [
-    {
-      href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
-      label: isId ? 'Profil Usaha' : 'Business profile',
-      caption: isId ? 'Profil usaha' : 'Business profile',
-      icon: Store,
-    },
     {
       href: buildCreateBasePath({
         locale,
@@ -114,28 +119,59 @@ function CreateDesktopSidebar({
         sideId: 'supply',
         typeId: 'service',
       }),
-      label: isId ? 'Jasa' : 'Services',
-      caption: isId ? 'Paket dan layanan' : 'Packages and services',
+      label: isId ? 'Paket Jasa' : 'Service package',
+      caption: isId ? 'Scope, output, harga' : 'Scope, output, price',
       icon: Wrench,
-    },
-    {
-      href: resolveMarketplaceCreatePath(locale, 'talent', 'supply'),
-      label: isId ? 'Talent' : 'Talent',
-      caption: isId
-        ? 'Skill, level, verifikasi'
-        : 'Skills, level, verification',
-      icon: Users,
     },
     {
       href: buildCreateBasePath({
         locale,
         sideId: 'supply',
-        typeId: 'property',
+        typeId: 'service',
       }),
-      label: isId ? 'Lokasi' : 'Spaces',
-      caption: isId ? 'Ruko, booth, kios' : 'Shops and booths',
-      icon: MapPin,
+      label: isId ? 'Jadi Mentor' : 'Offer mentoring',
+      caption: isId ? 'Sesi, audit, kelas' : 'Sessions, audit, class',
+      icon: Users,
     },
+    {
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'demand',
+        typeId: 'service',
+      }),
+      label: isId ? 'Cari Mentor' : 'Find mentor',
+      caption: isId ? 'Topik, budget, jadwal' : 'Topic, budget, schedule',
+      icon: Target,
+    },
+    ...(
+      PROMO_ONLY_MODE
+        ? [
+            {
+              href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
+              label: isId ? 'Profil Usaha' : 'Business profile',
+              caption: isId ? 'Alamat dan kontak' : 'Address and contact',
+              icon: Store,
+            },
+          ]
+        : [
+          {
+            href: buildCreateBasePath({
+              locale,
+              sideId: 'supply',
+              typeId: 'property',
+            }),
+            label: isId ? 'Lokasi / Alat' : 'Spaces / tools',
+            caption: isId ? 'Kios, booth, sewa alat' : 'Shops, booths, tools',
+            icon: MapPin,
+          },
+          {
+            href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
+            label: isId ? 'Profil Usaha' : 'Business profile',
+            caption: isId ? 'Alamat dan kontak' : 'Address and contact',
+            icon: Store,
+          },
+        ]
+    ),
   ];
   const renderNavItem = (item: CreateNavItem) => {
     const itemPath = item.href.split('?')[0];
@@ -226,8 +262,12 @@ function CreateDesktopSidebar({
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-emerald-800/78 dark:text-emerald-100/78">
                 {isId
-                  ? 'Pilih Tawarkan kalau Anda menyediakan sesuatu. Pilih Cari Kebutuhan kalau sedang mencari vendor.'
-                  : 'Choose Want to Sell when offering. Choose Need Something when looking.'}
+                  ? PROMO_ONLY_MODE
+                    ? 'Untuk launching awal, mulai dari profil usaha, produk, atau jasa dulu.'
+                    : 'Pilih Tawarkan kalau Anda menyediakan sesuatu. Pilih Cari Kebutuhan kalau sedang mencari vendor.'
+                  : PROMO_ONLY_MODE
+                    ? 'For early launch, start with business profile, products, or services first.'
+                    : 'Choose Want to Sell when offering. Choose Need Something when looking.'}
               </p>
             </div>
           </div>

@@ -14,11 +14,16 @@ import {
 } from '@/lib/content/ownerProfiles';
 import {
   isPlaceholderLikeContentImage,
+  normalizeContentMediaUrl,
   resolveImageGallery,
   type ContentItem as CatalogContentItem,
 } from '@/lib/content/catalog';
 import { extractContentId } from '@/lib/content/routes';
-import { requirePhoneVerifiedForListing } from '@/lib/server/phoneVerification';
+import { requireAuth } from '@/lib/serverAuth';
+import {
+  enforceCreatorBudget,
+  refundCreatorBudget,
+} from '@/lib/server/creatorBudget';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -65,17 +70,22 @@ async function readUpstreamPayload(res: Response): Promise<unknown> {
 
 function absolutizeIfRelativeUrl(value: string, origin: string): string {
   const trimmed = value.trim();
+  const normalized = normalizeContentMediaUrl(trimmed);
   if (
-    trimmed.startsWith('/api/content/media/') ||
-    trimmed.startsWith('/uploads/')
+    normalized.startsWith('/api/content/media/') ||
+    normalized.startsWith('/api/chat/media/') ||
+    normalized.startsWith('/api/forum/media/') ||
+    normalized.startsWith('/uploads/') ||
+    normalized.startsWith('data:') ||
+    normalized.startsWith('blob:')
   ) {
-    return trimmed;
+    return normalized;
   }
-  if (!trimmed.startsWith('/')) return trimmed;
+  if (!normalized.startsWith('/')) return normalized || trimmed;
   try {
-    return new URL(trimmed, origin).toString();
+    return new URL(normalized, origin).toString();
   } catch {
-    return trimmed;
+    return normalized || trimmed;
   }
 }
 
@@ -346,13 +356,9 @@ export async function PUT(
     );
   }
 
-  const token =
-    req.headers.get('authorization')?.replace('Bearer ', '') ||
-    req.cookies.get('access_token')?.value;
-
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.res;
+  const token = auth.ctx.token;
 
   const parsedBody = await parseJsonBody(req);
   if (!parsedBody.ok) return parsedBody.response;
@@ -417,12 +423,6 @@ export async function PUT(
 
   const requiresStrictValidation =
     requestedStatus === 'active' && currentStatus !== 'active';
-  if (requiresStrictValidation) {
-    const phoneVerification = await requirePhoneVerifiedForListing(token);
-    if (!phoneVerification.ok) {
-      return phoneVerification.response;
-    }
-  }
 
   if (requiresStrictValidation) {
     const mergedPayload: Record<string, unknown> = {
@@ -462,6 +462,14 @@ export async function PUT(
     setNestedString(forwardPayload, candidate.field, safety.sanitizedText);
   }
 
+  const creatorBudget = await enforceCreatorBudget({
+    userId: auth.ctx.userId,
+    action: 'edit_listing',
+    cost: 10,
+    dailyLimit: 40,
+  });
+  if (!creatorBudget.ok) return creatorBudget.response;
+
   const backendRes = await fetch(
     `${marketplaceBase}/v1/content/${resolvedContentId || resolvedParams.id}`,
     {
@@ -479,6 +487,13 @@ export async function PUT(
   );
 
   const data = await readUpstreamPayload(backendRes);
+  if (!backendRes.ok && backendRes.status >= 500) {
+    await refundCreatorBudget({
+      userId: auth.ctx.userId,
+      action: 'edit_listing',
+      cost: 10,
+    });
+  }
   return NextResponse.json(data ?? { error: 'Invalid response' }, {
     status: backendRes.status,
   });

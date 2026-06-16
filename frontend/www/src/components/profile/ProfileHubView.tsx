@@ -21,6 +21,7 @@ import {
   PROFILE_CONTENT_TABS,
   type ProfileContentTab,
 } from '@/lib/profile/profileContentTabs';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
 import {
   BadgeCheck,
@@ -134,6 +135,7 @@ export type ProfileHubViewProps = {
   user: UserLike;
   effectiveCoverUrl: string;
   effectiveAvatarUrl: string;
+  avatarBuilder?: ReactNode;
   coverUploading: boolean;
   avatarUploading: boolean;
   saving: boolean;
@@ -852,8 +854,12 @@ function ProfileGameProgress({
           ? 'Buat Reels singkat'
           : 'Upload a short reel'
         : isId
-          ? 'Balas chat dan transaksi'
-          : 'Reply to chats and deals';
+          ? PROMO_ONLY_MODE
+            ? 'Balas chat dan rapikan listing'
+            : 'Balas chat dan transaksi'
+          : PROMO_ONLY_MODE
+            ? 'Reply to chats and polish listings'
+            : 'Reply to chats and deals';
 
   return (
     <section className="relative overflow-hidden rounded-[20px] border border-emerald-200/85 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_48%,#ecfdf5_100%)] p-3.5 text-[color:var(--app-text)] shadow-[0_18px_38px_-34px_rgba(15,23,42,0.3)] dark:border-emerald-900/70 dark:bg-[linear-gradient(135deg,#07120f_0%,#0b1b16_58%,#10251e_100%)] sm:p-4">
@@ -957,6 +963,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     user,
     effectiveCoverUrl,
     effectiveAvatarUrl,
+    avatarBuilder,
     coverUploading,
     avatarUploading,
     saving,
@@ -991,6 +998,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     qaMessage,
     onQuickApplyResumeChange,
     onSaveQuickApply,
+    dialPhone,
   } = props;
 
   useEffect(() => {
@@ -1117,8 +1125,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             cv: 'CV & Link',
             trust: 'Trust',
             activityTitle: 'Aktivitas Lajukan',
-            activitySubtitle:
-              'Reels, komunitas, listing, chat, dan transaksi dibuat kelihatan dari satu profil.',
+            activitySubtitle: PROMO_ONLY_MODE
+              ? 'Reels, komunitas, listing, chat, dan data profil dibuat kelihatan dari satu profil.'
+              : 'Reels, komunitas, listing, chat, dan transaksi dibuat kelihatan dari satu profil.',
             quickMoves: 'Satset dari profil',
             footprint: 'Jejak terbaru',
             signalMap: 'Sinyal minat',
@@ -1130,11 +1139,14 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               'Posting diskusi, foto/video, polling, dan ikut grup.',
             listingAction: 'Upload listing',
             listingDesc: 'Produk, jasa, properti, talent, rental, sampai UMKM.',
-            dealAction: 'Deal & chat',
-            dealDesc: 'Lanjut chat, negosiasi, transaksi, wallet, dan riwayat.',
+            dealAction: PROMO_ONLY_MODE ? 'Chat & minat' : 'Deal & chat',
+            dealDesc: PROMO_ONLY_MODE
+              ? 'Lanjut chat, simpan sinyal kebutuhan, dan rapikan listing dari pertanyaan user.'
+              : 'Lanjut chat, negosiasi, transaksi, wallet, dan riwayat.',
             storeAction: 'Toko UMKM',
-            storeDesc:
-              'Kelola storefront, katalog, order, QR, dan operasional.',
+            storeDesc: PROMO_ONLY_MODE
+              ? 'Kelola storefront, katalog, profil, dan chat usaha.'
+              : 'Kelola storefront, katalog, order, QR, dan operasional.',
             profileAction: 'CV / Trust',
             profileDesc: 'Lengkapi skill, link, dokumen, dan verifikasi.',
             open: 'Buka',
@@ -1149,7 +1161,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             publicProfile: 'Profil publik',
             setup: 'Setup satset',
             listings: 'Listing aktif',
-            transactions: 'Transaksi',
+            transactions: PROMO_ONLY_MODE ? 'Chat & minat' : 'Transaksi',
             professional: 'Profesional',
             skills: 'Skill',
             experience: 'Pengalaman',
@@ -1188,8 +1200,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             cv: 'CV & Links',
             trust: 'Trust',
             activityTitle: 'Lajukan activity',
-            activitySubtitle:
-              'Reels, community, listings, chat, and transactions are visible from one profile.',
+            activitySubtitle: PROMO_ONLY_MODE
+              ? 'Reels, community, listings, chats, and profile data are visible from one profile.'
+              : 'Reels, community, listings, chat, and transactions are visible from one profile.',
             quickMoves: 'Fast moves',
             footprint: 'Latest footprint',
             signalMap: 'Interest signals',
@@ -1202,12 +1215,14 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             listingAction: 'Upload listing',
             listingDesc:
               'Products, services, property, talent, rental, and UMKM.',
-            dealAction: 'Deals & chat',
-            dealDesc:
-              'Continue chats, negotiations, transactions, wallet, and history.',
+            dealAction: PROMO_ONLY_MODE ? 'Chats & interest' : 'Deals & chat',
+            dealDesc: PROMO_ONLY_MODE
+              ? 'Continue chats, save demand signals, and improve listings from user questions.'
+              : 'Continue chats, negotiations, transactions, wallet, and history.',
             storeAction: 'UMKM store',
-            storeDesc:
-              'Manage storefront, catalog, orders, QR, and operations.',
+            storeDesc: PROMO_ONLY_MODE
+              ? 'Manage storefront, catalog, profile, and business chats.'
+              : 'Manage storefront, catalog, orders, QR, and operations.',
             profileAction: 'CV / Trust',
             profileDesc: 'Complete skills, links, documents, and verification.',
             open: 'Open',
@@ -1222,7 +1237,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             publicProfile: 'Public profile',
             setup: 'Fast setup',
             listings: 'Active listings',
-            transactions: 'Transactions',
+            transactions: PROMO_ONLY_MODE ? 'Chats' : 'Transactions',
             professional: 'Professional',
             skills: 'Skills',
             experience: 'Experience',
@@ -1442,9 +1457,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         key: 'deal',
         title: copy.dealAction,
         description: copy.dealDesc,
-        href: '/transactions',
+        href: PROMO_ONLY_MODE ? '/chat' : '/transactions',
         icon: MessageCircle,
-        metric: `${txPreview.length.toLocaleString(locale)} ${isId ? 'terbaru' : 'latest'}`,
+        metric: PROMO_ONLY_MODE
+          ? isId
+            ? 'Inbox aktif'
+            : 'Active inbox'
+          : `${txPreview.length.toLocaleString(locale)} ${isId ? 'terbaru' : 'latest'}`,
         actionLabel: copy.open,
       },
       {
@@ -1453,7 +1472,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         description: copy.storeDesc,
         href: '/home',
         icon: Store,
-        metric: isId ? 'Toko + order' : 'Store + orders',
+        metric: PROMO_ONLY_MODE
+          ? isId
+            ? 'Toko + chat'
+            : 'Store + chats'
+          : isId
+            ? 'Toko + order'
+            : 'Store + orders',
         actionLabel: copy.manage,
       },
       {
@@ -1491,12 +1516,16 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         hint: isId ? 'etalase' : 'showcase',
         icon: Upload,
       },
-      {
-        label: isId ? 'Transaksi terbaru' : 'Latest deals',
-        value: txPreview.length.toLocaleString(locale),
-        hint: isId ? 'deal' : 'deals',
-        icon: BarChart3,
-      },
+      ...(!PROMO_ONLY_MODE
+        ? [
+            {
+              label: isId ? 'Transaksi terbaru' : 'Latest deals',
+              value: txPreview.length.toLocaleString(locale),
+              hint: isId ? 'deal' : 'deals',
+              icon: BarChart3,
+            },
+          ]
+        : []),
       {
         label: isId ? 'Profil siap' : 'Profile ready',
         value: `${setupPercent}%`,
@@ -1545,14 +1574,19 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       });
     }
 
-    for (const item of txPreview.slice(0, 2)) {
-      rows.push({
-        key: `tx-${item.id}`,
-        title: formatMoneyFromCents(item.amount_cents, item.currency || 'IDR'),
-        description: `${item.status || 'pending'} - ${formatDate(item.created_at)}`,
-        href: '/transactions',
-        icon: MessageCircle,
-      });
+    if (!PROMO_ONLY_MODE) {
+      for (const item of txPreview.slice(0, 2)) {
+        rows.push({
+          key: `tx-${item.id}`,
+          title: formatMoneyFromCents(
+            item.amount_cents,
+            item.currency || 'IDR',
+          ),
+          description: `${item.status || 'pending'} - ${formatDate(item.created_at)}`,
+          href: '/transactions',
+          icon: MessageCircle,
+        });
+      }
     }
 
     if (setupPercent > 0) {
@@ -1595,6 +1629,470 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       setCopyMessage(copy.copyFailed);
     }
   };
+
+  const importantSetup = [
+    {
+      label: isId ? 'Nama' : 'Name',
+      done: Boolean(fullNameInput.trim() || displayName),
+    },
+    {
+      label: isId ? 'Foto' : 'Photo',
+      done: Boolean(effectiveAvatarUrl),
+    },
+    {
+      label: isId ? 'Lokasi' : 'Location',
+      done: Boolean(locationValue),
+    },
+    {
+      label: isId ? 'Cerita singkat' : 'Short intro',
+      done: Boolean(bioInput.trim() || professionalData.summary.trim()),
+    },
+  ];
+  const previewListings = listings.slice(0, 3);
+  const simpleProfileIntro = isId
+    ? 'Layar awal cukup jawab 3 hal: siapa kamu, ada postingan apa, dan bisa dihubungi lewat mana.'
+    : 'The first screen should answer 3 things: who you are, what you show, and how people can reach you.';
+  const simpleProfileTitle = isId
+    ? 'Profil promosi kamu'
+    : 'Your promo profile';
+
+  return (
+    <div className="min-h-screen overflow-x-hidden bg-[#f6f3ec] pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-slate-950 dark:bg-slate-950 dark:text-white sm:pb-10">
+      <div className="page-shell page-shell-inset py-3 sm:py-5">
+        <div className="mx-auto grid w-full max-w-[1040px] gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#fffdf7_0%,#f2fff7_56%,#fff7e7_100%)] p-4 shadow-[0_20px_52px_-44px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#0f172a_0%,#06281d_60%,#1c1917_100%)] sm:p-5 lg:col-span-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
+                  {isId ? 'Profil sederhana' : 'Simple profile'}
+                </p>
+                <h1 className="mt-1 text-2xl font-black tracking-[-0.055em] text-slate-950 dark:text-white sm:text-3xl">
+                  {simpleProfileTitle}
+                </h1>
+                <p className="mt-2 line-clamp-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+                  {simpleProfileIntro}
+                </p>
+              </div>
+              <LocalizedLink
+                href="/create"
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
+              >
+                <Upload className="h-4 w-4" />
+                {isId ? 'Buat postingan' : 'Create post'}
+              </LocalizedLink>
+            </div>
+          </section>
+
+          <main className="min-w-0 space-y-3">
+            <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_22px_54px_-42px_rgba(15,23,42,0.28)] dark:border-white/10 dark:bg-slate-900">
+              <div className="relative h-32 bg-emerald-100 sm:h-44">
+                {effectiveCoverUrl ? (
+                  <Image
+                    src={effectiveCoverUrl}
+                    alt="Sampul profil"
+                    fill
+                    sizes="100vw"
+                    className="object-cover"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="h-full w-full bg-[linear-gradient(135deg,#d9f99d_0%,#99f6e4_48%,#fed7aa_100%)] dark:bg-[linear-gradient(135deg,#064e3b_0%,#0f172a_58%,#78350f_100%)]" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/28" />
+                <label
+                  htmlFor="simple-profile-cover-upload"
+                  className="absolute right-3 top-3 inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full bg-white/92 px-3 text-xs font-black text-slate-800 shadow-sm backdrop-blur transition hover:bg-white dark:bg-slate-950/82 dark:text-white"
+                >
+                  {coverUploading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  {isId ? 'Ganti sampul' : 'Change cover'}
+                  <input
+                    id="simple-profile-cover-upload"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={onCoverFileChange}
+                  />
+                </label>
+              </div>
+
+              <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="-mt-10 relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border-4 border-white bg-slate-100 shadow-[0_18px_36px_-26px_rgba(15,23,42,0.6)] dark:border-slate-900 dark:bg-slate-800 sm:-mt-12 sm:h-24 sm:w-24 lg:h-28 lg:w-28">
+                      <Image
+                        src={profileAvatarSrc(effectiveAvatarUrl)}
+                        alt={displayName}
+                        fill
+                        sizes="(min-width: 1024px) 112px, (min-width: 640px) 96px, 80px"
+                        className="object-cover"
+                        unoptimized
+                      />
+                      <label
+                        htmlFor="simple-profile-avatar-upload"
+                        className="absolute inset-x-1.5 bottom-1.5 inline-flex min-h-7 cursor-pointer items-center justify-center rounded-full bg-slate-950/72 px-2 text-[10px] font-black text-white backdrop-blur transition hover:bg-slate-950/86 sm:inset-x-2 sm:bottom-2 sm:px-2.5"
+                      >
+                        {avatarUploading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : isId ? (
+                          'Foto'
+                        ) : (
+                          'Photo'
+                        )}
+                        <input
+                          id="simple-profile-avatar-upload"
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={onAvatarFileChange}
+                        />
+                      </label>
+                    </div>
+                    <div className="min-w-0 pb-0 sm:pb-1">
+                      <h1 className="truncate text-2xl font-black tracking-[-0.05em] text-slate-950 dark:text-white sm:text-3xl">
+                        {displayName}
+                      </h1>
+                      {publicHandle ? (
+                        <p className="mt-0.5 truncate text-xs font-black text-emerald-700 dark:text-emerald-300">
+                          @{publicHandle}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-slate-600 dark:text-slate-300">
+                        {headlineValue}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {phoneValue ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-700 dark:bg-orange-400/12 dark:text-orange-200">
+                            <Phone className="h-3 w-3" />
+                            {phoneValue}
+                          </span>
+                        ) : null}
+                        {locationValue ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
+                            <MapPin className="h-3 w-3" />
+                            {locationValue}
+                          </span>
+                        ) : null}
+                        {trustReady ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-400/12 dark:text-sky-200">
+                            <BadgeCheck className="h-3 w-3" />
+                            {isId ? 'Terverifikasi' : 'Verified'}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end md:pt-0">
+                    {avatarBuilder ? (
+                      <button
+                        type="button"
+                        onClick={() => setQuickEditOpen(true)}
+                        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 text-xs font-black text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {isId ? 'Avatar 2D' : '2D avatar'}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={copyPublicProfileUrl}
+                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                    >
+                      <Link2 className="h-3.5 w-3.5" />
+                      {copyMessage || copy.copyLink}
+                    </button>
+                    <LocalizedLink
+                      href={publicProfilePath}
+                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-slate-950 px-3 text-xs font-black text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {isId ? 'Lihat publik' : 'Public'}
+                    </LocalizedLink>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-[22px] bg-[#f7f4ed] p-3 dark:bg-white/[0.04]">
+                  <p className="line-clamp-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-300">
+                    {summaryValue}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
+              <div className="flex flex-col gap-1">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                  {isId ? 'Edit profil' : 'Edit profile'}
+                </p>
+                <h2 className="text-lg font-black tracking-[-0.03em]">
+                  {isId
+                    ? 'Cukup isi yang orang perlu tahu.'
+                    : 'Only fill what people need to know.'}
+                </h2>
+                <p className="text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+                  {isId
+                    ? 'Tidak perlu ribet. Nama, lokasi, nomor, dan cerita singkat sudah cukup untuk mulai promosi.'
+                    : 'No need to complete everything. Name, location, phone, and a short intro are enough to start.'}
+                </p>
+              </div>
+
+              {avatarBuilder ? (
+                <div className="mt-4">{avatarBuilder}</div>
+              ) : null}
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-black">
+                    {isId ? 'Nama tampil' : 'Display name'}
+                  </span>
+                  <input
+                    value={fullNameInput}
+                    onChange={event => onFullNameChange(event.target.value)}
+                    className={INPUT_CLASS}
+                    placeholder={
+                      isId ? 'Contoh: Warung Bu Sari' : 'Example: Sari Store'
+                    }
+                    autoComplete="name"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-black">
+                    {isId ? 'Nomor HP' : 'Phone number'}
+                  </span>
+                  <input
+                    value={phoneInput}
+                    onChange={event => onPhoneChange(event.target.value)}
+                    className={INPUT_CLASS}
+                    placeholder="08xxxxxxxxxx"
+                    autoComplete="tel"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-black">
+                    {isId ? 'Lokasi' : 'Location'}
+                  </span>
+                  <input
+                    value={locationInput}
+                    onChange={event => onLocationChange(event.target.value)}
+                    className={INPUT_CLASS}
+                    placeholder={isId ? 'Kota / Kecamatan' : 'City / district'}
+                    autoComplete="address-level2"
+                  />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-black">
+                    {isId ? 'Link profil' : 'Profile link'}
+                  </span>
+                  <input
+                    value={usernameInput}
+                    onChange={event => onUsernameChange(event.target.value)}
+                    className={INPUT_CLASS}
+                    placeholder="nama-usaha"
+                    autoComplete="username"
+                  />
+                </label>
+                <label className="space-y-1.5 sm:col-span-2">
+                  <span className="text-sm font-black">
+                    {isId ? 'Cerita singkat' : 'Short intro'}
+                  </span>
+                  <textarea
+                    value={bioInput}
+                    onChange={event => onBioChange(event.target.value)}
+                    rows={4}
+                    className={INPUT_CLASS}
+                    placeholder={
+                      isId
+                        ? 'Contoh: Jual snack rumahan, katering harian, dan bisa pesan untuk acara kecil.'
+                        : 'Example: Home-made snacks, daily catering, and small event orders.'
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={onSaveProfile}
+                  disabled={saving || avatarUploading || coverUploading}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {isId ? 'Simpan profil' : 'Save profile'}
+                </button>
+                {saveMessage ? (
+                  <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                    {saveMessage}
+                  </p>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                    {isId ? 'Postingan' : 'Posts'}
+                  </p>
+                  <h2 className="text-lg font-black tracking-[-0.03em]">
+                    {isId
+                      ? 'Yang sedang kamu tampilkan.'
+                      : 'What you are showing.'}
+                  </h2>
+                </div>
+                <LocalizedLink
+                  href="/create"
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-slate-950 px-3 text-xs font-black text-white dark:bg-white dark:text-slate-950"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {isId ? 'Posting' : 'Post'}
+                </LocalizedLink>
+              </div>
+
+              {previewListings.length === 0 ? (
+                <div className="mt-4 rounded-[20px] border border-dashed border-slate-200 bg-[#f7f4ed] p-4 text-center dark:border-white/10 dark:bg-white/[0.04]">
+                  <p className="text-sm font-black">
+                    {isId
+                      ? 'Belum ada postingan aktif.'
+                      : 'No active posts yet.'}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">
+                    {isId
+                      ? 'Buat satu postingan produk, jasa, atau kebutuhan agar orang bisa menemukan kamu.'
+                      : 'Create one product, service, or need post so people can find you.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-2">
+                  {previewListings.map(item => (
+                    <LocalizedLink
+                      key={item.id}
+                      href="/my-listings"
+                      className="flex min-w-0 items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-[#f7f4ed] px-3 py-3 transition hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.04]"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-black">
+                          {item.title ||
+                            (isId ? 'Postingan tanpa judul' : 'Untitled post')}
+                        </span>
+                        <span className="mt-0.5 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          {(item.content_type || 'post').toUpperCase()} -{' '}
+                          {formatDate(item.created_at)}
+                        </span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                    </LocalizedLink>
+                  ))}
+                </div>
+              )}
+            </section>
+          </main>
+
+          <aside className="space-y-3 lg:sticky lg:top-[calc(88px+env(safe-area-inset-top))] lg:self-start">
+            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black">
+                    {isId ? 'Profil siap' : 'Profile ready'}
+                  </p>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {setupPercent}% {isId ? 'terisi' : 'complete'}
+                  </p>
+                </div>
+                <span className="grid h-11 w-11 place-items-center rounded-[18px] bg-emerald-50 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
+                  <Sparkles className="h-5 w-5" />
+                </span>
+              </div>
+              <div className="mt-3">
+                <ProgressBar value={setupPercent} />
+              </div>
+              <div className="mt-3 grid gap-2">
+                {importantSetup.map(item => (
+                  <div
+                    key={item.label}
+                    className="flex items-center justify-between gap-3 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]"
+                  >
+                    <span className="text-sm font-semibold">{item.label}</span>
+                    {item.done ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <span className="text-xs font-bold text-slate-400">
+                        {isId ? 'Belum' : 'Missing'}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
+              <p className="text-sm font-black">
+                {isId ? 'Butuh apa sekarang?' : 'What do you need now?'}
+              </p>
+              <div className="mt-3 grid gap-2">
+                <LocalizedLink
+                  href="/chat"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  {isId ? 'Buka chat' : 'Open chat'}
+                </LocalizedLink>
+                <LocalizedLink
+                  href="/my-listings"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                >
+                  <Store className="h-4 w-4" />
+                  {isId ? 'Kelola postingan' : 'Manage posts'}
+                </LocalizedLink>
+                {dialPhone ? (
+                  <a
+                    href={`tel:${dialPhone}`}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                  >
+                    <Phone className="h-4 w-4" />
+                    {isId ? 'Telepon' : 'Call'}
+                  </a>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
+              <p className="text-sm font-black">
+                {isId ? 'Kontak' : 'Contact'}
+              </p>
+              <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                <div className="flex min-w-0 items-center gap-2 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]">
+                  <Mail className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                  <span className="truncate">{emailValue || '-'}</span>
+                </div>
+                <div className="flex min-w-0 items-center gap-2 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]">
+                  <Phone className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                  <span className="truncate">{phoneValue || '-'}</span>
+                </div>
+                <div className="flex min-w-0 items-center gap-2 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]">
+                  <MapPin className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
+                  <span className="truncate">{locationValue || '-'}</span>
+                </div>
+              </div>
+            </section>
+
+            {profileError ? (
+              <section className="rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+                {profileError}
+              </section>
+            ) : null}
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className={PAGE_CLASS}>
@@ -2261,63 +2759,65 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     )}
                   </SectionBlock>
 
-                  <SectionBlock
-                    title={copy.transactions}
-                    tone="trust"
-                    subtitle={
-                      isId
-                        ? 'Riwayat paling baru, cukup yang penting.'
-                        : 'Latest history, only the important bits.'
-                    }
-                    action={
-                      <LocalizedLink
-                        href="/transactions"
-                        className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--app-accent)]"
-                      >
-                        {isId ? 'Buka' : 'Open'}
-                        <ChevronRight className="h-4 w-4" />
-                      </LocalizedLink>
-                    }
-                  >
-                    {txPreview.length === 0 ? (
-                      <EmptyState
-                        title={
-                          isId ? 'Belum ada transaksi' : 'No transactions yet'
-                        }
-                        description={
-                          isId
-                            ? 'Transaksi baru akan muncul di sini.'
-                            : 'New transactions will appear here.'
-                        }
-                      />
-                    ) : (
-                      <div className="space-y-2">
-                        {txPreview.map(item => (
-                          <div
-                            key={item.id}
-                            className={cn(MUTED_ROW_CLASS, 'p-2.5')}
-                          >
-                            <div className="flex items-center justify-between gap-2.5">
-                              <div className="min-w-0">
-                                <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                                  {formatMoneyFromCents(
-                                    item.amount_cents,
-                                    item.currency || 'IDR',
-                                  )}
-                                </p>
-                                <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                                  {formatDate(item.created_at)}
-                                </p>
+                  {!PROMO_ONLY_MODE ? (
+                    <SectionBlock
+                      title={copy.transactions}
+                      tone="trust"
+                      subtitle={
+                        isId
+                          ? 'Riwayat paling baru, cukup yang penting.'
+                          : 'Latest history, only the important bits.'
+                      }
+                      action={
+                        <LocalizedLink
+                          href="/transactions"
+                          className="inline-flex items-center gap-1 text-sm font-semibold text-[color:var(--app-accent)]"
+                        >
+                          {isId ? 'Buka' : 'Open'}
+                          <ChevronRight className="h-4 w-4" />
+                        </LocalizedLink>
+                      }
+                    >
+                      {txPreview.length === 0 ? (
+                        <EmptyState
+                          title={
+                            isId ? 'Belum ada transaksi' : 'No transactions yet'
+                          }
+                          description={
+                            isId
+                              ? 'Transaksi baru akan muncul di sini.'
+                              : 'New transactions will appear here.'
+                          }
+                        />
+                      ) : (
+                        <div className="space-y-2">
+                          {txPreview.map(item => (
+                            <div
+                              key={item.id}
+                              className={cn(MUTED_ROW_CLASS, 'p-2.5')}
+                            >
+                              <div className="flex items-center justify-between gap-2.5">
+                                <div className="min-w-0">
+                                  <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                    {formatMoneyFromCents(
+                                      item.amount_cents,
+                                      item.currency || 'IDR',
+                                    )}
+                                  </p>
+                                  <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                                    {formatDate(item.created_at)}
+                                  </p>
+                                </div>
+                                <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-muted)]">
+                                  {item.status || 'pending'}
+                                </span>
                               </div>
-                              <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-muted)]">
-                                {item.status || 'pending'}
-                              </span>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </SectionBlock>
+                          ))}
+                        </div>
+                      )}
+                    </SectionBlock>
+                  ) : null}
                 </>
               ) : null}
 
@@ -2774,6 +3274,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         }
       >
         <div className="space-y-3">
+          {avatarBuilder ? avatarBuilder : null}
+
           <label className="block space-y-1.5">
             <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId ? 'Nama tampil' : 'Display name'}

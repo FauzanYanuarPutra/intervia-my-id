@@ -1,7 +1,14 @@
 // app/[locale]/contact/page.tsx
 import { Metadata } from 'next';
 import { LocalizedLink } from '@/components/ui-kit';
-import { ArrowUpRight, Mail, MessageCircle, Phone, ShieldCheck } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Mail,
+  MessageCircle,
+  Phone,
+  ReceiptText,
+  ShieldCheck,
+} from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Hubungi Kami | Lajukan',
@@ -24,6 +31,9 @@ type PageProps = {
 export default async function ContactPage({ params }: PageProps) {
   const { locale } = await params;
   const isId = locale === 'id';
+  const businessPhone = '0821 1714 8623';
+  const businessPhoneHref = 'tel:+6282117148623';
+  const businessWhatsappHref = 'https://wa.me/6282117148623';
 
   const channels = [
     {
@@ -37,13 +47,23 @@ export default async function ContactPage({ params }: PageProps) {
       external: true,
     },
     {
-      href: 'tel:+622112345678',
+      href: businessPhoneHref,
       title: isId ? 'Hotline' : 'Hotline',
       desc: isId
-        ? 'Mendesak.'
+        ? 'Kontak bisnis resmi untuk bantuan akun, listing, pembayaran, dan verifikasi.'
         : 'For urgent issues, quick verification, and sensitive cases.',
-      meta: '+62 21 1234 5678',
+      meta: businessPhone,
       icon: Phone,
+      external: true,
+    },
+    {
+      href: businessWhatsappHref,
+      title: 'WhatsApp',
+      desc: isId
+        ? 'Jalur cepat untuk tanya status listing, order, pembayaran, atau kerja sama.'
+        : 'Fast path for listing, order, payment, or partnership questions.',
+      meta: businessPhone,
+      icon: MessageCircle,
       external: true,
     },
     {
@@ -73,7 +93,7 @@ export default async function ContactPage({ params }: PageProps) {
             : 'Start from the closest context: suppliers, transactions, storefronts, or trust. Keep it short so the team can act quickly.'}
         </p>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {channels.map(channel => {
             const Icon = channel.icon;
             const content = (
@@ -104,6 +124,45 @@ export default async function ContactPage({ params }: PageProps) {
           })}
         </div>
 
+        <div className="mt-4 grid gap-3 rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-sm text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] lg:grid-cols-3">
+          <div>
+            <p className="font-black text-[color:var(--app-text)]">
+              {isId ? 'Informasi bisnis' : 'Business information'}
+            </p>
+            <p className="mt-1 leading-6">
+              {isId
+                ? 'Lajukan menyediakan discovery listing produk, jasa, supplier, lokasi usaha, komunitas, chat, dan halaman usaha.'
+                : 'Lajukan provides product, service, supplier, business-location discovery, communities, chat, and business profiles.'}
+            </p>
+          </div>
+          <div>
+            <p className="font-black text-[color:var(--app-text)]">
+              {isId ? 'Pembayaran' : 'Payments'}
+            </p>
+            <p className="mt-1 leading-6">
+              {isId
+                ? 'Semua harga dan transaksi yang aktif memakai Rupiah (IDR). Pembayaran diproses dari halaman Lajukan.'
+                : 'All active prices and transactions use Indonesian Rupiah (IDR). Payments are processed from Lajukan pages.'}
+            </p>
+          </div>
+          <div>
+            <p className="font-black text-[color:var(--app-text)]">
+              {isId ? 'Kebijakan' : 'Policies'}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <LocalizedLink href="/terms" className="ui-button-secondary inline-flex min-h-9 items-center px-3 text-xs">
+                {isId ? 'Syarat' : 'Terms'}
+              </LocalizedLink>
+              <LocalizedLink href="/privacy" className="ui-button-secondary inline-flex min-h-9 items-center px-3 text-xs">
+                {isId ? 'Privasi' : 'Privacy'}
+              </LocalizedLink>
+              <LocalizedLink href="/refund-policy" className="ui-button-secondary inline-flex min-h-9 items-center px-3 text-xs">
+                {isId ? 'Refund & retur' : 'Refunds & returns'}
+              </LocalizedLink>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <LocalizedLink
             href="/support"
@@ -118,6 +177,13 @@ export default async function ContactPage({ params }: PageProps) {
           >
             <ShieldCheck className="h-4 w-4" />
             {isId ? 'Trust center' : 'Trust center'}
+          </LocalizedLink>
+          <LocalizedLink
+            href="/refund-policy"
+            className="ui-button-secondary inline-flex items-center gap-2 px-4"
+          >
+            <ReceiptText className="h-4 w-4" />
+            {isId ? 'Refund & retur' : 'Refunds & returns'}
           </LocalizedLink>
         </div>
       </section>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJwtSubject } from '@/lib/server/jwtPayload';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -123,10 +124,17 @@ export async function GET(req: NextRequest) {
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       }),
-      fetch(`${MARKETPLACE_URL}/v1/wallet/balance`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      }),
+      PROMO_ONLY_MODE
+        ? Promise.resolve(
+            new Response(JSON.stringify({ accounts: [] }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        : fetch(`${MARKETPLACE_URL}/v1/wallet/balance`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: 'no-store',
+          }),
     ]);
 
     if (contentResult.status === 'fulfilled' && contentResult.value.ok) {

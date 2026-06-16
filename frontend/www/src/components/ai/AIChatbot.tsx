@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
 import { buildAiChatPayload } from '@/lib/aiChat';
+import { AI_CHAT_ENABLED } from '@/lib/featureFlags';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -18,6 +19,7 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 export function AIChatbot() {
+  if (!AI_CHAT_ENABLED) return null;
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');

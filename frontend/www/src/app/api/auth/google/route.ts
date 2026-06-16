@@ -2,8 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `${BASE_URL}/api/auth/google/callback`;
+
+function getPublicBaseUrl(req: NextRequest): string {
+  const envBase =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_WWW_URL || '';
+  if (envBase.trim()) return envBase.replace(/\/$/, '');
+  return req.nextUrl.origin || 'https://www.lajukan.com';
+}
+
+function getGoogleRedirectUri(req: NextRequest): string {
+  return (
+    process.env.GOOGLE_REDIRECT_URI ||
+    `${getPublicBaseUrl(req)}/api/auth/google/callback`
+  );
+}
 
 function getPreferredLocale(req: NextRequest, callbackUrl?: string | null): 'id' | 'en' {
   if (callbackUrl?.startsWith('/en')) return 'en';
@@ -28,9 +40,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const callbackUrl = searchParams.get('callbackUrl') || '/home';
   const preferredLocale = getPreferredLocale(req, callbackUrl);
+  const baseUrl = getPublicBaseUrl(req);
 
   if (!GOOGLE_CLIENT_ID) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     return NextResponse.redirect(`${baseUrl}/${preferredLocale}/login?error=oauth_not_configured`);
   }
 
@@ -39,7 +51,7 @@ export async function GET(req: NextRequest) {
 
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: GOOGLE_REDIRECT_URI,
+    redirect_uri: getGoogleRedirectUri(req),
     response_type: 'code',
     scope: 'openid email profile',
     state,

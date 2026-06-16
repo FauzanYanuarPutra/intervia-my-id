@@ -13,5 +13,5 @@ export async function getBaseUrl(): Promise<string> {
     // Fall back to env/default when headers are unavailable.
   }
 
-  return envBase ? envBase.replace(/\/$/, '') : 'http://localhost:3000';
+  return envBase ? envBase.replace(/\/$/, '') : 'https://www.lajukan.com';
 }

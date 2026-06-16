@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -7,6 +8,12 @@ const MARKETPLACE_URL =
 
 export async function GET(req: NextRequest) {
   try {
+    if (PROMO_ONLY_MODE) {
+      return NextResponse.json(
+        { error: 'Transactions are disabled for now' },
+        { status: 404 },
+      );
+    }
     const token =
       req.headers.get('authorization')?.replace('Bearer ', '') ||
       req.cookies.get('access_token')?.value;

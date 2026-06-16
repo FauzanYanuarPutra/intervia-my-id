@@ -8,7 +8,11 @@ import {
   toUpsertListingPayload,
   validateListingPayload,
 } from '@/lib/content/listingFlowRules';
-import { requirePhoneVerifiedForListing } from '@/lib/server/phoneVerification';
+import { normalizeContentMediaUrl } from '@/lib/content/catalog';
+import {
+  enforceCreatorBudget,
+  refundCreatorBudget,
+} from '@/lib/server/creatorBudget';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -49,17 +53,22 @@ async function readUpstreamPayload(res: Response): Promise<unknown> {
 
 function absolutizeIfRelativeUrl(value: string, origin: string): string {
   const trimmed = value.trim();
+  const normalized = normalizeContentMediaUrl(trimmed);
   if (
-    trimmed.startsWith('/api/content/media/') ||
-    trimmed.startsWith('/uploads/')
+    normalized.startsWith('/api/content/media/') ||
+    normalized.startsWith('/api/chat/media/') ||
+    normalized.startsWith('/api/forum/media/') ||
+    normalized.startsWith('/uploads/') ||
+    normalized.startsWith('data:') ||
+    normalized.startsWith('blob:')
   ) {
-    return trimmed;
+    return normalized;
   }
-  if (!trimmed.startsWith('/')) return trimmed;
+  if (!normalized.startsWith('/')) return normalized || trimmed;
   try {
-    return new URL(trimmed, origin).toString();
+    return new URL(normalized, origin).toString();
   } catch {
-    return trimmed;
+    return normalized || trimmed;
   }
 }
 
@@ -198,11 +207,6 @@ export async function POST(req: NextRequest) {
     const auth = await requireAuth(req);
     if (!auth.ok) return auth.res;
 
-    const phoneVerification = await requirePhoneVerifiedForListing(
-      auth.ctx.token,
-    );
-    if (!phoneVerification.ok) return phoneVerification.response;
-
     const ip = getClientIp(req);
     const ipRateLimit = await enforceRateLimit({
       key: `content:create:ip:${ip}`,
@@ -251,6 +255,14 @@ export async function POST(req: NextRequest) {
       setNestedString(forwardPayload, candidate.field, safety.sanitizedText);
     }
 
+    const creatorBudget = await enforceCreatorBudget({
+      userId: auth.ctx.userId,
+      action: 'create_listing',
+      cost: 10,
+      dailyLimit: 10,
+    });
+    if (!creatorBudget.ok) return creatorBudget.response;
+
     const res = await fetch(`${MARKETPLACE_URL}/v1/content`, {
       method: 'POST',
       headers: {
@@ -267,6 +279,13 @@ export async function POST(req: NextRequest) {
     const data = await readUpstreamPayload(res);
     if (!res.ok) {
       console.error('[CREATE_CONTENT_ERROR]', res.status, data);
+      if (res.status >= 500) {
+        await refundCreatorBudget({
+          userId: auth.ctx.userId,
+          action: 'create_listing',
+          cost: 10,
+        });
+      }
     }
     return NextResponse.json(data ?? { error: 'Invalid response' }, {
       status: res.status,

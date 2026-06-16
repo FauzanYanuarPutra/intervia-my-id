@@ -34,7 +34,7 @@ const MAX_METADATA_DEPTH: usize = 6;
 const MAX_METADATA_ARRAY_ITEMS: usize = 64;
 const MAX_METADATA_OBJECT_KEYS: usize = 80;
 const MAX_STRING_LEN: usize = 500;
-const DEFAULT_PROFILE_AVATAR: &str = "/default-avatar.svg";
+const MAX_PROFILE_MEDIA_URL_LEN: usize = 32 * 1024;
 
 // ============================================================
 // Types
@@ -252,6 +252,44 @@ fn normalize_http_url(raw: &str) -> Option<String> {
         return None;
     }
     Some(value.to_string())
+}
+
+fn normalize_profile_media_url(raw: &str, allow_inline_svg: bool) -> Option<String> {
+    let value = raw.trim();
+    if value.is_empty() || value.len() > MAX_PROFILE_MEDIA_URL_LEN {
+        return None;
+    }
+
+    let lower = value.to_ascii_lowercase();
+    if lower.starts_with("http://") || lower.starts_with("https://") {
+        return Some(value.to_string());
+    }
+
+    if value.starts_with('/') && !value.starts_with("//") {
+        return Some(value.to_string());
+    }
+
+    if allow_inline_svg && lower.starts_with("data:image/svg+xml") {
+        let blocked = [
+            "<script",
+            "%3cscript",
+            "javascript:",
+            "javascript%3a",
+            "onload",
+            "onerror",
+            "foreignobject",
+            "%3cforeignobject",
+            "%3ciframe",
+            "%3cobject",
+            "%3cembed",
+        ];
+        if blocked.iter().any(|needle| lower.contains(needle)) {
+            return None;
+        }
+        return Some(value.to_string());
+    }
+
+    None
 }
 
 fn normalize_url_list(values: Option<Vec<String>>, max_items: usize) -> Option<Vec<String>> {
@@ -545,9 +583,10 @@ pub async fn update_me_profile(
     let phone = normalize_optional_text(payload.phone);
     let location = normalize_optional_text(payload.location);
     let bio = normalize_optional_text(payload.bio);
-    let avatar_url = Some(DEFAULT_PROFILE_AVATAR.to_string());
-    let cover_image =
-        normalize_optional_text(payload.cover_image).and_then(|value| normalize_http_url(&value));
+    let avatar_url = normalize_optional_text(payload.avatar_url)
+        .and_then(|value| normalize_profile_media_url(&value, true));
+    let cover_image = normalize_optional_text(payload.cover_image)
+        .and_then(|value| normalize_profile_media_url(&value, false));
     let roles = normalize_roles(payload.roles);
     let image_urls = normalize_url_list(payload.image_urls, 40);
     let document_urls = normalize_url_list(payload.document_urls, 24);
@@ -792,6 +831,19 @@ pub async fn update_me_profile(
             _ => serde_json::Map::new(),
         };
         for (key, value) in metadata_patch {
+            if key == "extended" {
+                if let Value::Object(next_extended) = value {
+                    let mut existing_extended = match merged.remove("extended") {
+                        Some(Value::Object(map)) => map,
+                        _ => serde_json::Map::new(),
+                    };
+                    for (extended_key, extended_value) in next_extended {
+                        existing_extended.insert(extended_key, extended_value);
+                    }
+                    merged.insert(key, Value::Object(existing_extended));
+                    continue;
+                }
+            }
             merged.insert(key, value);
         }
 

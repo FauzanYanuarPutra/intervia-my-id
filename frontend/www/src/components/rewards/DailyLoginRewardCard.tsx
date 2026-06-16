@@ -15,6 +15,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
 
 type RewardBalance = {
@@ -112,6 +113,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
   >('idle');
 
   const loadRewardBalance = useCallback(() => {
+    if (PROMO_ONLY_MODE) return;
     if (!user) return;
     setStatus('loading');
     setErrorMessage(null);
@@ -136,12 +138,14 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
   }, [authFetch, isId, user]);
 
   useEffect(() => {
+    if (PROMO_ONLY_MODE) return;
     if (loading) return;
     if (!user) return;
     loadRewardBalance();
   }, [loadRewardBalance, loading, user]);
 
   const handleClaim = async () => {
+    if (PROMO_ONLY_MODE) return;
     if (!user || status === 'claiming') return;
     setStatus('claiming');
     setErrorMessage(null);
@@ -169,6 +173,8 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
 
   const rewardCardShellClass =
     'lajukan-daily-reward-card relative overflow-hidden rounded-[22px] border border-amber-200/90 bg-amber-50 text-[color:var(--app-text)] shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-amber-800/70 dark:bg-amber-950/20';
+
+  if (PROMO_ONLY_MODE) return null;
 
   if (loading) {
     return (

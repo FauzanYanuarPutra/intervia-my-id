@@ -58,16 +58,22 @@ const FAILED_LOGIN_DELAY_MS: u64 = 200;
 // -------------------- Request / Response types --------------------
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
-    pub phone: String,
+    #[serde(default)]
+    pub phone: Option<String>,
     #[serde(default)]
     pub email: Option<String>,
+    #[serde(default)]
     pub full_name: Option<String>,
-    pub username: Option<String>,
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
-    pub email: String,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
     pub password: String,
 }
 
@@ -292,6 +298,43 @@ fn normalize_optional_email(raw: Option<&str>) -> Option<String> {
             Some(email)
         }
     })
+}
+
+fn normalize_username(raw: &str) -> String {
+    raw.trim()
+        .trim_start_matches('@')
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '_' || *ch == '.')
+        .collect()
+}
+
+fn validate_username(username: &str) -> Result<(), &'static str> {
+    if username.len() < 3 {
+        return Err("username too short");
+    }
+    if username.len() > 30 {
+        return Err("username too long");
+    }
+    if username.starts_with('.') || username.ends_with('.') || username.contains("..") {
+        return Err("username format is invalid");
+    }
+    if !username
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '.')
+    {
+        return Err("username contains unsupported characters");
+    }
+    Ok(())
+}
+
+fn mask_identifier_for_log(raw: &str) -> String {
+    let trimmed = raw.trim();
+    let visible: String = trimmed.chars().take(3).collect();
+    if visible.chars().count() < 3 {
+        return "***".to_string();
+    }
+    format!("{}***", visible)
 }
 
 fn verify_reset_proof(secret: &str, proof: &str, email: &str) -> bool {
@@ -617,28 +660,56 @@ pub async fn register(
     let secure_cookie = should_secure_cookies(&state, &headers);
     let (ip_address, user_agent) = extract_audit_info(&headers);
 
-    let phone = normalize_phone_digits(&payload.phone);
-    let masked_phone = mask_phone_for_log(&phone);
+    let phone = payload
+        .phone
+        .as_deref()
+        .map(normalize_phone_digits)
+        .filter(|value| !value.is_empty());
+    let masked_phone = phone.as_deref().map(mask_phone_for_log);
     let email = normalize_optional_email(payload.email.as_deref());
+    let username = normalize_username(&payload.username);
+    let username_attempt = mask_identifier_for_log(&username);
 
-    if phone.len() < 8 {
+    if let Err(reason) = validate_username(&username) {
         record_audit_log(
             state.clone(),
             "user".to_string(),
             "register.conflict",
             None,
             None,
-            Some(json!({"phone_attempt": masked_phone})),
+            Some(json!({"username_attempt": username_attempt, "reason": reason})),
             ip_address.clone(),
             user_agent.clone(),
         )
         .await;
 
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error":"invalid phone number"})),
-        )
-            .into_response();
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": reason}))).into_response();
+    }
+
+    if let Err(reason) = validate_password_strength(&payload.password) {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": reason}))).into_response();
+    }
+
+    if let Some(phone_value) = phone.as_ref() {
+        if phone_value.len() < 8 {
+            record_audit_log(
+                state.clone(),
+                "user".to_string(),
+                "register.conflict",
+                None,
+                None,
+                Some(json!({"phone_attempt": masked_phone.clone(), "reason": "invalid phone"})),
+                ip_address.clone(),
+                user_agent.clone(),
+            )
+            .await;
+
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"invalid phone number"})),
+            )
+                .into_response();
+        }
     }
 
     if let Some(email_value) = email.as_ref() {
@@ -654,12 +725,13 @@ pub async fn register(
     match sqlx::query_scalar::<_, i64>(
         r#"
         SELECT COUNT(1)
-        FROM users
-        WHERE deleted_at IS NULL
-          AND regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = $1
+        FROM user_profiles up
+        INNER JOIN users u ON u.id = up.user_id
+        WHERE u.deleted_at IS NULL
+          AND lower(up.username::text) = lower($1)
         "#,
     )
-    .bind(&phone)
+    .bind(&username)
     .fetch_one(&state.db)
     .await
     {
@@ -670,19 +742,19 @@ pub async fn register(
                 "register.conflict",
                 None,
                 None,
-                Some(json!({"phone_attempt": masked_phone})),
+                Some(json!({"username_attempt": username_attempt, "reason": "duplicate username"})),
                 ip_address.clone(),
                 user_agent.clone(),
             )
             .await;
             return (
                 StatusCode::CONFLICT,
-                Json(json!({"error": "phone number already registered"})),
+                Json(json!({"error": "username already registered"})),
             )
                 .into_response();
         }
         Err(e) => {
-            tracing::error!("DB error checking phone exists: {:?}", e);
+            tracing::error!("DB error checking username exists: {:?}", e);
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error":"db error"})),
@@ -690,6 +762,49 @@ pub async fn register(
                 .into_response();
         }
         _ => {}
+    }
+
+    if let Some(phone_value) = phone.as_ref() {
+        match sqlx::query_scalar::<_, i64>(
+            r#"
+        SELECT COUNT(1)
+        FROM users
+        WHERE deleted_at IS NULL
+          AND regexp_replace(COALESCE(phone, ''), '[^0-9]', '', 'g') = $1
+        "#,
+        )
+        .bind(phone_value)
+        .fetch_one(&state.db)
+        .await
+        {
+            Ok(count) if count > 0 => {
+                record_audit_log(
+                    state.clone(),
+                    "user".to_string(),
+                    "register.conflict",
+                    None,
+                    None,
+                    Some(json!({"phone_attempt": masked_phone.clone()})),
+                    ip_address.clone(),
+                    user_agent.clone(),
+                )
+                .await;
+                return (
+                    StatusCode::CONFLICT,
+                    Json(json!({"error": "phone number already registered"})),
+                )
+                    .into_response();
+            }
+            Err(e) => {
+                tracing::error!("DB error checking phone exists: {:?}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error":"db error"})),
+                )
+                    .into_response();
+            }
+            _ => {}
+        }
     }
 
     if let Some(email_value) = email.as_ref() {
@@ -720,6 +835,17 @@ pub async fn register(
     }
 
     let user_id = Uuid::new_v4();
+    let password_hash = match hash_password(&payload.password).await {
+        Ok(hash) => hash,
+        Err(error) => {
+            tracing::error!("hash password error on register: {:?}", error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error":"password setup failed"})),
+            )
+                .into_response();
+        }
+    };
 
     // Mulai transaksi DB
     let mut tx = match state.db.begin().await {
@@ -736,12 +862,13 @@ pub async fn register(
 
     // Insert user
     let res = sqlx::query(
-        r#"INSERT INTO users (id, email, phone, phone_verified, password_hash, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, TRUE, NULL, TRUE, NOW(), NOW())"#,
+        r#"INSERT INTO users (id, email, email_verified, phone, phone_verified, password_hash, is_active, created_at, updated_at)
+            VALUES ($1, $2, FALSE, $3, FALSE, $4, TRUE, NOW(), NOW())"#,
     )
     .bind(user_id)
     .bind(email.clone())
-    .bind(&phone)
+    .bind(phone.clone())
+    .bind(&password_hash)
     .execute(&mut *tx)
     .await;
 
@@ -755,26 +882,31 @@ pub async fn register(
             .into_response();
     }
 
-    // Insert profile jika ada
-    if payload.full_name.is_some() || payload.username.is_some() {
-        if let Err(e) = sqlx::query(
-            r#"INSERT INTO user_profiles (user_id, full_name, username, created_at)
-                VALUES ($1, $2, $3, NOW())"#,
-        )
-        .bind(user_id)
-        .bind(payload.full_name.clone())
-        .bind(payload.username.clone())
-        .execute(&mut *tx)
-        .await
-        {
-            tracing::error!("insert profile error: {:?}", e);
-            let _ = tx.rollback().await;
+    if let Err(e) = sqlx::query(
+        r#"INSERT INTO user_profiles (user_id, full_name, username, created_at)
+            VALUES ($1, $2, $3, NOW())"#,
+    )
+    .bind(user_id)
+    .bind(payload.full_name.clone())
+    .bind(username.clone())
+    .execute(&mut *tx)
+    .await
+    {
+        tracing::error!("insert profile error: {:?}", e);
+        let _ = tx.rollback().await;
+        let error_text = e.to_string().to_lowercase();
+        if error_text.contains("duplicate") || error_text.contains("unique") {
             return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error":"db error"})),
+                StatusCode::CONFLICT,
+                Json(json!({"error": "username already registered"})),
             )
                 .into_response();
         }
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"db error"})),
+        )
+            .into_response();
     }
 
     // Commit transaksi
@@ -812,15 +944,10 @@ pub async fn register(
             roles: vec![],
             permissions: vec![],
         });
-    let username = payload
-        .username
-        .clone()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| format!("user_{}", &phone[phone.len().saturating_sub(4)..]));
     let access_token = match create_access_token(
         &state.config.jwt_secret,
         user_id,
-        username,
+        username.clone(),
         ACCESS_TOKEN_EXP_HOURS,
         rp.roles.clone(),
         rp.permissions.clone(),
@@ -871,7 +998,9 @@ pub async fn register(
         Some(json!({
             "phone": masked_phone,
             "email": email.clone(),
-            "method": "phone_otp"
+            "username": username_attempt,
+            "method": "username_password",
+            "verified": false
         })),
         ip_address,
         user_agent,
@@ -918,8 +1047,11 @@ pub async fn register(
                 "id": user_id,
                 "phone": phone,
                 "email": email,
+                "username": username,
                 "roles": rp.roles,
-                "permissions": rp.permissions
+                "permissions": rp.permissions,
+                "phone_verified": false,
+                "email_verified": false
             }
         })),
     )
@@ -933,11 +1065,19 @@ pub async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> impl IntoResponse {
     let secure_cookie = should_secure_cookies(&state, &headers);
-    let email = payload.email.trim().to_lowercase();
+    let identifier = payload
+        .username
+        .as_deref()
+        .or(payload.email.as_deref())
+        .unwrap_or_default()
+        .trim()
+        .trim_start_matches('@')
+        .to_lowercase();
+    let identifier_attempt = mask_identifier_for_log(&identifier);
     let (ip_address, user_agent) = extract_audit_info(&headers);
 
     // 1. Validasi dasar input
-    if email.is_empty() || payload.password.is_empty() {
+    if identifier.is_empty() || payload.password.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({"error":"invalid input"})),
@@ -950,9 +1090,14 @@ pub async fn login(
         r#"SELECT u.id, u.password_hash, u.is_active, u.failed_login_attempts, 
                     u.lockout_expires_at, up.username
             FROM users u LEFT JOIN user_profiles up ON u.id = up.user_id
-            WHERE u.email = $1 AND u.deleted_at IS NULL LIMIT 1"#,
+            WHERE u.deleted_at IS NULL
+              AND (
+                lower(COALESCE(u.email::text, '')) = lower($1)
+                OR lower(COALESCE(up.username::text, '')) = lower($1)
+              )
+            LIMIT 1"#,
     )
-    .bind(&email)
+    .bind(&identifier)
     .fetch_optional(&state.db)
     .await
     {
@@ -966,7 +1111,7 @@ pub async fn login(
                 "login.failed",
                 None,
                 None,
-                Some(json!({"email_attempt": email.clone(), "reason": "not found"})),
+                Some(json!({"identifier_attempt": identifier_attempt.clone(), "reason": "not found"})),
                 ip_address.clone(),
                 user_agent.clone(),
             )
@@ -1048,7 +1193,7 @@ pub async fn login(
             "login.failed",
             Some(user_data.id),
             Some(user_data.id),
-            Some(json!({"email_attempt": email.clone(), "reason": "wrong password"})),
+            Some(json!({"identifier_attempt": identifier_attempt.clone(), "reason": "wrong password"})),
             ip_address.clone(),
             user_agent.clone(),
         )
@@ -1138,7 +1283,7 @@ pub async fn login(
         "login.success",
         Some(user_data.id),
         Some(user_data.id),
-        Some(json!({"email_attempt": email})),
+        Some(json!({"identifier_attempt": identifier_attempt})),
         ip_address,
         user_agent,
     )

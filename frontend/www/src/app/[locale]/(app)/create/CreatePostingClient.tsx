@@ -7,6 +7,7 @@ import { useLocale } from 'next-intl';
 import { useAuth } from '@/context/AuthContext';
 import { CONTENT_TYPES, getContentTypeName } from '@/data/contentTypes';
 import { resolveMarketplaceCreatePath } from '@/lib/createRoutes';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   getSectorDescription,
   getSectorLabel,
@@ -93,7 +94,6 @@ import {
   BadgeDollarSign,
   BadgePercent,
   BriefcaseBusiness,
-  Building2,
   CalendarClock,
   ChevronLeft,
   ChevronRight,
@@ -101,11 +101,9 @@ import {
   ClipboardList,
   FileText,
   FolderKanban,
-  Globe2,
   Gift,
   Handshake,
   ImageIcon,
-  Info,
   Loader2,
   MapPin,
   Megaphone,
@@ -125,60 +123,6 @@ import {
   Package,
   type LucideIcon,
 } from 'lucide-react';
-const FIELD_ICON_BY_KIND: Record<SectorField['kind'], LucideIcon> = {
-  text: ScanLine,
-  number: BadgeDollarSign,
-  currency: BadgeDollarSign,
-  select: Target,
-  multiline: ClipboardList,
-  url: Globe2,
-  images: ImageIcon,
-  date: CalendarClock,
-};
-const FIELD_ICON_BY_KEY: Record<string, LucideIcon> = {
-  title: Sparkles,
-  summary: Info,
-  body: ClipboardList,
-  location: MapPin,
-  address: MapPin,
-  tags: Tag,
-  company_name: Building2,
-  must_have_skills: BriefcaseBusiness,
-  responsibilities: ClipboardList,
-  price_cents: BadgeDollarSign,
-  price_unit: BadgeDollarSign,
-  salary_range: BadgeDollarSign,
-  promo_budget_amount: BadgeDollarSign,
-  promo_target_audience: Users,
-  promo_headline: Megaphone,
-  promo_cta: Target,
-  promo_discount_kind: BadgePercent,
-  promo_discount_percent: BadgePercent,
-  promo_discount_amount: BadgeDollarSign,
-  promo_loyalty_stamp_target: Gift,
-  promo_loyalty_reward_type: Gift,
-  promo_loyalty_reward_value: BadgeDollarSign,
-  promo_raffle_prize_title: Trophy,
-  promo_raffle_prize_value: BadgeDollarSign,
-  promo_raffle_draw_date: CalendarClock,
-  promo_raffle_expected_entries: Users,
-  promo_raffle_max_winners: Trophy,
-  promo_estimated_margin_percent: BadgePercent,
-  promo_platform_fee_percent: BadgePercent,
-  promo_tax_percent: BadgePercent,
-  promo_opex_percent: BadgePercent,
-  legal_docs: ShieldCheck,
-  business_name: Store,
-  included_assets: Package,
-  handover_items: ClipboardList,
-  rating_summary: Trophy,
-  rating_transfer_policy: ShieldCheck,
-  liabilities_note: ShieldCheck,
-  reason_for_sale: Info,
-  ownership_proof: ShieldCheck,
-  cover_image: ImageIcon,
-  images: ImageIcon,
-};
 
 type PromotionOfferCardMeta = {
   offerType: PromotionOfferType;
@@ -332,16 +276,16 @@ function getSimpleModePinnedFieldKeys(
     case 'property':
     case 'tool_rental':
       return listingSide === 'demand'
-        ? ['title', 'price_cents', 'price_unit', 'location']
-        : ['title', 'price_cents', 'price_unit', 'location'];
+        ? ['title', 'price_cents', 'location']
+        : ['title', 'price_cents', 'location'];
     case 'business_transfer':
-      return ['title', 'price_cents', 'price_unit', 'location'];
+      return ['title', 'price_cents', 'location'];
     case 'service':
       return listingSide === 'demand'
-        ? ['title', 'summary', 'price_cents', 'price_unit', 'location']
-        : ['title', 'price_cents', 'price_unit', 'location'];
+        ? ['title', 'price_cents', 'location']
+        : ['title', 'price_cents', 'location'];
     case 'job':
-      return ['title', 'salary_range', 'price_unit', 'location'];
+      return ['title', 'salary_range', 'location'];
     case 'company':
       return ['title', 'company_name'];
     default:
@@ -517,25 +461,25 @@ function CreateFormSectionCard({
   return (
     <section
       className={cn(
-        'ui-section-shell relative overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-white px-4 py-4 shadow-[0_18px_38px_-38px_rgba(15,23,42,0.16)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[20px] sm:px-5 sm:py-5',
+        'ui-section-shell relative overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-white px-3 py-3 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[18px] sm:px-4 sm:py-4',
         className,
       )}
     >
-      <div className="relative flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-800/70">
+      <div className="relative flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2 dark:border-slate-800/70">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
             {eyebrow}
           </p>
-          <h2 className="mt-1.5 text-[16px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h2 className="mt-0.5 text-[15px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {title}
           </h2>
-          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+          <p className="mt-0.5 hidden line-clamp-1 max-w-2xl text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:block">
             {description}
           </p>
         </div>
         {aside ? <div className="shrink-0">{aside}</div> : null}
       </div>
-      <div className="relative mt-4 space-y-3">{children}</div>
+      <div className="relative mt-3 space-y-2.5">{children}</div>
     </section>
   );
 }
@@ -1118,8 +1062,8 @@ function getFieldHelperHint(
 
   if (key === 'title') {
     return isId
-      ? 'Kalau bingung, pakai contoh di placeholder lalu ganti seperlunya.'
-      : 'Use the placeholder example as a starter if needed.';
+      ? 'Tulis singkat dan jelas.'
+      : 'Keep it short and clear.';
   }
 
   if (
@@ -1166,21 +1110,8 @@ function getFieldHelperHint(
   return null;
 }
 
-function stripFieldExampleLabel(example: string): string {
-  return example
-    .replace(/^(judul|title|budget|harga|price|lokasi|location)\s*:\s*/i, '')
-    .trim();
-}
-
 function formatDateInputValue(date: Date): string {
   return date.toISOString().slice(0, 10);
-}
-
-function splitSuggestionTokens(value: string): string[] {
-  return value
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
 }
 
 function requiresPrimaryImageForType(type: string): boolean {
@@ -3004,164 +2935,6 @@ const TYPE_COMPLIANCE_VISUALS: Record<ListingTypeId, TypeVisualChecklistMeta> =
     },
   };
 
-const TYPE_MEDIA_GUIDANCE: Record<ListingTypeId, TypeChecklistMeta> = {
-  product: {
-    titleId: 'Media yang disarankan',
-    titleEn: 'Recommended media',
-    itemsId: [
-      'Foto produk dari beberapa sisi.',
-      'Dokumen spesifikasi, katalog, atau manual singkat.',
-      'Dokumen garansi/retur jika ada.',
-    ],
-    itemsEn: [
-      'Product photos from multiple angles.',
-      'Specification sheet, catalog, or short manual.',
-      'Warranty / return document when available.',
-    ],
-  },
-  service: {
-    titleId: 'Media yang disarankan',
-    titleEn: 'Recommended media',
-    itemsId: [
-      'Contoh hasil kerja, slide deck, atau ringkasan portofolio.',
-      'Template scope of work atau service brochure.',
-      'Dokumen sertifikasi jika memang relevan.',
-    ],
-    itemsEn: [
-      'Work samples, a slide deck, or a short portfolio summary.',
-      'A scope-of-work template or service brochure.',
-      'Certification files only when truly relevant.',
-    ],
-  },
-  job: {
-    titleId: 'Dokumen yang disarankan',
-    titleEn: 'Recommended documents',
-    itemsId: [
-      'JD/PDF posisi, hiring brief, atau company deck.',
-      'Benefit guide atau culture note bila ada.',
-      'Jangan upload dokumen internal yang memuat data personal kandidat.',
-    ],
-    itemsEn: [
-      'Job description PDF, hiring brief, or company deck.',
-      'Benefits guide or culture note when available.',
-      'Do not upload internal documents that contain applicant personal data.',
-    ],
-  },
-  property: {
-    titleId: 'Media yang disarankan',
-    titleEn: 'Recommended media',
-    itemsId: [
-      'Foto eksterior/interior yang aktual.',
-      'Floor plan, legal docs ringkas, dan link survey bila ada.',
-      'Pastikan materi visual sesuai unit yang benar.',
-    ],
-    itemsEn: [
-      'Current exterior and interior photos.',
-      'Floor plan, short legal-doc summary, and tour link when available.',
-      'Make sure the visuals match the actual unit.',
-    ],
-  },
-  tool_rental: {
-    titleId: 'Media yang disarankan',
-    titleEn: 'Recommended media',
-    itemsId: [
-      'Foto unit, serial number, dan setiap aksesori yang ikut.',
-      'Checklist inspeksi, manual, dan riwayat perawatan.',
-      'Dokumen bukti kepemilikan/otorisasi bila tersedia.',
-    ],
-    itemsEn: [
-      'Photos of the unit, serial number, and every included accessory.',
-      'Inspection checklist, manual, and maintenance history.',
-      'Ownership / authorization proof when available.',
-    ],
-  },
-  business_transfer: {
-    titleId: 'Bukti yang disarankan',
-    titleEn: 'Recommended proof',
-    itemsId: [
-      'Foto outlet, aset, stok, dan kondisi operasional terbaru.',
-      'Ringkasan omzet/biaya dengan data sensitif disamarkan.',
-      'Dokumen aman: NIB/izin, invoice aset, kontrak sewa, SOP, dan checklist handover.',
-    ],
-    itemsEn: [
-      'Recent photos of the outlet, assets, inventory, and operating condition.',
-      'Revenue/cost summary with sensitive data masked.',
-      'Safe documents: registration/permits, asset invoices, lease, SOP, and handover checklist.',
-    ],
-  },
-  company: {
-    titleId: 'Media yang disarankan',
-    titleEn: 'Recommended media',
-    itemsId: [
-      'Logo, foto kantor/tim, dan company deck publik.',
-      'Dokumen profil perusahaan atau press kit.',
-      'Bila perlu, unggah bukti registrasi usaha yang memang aman dibagikan publik.',
-    ],
-    itemsEn: [
-      'Logo, office/team photos, and a public company deck.',
-      'Company profile document or press kit.',
-      'If needed, upload business registration proof only when it is safe to share publicly.',
-    ],
-  },
-};
-const TYPE_MEDIA_VISUALS: Record<ListingTypeId, TypeVisualChecklistMeta> = {
-  product: {
-    itemsId: ['Foto multi-angle', 'Spec atau manual', 'Garansi atau retur'],
-    itemsEn: ['Multi-angle photos', 'Spec or manual', 'Warranty or returns'],
-  },
-  service: {
-    itemsId: ['Contoh kerja', 'Scope atau brochure', 'Sertifikat relevan'],
-    itemsEn: ['Work samples', 'Scope or brochure', 'Relevant certificates'],
-  },
-  job: {
-    itemsId: [
-      'JD atau hiring brief',
-      'Benefit atau culture note',
-      'Tanpa data kandidat',
-    ],
-    itemsEn: [
-      'JD or hiring brief',
-      'Benefits or culture note',
-      'No applicant data',
-    ],
-  },
-  property: {
-    itemsId: ['Foto aktual unit', 'Floor plan atau docs', 'Visual harus cocok'],
-    itemsEn: [
-      'Current unit photos',
-      'Floor plan or docs',
-      'Visuals must match',
-    ],
-  },
-  tool_rental: {
-    itemsId: [
-      'Foto unit dan aksesori',
-      'Checklist atau manual',
-      'Bukti otorisasi',
-    ],
-    itemsEn: [
-      'Unit and accessory photos',
-      'Checklist or manual',
-      'Authority proof',
-    ],
-  },
-  business_transfer: {
-    itemsId: ['Foto outlet/aset', 'Ringkasan angka', 'Checklist handover'],
-    itemsEn: ['Outlet/asset photos', 'Numbers summary', 'Handover checklist'],
-  },
-  company: {
-    itemsId: [
-      'Logo dan foto tim',
-      'Deck atau press kit',
-      'Dokumen publik aman',
-    ],
-    itemsEn: [
-      'Logo and team photos',
-      'Deck or press kit',
-      'Safe public documents',
-    ],
-  },
-};
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const DEMAND_FORM_GUIDANCE: Partial<Record<ListingTypeId, TypeChecklistMeta>> =
   {
@@ -3522,21 +3295,6 @@ export function CreatePostingClient({
     forcedListingSide === 'demand' &&
     activeType === 'service' &&
     listingSide === 'demand';
-  const mediaGuide =
-    TYPE_MEDIA_GUIDANCE[activeType as ListingTypeId] ||
-    TYPE_MEDIA_GUIDANCE.product;
-  const mediaItems = locale === 'id' ? mediaGuide.itemsId : mediaGuide.itemsEn;
-  const mediaVisualItems =
-    locale === 'id'
-      ? (
-          TYPE_MEDIA_VISUALS[activeType as ListingTypeId] ||
-          TYPE_MEDIA_VISUALS.product
-        ).itemsId
-      : (
-          TYPE_MEDIA_VISUALS[activeType as ListingTypeId] ||
-          TYPE_MEDIA_VISUALS.product
-        ).itemsEn;
-
   useEffect(() => {
     if (showSectorPicker) return;
     setIsSectorPickerOpen(false);
@@ -3704,13 +3462,11 @@ export function CreatePostingClient({
   const step1SecondaryFields = useMemo(
     () =>
       isSimpleModeActive
-        ? step1Fields.filter(field => !step1PinnedFieldKeys.has(field.key))
+        ? []
         : step1OptionalFields,
     [
       isSimpleModeActive,
-      step1Fields,
       step1OptionalFields,
-      step1PinnedFieldKeys,
     ],
   );
   const parsedPriceCents = useMemo(() => {
@@ -4136,8 +3892,6 @@ export function CreatePostingClient({
     foreignBrandSignalSummary,
     typePicked,
   ]);
-  const getFieldIcon = (field: SectorField): LucideIcon =>
-    FIELD_ICON_BY_KEY[field.key] || FIELD_ICON_BY_KIND[field.kind] || ScanLine;
   const ActiveTypeIcon = selectedType?.icon || ScanLine;
   const buildCreateHref = ({
     draftId = workingId,
@@ -4355,92 +4109,99 @@ export function CreatePostingClient({
           : ['Scope', 'Output', 'Area'],
     },
   ] as const;
-  const supplySupportCards = [
-    {
-      key: 'property',
-      href: resolveMarketplaceCreatePath(locale, 'property', 'supply'),
-      badge: locale === 'id' ? 'Lokasi' : 'Spaces',
-      title: locale === 'id' ? 'Tawarkan lokasi jualan' : 'Offer selling space',
-      description:
-        locale === 'id'
-          ? 'Untuk booth, kios, ruko, atau area jual.'
-          : 'Use this for booths, kiosks, shophouses, or selling spaces.',
-      example:
-        locale === 'id'
-          ? 'Contoh: sewa booth bazaar weekend di Bekasi'
-          : 'Example: rent a weekend bazaar booth in Bekasi',
-      Icon: MapPin,
-      theme: TYPE_THEMES.property,
-      highlights:
-        locale === 'id'
-          ? ['Booth', 'Kios', 'Traffic']
-          : ['Booth', 'Kiosk', 'Traffic'],
-    },
-    {
-      key: 'tool_rental',
-      href: resolveMarketplaceCreatePath(locale, 'tool_rental', 'supply'),
-      badge: locale === 'id' ? 'Sewa alat' : 'Tool rental',
-      title: locale === 'id' ? 'Sewakan alat usaha' : 'Rent out tools',
-      description:
-        locale === 'id'
-          ? 'Untuk freezer, alat produksi, atau alat konten.'
-          : 'Use this for freezers, production gear, or content tools.',
-      example:
-        locale === 'id'
-          ? 'Contoh: sewa freezer display 7 hari untuk pop-up'
-          : 'Example: rent a display freezer for a seven-day pop-up',
-      Icon: Snowflake,
-      theme: TYPE_THEMES.tool_rental,
-      highlights:
-        locale === 'id'
-          ? ['Alat', 'Durasi', 'Pickup']
-          : ['Tools', 'Duration', 'Pickup'],
-    },
-    {
-      key: 'business_transfer',
-      href: resolveMarketplaceCreatePath(locale, 'business_transfer', 'supply'),
-      badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
-      title:
-        locale === 'id' ? 'Tawarkan oper usaha' : 'Offer business transfer',
-      description:
-        locale === 'id'
-          ? 'Usaha berjalan, aset, rating, dan handover.'
-          : 'Sell a running business, assets, ratings, and handover.',
-      example:
-        locale === 'id'
-          ? 'Contoh: oper usaha laundry aktif plus SOP'
-          : 'Example: transfer an active laundry business plus SOP',
-      Icon: Handshake,
-      theme: TYPE_THEMES.business_transfer,
-      highlights:
-        locale === 'id'
-          ? ['Omzet', 'Aset', 'Handover']
-          : ['Revenue', 'Assets', 'Handover'],
-    },
-    {
-      key: 'profile',
-      href: '/profile/edit?focus=talent',
-      badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
-      title:
-        locale === 'id'
-          ? 'Tawarkan skill lewat profil'
-          : 'Offer skills via profile',
-      description:
-        locale === 'id'
-          ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
-          : 'If you want to sell personal skills, polish your user profile.',
-      example:
-        locale === 'id'
-          ? 'Contoh: profil akuntan UMKM freelance'
-          : 'Example: freelance MSME accountant profile',
-      Icon: Users,
-      theme: specialCreateThemes.profile,
-      highlights:
-        locale === 'id'
-          ? ['Headline', 'Skill', 'Rate']
-          : ['Headline', 'Skills', 'Rate'],
-    },
-  ] as const;
+  const supplySupportCards = PROMO_ONLY_MODE
+    ? []
+    : ([
+      {
+        key: 'property',
+        href: resolveMarketplaceCreatePath(locale, 'property', 'supply'),
+        badge: locale === 'id' ? 'Lokasi' : 'Spaces',
+        title:
+          locale === 'id' ? 'Tawarkan lokasi jualan' : 'Offer selling space',
+        description:
+          locale === 'id'
+            ? 'Untuk booth, kios, ruko, atau area jual.'
+            : 'Use this for booths, kiosks, shophouses, or selling spaces.',
+        example:
+          locale === 'id'
+            ? 'Contoh: sewa booth bazaar weekend di Bekasi'
+            : 'Example: rent a weekend bazaar booth in Bekasi',
+        Icon: MapPin,
+        theme: TYPE_THEMES.property,
+        highlights:
+          locale === 'id'
+            ? ['Booth', 'Kios', 'Traffic']
+            : ['Booth', 'Kiosk', 'Traffic'],
+      },
+      {
+        key: 'tool_rental',
+        href: resolveMarketplaceCreatePath(locale, 'tool_rental', 'supply'),
+        badge: locale === 'id' ? 'Sewa alat' : 'Tool rental',
+        title: locale === 'id' ? 'Sewakan alat usaha' : 'Rent out tools',
+        description:
+          locale === 'id'
+            ? 'Untuk freezer, alat produksi, atau alat konten.'
+            : 'Use this for freezers, production gear, or content tools.',
+        example:
+          locale === 'id'
+            ? 'Contoh: sewa freezer display 7 hari untuk pop-up'
+            : 'Example: rent a display freezer for a seven-day pop-up',
+        Icon: Snowflake,
+        theme: TYPE_THEMES.tool_rental,
+        highlights:
+          locale === 'id'
+            ? ['Alat', 'Durasi', 'Pickup']
+            : ['Tools', 'Duration', 'Pickup'],
+      },
+      {
+        key: 'business_transfer',
+        href: resolveMarketplaceCreatePath(
+          locale,
+          'business_transfer',
+          'supply',
+        ),
+        badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
+        title:
+          locale === 'id' ? 'Tawarkan oper usaha' : 'Offer business transfer',
+        description:
+          locale === 'id'
+            ? 'Usaha berjalan, aset, rating, dan handover.'
+            : 'Sell a running business, assets, ratings, and handover.',
+        example:
+          locale === 'id'
+            ? 'Contoh: oper usaha laundry aktif plus SOP'
+            : 'Example: transfer an active laundry business plus SOP',
+        Icon: Handshake,
+        theme: TYPE_THEMES.business_transfer,
+        highlights:
+          locale === 'id'
+            ? ['Omzet', 'Aset', 'Handover']
+            : ['Revenue', 'Assets', 'Handover'],
+      },
+      {
+        key: 'profile',
+        href: '/profile/edit?focus=talent',
+        badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
+        title:
+          locale === 'id'
+            ? 'Tawarkan skill lewat profil'
+            : 'Offer skills via profile',
+        description:
+          locale === 'id'
+            ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
+            : 'If you want to sell personal skills, polish your user profile.',
+        example:
+          locale === 'id'
+            ? 'Contoh: profil akuntan UMKM freelance'
+            : 'Example: freelance MSME accountant profile',
+        Icon: Users,
+        theme: specialCreateThemes.profile,
+        highlights:
+          locale === 'id'
+            ? ['Headline', 'Skill', 'Rate']
+            : ['Headline', 'Skills', 'Rate'],
+      },
+    ] as const);
   const typeSelectorGrid = (
     <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
       {supplyCreateCards.map(card => {
@@ -4469,7 +4230,7 @@ export function CreatePostingClient({
       })}
     </div>
   );
-  const supplySupportQuickLinks = (
+  const supplySupportQuickLinks = supplySupportCards.length > 0 ? (
     <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-3">
       {supplySupportCards.map(card => (
         <button
@@ -4518,7 +4279,7 @@ export function CreatePostingClient({
         </button>
       ))}
     </div>
-  );
+  ) : null;
   const errorDetails = errorMessage
     .split('\n')
     .map(line => line.trim())
@@ -4547,7 +4308,13 @@ export function CreatePostingClient({
       href: supplyEntryHref,
       label: locale === 'id' ? 'Tawarkan' : 'Offer',
       helper:
-        locale === 'id' ? 'Produk, jasa, lokasi' : 'Products, services, spaces',
+        locale === 'id'
+          ? PROMO_ONLY_MODE
+            ? 'Produk dan jasa'
+            : 'Produk, jasa, lokasi'
+          : PROMO_ONLY_MODE
+            ? 'Products and services'
+            : 'Products, services, spaces',
       Icon: Store,
     },
     {
@@ -4556,8 +4323,12 @@ export function CreatePostingClient({
       label: locale === 'id' ? 'Cari kebutuhan' : 'Find what you need',
       helper:
         locale === 'id'
-          ? 'Supplier, jasa, talent'
-          : 'Find suppliers, services, talent',
+          ? PROMO_ONLY_MODE
+            ? 'Supplier dan jasa'
+            : 'Supplier, jasa, talent'
+          : PROMO_ONLY_MODE
+            ? 'Find suppliers and services'
+            : 'Find suppliers, services, talent',
       Icon: Target,
     },
   ];
@@ -4701,13 +4472,14 @@ export function CreatePostingClient({
   const showStepOneSetupCard =
     currentStep === 1 &&
     !isNeedServiceJourney &&
+    !isSimpleModeActive &&
     (canSwitchListingSide || (!isSimpleModeActive && typePicked));
   const showSharePackPanel =
     typePicked &&
     (!isSimpleModeActive ||
       currentStep === TOTAL_STEPS ||
       contentStatus === 'active');
-  const showDesktopAssistRail = typePicked;
+  const showDesktopAssistRail = typePicked && currentStep > 1;
   const industryPickerLayer =
     showSectorPicker && isSectorPickerOpen ? (
       <div
@@ -4925,21 +4697,6 @@ export function CreatePostingClient({
     ) : null;
   const rootCreateActions: CreateEntryAction[] = [
     {
-      key: 'company',
-      href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
-      title: locale === 'id' ? 'Buat profil usaha' : 'Create business profile',
-      description:
-        locale === 'id'
-          ? 'Biar calon pembeli tahu alamat, kontak, dan usaha kamu.'
-          : 'Create a business profile before selling.',
-      chips:
-        locale === 'id'
-          ? ['Alamat', 'Kontak', 'Jam buka']
-          : ['Profile', 'Address', 'Contact'],
-      Icon: Store,
-      tone: 'bg-emerald-100 text-emerald-700',
-    },
-    {
       key: 'sell-product',
       href: buildCreateBasePath({
         locale,
@@ -4959,23 +4716,97 @@ export function CreatePostingClient({
       tone: 'bg-emerald-100 text-emerald-700',
     },
     {
-      key: 'sell-service',
+      key: 'sell-service-package',
       href: buildCreateBasePath({
         locale,
         sideId: 'supply',
         typeId: 'service',
       }),
-      title: locale === 'id' ? 'Tawarkan jasa' : 'Offer service',
+      title: locale === 'id' ? 'Buat paket jasa' : 'Create service package',
       description:
         locale === 'id'
-          ? 'Untuk desain, foto produk, admin live, legal, kirim, dan lainnya.'
-          : 'Offer services, packages, or service portfolios.',
+          ? 'Jual jasa sebagai paket jelas: scope, durasi, output, dan harga.'
+          : 'Sell services as clear packages with scope, duration, output, and price.',
       chips:
         locale === 'id'
-          ? ['Paket', 'Area', 'Harga']
-          : ['Package', 'Portfolio', 'Price'],
+          ? ['Paket', 'Output', 'Harga']
+          : ['Package', 'Output', 'Price'],
       Icon: BriefcaseBusiness,
       tone: 'bg-orange-100 text-orange-700',
+    },
+    {
+      key: 'sell-mentor',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'supply',
+        typeId: 'service',
+      }),
+      title: locale === 'id' ? 'Jadi mentor' : 'Offer mentoring',
+      description:
+        locale === 'id'
+          ? 'Tawarkan sesi konsultasi, kelas kecil, audit, atau pendampingan.'
+          : 'Offer consulting sessions, mini classes, audits, or mentoring.',
+      chips:
+        locale === 'id'
+          ? ['Sesi', 'Materi', 'Harga']
+          : ['Session', 'Topic', 'Price'],
+      Icon: Users,
+      tone: 'bg-sky-100 text-sky-700',
+    },
+    {
+      key: 'need-mentor',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'demand',
+        typeId: 'service',
+      }),
+      title: locale === 'id' ? 'Cari mentor' : 'Find mentor',
+      description:
+        locale === 'id'
+          ? 'Butuh arahan untuk usaha, karier, produk, marketing, atau operasional.'
+          : 'Need guidance for business, career, products, marketing, or operations.',
+      chips:
+        locale === 'id'
+          ? ['Topik', 'Budget', 'Jadwal']
+          : ['Topic', 'Budget', 'Schedule'],
+      Icon: Sparkles,
+      tone: 'bg-violet-100 text-violet-700',
+    },
+    {
+      key: 'need-product',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'demand',
+        typeId: 'product',
+      }),
+      title: locale === 'id' ? 'Cari produk/supplier' : 'Find supplier/goods',
+      description:
+        locale === 'id'
+          ? 'Tulis barang, jumlah, lokasi kirim, dan budget agar supplier bisa respon.'
+          : 'Post item, quantity, delivery area, and budget so suppliers can respond.',
+      chips:
+        locale === 'id' ? ['Budget', 'Area', 'Qty'] : ['Budget', 'Area', 'Qty'],
+      Icon: Target,
+      tone: 'bg-amber-100 text-amber-700',
+    },
+    {
+      key: 'need-service',
+      href: buildCreateBasePath({
+        locale,
+        sideId: 'demand',
+        typeId: 'service',
+      }),
+      title: locale === 'id' ? 'Cari jasa/vendor' : 'Find service',
+      description:
+        locale === 'id'
+          ? 'Cari vendor untuk foto produk, admin, desain, legal, event, atau live.'
+          : 'Find vendors for photos, admin, design, legal, events, or live selling.',
+      chips:
+        locale === 'id'
+          ? ['Scope', 'Deadline', 'Budget']
+          : ['Scope', 'Deadline', 'Budget'],
+      Icon: Wrench,
+      tone: 'bg-cyan-100 text-cyan-700',
     },
     {
       key: 'sell-property',
@@ -4997,83 +4828,47 @@ export function CreatePostingClient({
       tone: 'bg-rose-100 text-rose-700',
     },
     {
-      key: 'need-product',
+      key: 'rent-tools',
       href: buildCreateBasePath({
         locale,
-        sideId: 'demand',
-        typeId: 'product',
+        sideId: 'supply',
+        typeId: 'tool_rental',
       }),
-      title: locale === 'id' ? 'Cari produk/supplier' : 'Find supplier/goods',
+      title: locale === 'id' ? 'Sewakan alat' : 'Rent out tools',
       description:
         locale === 'id'
-          ? 'Tulis barang, jumlah, lokasi kirim, dan budget agar supplier bisa menawar.'
-          : 'Post a need so matching suppliers can offer.',
-      chips:
-        locale === 'id' ? ['Budget', 'Area', 'Qty'] : ['Budget', 'Area', 'Qty'],
-      Icon: Target,
-      tone: 'bg-amber-100 text-amber-700',
-    },
-    {
-      key: 'need-service',
-      href: buildCreateBasePath({
-        locale,
-        sideId: 'demand',
-        typeId: 'service',
-      }),
-      title: locale === 'id' ? 'Cari jasa/vendor' : 'Find service',
-      description:
-        locale === 'id'
-          ? 'Tulis scope, deadline, area kerja, dan budget supaya vendor paham.'
-          : 'Need a vendor? Add scope, deadline, and budget.',
+          ? 'Untuk kamera, freezer, mesin, booth, tenda, atau alat event.'
+          : 'For cameras, freezers, machines, booths, tents, or event tools.',
       chips:
         locale === 'id'
-          ? ['Scope', 'Deadline', 'Budget']
-          : ['Scope', 'Deadline', 'Budget'],
+          ? ['Durasi', 'Deposit', 'Foto']
+          : ['Duration', 'Deposit', 'Photos'],
       Icon: Wrench,
-      tone: 'bg-sky-100 text-sky-700',
-    },
-    {
-      key: 'need-talent',
-      href: buildCreateBasePath({
-        locale,
-        sideId: 'demand',
-        typeId: 'job',
-      }),
-      title: locale === 'id' ? 'Cari talent/pekerja' : 'Find talent',
-      description:
-        locale === 'id'
-          ? 'Untuk lowongan, freelance, shift toko, admin, atau kreator.'
-          : 'For jobs, freelancers, shop shifts, admins, or creators.',
-      chips:
-        locale === 'id'
-          ? ['Role', 'Gaji', 'Skill']
-          : ['Role', 'Salary', 'Skills'],
-      Icon: Users,
       tone: 'bg-lime-100 text-lime-800',
     },
     {
-      key: 'need-property',
-      href: buildCreateBasePath({
-        locale,
-        sideId: 'demand',
-        typeId: 'property',
-      }),
-      title: locale === 'id' ? 'Cari lokasi jualan' : 'Find selling space',
+      key: 'company',
+      href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
+      title: locale === 'id' ? 'Buat profil usaha' : 'Create business profile',
       description:
         locale === 'id'
-          ? 'Cari booth, ruko, kios, dapur, gudang, atau titik ramai.'
-          : 'Find booths, shops, kitchens, warehouses, or busy locations.',
+          ? 'Halaman usaha publik untuk alamat, kontak, katalog, dan cerita singkat.'
+          : 'A public business page for address, contact, catalog, and a short story.',
       chips:
         locale === 'id'
-          ? ['Budget', 'Area', 'Traffic']
-          : ['Budget', 'Area', 'Traffic'],
-      Icon: MapPin,
-      tone: 'bg-teal-100 text-teal-700',
+          ? ['Alamat', 'Kontak', 'Katalog']
+          : ['Profile', 'Address', 'Catalog'],
+      Icon: Store,
+      tone: 'bg-emerald-100 text-emerald-700',
     },
   ];
-  const journeyIntents = UMKM_JOURNEY_STEPS.filter(step =>
-    CORE_DEMAND_CREATE_TYPE_IDS.has(step.typeId as ListingTypeId),
-  );
+  const journeyIntents = UMKM_JOURNEY_STEPS.filter(step => {
+    if (!CORE_DEMAND_CREATE_TYPE_IDS.has(step.typeId as ListingTypeId)) {
+      return false;
+    }
+    if (!PROMO_ONLY_MODE) return true;
+    return step.typeId === 'product' || step.typeId === 'service';
+  });
   const demandFormEyebrow =
     activeType === 'product'
       ? locale === 'id'
@@ -5222,20 +5017,6 @@ export function CreatePostingClient({
       ? 'Isi inti dulu biar penyedia cepat paham.'
       : 'Start with the essentials so relevant providers can understand it fast and respond sooner.'
     : formSubtitle;
-  const simpleModeCallout = isNeedServiceJourney
-    ? locale === 'id'
-      ? 'Mulai dari inti. Detail nanti.'
-      : 'Start with the core need first. The rest can follow.'
-    : locale === 'id'
-      ? 'Mode satset aktif. Isi yang penting.'
-      : 'Quick mode is active. Focus on the essentials first.';
-  const simpleModeCalloutChips = isNeedServiceJourney
-    ? locale === 'id'
-      ? ['Jasa yang dicari', 'Ringkasan singkat', 'Budget', 'Kota utama']
-      : ['Needed service', 'Short summary', 'Budget', 'Primary city']
-    : locale === 'id'
-      ? ['Judul jelas', 'Harga atau budget', 'Lokasi utama']
-      : ['Clear title', 'Price or budget', 'Main location'];
   const stepCopyByType: Record<
     ListingTypeId,
     {
@@ -5389,8 +5170,8 @@ export function CreatePostingClient({
       : 'What service are you looking for?'
     : isSimpleModeActive
       ? locale === 'id'
-        ? 'Info utama postingan'
-        : 'Main information'
+        ? 'Isi cepat'
+        : 'Quick fill'
       : stepCopy.step1Title;
   const stepOneMainDescription = isNeedServiceJourney
     ? locale === 'id'
@@ -5398,8 +5179,8 @@ export function CreatePostingClient({
       : 'Write the core need first so people can understand it quickly.'
     : isSimpleModeActive
       ? locale === 'id'
-        ? 'Mulai dari judul, harga, dan lokasi.'
-        : 'Start with title, price, and location.'
+        ? 'Judul, harga, lokasi. Detail bisa nanti.'
+        : 'Title, price, location. Details can wait.'
       : stepCopy.step1Description;
   const stepTwoMainTitle = isNeedServiceJourney
     ? locale === 'id'
@@ -5620,108 +5401,11 @@ export function CreatePostingClient({
     setFieldValues(prev => ({ ...prev, [key]: value }));
   };
 
-  const appendCommaSeparatedToken = (key: string, token: string) => {
-    setFieldValues(prev => {
-      const current = splitSuggestionTokens(cleanText(prev[key]));
-      if (current.some(item => item.toLowerCase() === token.toLowerCase())) {
-        return prev;
-      }
-      const next = current.length > 0 ? [...current, token] : [token];
-      return { ...prev, [key]: next.join(', ') };
-    });
-  };
-
-  const formatQuickAmountLabel = (amount: number) =>
-    new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-
-  const getQuickAmountPresets = (fieldKey: string) => {
-    const key = fieldKey.toLowerCase();
-    if (key.includes('salary_range')) {
-      return [
-        { label: '4.5 - 5.5 jt', value: '4500000 - 5500000' },
-        { label: '5.5 - 7 jt', value: '5500000 - 7000000' },
-      ];
-    }
-    if (key.startsWith('promo_')) {
-      return [50000, 100000, 250000].map(amount => ({
-        label: formatQuickAmountLabel(amount),
-        value: String(amount),
-      }));
-    }
-    if (activeType === 'job') {
-      return [4500000, 5500000, 7500000].map(amount => ({
-        label: formatQuickAmountLabel(amount),
-        value: String(amount),
-      }));
-    }
-    if (activeType === 'service') {
-      return (
-        listingSide === 'demand'
-          ? [1250000, 5000000, 12000000]
-          : [250000, 1250000, 3000000]
-      ).map(amount => ({
-        label: formatQuickAmountLabel(amount),
-        value: String(amount),
-      }));
-    }
-    if (activeType === 'property') {
-      return [950000, 1500000, 3000000].map(amount => ({
-        label: formatQuickAmountLabel(amount),
-        value: String(amount),
-      }));
-    }
-    if (activeType === 'tool_rental') {
-      return [250000, 700000, 1500000].map(amount => ({
-        label: formatQuickAmountLabel(amount),
-        value: String(amount),
-      }));
-    }
-    return (
-      listingSide === 'demand'
-        ? [500000, 2000000, 8000000]
-        : [50000, 185000, 500000]
-    ).map(amount => ({
-      label: formatQuickAmountLabel(amount),
-      value: String(amount),
-    }));
-  };
-
-  const getQuickLocationPresets = () => {
-    if (activeType === 'property') {
-      return ['BSD', 'Tangerang', 'Jakarta Selatan'];
-    }
-    if (activeType === 'service') {
-      return ['Jakarta', 'Bandung', locale === 'id' ? 'Remote' : 'Remote'];
-    }
-    if (activeType === 'job') {
-      return [
-        'Jakarta Barat',
-        'Bandung',
-        locale === 'id' ? 'Hybrid' : 'Hybrid',
-      ];
-    }
-    if (activeType === 'tool_rental') {
-      return ['Depok', 'Bekasi', 'Tangerang Selatan'];
-    }
-    return ['Jakarta', 'Bandung', 'Surabaya'];
-  };
-
   const buildQuickFieldActions = (
     field: SectorField,
     value: string,
   ): QuickFieldAction[] => {
-    const key = field.key.toLowerCase();
     const normalizedValue = cleanText(value);
-    const example = getFieldExample(
-      field.key,
-      locale,
-      activeType as ListingTypeId,
-      listingSide,
-    );
     const actions: QuickFieldAction[] = [];
 
     if (field.kind === 'select' && field.options && field.options.length <= 4) {
@@ -5772,72 +5456,6 @@ export function CreatePostingClient({
       );
     }
 
-    if (example && field.kind !== 'select') {
-      const sampleValue = stripFieldExampleLabel(example);
-      actions.push({
-        key: 'example',
-        label: locale === 'id' ? 'Pakai contoh' : 'Use sample',
-        tone: (normalizedValue === sampleValue
-          ? 'accent'
-          : 'muted') as QuickFieldActionTone,
-        onClick: () => updateField(field.key, sampleValue),
-      });
-    }
-
-    if (
-      key.includes('price') ||
-      key.includes('budget') ||
-      key.includes('salary') ||
-      key.includes('rent') ||
-      key.includes('rate')
-    ) {
-      actions.push(
-        ...getQuickAmountPresets(field.key).map(preset => ({
-          key: `amount-${preset.value}`,
-          label: preset.label,
-          tone: (normalizedValue === preset.value
-            ? 'accent'
-            : 'muted') as QuickFieldActionTone,
-          onClick: () => updateField(field.key, preset.value),
-        })),
-      );
-    }
-
-    if (
-      key.includes('location') ||
-      key.includes('city') ||
-      key.includes('address')
-    ) {
-      actions.push(
-        ...getQuickLocationPresets().map(preset => ({
-          key: `location-${preset}`,
-          label: preset,
-          tone: (normalizedValue === preset
-            ? 'accent'
-            : 'muted') as QuickFieldActionTone,
-          onClick: () => updateField(field.key, preset),
-        })),
-      );
-    }
-
-    if (key.includes('tag') || key.includes('skill')) {
-      const suggestionSource = example || '';
-      actions.push(
-        ...splitSuggestionTokens(stripFieldExampleLabel(suggestionSource))
-          .slice(0, 4)
-          .map(token => ({
-            key: `token-${token.toLowerCase()}`,
-            label: token,
-            tone: splitSuggestionTokens(normalizedValue).some(
-              item => item.toLowerCase() === token.toLowerCase(),
-            )
-              ? ('accent' as QuickFieldActionTone)
-              : ('muted' as QuickFieldActionTone),
-            onClick: () => appendCommaSeparatedToken(field.key, token),
-          })),
-      );
-    }
-
     if (normalizedValue) {
       actions.push({
         key: 'clear',
@@ -5854,16 +5472,7 @@ export function CreatePostingClient({
       }
     }
     const uniqueActions = Array.from(unique.values());
-    const clearAction = uniqueActions.find(action => action.key === 'clear');
-    const primaryActions = uniqueActions.filter(
-      action => action.key !== 'clear',
-    );
-    const maxVisible = field.kind === 'select' ? 4 : 3;
-    const visiblePrimary = primaryActions.slice(
-      0,
-      clearAction ? maxVisible - 1 : maxVisible,
-    );
-    return clearAction ? [...visiblePrimary, clearAction] : visiblePrimary;
+    return Array.from(unique.values()).slice(0, field.kind === 'select' ? 4 : 1);
   };
 
   useEffect(() => {
@@ -7270,15 +6879,16 @@ export function CreatePostingClient({
 
   const renderFieldBlock = (f: SectorField) => {
     const meta = resolveFieldMeta(f);
-    const FieldIcon = getFieldIcon(f);
     const isWide = f.kind === 'multiline';
     const value = String(fieldValues[f.key] ?? '');
-    const quickActions = buildQuickFieldActions(f, value);
+    const quickActions = isSimpleModeActive
+      ? []
+      : buildQuickFieldActions(f, value);
     const lowerKey = f.key.toLowerCase();
     const isRequired = isFieldRequired(f);
-    const isFilled = cleanText(value).length > 0;
     const showHint =
       Boolean(meta.hint) &&
+      !isSimpleModeActive &&
       !cleanText(value) &&
       (f.kind === 'select' ||
         f.kind === 'date' ||
@@ -7296,34 +6906,13 @@ export function CreatePostingClient({
     return (
       <div
         key={f.key}
-        className={cn('space-y-2', isWide ? 'lg:col-span-2' : undefined)}
+        className={cn('space-y-1.5', isWide ? 'lg:col-span-2' : undefined)}
       >
-        <label className="block text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-          <span className="inline-flex w-full min-w-0 flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] border',
-                isFilled
-                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                  : 'border-slate-200 bg-slate-50 text-[color:var(--app-text-soft)] dark:border-slate-700 dark:bg-slate-900',
-              )}
-            >
-              <FieldIcon className="h-3.5 w-3.5" />
-            </span>
-            <span className="min-w-0 flex-1 truncate">
-              {meta.label}
-              {isRequired ? (
-                <span className="ml-1 text-[color:var(--app-danger)]">*</span>
-              ) : null}
-            </span>
-            {isFilled ? (
-              <span className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-accent)]">
-                {locale === 'id' ? 'terisi' : 'filled'}
-              </span>
-            ) : isSimpleModeActive && !isRequired ? (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                {locale === 'id' ? 'opsional' : 'optional'}
-              </span>
+        <label className="block text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <span className="min-w-0 truncate">{meta.label}</span>
+            {isRequired ? (
+              <span className="text-[color:var(--app-danger)]">*</span>
             ) : null}
           </span>
         </label>
@@ -7350,7 +6939,7 @@ export function CreatePostingClient({
           </div>
         ) : null}
         {showHint && (
-          <p className="line-clamp-1 rounded-full bg-slate-50 px-2.5 py-1 text-[11px] leading-4 text-[color:var(--app-text-soft)] dark:bg-slate-900">
+          <p className="line-clamp-1 text-[10.5px] leading-4 text-[color:var(--app-text-soft)]">
             {meta.hint}
           </p>
         )}
@@ -7396,15 +6985,23 @@ export function CreatePostingClient({
                   </span>
                   <span className="mt-1.5 block text-[12px] leading-5 text-[color:var(--app-text-soft)]">
                     {locale === 'id'
-                      ? 'Untuk produk, jasa, lokasi, alat sewa, atau oper usaha.'
-                      : 'Products, services, spaces, rentals, or business transfer.'}
+                      ? PROMO_ONLY_MODE
+                        ? 'Untuk produk dan jasa yang ingin dipromosikan dulu.'
+                        : 'Untuk produk, jasa, lokasi, alat sewa, atau oper usaha.'
+                      : PROMO_ONLY_MODE
+                        ? 'For products and services you want to promote first.'
+                        : 'Products, services, spaces, rentals, or business transfer.'}
                   </span>
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {(locale === 'id'
-                  ? ['Produk', 'Jasa', 'Lokasi']
-                  : ['Product', 'Service', 'Space']
+                  ? PROMO_ONLY_MODE
+                    ? ['Produk', 'Jasa']
+                    : ['Produk', 'Jasa', 'Lokasi']
+                  : PROMO_ONLY_MODE
+                    ? ['Product', 'Service']
+                    : ['Product', 'Service', 'Space']
                 ).map(item => (
                   <span
                     key={item}
@@ -7438,15 +7035,23 @@ export function CreatePostingClient({
                   </span>
                   <span className="mt-1.5 block text-[12px] leading-5 text-[color:var(--app-text-soft)]">
                     {locale === 'id'
-                      ? 'Cari supplier, jasa, pekerja, lokasi, atau alat.'
-                      : 'Find suppliers, services, talent, spaces, or tools.'}
+                      ? PROMO_ONLY_MODE
+                        ? 'Cari supplier produk atau jasa yang dibutuhkan.'
+                        : 'Cari supplier, jasa, pekerja, lokasi, atau alat.'
+                      : PROMO_ONLY_MODE
+                        ? 'Find product suppliers or services you need.'
+                        : 'Find suppliers, services, talent, spaces, or tools.'}
                   </span>
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {(locale === 'id'
-                  ? ['Supplier', 'Jasa', 'Talent']
-                  : ['Supplier', 'Service', 'Talent']
+                  ? PROMO_ONLY_MODE
+                    ? ['Supplier', 'Jasa']
+                    : ['Supplier', 'Jasa', 'Talent']
+                  : PROMO_ONLY_MODE
+                    ? ['Supplier', 'Service']
+                    : ['Supplier', 'Service', 'Talent']
                 ).map(item => (
                   <span
                     key={item}
@@ -7564,7 +7169,9 @@ export function CreatePostingClient({
         locale === 'id' ? 'Apa yang ingin Anda cari?' : 'What do you need?',
       description:
         locale === 'id'
-          ? 'Pilih kategori yang paling dekat. Setelah itu tulis barang, jasa, talent, lokasi, atau alat yang sedang dicari.'
+          ? PROMO_ONLY_MODE
+            ? 'Pilih kategori yang paling dekat. Setelah itu tulis barang atau jasa yang sedang dicari.'
+            : 'Pilih kategori yang paling dekat. Setelah itu tulis barang, jasa, talent, lokasi, atau alat yang sedang dicari.'
           : 'Choose the closest category. Then add a short brief.',
       children: (
         <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
@@ -7630,8 +7237,12 @@ export function CreatePostingClient({
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
               {locale === 'id'
-                ? 'Kalau Anda menyediakan produk, jasa, lokasi, alat, atau oper usaha, pindah ke Tawarkan.'
-                : 'If you want to post products, services, or spaces, switch to Offer. Talent is managed from the account profile.'}
+                ? PROMO_ONLY_MODE
+                  ? 'Kalau Anda menyediakan produk atau jasa, pindah ke Tawarkan.'
+                  : 'Kalau Anda menyediakan produk, jasa, lokasi, alat, atau oper usaha, pindah ke Tawarkan.'
+                : PROMO_ONLY_MODE
+                  ? 'If you want to post products or services, switch to Offer.'
+                  : 'If you want to post products, services, or spaces, switch to Offer. Talent is managed from the account profile.'}
             </p>
             <Link
               href={supplyEntryHref}
@@ -7703,8 +7314,12 @@ export function CreatePostingClient({
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
               {locale === 'id'
-                ? 'Produk, jasa, supplier, lokasi, dan talent paling mudah ditemukan kalau judulnya jelas.'
-                : 'Products, services, suppliers, spaces, and talent are easier to find with a clear title.'}
+                ? PROMO_ONLY_MODE
+                  ? 'Produk dan jasa paling mudah ditemukan kalau judul, foto, dan deskripsinya jelas.'
+                  : 'Produk, jasa, supplier, lokasi, dan talent paling mudah ditemukan kalau judulnya jelas.'
+                : PROMO_ONLY_MODE
+                  ? 'Products and services are easier to find with a clear title, photos, and description.'
+                  : 'Products, services, suppliers, spaces, and talent are easier to find with a clear title.'}
             </p>
           </div>
           <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
@@ -7807,6 +7422,7 @@ export function CreatePostingClient({
         listingMode={listingMode}
         onListingModeChange={setListingMode}
         hideModeSwitch={isNeedServiceJourney}
+        minimal={currentStep === 1 && typePicked && !isNeedServiceJourney}
         canChangeTypeBeforeDraft={canChangeTypeBeforeDraft}
         onChangeType={openTypePicker}
         typeSelectionLocked={typeSelectionLocked}
@@ -7853,11 +7469,25 @@ export function CreatePostingClient({
       <form
         onSubmit={handleSubmit}
         data-testid="create-listing-form"
-        className="mt-4 xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]"
+        className={cn(
+          'mt-3',
+          showDesktopAssistRail
+            ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-4 2xl:grid-cols-[minmax(0,1fr)_320px]'
+            : '',
+        )}
       >
         <div className="space-y-3">
           {showStepOneSetupCard && (
-            <div className="space-y-2">
+            <details className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-2 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/35">
+              <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 rounded-[12px] px-1 text-left text-[12px] font-black text-[color:var(--app-text)] [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 truncate">
+                  {locale === 'id' ? 'Opsi lanjutan' : 'Advanced options'}
+                </span>
+                <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:ring-[color:var(--app-border-strong)]">
+                  {locale === 'id' ? 'Kategori, contoh' : 'Category, samples'}
+                </span>
+              </summary>
+            <div className="mt-2 space-y-2">
               {typePicked && supportsDemandListing(activeType) && (
                 <section className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] dark:border-[color:var(--app-border-strong)]">
                   <div className="flex flex-wrap items-center justify-between gap-2 px-1">
@@ -8043,6 +7673,7 @@ export function CreatePostingClient({
                 />
               ) : null}
             </div>
+            </details>
           )}
 
           {/* Step 1 fields */}
@@ -8053,11 +7684,26 @@ export function CreatePostingClient({
                 title={stepOneMainTitle}
                 description={stepOneMainDescription}
                 aside={
-                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-                    {locale === 'id'
-                      ? `${requiredDone}/${requiredFields.length} wajib diisi`
-                      : `${requiredDone}/${requiredFields.length} required`}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                      {isSimpleModeActive
+                        ? locale === 'id'
+                          ? `${requiredFields.length} info inti`
+                          : `${requiredFields.length} core info`
+                        : locale === 'id'
+                          ? `${requiredDone}/${requiredFields.length} wajib`
+                          : `${requiredDone}/${requiredFields.length} required`}
+                    </span>
+                    {!isSimpleModeActive && supportsSimpleMode ? (
+                      <button
+                        type="button"
+                        onClick={() => setListingMode('simple')}
+                        className="inline-flex min-h-7 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]"
+                      >
+                        {locale === 'id' ? 'Ringkas' : 'Simplify'}
+                      </button>
+                    ) : null}
+                  </div>
                 }
               >
                 {!typePicked && (
@@ -8069,23 +7715,6 @@ export function CreatePostingClient({
                 )}
                 {typePicked && (
                   <>
-                    {isSimpleModeActive && (
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3 py-3 dark:border-emerald-900 dark:bg-emerald-950/20">
-                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
-                          {simpleModeCallout}
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {simpleModeCalloutChips.map(chip => (
-                            <span
-                              key={chip}
-                              className="rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-slate-950/70 dark:text-emerald-200"
-                            >
-                              {chip}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
                       {step1PrimaryFields.map(renderFieldBlock)}
                     </div>
@@ -8094,20 +7723,16 @@ export function CreatePostingClient({
                         title={
                           locale === 'id'
                             ? isSimpleModeActive
-                              ? 'Tambah kalau perlu'
+                              ? 'Opsional'
                               : 'Detail tambahan (opsional)'
                             : isSimpleModeActive
-                              ? 'Add more if you want clarity'
+                              ? 'Optional'
                               : 'Optional details'
                         }
                         description={
                           locale === 'id'
-                            ? isSimpleModeActive
-                              ? 'Boleh kosong.'
-                              : 'Isi kalau memang kepake.'
-                            : isSimpleModeActive
-                              ? 'Optional.'
-                              : 'Fill if relevant.'
+                            ? 'Isi kalau perlu.'
+                            : 'Fill if needed.'
                         }
                         className="bg-[color:var(--app-surface-muted)]"
                       >
@@ -8135,8 +7760,8 @@ export function CreatePostingClient({
                   <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                     {isSimpleModeActive
                       ? locale === 'id'
-                        ? 'boleh kosong semua'
-                        : 'all optional'
+                        ? 'opsional'
+                        : 'optional'
                       : locale === 'id'
                         ? `${step2RequiredFields.length} field utama`
                         : `${step2RequiredFields.length} main fields`}
@@ -8152,23 +7777,21 @@ export function CreatePostingClient({
                 )}
                 {typePicked && (
                   <>
-                    <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-                      {isSimpleModeActive
-                        ? locale === 'id'
-                          ? 'Tambah kalau perlu.'
-                          : 'Add detail only if needed.'
-                        : locale === 'id'
+                    {!isSimpleModeActive ? (
+                      <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                        {locale === 'id'
                           ? demandTypeMeta?.step2HintId ||
                             typeConfig.step2HintId
                           : demandTypeMeta?.step2HintEn ||
                             typeConfig.step2HintEn}
-                    </div>
+                      </div>
+                    ) : null}
                     {step2Fields.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-4 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
                         {isSimpleModeActive
                           ? locale === 'id'
-                            ? 'Mode satset: tidak ada detail wajib.'
-                            : 'There are no extra detail fields you must fill in during this quick step.'
+                            ? 'Tidak ada yang wajib.'
+                            : 'Nothing required here.'
                           : locale === 'id'
                             ? 'Belum ada detail tambahan.'
                             : 'No additional detail fields for this combination yet.'}
@@ -8183,20 +7806,16 @@ export function CreatePostingClient({
                             title={
                               locale === 'id'
                                 ? isSimpleModeActive
-                                  ? 'Tambah lagi kalau perlu'
+                                  ? 'Opsional'
                                   : 'Detail tambahan (opsional)'
                                 : isSimpleModeActive
-                                  ? 'Add more if needed'
+                                  ? 'Optional'
                                   : 'Optional details'
                             }
                             description={
                               locale === 'id'
-                                ? isSimpleModeActive
-                                  ? 'Boleh kosong semua.'
-                                  : 'Tambah kalau bikin lebih jelas.'
-                                : isSimpleModeActive
-                                  ? 'Everything here is optional.'
-                                  : 'Add if it helps clarity.'
+                                ? 'Isi kalau perlu.'
+                                : 'Fill if needed.'
                             }
                             className="bg-[color:var(--app-surface-muted)]"
                           >
@@ -8227,32 +7846,6 @@ export function CreatePostingClient({
                   </span>
                 }
               >
-                {typePicked && (
-                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
-                    <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                      {locale === 'id'
-                        ? mediaGuide.titleId
-                        : mediaGuide.titleEn}
-                    </p>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                      {mediaVisualItems.map((item, index) => {
-                        const GuideIcon =
-                          [ImageIcon, FileText, Upload][index] || ImageIcon;
-                        return (
-                          <div
-                            key={item}
-                            title={mediaItems[index] || item}
-                            className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text)]"
-                          >
-                            <GuideIcon className="mb-2 h-4 w-4 text-[color:var(--app-info)]" />
-                            <span className="font-semibold">{item}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
                 {showImages && (
                   <div>
                     <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
@@ -8388,29 +7981,9 @@ export function CreatePostingClient({
                 </p>
                 <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                   {locale === 'id'
-                    ? 'Boleh skip. Pakai kalau mau dorong listing.'
-                    : 'Optional. Use it when you want extra push.'}
+                    ? 'Boleh skip. Listing tetap bisa tayang.'
+                    : 'Optional. You can still publish without this.'}
                 </p>
-                <div className="mt-3 grid grid-cols-1 gap-2 min-[460px]:grid-cols-3">
-                  {[
-                    locale === 'id'
-                      ? 'Tanpa promo tetap bisa tayang.'
-                      : 'You can still publish normally without promotion.',
-                    locale === 'id'
-                      ? 'Cocok buat diskon, voucher, boost.'
-                      : 'Promotion is useful for discounts, vouchers, or boosting a listing.',
-                    locale === 'id'
-                      ? 'Kalau masih bingung, skip dulu juga aman.'
-                      : 'If unsure, skip promotion for now.',
-                  ].map(item => (
-                    <div
-                      key={item}
-                      className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
                 <div className="mt-3 inline-flex rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-1 text-[11px] font-semibold">
                   <button
                     type="button"

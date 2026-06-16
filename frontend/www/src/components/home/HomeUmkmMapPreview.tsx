@@ -93,7 +93,7 @@ function HomeUmkmCard({ item, isId }: { item: PreparedStore; isId: boolean }) {
     ? buildUmkmStorefrontPath(item.store.slug)
     : UMKM_DISCOVERY_PATH;
   const mapHref = item.store.slug
-    ? buildUmkmDiscoveryPath({ store: item.store.slug })
+    ? buildUmkmDiscoveryPath({ store: item.store.slug, storeId: item.store.id })
     : UMKM_DISCOVERY_PATH;
   const contactHref = item.ui.whatsappHref || item.ui.telHref || detailHref;
   const contactIsExternal = contactHref.startsWith('http');

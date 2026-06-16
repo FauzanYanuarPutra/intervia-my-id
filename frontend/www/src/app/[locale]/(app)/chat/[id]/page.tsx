@@ -70,6 +70,7 @@ import {
 import { validateListingPayload } from '@/lib/content/listingFlowRules';
 import { buildContentHref } from '@/lib/content/routes';
 import { buildCreatePath } from '@/lib/createRoutes';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { soundManager } from '@/lib/soundManager';
 import { CameraCaptureModal } from '@/components/chat/CameraCaptureModal';
 import { VideoCall } from '@/components/chat/VideoCall';
@@ -190,6 +191,18 @@ const AI_TEMPLATES = [
     prompt: 'Tanyakan 2-3 detail inti.',
   },
   {
+    id: 'support-summary',
+    label: 'Ringkas masalah',
+    prompt:
+      'Bantu rangkum masalah user dengan format singkat: masalah, data yang dibutuhkan, dan langkah berikutnya.',
+  },
+  {
+    id: 'support-checklist',
+    label: 'Data bantuan',
+    prompt:
+      'Tanyakan data penting untuk bantuan tanpa bertele-tele. Maksimal 3 poin dan tetap ramah.',
+  },
+  {
     id: 'decline',
     label: 'Tolak sopan',
     prompt:
@@ -223,6 +236,12 @@ const AI_PROMPT_EXAMPLES = [
     id: 'closing',
     label: 'Ajak closing',
     prompt: 'Ringkas poin penting lalu ajak konfirmasi untuk lanjut.',
+  },
+  {
+    id: 'support',
+    label: 'Bantu cek masalah',
+    prompt:
+      'Bantu user menjelaskan kendala: apa yang terjadi, akun/fitur terkait, dan bukti yang perlu dilampirkan.',
   },
 ] as const;
 
@@ -1643,6 +1662,51 @@ export default function ChatRoomPage() {
 
   const handleBack = useAppBack(router, '/chat');
 
+  const handleOpenStructuredContent = useCallback(
+    async (contentId: string, href: string) => {
+      const safeHref = href.trim();
+      const safeContentId = contentId.trim();
+      if (!safeHref && !safeContentId) {
+        notify({
+          title:
+            chatLocale === 'id'
+              ? 'Listing tidak tersedia'
+              : 'Listing unavailable',
+          description:
+            chatLocale === 'id'
+              ? 'Konteks chat tetap tersimpan, tapi link listing tidak ada.'
+              : 'The chat context is still saved, but the listing link is missing.',
+          variant: 'error',
+        });
+        return;
+      }
+
+      if (safeContentId) {
+        const res = await authFetch(
+          `/api/content/${encodeURIComponent(safeContentId)}`,
+          { cache: 'no-store' },
+        ).catch(() => null);
+        if (!res?.ok) {
+          notify({
+            title:
+              chatLocale === 'id'
+                ? 'Listing sudah tidak tersedia'
+                : 'Listing is no longer available',
+            description:
+              chatLocale === 'id'
+                ? 'Snapshot di chat tetap ada sebagai riwayat, tapi halaman aslinya mungkin dihapus atau dinonaktifkan.'
+                : 'The chat snapshot remains as history, but the original page may have been deleted or unpublished.',
+            variant: 'info',
+          });
+          return;
+        }
+      }
+
+      router.push(safeHref || `/content/${encodeURIComponent(safeContentId)}`);
+    },
+    [authFetch, chatLocale, notify, router],
+  );
+
   // Allowed rooms based on inbox (anti URL injection)
   const allowedRoomIds = useMemo(() => {
     const set = new Set<string>();
@@ -1970,6 +2034,20 @@ export default function ChatRoomPage() {
       AI_TEMPLATES[0],
     [aiTemplateId],
   );
+  const aiReplyTemplates = useMemo(
+    () =>
+      isSupportRoom
+        ? AI_TEMPLATES
+        : AI_TEMPLATES.filter(template => !template.id.startsWith('support-')),
+    [isSupportRoom],
+  );
+  const aiPromptExamples = useMemo(
+    () =>
+      isSupportRoom
+        ? AI_PROMPT_EXAMPLES
+        : AI_PROMPT_EXAMPLES.filter(example => example.id !== 'support'),
+    [isSupportRoom],
+  );
   const aiTone = useMemo(
     () => AI_TONES.find(tone => tone.id === aiToneId) ?? AI_TONES[0],
     [aiToneId],
@@ -2002,19 +2080,17 @@ export default function ChatRoomPage() {
   } | null>(null);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [activeCallIsCaller, setActiveCallIsCaller] = useState(false);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [composerHeight, setComposerHeight] = useState(0);
-  const [isComposerFocused, setIsComposerFocused] = useState(false);
 
+  const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const sendPointerHandledRef = useRef(false);
+  const sendShouldRefocusComposerRef = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const stickerPanelRef = useRef<HTMLDivElement>(null);
   const attachmentTouchStartXRef = useRef<number | null>(null);
-  const keyboardBaselineHeightRef = useRef(0);
 
   const channelRef = useRef<Awaited<ReturnType<typeof joinRoom>> | null>(null);
   const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2037,6 +2113,25 @@ export default function ChatRoomPage() {
 
   const TYPING_DEBOUNCE_MS = 2000;
   const TYPING_STOP_MS = 3000;
+
+  const scrollMessagesToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto') => {
+      const viewport = messagesViewportRef.current;
+      if (viewport) {
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior,
+        });
+        return;
+      }
+
+      messagesEndRef.current?.scrollIntoView({
+        behavior,
+        block: 'end',
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     activeCallIdRef.current = activeCallId;
@@ -2124,6 +2219,12 @@ export default function ChatRoomPage() {
     user?.id,
   ]);
 
+  useEffect(() => {
+    if (!isSupportRoom && aiTemplateId.startsWith('support-')) {
+      setAiTemplateId('quick-reply');
+    }
+  }, [aiTemplateId, isSupportRoom]);
+
   // Click outside emoji/sticker
   useEffect(() => {
     if (!showEmojiPicker && !showStickerPanel) return;
@@ -2146,85 +2247,6 @@ export default function ChatRoomPage() {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const mq = window.matchMedia('(max-width: 639px)');
-    const update = () => setIsMobileViewport(mq.matches);
-    update();
-    if (typeof mq.addEventListener === 'function') {
-      mq.addEventListener('change', update);
-      return () => mq.removeEventListener('change', update);
-    }
-    mq.addListener(update);
-    return () => mq.removeListener(update);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (!isMobileViewport) {
-      setKeyboardOffset(0);
-      keyboardBaselineHeightRef.current = 0;
-      return;
-    }
-    const viewport = window.visualViewport;
-    const KEYBOARD_THRESHOLD = 80;
-    let raf = 0;
-
-    const update = () => {
-      const layoutHeight = window.innerHeight;
-      const visualHeight = viewport?.height ?? layoutHeight;
-
-      if (!keyboardBaselineHeightRef.current) {
-        keyboardBaselineHeightRef.current = layoutHeight;
-      }
-
-      const baselineHeight = keyboardBaselineHeightRef.current || layoutHeight;
-      const diff = Math.max(0, Math.round(baselineHeight - visualHeight));
-      const keyboardLikelyOpen = isComposerFocused && diff > KEYBOARD_THRESHOLD;
-
-      if (!keyboardLikelyOpen) {
-        keyboardBaselineHeightRef.current = layoutHeight;
-      }
-
-      setKeyboardOffset(keyboardLikelyOpen ? diff : 0);
-    };
-
-    const scheduleUpdate = () => {
-      if (raf) window.cancelAnimationFrame(raf);
-      raf = window.requestAnimationFrame(update);
-    };
-
-    update();
-    viewport?.addEventListener('resize', scheduleUpdate);
-    viewport?.addEventListener('scroll', scheduleUpdate);
-    window.addEventListener('resize', scheduleUpdate);
-    return () => {
-      if (raf) window.cancelAnimationFrame(raf);
-      viewport?.removeEventListener('resize', scheduleUpdate);
-      viewport?.removeEventListener('scroll', scheduleUpdate);
-      window.removeEventListener('resize', scheduleUpdate);
-    };
-  }, [isMobileViewport, isComposerFocused]);
-
-  useEffect(() => {
-    const element = composerRef.current;
-    if (!element) return;
-    const update = () => {
-      setComposerHeight(Math.ceil(element.getBoundingClientRect().height));
-    };
-    update();
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(update);
-      observer.observe(element);
-    }
-    window.addEventListener('resize', update);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', update);
-    };
   }, []);
 
   const openAiWorkspace = useCallback(
@@ -2756,13 +2778,10 @@ export default function ChatRoomPage() {
   useEffect(() => {
     if (messages.length === 0) return;
     const raf = window.requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'end',
-      });
+      scrollMessagesToBottom('smooth');
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [messages.length]);
+  }, [messages.length, scrollMessagesToBottom]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -3061,6 +3080,9 @@ export default function ChatRoomPage() {
     };
 
     setMessages(prev => [...prev, tempMessage]);
+    window.requestAnimationFrame(() => {
+      scrollMessagesToBottom('smooth');
+    });
     soundManager.play('messageSend');
 
     const ch = channelRef.current;
@@ -3441,6 +3463,9 @@ export default function ChatRoomPage() {
       userDraftHint
         ? `Gunakan draft pengguna sebagai referensi lalu rapikan: "${userDraftHint}"`
         : '',
+      isSupportRoom
+        ? 'Mode bantuan: fokus bantu user memecahkan masalah Lajukan. Buat jawaban pendek, mudah dipahami orang Indonesia, sebutkan langkah praktis, dan kalau perlu eskalasi ke admin minta maksimal 3 data penting.'
+        : '',
       'Kalau butuh konteks dari lawan bicara, minta user menuliskan poinnya di draft/instruksi. Jangan menebak data sensitif.',
       'Balasan harus natural, siap dikirim, dan tidak kaku.',
     ].filter(Boolean);
@@ -3495,6 +3520,7 @@ export default function ChatRoomPage() {
     aiTone.label,
     aiUseContext,
     authFetch,
+    isSupportRoom,
     isUploadingAttachments,
     newMessage,
     sendPayload,
@@ -3521,73 +3547,85 @@ export default function ChatRoomPage() {
     setAiError(null);
   }, []);
 
-  const handleSend = useCallback(async () => {
-    const trimmed = newMessage.trim();
-    const hasAttachments = draftAttachments.length > 0;
-    if (!trimmed && !hasAttachments) return;
-    if (sending || isUploadingAttachments) return;
+  const handleSend = useCallback(
+    async (options?: { refocusComposer?: boolean }) => {
+      const trimmed = newMessage.trim();
+      const hasAttachments = draftAttachments.length > 0;
+      if (!trimmed && !hasAttachments) return;
+      if (sending || isUploadingAttachments) return;
+      const shouldRefocusComposer =
+        options?.refocusComposer === true && Boolean(messageInputRef.current);
 
-    if (trimmed) {
-      const risks = detectFraudSignals(trimmed);
-      if (risks.some(risk => risk.severity === 'high')) {
-        const proceed = await confirm({
-          title: 'Pesan berisiko',
-          description:
-            'Pesan ini terdeteksi berisiko scam/off-platform. Lanjut kirim?',
-          confirmLabel: 'Tetap kirim',
-          cancelLabel: 'Batal',
-          tone: 'danger',
-        });
-        if (!proceed) return;
+      if (trimmed) {
+        const risks = detectFraudSignals(trimmed);
+        if (risks.some(risk => risk.severity === 'high')) {
+          const proceed = await confirm({
+            title: 'Pesan berisiko',
+            description:
+              'Pesan ini terdeteksi berisiko scam/off-platform. Lanjut kirim?',
+            confirmLabel: 'Tetap kirim',
+            cancelLabel: 'Batal',
+            tone: 'danger',
+          });
+          if (!proceed) return;
+        }
       }
-    }
 
-    if (hasAttachments) {
-      const notReady = draftAttachments.filter(
-        att => att.status !== 'uploaded' || !att.serverUrl,
-      );
-      if (notReady.length > 0) {
-        notify({
-          title: 'Upload masih berjalan',
-          description: 'Please wait until all attachments finish uploading.',
-          variant: 'info',
-        });
-        return;
+      if (hasAttachments) {
+        const notReady = draftAttachments.filter(
+          att => att.status !== 'uploaded' || !att.serverUrl,
+        );
+        if (notReady.length > 0) {
+          notify({
+            title: 'Upload masih berjalan',
+            description: 'Please wait until all attachments finish uploading.',
+            variant: 'info',
+          });
+          return;
+        }
       }
-    }
 
-    if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
-    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
-    if (channelRef.current && channelReady) {
-      try {
-        channelRef.current.push('typing', { is_typing: false });
-        lastTypingSentRef.current = 0;
-      } catch { }
-    }
+      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      if (channelRef.current && channelReady) {
+        try {
+          channelRef.current.push('typing', { is_typing: false });
+          lastTypingSentRef.current = 0;
+        } catch { }
+      }
 
-    const attachmentUrls = hasAttachments
-      ? draftAttachments.map(att => att.serverUrl ?? '').filter(Boolean)
-      : [];
-    const messageType = hasAttachments
-      ? draftAttachments.length === 1
-        ? draftAttachments[0].type
-        : 'file'
-      : 'text';
+      const attachmentUrls = hasAttachments
+        ? draftAttachments.map(att => att.serverUrl ?? '').filter(Boolean)
+        : [];
+      const messageType = hasAttachments
+        ? draftAttachments.length === 1
+          ? draftAttachments[0].type
+          : 'file'
+        : 'text';
 
-    await sendPayload(trimmed, messageType, attachmentUrls);
-    setNewMessage('');
-    clearDraftAttachments();
-  }, [
-    newMessage,
-    draftAttachments,
-    sending,
-    isUploadingAttachments,
-    confirm,
-    notify,
-    sendPayload,
-    channelReady,
-    clearDraftAttachments,
-  ]);
+      await sendPayload(trimmed, messageType, attachmentUrls);
+      setNewMessage('');
+      clearDraftAttachments();
+      requestAnimationFrame(() => {
+        if (shouldRefocusComposer) {
+          messageInputRef.current?.focus({ preventScroll: true });
+        }
+        scrollMessagesToBottom('smooth');
+      });
+    },
+    [
+      newMessage,
+      draftAttachments,
+      sending,
+      isUploadingAttachments,
+      confirm,
+      notify,
+      sendPayload,
+      channelReady,
+      clearDraftAttachments,
+      scrollMessagesToBottom,
+    ],
+  );
 
   const handleChooseFile = () => fileInputRef.current?.click();
   const handleFileChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
@@ -4750,18 +4788,6 @@ export default function ChatRoomPage() {
     );
   }
 
-  const composerOffset = isMobileViewport ? keyboardOffset : 0;
-  const messageListSpacerHeight =
-    isMobileViewport && composerHeight > 0
-      ? `calc(${composerHeight}px + ${composerOffset}px + env(safe-area-inset-bottom))`
-      : undefined;
-  const composerStyle = isMobileViewport
-    ? {
-      transform: `translateY(-${composerOffset}px)`,
-      paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
-    }
-    : undefined;
-
   if (!canonicalRoomId) {
     return (
       <div className="min-h-full flex flex-col items-center justify-center gap-4 bg-[color:var(--app-surface)] p-4">
@@ -4778,12 +4804,24 @@ export default function ChatRoomPage() {
 
   if (roomAllowed === null) {
     return (
-      <div className="min-h-full flex items-center justify-center bg-[color:var(--app-surface)]">
-        <div className="flex items-center gap-2 text-[color:var(--app-text-soft)]">
-          <Loader2 className="h-5 w-5 animate-spin text-[color:var(--app-accent)]" />
-          <span className="text-sm">
-            {chatLocale === 'id' ? 'Membuka chat...' : 'Opening chat...'}
-          </span>
+      <div className="flex h-full max-h-full min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]">
+        <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
+          <div className="flex min-w-0 items-center gap-3 px-2.5 py-2 sm:px-4 sm:py-2.5">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942]" />
+            <div className="min-w-0 flex-1">
+              <div className="h-4 w-36 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942]" />
+              <div className="mt-2 h-3 w-24 rounded-full bg-[#e9edef] dark:bg-[#202c33]" />
+            </div>
+          </div>
+        </header>
+
+        <div className="grid min-h-0 flex-1 place-items-center px-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/88 px-4 py-2 text-[#54656f] shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#111b21]/88 dark:text-[#aebac1]">
+            <Loader2 className="h-5 w-5 animate-spin text-[#00a884]" />
+            <span className="text-sm font-semibold">
+              {chatLocale === 'id' ? 'Membuka chat...' : 'Opening chat...'}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -4819,7 +4857,7 @@ export default function ChatRoomPage() {
         backgroundColor: 'transparent',
       }}
     >
-      <header className="fixed top-0 left-0 right-0 z-50 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
+      <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
         <div className="min-w-0 px-2.5 py-2 sm:px-4 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
@@ -4944,25 +4982,26 @@ export default function ChatRoomPage() {
               </span>
             )}
 
-            {/* 3. TRANSACTION BUTTON ACTION */}
-            <button
-              onClick={() => setShowTransactionsDrawer(prev => !prev)}
-              className="inline-flex min-h-[26px] shrink-0 items-center gap-1 rounded-md bg-zinc-100/70 px-2 text-[11px] font-semibold text-zinc-600 transition-all duration-150 hover:bg-zinc-200/80 hover:text-zinc-900 active:scale-95 dark:bg-zinc-800/40 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200"
-              aria-label={
-                chatLocale === 'id' ? 'Buka transaksi' : 'Open transactions'
-              }
-              title={chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
-            >
-              <ReceiptText className="h-3.5 w-3.5 opacity-70" />
-              <span>
-                {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
-              </span>
-            </button>
+            {!PROMO_ONLY_MODE ? (
+              <button
+                onClick={() => setShowTransactionsDrawer(prev => !prev)}
+                className="inline-flex min-h-[26px] shrink-0 items-center gap-1 rounded-md bg-zinc-100/70 px-2 text-[11px] font-semibold text-zinc-600 transition-all duration-150 hover:bg-zinc-200/80 hover:text-zinc-900 active:scale-95 dark:bg-zinc-800/40 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200"
+                aria-label={
+                  chatLocale === 'id' ? 'Buka transaksi' : 'Open transactions'
+                }
+                title={chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
+              >
+                <ReceiptText className="h-3.5 w-3.5 opacity-70" />
+                <span>
+                  {chatLocale === 'id' ? 'Transaksi' : 'Transactions'}
+                </span>
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
 
-      {roomSummaryTransaction ? (
+      {!PROMO_ONLY_MODE && roomSummaryTransaction ? (
         <div className="border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
           <div className="mx-auto w-full max-w-[920px]">
             <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)] backdrop-blur dark:border-white/8 dark:bg-[#202c33]/90">
@@ -5149,10 +5188,17 @@ export default function ChatRoomPage() {
             }}
           />
           <div
-            className="relative h-full min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-2 py-3 sm:px-5 sm:py-4"
+            ref={messagesViewportRef}
+            className="relative h-full min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-2 py-3 pb-4 sm:px-5 sm:py-4"
             data-auto-scrollbar
           >
-            <div className="mx-auto flex w-full max-w-[920px] flex-col space-y-1.5">
+            <div
+              className={`mx-auto flex min-h-full w-full max-w-[920px] flex-col space-y-1.5 ${
+                !loading && !loadError && messages.length > 0
+                  ? ''
+                  : 'justify-center'
+              }`}
+            >
               {loading ? (
                 <div className="flex justify-center py-20">
                   <Loader2 className="h-6 w-6 animate-spin text-[#25d366]" />
@@ -5184,7 +5230,9 @@ export default function ChatRoomPage() {
                   </p>
                 </div>
               ) : (
-                timelineItems.map(item => {
+                <>
+                  <div className="mt-auto" aria-hidden="true" />
+                  {timelineItems.map(item => {
                   if (item.type === 'day') {
                     return (
                       <div
@@ -5246,6 +5294,14 @@ export default function ChatRoomPage() {
                               : '',
                           )
                           : '';
+                  const structuredContentId =
+                    typeof meta?.content_id === 'string' &&
+                      meta.content_id.trim()
+                      ? meta.content_id.trim()
+                      : typeof listingSnapshot.content_id === 'string' &&
+                        listingSnapshot.content_id.trim()
+                        ? String(listingSnapshot.content_id).trim()
+                        : '';
                   const isAiRoomDraftCard =
                     msg.message_type === 'listing' &&
                     typeof meta?.source === 'string' &&
@@ -5423,6 +5479,10 @@ export default function ChatRoomPage() {
                     msg.message_type === 'listing' ||
                     msg.message_type === 'transaction' ||
                     msg.message_type === 'job_update';
+                  const isTextOnlyMessage =
+                    !isStructured &&
+                    (!msg.message_type || msg.message_type === 'text') &&
+                    !(msg.attachments?.length);
 
                   const bubbleMaxWidthClass =
                     msg.message_type === 'transaction'
@@ -5439,6 +5499,31 @@ export default function ChatRoomPage() {
                   const bubbleMetaClass = isOwn
                     ? 'text-[#667781] dark:text-[#d1f4cc]'
                     : 'text-[#667781] dark:text-[#8696a0]';
+                  const deliveryStatusIcon = isOwn ? (
+                    <>
+                      {status === 'sending' && (
+                        <Clock
+                          className="h-3 w-3 animate-pulse"
+                          aria-label="Sending"
+                        />
+                      )}
+                      {status === 'sent' && (
+                        <Check className="h-3 w-3" aria-label="Sent" />
+                      )}
+                      {status === 'read' && (
+                        <CheckCheck
+                          className="h-3 w-3 text-[#53bdeb]"
+                          aria-label="Read"
+                        />
+                      )}
+                      {status === 'failed' && (
+                        <AlertCircle
+                          className="h-3 w-3 text-[#ff6b6b]"
+                          aria-label="Failed"
+                        />
+                      )}
+                    </>
+                  ) : null;
 
                   return (
                     <motion.div
@@ -5556,15 +5641,22 @@ export default function ChatRoomPage() {
                                             : 'Open Ticket'}
                                         </button>
                                       )}
-                                    {structuredContentUrl && (
-                                      <Link
-                                        href={structuredContentUrl}
+                                    {(structuredContentUrl ||
+                                      structuredContentId) && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          void handleOpenStructuredContent(
+                                            structuredContentId,
+                                            structuredContentUrl,
+                                          )
+                                        }
                                         className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
                                       >
                                         {chatLocale === 'id'
                                           ? 'Buka listing'
                                           : 'Open Listing'}
-                                      </Link>
+                                      </button>
                                     )}
                                   </div>
                                 </div>
@@ -5686,15 +5778,22 @@ export default function ChatRoomPage() {
                                             : 'View Resume'}
                                         </a>
                                       )}
-                                    {structuredContentUrl && (
-                                      <Link
-                                        href={structuredContentUrl}
+                                    {(structuredContentUrl ||
+                                      structuredContentId) && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          void handleOpenStructuredContent(
+                                            structuredContentId,
+                                            structuredContentUrl,
+                                          )
+                                        }
                                         className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
                                       >
                                         {chatLocale === 'id'
                                           ? 'Buka listing'
                                           : 'Open Listing'}
-                                      </Link>
+                                      </button>
                                     )}
                                   </div>
                                 </div>
@@ -5957,15 +6056,22 @@ export default function ChatRoomPage() {
                                               ? 'Respond'
                                               : 'Choose Action'}
                                         </button>
-                                        {structuredContentUrl && (
-                                          <Link
-                                            href={structuredContentUrl}
+                                        {(structuredContentUrl ||
+                                          structuredContentId) && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              void handleOpenStructuredContent(
+                                                structuredContentId,
+                                                structuredContentUrl,
+                                              )
+                                            }
                                             className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
                                           >
                                             {chatLocale === 'id'
                                               ? 'Buka listing'
                                               : 'Open Listing'}
-                                          </Link>
+                                          </button>
                                         )}
                                       </div>
                                     )}
@@ -6222,52 +6328,47 @@ export default function ChatRoomPage() {
                               {msg.content || 'Download file'}
                             </a>
                           ) : (
-                            <span>{msg.content}</span>
+                            <span>
+                              {msg.content}
+                              {isTextOnlyMessage ? (
+                                <span
+                                  className={`ml-2 inline-flex translate-y-[2px] items-center gap-1 whitespace-nowrap align-baseline text-[10px] leading-none ${bubbleMetaClass}`}
+                                >
+                                  <span>
+                                    {formatMessageTime(msg.created_at)}
+                                  </span>
+                                  {deliveryStatusIcon ? (
+                                    <span className="inline-flex items-center opacity-90">
+                                      {deliveryStatusIcon}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : null}
+                            </span>
                           )}
 
-                          <div className="mt-1.5 flex items-center justify-end gap-1 pl-8">
-                            <span className={`text-[10px] ${bubbleMetaClass}`}>
-                              {formatMessageTime(msg.created_at)}
-                            </span>
-                            {isOwn && (
-                              <span className="ml-0.5 inline-flex items-center opacity-90">
-                                {status === 'sending' && (
-                                  <Clock
-                                    className="w-3 h-3 animate-pulse"
-                                    aria-label="Sending"
-                                  />
-                                )}
-                                {status === 'sent' && (
-                                  <Check
-                                    className="w-3 h-3"
-                                    aria-label="Sent"
-                                  />
-                                )}
-                                {status === 'read' && (
-                                  <CheckCheck
-                                    className="w-3 h-3 text-[#53bdeb]"
-                                    aria-label="Read"
-                                  />
-                                )}
-                                {status === 'failed' && (
-                                  <AlertCircle
-                                    className="w-3 h-3 text-[#ff6b6b]"
-                                    aria-label="Failed"
-                                  />
-                                )}
+                          {!isTextOnlyMessage ? (
+                            <div className="mt-1.5 flex items-center justify-end gap-1 pl-8">
+                              <span
+                                className={`text-[10px] ${bubbleMetaClass}`}
+                              >
+                                {formatMessageTime(msg.created_at)}
                               </span>
-                            )}
-                          </div>
+                              {deliveryStatusIcon ? (
+                                <span className="ml-0.5 inline-flex items-center opacity-90">
+                                  {deliveryStatusIcon}
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </motion.div>
                   );
-                })
+                })}
+                </>
               )}
 
-              {messageListSpacerHeight ? (
-                <div style={{ height: messageListSpacerHeight }} />
-              ) : null}
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -6277,9 +6378,7 @@ export default function ChatRoomPage() {
       {/* Composer */}
       <div
         ref={composerRef}
-        className={`border-t border-black/5 bg-[#f0f2f5]/95 px-2 py-2 backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95 ${isMobileViewport ? 'fixed inset-x-0 bottom-0 z-40' : ''
-          }`}
-        style={composerStyle}
+        className="shrink-0 border-t border-black/5 bg-[#f0f2f5]/95 px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95"
       >
         <div className="mx-auto w-full max-w-[920px] space-y-2">
           <input
@@ -6579,15 +6678,19 @@ export default function ChatRoomPage() {
                     type="text"
                     value={newMessage}
                     onChange={e => handleTypingChange(e.target.value)}
-                    onFocus={() => setIsComposerFocused(true)}
-                    onBlur={() => {
-                      setIsComposerFocused(false);
-                      setKeyboardOffset(0);
+                    onFocus={() => {
+                      requestAnimationFrame(() =>
+                        scrollMessagesToBottom('smooth'),
+                      );
+                      window.setTimeout(
+                        () => scrollMessagesToBottom('smooth'),
+                        260,
+                      );
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        void handleSend();
+                        void handleSend({ refocusComposer: true });
                       }
                     }}
                     placeholder={
@@ -6620,9 +6723,39 @@ export default function ChatRoomPage() {
 
                 <button
                   type="button"
-                  onClick={() => void handleSend()}
+                  onPointerDown={event => {
+                    if (!canSendMessage || sending || isUploadingAttachments)
+                      return;
+                    const refocusComposer =
+                      typeof document !== 'undefined' &&
+                      document.activeElement === messageInputRef.current;
+                    sendShouldRefocusComposerRef.current = refocusComposer;
+                    if (event.pointerType === 'mouse') return;
+                    event.preventDefault();
+                    sendPointerHandledRef.current = true;
+                    window.setTimeout(() => {
+                      sendPointerHandledRef.current = false;
+                      sendShouldRefocusComposerRef.current = false;
+                    }, 1200);
+                    void handleSend({ refocusComposer });
+                  }}
+                  onClick={() => {
+                    if (sendPointerHandledRef.current) {
+                      sendPointerHandledRef.current = false;
+                      sendShouldRefocusComposerRef.current = false;
+                      return;
+                    }
+                    const refocusComposer =
+                      sendShouldRefocusComposerRef.current ||
+                      (typeof document !== 'undefined' &&
+                        document.activeElement === messageInputRef.current);
+                    sendShouldRefocusComposerRef.current = false;
+                    void handleSend({
+                      refocusComposer,
+                    });
+                  }}
                   disabled={!canSendMessage || sending || isUploadingAttachments}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm transition-all duration-200 hover:bg-emerald-600 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-400 disabled:shadow-none dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:disabled:bg-zinc-800/50 dark:disabled:text-zinc-600"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#00a884] text-white shadow-[0_8px_18px_-12px_rgba(0,128,96,0.9)] transition-all duration-200 hover:bg-[#008f72] hover:shadow-[0_10px_22px_-14px_rgba(0,128,96,0.95)] active:scale-95 disabled:cursor-not-allowed disabled:bg-[#d7dbd8] disabled:text-[#87939b] disabled:shadow-none dark:bg-[#00a884] dark:hover:bg-[#06cf9c] dark:disabled:bg-[#2a3942] dark:disabled:text-[#667781]"
                   title="Send"
                 >
                   {sending ? (
@@ -6674,10 +6807,22 @@ export default function ChatRoomPage() {
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id' ? 'AI Workspace' : 'AI Workspace'}
+                  {isSupportRoom
+                    ? chatLocale === 'id'
+                      ? 'Pusat Bantuan AI'
+                      : 'AI Help Desk'
+                    : chatLocale === 'id'
+                      ? 'AI Workspace'
+                      : 'AI Workspace'}
                 </p>
                 <h3 className="mt-1 text-sm font-semibold text-[color:var(--app-text-soft)]">
-                  {aiProfileName || 'AI Pribadi'}
+                  {isSupportRoom
+                    ? canonicalRoomId === 'support:aida'
+                      ? 'Aida bantu beresin kendala'
+                      : chatLocale === 'id'
+                        ? 'Bantu support lebih cepat'
+                        : 'Faster support helper'
+                    : aiProfileName || 'AI Pribadi'}
                 </h3>
               </div>
               <button
@@ -6712,10 +6857,79 @@ export default function ChatRoomPage() {
               ))}
             </div>
 
+            {isSupportRoom ? (
+              <div className="mt-3 rounded-2xl border border-[#b7e4cf] bg-[#effdf5] p-3 text-[#134e3a] dark:border-[#214f3b] dark:bg-[#0f241d] dark:text-[#d8fbe7]">
+                <div className="flex items-start gap-2">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-[#d9fdd3] text-[#008f72] dark:bg-[#103529] dark:text-[#25d366]">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black">
+                      {chatLocale === 'id'
+                        ? 'Bikin bantuan lebih rapi'
+                        : 'Make support clearer'}
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold leading-4 opacity-80">
+                      {chatLocale === 'id'
+                        ? 'Pilih aksi cepat, AI akan bantu susun jawaban pendek yang bisa langsung dikirim.'
+                        : 'Pick a quick action and AI will draft a short reply ready to send.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiWorkspaceMode('reply');
+                      setAiTemplateId('support-summary');
+                      setAiInstruction(
+                        chatLocale === 'id'
+                          ? 'Ringkas kendala user dalam 3 bagian: masalah, data yang dibutuhkan, dan langkah berikutnya.'
+                          : 'Summarize the issue in 3 parts: problem, needed data, and next step.',
+                      );
+                    }}
+                    className="rounded-full bg-[#008f72] px-3 py-1.5 text-[11px] font-black text-white shadow-sm transition hover:bg-[#00745d]"
+                  >
+                    {chatLocale === 'id' ? 'Ringkas masalah' : 'Summarize'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiWorkspaceMode('reply');
+                      setAiTemplateId('support-checklist');
+                      setAiInstruction(
+                        chatLocale === 'id'
+                          ? 'Tanyakan maksimal 3 data penting yang dibutuhkan admin untuk bantu cek masalah.'
+                          : 'Ask for up to 3 key details an admin needs to investigate.',
+                      );
+                    }}
+                    className="rounded-full border border-[#9bd9bd] bg-white/80 px-3 py-1.5 text-[11px] font-black text-[#0f5138] transition hover:bg-white dark:border-[#2b6b50] dark:bg-white/10 dark:text-[#d8fbe7] dark:hover:bg-white/15"
+                  >
+                    {chatLocale === 'id' ? 'Minta data' : 'Ask details'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiWorkspaceMode('reply');
+                      setAiTemplateId('support-summary');
+                      setAiInstruction(
+                        chatLocale === 'id'
+                          ? 'Siapkan pesan eskalasi ke admin: ringkas masalah, dampak ke user, dan bukti yang perlu dilampirkan.'
+                          : 'Prepare an admin escalation: issue summary, user impact, and evidence to attach.',
+                      );
+                    }}
+                    className="rounded-full border border-[#9bd9bd] bg-white/80 px-3 py-1.5 text-[11px] font-black text-[#0f5138] transition hover:bg-white dark:border-[#2b6b50] dark:bg-white/10 dark:text-[#d8fbe7] dark:hover:bg-white/15"
+                  >
+                    {chatLocale === 'id' ? 'Eskalasi admin' : 'Escalate'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             {aiWorkspaceMode === 'reply' ? (
               <>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  {AI_TEMPLATES.map(template => (
+                  {aiReplyTemplates.map(template => (
                     <button
                       key={template.id}
                       type="button"
@@ -7209,7 +7423,7 @@ export default function ChatRoomPage() {
                     Tujuan balasan
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {AI_TEMPLATES.map(template => (
+                    {aiReplyTemplates.map(template => (
                       <button
                         key={template.id}
                         type="button"
@@ -7237,7 +7451,7 @@ export default function ChatRoomPage() {
                 </label>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {AI_PROMPT_EXAMPLES.map(example => (
+                  {aiPromptExamples.map(example => (
                     <button
                       key={example.id}
                       type="button"

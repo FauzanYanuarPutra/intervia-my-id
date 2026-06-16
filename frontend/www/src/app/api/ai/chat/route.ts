@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LAJUKAN_SYSTEM_PROMPT } from '@/lib/aiSystemPrompt';
 import { enforceRateLimit, getClientIp } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
+import { AI_CHAT_ENABLED } from '@/lib/featureFlags';
 
 const INTERNAL_AI_URL = process.env.INTERNAL_AI_URL || '';
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
@@ -208,6 +209,12 @@ const CHAT_RATE_LIMIT_MAX = 30; // 30 requests per minute
 
 export async function POST(req: NextRequest) {
   try {
+    if (!AI_CHAT_ENABLED) {
+      return NextResponse.json(
+        { response: 'AI chat is disabled for now.' },
+        { status: 404 },
+      );
+    }
     const auth = await requireAuth(req);
     if (!auth.ok) return auth.res;
 

@@ -69,6 +69,45 @@ function has(source: string, ...needles: string[]): boolean {
   return needles.some(needle => source.includes(needle));
 }
 
+export function isMoneyRelatedNotification({
+  category,
+  eventType,
+  title,
+  message,
+}: NotificationPresentationInput): boolean {
+  const cat = cleanText(category);
+  const event = cleanText(eventType);
+  const text = `${cat} ${event} ${cleanText(title)} ${cleanText(message)}`;
+
+  if (cat === 'wallet' || cat === 'transaction') return true;
+
+  return has(
+    text,
+    'midtrans',
+    'wallet',
+    'saldo',
+    'topup',
+    'top-up',
+    'deposit',
+    'cash_in',
+    'payment',
+    'pembayaran',
+    'paid',
+    'buyer_funded',
+    'funded',
+    'payment_confirmed',
+    'payment_released',
+    'payout',
+    'withdraw',
+    'refund',
+    'dikembalikan',
+    'transaksi',
+    'transaction',
+    'dana ditahan',
+    'dana masuk',
+  );
+}
+
 export function notificationPresentation({
   category,
   eventType,

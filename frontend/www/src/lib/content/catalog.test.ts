@@ -20,6 +20,14 @@ describe('normalizeContentMediaUrl', () => {
     ).toBe('/api/content/media/laju-chat/content/example.webp');
   });
 
+  it('removes stale localhost origins from forum media URLs', () => {
+    expect(
+      normalizeContentMediaUrl(
+        'http://localhost:3000/api/forum/media/forum-123-image.png',
+      ),
+    ).toBe('/api/forum/media/forum-123-image.png');
+  });
+
   it('keeps absolute upload URLs on the same path', () => {
     expect(
       normalizeContentMediaUrl(
@@ -34,6 +42,18 @@ describe('normalizeContentMediaUrl', () => {
         'https://cdn.example.com/laju-chat/content/example.webp',
       ),
     ).toBe('/api/content/media/laju-chat/content/example.webp');
+  });
+
+  it('normalizes upload paths that are missing the leading slash', () => {
+    expect(normalizeContentMediaUrl('uploads/content/example.jpg')).toBe(
+      '/uploads/content/example.jpg',
+    );
+  });
+
+  it('converts bare bucket content paths to proxy URLs', () => {
+    expect(normalizeContentMediaUrl('laju-chat/content/example.webp')).toBe(
+      '/api/content/media/laju-chat/content/example.webp',
+    );
   });
 });
 
@@ -91,5 +111,40 @@ describe('parseImages', () => {
 
     expect(parseImages(item)).toEqual([]);
     expect(resolveImageGallery(item)).toEqual([]);
+  });
+
+  it('reads JSON-string media lists from legacy payloads', () => {
+    expect(
+      parseImages({
+        id: 'listing-json-media',
+        title: 'Produk lama',
+        content_type: 'product',
+        metadata: {
+          image_urls: JSON.stringify([
+            'uploads/content/legacy-one.jpg',
+            { url: 'laju-chat/content/legacy-two.webp' },
+          ]),
+        },
+      }),
+    ).toEqual([
+      '/uploads/content/legacy-one.jpg',
+      '/api/content/media/laju-chat/content/legacy-two.webp',
+    ]);
+  });
+
+  it('filters non-visual attachments from preview galleries', () => {
+    expect(
+      parseImages({
+        id: 'listing-docs',
+        title: 'Listing dengan dokumen',
+        content_type: 'service',
+        metadata: {
+          attachments: [
+            '/uploads/content/brochure.pdf',
+            { url: '/uploads/content/work-sample.png' },
+          ],
+        },
+      }),
+    ).toEqual(['/uploads/content/work-sample.png']);
   });
 });

@@ -10,12 +10,20 @@ import {
   useState,
 } from 'react';
 import NextImage from 'next/image';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { LocalizedLink } from '@/components/ui-kit';
 import { ImageCropModal } from '@/components/common/ImageCropModal';
+import {
+  AvatarBuilder,
+  DEFAULT_LAJUKAN_AVATAR,
+  readLajukanAvatarSpec,
+  type LajukanAvatarSpec,
+} from '@/components/profile/AvatarBuilder';
 import { IdentityVerificationPanel } from '@/components/profile/IdentityVerificationPanel';
 import { ProfileHubView } from '@/components/profile/ProfileHubView';
 import { ProfileViewSkeleton } from '@/components/system/feedback/RouteSkeletons';
+import { resolveLocaleFromPathname } from '@/lib/locale';
 import { type ProfileContentTab } from '@/lib/profile/profileContentTabs';
 import { normalizePublicProfileHandleInput } from '@/lib/profile/publicProfileLink';
 import {
@@ -24,6 +32,7 @@ import {
   normalizeProfileMediaUrl,
 } from '@/lib/profile/profileMedia';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   Activity,
   Award,
@@ -185,6 +194,19 @@ function formatMoneyFromCents(
 function asRecord(value: unknown): MetaRecord | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as MetaRecord;
+}
+
+function readAvatarStyleFromMetadata(value: unknown): LajukanAvatarSpec {
+  const root = asRecord(value);
+  const extended = asRecord(root?.extended);
+  const profile = asRecord(root?.profile);
+  const media = asRecord(root?.media);
+  return readLajukanAvatarSpec(
+    root?.avatar_style ||
+      extended?.avatar_style ||
+      profile?.avatar_style ||
+      media?.avatar_style,
+  );
 }
 
 function readString(value: unknown): string {
@@ -533,6 +555,9 @@ function EmptyState({ text }: { text: string }) {
 
 export default function SuperProfile() {
   const { user, authFetch, refreshUser, loading: authLoading } = useAuth();
+  const pathname = usePathname();
+  const locale = resolveLocaleFromPathname(pathname);
+  const isId = locale === 'id';
 
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [listings, setListings] = useState<ListingItem[]>([]);
@@ -543,6 +568,9 @@ export default function SuperProfile() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
+  const [avatarStyleInput, setAvatarStyleInput] = useState<LajukanAvatarSpec>(
+    DEFAULT_LAJUKAN_AVATAR,
+  );
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [coverUrlInput, setCoverUrlInput] = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
@@ -578,6 +606,7 @@ export default function SuperProfile() {
           value.avatar_url || value.avatarUrl || value.metadata?.avatar_url,
         ) || '',
       );
+      setAvatarStyleInput(readAvatarStyleFromMetadata(value.metadata));
       const metaMedia = asRecord(value.metadata?.media) || {};
       setCoverUrlInput(
         normalizeProfileMediaUrl(value.cover_image) ||
@@ -602,7 +631,9 @@ export default function SuperProfile() {
       const [detailRes, listingsRes, txRes] = await Promise.all([
         authFetch(`/api/users/${user.id}`),
         authFetch('/api/my-listings?status=active'),
-        authFetch('/api/my-applications'),
+        PROMO_ONLY_MODE
+          ? Promise.resolve(null)
+          : authFetch('/api/my-applications'),
       ]);
 
       const detailData = (await detailRes
@@ -611,7 +642,9 @@ export default function SuperProfile() {
       const listingsData = (await listingsRes.json().catch(() => ({}))) as {
         results?: ListingItem[];
       };
-      const txData = (await txRes.json().catch(() => ({}))) as {
+      const txData = (
+        PROMO_ONLY_MODE || !txRes ? {} : await txRes.json().catch(() => ({}))
+      ) as {
         results?: TransactionItem[];
       };
 
@@ -639,7 +672,13 @@ export default function SuperProfile() {
       setListings(
         Array.isArray(listingsData.results) ? listingsData.results : [],
       );
-      setTransactions(Array.isArray(txData.results) ? txData.results : []);
+      setTransactions(
+        PROMO_ONLY_MODE
+          ? []
+          : Array.isArray(txData.results)
+            ? txData.results
+            : [],
+      );
     } catch (error) {
       setProfileError(
         error instanceof Error ? error.message : 'Failed to load profile',
@@ -717,10 +756,12 @@ export default function SuperProfile() {
 
   const saveProfile = async ({
     overrideAvatarUrl,
+    overrideAvatarStyle,
     overrideCoverUrl,
     successMessage = 'Profile berhasil diperbarui',
   }: {
     overrideAvatarUrl?: string;
+    overrideAvatarStyle?: LajukanAvatarSpec;
     overrideCoverUrl?: string;
     successMessage?: string;
   } = {}) => {
@@ -728,7 +769,7 @@ export default function SuperProfile() {
     setSaveMessage(null);
 
     try {
-      const payload: Record<string, string> = {};
+      const payload: Record<string, unknown> = {};
       const fullName = nonEmpty(fullNameInput);
       const username = nonEmpty(
         normalizePublicProfileHandleInput(usernameInput),
@@ -738,6 +779,8 @@ export default function SuperProfile() {
       const bio = nonEmpty(bioInput);
       const avatar = nonEmpty(overrideAvatarUrl ?? avatarUrlInput);
       const cover = nonEmpty(overrideCoverUrl ?? coverUrlInput);
+      const avatarStyle = overrideAvatarStyle || avatarStyleInput;
+      const isGeneratedAvatar = /^data:image\/svg\+xml/i.test(avatar || '');
 
       if (fullName) payload.full_name = fullName;
       if (username) payload.username = username;
@@ -750,26 +793,36 @@ export default function SuperProfile() {
         throw new Error('Tidak ada perubahan untuk disimpan');
       }
 
+      const body: Record<string, unknown> = {
+        ...payload,
+        ...(avatar || cover
+          ? {
+              media: {
+                ...(asRecord(mergedMetadata?.media) || {}),
+                ...(avatar && !isGeneratedAvatar ? { avatar_url: avatar } : {}),
+                ...(cover ? { cover_image: cover } : {}),
+              },
+            }
+          : null),
+        ...(cover
+          ? {
+              cover_image: cover,
+            }
+          : null),
+        ...(isGeneratedAvatar
+          ? {
+              metadata: {
+                avatar_style: avatarStyle,
+                avatar_source: 'lajukan_avatar_builder',
+              },
+            }
+          : null),
+      };
+
       const res = await authFetch('/api/auth/update-profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          ...(avatar || cover
-            ? {
-                media: {
-                  ...(asRecord(mergedMetadata?.media) || {}),
-                  ...(avatar ? { avatar_url: avatar } : {}),
-                  ...(cover ? { cover_image: cover } : {}),
-                },
-              }
-            : null),
-          ...(cover
-            ? {
-                cover_image: cover,
-              }
-            : null),
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -1006,12 +1059,16 @@ export default function SuperProfile() {
         icon: Briefcase,
         hint: 'Live',
       },
-      {
-        label: 'Transactions',
-        value: transactions.length.toLocaleString('en-US'),
-        icon: Activity,
-        hint: 'History',
-      },
+      ...(!PROMO_ONLY_MODE
+        ? [
+            {
+              label: 'Transactions',
+              value: transactions.length.toLocaleString('en-US'),
+              icon: Activity,
+              hint: 'History',
+            },
+          ]
+        : []),
       {
         label: 'Roles',
         value: roleList.length.toLocaleString('en-US'),
@@ -1151,6 +1208,18 @@ export default function SuperProfile() {
         user={currentUser}
         effectiveCoverUrl={effectiveCoverUrl}
         effectiveAvatarUrl={effectiveAvatarUrl}
+        avatarBuilder={
+          <AvatarBuilder
+            compact
+            isId={isId}
+            title={fullNameInput || currentUser.full_name || currentUser.email}
+            value={avatarStyleInput}
+            onChange={(nextSpec, nextAvatarUrl) => {
+              setAvatarStyleInput(nextSpec);
+              setAvatarUrlInput(nextAvatarUrl);
+            }}
+          />
+        }
         coverUploading={coverUploading}
         avatarUploading={avatarUploading}
         saving={saving}
@@ -1739,47 +1808,49 @@ export default function SuperProfile() {
                 )}
               </SectionCard>
 
-              <SectionCard
-                title="Recent Transactions"
-                subtitle="Model compact widget seperti dashboard jobs / freelance."
-                action={
-                  <LocalizedLink
-                    href="/transactions"
-                    className="inline-flex items-center gap-1 text-sm font-semibold ui-accent-text"
-                  >
-                    View all
-                    <ChevronRight className="h-4 w-4" />
-                  </LocalizedLink>
-                }
-              >
-                {transactions.length === 0 ? (
-                  <EmptyState text="Belum ada transaksi." />
-                ) : (
-                  <div className="space-y-3">
-                    {txPreview.map(item => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {formatMoneyFromCents(
-                              item.amount_cents,
-                              item.currency || 'IDR',
-                            )}
-                          </p>
-                          <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                            {formatDate(item.created_at)}
-                          </p>
+              {!PROMO_ONLY_MODE ? (
+                <SectionCard
+                  title="Recent Transactions"
+                  subtitle="Model compact widget seperti dashboard jobs / freelance."
+                  action={
+                    <LocalizedLink
+                      href="/transactions"
+                      className="inline-flex items-center gap-1 text-sm font-semibold ui-accent-text"
+                    >
+                      View all
+                      <ChevronRight className="h-4 w-4" />
+                    </LocalizedLink>
+                  }
+                >
+                  {transactions.length === 0 ? (
+                    <EmptyState text="Belum ada transaksi." />
+                  ) : (
+                    <div className="space-y-3">
+                      {txPreview.map(item => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              {formatMoneyFromCents(
+                                item.amount_cents,
+                                item.currency || 'IDR',
+                              )}
+                            </p>
+                            <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                              {formatDate(item.created_at)}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-[color:var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
+                            {(item.status || 'pending').toUpperCase()}
+                          </span>
                         </div>
-                        <span className="shrink-0 rounded-full bg-[color:var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
-                          {(item.status || 'pending').toUpperCase()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </SectionCard>
+                      ))}
+                    </div>
+                  )}
+                </SectionCard>
+              ) : null}
             </div>
           </main>
 

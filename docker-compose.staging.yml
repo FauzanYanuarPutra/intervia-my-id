@@ -68,3 +68,8 @@ services:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-crm:${IMAGE_TAG:-staging}
     environment:
       NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lajukan.com}
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-https://www.lajukan.com}
+      NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-https://crm.lajukan.com}
+      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-https://api.lajukan.com}
+      NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-https://www.lajukan.com}

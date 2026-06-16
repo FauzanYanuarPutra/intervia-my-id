@@ -6,6 +6,7 @@ import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { hasUmkmStorePermission } from '@/lib/super-app/umkm-authorization';
 import { superAppEntityIdSchema } from '@/lib/super-app/idSchema';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   createUmkmOrder,
   getUmkmOrderById,
@@ -48,6 +49,12 @@ const CreateOrderSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
+    if (PROMO_ONLY_MODE) {
+      return NextResponse.json(
+        { error: 'UMKM orders are disabled for now' },
+        { status: 404 },
+      );
+    }
     const auth = await requireAuth(req);
     if (!auth.ok) return auth.res;
 
@@ -157,6 +164,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    if (PROMO_ONLY_MODE) {
+      return NextResponse.json(
+        { error: 'UMKM orders are disabled for now' },
+        { status: 404 },
+      );
+    }
     const security = await enforceAuthRouteSecurity(req, {
       routeKey: 'super-app-umkm-orders-create',
       ipLimit: 260,

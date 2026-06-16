@@ -17,8 +17,12 @@ import {
   useNotificationInbox,
   type InboxNotification,
 } from '@/context/NotificationInboxContext';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { resolveLocaleFromPathname } from '@/lib/locale';
-import { notificationPresentation } from '@/lib/notifications/presentation';
+import {
+  isMoneyRelatedNotification,
+  notificationPresentation,
+} from '@/lib/notifications/presentation';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +46,70 @@ function toText(value: unknown, fallback = ''): string {
   if (typeof value === 'string') return value.trim() || fallback;
   if (typeof value === 'number') return String(value);
   return fallback;
+}
+
+function cleanNotificationText(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function notificationEmoji(item: InboxNotification, label: string): string {
+  const text = [
+    item.category,
+    item.event_type,
+    item.title,
+    item.message,
+    label,
+  ]
+    .map(cleanNotificationText)
+    .join(' ');
+
+  if (text.includes('topup') || text.includes('top-up')) return '💚';
+  if (text.includes('refund') || text.includes('dikembalikan')) return '↩️';
+  if (
+    text.includes('payment') ||
+    text.includes('pembayaran') ||
+    text.includes('paid')
+  ) {
+    return '💳';
+  }
+  if (text.includes('wallet') || text.includes('saldo')) return '💰';
+  if (
+    text.includes('security') ||
+    text.includes('keamanan') ||
+    text.includes('login') ||
+    text.includes('otp')
+  ) {
+    return '🛡️';
+  }
+  if (text.includes('chat') || text.includes('message')) return '💬';
+  if (text.includes('offer') || text.includes('tawaran')) return '🤝';
+  if (
+    text.includes('failed') ||
+    text.includes('gagal') ||
+    text.includes('cancel') ||
+    text.includes('dibatalkan')
+  ) {
+    return '⚠️';
+  }
+  if (text.includes('pending') || text.includes('menunggu')) return '⏳';
+  if (text.includes('support') || text.includes('bantuan')) return '🛟';
+  if (
+    text.includes('business') ||
+    text.includes('usaha') ||
+    text.includes('profile')
+  ) {
+    return '🏪';
+  }
+  if (
+    text.includes('success') ||
+    text.includes('berhasil') ||
+    text.includes('confirmed') ||
+    text.includes('terkonfirmasi')
+  ) {
+    return '✅';
+  }
+
+  return '🔔';
 }
 
 function formatRelativeTime(value: string | undefined, isId: boolean): string {
@@ -106,6 +174,12 @@ function notificationHref(item: InboxNotification): string {
 
   const transactionId =
     toText(data.transaction_id) || toText(data.order_id) || toText(data.txn_id);
+  if (
+    PROMO_ONLY_MODE &&
+    (transactionId || item.category === 'wallet' || item.category === 'transaction')
+  ) {
+    return '/notifications';
+  }
   if (transactionId)
     return `/transactions/${encodeURIComponent(transactionId)}`;
 
@@ -177,7 +251,31 @@ export function HeaderInboxDropdown({
   const notificationInbox = useNotificationInbox();
 
   const isChat = kind === 'chat';
-  const count = isChat ? chatInbox.totalUnread : notificationInbox.unreadCount;
+  const visibleNotificationItems = useMemo(
+    () =>
+      notificationInbox.items.filter(
+        item =>
+          !(
+            PROMO_ONLY_MODE &&
+            isMoneyRelatedNotification({
+              category: item.category,
+              eventType: item.event_type,
+              title: item.title,
+              message: item.message,
+            })
+          ),
+      ),
+    [notificationInbox.items],
+  );
+  const visibleNotificationUnreadCount = useMemo(
+    () => visibleNotificationItems.filter(item => !item.is_read).length,
+    [visibleNotificationItems],
+  );
+  const count = isChat
+    ? chatInbox.totalUnread
+    : PROMO_ONLY_MODE
+      ? visibleNotificationUnreadCount
+      : notificationInbox.unreadCount;
   const badge = compactCount(count);
   const title = isChat
     ? idLocale
@@ -202,13 +300,13 @@ export function HeaderInboxDropdown({
   );
   const sortedNotifications = useMemo(
     () =>
-      [...notificationInbox.items]
+      [...visibleNotificationItems]
         .sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         )
         .slice(0, 6),
-    [notificationInbox.items],
+    [visibleNotificationItems],
   );
 
   useEffect(() => {
@@ -249,7 +347,7 @@ export function HeaderInboxDropdown({
           if (!open) refresh();
         }}
         className={cn(
-          'ui-pressable relative inline-flex h-10 w-10 items-center justify-center rounded-full border transition',
+          'ui-pressable relative inline-flex h-11 min-h-11 w-11 min-w-11 items-center justify-center rounded-full border shadow-[0_12px_24px_-22px_rgba(15,23,42,0.42)] transition',
           active || open
             ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
             : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
@@ -297,7 +395,7 @@ export function HeaderInboxDropdown({
               </p>
             </div>
             <div className="flex items-center gap-1.5">
-              {!isChat && notificationInbox.unreadCount > 0 ? (
+              {!isChat && count > 0 ? (
                 <button
                   type="button"
                   disabled={markingAll}
@@ -342,8 +440,12 @@ export function HeaderInboxDropdown({
                   title={idLocale ? 'Belum ada chat' : 'No chats yet'}
                   body={
                     idLocale
-                      ? 'Percakapan dari transaksi, reels, dan profil usaha akan muncul di sini.'
-                      : 'Conversations from transactions, reels, and business profiles will appear here.'
+                      ? PROMO_ONLY_MODE
+                        ? 'Percakapan dari listing, reels, dan profil usaha akan muncul di sini.'
+                        : 'Percakapan dari transaksi, reels, dan profil usaha akan muncul di sini.'
+                      : PROMO_ONLY_MODE
+                        ? 'Conversations from listings, reels, and business profiles will appear here.'
+                        : 'Conversations from transactions, reels, and business profiles will appear here.'
                   }
                 />
               ) : (
@@ -417,8 +519,12 @@ export function HeaderInboxDropdown({
                 }
                 body={
                   idLocale
-                    ? 'Update pembayaran, keamanan, dan transaksi penting akan tampil di sini.'
-                    : 'Payment, security, and transaction updates will appear here.'
+                    ? PROMO_ONLY_MODE
+                      ? 'Update chat, keamanan, dan profil usaha akan tampil di sini.'
+                      : 'Update pembayaran, keamanan, dan transaksi penting akan tampil di sini.'
+                    : PROMO_ONLY_MODE
+                      ? 'Chat, security, and business profile updates will appear here.'
+                      : 'Payment, security, and transaction updates will appear here.'
                 }
               />
             ) : (
@@ -431,6 +537,7 @@ export function HeaderInboxDropdown({
                   message: item.message,
                 });
                 const Icon = visual.Icon;
+                const emoji = notificationEmoji(item, visual.label);
 
                 return (
                   <Link
@@ -458,11 +565,20 @@ export function HeaderInboxDropdown({
                     ) : null}
                     <span
                       className={cn(
-                        'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border',
+                        'relative mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border text-[1.2rem]',
                         visual.iconClassName,
                       )}
+                      aria-hidden="true"
                     >
-                      <Icon className="h-4 w-4" />
+                      <span className="leading-none">{emoji}</span>
+                      <span
+                        className={cn(
+                          'absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border bg-white shadow-sm dark:bg-slate-950',
+                          visual.badgeClassName,
+                        )}
+                      >
+                        <Icon className="h-3 w-3" />
+                      </span>
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
@@ -494,6 +610,7 @@ export function HeaderInboxDropdown({
                             visual.badgeClassName,
                           )}
                         >
+                          {emoji}{' '}
                           {visual.label ||
                             item.category ||
                             item.event_type ||

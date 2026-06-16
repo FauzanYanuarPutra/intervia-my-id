@@ -687,7 +687,9 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
-      NEXT_PUBLIC_MARKETPLACE_URL: http://localhost:8081
+      NEXT_PUBLIC_WWW_URL: ${NEXT_PUBLIC_WWW_URL:-http://localhost:3000}
+      NEXT_PUBLIC_CRM_URL: ${NEXT_PUBLIC_CRM_URL:-http://localhost:3002}
+      NEXT_PUBLIC_MARKETPLACE_URL: ${NEXT_PUBLIC_MARKETPLACE_URL:-http://localhost:8081}
       NEXT_PUBLIC_USAHA_URL: ${NEXT_PUBLIC_USAHA_URL:-http://localhost:3003}
       INTERNAL_API_URL: http://identity_service:8080
       INTERNAL_CHAT_URL: http://chat_service:4000

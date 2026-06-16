@@ -6,6 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useChatInbox } from '@/context/ChatInboxContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  BellDot,
+  Inbox,
   MessageCircle,
   Plus,
   X,
@@ -16,6 +18,8 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  UserRound,
+  UsersRound,
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAppBack } from '@/lib/navigation/useAppBack';
@@ -34,6 +38,8 @@ type PublicProfile = {
   username?: string | null;
   full_name?: string | null;
 };
+
+type ChatFilterValue = 'all' | 'unread' | 'direct' | 'group';
 
 const SUPPORT_ROOMS = [
   { room_id: 'support:aida', room_name: 'Aida Support' },
@@ -137,9 +143,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<
-    'all' | 'unread' | 'direct' | 'group'
-  >('all');
+  const [activeFilter, setActiveFilter] = useState<ChatFilterValue>('all');
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverUsers, setDiscoverUsers] = useState<DiscoverUser[]>([]);
   const [dmNamesByUserId, setDmNamesByUserId] = useState<
@@ -352,21 +356,45 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
         label: isId ? 'Semua' : 'All',
         value: 'all' as const,
         count: rooms.length,
+        caption: isId ? 'Semua obrolan' : 'Every chat',
+        icon: Inbox,
+        activeClass:
+          'border-[#25d366] bg-[#d9fdd3] text-[#111b21] shadow-[0_12px_24px_-20px_rgba(37,211,102,0.7)] dark:border-emerald-400/40 dark:bg-emerald-400/14 dark:text-[#d1f4cc]',
+        iconClass:
+          'bg-[#25d366]/14 text-[#128c4a] dark:bg-emerald-400/15 dark:text-emerald-200',
       },
       {
-        label: isId ? 'Belum dibaca' : 'Unread',
+        label: isId ? 'Baru' : 'Unread',
         value: 'unread' as const,
         count: unreadCount,
+        caption: isId ? 'Perlu dicek' : 'Needs attention',
+        icon: BellDot,
+        activeClass:
+          'border-amber-300 bg-amber-50 text-amber-950 shadow-[0_12px_24px_-20px_rgba(245,158,11,0.7)] dark:border-amber-300/35 dark:bg-amber-400/12 dark:text-amber-100',
+        iconClass:
+          'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-200',
       },
       {
         label: isId ? 'DM' : 'Direct',
         value: 'direct' as const,
         count: directCount,
+        caption: isId ? 'Chat pribadi' : 'Private chats',
+        icon: UserRound,
+        activeClass:
+          'border-sky-300 bg-sky-50 text-sky-950 shadow-[0_12px_24px_-20px_rgba(14,165,233,0.72)] dark:border-sky-300/35 dark:bg-sky-400/12 dark:text-sky-100',
+        iconClass:
+          'bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-200',
       },
       {
         label: isId ? 'Grup' : 'Group',
         value: 'group' as const,
         count: groupCount,
+        caption: isId ? 'Ruang bareng' : 'Shared rooms',
+        icon: UsersRound,
+        activeClass:
+          'border-violet-300 bg-violet-50 text-violet-950 shadow-[0_12px_24px_-20px_rgba(139,92,246,0.7)] dark:border-violet-300/35 dark:bg-violet-400/12 dark:text-violet-100',
+        iconClass:
+          'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-200',
       },
     ],
     [directCount, groupCount, isId, rooms.length, unreadCount],
@@ -615,15 +643,15 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="h-[100dvh] min-h-[100dvh] overflow-hidden bg-[#d9dbd5] dark:bg-[#0b141a]">
-      <div className="mx-auto flex h-[100dvh] w-full min-w-0 max-w-[1600px] overflow-hidden lg:px-4 lg:py-4">
+    <div className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#d9dbd5] dark:bg-[#0b141a]">
+      <div className="mx-auto flex h-full max-h-full min-h-0 w-full min-w-0 max-w-[1600px] overflow-hidden lg:px-4 lg:py-4">
         <div className="flex h-full w-full min-w-0 overflow-hidden bg-[#f7f5f3] shadow-none dark:bg-[#111b21] lg:rounded-[18px] lg:border lg:border-black/5 lg:shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)] dark:lg:border-white/10">
           <section
-            className={`h-full min-h-0 w-full min-w-0 max-w-full flex-col border-r border-black/5 bg-white dark:border-white/6 dark:bg-[#111b21] lg:w-[390px] lg:shrink-0 ${
+            className={`h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden border-r border-black/5 bg-white dark:border-white/6 dark:bg-[#111b21] lg:w-[390px] lg:shrink-0 ${
               activeRoomId ? 'hidden lg:flex' : 'flex'
             }`}
           >
-            <div className="shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 py-3 dark:border-white/6 dark:bg-[#202c33] sm:px-4">
+            <div className="sticky top-0 z-20 shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 py-3 dark:border-white/6 dark:bg-[#202c33] sm:px-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <button
@@ -684,36 +712,40 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                   />
                 </div>
 
-                <div className="-mx-1 overflow-x-auto px-1 pb-0.5">
-                  <div className="inline-flex min-w-full items-center gap-1.5">
-                    {filterOptions.map(option => (
-                      <button
-                        key={option.value}
-                        onClick={() => setActiveFilter(option.value)}
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
-                          activeFilter === option.value
-                            ? 'bg-[#d9fdd3] text-[#111b21] dark:bg-[#103529] dark:text-[#d1f4cc]'
-                            : 'bg-white text-[#54656f] hover:bg-[#e9edef] dark:bg-[#111b21] dark:text-[#aebac1] dark:hover:bg-[#182229]'
-                        }`}
-                      >
-                        <span>{option.label}</span>
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                            activeFilter === option.value
-                              ? 'bg-black/5 text-[#111b21] dark:bg-white/10 dark:text-[#d1f4cc]'
-                              : 'bg-[#f0f2f5] text-[#667781] dark:bg-[#202c33] dark:text-[#8696a0]'
+                <div className="grid grid-cols-4 gap-1">
+                  <div
+                    className="contents"
+                    aria-label={isId ? 'Filter cepat chat' : 'Quick chat filters'}
+                  >
+                    {filterOptions.map(option => {
+                      const active = activeFilter === option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setActiveFilter(option.value)}
+                          className={`inline-flex min-h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-1.5 text-[11px] font-black transition active:scale-[0.98] ${
+                            active
+                              ? option.activeClass
+                              : 'border-black/5 bg-white/80 text-[#111b21] hover:border-[#25d366]/35 hover:bg-white dark:border-white/8 dark:bg-[#182229] dark:text-[#e9edef] dark:hover:border-emerald-300/25 dark:hover:bg-[#202c33]'
                           }`}
                         >
-                          {option.count}
-                        </span>
-                      </button>
-                    ))}
+                          <span className="shrink-0 tabular-nums">
+                            {option.count}
+                          </span>
+                          <span className="min-w-0 truncate">{option.label}</span>
+                          <span className="sr-only">{option.caption}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-white pb-[calc(5rem+env(safe-area-inset-bottom))] dark:bg-[#111b21] lg:pb-0">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-white pb-[env(safe-area-inset-bottom)] dark:bg-[#111b21]">
               {loading ? (
                 <div className="flex justify-center py-16">
                   <Loader2 className="h-6 w-6 animate-spin text-[#25d366]" />
@@ -857,7 +889,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
           <div
             className={`min-h-0 w-full min-w-0 flex-1 ${activeRoomId ? 'flex' : 'hidden lg:flex'}`}
           >
-            <div className="h-full min-h-0 w-full min-w-0 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+            <div className="flex h-full max-h-full min-h-0 w-full min-w-0 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
               {children}
             </div>
           </div>

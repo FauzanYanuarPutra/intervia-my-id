@@ -161,6 +161,7 @@ type ReelsStudioEffect =
   | 'product'
   | 'focus'
   | 'scan'
+  | 'dog'
   | 'grain';
 type ReelsStudioFacingMode = 'environment' | 'user';
 
@@ -385,6 +386,13 @@ const REELS_STUDIO_EFFECTS: Array<{
         'bg-[repeating-linear-gradient(180deg,#67e8f9_0_3px,#0f172a_3px_7px)]',
     },
     {
+      id: 'dog',
+      label: 'Dog',
+      helper: 'kuping + hidung',
+      swatch:
+        'bg-[radial-gradient(circle_at_30%_18%,#92400e_0_18%,transparent_19%),radial-gradient(circle_at_70%_18%,#92400e_0_18%,transparent_19%),radial-gradient(circle_at_50%_58%,#111827_0_16%,transparent_17%),#fef3c7]',
+    },
+    {
       id: 'grain',
       label: 'Grain',
       helper: 'tekstur halus',
@@ -543,6 +551,35 @@ function drawStudioCanvasEffect(
     for (let y = 0; y < height; y += 18) {
       context.fillRect(0, y, width, 2);
     }
+  } else if (effect === 'dog') {
+    context.fillStyle = 'rgba(120,53,15,0.92)';
+    context.beginPath();
+    context.ellipse(width * 0.3, height * 0.14, width * 0.09, height * 0.055, -0.62, 0, Math.PI * 2);
+    context.ellipse(width * 0.7, height * 0.14, width * 0.09, height * 0.055, 0.62, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = 'rgba(254,243,199,0.96)';
+    context.beginPath();
+    context.ellipse(width * 0.3, height * 0.145, width * 0.044, height * 0.026, -0.62, 0, Math.PI * 2);
+    context.ellipse(width * 0.7, height * 0.145, width * 0.044, height * 0.026, 0.62, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = 'rgba(17,24,39,0.92)';
+    context.beginPath();
+    context.ellipse(width * 0.5, height * 0.41, width * 0.045, height * 0.026, 0, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = 'rgba(17,24,39,0.6)';
+    context.lineWidth = Math.max(2, width * 0.004);
+    [-1, 1].forEach(side => {
+      for (let offset = -1; offset <= 1; offset += 1) {
+        context.beginPath();
+        context.moveTo(width * 0.5 + side * width * 0.052, height * (0.425 + offset * 0.01));
+        context.lineTo(width * 0.5 + side * width * 0.17, height * (0.41 + offset * 0.026));
+        context.stroke();
+      }
+    });
+    context.fillStyle = 'rgba(244,63,94,0.82)';
+    context.beginPath();
+    context.roundRect(width * 0.474, height * 0.443, width * 0.052, height * 0.05, width * 0.026);
+    context.fill();
   } else if (effect === 'grain') {
     context.fillStyle = 'rgba(255,255,255,0.025)';
     for (let i = 0; i < 280; i += 1) {
@@ -2718,7 +2755,7 @@ function ReelsTopBar({
           ) : (
             <nav
               aria-label="Filter reels"
-              className="inline-flex h-10 max-w-full items-center justify-center gap-0.5 rounded-full border border-white/16 bg-black/52 p-1 text-[12px] font-black shadow-[0_16px_34px_-24px_rgba(0,0,0,0.85)] backdrop-blur-xl sm:text-sm"
+              className="inline-flex h-10 max-w-full items-center justify-center gap-0.5 rounded-full border border-white/70 bg-white/92 p-1 text-[12px] font-black text-slate-700 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.72)] ring-1 ring-black/5 backdrop-blur-xl sm:text-sm"
             >
               {REELS_FEED_TABS.map(tab => (
                 <button
@@ -2730,9 +2767,9 @@ function ReelsTopBar({
                   }}
                   aria-pressed={feedTab === tab.id}
                   className={cn(
-                    'relative h-8 rounded-full px-2.5 text-white/62 transition active:scale-95 sm:px-3',
+                    'relative h-8 rounded-full px-2.5 text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800 active:scale-95 sm:px-3',
                     feedTab === tab.id &&
-                    'bg-white text-slate-950 shadow-lg shadow-black/24',
+                      'bg-[linear-gradient(135deg,#047857,#16a34a)] text-white shadow-lg shadow-emerald-900/24',
                   )}
                 >
                   {tab.label}
@@ -2867,17 +2904,17 @@ function ReelsCreateDock({
 
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-50 flex justify-center pb-[calc(env(safe-area-inset-bottom)+14px)]">
+      <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-3 z-50 flex justify-end lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="pointer-events-auto flex h-10 min-h-10 w-10 min-w-10 touch-manipulation items-center justify-center rounded-full bg-[#6cd698] text-white shadow-[0_18px_38px_-14px_rgba(16,185,129,0.82),0_8px_18px_-10px_rgba(0,0,0,0.72)] ring-4 ring-black/55 transition active:scale-95"
+          className="pointer-events-auto flex h-12 min-h-12 w-12 min-w-12 touch-manipulation items-center justify-center rounded-full bg-[#6cd698] text-slate-950 shadow-[0_18px_38px_-14px_rgba(16,185,129,0.82),0_8px_18px_-10px_rgba(0,0,0,0.72)] ring-4 ring-black/45 transition active:scale-95"
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={isId ? 'Buat di Lajukan' : 'Create on Lajukan'}
           data-testid="reels-create-fab"
         >
-          <Plus className="h-8 w-8 stroke-[3]" aria-hidden="true" />
+          <Plus className="h-7 w-7 stroke-[3]" aria-hidden="true" />
         </button>
       </div>
 
@@ -3182,6 +3219,25 @@ function StudioEffectOverlay({ effect }: { effect: ReelsStudioEffect }) {
   if (effect === 'scan') {
     return (
       <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(180deg,rgba(103,232,249,0.28)_0_1px,transparent_1px_11px)] mix-blend-screen" />
+    );
+  }
+
+  if (effect === 'dog') {
+    return (
+      <div className="pointer-events-none absolute inset-0">
+        <span className="absolute left-[21%] top-[8%] h-[12%] w-[18%] -rotate-[24deg] rounded-[55%_45%_58%_42%] bg-amber-900/92 shadow-[inset_0_-10px_18px_rgba(0,0,0,0.22),0_10px_24px_rgba(0,0,0,0.18)]">
+          <span className="absolute left-1/2 top-1/2 h-[44%] w-[48%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-200/92" />
+        </span>
+        <span className="absolute right-[21%] top-[8%] h-[12%] w-[18%] rotate-[24deg] rounded-[45%_55%_42%_58%] bg-amber-900/92 shadow-[inset_0_-10px_18px_rgba(0,0,0,0.22),0_10px_24px_rgba(0,0,0,0.18)]">
+          <span className="absolute left-1/2 top-1/2 h-[44%] w-[48%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-200/92" />
+        </span>
+        <span className="absolute left-1/2 top-[39%] h-[5.2%] w-[9%] -translate-x-1/2 rounded-[50%] bg-slate-950/90 shadow-[0_6px_14px_rgba(0,0,0,0.28)]" />
+        <span className="absolute left-1/2 top-[44.5%] h-[5.8%] w-[5.2%] -translate-x-1/2 rounded-b-full rounded-t-[40%] bg-rose-500/82 shadow-[0_4px_10px_rgba(244,63,94,0.28)]" />
+        <span className="absolute left-[30%] top-[42%] h-px w-[15%] -rotate-6 bg-slate-950/50" />
+        <span className="absolute left-[30%] top-[44%] h-px w-[15%] bg-slate-950/46" />
+        <span className="absolute right-[30%] top-[42%] h-px w-[15%] rotate-6 bg-slate-950/50" />
+        <span className="absolute right-[30%] top-[44%] h-px w-[15%] bg-slate-950/46" />
+      </div>
     );
   }
 
@@ -6166,15 +6222,64 @@ function UploadReelSheet({
                     )}
 
                     <div className="absolute right-2 top-[calc(env(safe-area-inset-top)+76px)] z-30 flex w-11 flex-col items-center gap-2 text-white">
-                      <button
-                        type="button"
-                        onClick={flipCamera}
-                        className="grid h-10 w-10 place-items-center rounded-full bg-black/32 text-white shadow-lg ring-1 ring-white/12 backdrop-blur transition active:scale-95"
-                        aria-label="Flip"
-                        title="Flip"
-                      >
-                        <RefreshCcw className="h-4.5 w-4.5" />
-                      </button>
+                      {[
+                        {
+                          key: 'filters' as const,
+                          label: 'Filter',
+                          icon: SlidersHorizontal,
+                          onClick: () =>
+                            setStudioPanel(current =>
+                              current === 'filters' ? null : 'filters',
+                            ),
+                          active: studioPanel === 'filters',
+                        },
+                        {
+                          key: 'effects' as const,
+                          label: 'Efek',
+                          icon: Sparkles,
+                          onClick: () =>
+                            setStudioPanel(current =>
+                              current === 'effects' ? null : 'effects',
+                            ),
+                          active: studioPanel === 'effects',
+                        },
+                        {
+                          key: 'speed' as const,
+                          label: studioSpeed,
+                          icon: Clapperboard,
+                          onClick: () =>
+                            setStudioPanel(current =>
+                              current === 'speed' ? null : 'speed',
+                            ),
+                          active: studioPanel === 'speed',
+                        },
+                        {
+                          key: 'flip' as const,
+                          label: 'Flip',
+                          icon: RefreshCcw,
+                          onClick: flipCamera,
+                          active: false,
+                        },
+                      ].map(tool => {
+                        const ToolIcon = tool.icon;
+                        return (
+                          <button
+                            key={tool.key}
+                            type="button"
+                            onClick={tool.onClick}
+                            className={cn(
+                              'grid h-10 w-10 place-items-center rounded-full text-white shadow-lg ring-1 ring-white/12 backdrop-blur transition active:scale-95',
+                              tool.active
+                                ? 'bg-white text-slate-950'
+                                : 'bg-black/32',
+                            )}
+                            aria-label={tool.label}
+                            title={tool.label}
+                          >
+                            <ToolIcon className="h-4.5 w-4.5" />
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {cameraError && (
@@ -6188,8 +6293,121 @@ function UploadReelSheet({
                       </div>
                     )}
 
-                    <div className="absolute inset-x-0 bottom-[148px] z-30 flex justify-center">
-                      {recording ? (
+                    <div className="absolute inset-x-0 bottom-[148px] z-30 flex justify-center px-3">
+                      {studioPanel ? (
+                        <div className="w-full max-w-[340px] rounded-[24px] bg-black/58 p-2 shadow-2xl ring-1 ring-white/12 backdrop-blur-xl">
+                          <div className="mb-2 flex items-center justify-between gap-2 px-1 text-white">
+                            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-white/64">
+                              {studioPanel === 'filters'
+                                ? 'Filter'
+                                : studioPanel === 'effects'
+                                  ? 'Efek'
+                                  : studioPanel === 'music'
+                                    ? 'Audio'
+                                    : 'Speed'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setStudioPanel(null)}
+                              className="grid h-7 w-7 place-items-center rounded-full bg-white/10 text-white/70"
+                              aria-label="Tutup panel"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            {studioPanel === 'filters'
+                              ? REEL_FILTER_PRESETS.map(filter => {
+                                  const active = form.filterPreset === filter.id;
+                                  return (
+                                    <button
+                                      key={filter.id}
+                                      type="button"
+                                      onClick={() =>
+                                        setField('filterPreset', filter.id)
+                                      }
+                                      className={cn(
+                                        'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
+                                        active
+                                          ? 'bg-white text-slate-950'
+                                          : 'bg-white/9 text-white/72',
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          'h-9 w-9 rounded-full ring-1 ring-white/18',
+                                          filter.swatch,
+                                        )}
+                                      />
+                                      <span className="max-w-full truncate">
+                                        {filter.label}
+                                      </span>
+                                    </button>
+                                  );
+                                })
+                              : studioPanel === 'effects'
+                                ? REELS_STUDIO_EFFECTS.map(effect => {
+                                    const active = studioEffect === effect.id;
+                                    return (
+                                      <button
+                                        key={effect.id}
+                                        type="button"
+                                        onClick={() => setStudioEffect(effect.id)}
+                                        className={cn(
+                                          'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
+                                          active
+                                            ? 'bg-yellow-300 text-slate-950'
+                                            : 'bg-white/9 text-white/72',
+                                        )}
+                                      >
+                                        <span
+                                          className={cn(
+                                            'h-9 w-9 rounded-full ring-1 ring-white/18',
+                                            effect.swatch,
+                                          )}
+                                        />
+                                        <span className="max-w-full truncate">
+                                          {effect.label}
+                                        </span>
+                                      </button>
+                                    );
+                                  })
+                                : studioPanel === 'music'
+                                  ? REELS_MUSIC_TRACKS.map(track => (
+                                      <button
+                                        key={track}
+                                        type="button"
+                                        onClick={() =>
+                                          setField('musicTrack', track)
+                                        }
+                                        className={cn(
+                                          'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-black transition active:scale-95',
+                                          form.musicTrack === track
+                                            ? 'bg-yellow-300 text-slate-950'
+                                            : 'bg-white/9 text-white/72',
+                                        )}
+                                      >
+                                        {track}
+                                      </button>
+                                    ))
+                                  : REELS_STUDIO_SPEEDS.map(speed => (
+                                      <button
+                                        key={speed}
+                                        type="button"
+                                        onClick={() => setStudioSpeed(speed)}
+                                        className={cn(
+                                          'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-black transition active:scale-95',
+                                          studioSpeed === speed
+                                            ? 'bg-white text-slate-950'
+                                            : 'bg-white/9 text-white/72',
+                                        )}
+                                      >
+                                        {speed}
+                                      </button>
+                                    ))}
+                          </div>
+                        </div>
+                      ) : recording ? (
                         <div className="w-[210px] overflow-hidden rounded-full bg-black/52 px-3 py-2 text-[12px] font-black text-white shadow-xl ring-1 ring-white/12 backdrop-blur">
                           <div className="flex items-center justify-between gap-3">
                             <span className="inline-flex items-center gap-1.5">
@@ -6273,7 +6491,7 @@ function UploadReelSheet({
                         <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 backdrop-blur">
                           <Upload className="h-5 w-5 text-orange-200" />
                         </span>
-                        Galeri
+                        Upload
                         <input
                           type="file"
                           accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/*"
@@ -6516,7 +6734,7 @@ function UploadReelSheet({
 
                   <div>
                     <p className={fieldLabelClass}>Filter tampilan</p>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {REEL_FILTER_PRESETS.map(filter => {
                         const active = form.filterPreset === filter.id;
                         return (
@@ -6525,7 +6743,7 @@ function UploadReelSheet({
                             type="button"
                             onClick={() => setField('filterPreset', filter.id)}
                             className={cn(
-                              'flex items-center gap-2 rounded-[15px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
+                              'flex min-w-[136px] shrink-0 items-center gap-2 rounded-[16px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
                               active
                                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-100'
                                 : 'border-white/10 bg-white/[0.08] text-white',
@@ -6553,7 +6771,7 @@ function UploadReelSheet({
 
                   <div>
                     <p className={fieldLabelClass}>Efek kamera gratis</p>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       {REELS_STUDIO_EFFECTS.map(effect => {
                         const active = studioEffect === effect.id;
                         return (
@@ -6562,7 +6780,7 @@ function UploadReelSheet({
                             type="button"
                             onClick={() => setStudioEffect(effect.id)}
                             className={cn(
-                              'flex items-center gap-2 rounded-[15px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
+                              'flex min-w-[140px] shrink-0 items-center gap-2 rounded-[16px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
                               active
                                 ? 'border-yellow-200 bg-yellow-300 text-slate-950 ring-2 ring-yellow-100'
                                 : 'border-white/10 bg-white/[0.08] text-white',

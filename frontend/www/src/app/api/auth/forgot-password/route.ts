@@ -65,10 +65,12 @@ export async function POST(req: NextRequest) {
       await redis.setex(`reset:${resetToken}`, RESET_TOKEN_EXPIRY, email);
 
       const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.NEXT_PUBLIC_WWW_URL ||
-        req.nextUrl.origin ||
-        'http://localhost:3000';
+        (
+          process.env.NEXT_PUBLIC_APP_URL ||
+          process.env.NEXT_PUBLIC_WWW_URL ||
+          req.nextUrl.origin ||
+          'https://www.lajukan.com'
+        ).replace(/\/$/, '');
       const locale = req.cookies.get('NEXT_LOCALE')?.value || 'id';
       const resetLink = `${baseUrl}/${locale}/reset-password?token=${resetToken}`;
 

@@ -1,8 +1,25 @@
 'use client';
 
-import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Expand, PlayCircle, X } from 'lucide-react';
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Expand,
+  ImageOff,
+  PlayCircle,
+  X,
+} from 'lucide-react';
 import { LajukanImage } from '@/components/common/LajukanImage';
+import {
+  isPreviewableContentMediaUrl,
+  normalizeContentMediaUrl,
+} from '@/lib/content/catalog';
 import { cn } from '@/lib/utils';
 
 export type MediaPreviewItem =
@@ -42,6 +59,11 @@ function isVideoSrc(src: string): boolean {
   return /\.(mp4|webm|ogg|mov)(\?|#|$)/i.test(src);
 }
 
+function mediaTypeFor(src: string, explicitType?: 'image' | 'video') {
+  if (explicitType) return explicitType;
+  return isVideoSrc(src) ? 'video' : 'image';
+}
+
 function normalizeMediaItems(items: MediaPreviewItem[], alt: string) {
   const seen = new Set<string>();
   const result: NormalizedMedia[] = [];
@@ -53,19 +75,15 @@ function normalizeMediaItems(items: MediaPreviewItem[], alt: string) {
         : typeof item?.src === 'string'
           ? item.src
           : '';
-    const src = raw.trim();
+    const src = normalizeContentMediaUrl(raw);
     if (!src) continue;
+    if (!isPreviewableContentMediaUrl(src)) continue;
     const key = src.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     result.push({
       src,
-      type:
-        typeof item === 'string'
-          ? isVideoSrc(src)
-            ? 'video'
-            : 'image'
-          : item.type || (isVideoSrc(src) ? 'video' : 'image'),
+      type: mediaTypeFor(src, typeof item === 'string' ? undefined : item.type),
       alt: typeof item === 'string' ? alt : item.alt || alt,
     });
   }
@@ -76,6 +94,23 @@ function normalizeMediaItems(items: MediaPreviewItem[], alt: string) {
 function clampIndex(index: number, length: number) {
   if (length <= 0) return 0;
   return Math.min(Math.max(index, 0), length - 1);
+}
+
+function EmptyMediaFallback({ alt }: { alt: string }) {
+  return (
+    <div
+      role="img"
+      aria-label={alt || 'Media belum tersedia'}
+      className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,#e5eef7_0%,#f8fafc_50%,#edf7f7_100%)] px-4 text-center text-slate-500 dark:bg-[linear-gradient(135deg,#111827_0%,#1f2937_48%,#0f172a_100%)] dark:text-slate-300"
+    >
+      <span className="inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-white/78 shadow-sm ring-1 ring-black/5 dark:bg-slate-950/62 dark:ring-white/10">
+        <ImageOff className="h-7 w-7" />
+      </span>
+      <span className="max-w-[13rem] text-[11px] font-bold leading-4">
+        Media belum bisa dipreview
+      </span>
+    </div>
+  );
 }
 
 export function MediaPreviewCarousel({
@@ -103,37 +138,50 @@ export function MediaPreviewCarousel({
 
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [failedSources, setFailedSources] = useState<Set<string>>(
+    () => new Set(),
+  );
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const isScrolling = useRef(false);
 
-  const active = clampIndex(activeIndex, mediaItems.length);
-  const hasMany = mediaItems.length > 1;
+  const visibleMediaItems = useMemo(
+    () => mediaItems.filter(item => !failedSources.has(item.src)),
+    [failedSources, mediaItems],
+  );
 
-  // Sinkronisasi posisi scroll saat initialIndex berubah (terutama untuk Lightbox)
-  useEffect(() => {
-    if (initialIndex > 0) {
-      scrollToIndex(initialIndex, 'instant');
-    }
-  }, [initialIndex]);
+  const active = clampIndex(activeIndex, visibleMediaItems.length);
+  const hasMany = visibleMediaItems.length > 1;
 
-  const scrollToIndex = (nextIndex: number, behavior: ScrollBehavior = 'smooth') => {
-    const next = clampIndex(nextIndex, mediaItems.length);
-    setActiveIndex(next);
-
-    const node = viewportRef.current;
-    if (!node) return;
-
-    isScrolling.current = true;
-    node.scrollTo({
-      left: node.clientWidth * next,
-      behavior,
+  const markMediaFailed = (src: string) => {
+    setFailedSources(previous => {
+      if (previous.has(src)) return previous;
+      const next = new Set(previous);
+      next.add(src);
+      return next;
     });
-
-    // Berikan jeda sejenak agar flag onScroll tidak tabrakan dengan animasi tombol
-    setTimeout(() => {
-      isScrolling.current = false;
-    }, 300);
   };
+
+  const scrollToIndex = useCallback(
+    (nextIndex: number, behavior: ScrollBehavior = 'smooth') => {
+      const next = clampIndex(nextIndex, visibleMediaItems.length);
+      setActiveIndex(next);
+
+      const node = viewportRef.current;
+      if (!node) return;
+
+      isScrolling.current = true;
+      node.scrollTo({
+        left: node.clientWidth * next,
+        behavior,
+      });
+
+      // Berikan jeda sejenak agar flag onScroll tidak tabrakan dengan animasi tombol.
+      setTimeout(() => {
+        isScrolling.current = false;
+      }, 300);
+    },
+    [visibleMediaItems.length],
+  );
 
   const updateIndexFromScroll = () => {
     if (isScrolling.current) return;
@@ -142,7 +190,7 @@ export function MediaPreviewCarousel({
 
     const next = clampIndex(
       Math.round(node.scrollLeft / node.clientWidth),
-      mediaItems.length,
+      visibleMediaItems.length,
     );
     if (next !== activeIndex) setActiveIndex(next);
   };
@@ -164,6 +212,7 @@ export function MediaPreviewCarousel({
           muted={!inLightbox}
           playsInline
           preload="metadata"
+          onError={() => markMediaFailed(item.src)}
         />
       );
     }
@@ -177,6 +226,7 @@ export function MediaPreviewCarousel({
         priority={priority && index === 0}
         loading={priority && index === 0 ? undefined : loading}
         className={cn('h-full w-full select-none', fitClass, mediaClassName)}
+        onError={() => markMediaFailed(item.src)}
       />
     );
   };
@@ -185,24 +235,24 @@ export function MediaPreviewCarousel({
     <>
       <div
         className={cn(
-          'group relative overflow-hidden bg-slate-100 text-slate-500 dark:bg-slate-900 dark:text-slate-300 transition-colors duration-200',
+          'group relative isolate overflow-hidden bg-slate-100 text-slate-500 transition-colors duration-200 dark:bg-slate-900 dark:text-slate-300',
           aspectClassName,
           className,
         )}
       >
-        {mediaItems.length > 0 ? (
+        {visibleMediaItems.length > 0 ? (
           <div
             ref={viewportRef}
             onScroll={updateIndexFromScroll}
             className={cn(
-              'flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+              'relative flex h-full min-h-0 w-full snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
               viewportClassName,
             )}
           >
-            {mediaItems.map((item, index) => (
+            {visibleMediaItems.map((item, index) => (
               <div
                 key={`${item.src}-${index}`}
-                className="relative h-full min-w-full snap-center overflow-hidden"
+                className="relative h-full min-h-0 w-full min-w-full shrink-0 grow-0 basis-full snap-center overflow-hidden bg-slate-100 dark:bg-slate-950"
               >
                 {renderMedia(item, index)}
                 {item.type === 'video' ? (
@@ -215,20 +265,20 @@ export function MediaPreviewCarousel({
             ))}
           </div>
         ) : (
-          <LajukanImage src={null} alt={alt} fill className="h-full w-full object-cover" />
+          <EmptyMediaFallback alt={alt} />
         )}
 
         {overlay}
 
         {/* Counter Badge */}
-        {mediaItems.length > 1 && showCounter ? (
+        {visibleMediaItems.length > 1 && showCounter ? (
           <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm select-none">
-            {active + 1} / {mediaItems.length}
+            {active + 1} / {visibleMediaItems.length}
           </span>
         ) : null}
 
         {/* Lightbox Trigger Button */}
-        {lightbox && mediaItems.length > 0 ? (
+        {lightbox && visibleMediaItems.length > 0 ? (
           <button
             type="button"
             onClick={event => {
@@ -264,7 +314,7 @@ export function MediaPreviewCarousel({
             </button>
             <button
               type="button"
-              disabled={active === mediaItems.length - 1}
+              disabled={active === visibleMediaItems.length - 1}
               onClick={event => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -272,7 +322,7 @@ export function MediaPreviewCarousel({
               }}
               className={cn(
                 "absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md backdrop-blur-sm transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white md:opacity-0 md:group-hover:opacity-100",
-                active === mediaItems.length - 1 && "cursor-not-allowed opacity-40 md:group-hover:opacity-40"
+                active === visibleMediaItems.length - 1 && "cursor-not-allowed opacity-40 md:group-hover:opacity-40"
               )}
               aria-label="Media berikutnya"
             >
@@ -284,7 +334,7 @@ export function MediaPreviewCarousel({
         {/* Dynamic Indicator Dots */}
         {showDots && hasMany ? (
           <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5 pointer-events-none">
-            {mediaItems.map((_, index) => (
+            {visibleMediaItems.map((_, index) => (
               <span
                 key={`dot-${index}`}
                 className={cn(
@@ -311,7 +361,7 @@ export function MediaPreviewCarousel({
 
           <div className="w-full max-w-5xl aspect-video md:h-[85vh]">
             <MediaPreviewCarousel
-              items={mediaItems}
+              items={visibleMediaItems}
               alt={alt}
               aspectClassName="h-full w-full"
               className="rounded-2xl bg-transparent"

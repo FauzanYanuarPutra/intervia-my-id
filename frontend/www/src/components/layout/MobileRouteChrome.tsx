@@ -229,14 +229,11 @@ export function MobileRouteChrome({
   return (
     <>
       {config.showTopBar ? (
-        <>
-          <MobileRouteTopBar
-            title={config.title}
-            eyebrow={config.eyebrow}
-            locale={locale}
-          />
-          <div className='h-10'></div>
-        </>
+        <MobileRouteTopBar
+          title={config.title}
+          eyebrow={config.eyebrow}
+          locale={locale}
+        />
       ) : null}
 
       {config.showBottomNav ? <ClientBottomNav /> : null}

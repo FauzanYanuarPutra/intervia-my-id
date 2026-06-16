@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildForwardAuthHeaders, withProtectedRoute } from '@/lib/api/withProtectedRoute';
 import { errorResponse } from '@/lib/api/errorResponse';
+import { paymentsEnabled } from '@/lib/server/paymentFeature';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -9,6 +10,12 @@ const MARKETPLACE_URL =
 
 export async function GET(req: NextRequest) {
   try {
+    if (!paymentsEnabled()) {
+      return NextResponse.json(
+        { error: 'Wallet is disabled for now' },
+        { status: 404 },
+      );
+    }
     return withProtectedRoute(
       req,
       {

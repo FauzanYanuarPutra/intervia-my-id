@@ -16,6 +16,9 @@ import {
   FileText,
   Handshake,
   Ban,
+  CreditCard,
+  PhoneCall,
+  RotateCcw,
 } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -147,6 +150,60 @@ export default async function TermsPage({ params }: PageProps) {
 
           <p>• {isId ? 'Pelanggaran dapat menyebabkan akun dibatasi' : 'Violations may lead to account restrictions'}</p>
         </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        {[
+          {
+            icon: CreditCard,
+            title: isId ? 'Pembayaran Rupiah' : 'Rupiah payments',
+            body: isId
+              ? 'Harga, biaya, refund, dan transaksi di Lajukan memakai Rupiah (IDR). Mata uang lain hanya sebagai informasi pembanding bila ada.'
+              : 'Prices, fees, refunds, and transactions on Lajukan use Indonesian Rupiah (IDR). Other currencies are only informational if shown.',
+            href: '/trust/payments',
+            cta: isId ? 'Baca pembayaran' : 'Read payments',
+          },
+          {
+            icon: RotateCcw,
+            title: isId ? 'Refund & retur' : 'Refunds & returns',
+            body: isId
+              ? 'Pengembalian dana, pembatalan, retur produk, dan komplain layanan mengikuti kebijakan refund/retur Lajukan.'
+              : 'Refunds, cancellations, product returns, and service complaints follow the Lajukan refund and return policy.',
+            href: '/refund-policy',
+            cta: isId ? 'Buka kebijakan' : 'Open policy',
+          },
+          {
+            icon: PhoneCall,
+            title: isId ? 'Kontak bisnis' : 'Business contact',
+            body: isId
+              ? 'Untuk bantuan transaksi, listing, atau verifikasi, hubungi 0821 1714 8623 atau support@lajukan.com.'
+              : 'For transaction, listing, or verification help, contact 0821 1714 8623 or support@lajukan.com.',
+            href: '/contact',
+            cta: isId ? 'Hubungi kami' : 'Contact us',
+          },
+        ].map(item => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.title}
+              href={item.href}
+              className="ui-panel ui-card-hover rounded-[22px] p-5"
+            >
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h2 className="mt-4 text-base font-black text-[color:var(--app-text)]">
+                {item.title}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {item.body}
+              </p>
+              <span className="mt-4 inline-flex text-xs font-black text-[color:var(--app-accent)]">
+                {item.cta}
+              </span>
+            </Link>
+          );
+        })}
       </section>
 
       {/* LEGAL CONTENT */}

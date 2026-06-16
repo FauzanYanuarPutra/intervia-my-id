@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useLanguageModal } from '@/components/modal/LanguageModal/LanguageModalContext';
 import { useTheme } from '@/context/ThemeContext';
+import { getPageMeta } from '@/config/pageMeta';
 import { cn } from '@/lib/utils';
 
 function normalizePathname(pathname: string) {
@@ -18,8 +19,9 @@ export function GlobalPreferenceDock() {
   const { open, currentLocale } = useLanguageModal();
   const [isOpen, setIsOpen] = useState(false);
   const cleanPath = normalizePathname(pathname || '/');
+  const routeMeta = getPageMeta(pathname || '/');
 
-  if (cleanPath === '/home' || cleanPath === '/') {
+  if (cleanPath === '/home' || cleanPath === '/' || routeMeta.immersive) {
     return null;
   }
 

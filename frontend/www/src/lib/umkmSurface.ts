@@ -22,6 +22,7 @@ type BuildDiscoveryPathOptions = {
   q?: string | null;
   city?: string | null;
   store?: string | null;
+  storeId?: string | null;
 };
 
 export type SurfaceSearchParams = Record<
@@ -163,10 +164,12 @@ export function buildUmkmDiscoveryPath(
   const query = options.q?.trim();
   const city = options.city?.trim();
   const store = options.store?.trim();
+  const storeId = options.storeId?.trim();
 
   if (query) params.set('q', query);
   if (city) params.set('city', city);
   if (store) params.set('store', store);
+  if (storeId) params.set('storeId', storeId);
 
   const queryString = params.toString();
   return queryString ? `${UMKM_DISCOVERY_PATH}?${queryString}` : UMKM_DISCOVERY_PATH;

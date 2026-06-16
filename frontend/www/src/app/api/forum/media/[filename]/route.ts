@@ -9,5 +9,10 @@ export async function GET(
   return proxyCommunityBackend(
     req,
     `/v1/forum/media/${encodeURIComponent(filename)}`,
+    {
+      accept:
+        'image/avif,image/webp,image/apng,image/svg+xml,image/*,video/*,*/*;q=0.8',
+      cacheControl: 'public, max-age=300, stale-while-revalidate=86400',
+    },
   );
 }

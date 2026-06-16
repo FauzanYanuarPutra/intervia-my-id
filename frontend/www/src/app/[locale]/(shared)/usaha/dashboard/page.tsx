@@ -1,4 +1,5 @@
-import { UsahaOwnerRouteView } from '../_components/UsahaOwnerRouteView';
+import { redirect } from 'next/navigation';
+import { buildUsahaPath } from '@/lib/umkmSurface';
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -6,5 +7,5 @@ type PageProps = {
 
 export default async function UsahaDashboardPage({ params }: PageProps) {
   const { locale } = await params;
-  return <UsahaOwnerRouteView locale={locale} />;
+  redirect(`/${locale}${buildUsahaPath('home')}`);
 }

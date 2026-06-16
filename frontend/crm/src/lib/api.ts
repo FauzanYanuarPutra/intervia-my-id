@@ -209,6 +209,32 @@ export type IdentityPublicProfile = {
   verification: JsonRecord;
 };
 
+export type CrmContentItem = {
+  id: string;
+  owner_id?: string | null;
+  content_type?: string | null;
+  type?: string | null;
+  slug?: string | null;
+  title?: string | null;
+  summary?: string | null;
+  body?: string | null;
+  price_cents?: number | null;
+  price?: number | null;
+  price_unit?: string | null;
+  currency?: string | null;
+  tags?: string[] | string | null;
+  cover_image?: string | null;
+  image_urls?: string[] | null;
+  listing_images?: string[] | null;
+  category?: string | null;
+  content_status?: string | null;
+  status?: string | null;
+  pricing_mode?: string | null;
+  metadata?: JsonRecord;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 function readErrorMessage(
   responseText: string,
   payload: unknown,
@@ -636,6 +662,34 @@ export const identityApi = {
       `${API_URL}/users/public/${encodeURIComponent(userId)}`,
       {
         method: 'GET',
+      },
+    );
+  },
+};
+
+export const contentApi = {
+  list: async (token: string, params: Record<string, string> = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchJson<{ items: CrmContentItem[] }>(
+      `${MARKETPLACE_URL}/v1/content${query ? `?${query}` : ''}`,
+      {
+        method: 'GET',
+        token,
+      },
+    );
+  },
+
+  update: async (
+    token: string,
+    id: string,
+    data: Record<string, unknown>,
+  ) => {
+    return fetchJson<{ item?: CrmContentItem; content?: CrmContentItem }>(
+      `${MARKETPLACE_URL}/v1/content/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify(data),
       },
     );
   },

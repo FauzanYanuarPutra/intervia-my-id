@@ -1,4 +1,5 @@
 import { Link } from '@/i18n/navigation';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { UMKM_DISCOVERY_PATH, buildUsahaPath } from '@/lib/umkmSurface';
 import {
   ArrowRight,
@@ -163,29 +164,33 @@ export default async function LainnyaPage({ params }: PageProps) {
   const { locale } = await params;
   const isId = locale === 'id';
 
-  const financeRoutes = [
-    {
-      href: '/payments',
-      title: isId ? 'Saldo & isi ulang' : 'Balance and top-up',
-      hint: isId ? 'Cek saldo dan isi ulang.' : 'Check balance and top up.',
-      icon: Wallet,
-      tone: 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
-    },
-    {
-      href: '/transactions',
-      title: isId ? 'Transaksi' : 'Transactions',
-      hint: isId ? 'Lihat order dan dana.' : 'Review orders and funds.',
-      icon: ReceiptText,
-      tone: 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
-    },
-    {
-      href: '/support',
-      title: isId ? 'Bantuan' : 'Support',
-      hint: isId ? 'Kalau pembayaran bermasalah.' : 'When payments need help.',
-      icon: ShieldCheck,
-      tone: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
-    },
-  ];
+  const financeRoutes = PROMO_ONLY_MODE
+    ? []
+    : [
+        {
+          href: '/payments',
+          title: isId ? 'Saldo & isi ulang' : 'Balance and top-up',
+          hint: isId ? 'Cek saldo dan isi ulang.' : 'Check balance and top up.',
+          icon: Wallet,
+          tone: 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+        },
+        {
+          href: '/transactions',
+          title: isId ? 'Transaksi' : 'Transactions',
+          hint: isId ? 'Lihat order dan dana.' : 'Review orders and funds.',
+          icon: ReceiptText,
+          tone: 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
+        },
+        {
+          href: '/support',
+          title: isId ? 'Bantuan' : 'Support',
+          hint: isId
+            ? 'Kalau pembayaran bermasalah.'
+            : 'When payments need help.',
+          icon: ShieldCheck,
+          tone: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
+        },
+      ];
 
   const quickRoutes = [
     {
@@ -200,10 +205,14 @@ export default async function LainnyaPage({ params }: PageProps) {
       href: buildUsahaPath('home'),
       label: isId ? 'Kelola' : 'Manage',
     },
-    {
-      href: '/payments',
-      label: isId ? 'Saldo' : 'Balance',
-    },
+    ...(!PROMO_ONLY_MODE
+      ? [
+          {
+            href: '/payments',
+            label: isId ? 'Saldo' : 'Balance',
+          },
+        ]
+      : []),
   ];
 
   const valueRoutes = [
@@ -329,28 +338,37 @@ export default async function LainnyaPage({ params }: PageProps) {
       eyebrow: isId ? 'Kelola usaha' : 'Manage',
       title: isId ? 'Masuk ke usaha aktif' : 'Open the active business',
       hint: isId
-        ? 'Produk, order, operasional, tim.'
-        : 'Products, orders, operations, and team.',
+        ? PROMO_ONLY_MODE
+          ? 'Produk, katalog, chat, tim.'
+          : 'Produk, order, operasional, tim.'
+        : PROMO_ONLY_MODE
+          ? 'Products, catalogs, chats, and team.'
+          : 'Products, orders, operations, and team.',
       meta: isId ? 'Satu pintu' : 'One doorway',
       href: buildUsahaPath('home'),
       cta: isId ? 'Kelola' : 'Open business control',
       icon: Store,
       toneClass: 'from-teal-500/18 via-teal-400/10 to-transparent',
     },
-    {
-      eyebrow: isId ? 'Pembayaran' : 'Finance',
-      title: isId
-        ? 'Saldo, transaksi, bantuan'
-        : 'Balance, transactions, support',
-      hint: isId
-        ? 'Kalau uang sudah mulai jalan.'
-        : 'When money starts moving.',
-      meta: isId ? 'Keuangan' : 'Finance',
-      href: '/payments',
-      cta: isId ? 'Keuangan' : 'Open finance',
-      icon: Wallet,
-      toneClass: 'from-emerald-500/18 via-emerald-400/10 to-transparent',
-    },
+    ...(!PROMO_ONLY_MODE
+      ? [
+          {
+            eyebrow: isId ? 'Pembayaran' : 'Finance',
+            title: isId
+              ? 'Saldo, transaksi, bantuan'
+              : 'Balance, transactions, support',
+            hint: isId
+              ? 'Kalau uang sudah mulai jalan.'
+              : 'When money starts moving.',
+            meta: isId ? 'Keuangan' : 'Finance',
+            href: '/payments',
+            cta: isId ? 'Keuangan' : 'Open finance',
+            icon: Wallet,
+            toneClass:
+              'from-emerald-500/18 via-emerald-400/10 to-transparent',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -365,8 +383,12 @@ export default async function LainnyaPage({ params }: PageProps) {
               </h1>
               <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[color:var(--app-text-soft)]">
                 {isId
-                  ? 'Cari supplier, kelola usaha, atau cek pembayaran.'
-                  : 'Search supply, run the business, or check finance.'}
+                  ? PROMO_ONLY_MODE
+                    ? 'Cari supplier, posting katalog, atau kelola usaha.'
+                    : 'Cari supplier, kelola usaha, atau cek pembayaran.'
+                  : PROMO_ONLY_MODE
+                    ? 'Search supply, post catalogs, or run the business.'
+                    : 'Search supply, run the business, or check finance.'}
               </p>
 
               <div className="mt-3 flex flex-col gap-2 min-[420px]:flex-row">
@@ -441,28 +463,30 @@ export default async function LainnyaPage({ params }: PageProps) {
               </div>
             </div>
 
-            <div className="rounded-[22px] border border-[color:var(--app-border)]/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.94))] px-3 py-3 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.22)]">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
-                  {isId ? 'Keuangan' : 'Finance'}
-                </p>
-                <span className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                  {financeRoutes.length}
-                </span>
+            {!PROMO_ONLY_MODE ? (
+              <div className="rounded-[22px] border border-[color:var(--app-border)]/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.94))] px-3 py-3 shadow-[0_16px_36px_-30px_rgba(15,23,42,0.22)]">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold text-[color:var(--app-text)]">
+                    {isId ? 'Keuangan' : 'Finance'}
+                  </p>
+                  <span className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                    {financeRoutes.length}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {financeRoutes.map(route => (
+                    <FinanceCard
+                      key={route.href}
+                      href={route.href}
+                      title={route.title}
+                      hint={route.hint}
+                      icon={route.icon}
+                      tone={route.tone}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {financeRoutes.map(route => (
-                  <FinanceCard
-                    key={route.href}
-                    href={route.href}
-                    title={route.title}
-                    hint={route.hint}
-                    icon={route.icon}
-                    tone={route.tone}
-                  />
-                ))}
-              </div>
-            </div>
+            ) : null}
           </div>
         </section>
 

@@ -1,3 +1,5 @@
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+
 export type BusinessOsModuleMetric = {
   status: 'live' | 'partial' | 'planned';
   value: number;
@@ -126,12 +128,14 @@ export function buildBusinessOperatingSystemSnapshot({
     overview.unread_messages > 0
       ? {
           id: 'reply-to-revenue',
-          title: 'Chat -> Deal -> CRM',
+          title: PROMO_ONLY_MODE ? 'Chat -> Data -> CRM' : 'Chat -> Deal -> CRM',
           description:
-            'Balas chat yang menunggu, rangkum kebutuhan, lalu ubah jadi offer agar peluang tidak hilang.',
+            PROMO_ONLY_MODE
+              ? 'Balas chat yang menunggu, rangkum kebutuhan, lalu simpan sinyal kategori/lokasi agar promosi makin tepat.'
+              : 'Balas chat yang menunggu, rangkum kebutuhan, lalu ubah jadi offer agar peluang tidak hilang.',
           href: '/chat',
         }
-      : overview.active_transactions > 0
+      : !PROMO_ONLY_MODE && overview.active_transactions > 0
         ? {
             id: 'transaction-control',
             title: 'Transaksi -> Operasional -> Trust',
@@ -167,28 +171,44 @@ export function buildBusinessOperatingSystemSnapshot({
       href: '/search',
       priority: overview.active_leads > 0 ? 'high' : 'medium',
     },
-    {
-      id: 'chat-transaction',
-      from: 'Chat',
-      to: 'Transaksi',
-      title: 'Negosiasi diubah menjadi offer terstruktur',
-      signal: `${overview.unread_messages} pesan belum dibalas`,
-      automation:
-        'AI merangkum harga, deadline, fulfillment, dan membuat draft transaksi.',
-      href: '/chat',
-      priority: overview.unread_messages > 0 ? 'critical' : 'medium',
-    },
-    {
-      id: 'erp-trust',
-      from: 'ERP',
-      to: 'Trust',
-      title: 'Milestone transaksi memperkuat reputasi',
-      signal: `${overview.active_transactions} transaksi aktif`,
-      automation:
-        'Setiap status transaksi memicu reminder, bukti kerja, dan permintaan review.',
-      href: '/transactions',
-      priority: overview.active_transactions > 0 ? 'high' : 'medium',
-    },
+    ...(PROMO_ONLY_MODE
+      ? [
+          {
+            id: 'chat-profile-signal',
+            from: 'Chat',
+            to: 'Profil Usaha',
+            title: 'Pertanyaan user jadi sinyal katalog',
+            signal: `${overview.unread_messages} pesan belum dibalas`,
+            automation:
+              'Rangkum pertanyaan berulang untuk memperbaiki judul, kategori, lokasi, dan deskripsi listing.',
+            href: '/chat',
+            priority: overview.unread_messages > 0 ? 'critical' : 'medium',
+          } satisfies BusinessSystemRelation,
+        ]
+      : [
+          {
+            id: 'chat-transaction',
+            from: 'Chat',
+            to: 'Transaksi',
+            title: 'Negosiasi diubah menjadi offer terstruktur',
+            signal: `${overview.unread_messages} pesan belum dibalas`,
+            automation:
+              'AI merangkum harga, deadline, fulfillment, dan membuat draft transaksi.',
+            href: '/chat',
+            priority: overview.unread_messages > 0 ? 'critical' : 'medium',
+          } satisfies BusinessSystemRelation,
+          {
+            id: 'erp-trust',
+            from: 'ERP',
+            to: 'Trust',
+            title: 'Milestone transaksi memperkuat reputasi',
+            signal: `${overview.active_transactions} transaksi aktif`,
+            automation:
+              'Setiap status transaksi memicu reminder, bukti kerja, dan permintaan review.',
+            href: '/transactions',
+            priority: overview.active_transactions > 0 ? 'high' : 'medium',
+          } satisfies BusinessSystemRelation,
+        ]),
     {
       id: 'content-growth',
       from: 'Listing/Reels',
@@ -238,15 +258,29 @@ export function buildBusinessOperatingSystemSnapshot({
       impact: 'Naikkan peluang deal dari respons cepat.',
       href: '/chat',
     },
-    {
-      id: 'auto-offer-draft',
-      title: 'Draft offer dari chat',
-      trigger: 'Chat berisi harga, jumlah, deadline, atau alamat',
-      action:
-        'AI membuat offer draft dengan nominal, fulfillment, dan catatan.',
-      impact: 'Kurangi bolak-balik negosiasi manual.',
-      href: '/transactions',
-    },
+    ...(PROMO_ONLY_MODE
+      ? [
+          {
+            id: 'auto-chat-insight',
+            title: 'Insight chat untuk listing',
+            trigger: 'Chat berisi pertanyaan kategori, lokasi, stok, atau layanan',
+            action:
+              'Tandai kata kunci yang perlu masuk ke judul, deskripsi, atau FAQ listing.',
+            impact: 'Listing makin mudah ditemukan dan dipahami calon buyer.',
+            href: '/chat',
+          },
+        ]
+      : [
+          {
+            id: 'auto-offer-draft',
+            title: 'Draft offer dari chat',
+            trigger: 'Chat berisi harga, jumlah, deadline, atau alamat',
+            action:
+              'AI membuat offer draft dengan nominal, fulfillment, dan catatan.',
+            impact: 'Kurangi bolak-balik negosiasi manual.',
+            href: '/transactions',
+          },
+        ]),
     {
       id: 'auto-listing-quality',
       title: 'Perbaikan listing otomatis',
@@ -270,8 +304,12 @@ export function buildBusinessOperatingSystemSnapshot({
       id: 'ai-next-best-action',
       title: 'Next best action harian',
       prompt:
-        'Gabungkan chat, transaksi, listing, support, dan aktivitas 7 hari terakhir.',
-      output: '3 tindakan paling dekat ke transaksi atau repeat usage.',
+        PROMO_ONLY_MODE
+          ? 'Gabungkan chat, listing, support, dan aktivitas 7 hari terakhir.'
+          : 'Gabungkan chat, transaksi, listing, support, dan aktivitas 7 hari terakhir.',
+      output: PROMO_ONLY_MODE
+        ? '3 tindakan paling dekat ke chat, listing rapi, atau repeat usage.'
+        : '3 tindakan paling dekat ke transaksi atau repeat usage.',
       href: '/dashboard',
     },
     {
@@ -282,37 +320,63 @@ export function buildBusinessOperatingSystemSnapshot({
       output: 'Shortlist supplier/jasa/talent beserta alasan matching.',
       href: '/search',
     },
-    {
-      id: 'ai-risk-trust',
-      title: 'Trust & fraud reviewer',
-      prompt:
-        'Pantau pola chat, refund, dispute, direct-transfer hint, dan akun baru.',
-      output: 'Risk label, guardrail transaksi, dan rekomendasi verifikasi.',
-      href: '/transactions',
-    },
+    ...(PROMO_ONLY_MODE
+      ? [
+          {
+            id: 'ai-profile-trust',
+            title: 'Profile trust reviewer',
+            prompt:
+              'Pantau kelengkapan profil, konsistensi listing, lokasi, dan pola chat akun baru.',
+            output: 'Rekomendasi verifikasi profil, kelengkapan katalog, dan guardrail chat.',
+            href: '/profile',
+          },
+        ]
+      : [
+          {
+            id: 'ai-risk-trust',
+            title: 'Trust & fraud reviewer',
+            prompt:
+              'Pantau pola chat, refund, dispute, direct-transfer hint, dan akun baru.',
+            output:
+              'Risk label, guardrail transaksi, dan rekomendasi verifikasi.',
+            href: '/transactions',
+          },
+        ]),
   ];
 
   const retentionLoops: BusinessRetentionLoop[] = [
     {
       id: 'daily-work-loop',
       title: 'Daily work loop',
-      loop: 'Login -> klaim reward -> lihat next action -> selesaikan 1 tugas.',
-      reward: 'Coin, XP, streak, dan unlock boost ringan.',
+      loop: PROMO_ONLY_MODE
+        ? 'Login -> cek chat -> lihat next action -> rapikan 1 data usaha.'
+        : 'Login -> klaim reward -> lihat next action -> selesaikan 1 tugas.',
+      reward: PROMO_ONLY_MODE
+        ? 'Profil makin lengkap, listing lebih rapi, dan promosi lebih mudah ditemukan.'
+        : 'Coin, XP, streak, dan unlock boost ringan.',
       metric: 'daily_active_operator',
     },
     {
       id: 'seller-growth-loop',
       title: 'Seller growth loop',
-      loop: 'Upload listing -> dapat view -> balas chat -> transaksi -> review.',
-      reward: 'Trust badge, ranking search, dan insight performa.',
-      metric: 'listing_to_deal_rate',
+      loop: PROMO_ONLY_MODE
+        ? 'Upload listing -> dapat view -> balas chat -> update profil.'
+        : 'Upload listing -> dapat view -> balas chat -> transaksi -> review.',
+      reward: PROMO_ONLY_MODE
+        ? 'Trust badge, ranking search, dan insight performa promosi.'
+        : 'Trust badge, ranking search, dan insight performa.',
+      metric: PROMO_ONLY_MODE ? 'listing_to_chat_rate' : 'listing_to_deal_rate',
     },
     {
       id: 'community-commerce-loop',
       title: 'Community commerce loop',
-      loop: 'Diskusi masalah -> rekomendasi solusi -> vendor/chat -> deal.',
+      loop: PROMO_ONLY_MODE
+        ? 'Diskusi masalah -> rekomendasi solusi -> vendor/chat -> shortlist.'
+        : 'Diskusi masalah -> rekomendasi solusi -> vendor/chat -> deal.',
       reward: 'Social proof, reputation point, dan expert badge.',
-      metric: 'community_to_transaction_assist',
+      metric: PROMO_ONLY_MODE
+        ? 'community_to_chat_assist'
+        : 'community_to_transaction_assist',
     },
   ];
 
@@ -326,9 +390,11 @@ export function buildBusinessOperatingSystemSnapshot({
     },
     {
       id: 'scam-prevention',
-      title: 'Anti scam transaksi',
+      title: PROMO_ONLY_MODE ? 'Anti scam komunikasi' : 'Anti scam transaksi',
       guardrail:
-        'Deteksi direct transfer, kata risiko, akun baru, dan dispute pattern.',
+        PROMO_ONLY_MODE
+          ? 'Deteksi ajakan transfer langsung, kata risiko, spam, dan akun baru dalam chat.'
+          : 'Deteksi direct transfer, kata risiko, akun baru, dan dispute pattern.',
       signal:
         overview.active_transactions > 0 ? 'transaction_signal' : 'baseline',
     },
@@ -348,12 +414,23 @@ export function buildBusinessOperatingSystemSnapshot({
       enriches: 'CRM lead, customer profile, response SLA',
       usedBy: 'AI follow-up, sales priority, retention reminder',
     },
-    {
-      id: 'transaction-to-erp',
-      source: 'Transaksi dan milestone',
-      enriches: 'ERP order state, finance, trust score',
-      usedBy: 'Automation reminder, dispute prevention, review prompt',
-    },
+    ...(PROMO_ONLY_MODE
+      ? [
+          {
+            id: 'listing-to-profile',
+            source: 'Listing, profil usaha, dan chat',
+            enriches: 'Search ranking, CRM lead, trust readiness',
+            usedBy: 'Recommendation engine, profile checklist, promo insight',
+          },
+        ]
+      : [
+          {
+            id: 'transaction-to-erp',
+            source: 'Transaksi dan milestone',
+            enriches: 'ERP order state, finance, trust score',
+            usedBy: 'Automation reminder, dispute prevention, review prompt',
+          },
+        ]),
     {
       id: 'content-to-recommendation',
       source: 'Listing, reels, komunitas, learn',
@@ -362,9 +439,13 @@ export function buildBusinessOperatingSystemSnapshot({
     },
     {
       id: 'reward-to-retention',
-      source: 'Login streak, coin, XP, mission',
+      source: PROMO_ONLY_MODE
+        ? 'Login, checklist profil, aktivitas chat'
+        : 'Login streak, coin, XP, mission',
       enriches: 'Retention segment dan active operator score',
-      usedBy: 'Daily mission, voucher, boost, lifecycle notification',
+      usedBy: PROMO_ONLY_MODE
+        ? 'Daily checklist, content reminder, lifecycle notification'
+        : 'Daily mission, voucher, boost, lifecycle notification',
     },
   ];
 

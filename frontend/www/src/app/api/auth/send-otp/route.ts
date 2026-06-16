@@ -7,7 +7,7 @@ import {
 } from '@/lib/redis';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { sendOTPEmail } from '@/lib/email';
-import { sendOTPSMS } from '@/lib/sms';
+import { sendPhoneOTP } from '@/lib/sms';
 import { enforceRateLimit } from '@/lib/rateLimit';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { z } from 'zod';
@@ -22,6 +22,7 @@ const OTP_LIMIT_PER_IP_PER_HOUR = Number.parseInt(
   process.env.OTP_LIMIT_PER_IP_PER_HOUR || '30',
   10,
 );
+const OTP_AUTH_ENABLED = process.env.ENABLE_OTP_AUTH === 'true';
 
 const SendOtpSchema = z.object({
   type: z.enum(['email', 'phone']),
@@ -75,6 +76,13 @@ export async function POST(req: NextRequest) {
     const { type, target, purpose } = parsed.data;
     const normalizedTarget = normalizeTarget(type, target);
 
+    if (!OTP_AUTH_ENABLED && (purpose === 'register' || purpose === 'login')) {
+      return NextResponse.json(
+        { error: 'OTP login/register is disabled. Use username and password.' },
+        { status: 410 },
+      );
+    }
+
     if (!validateTarget(type, normalizedTarget)) {
       return NextResponse.json(
         { error: type === 'email' ? 'Invalid email address' : 'Invalid phone number' },
@@ -108,11 +116,12 @@ export async function POST(req: NextRequest) {
     const otp = generateOTP();
     await storeOTP(type, normalizedTarget, otp);
 
-    const delivery: string = type === 'email' ? 'email' : 'sms';
+    const phoneDelivery =
+      type === 'phone' ? await sendPhoneOTP(normalizedTarget, otp) : null;
     const sent =
       type === 'email'
         ? await sendOTPEmail(normalizedTarget, otp)
-        : await sendOTPSMS(normalizedTarget, otp);
+        : Boolean(phoneDelivery?.ok);
 
     if (!sent) {
       await deleteOTP(type, normalizedTarget);
@@ -131,12 +140,14 @@ export async function POST(req: NextRequest) {
 
     const emailTransport =
       process.env.EMAIL_TRANSPORT || (IS_DEV ? 'console' : 'smtp');
+    const delivery =
+      type === 'email' ? emailTransport : phoneDelivery?.delivery || 'phone';
 
     return NextResponse.json({
       success: true,
       message: `OTP sent to ${type === 'email' ? 'email' : 'whatsapp'}`,
       purpose,
-      delivery: type === 'email' ? emailTransport : delivery,
+      delivery,
     });
   } catch (e) {
     console.error('Send OTP error:', e);

@@ -22,6 +22,7 @@ import {
   Loader2,
   Map,
   MapPinned,
+  MessageCircle,
   PackagePlus,
   ShieldCheck,
   Store,
@@ -42,6 +43,7 @@ import {
   buildUsahaPath,
   buildUsahaPathFromWorkspace,
 } from '@/lib/umkmSurface';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { cn } from '@/lib/utils';
 import {
   buildDefaultCustomFieldsForBusiness,
@@ -148,6 +150,15 @@ import {
 import { QrPreview } from './QrPreview';
 import { UmkmLocationPicker } from './UmkmLocationPicker';
 import { getPlaceIcon } from './UmkmPlacesChromePrimitives';
+import { BusinessSetupIntroLayout } from './manage/BusinessSetupLayout';
+import { buildBusinessSetupLayoutSteps } from './manage/BusinessSetupFlow';
+import { BusinessPromoOnlyWorkspace } from './manage/BusinessPromoOnlyWorkspace';
+import { UsahaSetupFlow, UsahaWorkspaceShell } from './manage/UsahaOwnerFlow';
+import {
+  UsahaOverview,
+  buildUsahaOverviewModel,
+  type OverviewStore,
+} from '@/features/umkm-owner/overview';
 
 type UmkmHubClientProps = {
   locale: string;
@@ -167,23 +178,23 @@ type StoreCreateStepId =
 type StoreListFilterId = 'all' | 'attention' | 'active' | 'live';
 type SimpleWorkspaceHero =
   | {
-    eyebrow: string;
-    title: string;
-    desc: string;
-    primaryLabel: string;
-    primaryHref: string;
-    secondaryLabel: string;
-    secondaryHref: string;
-  }
+      eyebrow: string;
+      title: string;
+      desc: string;
+      primaryLabel: string;
+      primaryHref: string;
+      secondaryLabel: string;
+      secondaryHref: string;
+    }
   | {
-    eyebrow: string;
-    title: string;
-    desc: string;
-    primaryLabel: string;
-    primaryTarget: string;
-    secondaryLabel: string;
-    secondaryHref: string;
-  };
+      eyebrow: string;
+      title: string;
+      desc: string;
+      primaryLabel: string;
+      primaryTarget: string;
+      secondaryLabel: string;
+      secondaryHref: string;
+    };
 type BasicStoreEditFormState = Pick<
   StoreFormState,
   'name' | 'description' | 'city' | 'address' | 'phone'
@@ -202,15 +213,15 @@ type LaunchRecommendationCard = {
 };
 type GuidedFlowAction =
   | {
-    kind: 'href';
-    href: string;
-    label: string;
-  }
+      kind: 'href';
+      href: string;
+      label: string;
+    }
   | {
-    kind: 'target';
-    target: string;
-    label: string;
-  };
+      kind: 'target';
+      target: string;
+      label: string;
+    };
 type GuidedFlowCard = {
   id: string;
   stepLabel: string;
@@ -326,6 +337,19 @@ function buildSearchHref(type: string, query: string): string {
   return queryString ? `/search?${queryString}` : '/search';
 }
 
+function formatLaunchTeamRole(
+  role: TeamMemberRecord['role'],
+  isId: boolean,
+): string {
+  if (PROMO_ONLY_MODE && role === 'cashier') {
+    return isId ? 'Admin chat' : 'Chat admin';
+  }
+  if (PROMO_ONLY_MODE && role === 'finance') {
+    return isId ? 'Admin data' : 'Data admin';
+  }
+  return teamRoleLabel(role, isId);
+}
+
 export function UmkmHubClient({
   locale,
   isId,
@@ -358,6 +382,12 @@ export function UmkmHubClient({
     isSimpleHubMode && currentWorkspace === 'setup' && !isSetupCreateView;
   const useSimpleWorkspaceShell =
     isSimpleHubMode && !isOverviewWorkspace && currentWorkspace !== 'setup';
+  const isDirectQrWorkspaceRoute = /\/usaha(?:\/toko\/[^/]+)?\/qr\/?$/.test(
+    pathname,
+  );
+  const isPromoOnlyCommercePaused =
+    PROMO_ONLY_MODE &&
+    (currentWorkspace === 'orders' || isDirectQrWorkspaceRoute);
   const storefrontActionLabel = isId ? 'Tampilan pembeli' : 'Buyer view';
 
   const [myStores, setMyStores] = useState<StoreRecord[]>([]);
@@ -690,13 +720,13 @@ export function UmkmHubClient({
       if (view === 'detail' && activeStoreId) {
         return isAssistantSetupRoute
           ? buildUsahaPath('assistant', {
-            storeId: activeStoreId,
-            hash,
-          })
+              storeId: activeStoreId,
+              hash,
+            })
           : buildUsahaPath('profile', {
-            storeId: activeStoreId,
-            hash,
-          });
+              storeId: activeStoreId,
+              hash,
+            });
       }
 
       const basePath = isAssistantSetupRoute
@@ -999,23 +1029,23 @@ export function UmkmHubClient({
   );
   const isGuidedStoreSetup = storeSetupMode === 'guided';
   const compactStoreControlClass =
-    'min-h-[40px] rounded-[13px] px-3 text-[13px]';
+    'min-h-[46px] rounded-[14px] border-slate-200 px-3.5 text-[13px] shadow-[0_10px_22px_-20px_rgba(15,23,42,0.16)]';
   const compactStoreTextAreaClass =
-    'min-h-[84px] rounded-[13px] px-3 py-2.5 text-[13px]';
+    'min-h-[112px] rounded-[14px] border-slate-200 px-3.5 py-3 text-[13px] shadow-[0_10px_22px_-20px_rgba(15,23,42,0.16)]';
   const manageFormHeroClass =
-    'relative overflow-hidden rounded-[22px] border border-emerald-200/85 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_48%,#ecfeff_100%)] px-3.5 py-3.5 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.22)] dark:border-emerald-400/20 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.26),rgba(2,6,23,0.96)_56%,rgba(8,47,73,0.22))] sm:px-4 sm:py-4';
+    'relative overflow-hidden rounded-[26px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_52%,#fff8ed_100%)] px-4 py-4 shadow-[0_20px_48px_-40px_rgba(15,23,42,0.22)] dark:border-emerald-400/16 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.24),rgba(2,6,23,0.96)_58%,rgba(120,53,15,0.16))] sm:px-5 sm:py-5';
   const manageInfoCardClass =
-    'rounded-[16px] border border-emerald-100/90 bg-white/84 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-emerald-400/14 dark:bg-white/[0.07]';
+    'rounded-[18px] border border-emerald-100 bg-white/90 px-3.5 py-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-white/[0.07]';
   const manageSectionBlockClass =
-    'rounded-[20px] border border-emerald-100/90 bg-white/96 px-3 py-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-slate-950/86';
+    'rounded-[24px] border border-emerald-100 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-slate-950/86';
   const manageStorePanelClass =
-    'rounded-[20px] border border-emerald-100/90 bg-white/96 px-3 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.26)] dark:border-emerald-400/14 dark:bg-slate-950/88 sm:px-4 sm:py-4';
+    'rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.22)] dark:border-emerald-400/14 dark:bg-slate-950/88 sm:px-5 sm:py-5';
   const manageStoreSoftPanelClass =
-    'rounded-[18px] border border-emerald-100/85 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_100%)] px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)] shadow-[0_12px_24px_-24px_rgba(15,23,42,0.16)] dark:border-emerald-400/14 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.18),rgba(2,6,23,0.94))]';
+    'rounded-[20px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_100%)] px-4 py-3.5 text-[12px] leading-5 text-[color:var(--app-accent)] shadow-[0_14px_28px_-26px_rgba(15,23,42,0.16)] dark:border-emerald-400/14 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.18),rgba(2,6,23,0.94))]';
   const manageDashboardShellClass =
-    'relative overflow-hidden rounded-[24px] border border-emerald-200/85 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_44%,#f8fafc_72%,#eff6ff_100%)] p-2.5 shadow-[0_22px_46px_-36px_rgba(15,23,42,0.24)] dark:border-emerald-400/18 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_58%,rgba(15,23,42,0.94))] sm:p-3';
+    'relative overflow-hidden rounded-[30px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f7fff9_50%,#fff8ed_100%)] p-3 shadow-[0_24px_58px_-44px_rgba(15,23,42,0.26)] dark:border-emerald-400/18 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.28),rgba(2,6,23,0.96)_58%,rgba(15,23,42,0.94))] sm:p-4';
   const manageDashboardCardClass =
-    'rounded-[22px] border border-white/80 bg-white/92 p-3.5 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.2)] dark:border-white/10 dark:bg-slate-950/82 sm:p-4';
+    'rounded-[26px] border border-slate-100 bg-white p-4 shadow-[0_20px_44px_-38px_rgba(15,23,42,0.2)] dark:border-white/10 dark:bg-slate-950/82 sm:p-5';
   const manageDashboardSoftCardClass =
     'rounded-[20px] border border-emerald-100/85 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_100%)] p-3 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.18),rgba(15,23,42,0.92))]';
   const buildStoreBaseAddress = useCallback(
@@ -1106,17 +1136,19 @@ export function UmkmHubClient({
       {
         id: 'intro' as const,
         icon: Clipboard,
-        title: isId ? 'Mulai' : 'Start',
-        desc: isId ? 'Lihat alur singkat.' : 'See the quick flow.',
+        title: isId ? 'Informasi Dasar' : 'Basic Info',
+        desc: isId ? 'Jenis dan profil awal.' : 'Type and core profile.',
         summary: isId
-          ? 'Kamu akan isi jenis, nama, alamat, lokasi, lalu simpan.'
-          : 'Prepare the business type, name, base address, and location point.',
+          ? 'Lengkapi data dasar supaya orang cepat paham usahamu.'
+          : 'Complete the core data so people understand the business quickly.',
       },
       {
         id: 'group' as const,
         icon: Store,
-        title: isId ? 'Jenis' : 'Type',
-        desc: isId ? 'Pilih yang paling mirip.' : 'Pick the closest fit.',
+        title: isId ? 'Jenis Usaha' : 'Business Type',
+        desc: isId
+          ? 'Produk, jasa, atau keduanya.'
+          : 'Product, service, or both.',
         summary: selectedRegistrationPath
           ? `${selectedRegistrationPath.title} - ${getUmkmBusinessCategoryLabel(storeForm.business_category, isId)}`
           : isId
@@ -1126,17 +1158,19 @@ export function UmkmHubClient({
       {
         id: 'identity' as const,
         icon: FileText,
-        title: isId ? 'Data' : 'Details',
-        desc: isId ? 'Nama, kota, alamat.' : 'Name, city, address.',
+        title: isId ? 'Kontak & Media' : 'Contact & Media',
+        desc: isId
+          ? 'Nama, kota, WA, dan cerita.'
+          : 'Name, city, WhatsApp, story.',
         summary:
           storeForm.name.trim() || storeForm.city.trim()
             ? [
-              storeForm.name.trim() ||
-              (isId ? 'Nama belum diisi' : 'Name missing'),
-              storeForm.city.trim(),
-            ]
-              .filter(Boolean)
-              .join(' - ')
+                storeForm.name.trim() ||
+                  (isId ? 'Nama belum diisi' : 'Name missing'),
+                storeForm.city.trim(),
+              ]
+                .filter(Boolean)
+                .join(' - ')
             : isId
               ? 'Isi nama usaha, kota, dan alamat atau patokan.'
               : 'Fill the core data.',
@@ -1145,7 +1179,7 @@ export function UmkmHubClient({
         id: 'location' as const,
         icon: Map,
         title: isId ? 'Lokasi' : 'Location',
-        desc: isId ? 'Tandai area usaha.' : 'Place the business area.',
+        desc: isId ? 'Alamat dan titik peta.' : 'Address and map pin.',
         summary: storeLocationPoint
           ? `${storeLocationPoint.lat.toFixed(4)}, ${storeLocationPoint.lng.toFixed(4)}`
           : isId
@@ -1155,8 +1189,8 @@ export function UmkmHubClient({
       {
         id: 'operations' as const,
         icon: ShieldCheck,
-        title: isId ? 'Cek' : 'Review',
-        desc: isId ? 'Review lalu simpan.' : 'Review then save.',
+        title: isId ? 'Review & Simpan' : 'Review & Save',
+        desc: isId ? 'Cek lalu publikasikan.' : 'Check, then publish.',
         summary: supportsDineIn(storeForm.business_capabilities)
           ? isId
             ? `${Math.max(0, Number(storeForm.table_count) || 0)} meja awal`
@@ -1185,6 +1219,24 @@ export function UmkmHubClient({
     storeCreateSteps[storeCreateStepIndex] || storeCreateSteps[0];
   const storeCreateProgress = Math.round(
     ((storeCreateStepIndex + 1) / STORE_CREATE_STEP_ORDER.length) * 100,
+  );
+  const businessSetupLayoutSteps = useMemo(
+    () =>
+      buildBusinessSetupLayoutSteps({
+        activeStepId: storeCreateStep,
+        activeStepIndex: storeCreateStepIndex,
+        finalStepId: 'operations' as const,
+        highestUnlockedStepIndex: highestUnlockedStoreCreateStepIndex,
+        isStepValid: stepId => storeCreateValidation[stepId],
+        steps: storeCreateSteps,
+      }),
+    [
+      highestUnlockedStoreCreateStepIndex,
+      storeCreateStep,
+      storeCreateStepIndex,
+      storeCreateSteps,
+      storeCreateValidation,
+    ],
   );
   const storeCreateChecklist = useMemo(
     () => [
@@ -1239,39 +1291,6 @@ export function UmkmHubClient({
     if (count <= 8) return 'medium';
     return 'large';
   }, [storeForm.table_count, storeSupportsTables]);
-  const storeOnboardingInfoCards = useMemo(
-    () => [
-      {
-        icon: Store,
-        title: isId ? 'Pilih jenis usaha' : 'Pick business type',
-        desc: isId
-          ? 'Misalnya kuliner, retail, jasa, workshop, kerajinan, atau agribisnis.'
-          : 'Choose the closest category. Details can be changed after saving.',
-      },
-      {
-        icon: FileText,
-        title: isId ? 'Isi data yang dicari pembeli' : 'Fill core details',
-        desc: isId
-          ? 'Nama usaha, kota, dan alamat atau patokan dulu cukup.'
-          : 'Name, city, and base address are enough. Phone and description are optional.',
-      },
-      {
-        icon: MapPinned,
-        title: isId ? 'Tandai lokasi' : 'Set location point',
-        desc: isId
-          ? 'Tekan Lokasi saya atau geser pin. Bisa diedit lagi nanti.'
-          : 'Use your current location if unsure. The point can be refined later.',
-      },
-      {
-        icon: PackagePlus,
-        title: isId ? 'Simpan, lalu rapikan' : 'Continue after saving',
-        desc: isId
-          ? 'Setelah jadi, baru tambah produk, QR, tim, dan jam operasional.'
-          : 'Catalog, QR, team, and operations open after the business profile exists.',
-      },
-    ],
-    [isId],
-  );
   const storeCreateReviewCards = useMemo(
     () => [
       {
@@ -1349,7 +1368,7 @@ export function UmkmHubClient({
     if (selectedStore) {
       return parseCapabilityList(
         selectedStore.metadata?.business_capabilities ??
-        selectedStore.metadata?.capabilities,
+          selectedStore.metadata?.capabilities,
         selectedBusinessCategory,
       );
     }
@@ -1482,14 +1501,15 @@ export function UmkmHubClient({
         icon: PackagePlus,
         title: isId ? 'Nama & jenis' : 'Name and type',
         body: productForm.name.trim()
-          ? `${productForm.name.trim()} / ${productForm.product_kind === 'digital'
-            ? isId
-              ? 'digital'
-              : 'digital'
-            : isId
-              ? 'fisik'
-              : 'physical'
-          }`
+          ? `${productForm.name.trim()} / ${
+              productForm.product_kind === 'digital'
+                ? isId
+                  ? 'digital'
+                  : 'digital'
+                : isId
+                  ? 'fisik'
+                  : 'physical'
+            }`
           : isId
             ? 'Isi nama listing yang jelas.'
             : 'Add a clear listing name.',
@@ -1501,8 +1521,9 @@ export function UmkmHubClient({
         title: isId ? 'Harga & stok' : 'Price and stock',
         body:
           Number(productForm.price_rupiah) > 0
-            ? `${isId ? 'Rp' : 'Rp'} ${productForm.price_rupiah || '0'} / ${isId ? 'stok' : 'stock'
-            } ${productForm.stock_qty || '0'}`
+            ? `${isId ? 'Rp' : 'Rp'} ${productForm.price_rupiah || '0'} / ${
+                isId ? 'stok' : 'stock'
+              } ${productForm.stock_qty || '0'}`
             : isId
               ? 'Isi harga dulu.'
               : 'Set the price first.',
@@ -1521,15 +1542,15 @@ export function UmkmHubClient({
                 ? 'Digital'
                 : 'Digital'
               : [
-                productForm.allow_pickup ? (isId ? 'Pickup' : 'Pickup') : '',
-                productForm.allow_courier_shipping
-                  ? isId
-                    ? 'Kurir'
-                    : 'Courier'
-                  : '',
-              ]
-                .filter(Boolean)
-                .join(' / '),
+                  productForm.allow_pickup ? (isId ? 'Pickup' : 'Pickup') : '',
+                  productForm.allow_courier_shipping
+                    ? isId
+                      ? 'Kurir'
+                      : 'Courier'
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join(' / '),
           ]
             .filter(Boolean)
             .join(' / ') ||
@@ -1589,9 +1610,9 @@ export function UmkmHubClient({
     () =>
       normalizeSingleLineInput(
         (isSetupDetailView ? selectedStore?.city : '') ||
-        storeForm.city ||
-        selectedStore?.city ||
-        '',
+          storeForm.city ||
+          selectedStore?.city ||
+          '',
       ),
     [isSetupDetailView, selectedStore?.city, storeForm.city],
   );
@@ -1878,23 +1899,43 @@ export function UmkmHubClient({
   const operationsWorkspaceCopy = useMemo(() => {
     if (supportsDineInFlow) {
       return {
-        title: isId ? 'Meja & QR' : 'Tables & QR',
-        desc: isId
-          ? 'QR, meja, booking, pickup.'
-          : 'QR, tables, bookings, pickup.',
-        badge: onlineQr
-          ? `${tables.length} ${isId ? 'meja' : 'tables'}`
+        title: PROMO_ONLY_MODE
+          ? isId
+            ? 'Area layanan'
+            : 'Service area'
           : isId
-            ? 'QR belum siap'
-            : 'QR pending',
+            ? 'Meja & QR'
+            : 'Tables & QR',
+        desc: PROMO_ONLY_MODE
+          ? isId
+            ? 'Meja, booking, pickup, jam layanan.'
+            : 'Tables, bookings, pickup, service hours.'
+          : isId
+            ? 'QR, meja, booking, pickup.'
+            : 'QR, tables, bookings, pickup.',
+        badge: PROMO_ONLY_MODE
+          ? `${tables.length} ${isId ? 'area' : 'spots'}`
+          : onlineQr
+            ? `${tables.length} ${isId ? 'meja' : 'tables'}`
+            : isId
+              ? 'QR belum siap'
+              : 'QR pending',
         modeTitle: isId ? 'Operasional outlet' : 'Outlet ops',
-        modeDesc: isId
-          ? 'Atur meja, QR, booking, dan ritme outlet.'
-          : 'Manage tables, QR, bookings, and outlet flow.',
+        modeDesc: PROMO_ONLY_MODE
+          ? isId
+            ? 'Atur area layanan, booking, dan ritme outlet.'
+            : 'Manage service area, bookings, and outlet flow.'
+          : isId
+            ? 'Atur meja, QR, booking, dan ritme outlet.'
+            : 'Manage tables, QR, bookings, and outlet flow.',
         teamScope: isId ? 'Dine-in / pickup' : 'Dine-in / pickup',
-        teamDesc: isId
-          ? 'Pegang meja, QR, booking, dan flow layanan.'
-          : 'Handle tables, QR, bookings, and on-site flow.',
+        teamDesc: PROMO_ONLY_MODE
+          ? isId
+            ? 'Pegang area layanan, booking, dan flow layanan.'
+            : 'Handle service area, bookings, and on-site flow.'
+          : isId
+            ? 'Pegang meja, QR, booking, dan flow layanan.'
+            : 'Handle tables, QR, bookings, and on-site flow.',
       };
     }
 
@@ -2105,7 +2146,7 @@ export function UmkmHubClient({
           isId,
         );
         const roleLabel = store.access_role
-          ? teamRoleLabel(store.access_role, isId)
+          ? formatLaunchTeamRole(store.access_role, isId)
           : isId
             ? 'Pemilik'
             : 'Owner';
@@ -2170,11 +2211,11 @@ export function UmkmHubClient({
           },
           ...(services.includes('food')
             ? [
-              {
-                label: isId ? 'Foto menu' : 'Menu photo',
-                done: hasMenuPhoto,
-              },
-            ]
+                {
+                  label: isId ? 'Foto menu' : 'Menu photo',
+                  done: hasMenuPhoto,
+                },
+              ]
             : []),
           {
             label: isId ? 'Kanal jual' : 'Selling channel',
@@ -2289,24 +2330,24 @@ export function UmkmHubClient({
             : 'Core data, trust, and sales channels are tidy enough for daily work.'
           : isId
             ? `Masih perlu: ${missingItems
-              .slice(0, 3)
-              .join(
-                ', ',
-              )}${attentionCount > 3 ? `, +${attentionCount - 3} lainnya` : ''}.`
+                .slice(0, 3)
+                .join(
+                  ', ',
+                )}${attentionCount > 3 ? `, +${attentionCount - 3} lainnya` : ''}.`
             : `Still missing: ${missingItems
-              .slice(0, 3)
-              .join(
-                ', ',
-              )}${attentionCount > 3 ? `, +${attentionCount - 3} more` : ''}.`;
+                .slice(0, 3)
+                .join(
+                  ', ',
+                )}${attentionCount > 3 ? `, +${attentionCount - 3} more` : ''}.`;
 
         const badges = [
           ...(businessCategoryLabel
             ? [
-              {
-                label: businessCategoryLabel,
-                tone: 'accent' as const,
-              },
-            ]
+                {
+                  label: businessCategoryLabel,
+                  tone: 'accent' as const,
+                },
+              ]
             : []),
           {
             label: presenceLabel,
@@ -2324,27 +2365,27 @@ export function UmkmHubClient({
           },
           ...(liveNow
             ? [
-              {
-                label: 'Live',
-                tone: 'accent' as const,
-              },
-            ]
+                {
+                  label: 'Live',
+                  tone: 'accent' as const,
+                },
+              ]
             : []),
           ...(store.online_order_enabled
             ? [
-              {
-                label: 'Online',
-                tone: 'accent' as const,
-              },
-            ]
+                {
+                  label: 'Online',
+                  tone: 'accent' as const,
+                },
+              ]
             : []),
           ...(store.offline_order_enabled
             ? [
-              {
-                label: 'Offline',
-                tone: 'default' as const,
-              },
-            ]
+                {
+                  label: 'Offline',
+                  tone: 'default' as const,
+                },
+              ]
             : []),
           {
             label: roleLabel,
@@ -2643,8 +2684,8 @@ export function UmkmHubClient({
         const savedStoreId =
           typeof window !== 'undefined'
             ? window.localStorage
-              .getItem(UMKM_ACTIVE_STORE_STORAGE_KEY)
-              ?.trim() || ''
+                .getItem(UMKM_ACTIVE_STORE_STORAGE_KEY)
+                ?.trim() || ''
             : '';
         const useBlankCreateSelection = !forcedStoreId && isSetupCreateView;
 
@@ -2692,38 +2733,43 @@ export function UmkmHubClient({
               `/api/super-app/umkm/stores/${storeId}/products?include_unavailable=1`,
             ),
             authFetch(`/api/super-app/umkm/stores/${storeId}/tables`),
-            authFetch(`/api/super-app/umkm/stores/${storeId}/qr`),
-            authFetch(
-              `/api/super-app/umkm/orders?store_id=${encodeURIComponent(storeId)}&limit=120`,
-            ),
+            PROMO_ONLY_MODE
+              ? Promise.resolve(null)
+              : authFetch(`/api/super-app/umkm/stores/${storeId}/qr`),
+            PROMO_ONLY_MODE
+              ? Promise.resolve(null)
+              : authFetch(
+                  `/api/super-app/umkm/orders?store_id=${encodeURIComponent(storeId)}&limit=120`,
+                ),
             authFetch(
               `/api/super-app/umkm/reservations?store_id=${encodeURIComponent(storeId)}&limit=120`,
             ),
             authFetch(`/api/super-app/umkm/stores/${storeId}/team?limit=120`),
           ]);
 
-        const [
-          productPayload,
-          tablePayload,
-          qrPayload,
-          orderPayload,
-          reservationPayload,
-          teamPayload,
-        ] = (await Promise.all([
-          productRes.json().catch(() => ({})),
-          tableRes.json().catch(() => ({})),
-          qrRes.json().catch(() => ({})),
-          orderRes.json().catch(() => ({})),
-          reservationRes.json().catch(() => ({})),
-          teamRes.json().catch(() => ({})),
-        ])) as [
-            CollectionResponse<ProductRecord>,
-            CollectionResponse<TableRecord>,
-            CollectionResponse<QrRecord>,
-            CollectionResponse<OrderRecord>,
-            CollectionResponse<ReservationRecord>,
-            CollectionResponse<TeamMemberRecord>,
-          ];
+        const emptyCollection = { data: { count: 0, items: [] } };
+        const productPayload = (await productRes
+          .json()
+          .catch(() => ({}))) as CollectionResponse<ProductRecord>;
+        const tablePayload = (await tableRes
+          .json()
+          .catch(() => ({}))) as CollectionResponse<TableRecord>;
+        const qrPayload = PROMO_ONLY_MODE
+          ? (emptyCollection as CollectionResponse<QrRecord>)
+          : ((await qrRes
+              ?.json()
+              .catch(() => ({}))) as CollectionResponse<QrRecord>);
+        const orderPayload = PROMO_ONLY_MODE
+          ? (emptyCollection as CollectionResponse<OrderRecord>)
+          : ((await orderRes
+              ?.json()
+              .catch(() => ({}))) as CollectionResponse<OrderRecord>);
+        const reservationPayload = (await reservationRes
+          .json()
+          .catch(() => ({}))) as CollectionResponse<ReservationRecord>;
+        const teamPayload = (await teamRes
+          .json()
+          .catch(() => ({}))) as CollectionResponse<TeamMemberRecord>;
 
         if (!productRes.ok || !productPayload.data) {
           throw new Error(productPayload.error || 'Failed to load products');
@@ -2731,10 +2777,10 @@ export function UmkmHubClient({
         if (!tableRes.ok || !tablePayload.data) {
           throw new Error(tablePayload.error || 'Failed to load tables');
         }
-        if (!qrRes.ok || !qrPayload.data) {
+        if (!PROMO_ONLY_MODE && (!qrRes?.ok || !qrPayload.data)) {
           throw new Error(qrPayload.error || 'Failed to load QR tokens');
         }
-        if (!orderRes.ok || !orderPayload.data) {
+        if (!PROMO_ONLY_MODE && (!orderRes?.ok || !orderPayload.data)) {
           throw new Error(orderPayload.error || 'Failed to load orders');
         }
         if (!reservationRes.ok || !reservationPayload.data) {
@@ -2750,8 +2796,8 @@ export function UmkmHubClient({
 
         setProducts(productPayload.data.items || []);
         setTables(tablePayload.data.items || []);
-        setQrs(qrPayload.data.items || []);
-        setOrders(orderPayload.data.items || []);
+        setQrs(qrPayload.data?.items || []);
+        setOrders(orderPayload.data?.items || []);
         setReservations(reservationPayload.data.items || []);
         setTeamMembers(teamPayload.data.items || []);
       } catch (error) {
@@ -2867,12 +2913,12 @@ export function UmkmHubClient({
       live_now: Object.prototype.hasOwnProperty.call(meta, 'live_now')
         ? readMetaBool(meta, 'live_now', current.live_now)
         : readMetaBool(
-          meta,
-          'outlet_active',
-          current.live_now ||
-          selectedStore.online_order_enabled ||
-          selectedStore.offline_order_enabled,
-        ),
+            meta,
+            'outlet_active',
+            current.live_now ||
+              selectedStore.online_order_enabled ||
+              selectedStore.offline_order_enabled,
+          ),
       auto_live_schedule_enabled: readMetaBool(
         meta,
         'auto_live_schedule_enabled',
@@ -3105,10 +3151,10 @@ export function UmkmHubClient({
     setProductForm(current => {
       const nextKind =
         defaultKind === 'digital' &&
-          !products.length &&
-          !current.name &&
-          !current.description &&
-          !current.image_url
+        !products.length &&
+        !current.name &&
+        !current.description &&
+        !current.image_url
           ? 'digital'
           : current.product_kind;
 
@@ -3123,12 +3169,12 @@ export function UmkmHubClient({
         allow_pickup:
           nextKind === 'physical'
             ? current.allow_pickup ||
-            selectedBusinessCapabilities.includes('pickup')
+              selectedBusinessCapabilities.includes('pickup')
             : false,
         allow_courier_shipping:
           nextKind === 'physical'
             ? current.allow_courier_shipping ||
-            supportsShipping(selectedBusinessCapabilities)
+              supportsShipping(selectedBusinessCapabilities)
             : false,
         publish_food: publishSet.has('food'),
         publish_mart: publishSet.has('mart'),
@@ -3137,7 +3183,7 @@ export function UmkmHubClient({
           current.channel_offline || defaultChannels.has('offline'),
         weight_grams:
           nextKind === 'physical' &&
-            supportsShipping(selectedBusinessCapabilities)
+          supportsShipping(selectedBusinessCapabilities)
             ? current.weight_grams || '500'
             : nextKind === 'digital'
               ? '0'
@@ -4338,9 +4384,9 @@ export function UmkmHubClient({
               publish_services: publishServices,
               ...(trimmedBusinessFocus
                 ? {
-                  umkm_focus: trimmedBusinessFocus,
-                  business_focus: trimmedBusinessFocus,
-                }
+                    umkm_focus: trimmedBusinessFocus,
+                    business_focus: trimmedBusinessFocus,
+                  }
                 : {}),
               prep_minutes: prepMinutes || undefined,
               sku: trimmedSku || undefined,
@@ -4362,9 +4408,9 @@ export function UmkmHubClient({
           selectedBusinessCapabilities,
           verificationForm.publish_food || verificationForm.publish_mart
             ? [
-              ...(verificationForm.publish_food ? (['food'] as const) : []),
-              ...(verificationForm.publish_mart ? (['mart'] as const) : []),
-            ]
+                ...(verificationForm.publish_food ? (['food'] as const) : []),
+                ...(verificationForm.publish_mart ? (['mart'] as const) : []),
+              ]
             : storePublishServices,
         ),
       );
@@ -4695,9 +4741,9 @@ export function UmkmHubClient({
     orderId: string,
     body:
       | {
-        action: 'update_status';
-        status: 'pending' | 'preparing' | 'served' | 'paid' | 'cancelled';
-      }
+          action: 'update_status';
+          status: 'pending' | 'preparing' | 'served' | 'paid' | 'cancelled';
+        }
       | { action: 'checkout' }
       | { action: 'confirm_bill' }
       | { action: 'move_table'; to_table_id: string },
@@ -4855,6 +4901,7 @@ export function UmkmHubClient({
     }
 
     if (
+      !PROMO_ONLY_MODE &&
       supportsDineInFlow &&
       tables.length === 0 &&
       selectedStore.offline_order_enabled !== false
@@ -4879,11 +4926,11 @@ export function UmkmHubClient({
     }
 
     return {
-      target: 'umkm-orders',
-      label: isId ? 'Buka pesanan' : 'Open orders',
+      target: 'umkm-products',
+      label: isId ? 'Siapkan promosi' : 'Prepare promotion',
       desc: isId
-        ? 'Masuk ke kerjaan yang lagi jalan.'
-        : 'Jump into the live work queue.',
+        ? 'Rapikan katalog dan foto agar siap dibagikan.'
+        : 'Tidy the catalog and photos so it is ready to share.',
     };
   }, [
     hasEnabledPublishChannel,
@@ -4965,7 +5012,7 @@ export function UmkmHubClient({
       });
     }
 
-    if (supportsDineInFlow && !onlineQr) {
+    if (!PROMO_ONLY_MODE && supportsDineInFlow && !onlineQr) {
       items.push({
         id: 'qr',
         icon: Table2,
@@ -4995,7 +5042,7 @@ export function UmkmHubClient({
       });
     }
 
-    if (orderSummary.awaitingBill > 0) {
+    if (!PROMO_ONLY_MODE && orderSummary.awaitingBill > 0) {
       items.push({
         id: 'awaiting-bill',
         icon: WalletCards,
@@ -5049,55 +5096,54 @@ export function UmkmHubClient({
     () =>
       selectedStore
         ? [
-          {
-            label: isId ? 'Produk' : 'Products',
-            value: products.length,
-            desc: isId ? 'Sudah masuk' : 'Added already',
-          },
-          {
-            label: isId ? 'Pesanan aktif' : 'Active orders',
-            value: openOrders.length,
-            desc: isId ? 'Cek sekarang' : 'Check now',
-          },
-          {
-            label: isId ? 'Perlu dicek' : 'Needs attention',
-            value: ownerAlerts.length,
-            desc:
-              ownerAlerts.length > 0
-                ? isId
-                  ? 'Beresin dulu'
-                  : 'Fix first'
-                : isId
-                  ? 'Aman'
-                  : 'Healthy',
-          },
-        ]
+            {
+              label: isId ? 'Produk' : 'Products',
+              value: products.length,
+              desc: isId ? 'Sudah masuk' : 'Added already',
+            },
+            {
+              label: isId ? 'Siap promosi' : 'Promo ready',
+              value: products.filter(product => product.image_url).length,
+              desc: isId ? 'Punya foto' : 'With photos',
+            },
+            {
+              label: isId ? 'Perlu dicek' : 'Needs attention',
+              value: ownerAlerts.length,
+              desc:
+                ownerAlerts.length > 0
+                  ? isId
+                    ? 'Beresin dulu'
+                    : 'Fix first'
+                  : isId
+                    ? 'Aman'
+                    : 'Healthy',
+            },
+          ]
         : [
-          {
-            label: isId ? 'Usaha' : 'Businesses',
-            value: myStores.length,
-            desc: isId
-              ? `${activeStoreCount} aktif`
-              : `${activeStoreCount} active`,
-          },
-          {
-            label: isId ? 'Aktif' : 'Active',
-            value: activeStoreCount,
-            desc: isId ? 'Sudah siap dibuka' : 'Ready to be opened',
-          },
-          {
-            label: isId ? 'Mulai' : 'Start',
-            value: isId ? 'Bikin usaha' : 'Add one',
-            desc: isId ? 'Simpan satu dulu' : 'Save one first',
-          },
-        ],
+            {
+              label: isId ? 'Usaha' : 'Businesses',
+              value: myStores.length,
+              desc: isId
+                ? `${activeStoreCount} aktif`
+                : `${activeStoreCount} active`,
+            },
+            {
+              label: isId ? 'Aktif' : 'Active',
+              value: activeStoreCount,
+              desc: isId ? 'Sudah siap dibuka' : 'Ready to be opened',
+            },
+            {
+              label: isId ? 'Mulai' : 'Start',
+              value: isId ? 'Bikin usaha' : 'Add one',
+              desc: isId ? 'Simpan satu dulu' : 'Save one first',
+            },
+          ],
     [
       activeStoreCount,
       isId,
       myStores.length,
-      openOrders.length,
       ownerAlerts.length,
-      products.length,
+      products,
       selectedStore,
     ],
   );
@@ -5127,15 +5173,15 @@ export function UmkmHubClient({
           stepLabel: `${stepPrefix} 1`,
           title: hasStores
             ? isId
-              ? 'Pilih usaha aktif'
-              : 'Choose the active business'
+              ? 'Pilih usaha yang mau dikerjakan'
+              : 'Choose the business to work on'
             : isId
               ? 'Buat usaha pertama'
               : 'Create the first business',
           desc: hasStores
             ? isId
-              ? 'Pilih usaha aktif dulu.'
-              : 'One account can manage multiple businesses. Pick the active business first so the next pages stay focused.'
+              ? 'Satu akun bisa punya banyak usaha. Pilih satu sebagai fokus kerja sekarang.'
+              : 'One account can manage multiple businesses. Pick one as the current work focus.'
             : isId
               ? 'Mulai dari usaha pertama dulu. Setelah tersimpan, Anda bisa tambah usaha lain kapan saja.'
               : 'Start with the first business. After saving it, you can add more businesses anytime.',
@@ -5151,8 +5197,8 @@ export function UmkmHubClient({
             href: firstActionHref,
             label: hasStores
               ? isId
-                ? 'Pilih usaha aktif'
-                : 'Choose active business'
+                ? 'Pilih usaha'
+                : 'Choose business'
               : isId
                 ? 'Buat usaha'
                 : 'Add business',
@@ -5185,10 +5231,10 @@ export function UmkmHubClient({
         {
           id: 'selling',
           stepLabel: `${stepPrefix} 3`,
-          title: isId ? 'Masukkin jualan pertama' : 'Add the first listing',
+          title: isId ? 'Siapkan bahan promosi' : 'Prepare promo material',
           desc: isId
-            ? 'Begitu fondasi beres, baru lanjut ke katalog dan pesanan.'
-            : 'Once the foundation is ready, move into catalog and orders.',
+            ? 'Begitu fondasi beres, lanjut ke katalog dan chat calon pelanggan.'
+            : 'Once the foundation is ready, move into catalog and customer chat.',
           badge: isId ? 'Buka setelah setup' : 'Opens after setup',
           tone: 'default',
           done: false,
@@ -5212,11 +5258,6 @@ export function UmkmHubClient({
       hasEnabledPublishChannel &&
       verificationGapCount === 0;
     const sellingReady = products.length > 0;
-    const ordersReady =
-      openOrders.length > 0 ||
-      selectedStore.online_order_enabled ||
-      selectedStore.offline_order_enabled ||
-      Boolean(onlineQr);
 
     return [
       {
@@ -5276,40 +5317,34 @@ export function UmkmHubClient({
         },
       },
       {
-        id: 'orders',
+        id: 'promotion',
         stepLabel: `${stepPrefix} 3`,
-        title: isId ? 'Jalanin pesanan' : 'Run the orders flow',
+        title: isId ? 'Siapkan promosi' : 'Prepare promotion',
         desc: isId
-          ? 'Setelah setup dan katalog aman, fokus ke order yang sedang jalan.'
-          : 'Once setup and catalog are in shape, focus on the live order flow.',
+          ? 'Bagikan storefront, lengkapi foto, dan arahkan calon pelanggan untuk chat dulu.'
+          : 'Share the storefront, polish photos, and guide customers to chat first.',
         badge:
-          openOrders.length > 0
-            ? `${openOrders.length} ${isId ? 'pesanan aktif' : 'active orders'}`
-            : ordersReady
-              ? isId
-                ? 'Siap dipakai'
-                : 'Ready to use'
-              : isId
-                ? 'Nyalakan alur jual'
-                : 'Turn on the selling flow',
-        tone:
-          openOrders.length > 0
-            ? 'accent'
-            : ordersReady
-              ? 'success'
-              : 'default',
-        done: ordersReady,
+          products.length > 0
+            ? isId
+              ? 'Siap dibagikan'
+              : 'Ready to share'
+            : isId
+              ? 'Lengkapi katalog'
+              : 'Complete catalog',
+        tone: sellingReady ? 'success' : 'default',
+        done: sellingReady,
         action: {
           kind: 'href',
-          href: buildWorkspaceHref('orders', selectedStore.id),
-          label:
-            openOrders.length > 0
-              ? isId
-                ? 'Cek pesanan'
-                : 'Check orders'
-              : isId
-                ? 'Buka pesanan'
-                : 'Open orders',
+          href: sellingReady
+            ? buildUmkmStorefrontPath(selectedStore.slug)
+            : buildWorkspaceHref('catalog', selectedStore.id),
+          label: sellingReady
+            ? isId
+              ? 'Lihat storefront'
+              : 'View storefront'
+            : isId
+              ? 'Rapikan katalog'
+              : 'Tidy catalog',
         },
       },
     ];
@@ -5320,8 +5355,6 @@ export function UmkmHubClient({
     hasEnabledPublishChannel,
     isId,
     myStores.length,
-    onlineQr,
-    openOrders.length,
     products.length,
     selectedStore,
     verificationGapCount,
@@ -5475,8 +5508,18 @@ export function UmkmHubClient({
 
     return {
       kind: 'href',
-      href: buildWorkspaceHref('orders', selectedStore.id),
-      label: isId ? 'Buka pesanan' : 'Open orders',
+      href:
+        products.length > 0
+          ? buildUmkmStorefrontPath(selectedStore.slug)
+          : buildWorkspaceHref('catalog', selectedStore.id),
+      label:
+        products.length > 0
+          ? isId
+            ? 'Lihat storefront'
+            : 'View storefront'
+          : isId
+            ? 'Rapikan katalog'
+            : 'Tidy catalog',
     };
   }, [
     buildWorkspaceHref,
@@ -5500,12 +5543,32 @@ export function UmkmHubClient({
         target: 'umkm-verification',
       },
       {
-        id: 'cashier',
-        icon: WalletCards,
-        title: isId ? 'Kasir' : 'Cashier',
-        desc: isId ? 'Pesanan, bill, bayar.' : 'Orders, bills, payments.',
-        badge: `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
-        target: 'umkm-orders',
+        id: PROMO_ONLY_MODE ? 'chat' : 'cashier',
+        icon: PROMO_ONLY_MODE ? MessageCircle : WalletCards,
+        title: PROMO_ONLY_MODE
+          ? isId
+            ? 'Chat & promosi'
+            : 'Chat & promo'
+          : isId
+            ? 'Kasir'
+            : 'Cashier',
+        desc: PROMO_ONLY_MODE
+          ? isId
+            ? 'Tanya jawab calon pelanggan.'
+            : 'Customer questions and interest.'
+          : isId
+            ? 'Pesanan, bill, bayar.'
+            : 'Orders, bills, payments.',
+        badge: PROMO_ONLY_MODE
+          ? products.length > 0
+            ? isId
+              ? 'Siap dibagikan'
+              : 'Ready to share'
+            : isId
+              ? 'Lengkapi katalog'
+              : 'Tidy catalog'
+          : `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
+        target: PROMO_ONLY_MODE ? 'umkm-products' : 'umkm-orders',
       },
       {
         id: 'stock',
@@ -5537,6 +5600,7 @@ export function UmkmHubClient({
       operationsWorkspaceCopy.modeTitle,
       orderSummary.unpaid,
       outOfStockCount,
+      products.length,
     ],
   );
 
@@ -5546,32 +5610,70 @@ export function UmkmHubClient({
         title: isId ? 'Pemilik / admin utama' : 'Owner / primary admin',
         scope: isId ? 'Semua usaha' : 'All businesses',
         desc: isId
-          ? 'Pegang outlet, publish, payout, tim, dan operasional lintas toko.'
-          : 'Own outlets, publishing, payouts, team setup, and cross-store operations.',
+          ? PROMO_ONLY_MODE
+            ? 'Pegang profil usaha, katalog, promosi, chat, dan tim lintas toko.'
+            : 'Pegang outlet, publish, payout, tim, dan operasional lintas toko.'
+          : PROMO_ONLY_MODE
+            ? 'Own business profiles, catalog, promo, chat, and cross-store teams.'
+            : 'Own outlets, publishing, payouts, team setup, and cross-store operations.',
         permissions: [
           isId ? 'semua outlet' : 'all outlets',
           isId ? 'publish' : 'publish',
-          isId ? 'pembayaran' : 'payments',
+          PROMO_ONLY_MODE
+            ? isId
+              ? 'promosi'
+              : 'promo'
+            : isId
+              ? 'pembayaran'
+              : 'payments',
         ],
         icon: ShieldCheck,
         tone: 'accent' as const,
       },
       {
-        title: isId ? 'Kasir' : 'Cashier',
+        title: PROMO_ONLY_MODE
+          ? isId
+            ? 'Admin chat'
+            : 'Chat admin'
+          : isId
+            ? 'Kasir'
+            : 'Cashier',
         scope: selectedStore
           ? selectedStore.name
           : isId
             ? 'Per outlet'
             : 'Per outlet',
         desc: isId
-          ? 'Lihat pesanan aktif, pindah meja, konfirmasi bill, dan checkout.'
-          : 'Handle active orders, move tables, confirm bills, and checkout.',
+          ? PROMO_ONLY_MODE
+            ? 'Bantu jawab calon pelanggan, arahkan ke katalog, dan catat minat yang masuk.'
+            : 'Lihat pesanan aktif, pindah meja, konfirmasi bill, dan checkout.'
+          : PROMO_ONLY_MODE
+            ? 'Answer prospects, point them to catalog items, and note incoming interest.'
+            : 'Handle active orders, move tables, confirm bills, and checkout.',
         permissions: [
-          isId ? 'order aktif' : 'live orders',
-          isId ? 'bill' : 'billing',
-          isId ? 'checkout' : 'checkout',
+          PROMO_ONLY_MODE
+            ? isId
+              ? 'chat'
+              : 'chat'
+            : isId
+              ? 'order aktif'
+              : 'live orders',
+          PROMO_ONLY_MODE
+            ? isId
+              ? 'katalog'
+              : 'catalog'
+            : isId
+              ? 'bill'
+              : 'billing',
+          PROMO_ONLY_MODE
+            ? isId
+              ? 'catatan minat'
+              : 'interest notes'
+            : isId
+              ? 'checkout'
+              : 'checkout',
         ],
-        icon: WalletCards,
+        icon: PROMO_ONLY_MODE ? MessageCircle : WalletCards,
       },
       {
         title: isId ? 'Stok / katalog' : 'Stock / catalog',
@@ -5597,8 +5699,12 @@ export function UmkmHubClient({
         permissions: [
           supportsDineInFlow
             ? isId
-              ? 'meja & QR'
-              : 'tables & QR'
+              ? PROMO_ONLY_MODE
+                ? 'area layanan'
+                : 'meja & QR'
+              : PROMO_ONLY_MODE
+                ? 'service area'
+                : 'tables & QR'
             : supportsFieldVisitFlow
               ? isId
                 ? 'area layanan'
@@ -5653,8 +5759,8 @@ export function UmkmHubClient({
         icon: MapPinned,
         title: isId ? 'Portfolio usaha' : 'Business portfolio',
         desc: isId
-          ? 'Pilih usaha aktif atau tambah usaha lain.'
-          : 'Choose the active business or add another one.',
+          ? 'Pilih usaha yang dikerjakan atau tambah usaha lain.'
+          : 'Choose the business to work on or add another one.',
         badge: `${activeStoreCount} ${isId ? 'aktif' : 'active'}`,
         tone: selectedStore ? ('success' as const) : ('default' as const),
         disabled: myStores.length === 0,
@@ -5717,13 +5823,38 @@ export function UmkmHubClient({
         disabled: !selectedStore,
       },
       {
-        id: 'orders',
-        icon: WalletCards,
-        title: isId ? 'Pesanan' : 'Orders',
-        desc: isId ? 'Yang lagi jalan.' : 'Active queue.',
-        badge: `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
-        tone:
-          orderSummary.unpaid > 0 ? ('accent' as const) : ('default' as const),
+        id: PROMO_ONLY_MODE ? 'promo' : 'orders',
+        icon: PROMO_ONLY_MODE ? MessageCircle : WalletCards,
+        title: PROMO_ONLY_MODE
+          ? isId
+            ? 'Chat calon pelanggan'
+            : 'Customer chat'
+          : isId
+            ? 'Pesanan'
+            : 'Orders',
+        desc: PROMO_ONLY_MODE
+          ? isId
+            ? 'Jawab pertanyaan dari katalog.'
+            : 'Answer questions from the catalog.'
+          : isId
+            ? 'Yang lagi jalan.'
+            : 'Active queue.',
+        badge: PROMO_ONLY_MODE
+          ? products.length > 0
+            ? isId
+              ? 'Siap chat'
+              : 'Ready'
+            : isId
+              ? 'Butuh katalog'
+              : 'Needs catalog'
+          : `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
+        tone: PROMO_ONLY_MODE
+          ? products.length > 0
+            ? ('success' as const)
+            : ('warning' as const)
+          : orderSummary.unpaid > 0
+            ? ('accent' as const)
+            : ('default' as const),
         disabled: !selectedStore,
       },
       {
@@ -5759,17 +5890,17 @@ export function UmkmHubClient({
     () =>
       selectedStore
         ? workspaceJumpTiles.filter(item =>
-          [
-            'register',
-            'portfolio',
-            'verification',
-            'products',
-            'orders',
-          ].includes(item.id),
-        )
+            [
+              'register',
+              'portfolio',
+              'verification',
+              'products',
+              PROMO_ONLY_MODE ? 'promo' : 'orders',
+            ].includes(item.id),
+          )
         : workspaceJumpTiles.filter(item =>
-          ['register', 'portfolio'].includes(item.id),
-        ),
+            ['register', 'portfolio'].includes(item.id),
+          ),
     [selectedStore, workspaceJumpTiles],
   );
 
@@ -5801,6 +5932,10 @@ export function UmkmHubClient({
       }
       if (tileId === 'orders') {
         router.push(buildWorkspaceHref('orders', selectedStoreId));
+        return;
+      }
+      if (tileId === 'promo') {
+        router.push('/chat');
         return;
       }
       if (tileId === 'team') {
@@ -5844,16 +5979,16 @@ export function UmkmHubClient({
       return {
         title: isId ? 'Operasional' : 'Operations',
         desc: isId
-          ? 'QR, meja, booking, dan alur harian.'
-          : 'QR, tables, bookings, and daily flow.',
+          ? 'Jam layanan, area, booking, dan alur harian.'
+          : 'Service hours, area, bookings, and daily flow.',
       };
     }
     if (currentWorkspace === 'orders') {
       return {
-        title: isId ? 'Pesanan' : 'Orders',
+        title: isId ? 'Transaksi ditunda' : 'Transactions paused',
         desc: isId
-          ? 'Pesanan masuk sampai pembayaran.'
-          : 'Incoming orders and payments.',
+          ? 'Fokus launching awal ke profil, katalog, promosi, dan chat.'
+          : 'Early launch focuses on profile, catalog, promotion, and chat.',
       };
     }
     return {
@@ -5866,16 +6001,14 @@ export function UmkmHubClient({
   const simpleWorkspaceHero = useMemo<SimpleWorkspaceHero>(() => {
     if (!selectedStore) {
       return {
-        eyebrow: isId
-          ? 'Pilih usaha aktif dulu'
-          : 'Choose the active business first',
+        eyebrow: isId ? 'Pilih usaha dulu' : 'Choose a business first',
         title: isId
           ? 'Buka usaha yang mau dipakai sekarang'
           : 'Open the business you want to use now',
         desc: isId
-          ? 'Satu akun bisa pegang banyak usaha. Pilih yang aktif dulu, lalu pindah atau tambah usaha lain kapan saja.'
-          : 'One account can manage multiple businesses. Pick the active one first, then switch or add another business anytime.',
-        primaryLabel: isId ? 'Pilih usaha aktif' : 'Choose active business',
+          ? 'Satu akun bisa pegang banyak usaha. Pilih fokus kerja sekarang, lalu pindah atau tambah usaha lain kapan saja.'
+          : 'One account can manage multiple businesses. Pick the current focus, then switch or add another business anytime.',
+        primaryLabel: isId ? 'Pilih usaha' : 'Choose business',
         primaryHref: buildSetupHref('list'),
         secondaryLabel: isId ? 'Tambah usaha' : 'Add business',
         secondaryHref: buildSetupHref('create'),
@@ -5901,8 +6034,8 @@ export function UmkmHubClient({
         eyebrow: selectedStore.name,
         title: isId ? 'Jalankan operasional' : 'Run operations',
         desc: isId
-          ? 'Atur QR, meja, booking, dan alur harian outlet ini.'
-          : 'Manage QR, tables, bookings, and the daily flow for this outlet.',
+          ? 'Atur jam, area layanan, booking ringan, dan catatan operasional outlet ini.'
+          : 'Manage hours, service area, light bookings, and operating notes for this outlet.',
         primaryLabel: isId ? 'Buka operasional' : 'Open operations',
         primaryTarget: 'umkm-tables',
         secondaryLabel: isId ? 'Ganti outlet' : 'Switch outlet',
@@ -5913,12 +6046,12 @@ export function UmkmHubClient({
     if (currentWorkspace === 'orders') {
       return {
         eyebrow: selectedStore.name,
-        title: isId ? 'Pantau pesanan' : 'Review orders',
+        title: isId ? 'Transaksi ditunda dulu' : 'Transactions are paused',
         desc: isId
-          ? 'Lihat pesanan aktif, tagihan, dan pembayaran di satu tempat.'
-          : 'Track live orders, bills, and payments in one place.',
-        primaryLabel: isId ? 'Lihat pesanan' : 'Open orders',
-        primaryTarget: 'umkm-orders',
+          ? 'Untuk launching awal, arahkan pengunjung ke katalog dan chat dulu.'
+          : 'For early launch, guide visitors to the catalog and chat first.',
+        primaryLabel: isId ? 'Buka katalog' : 'Open catalog',
+        primaryTarget: 'umkm-products',
         secondaryLabel: isId ? 'Ganti outlet' : 'Switch outlet',
         secondaryHref: buildSetupHref('list'),
       };
@@ -5963,9 +6096,9 @@ export function UmkmHubClient({
                   : 'Still healthy',
         },
         {
-          label: isId ? 'Pesanan aktif' : 'Live orders',
-          value: openOrders.length,
-          desc: isId ? 'Masih berjalan' : 'Still in progress',
+          label: isId ? 'Foto produk' : 'Product photos',
+          value: products.filter(product => product.image_url).length,
+          desc: isId ? 'Siap dipromosikan' : 'Ready to promote',
         },
       ];
     }
@@ -5996,15 +6129,15 @@ export function UmkmHubClient({
                 : 'No active sessions',
         },
         {
-          label: isId ? 'QR siap' : 'Ready QR',
-          value: qrs.length,
-          desc: onlineQr
+          label: isId ? 'Kontak' : 'Contact',
+          value: selectedStore.phone ? (isId ? 'Ada' : 'Set') : '-',
+          desc: selectedStore.phone
             ? isId
-              ? 'Online aktif'
-              : 'Online live'
+              ? 'Bisa dihubungi'
+              : 'Reachable'
             : isId
-              ? 'Belum dibuat'
-              : 'Not set yet',
+              ? 'Lengkapi WA'
+              : 'Add WhatsApp',
         },
         {
           label: isId ? 'Aktif hari ini' : 'Active today',
@@ -6029,7 +6162,7 @@ export function UmkmHubClient({
         {
           label: isId ? 'Selesai' : 'Completed',
           value: orderSummary.completed,
-          desc: isId ? 'Sudah dibayar' : 'Already paid',
+          desc: isId ? 'Riwayat nanti' : 'History later',
         },
       ];
     }
@@ -6060,14 +6193,11 @@ export function UmkmHubClient({
     currentWorkspace,
     isId,
     lowStockCount,
-    onlineQr,
-    openOrders.length,
     orderSummary.awaitingBill,
     orderSummary.completed,
     orderSummary.unpaid,
     outOfStockCount,
-    products.length,
-    qrs.length,
+    products,
     reservationSummary.active,
     reservationSummary.todayCount,
     selectedStore,
@@ -6124,8 +6254,8 @@ export function UmkmHubClient({
         return {
           tone: 'warning' as const,
           text: isId
-            ? 'QR dan area layanan belum siap. Mulai dari setelan operasional dulu.'
-            : 'QR and service spots are not ready yet. Start with the operations setup.',
+            ? 'Area layanan dan kontak belum lengkap. Mulai dari setelan operasional dulu.'
+            : 'Service area and contact details are not complete yet. Start with the operations setup.',
         };
       }
       return {
@@ -6191,12 +6321,18 @@ export function UmkmHubClient({
       {
         key: 'primary',
         href: selectedStore
-          ? buildWorkspaceHref('orders', selectedStore.id)
+          ? PROMO_ONLY_MODE
+            ? buildWorkspaceHref('catalog', selectedStore.id)
+            : buildWorkspaceHref('orders', selectedStore.id)
           : buildSetupHref('create'),
         label: selectedStore
-          ? isId
-            ? 'Pesanan'
-            : 'Orders'
+          ? PROMO_ONLY_MODE
+            ? isId
+              ? 'Katalog'
+              : 'Catalog'
+            : isId
+              ? 'Pesanan'
+              : 'Orders'
           : isId
             ? 'Buat'
             : 'Add',
@@ -6231,8 +6367,8 @@ export function UmkmHubClient({
       {
         id: 'setup',
         icon: FileText,
-        title: isId ? 'Usaha' : 'Business',
-        desc: isId ? 'Data utama.' : 'Core info.',
+        title: isId ? 'Profil' : 'Profile',
+        desc: isId ? 'Info inti.' : 'Core info.',
         badge:
           currentWorkspace === 'setup'
             ? isSetupCreateView
@@ -6251,12 +6387,8 @@ export function UmkmHubClient({
               : 'Info',
         selected: currentWorkspace === 'setup',
         href: buildSetupHref(
-          isSetupDetailView && selectedStoreId
-            ? 'detail'
-            : isSetupCreateView
-              ? 'create'
-              : 'list',
-          isSetupDetailView ? selectedStoreId : undefined,
+          selectedStoreId ? 'detail' : isSetupCreateView ? 'create' : 'list',
+          selectedStoreId || undefined,
         ),
       },
       {
@@ -6272,20 +6404,24 @@ export function UmkmHubClient({
         id: 'operations',
         icon: Table2,
         title: isId ? 'Operasional' : 'Operations',
-        desc: isId ? 'QR, booking, alur.' : 'QR, bookings, flow.',
+        desc: isId ? 'Jam, area, booking.' : 'Hours, area, bookings.',
         badge: operationsWorkspaceCopy.badge,
         selected: currentWorkspace === 'operations',
         href: buildWorkspaceHref('operations'),
       },
-      {
-        id: 'orders',
-        icon: WalletCards,
-        title: isId ? 'Pesanan' : 'Orders',
-        desc: isId ? 'Yang lagi jalan.' : 'Live queue.',
-        badge: `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
-        selected: currentWorkspace === 'orders',
-        href: buildWorkspaceHref('orders'),
-      },
+      ...(PROMO_ONLY_MODE
+        ? []
+        : [
+            {
+              id: 'orders',
+              icon: WalletCards,
+              title: isId ? 'Pesanan' : 'Orders',
+              desc: isId ? 'Yang lagi jalan.' : 'Live queue.',
+              badge: `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
+              selected: currentWorkspace === 'orders',
+              href: buildWorkspaceHref('orders'),
+            },
+          ]),
       {
         id: 'team',
         icon: Users,
@@ -6314,7 +6450,10 @@ export function UmkmHubClient({
   const workspaceShortcutTiles = useMemo(
     () =>
       workspaceNavTiles.filter(tile =>
-        ['setup', 'catalog', 'operations', 'orders'].includes(tile.id),
+        (PROMO_ONLY_MODE
+          ? ['setup', 'catalog', 'operations', 'team']
+          : ['setup', 'catalog', 'operations', 'orders']
+        ).includes(tile.id),
       ),
     [workspaceNavTiles],
   );
@@ -6322,46 +6461,93 @@ export function UmkmHubClient({
     currentWorkspace === 'setup'
       ? isSetupCreateView
         ? {
-          href: buildSetupHref('list'),
-          label: isId ? 'Daftar outlet' : 'See outlets',
-        }
+            href: buildSetupHref('list'),
+            label: isId ? 'Daftar outlet' : 'See outlets',
+          }
         : isSetupDetailView
           ? {
-            href: buildSetupHref('list'),
-            label: isId ? 'Pilih outlet' : 'Choose outlet',
-          }
+              href: buildSetupHref('list'),
+              label: isId ? 'Pilih outlet' : 'Choose outlet',
+            }
           : {
-            href: buildSetupHref('create'),
-            label: isId ? 'Tambah usaha' : 'Add business',
-          }
+              href: buildSetupHref('create'),
+              label: isId ? 'Tambah usaha' : 'Add business',
+            }
       : null;
   const setupHeaderCopy =
     currentWorkspace === 'setup'
       ? isSetupCreateView
         ? {
-          eyebrow: isId ? 'Buka usaha' : 'Add business',
-          title: isId
-            ? 'Buat profil usaha yang rapi'
-            : 'Create a clean business profile',
-          desc: isId
-            ? 'Ikuti alur singkat: info dasar, lokasi, kontak, operasional, lalu review.'
-            : 'Follow the short flow: basic info, location, contact, operations, then review.',
-        }
+            eyebrow: isId ? 'Buka usaha' : 'Add business',
+            title: isId
+              ? 'Buat profil usaha yang rapi'
+              : 'Create a clean business profile',
+            desc: isId
+              ? 'Ikuti alur singkat: info dasar, lokasi, kontak, operasional, lalu review.'
+              : 'Follow the short flow: basic info, location, contact, operations, then review.',
+          }
         : isSetupDetailView
           ? {
-            eyebrow: isId ? 'Edit usaha' : 'Edit business',
-            title:
-              selectedStore?.name || (isId ? 'Edit usaha' : 'Edit business'),
-            desc: isId ? 'Ubah yang perlu aja.' : 'Change only what matters.',
-          }
+              eyebrow: isId ? 'Edit usaha' : 'Edit business',
+              title:
+                selectedStore?.name || (isId ? 'Edit usaha' : 'Edit business'),
+              desc: isId ? 'Ubah yang perlu aja.' : 'Change only what matters.',
+            }
           : {
-            eyebrow: isId ? 'Daftar outlet' : 'Outlet list',
-            title: isId ? 'Pilih outlet' : 'Pick one outlet',
-            desc: isId
-              ? 'Tap outlet yang mau dipakai sekarang.'
-              : 'Tap the outlet you want to use right now.',
-          }
+              eyebrow: isId ? 'Daftar outlet' : 'Outlet list',
+              title: isId ? 'Pilih outlet' : 'Pick one outlet',
+              desc: isId
+                ? 'Tap outlet yang mau dipakai sekarang.'
+                : 'Tap the outlet you want to use right now.',
+            }
       : null;
+  const promoOnlyWorkspaceCopy = useMemo(() => {
+    const isQrRoute = isDirectQrWorkspaceRoute;
+
+    return {
+      title: isQrRoute
+        ? isId
+          ? 'QR transaksi belum dibuka dulu'
+          : 'Transaction QR is not open yet'
+        : isId
+          ? 'Transaksi belum dibuka dulu'
+          : 'Transactions are not open yet',
+      description: isQrRoute
+        ? isId
+          ? 'Untuk fase launching awal, QR bayar dan order langsung sengaja disembunyikan. Fokus dulu ke profil usaha, katalog, promosi, dan chat dengan calon pelanggan.'
+          : 'For the early launch phase, payment QR and direct ordering are intentionally hidden. Focus on profile, catalog, promotion, and customer chat first.'
+        : isId
+          ? 'Untuk fase launching awal, pesanan, saldo, pembayaran, dan kasir sengaja disembunyikan. User tetap bisa melihat usaha, membaca katalog, dan chat untuk tanya-tanya.'
+          : 'For the early launch phase, orders, balance, payments, and cashier tools are intentionally hidden. Users can still view the business, browse the catalog, and chat.',
+      primaryAction: selectedStore
+        ? {
+            href: buildWorkspaceHref('catalog', selectedStore.id),
+            label: isId ? 'Buka katalog' : 'Open catalog',
+          }
+        : {
+            href: buildSetupHref(myStores.length > 0 ? 'list' : 'create'),
+            label:
+              myStores.length > 0
+                ? isId
+                  ? 'Pilih usaha'
+                  : 'Choose business'
+                : isId
+                  ? 'Buat profil usaha'
+                  : 'Create business profile',
+          },
+      secondaryAction: {
+        href: '/chat',
+        label: isId ? 'Buka chat' : 'Open chat',
+      },
+    };
+  }, [
+    buildSetupHref,
+    buildWorkspaceHref,
+    isDirectQrWorkspaceRoute,
+    isId,
+    myStores.length,
+    selectedStore,
+  ]);
   const ActiveSetupDetailStepIcon = activeSetupDetailStepMeta?.icon || FileText;
   const renderGuidedFlowAction = (
     action: GuidedFlowAction,
@@ -6388,9 +6574,90 @@ export function UmkmHubClient({
     );
   };
 
+  if (isPromoOnlyCommercePaused) {
+    return (
+      <main
+        className={cn(
+          'page-shell overflow-x-hidden py-0 pb-8 sm:pb-0 sm:py-2.5 umkm-hub',
+          isSimpleHubMode && 'bg-[#fbfaf7] dark:bg-slate-950 sm:py-4',
+        )}
+      >
+        <div
+          className={cn(
+            'flex w-full flex-col gap-2 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-2.5',
+            isSimpleHubMode && 'sm:max-w-[1500px] sm:gap-4',
+          )}
+        >
+          <BusinessPromoOnlyWorkspace
+            description={promoOnlyWorkspaceCopy.description}
+            isId={isId}
+            primaryAction={promoOnlyWorkspaceCopy.primaryAction}
+            secondaryAction={promoOnlyWorkspaceCopy.secondaryAction}
+            storeName={selectedStore?.name}
+            title={promoOnlyWorkspaceCopy.title}
+          />
+        </div>
+      </main>
+    );
+  }
+
+  if (useSimpleOverviewLayout) {
+    const overviewStores: OverviewStore[] = myStores.map(store => ({
+      address: store.address,
+      city: store.city,
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+    }));
+    const overviewSelectedStore: OverviewStore | null = selectedStore
+      ? {
+          address: selectedStore.address,
+          city: selectedStore.city,
+          id: selectedStore.id,
+          name: selectedStore.name,
+          slug: selectedStore.slug,
+        }
+      : null;
+    const overviewModel = buildUsahaOverviewModel({
+      icons: {
+        addBusiness: Store,
+        assistant: ShieldCheck,
+        catalog: PackagePlus,
+        discovery: MapPinned,
+        operations: Table2,
+        profile: FileText,
+        store: Store,
+        switchBusiness: ArrowRightLeft,
+      },
+      isId,
+      nextOwnerStep,
+      routes: {
+        assistant: () => buildAssistantHref(),
+        discoveryPath: UMKM_DISCOVERY_PATH,
+        setup: buildSetupHref,
+        storefront: buildUmkmStorefrontPath,
+        workspace: buildWorkspaceHref,
+      },
+      selectedStore: overviewSelectedStore,
+      stores: overviewStores,
+    });
+
+    return <UsahaOverview isId={isId} model={overviewModel} />;
+  }
+
   return (
-    <main className="page-shell overflow-x-hidden py-0 pb-8 sm:pb-0 sm:py-2.5 umkm-hub">
-      <div className="flex w-full flex-col gap-2 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-2.5">
+    <main
+      className={cn(
+        'page-shell overflow-x-hidden py-0 pb-8 sm:pb-0 sm:py-2.5 umkm-hub',
+        isSimpleHubMode && 'bg-[#fbfaf7] dark:bg-slate-950 sm:py-4',
+      )}
+    >
+      <div
+        className={cn(
+          'flex w-full flex-col gap-2 sm:mx-auto sm:max-w-[var(--app-max-width)] sm:gap-2.5',
+          isSimpleHubMode && 'sm:max-w-[1500px] sm:gap-4',
+        )}
+      >
         {useSimpleOverviewLayout ? (
           <section className="rounded-none border-x-0 p-2 sm:p-2.5">
             <div className={manageDashboardShellClass}>
@@ -6416,17 +6683,17 @@ export function UmkmHubClient({
                         {selectedStore
                           ? isId
                             ? myStores.length > 1
-                              ? 'Lihat prioritas, katalog, pesanan, dan usaha lain tanpa pindah-pindah tampilan.'
-                              : 'Lihat prioritas, katalog, pesanan, dan langkah berikutnya dalam satu tampilan.'
+                              ? 'Lihat prioritas, katalog, promosi, dan usaha lain tanpa pindah-pindah tampilan.'
+                              : 'Lihat prioritas, katalog, promosi, dan langkah berikutnya dalam satu tampilan.'
                             : myStores.length > 1
                               ? `Focus on ${selectedStore.name} first. Clean up the foundation, add the listings, then switch quickly to the other businesses from the portfolio below.`
-                              : `Focus on ${selectedStore.name} first. Clean up the foundation, add the listings, then move into orders.`
+                              : `Focus on ${selectedStore.name} first. Clean up the foundation, add the listings, then prepare promotion and chat.`
                           : myStores.length > 0
                             ? isId
-                              ? 'Pilih usaha aktif dulu, lalu dashboard akan nunjukin aksi yang paling penting.'
-                              : 'Choose the active business first. You can still switch to other businesses anytime from the portfolio.'
+                              ? 'Pilih usaha yang mau dikerjakan, lalu dashboard akan nunjukin aksi yang paling penting.'
+                              : 'Choose the business to work on first. You can still switch to other businesses anytime from the portfolio.'
                             : isId
-                              ? 'Mulai dari usaha pertama, lalu lanjut ke info usaha, katalog, pesanan, dan tim.'
+                              ? 'Mulai dari usaha pertama, lalu lanjut ke info usaha, katalog, promosi, dan tim.'
                               : 'Start with the first business. After it is saved, you can add more businesses, and the setup, catalog, and operations flow becomes easier to understand.'}
                       </p>
                     </div>
@@ -6444,7 +6711,7 @@ export function UmkmHubClient({
                         ? `${simpleOverviewCompletedSteps}/${simpleOverviewFlowSteps.length} ${isId ? 'langkah rapi' : 'steps tidy'}`
                         : isId
                           ? 'Belum pilih usaha'
-                          : 'No active business'}
+                          : 'No business selected'}
                     </InlineBadge>
                   </div>
 
@@ -6476,8 +6743,8 @@ export function UmkmHubClient({
                             : 'Open business setup'
                           : myStores.length > 0
                             ? isId
-                              ? 'Pilih usaha aktif'
-                              : 'Choose active business'
+                              ? 'Pilih usaha'
+                              : 'Choose business'
                             : isId
                               ? 'Buat usaha'
                               : 'Add business'}
@@ -6544,8 +6811,8 @@ export function UmkmHubClient({
                             {selectedStore
                               ? selectedStore.name
                               : isId
-                                ? 'Pilih usaha aktif dulu'
-                                : 'Pick an active business first'}
+                                ? 'Pilih usaha dulu'
+                                : 'Pick a business first'}
                           </h2>
                           <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
                             {selectedStore
@@ -6557,7 +6824,9 @@ export function UmkmHubClient({
                                 : 'Once a business is selected, this panel will point to the most relevant next step.'}
                           </p>
                         </div>
-                        <InlineBadge tone={selectedStore ? 'accent' : 'default'}>
+                        <InlineBadge
+                          tone={selectedStore ? 'accent' : 'default'}
+                        >
                           {selectedStore
                             ? nextOwnerStep?.label ||
                               (isId ? 'Siap lanjut' : 'Ready to continue')
@@ -6694,7 +6963,7 @@ export function UmkmHubClient({
                             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                               {isId
                                 ? 'Usaha yang dipakai sekarang'
-                                : 'Currently active business'}
+                                : 'Selected business'}
                             </p>
                             <h3 className="mt-1 truncate text-[14px] font-black text-[color:var(--app-text)]">
                               {selectedStore.name}
@@ -6707,7 +6976,10 @@ export function UmkmHubClient({
                           </div>
                           <InlineBadge tone="accent">
                             {selectedStore.access_role
-                              ? teamRoleLabel(selectedStore.access_role, isId)
+                              ? formatLaunchTeamRole(
+                                  selectedStore.access_role,
+                                  isId,
+                                )
                               : isId
                                 ? 'Pemilik'
                                 : 'Owner'}
@@ -6726,13 +6998,13 @@ export function UmkmHubClient({
                           <InlineBadge
                             tone={
                               hasEnabledPublishChannel &&
-                                verificationGapCount === 0
+                              verificationGapCount === 0
                                 ? 'success'
                                 : 'warning'
                             }
                           >
                             {hasEnabledPublishChannel &&
-                              verificationGapCount === 0
+                            verificationGapCount === 0
                               ? isId
                                 ? 'Publish siap'
                                 : 'Publish ready'
@@ -6740,15 +7012,23 @@ export function UmkmHubClient({
                                 ? 'Setup belum rapi'
                                 : 'Setup still incomplete'}
                           </InlineBadge>
-                          <InlineBadge tone={onlineQr ? 'success' : 'default'}>
-                            {onlineQr
-                              ? isId
-                                ? 'QR siap'
-                                : 'QR ready'
-                              : isId
-                                ? 'QR nanti'
-                                : 'QR later'}
-                          </InlineBadge>
+                          {PROMO_ONLY_MODE ? (
+                            <InlineBadge tone="success">
+                              {isId ? 'Mode promosi' : 'Promo mode'}
+                            </InlineBadge>
+                          ) : (
+                            <InlineBadge
+                              tone={onlineQr ? 'success' : 'default'}
+                            >
+                              {onlineQr
+                                ? isId
+                                  ? 'QR siap'
+                                  : 'QR ready'
+                                : isId
+                                  ? 'QR nanti'
+                                  : 'QR later'}
+                            </InlineBadge>
+                          )}
                         </div>
 
                         <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
@@ -6783,8 +7063,8 @@ export function UmkmHubClient({
                           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                             {myStores.length > 0
                               ? isId
-                                ? 'Pilih usaha aktif'
-                                : 'Choose the active business'
+                                ? 'Pilih usaha'
+                                : 'Choose business'
                               : isId
                                 ? 'Mulai dari sini'
                                 : 'Start here'}
@@ -6792,8 +7072,8 @@ export function UmkmHubClient({
                           <h3 className="mt-1 text-[14px] font-black text-[color:var(--app-text)]">
                             {myStores.length > 0
                               ? isId
-                                ? 'Pilih usaha aktif'
-                                : 'The businesses are ready, pick the active one'
+                                ? 'Pilih usaha yang dikerjakan'
+                                : 'The businesses are ready, pick one to work on'
                               : isId
                                 ? 'Mulai dari usaha pertama'
                                 : 'Start with the first business'}
@@ -6816,8 +7096,8 @@ export function UmkmHubClient({
                         >
                           {myStores.length > 0
                             ? isId
-                              ? 'Pilih usaha aktif'
-                              : 'Choose active business'
+                              ? 'Pilih usaha'
+                              : 'Choose business'
                             : isId
                               ? 'Buat usaha pertama'
                               : 'Add the first business'}
@@ -6873,8 +7153,8 @@ export function UmkmHubClient({
                       ) : ownerAlerts.length === 0 ? (
                         <div className="rounded-[16px] border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] px-3 py-3 text-[11px] leading-5 ui-success-text">
                           {isId
-                            ? 'Fondasi rapi. Lanjut katalog, order, atau operasional.'
-                            : 'The business foundation is already in good shape. Continue with the catalog, orders, or operations.'}
+                            ? 'Fondasi rapi. Lanjut katalog, promosi, atau operasional.'
+                            : 'The business foundation is already in good shape. Continue with the catalog, promotion, or operations.'}
                         </div>
                       ) : (
                         ownerAlerts.slice(0, 2).map(alert => {
@@ -6922,12 +7202,12 @@ export function UmkmHubClient({
                             <h3 className="mt-1 text-[1.02rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.18rem]">
                               {isId
                                 ? 'Pilih usaha. Cek prioritas. Lanjut aksi.'
-                                : 'Pick the active business, review priorities, then jump into the next action'}
+                                : 'Pick a business, review priorities, then jump into the next action'}
                             </h3>
                             <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
                               {isId
                                 ? 'Cari outlet, filter yang perlu aksi, lalu buka detail.'
-                                : 'This page now acts as the owner control center. Search outlets, filter what needs action, switch the active business without leaving the page, then open the detail workspace only when needed.'}
+                                : 'This page now acts as the owner control center. Search outlets, filter what needs action, switch the selected business without leaving the page, then open the detail workspace only when needed.'}
                             </p>
                           </div>
 
@@ -7074,17 +7354,17 @@ export function UmkmHubClient({
                               <div className="mt-4 flex flex-wrap gap-2">
                                 {(hasStoreListQuery ||
                                   storeListFilter !== 'all') && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setStoreListQuery('');
-                                        setStoreListFilter('all');
-                                      }}
-                                      className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
-                                    >
-                                      {isId ? 'Reset pencarian' : 'Reset search'}
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setStoreListQuery('');
+                                      setStoreListFilter('all');
+                                    }}
+                                    className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
+                                  >
+                                    {isId ? 'Reset pencarian' : 'Reset search'}
+                                  </button>
+                                )}
                                 <Link
                                   href={buildSetupHref('create')}
                                   className="ui-button-primary ui-button-compact inline-flex px-4 text-sm font-semibold"
@@ -7181,12 +7461,18 @@ export function UmkmHubClient({
                             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                               <Link
                                 href={buildWorkspaceHref(
-                                  'orders',
+                                  PROMO_ONLY_MODE ? 'catalog' : 'orders',
                                   selectedStoreInsight.store.id,
                                 )}
                                 className="ui-button-primary inline-flex items-center justify-center px-4 text-sm font-semibold"
                               >
-                                {isId ? 'Buka pesanan' : 'Open orders'}
+                                {PROMO_ONLY_MODE
+                                  ? isId
+                                    ? 'Buka katalog'
+                                    : 'Open catalog'
+                                  : isId
+                                    ? 'Buka pesanan'
+                                    : 'Open orders'}
                               </Link>
                               <Link
                                 href={buildWorkspaceHref(
@@ -7437,7 +7723,10 @@ export function UmkmHubClient({
                           </div>
                           <InlineBadge tone="accent">
                             {selectedStore.access_role
-                              ? teamRoleLabel(selectedStore.access_role, isId)
+                              ? formatLaunchTeamRole(
+                                  selectedStore.access_role,
+                                  isId,
+                                )
                               : isId
                                 ? 'Pemilik'
                                 : 'Owner'}
@@ -7453,25 +7742,35 @@ export function UmkmHubClient({
                               )}
                             </InlineBadge>
                           ) : null}
-                          {selectedStore.online_order_enabled ? (
+                          {!PROMO_ONLY_MODE &&
+                          selectedStore.online_order_enabled ? (
                             <InlineBadge tone="accent">
                               {isId ? 'Online nyala' : 'Online live'}
                             </InlineBadge>
                           ) : null}
-                          {selectedStore.offline_order_enabled ? (
+                          {!PROMO_ONLY_MODE &&
+                          selectedStore.offline_order_enabled ? (
                             <InlineBadge tone="success">
                               {isId ? 'Offline nyala' : 'Offline live'}
                             </InlineBadge>
                           ) : null}
-                          <InlineBadge tone={onlineQr ? 'success' : 'warning'}>
-                            {onlineQr
-                              ? isId
-                                ? 'QR udah siap'
-                                : 'QR ready'
-                              : isId
-                                ? 'QR belum jadi'
-                                : 'QR pending'}
-                          </InlineBadge>
+                          {PROMO_ONLY_MODE ? (
+                            <InlineBadge tone="success">
+                              {isId ? 'Mode promosi' : 'Promo mode'}
+                            </InlineBadge>
+                          ) : (
+                            <InlineBadge
+                              tone={onlineQr ? 'success' : 'warning'}
+                            >
+                              {onlineQr
+                                ? isId
+                                  ? 'QR udah siap'
+                                  : 'QR ready'
+                                : isId
+                                  ? 'QR belum jadi'
+                                  : 'QR pending'}
+                            </InlineBadge>
+                          )}
                         </div>
 
                         <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
@@ -7501,12 +7800,18 @@ export function UmkmHubClient({
                           ) : (
                             <Link
                               href={buildWorkspaceHref(
-                                'orders',
+                                PROMO_ONLY_MODE ? 'catalog' : 'orders',
                                 selectedStore.id,
                               )}
                               className="ui-button-primary inline-flex items-center justify-center px-3.5 text-[12px] font-semibold"
                             >
-                              {isId ? 'Buka pesanan' : 'Open orders'}
+                              {PROMO_ONLY_MODE
+                                ? isId
+                                  ? 'Buka katalog'
+                                  : 'Open catalog'
+                                : isId
+                                  ? 'Buka pesanan'
+                                  : 'Open orders'}
                             </Link>
                           )}
                         </div>
@@ -7558,8 +7863,8 @@ export function UmkmHubClient({
                           </h3>
                           <p className="mt-1 text-[10px] leading-4 ui-text-soft sm:text-[11px]">
                             {isId
-                              ? 'Mulai dari usaha pertama dulu. Setelah tersimpan, Anda bisa tambah usaha lain, lalu katalog, pesanan, dan tim jadi lebih gampang diatur.'
-                              : 'Start with the first business. Once it is saved, you can add more businesses, and orders, catalog, and team flow become easier to manage.'}
+                              ? 'Mulai dari usaha pertama dulu. Setelah tersimpan, Anda bisa tambah usaha lain, lalu katalog, promosi, dan tim jadi lebih gampang diatur.'
+                              : 'Start with the first business. Once it is saved, you can add more businesses, and catalog, promo, and team flow become easier to manage.'}
                           </p>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2">
@@ -7586,48 +7891,59 @@ export function UmkmHubClient({
           </section>
         ) : null}
 
-        <section className="ui-panel rounded-none border-x-0 p-3 sm:rounded-[24px] sm:border-x sm:p-4">
+        <section
+          className={cn(
+            'ui-panel rounded-none border-x-0 p-3 sm:rounded-[24px] sm:border-x sm:p-4',
+            isSimpleHubMode &&
+              'border-slate-200 bg-white shadow-[0_22px_52px_-44px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 sm:rounded-[30px] sm:p-5',
+          )}
+        >
           {isSetupCreateView ? (
             useSimpleSetupCreateLayout ? (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="max-w-2xl">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
-                    {isAssistantSetupRoute
-                      ? isId
-                        ? 'Asisten usaha'
-                        : 'Business assistant'
-                      : isId
-                        ? 'Bikin usaha'
-                        : 'Add business'}
-                  </p>
-                  <h2 className="mt-1 text-lg font-black ui-text">
-                    {isAssistantSetupRoute
-                      ? isId
-                        ? 'Mulai usaha dengan pendamping yang jelas'
-                        : 'Start the business with a clearer guide'
-                      : isId
-                        ? 'Buat profil usaha pertama'
-                        : 'Create the first business profile'}
-                  </h2>
-                  <p className="mt-1 text-sm ui-text-soft">
-                    {isAssistantSetupRoute
-                      ? isId
-                        ? 'Mulai dari fondasi, lalu lanjut rekomendasi.'
-                        : 'This page helps the owner start from the foundation first, then adds search recommendations so the next move feels safer.'
-                      : isId
-                        ? 'Isi data seperti bikin profil toko: kategori, nama, kota, alamat, titik peta. Setelah tersimpan, baru tambah jualan dan operasional.'
-                        : 'Fill it like a store profile: category, name, city, address, map pin. After saving, add listings and operations.'}
-                  </p>
-                </div>
-                {setupPrimaryAction ? (
-                  <Link
-                    href={setupPrimaryAction.href}
-                    className="ui-button-secondary px-4 text-sm font-semibold"
+              <BusinessSetupIntroLayout
+                action={
+                  setupPrimaryAction ? (
+                    <Link
+                      href={setupPrimaryAction.href}
+                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                    >
+                      {setupPrimaryAction.label}
+                    </Link>
+                  ) : null
+                }
+                currentStepSummary={currentStoreCreateStep.summary}
+                currentStepTitle={currentStoreCreateStep.title}
+                isId={isId}
+                onStepSelect={stepId =>
+                  jumpToStoreCreateStep(stepId as StoreCreateStepId)
+                }
+                progressBadge={
+                  <InlineBadge
+                    tone={
+                      storeCreateValidation[storeCreateStep]
+                        ? 'success'
+                        : 'warning'
+                    }
                   >
-                    {setupPrimaryAction.label}
-                  </Link>
-                ) : null}
-              </div>
+                    {storeCreateStepIndex + 1}/{STORE_CREATE_STEP_ORDER.length}
+                  </InlineBadge>
+                }
+                steps={businessSetupLayoutSteps}
+                subtitle={
+                  isId
+                    ? 'Isi inti dulu. Detail bisa nanti.'
+                    : 'Essentials first. Details later.'
+                }
+                title={
+                  isAssistantSetupRoute
+                    ? isId
+                      ? 'Mulai usaha dengan pendamping'
+                      : 'Start with a clearer guide'
+                    : isId
+                      ? 'Buat Profil Usaha'
+                      : 'Create Business Profile'
+                }
+              />
             ) : (
               <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-3.5 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.14)] sm:px-4 sm:py-4 dark:border-[color:var(--app-border-strong)]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -7664,196 +7980,99 @@ export function UmkmHubClient({
               </div>
             )
           ) : useSimpleOverviewLayout ? null : useSimpleSetupShell ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
-                  {setupHeaderCopy?.eyebrow}
-                </p>
-                <h2 className="mt-1 text-lg font-black ui-text">
-                  {setupHeaderCopy?.title}
-                </h2>
-                <p className="mt-1 text-sm ui-text-soft">
-                  {setupHeaderCopy?.desc}
-                </p>
-              </div>
-              <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
-                {setupPrimaryAction ? (
-                  <Link
-                    href={setupPrimaryAction.href}
-                    className="ui-button-primary w-full px-4 text-sm font-semibold sm:w-auto"
-                  >
-                    {setupPrimaryAction.label}
-                  </Link>
-                ) : null}
-                {isSetupDetailView && selectedStore ? (
-                  <Link
-                    href={buildUmkmStorefrontPath(selectedStore.slug)}
-                    className="ui-button-secondary w-full px-4 text-sm font-semibold sm:w-auto"
-                  >
-                    {storefrontActionLabel}
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-          ) : useSimpleWorkspaceShell ? (
-            <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)_320px]">
-              <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,247,0.92))] p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.92))]">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] ui-accent-text">
-                  {isId ? 'Langkah usaha' : 'Business steps'}
-                </p>
-                <div className="mt-3 space-y-2.5">
-                  {setupDetailSteps.map((step, index) => {
-                    const active = step.id === activeSetupDetailStep;
-                    const done = step.done;
-                    return (
-                      <button
-                        key={step.id}
-                        type="button"
-                        onClick={() => openSetupDetailStep(step.id)}
-                        className={cn(
-                          'flex w-full items-start gap-3 rounded-[18px] border px-3 py-3 text-left transition',
-                          active
-                            ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)]'
-                            : 'border-[color:var(--app-border)] bg-white hover:border-[color:var(--app-accent-border)] dark:bg-slate-950/80',
-                        )}
-                        aria-current={active ? 'step' : undefined}
-                      >
-                        <span
-                          className={cn(
-                            'mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black',
-                            done
-                              ? 'bg-[color:var(--app-accent)] text-white'
-                              : active
-                                ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                                : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
-                          )}
-                        >
-                          {index + 1}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block text-[13px] font-black ui-text">
-                            {step.title}
-                          </span>
-                          <span className="mt-0.5 block text-[11px] leading-5 ui-text-soft">
-                            {step.desc}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.18)] sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="max-w-2xl">
-                  <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
-                    {simpleWorkspaceHero.eyebrow}
-                  </p>
-                  <h2 className="mt-1 text-lg font-black ui-text">
-                    {simpleWorkspaceHero.title}
-                  </h2>
-                  <p className="mt-1 text-sm ui-text-soft">
-                    {simpleWorkspaceHero.desc}
-                  </p>
-                </div>
-                <div className="grid w-full gap-2 sm:w-auto sm:min-w-[220px]">
-                  {'primaryTarget' in simpleWorkspaceHero ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        scrollToSection(simpleWorkspaceHero.primaryTarget)
-                      }
-                      className="ui-button-primary w-full px-4 text-sm font-semibold"
-                    >
-                      {simpleWorkspaceHero.primaryLabel}
-                    </button>
-                  ) : (
+            <UsahaSetupFlow
+              actions={
+                <>
+                  {setupPrimaryAction ? (
                     <Link
-                      href={simpleWorkspaceHero.primaryHref}
+                      href={setupPrimaryAction.href}
                       className="ui-button-primary w-full px-4 text-sm font-semibold"
                     >
-                      {simpleWorkspaceHero.primaryLabel}
+                      {setupPrimaryAction.label}
                     </Link>
-                  )}
-                  <Link
-                    href={simpleWorkspaceHero.secondaryHref}
-                    className="ui-button-secondary w-full px-4 text-sm font-semibold"
-                  >
-                    {simpleWorkspaceHero.secondaryLabel}
-                  </Link>
-                </div>
-                </div>
-
-                {selectedStore ? (
-                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                    {simpleWorkspaceStats.map(item => (
-                      <StatCard
-                        key={item.label}
-                        label={item.label}
-                        value={item.value}
-                        desc={item.desc}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-
-                {simpleWorkspaceNote ? (
-                  <div
-                    className={cn(
-                      'mt-4 rounded-[18px] px-4 py-3 text-sm leading-5',
-                      simpleWorkspaceNote.tone === 'warning'
-                        ? 'border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-accent)]'
-                        : 'border border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] text-[color:var(--app-accent)]',
-                    )}
-                  >
-                    {simpleWorkspaceNote.text}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,247,0.92))] p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.92))]">
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] ui-accent-text">
-                  {isId ? 'Preview usaha' : 'Business preview'}
-                </p>
-                {selectedStore ? (
-                  <div className="mt-3 rounded-[22px] border border-[color:var(--app-border)] bg-white p-4 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">
-                    <div className="flex items-start gap-3">
-                      <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                        <Store className="h-6 w-6" />
-                      </span>
-                      <div className="min-w-0">
-                        <h3 className="truncate text-lg font-black ui-text">
-                          {selectedStore.name}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-sm ui-text-soft">
-                          {[selectedStore.city, selectedStore.address]
-                            .filter(Boolean)
-                            .join(' - ')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-2">
-                      {simpleWorkspaceStats.slice(0, 3).map(item => (
-                        <StatCard
-                          key={item.label}
-                          label={item.label}
-                          value={item.value}
-                          desc={item.desc}
-                          compact
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 rounded-[22px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-sm leading-6 ui-text-soft">
-                    {isId
-                      ? 'Pilih usaha dulu supaya panel kanan bisa menampilkan ringkasan dan langkah berikutnya.'
-                      : 'Pick a business first so the right panel can show the preview and next move.'}
-                  </div>
-                )}
-              </div>
-            </div>
+                  ) : null}
+                  {isSetupDetailView && selectedStore ? (
+                    <Link
+                      href={buildUmkmStorefrontPath(selectedStore.slug)}
+                      className="ui-button-secondary w-full px-4 text-sm font-semibold"
+                    >
+                      {storefrontActionLabel}
+                    </Link>
+                  ) : null}
+                </>
+              }
+              desc={setupHeaderCopy?.desc || ''}
+              eyebrow={
+                setupHeaderCopy?.eyebrow || (isId ? 'Usaha' : 'Business')
+              }
+              steps={
+                isSetupDetailView && selectedStore
+                  ? setupDetailSteps.map(step => ({
+                      label: step.title,
+                      active: step.id === activeSetupDetailStep,
+                      done: step.done,
+                    }))
+                  : [
+                      {
+                        label: isId ? 'Pilih usaha' : 'Choose business',
+                        active: isSetupListView,
+                        done: myStores.length > 0,
+                      },
+                      {
+                        label: isId ? 'Buat usaha' : 'Add business',
+                        active: false,
+                        done: myStores.length > 0,
+                      },
+                    ]
+              }
+              title={
+                setupHeaderCopy?.title ||
+                (isId ? 'Profil usaha' : 'Business profile')
+              }
+            />
+          ) : useSimpleWorkspaceShell ? (
+            <UsahaWorkspaceShell
+              hero={{
+                eyebrow: simpleWorkspaceHero.eyebrow,
+                title: simpleWorkspaceHero.title,
+                desc: simpleWorkspaceHero.desc,
+                primaryLabel: simpleWorkspaceHero.primaryLabel,
+                primaryHref:
+                  'primaryHref' in simpleWorkspaceHero
+                    ? simpleWorkspaceHero.primaryHref
+                    : undefined,
+                primaryTarget:
+                  'primaryTarget' in simpleWorkspaceHero
+                    ? simpleWorkspaceHero.primaryTarget
+                    : undefined,
+                secondaryLabel: simpleWorkspaceHero.secondaryLabel,
+                secondaryHref: simpleWorkspaceHero.secondaryHref,
+              }}
+              isId={isId}
+              navItems={workspaceNavTiles.filter(tile =>
+                [
+                  'setup',
+                  'catalog',
+                  'operations',
+                  currentWorkspace === 'orders' ? 'orders' : 'team',
+                ].includes(tile.id),
+              )}
+              note={simpleWorkspaceNote}
+              onPrimaryTarget={scrollToSection}
+              selectedStore={
+                selectedStore
+                  ? {
+                      name: selectedStore.name,
+                      summary:
+                        [selectedStore.city, selectedStore.address]
+                          .filter(Boolean)
+                          .join(' - ') ||
+                        (isId ? 'Lokasi belum diisi' : 'No location yet'),
+                    }
+                  : null
+              }
+              stats={selectedStore ? simpleWorkspaceStats : []}
+            />
           ) : (
             <>
               {currentWorkspace === 'setup' ? (
@@ -7878,15 +8097,15 @@ export function UmkmHubClient({
                                 : 'Business type'
                               : stepId === 'identity'
                                 ? isId
-                                  ? 'Nama & kategori'
-                                  : 'Identity'
+                                  ? 'Kontak & Media'
+                                  : 'Contact & Media'
                                 : stepId === 'location'
                                   ? isId
                                     ? 'Lokasi'
                                     : 'Location'
                                   : isId
-                                    ? 'Operasional'
-                                    : 'Operations';
+                                    ? 'Review & Simpan'
+                                    : 'Review & Save';
                         return (
                           <button
                             key={stepId}
@@ -7927,15 +8146,15 @@ export function UmkmHubClient({
                                       : 'Pick the closest business model.'
                                     : stepId === 'identity'
                                       ? isId
-                                        ? 'Buat identitas usaha yang mudah ditemukan.'
-                                        : 'Create a findable business identity.'
+                                        ? 'Lengkapi kontak dan cerita singkat.'
+                                        : 'Complete contacts and a short story.'
                                       : stepId === 'location'
                                         ? isId
                                           ? 'Tentukan alamat dan titik peta.'
                                           : 'Set the address and map pin.'
                                         : isId
-                                          ? 'Rapiin jam, layanan, dan kanal.'
-                                          : 'Finish hours, services, and channels.'}
+                                          ? 'Cek data lalu simpan.'
+                                          : 'Review the data, then save.'}
                               </span>
                             </span>
                           </button>
@@ -7947,16 +8166,16 @@ export function UmkmHubClient({
                   <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.18)] sm:p-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                       <div className="max-w-2xl">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
-                      {setupHeaderCopy?.eyebrow}
-                    </p>
-                    <h2 className="mt-1 text-[1.2rem] font-black tracking-[-0.02em] ui-text sm:text-[1.5rem]">
-                      {setupHeaderCopy?.title}
-                    </h2>
-                    <p className="mt-1 text-sm leading-6 ui-text-soft">
-                      {setupHeaderCopy?.desc}
-                    </p>
-                  </div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+                          {setupHeaderCopy?.eyebrow}
+                        </p>
+                        <h2 className="mt-1 text-[1.2rem] font-black tracking-[-0.02em] ui-text sm:text-[1.5rem]">
+                          {setupHeaderCopy?.title}
+                        </h2>
+                        <p className="mt-1 text-sm leading-6 ui-text-soft">
+                          {setupHeaderCopy?.desc}
+                        </p>
+                      </div>
                       {setupPrimaryAction ? (
                         <Link
                           href={setupPrimaryAction.href}
@@ -7979,7 +8198,8 @@ export function UmkmHubClient({
                     </p>
                     <div className="mt-3 rounded-[22px] border border-[color:var(--app-border)] bg-white p-4 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">
                       <p className="text-sm font-black ui-text">
-                        {selectedStore?.name || (isId ? 'Usaha baru' : 'New business')}
+                        {selectedStore?.name ||
+                          (isId ? 'Usaha baru' : 'New business')}
                       </p>
                       <p className="mt-1 text-sm leading-6 ui-text-soft">
                         {selectedStore
@@ -7993,7 +8213,7 @@ export function UmkmHubClient({
                     </div>
                   </div>
                 </div>
-                ) : (
+              ) : (
                 <>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -8253,8 +8473,8 @@ export function UmkmHubClient({
                     <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-accent)]/78">
                       {ownerAlerts[0]?.desc ||
                         (isId
-                          ? 'Lanjutkan ke katalog, pesanan, atau tampilan pembeli sesuai kebutuhan sekarang.'
-                          : 'Continue to the catalog, orders, or buyer view based on what matters most right now.')}
+                          ? 'Lanjutkan ke katalog, promosi, atau tampilan pembeli sesuai kebutuhan sekarang.'
+                          : 'Continue to the catalog, promotion, or buyer view based on what matters most right now.')}
                     </p>
                   </div>
 
@@ -8302,8 +8522,8 @@ export function UmkmHubClient({
           ) : null}
 
           {!isOverviewWorkspace &&
-            currentWorkspace !== 'setup' &&
-            !useSimpleWorkspaceShell ? (
+          currentWorkspace !== 'setup' &&
+          !useSimpleWorkspaceShell ? (
             <div className="mt-3 rounded-[20px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] px-3.5 py-3.5">
               {selectedStore && !isSetupCreateView ? (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -8344,7 +8564,10 @@ export function UmkmHubClient({
                               : 'default'
                           }
                         >
-                          {teamRoleLabel(selectedStore.access_role, isId)}
+                          {formatLaunchTeamRole(
+                            selectedStore.access_role,
+                            isId,
+                          )}
                         </InlineBadge>
                       ) : null}
                       {selectedStore.online_order_enabled ? (
@@ -8639,8 +8862,8 @@ export function UmkmHubClient({
                         title={
                           useSimpleSetupCreateLayout
                             ? isId
-                              ? 'Buat profil usaha'
-                              : 'Create business'
+                              ? 'Isi data usaha'
+                              : 'Business data'
                             : isId
                               ? 'Form usaha'
                               : 'Business form'
@@ -8648,8 +8871,8 @@ export function UmkmHubClient({
                         desc={
                           useSimpleSetupCreateLayout
                             ? isId
-                              ? 'Ikuti 5 langkah pendek. Yang penting terisi dulu, sisanya bisa nanti.'
-                              : 'Choose the type, fill the main details, set the location, then save.'
+                              ? 'Isi yang penting dulu. Bisa diedit lagi nanti.'
+                              : 'Fill the essentials first. Edit later.'
                             : isGuidedStoreSetup
                               ? isId
                                 ? 'Isi yang inti dulu.'
@@ -8686,7 +8909,13 @@ export function UmkmHubClient({
                           }}
                           className="space-y-3"
                         >
-                          <div className={manageFormHeroClass}>
+                          <div
+                            className={cn(
+                              manageFormHeroClass,
+                              useSimpleSetupCreateLayout &&
+                                'rounded-[18px] px-3 py-3 sm:px-3.5 sm:py-3.5',
+                            )}
+                          >
                             <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-emerald-200/50 blur-3xl dark:bg-emerald-400/10" />
                             <div className="pointer-events-none absolute -bottom-16 -left-12 h-28 w-28 rounded-full bg-sky-200/42 blur-3xl dark:bg-sky-400/10" />
                             <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
@@ -8696,14 +8925,19 @@ export function UmkmHubClient({
                                 </p>
                                 <h4 className="mt-1 text-[1.05rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.25rem]">
                                   {isId
-                                    ? 'Buat profil usaha dalam 5 langkah'
-                                    : 'Create a new business profile'}
+                                    ? 'Lengkapi data inti'
+                                    : 'Complete the core data'}
                                 </h4>
-                                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]">
+                                <p
+                                  className={cn(
+                                    'mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]',
+                                    useSimpleSetupCreateLayout && 'hidden',
+                                  )}
+                                >
                                   {useSimpleSetupCreateLayout
                                     ? isId
-                                      ? 'Isi yang wajib dulu: jenis usaha, nama, kota, alamat atau patokan, dan titik lokasi. Katalog, QR, tim, dan jam operasional bisa dirapikan setelah usaha tersimpan.'
-                                      : 'Fill the business type, name, city, address, and location pin. Catalog, QR, team, and operations can be refined after saving.'
+                                      ? 'Isi inti dulu: jenis usaha, nama, kota, alamat/patokan, dan titik lokasi.'
+                                      : 'Fill the essentials first: type, name, city, address, and location pin.'
                                     : isGuidedStoreSetup
                                       ? isId
                                         ? 'Pilih tipe, isi info, pasang titik, simpan.'
@@ -8719,7 +8953,7 @@ export function UmkmHubClient({
                                   manageInfoCardClass,
                                   'relative',
                                   useSimpleSetupCreateLayout
-                                    ? 'w-full max-w-[240px]'
+                                    ? 'w-full max-w-[180px] px-3 py-2'
                                     : 'w-full max-w-[220px]',
                                 )}
                               >
@@ -8753,74 +8987,41 @@ export function UmkmHubClient({
                                     />
                                   </div>
                                 ) : null}
-                                <p className="mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]">
+                                <p
+                                  className={cn(
+                                    'mt-1 text-[10px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px]',
+                                    useSimpleSetupCreateLayout && 'hidden',
+                                  )}
+                                >
                                   {currentStoreCreateStep.summary}
                                 </p>
                               </div>
                             </div>
 
                             {useSimpleSetupCreateLayout ? (
-                              <div className="relative mt-3 grid grid-cols-5 gap-1 sm:gap-2">
-                                {storeCreateSteps.map((step, index) => {
-                                  const active = step.id === storeCreateStep;
-                                  const done =
-                                    index < storeCreateStepIndex ||
-                                    (index === storeCreateStepIndex &&
-                                      step.id !== 'operations' &&
-                                      storeCreateValidation[step.id]);
-                                  const unlocked =
-                                    index <=
-                                    highestUnlockedStoreCreateStepIndex;
-                                  const StepIcon = step.icon;
-
-                                  return (
-                                    <button
-                                      key={step.id}
-                                      type="button"
-                                      onClick={() =>
-                                        jumpToStoreCreateStep(step.id)
-                                      }
-                                      disabled={!unlocked}
-                                      className={cn(
-                                        'ui-pressable flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[15px] border px-1.5 py-2 text-center transition sm:min-h-[70px] sm:px-2.5',
-                                        active
-                                          ? 'border-[color:var(--app-accent)] bg-white shadow-[0_14px_26px_-22px_rgba(15,23,42,0.22)]'
-                                          : done
-                                            ? 'border-emerald-100 bg-white/86'
-                                            : unlocked
-                                              ? 'border-emerald-100/80 bg-white/72 hover:bg-white'
-                                              : 'cursor-not-allowed border-slate-200/80 bg-white/52 opacity-65',
-                                      )}
-                                    >
-                                      <span
-                                        className={cn(
-                                          'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px]',
-                                          active || done
-                                            ? 'bg-[color:var(--app-accent)] text-white'
-                                            : 'bg-emerald-50 text-[color:var(--app-accent)] ring-1 ring-emerald-100',
-                                        )}
-                                      >
-                                        {done ? (
-                                          <CheckCircle2 className="h-4 w-4" />
-                                        ) : (
-                                          <StepIcon className="h-4 w-4" />
-                                        )}
-                                      </span>
-                                      <span className="min-w-0">
-                                        <span className="block truncate text-[10px] font-black leading-3 text-[color:var(--app-text)] sm:text-[11px] sm:leading-4">
-                                          {step.title}
-                                        </span>
-                                        <span className="mt-0.5 hidden text-[10px] leading-4 text-[color:var(--app-text-soft)] lg:line-clamp-2">
-                                          {step.summary}
-                                        </span>
-                                      </span>
-                                    </button>
-                                  );
-                                })}
+                              <div className="mt-4">
+                                <div className="h-2 overflow-hidden rounded-full bg-white ring-1 ring-emerald-100 dark:bg-slate-950 dark:ring-emerald-400/16">
+                                  <div
+                                    className="h-full rounded-full bg-emerald-700 transition-[width] duration-300"
+                                    style={{
+                                      width: `${storeCreateProgress}%`,
+                                    }}
+                                  />
+                                </div>
+                                <p className="sr-only">
+                                  {isId
+                                    ? `Progress profil usaha ${storeCreateProgress}%`
+                                    : `${storeCreateProgress}% business profile progress`}
+                                </p>
                               </div>
                             ) : null}
 
-                            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+                            <div
+                              className={cn(
+                                'mt-2.5 flex flex-wrap items-center justify-between gap-2',
+                                useSimpleSetupCreateLayout && 'sr-only',
+                              )}
+                            >
                               <p className="text-[11px] leading-4 text-[color:var(--app-text-soft)]">
                                 {useSimpleSetupCreateLayout
                                   ? isId
@@ -8953,62 +9154,28 @@ export function UmkmHubClient({
 
                           <div className="space-y-3.5">
                             {storeCreateStep === 'intro' ? (
-                              <div className={manageStorePanelClass}>
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                              <div
+                                className={cn(
+                                  manageStorePanelClass,
+                                  'rounded-[18px] px-3 py-2.5 sm:px-3 sm:py-2.5',
+                                )}
+                              >
+                                <div className="flex min-w-0 items-center justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-[13px] font-black text-[color:var(--app-text)]">
                                       {isId
-                                        ? 'Sebelum mulai'
-                                        : 'Before you start'}
+                                        ? 'Mulai cepat, isi yang penting saja.'
+                                        : 'Quick start. Fill only what matters.'}
                                     </p>
-                                    <h5 className="mt-1 text-[1rem] font-black leading-tight text-[color:var(--app-text)]">
+                                    <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                                       {isId
-                                        ? 'Bikin dulu versi paling penting'
-                                        : 'Create a business profile without the clutter'}
-                                    </h5>
-                                    <p className="mt-1.5 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
-                                      {isId
-                                        ? 'Tidak perlu lengkap sempurna. Mulai dari data yang membuat usaha bisa ditemukan dan dipercaya.'
-                                        : 'This step only creates the foundation. After saving, add catalog, QR, team, and operations.'}
+                                        ? 'Nama, jenis usaha, kontak, lokasi. Detail bisa nanti.'
+                                        : 'Name, type, contact, location. Details can come later.'}
                                     </p>
                                   </div>
                                   <InlineBadge tone="success">
-                                    {isId
-                                      ? 'Bisa diedit nanti'
-                                      : 'Editable later'}
+                                    {isId ? 'Editable' : 'Editable'}
                                   </InlineBadge>
-                                </div>
-
-                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                  {storeOnboardingInfoCards.map(card => {
-                                    const InfoIcon = card.icon;
-                                    return (
-                                      <div
-                                        key={card.title}
-                                        className="rounded-[18px] border border-emerald-100/90 bg-white px-3 py-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.14)] dark:border-emerald-400/14 dark:bg-slate-950/78"
-                                      >
-                                        <div className="flex items-start gap-2.5">
-                                          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                                            <InfoIcon className="h-4 w-4" />
-                                          </span>
-                                          <div>
-                                            <p className="text-[13px] font-black text-[color:var(--app-text)]">
-                                              {card.title}
-                                            </p>
-                                            <p className="mt-1 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
-                                              {card.desc}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-
-                                <div className="mt-3 rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-3 text-[12px] leading-5 text-[color:var(--app-accent)]">
-                                  {isId
-                                    ? 'Tips: kalau ragu, pilih jawaban yang paling dekat. Semua data bisa diedit lagi dari dashboard usaha.'
-                                    : 'Tip: do not aim for perfect setup first. Fill what you know now, save, then refine it from the business dashboard.'}
                                 </div>
                               </div>
                             ) : null}
@@ -9159,8 +9326,8 @@ export function UmkmHubClient({
                                     )}
                                   </SelectInput>
                                   {!isGuidedStoreSetup ||
-                                    showStoreBusinessFocus ||
-                                    storeForm.business_focus.trim().length > 0 ? (
+                                  showStoreBusinessFocus ||
+                                  storeForm.business_focus.trim().length > 0 ? (
                                     <TextInput
                                       label={
                                         isId
@@ -9184,8 +9351,8 @@ export function UmkmHubClient({
                                 </div>
 
                                 {isGuidedStoreSetup &&
-                                  !showStoreBusinessFocus &&
-                                  storeForm.business_focus.trim().length === 0 ? (
+                                !showStoreBusinessFocus &&
+                                storeForm.business_focus.trim().length === 0 ? (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -9239,7 +9406,7 @@ export function UmkmHubClient({
                                     className={cn(
                                       'mt-3 grid gap-3 sm:grid-cols-2',
                                       useSimpleSetupCreateLayout &&
-                                      '[&>*:last-child]:sm:col-span-2',
+                                        '[&>*:last-child]:sm:col-span-2',
                                     )}
                                   >
                                     <TextInput
@@ -9304,8 +9471,8 @@ export function UmkmHubClient({
                                     />
                                   </div>
                                   {storeSuggestedBaseAddress &&
-                                    normalizeSingleLineInput(storeForm.address)
-                                      .length < 3 ? (
+                                  normalizeSingleLineInput(storeForm.address)
+                                    .length < 3 ? (
                                     <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] px-4 py-3">
                                       <p className="text-xs leading-5 text-[color:var(--app-accent)]/74">
                                         {isId
@@ -9343,7 +9510,7 @@ export function UmkmHubClient({
                                     <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/78">
                                       {isGuidedStoreSetup
                                         ? isId
-                                          ? 'Kalau data utama sudah benar, simpan. Setelah itu kamu bisa tambah produk, QR, tim, dan jam buka.'
+                                          ? 'Kalau data utama sudah benar, simpan. Setelah itu kamu bisa tambah produk, tim, dan jam buka.'
                                           : 'The common defaults are enabled first. You can change them later.'
                                         : isId
                                           ? storeRegistrationProfile.registrationHintId
@@ -9496,7 +9663,7 @@ export function UmkmHubClient({
                                 ) : null}
 
                                 {!isGuidedStoreSetup ||
-                                  showDetailedStoreOperations ? (
+                                showDetailedStoreOperations ? (
                                   <>
                                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                                       {storePrimaryCapabilities
@@ -9645,10 +9812,10 @@ export function UmkmHubClient({
                             ) : null}
 
                             {storeCreateStep === 'identity' &&
-                              (!isGuidedStoreSetup ||
-                                showOptionalStoreIdentity ||
-                                storeForm.phone.trim().length > 0 ||
-                                storeForm.description.trim().length > 0) ? (
+                            (!isGuidedStoreSetup ||
+                              showOptionalStoreIdentity ||
+                              storeForm.phone.trim().length > 0 ||
+                              storeForm.description.trim().length > 0) ? (
                               <>
                                 <div className={manageStorePanelClass}>
                                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -9716,10 +9883,10 @@ export function UmkmHubClient({
                             ) : null}
 
                             {storeCreateStep === 'identity' &&
-                              isGuidedStoreSetup &&
-                              !showOptionalStoreIdentity &&
-                              storeForm.phone.trim().length === 0 &&
-                              storeForm.description.trim().length === 0 ? (
+                            isGuidedStoreSetup &&
+                            !showOptionalStoreIdentity &&
+                            storeForm.phone.trim().length === 0 &&
+                            storeForm.description.trim().length === 0 ? (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -9734,7 +9901,7 @@ export function UmkmHubClient({
                             ) : null}
 
                             {storeCreateStep === 'location' &&
-                              storeRegistrationCopy.locationHint ? (
+                            storeRegistrationCopy.locationHint ? (
                               <div className={manageStoreSoftPanelClass}>
                                 {storeRegistrationCopy.locationHint}
                               </div>
@@ -9912,8 +10079,8 @@ export function UmkmHubClient({
 
                             {storeCreateStep === 'operations' ? (
                               storeSupportsTables &&
-                                (!isGuidedStoreSetup ||
-                                  showDetailedStoreOperations) ? (
+                              (!isGuidedStoreSetup ||
+                                showDetailedStoreOperations) ? (
                                 <div className="grid gap-4 sm:grid-cols-3">
                                   <TextInput
                                     label={
@@ -10258,17 +10425,17 @@ export function UmkmHubClient({
                               <div className="mt-4 flex flex-wrap gap-2">
                                 {(hasStoreListQuery ||
                                   storeListFilter !== 'all') && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setStoreListQuery('');
-                                        setStoreListFilter('all');
-                                      }}
-                                      className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
-                                    >
-                                      {isId ? 'Reset pencarian' : 'Reset search'}
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setStoreListQuery('');
+                                      setStoreListFilter('all');
+                                    }}
+                                    className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
+                                  >
+                                    {isId ? 'Reset pencarian' : 'Reset search'}
+                                  </button>
+                                )}
                                 <Link
                                   href={buildSetupHref('create')}
                                   className="ui-button-primary ui-button-compact inline-flex px-4 text-sm font-semibold"
@@ -10336,14 +10503,15 @@ export function UmkmHubClient({
                 ) : null}
 
                 {selectedStore &&
-                  currentWorkspace !== 'setup' &&
-                  !useSimpleWorkspaceShell ? (
+                currentWorkspace !== 'setup' &&
+                !useSimpleOverviewLayout &&
+                !useSimpleWorkspaceShell ? (
                   <>
                     <SectionCard
                       title={
                         isId
-                          ? `Usaha aktif: ${selectedStore.name}`
-                          : `Active business: ${selectedStore.name}`
+                          ? `Usaha dipilih: ${selectedStore.name}`
+                          : `Selected business: ${selectedStore.name}`
                       }
                       desc={[selectedStore.city, selectedStore.address]
                         .filter(Boolean)
@@ -10383,7 +10551,10 @@ export function UmkmHubClient({
                                   : 'default'
                               }
                             >
-                              {teamRoleLabel(selectedStore.access_role, isId)}
+                              {formatLaunchTeamRole(
+                                selectedStore.access_role,
+                                isId,
+                              )}
                             </InlineBadge>
                           ) : null}
                           <Link
@@ -10697,7 +10868,7 @@ export function UmkmHubClient({
                       </div>
                     </SectionCard>
                     {isSetupDetailView &&
-                      activeSetupDetailStep === 'summary' ? (
+                    activeSetupDetailStep === 'summary' ? (
                       <SectionCard
                         id="umkm-setup-summary"
                         title={
@@ -11023,7 +11194,7 @@ export function UmkmHubClient({
                     ) : null}
 
                     {isSetupDetailView &&
-                      activeSetupDetailStep === 'recommendations' ? (
+                    activeSetupDetailStep === 'recommendations' ? (
                       <SectionCard
                         id="umkm-start-recommendations"
                         title={
@@ -11245,8 +11416,8 @@ export function UmkmHubClient({
                             {teamMembers.length === 0 ? (
                               <div className="rounded-[24px] border border-dashed border-[color:var(--app-accent-border)] px-4 py-8 text-sm text-[color:var(--app-accent)]">
                                 {isId
-                                  ? 'Tambah kasir, stok, atau operasional.'
-                                  : 'No team members besides the owner yet. Add cashier, stock, or ops so this dashboard can support all-day use.'}
+                                  ? 'Tambah admin chat, katalog, atau operasional.'
+                                  : 'No team members besides the owner yet. Add chat, catalog, or ops admins so this dashboard can support daily use.'}
                               </div>
                             ) : (
                               <div className="space-y-3">
@@ -11268,7 +11439,10 @@ export function UmkmHubClient({
                                                 : 'default'
                                             }
                                           >
-                                            {teamRoleLabel(member.role, isId)}
+                                            {formatLaunchTeamRole(
+                                              member.role,
+                                              isId,
+                                            )}
                                           </InlineBadge>
                                           <InlineBadge
                                             tone={
@@ -11297,13 +11471,13 @@ export function UmkmHubClient({
                                       </div>
 
                                       {canManageTeam &&
-                                        member.role !== 'owner' ? (
+                                      member.role !== 'owner' ? (
                                         <div className="flex flex-wrap gap-2">
                                           <button
                                             type="button"
                                             disabled={
                                               actingTeamMemberId ===
-                                              member.id ||
+                                                member.id ||
                                               member.status === 'active'
                                             }
                                             onClick={() =>
@@ -11320,7 +11494,7 @@ export function UmkmHubClient({
                                             type="button"
                                             disabled={
                                               actingTeamMemberId ===
-                                              member.id ||
+                                                member.id ||
                                               member.status === 'disabled'
                                             }
                                             onClick={() =>
@@ -11362,8 +11536,8 @@ export function UmkmHubClient({
                             <h4 className="mt-3 text-lg font-black">
                               {canManageTeam
                                 ? isId
-                                  ? 'Undang kasir, stok, atau operasional'
-                                  : 'Invite cashier, stock, or ops'
+                                  ? 'Undang admin chat, katalog, atau operasional'
+                                  : 'Invite chat, catalog, or ops admins'
                                 : isId
                                   ? 'Role Anda masih terbatas'
                                   : 'Your role is currently limited'}
@@ -11397,8 +11571,8 @@ export function UmkmHubClient({
                                   maxLength={TEAM_LIMITS.name}
                                   placeholder={
                                     isId
-                                      ? 'Contoh: Rina Kasir Pagi'
-                                      : 'Example: Rina Morning Cashier'
+                                      ? 'Contoh: Rina Admin Chat'
+                                      : 'Example: Rina Chat Admin'
                                   }
                                   required
                                 />
@@ -11430,7 +11604,13 @@ export function UmkmHubClient({
                                   }
                                 >
                                   <option value="cashier">
-                                    {isId ? 'Kasir' : 'Cashier'}
+                                    {PROMO_ONLY_MODE
+                                      ? isId
+                                        ? 'Admin chat'
+                                        : 'Chat admin'
+                                      : isId
+                                        ? 'Kasir'
+                                        : 'Cashier'}
                                   </option>
                                   <option value="stock">
                                     {isId
@@ -11462,8 +11642,12 @@ export function UmkmHubClient({
                                   maxLength={TEAM_LIMITS.notes}
                                   placeholder={
                                     isId
-                                      ? 'Contoh: shift pagi, khusus outlet Tebet, fokus checkout & bill'
-                                      : 'Example: morning shift, Tebet outlet only, focused on checkout & billing'
+                                      ? PROMO_ONLY_MODE
+                                        ? 'Contoh: shift pagi, khusus outlet Tebet, fokus balas chat dan cek katalog'
+                                        : 'Contoh: shift pagi, khusus outlet Tebet, fokus checkout & bill'
+                                      : PROMO_ONLY_MODE
+                                        ? 'Example: morning shift, Tebet outlet only, focused on chat and catalog follow-up'
+                                        : 'Example: morning shift, Tebet outlet only, focused on checkout & billing'
                                   }
                                 />
                                 <button
@@ -11533,16 +11717,27 @@ export function UmkmHubClient({
                               <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/78">
                                 {isId
                                   ? 'Owner pegang semua outlet. Tim cukup pegang area kerja.'
-                                  : 'The owner keeps full business control. Cashier, stock, and ops should each get a narrow outlet-specific workspace so this dashboard remains useful from morning until closing.'}
+                                  : PROMO_ONLY_MODE
+                                    ? 'The owner keeps full business control. Chat, catalog, and ops admins should each get a narrow outlet-specific workspace.'
+                                    : 'The owner keeps full business control. Cashier, stock, and ops should each get a narrow outlet-specific workspace so this dashboard remains useful from morning until closing.'}
                               </p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => scrollToSection('umkm-orders')}
-                              className="ui-button-secondary ui-button-compact px-4 text-xs font-bold"
-                            >
-                              {isId ? 'Lihat alur kasir' : 'See cashier flow'}
-                            </button>
+                            {PROMO_ONLY_MODE ? (
+                              <Link
+                                href="/chat"
+                                className="ui-button-secondary ui-button-compact px-4 text-xs font-bold"
+                              >
+                                {isId ? 'Buka chat' : 'Open chat'}
+                              </Link>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => scrollToSection('umkm-orders')}
+                                className="ui-button-secondary ui-button-compact px-4 text-xs font-bold"
+                              >
+                                {isId ? 'Lihat alur kasir' : 'See cashier flow'}
+                              </button>
+                            )}
                           </div>
 
                           <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -11553,7 +11748,9 @@ export function UmkmHubClient({
                               <p className="mt-2 text-xs leading-5 text-[color:var(--app-accent)]/76">
                                 {isId
                                   ? 'Tim pilih satu outlet aktif lalu kerja dari situ.'
-                                  : 'Cashiers and ops should not see every business. Choose one active outlet and work from there.'}
+                                  : PROMO_ONLY_MODE
+                                    ? 'Team members should not see every business. Choose one active outlet and work from there.'
+                                    : 'Cashiers and ops should not see every business. Choose one active outlet and work from there.'}
                               </p>
                             </div>
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4">
@@ -11564,8 +11761,12 @@ export function UmkmHubClient({
                               </p>
                               <p className="mt-2 text-xs leading-5 text-[color:var(--app-accent)]/76">
                                 {isId
-                                  ? 'Kasir fokus order dan pembayaran. Tim stok fokus katalog dan ketersediaan. Owner fokus trust, uang, dan ekspansi.'
-                                  : 'Cashiers focus on orders and payments. Stock teams focus on catalog and availability. Owners focus on trust, money, and expansion.'}
+                                  ? PROMO_ONLY_MODE
+                                    ? 'Admin chat fokus tanya jawab. Tim katalog fokus foto dan ketersediaan. Owner fokus trust, data, dan ekspansi.'
+                                    : 'Kasir fokus order dan pembayaran. Tim stok fokus katalog dan ketersediaan. Owner fokus trust, uang, dan ekspansi.'
+                                  : PROMO_ONLY_MODE
+                                    ? 'Chat admins focus on questions. Catalog teams focus on photos and availability. Owners focus on trust, data, and expansion.'
+                                    : 'Cashiers focus on orders and payments. Stock teams focus on catalog and availability. Owners focus on trust, money, and expansion.'}
                               </p>
                             </div>
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4">
@@ -11586,7 +11787,7 @@ export function UmkmHubClient({
                     ) : null}
 
                     {isSetupDetailView &&
-                      activeSetupDetailStep === 'publish' ? (
+                    activeSetupDetailStep === 'publish' ? (
                       <SectionCard
                         id="umkm-verification"
                         title={isId ? 'Profil & publish' : 'Profile & publish'}
@@ -12029,7 +12230,7 @@ export function UmkmHubClient({
                                   <div>
                                     <p className="text-sm font-black">
                                       {verificationForm.location_mode ===
-                                        'mobile'
+                                      'mobile'
                                         ? isId
                                           ? 'Titik live usaha'
                                           : 'Live business point'
@@ -12064,7 +12265,7 @@ export function UmkmHubClient({
                                     isId={isId}
                                     markerLabel={
                                       verificationForm.location_mode ===
-                                        'mobile'
+                                      'mobile'
                                         ? isId
                                           ? 'Titik live usaha'
                                           : 'Live business point'
@@ -12134,7 +12335,7 @@ export function UmkmHubClient({
                                   <p className="mt-2">{liveLocationMessage}</p>
                                 ) : null}
                                 {verificationForm.location_mode === 'mobile' &&
-                                  !canShareLiveLocation ? (
+                                !canShareLiveLocation ? (
                                   <p className="mt-2">
                                     {isId
                                       ? 'Agar titik bisa ikut bergerak, aktifkan dulu usaha lalu nyalakan status live.'
@@ -12571,7 +12772,7 @@ export function UmkmHubClient({
                                             </p>
                                           ) : null}
                                           {field.options &&
-                                            field.options.length > 0 ? (
+                                          field.options.length > 0 ? (
                                             <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/72">
                                               {field.options.join(' / ')}
                                             </p>
@@ -12652,7 +12853,7 @@ export function UmkmHubClient({
                               ].map(item => {
                                 const currentValue =
                                   verificationForm[
-                                  item.key as keyof typeof verificationForm
+                                    item.key as keyof typeof verificationForm
                                   ];
 
                                 return (
@@ -12696,7 +12897,7 @@ export function UmkmHubClient({
                                       />
                                     </label>
                                     {typeof currentValue === 'string' &&
-                                      currentValue ? (
+                                    currentValue ? (
                                       <p className="mt-2 break-all text-xs  text-[color:var(--app-accent)]">
                                         {currentValue}
                                       </p>
@@ -12902,7 +13103,7 @@ export function UmkmHubClient({
                     ) : null}
 
                     {currentWorkspace === 'catalog' ||
-                      currentWorkspace === 'operations' ? (
+                    currentWorkspace === 'operations' ? (
                       <div className="grid gap-6 2xl:grid-cols-2">
                         {currentWorkspace === 'catalog' ? (
                           <SectionCard
@@ -13055,12 +13256,12 @@ export function UmkmHubClient({
                                           allow_pickup:
                                             nextKind === 'physical'
                                               ? current.allow_pickup ||
-                                              !current.allow_courier_shipping
+                                                !current.allow_courier_shipping
                                               : false,
                                           allow_courier_shipping:
                                             nextKind === 'physical'
                                               ? current.allow_courier_shipping ||
-                                              !current.allow_pickup
+                                                !current.allow_pickup
                                               : false,
                                         }));
                                       }}
@@ -13226,7 +13427,7 @@ export function UmkmHubClient({
                                       }
                                       disabled={
                                         productForm.product_kind !==
-                                        'physical' ||
+                                          'physical' ||
                                         !productForm.allow_courier_shipping
                                       }
                                     />
@@ -13420,7 +13621,7 @@ export function UmkmHubClient({
                               </div>
 
                               {listingRequirementFields.length > 0 ||
-                                orderRequirementFields.length > 0 ? (
+                              orderRequirementFields.length > 0 ? (
                                 <div className={manageSectionBlockClass}>
                                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
                                     {isId
@@ -13470,15 +13671,15 @@ export function UmkmHubClient({
                                       {[
                                         productForm.publish_food
                                           ? getUmkmPublishServiceLabel(
-                                            'food',
-                                            isId,
-                                          )
+                                              'food',
+                                              isId,
+                                            )
                                           : '',
                                         productForm.publish_mart
                                           ? getUmkmPublishServiceLabel(
-                                            'mart',
-                                            isId,
-                                          )
+                                              'mart',
+                                              isId,
+                                            )
                                           : '',
                                       ]
                                         .filter(Boolean)
@@ -13522,20 +13723,20 @@ export function UmkmHubClient({
                                           ? 'Digital / instan'
                                           : 'Digital / instant'
                                         : [
-                                          productForm.allow_pickup
-                                            ? 'Pickup'
-                                            : '',
-                                          productForm.allow_courier_shipping
-                                            ? isId
-                                              ? 'Ekspedisi'
-                                              : 'Courier'
-                                            : '',
-                                        ]
-                                          .filter(Boolean)
-                                          .join(' / ') ||
-                                        (isId
-                                          ? 'Belum valid'
-                                          : 'Not valid yet')}
+                                            productForm.allow_pickup
+                                              ? 'Pickup'
+                                              : '',
+                                            productForm.allow_courier_shipping
+                                              ? isId
+                                                ? 'Ekspedisi'
+                                                : 'Courier'
+                                              : '',
+                                          ]
+                                            .filter(Boolean)
+                                            .join(' / ') ||
+                                          (isId
+                                            ? 'Belum valid'
+                                            : 'Not valid yet')}
                                     </p>
                                   </div>
                                   <div className={manageInfoCardClass}>
@@ -13557,23 +13758,23 @@ export function UmkmHubClient({
                                 </div>
                                 <p className="mt-3 text-[11px] leading-5">
                                   {productForm.product_kind === 'digital' &&
-                                    !productForm.digital_delivery_note.trim()
+                                  !productForm.digital_delivery_note.trim()
                                     ? isId
                                       ? 'Tambahkan catatan kirim digital.'
                                       : 'Add a digital delivery note so buyers know where files, vouchers, or access will be sent.'
                                     : productForm.product_kind === 'physical' &&
-                                      productForm.channel_online &&
-                                      !productForm.allow_pickup &&
-                                      !productForm.allow_courier_shipping
+                                        productForm.channel_online &&
+                                        !productForm.allow_pickup &&
+                                        !productForm.allow_courier_shipping
                                       ? isId
                                         ? 'Produk fisik online belum valid. Aktifkan pickup atau ekspedisi.'
                                         : 'This physical online product is not valid yet. Enable pickup or courier.'
                                       : productForm.product_kind ===
-                                        'physical' &&
-                                        productForm.allow_courier_shipping &&
-                                        !(
-                                          Number(productForm.weight_grams) > 0
-                                        )
+                                            'physical' &&
+                                          productForm.allow_courier_shipping &&
+                                          !(
+                                            Number(productForm.weight_grams) > 0
+                                          )
                                         ? isId
                                           ? 'Isi berat produk untuk hitung ongkir.'
                                           : 'Fill product weight so courier fees can be calculated correctly.'
@@ -13652,10 +13853,11 @@ export function UmkmHubClient({
                         {currentWorkspace === 'operations' ? (
                           <SectionCard
                             id="umkm-tables"
-                            title={`5. ${isId
-                              ? selectedManageProfile.operationsTitleId
-                              : selectedManageProfile.operationsTitleEn
-                              }`}
+                            title={`5. ${
+                              isId
+                                ? selectedManageProfile.operationsTitleId
+                                : selectedManageProfile.operationsTitleEn
+                            }`}
                             desc={getUmkmOperationsSummary(
                               selectedBusinessCategory,
                               selectedBusinessCapabilities,
@@ -13936,17 +14138,17 @@ export function UmkmHubClient({
                                 typeof order.metadata.shipping_option ===
                                   'object' && order.metadata.shipping_option
                                   ? (order.metadata.shipping_option as Record<
-                                    string,
-                                    unknown
-                                  >)
+                                      string,
+                                      unknown
+                                    >)
                                   : {};
                               const shippingFeeCents =
                                 typeof order.shipping_fee_cents === 'number'
                                   ? order.shipping_fee_cents
                                   : readMetaNumber(
-                                    order.metadata || {},
-                                    'shipping_fee_cents',
-                                  ) || 0;
+                                      order.metadata || {},
+                                      'shipping_fee_cents',
+                                    ) || 0;
                               const paymentStage =
                                 order.payment_stage ||
                                 (order.payment_status === 'paid'
@@ -14041,9 +14243,9 @@ export function UmkmHubClient({
                                   </div>
 
                                   {order.channel === 'online' &&
-                                    (deliveryAddress ||
-                                      (deliveryLat !== null &&
-                                        deliveryLng !== null)) ? (
+                                  (deliveryAddress ||
+                                    (deliveryLat !== null &&
+                                      deliveryLng !== null)) ? (
                                     <div className="mt-3 rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-3 text-xs  border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
                                       <p>
                                         {isId ? 'Alamat:' : 'Address:'}{' '}
@@ -14051,7 +14253,7 @@ export function UmkmHubClient({
                                           `${deliveryLat?.toFixed(5)}, ${deliveryLng?.toFixed(5)}`}
                                       </p>
                                       {deliveryLat !== null &&
-                                        deliveryLng !== null ? (
+                                      deliveryLng !== null ? (
                                         <a
                                           href={`https://www.google.com/maps?q=${deliveryLat},${deliveryLng}`}
                                           target="_blank"
@@ -14065,7 +14267,7 @@ export function UmkmHubClient({
                                         </a>
                                       ) : null}
                                       {Object.keys(shippingOption).length >
-                                        0 ? (
+                                      0 ? (
                                         <p className="mt-2">
                                           {isId ? 'Metode:' : 'Mode:'}{' '}
                                           {formatOrderFulfillmentLabel(
@@ -14073,7 +14275,7 @@ export function UmkmHubClient({
                                             isId,
                                           )}
                                           {typeof shippingOption.label ===
-                                            'string'
+                                          'string'
                                             ? ` / ${shippingOption.label}`
                                             : ''}
                                         </p>
@@ -14165,7 +14367,7 @@ export function UmkmHubClient({
                                     </button>
 
                                     {paymentStage ===
-                                      'awaiting_confirmation' ? (
+                                    'awaiting_confirmation' ? (
                                       <button
                                         type="button"
                                         disabled={actingOrderId === order.id}
@@ -14223,7 +14425,7 @@ export function UmkmHubClient({
                                   </div>
 
                                   {order.channel === 'offline' &&
-                                    order.payment_status === 'unpaid' ? (
+                                  order.payment_status === 'unpaid' ? (
                                     <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                                       <select
                                         value={moveTargets[order.id] || ''}

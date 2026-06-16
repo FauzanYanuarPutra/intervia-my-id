@@ -1,7 +1,15 @@
 const DEFAULT_MIN_LENGTH = Number.parseInt(
-  process.env.AUTH_PASSWORD_MIN_LENGTH || '10',
+  process.env.NEXT_PUBLIC_AUTH_PASSWORD_MIN_LENGTH ||
+    process.env.AUTH_PASSWORD_MIN_LENGTH ||
+    '15',
   10,
 );
+
+export function getPasswordMinLength(): number {
+  return Number.isFinite(DEFAULT_MIN_LENGTH) && DEFAULT_MIN_LENGTH > 0
+    ? DEFAULT_MIN_LENGTH
+    : 15;
+}
 
 function hasUppercase(password: string): boolean {
   return /[A-Z]/.test(password);
@@ -20,9 +28,7 @@ function hasSymbol(password: string): boolean {
 }
 
 export function validatePasswordStrength(password: string): string | null {
-  const minLength = Number.isFinite(DEFAULT_MIN_LENGTH) && DEFAULT_MIN_LENGTH > 0
-    ? DEFAULT_MIN_LENGTH
-    : 10;
+  const minLength = getPasswordMinLength();
 
   if (password.length < minLength) {
     return `Password must be at least ${minLength} characters`;
@@ -44,4 +50,31 @@ export function validatePasswordStrength(password: string): string | null {
   }
 
   return null;
+}
+
+function normalizeForPasswordHint(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+export function passwordContainsIdentityHint(
+  password: string,
+  hints: Array<string | null | undefined>,
+): boolean {
+  const normalizedPassword = normalizeForPasswordHint(password);
+  if (normalizedPassword.length < 8) return false;
+
+  return hints.some(rawHint => {
+    if (!rawHint) return false;
+    const normalizedHint = normalizeForPasswordHint(rawHint);
+    if (normalizedHint.length >= 4 && normalizedPassword.includes(normalizedHint)) {
+      return true;
+    }
+
+    return rawHint
+      .split(/\s+/)
+      .map(normalizeForPasswordHint)
+      .some(part => part.length >= 4 && normalizedPassword.includes(part));
+  });
 }

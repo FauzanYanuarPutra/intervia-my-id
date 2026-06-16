@@ -24,7 +24,11 @@ import {
   type SavedAccount,
 } from '@/lib/accountVault';
 import { mapCommonAuthError } from '@/lib/authErrors';
-import { validatePasswordStrength } from '@/lib/passwordPolicy';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+import {
+  getPasswordMinLength,
+  validatePasswordStrength,
+} from '@/lib/passwordPolicy';
 import { profileAvatarSrc } from '@/lib/profile/avatar';
 import {
   AlertTriangle,
@@ -350,7 +354,7 @@ function mapPasswordPolicyError(
   if (locale !== 'id') return message;
 
   if (message.includes('at least')) {
-    return 'Password minimal 10 karakter.';
+    return `Password minimal ${getPasswordMinLength()} karakter.`;
   }
   if (message.includes('uppercase')) {
     return 'Password harus punya minimal satu huruf besar.';
@@ -626,13 +630,25 @@ export default function SettingsPage() {
         {
           key: 'bisnis',
           label: isId ? 'Bisnis' : 'Business',
-          description: isId ? 'Toko, chat, transaksi' : 'Store, chat, deals',
+          description: isId
+            ? PROMO_ONLY_MODE
+              ? 'Toko, chat, promosi'
+              : 'Toko, chat, transaksi'
+            : PROMO_ONLY_MODE
+              ? 'Store, chat, promotion'
+              : 'Store, chat, deals',
           icon: BriefcaseBusiness,
         },
         {
           key: 'notifikasi',
           label: isId ? 'Notifikasi' : 'Notifications',
-          description: isId ? 'Chat, order, laporan' : 'Chat, orders, reports',
+          description: isId
+            ? PROMO_ONLY_MODE
+              ? 'Chat, profil, laporan'
+              : 'Chat, order, laporan'
+            : PROMO_ONLY_MODE
+              ? 'Chat, profile, reports'
+              : 'Chat, orders, reports',
           icon: BellRing,
         },
         {
@@ -686,16 +702,26 @@ export default function SettingsPage() {
         href: '/usaha',
         icon: Store,
         label: isId ? 'Kelola usaha' : 'Manage business',
-        description: isId ? 'Toko, katalog, order' : 'Store, catalog, orders',
-      },
-      {
-        href: '/payments',
-        icon: WalletCards,
-        label: isId ? 'Saldo & pembayaran' : 'Balance and payments',
         description: isId
-          ? 'Wallet, invoice, payout'
-          : 'Wallet, invoices, payouts',
+          ? PROMO_ONLY_MODE
+            ? 'Toko, katalog, chat'
+            : 'Toko, katalog, order'
+          : PROMO_ONLY_MODE
+            ? 'Store, catalog, chats'
+            : 'Store, catalog, orders',
       },
+      ...(!PROMO_ONLY_MODE
+        ? [
+            {
+              href: '/payments',
+              icon: WalletCards,
+              label: isId ? 'Saldo & pembayaran' : 'Balance and payments',
+              description: isId
+                ? 'Wallet, invoice, payout'
+                : 'Wallet, invoices, payouts',
+            },
+          ]
+        : []),
       {
         href: '/notifications',
         icon: BellRing,
@@ -1125,8 +1151,12 @@ export default function SettingsPage() {
                   title={isId ? 'Yang sering dipakai' : 'Frequently used'}
                   description={
                     isId
-                      ? 'Shortcut paling umum seperti Facebook: profil, usaha, pembayaran, dan notifikasi.'
-                      : 'Common shortcuts: profile, business, payments, and notifications.'
+                      ? PROMO_ONLY_MODE
+                        ? 'Shortcut paling umum: profil, usaha, chat, dan notifikasi.'
+                        : 'Shortcut paling umum seperti Facebook: profil, usaha, pembayaran, dan notifikasi.'
+                      : PROMO_ONLY_MODE
+                        ? 'Common shortcuts: profile, business, chats, and notifications.'
+                        : 'Common shortcuts: profile, business, payments, and notifications.'
                   }
                 >
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -1301,8 +1331,12 @@ export default function SettingsPage() {
                   title={isId ? 'Preferensi usaha' : 'Business preferences'}
                   description={
                     isId
-                      ? 'Pengaturan yang paling sering dicari pemilik UMKM: visibilitas, chat, transaksi, dan invoice.'
-                      : 'Common business controls: visibility, chat, transactions, and invoices.'
+                      ? PROMO_ONLY_MODE
+                        ? 'Pengaturan awal launching: visibilitas usaha, chat, dan distribusi konten.'
+                        : 'Pengaturan yang paling sering dicari pemilik UMKM: visibilitas, chat, transaksi, dan invoice.'
+                      : PROMO_ONLY_MODE
+                        ? 'Launch settings: business visibility, chats, and content distribution.'
+                        : 'Common business controls: visibility, chat, transactions, and invoices.'
                   }
                 >
                   <div className="space-y-2">
@@ -1327,26 +1361,30 @@ export default function SettingsPage() {
                           ? 'Chat masuk dari listing, toko, dan profil publik.'
                           : 'Chats can come from listings, stores, and public profile.',
                       },
-                      {
-                        key: 'escrowRequired' as const,
-                        icon: ShieldCheck,
-                        title: isId
-                          ? 'Sarankan pembayaran aman'
-                          : 'Recommend protected payments',
-                        desc: isId
-                          ? 'Tampilkan opsi escrow saat transaksi jasa atau project.'
-                          : 'Show escrow options for services and projects.',
-                      },
-                      {
-                        key: 'autoInvoice' as const,
-                        icon: WalletCards,
-                        title: isId
-                          ? 'Buat invoice otomatis'
-                          : 'Auto-create invoices',
-                        desc: isId
-                          ? 'Invoice disiapkan setelah deal di chat.'
-                          : 'Invoices are prepared after a chat deal.',
-                      },
+                      ...(!PROMO_ONLY_MODE
+                        ? [
+                            {
+                              key: 'escrowRequired' as const,
+                              icon: ShieldCheck,
+                              title: isId
+                                ? 'Sarankan pembayaran aman'
+                                : 'Recommend protected payments',
+                              desc: isId
+                                ? 'Tampilkan opsi escrow saat transaksi jasa atau project.'
+                                : 'Show escrow options for services and projects.',
+                            },
+                            {
+                              key: 'autoInvoice' as const,
+                              icon: WalletCards,
+                              title: isId
+                                ? 'Buat invoice otomatis'
+                                : 'Auto-create invoices',
+                              desc: isId
+                                ? 'Invoice disiapkan setelah deal di chat.'
+                                : 'Invoices are prepared after a chat deal.',
+                            },
+                          ]
+                        : []),
                     ].map(item => (
                       <PreferenceRow
                         key={item.key}
@@ -1381,16 +1419,27 @@ export default function SettingsPage() {
               >
                 <div className="space-y-2">
                   {[
-                    {
-                      key: 'orderAlerts' as const,
-                      icon: WalletCards,
-                      title: isId
-                        ? 'Order dan pembayaran'
-                        : 'Orders and payments',
-                      desc: isId
-                        ? 'Top up, invoice, escrow, payout, refund.'
-                        : 'Top ups, invoices, escrow, payouts, refunds.',
-                    },
+                    PROMO_ONLY_MODE
+                      ? {
+                          key: 'orderAlerts' as const,
+                          icon: Store,
+                          title: isId
+                            ? 'Update katalog & profil'
+                            : 'Catalog and profile updates',
+                          desc: isId
+                            ? 'Perubahan listing, etalase, dan profil usaha.'
+                            : 'Listing, showcase, and business profile changes.',
+                        }
+                      : {
+                          key: 'orderAlerts' as const,
+                          icon: WalletCards,
+                          title: isId
+                            ? 'Order dan pembayaran'
+                            : 'Orders and payments',
+                          desc: isId
+                            ? 'Top up, invoice, escrow, payout, refund.'
+                            : 'Top ups, invoices, escrow, payouts, refunds.',
+                        },
                     {
                       key: 'chatAlerts' as const,
                       icon: MessageCircle,
@@ -1404,8 +1453,12 @@ export default function SettingsPage() {
                       icon: Download,
                       title: isId ? 'Ringkasan mingguan' : 'Weekly summary',
                       desc: isId
-                        ? 'Performa listing, toko, dan transaksi.'
-                        : 'Listing, store, and transaction performance.',
+                        ? PROMO_ONLY_MODE
+                          ? 'Performa listing, toko, dan chat.'
+                          : 'Performa listing, toko, dan transaksi.'
+                        : PROMO_ONLY_MODE
+                          ? 'Listing, store, and chat performance.'
+                          : 'Listing, store, and transaction performance.',
                     },
                     {
                       key: 'promoTips' as const,
@@ -1860,8 +1913,12 @@ export default function SettingsPage() {
                     }
                     description={
                       isId
-                        ? 'Data profil, postingan, transaksi, dan preferensi akan disiapkan.'
-                        : 'Profile, posts, transactions, and preferences will be prepared.'
+                        ? PROMO_ONLY_MODE
+                          ? 'Data profil, postingan, chat, dan preferensi akan disiapkan.'
+                          : 'Data profil, postingan, transaksi, dan preferensi akan disiapkan.'
+                        : PROMO_ONLY_MODE
+                          ? 'Profile, posts, chats, and preferences will be prepared.'
+                          : 'Profile, posts, transactions, and preferences will be prepared.'
                     }
                   >
                     <button
