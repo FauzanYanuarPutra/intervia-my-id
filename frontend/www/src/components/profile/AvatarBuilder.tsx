@@ -203,7 +203,7 @@ export function AvatarBuilder({
               <p className="min-w-0 truncate text-sm font-black text-slate-950 dark:text-white">
                 {title || (isId ? 'Avatar Lajukan' : 'Lajukan Avatar')}
               </p>
-              <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-white dark:bg-white dark:text-slate-950">
+              <span className="flex justify-center items-center rounded-full !bg-slate-950 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] !text-white !dark:bg-white !dark:text-slate-950">
                 Chibi Game
               </span>
             </div>
@@ -745,8 +745,8 @@ function PresetButton({
       className={cn(
         'group min-w-0 rounded-[20px] border bg-white p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-lg dark:bg-white/8',
         active
-          ? 'border-slate-950 ring-2 ring-slate-950/10 dark:border-white dark:ring-white/20'
-          : 'border-slate-200 dark:border-white/10',
+          ? '!border-slate-950 !ring-2 !ring-slate-950/10 !dark:border-white !dark:ring-white/20'
+          : '!border-slate-200 !dark:border-white/10',
       )}
     >
       <div className="relative overflow-hidden rounded-[16px] bg-slate-100 dark:bg-slate-950">
@@ -830,7 +830,7 @@ function AvatarActionButton({
       className={cn(
         'inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-sm font-black transition disabled:cursor-wait disabled:opacity-60',
         variant === 'primary'
-          ? 'bg-slate-950 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950'
+          ? '!bg-slate-950 !text-white !hover:bg-slate-800 !dark:bg-white !containerdark:text-slate-950'
           : 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white',
       )}
     >

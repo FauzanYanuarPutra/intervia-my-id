@@ -110,11 +110,11 @@ function buildMapAction(
         : 'Full map',
     desc: selected
       ? isId
-        ? 'Buka peta layar penuh langsung ke pin usaha ini.'
-        : 'Open the full-screen map focused on this business pin.'
+        ? 'Lihat titik usaha.'
+        : 'Open the business pin.'
       : isId
-        ? 'Lihat usaha sekitar dalam peta penuh yang mudah digeser.'
-        : 'Browse nearby businesses in a full-screen draggable map.',
+        ? 'Cek usaha sekitar.'
+        : 'Check nearby businesses.',
     href: selected
       ? appendQueryParam(discoveryPath, 'storeId', selected.id)
       : discoveryPath,
@@ -146,7 +146,7 @@ function buildOverviewFlowSteps({
   storeCount: number;
 }): OverviewFlowStep[] {
   if (!selected) {
-    return buildEntryFlowSteps({ isId, mapHref, setupHref, storeCount });
+    return buildEntryFlowSteps({ isId, setupHref, storeCount });
   }
 
   return buildSelectedFlowSteps({
@@ -160,12 +160,10 @@ function buildOverviewFlowSteps({
 
 function buildEntryFlowSteps({
   isId,
-  mapHref,
   setupHref,
   storeCount,
 }: {
   isId: boolean;
-  mapHref: string;
   setupHref: string;
   storeCount: number;
 }): OverviewFlowStep[] {
@@ -175,11 +173,11 @@ function buildEntryFlowSteps({
       desc:
         storeCount > 0
           ? isId
-            ? 'Pilih satu usaha sebagai fokus kerja.'
-            : 'Choose one business as the current focus.'
+            ? 'Pilih yang mau dikerjakan.'
+            : 'Choose one to work on.'
           : isId
-            ? 'Simpan usaha pertama dulu.'
-            : 'Save the first business first.',
+            ? 'Isi profil singkat.'
+            : 'Fill a short profile.',
       done: storeCount > 0,
       href: setupHref,
       label:
@@ -193,30 +191,17 @@ function buildEntryFlowSteps({
     },
     {
       active: false,
-      desc: isId
-        ? 'Lengkapi nama, kontak, alamat, dan titik peta.'
-        : 'Complete name, contact, address, and map pin.',
+      desc: isId ? 'Tambah foto dan lokasi.' : 'Add photo and location.',
       done: false,
       href: setupHref,
-      label: isId ? 'Rapikan profil' : 'Tidy profile',
+      label: isId ? 'Foto & lokasi' : 'Photo & location',
     },
     {
       active: false,
-      desc: isId
-        ? 'Tambahkan produk atau jasa pertama.'
-        : 'Add the first product or service.',
+      desc: isId ? 'Masukkan jualan pertama.' : 'Add the first item.',
       done: false,
       href: setupHref,
       label: isId ? 'Isi katalog' : 'Fill catalog',
-    },
-    {
-      active: false,
-      desc: isId
-        ? 'Cek referensi usaha sekitar di peta penuh.'
-        : 'Check nearby business references on the full map.',
-      done: false,
-      href: mapHref,
-      label: isId ? 'Lihat maps' : 'Open maps',
     },
   ];
 }
@@ -240,36 +225,28 @@ function buildSelectedFlowSteps({
   return [
     {
       active: false,
-      desc: isId
-        ? `${selected.name} sedang jadi fokus kerja.`
-        : `${selected.name} is the current work focus.`,
+      desc: isId ? 'Usaha aktif.' : 'Active business.',
       done: true,
       href: routes.setup('list', selected.id),
       label: isId ? 'Usaha dipilih' : 'Business selected',
     },
     {
       active: activeLabel.toLowerCase().includes('setup'),
-      desc: isId
-        ? 'Pastikan profil, alamat, dan titik peta jelas.'
-        : 'Make sure profile, address, and map pin are clear.',
+      desc: isId ? 'Foto, alamat, kontak.' : 'Photo, address, contact.',
       done: profileDone,
       href: routes.setup('detail', selected.id),
       label: isId ? 'Profil & lokasi' : 'Profile & location',
     },
     {
       active: activeLabel.toLowerCase().includes('katalog'),
-      desc: isId
-        ? 'Masukkan jualan, foto, dan harga yang mudah dipahami.'
-        : 'Add listings, photos, and pricing that are easy to understand.',
+      desc: isId ? 'Jualan, foto, harga.' : 'Items, photos, prices.',
       done: false,
       href: routes.workspace('catalog', selected.id),
       label: isId ? 'Katalog' : 'Catalog',
     },
     {
       active: false,
-      desc: isId
-        ? 'Buka maps penuh untuk cek posisi dan promosi sekitar.'
-        : 'Open the full map to check position and nearby promotion context.',
+      desc: isId ? 'Cek titik dan share.' : 'Check pin and share.',
       done: profileDone,
       href: mapHref,
       label: isId ? 'Maps & promosi' : 'Maps & promo',

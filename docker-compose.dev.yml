@@ -183,9 +183,10 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 60s
       retries: 5
+      start_period: 120s
     networks:
       - web
 
@@ -237,7 +238,7 @@ services:
       ENV: ${ENV}
       PHX_SERVER: "true"
       PHX_HOST: auth.${APP_DOMAIN}
-      SECRET_KEY_BASE: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       SCYLLA_HOST: scylla_db
       SCYLLA_PORT: "9042"
       SCYLLA_KEYSPACE: laju_chat
@@ -249,9 +250,9 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:4000/api/health" ]
       interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+      timeout: 15s
+      retries: 10
+      start_period: 90s
     networks:
       - web
     restart: unless-stopped
@@ -349,12 +350,14 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum
       COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
+      INTERNAL_API_URL: http://identity_service:8080
       RUN_MIGRATIONS: ${RUN_MIGRATIONS_COMMUNITY:-true}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - community_uploads:/app/uploads/forum
     depends_on:
       community_db: { condition: service_healthy }
+      identity_service: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
     healthcheck:

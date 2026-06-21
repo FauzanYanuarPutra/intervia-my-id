@@ -11,7 +11,6 @@ import {
   MessageCircle,
   Plus,
   X,
-  Phone,
   Send,
   Loader2,
   Search,
@@ -118,6 +117,20 @@ function normalizeRoomId(raw: unknown): string {
 
 function buildDraftRoomId(contact: string): string {
   return `draft:${encodeURIComponent(contact)}`;
+}
+
+function normalizeUsername(value: string): string {
+  return value.trim().replace(/^@+/, '').toLowerCase();
+}
+
+function isValidUsername(value: string): boolean {
+  return /^[a-z0-9_.]{3,30}$/.test(value) && !value.includes('..');
+}
+
+function resolveUserLabel(entry: DiscoverUser): string {
+  const username = entry.username?.trim();
+  if (username) return `@${username}`;
+  return entry.full_name?.trim() || 'User';
 }
 
 const CHAT_LAYOUT_LABEL_CLASS =
@@ -507,21 +520,19 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
     if (!contactInput.trim()) {
       setError(
         isId
-          ? 'Masukkan nomor HP atau email'
-          : 'Please enter a phone number or email',
+          ? 'Masukkan username'
+          : 'Please enter a username',
       );
       return;
     }
 
-    const normalizedContact = contactInput.trim();
-    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedContact);
-    const cleanPhone = normalizedContact.replace(/\D/g, '');
+    const normalizedUsername = normalizeUsername(contactInput);
 
-    if (!isEmail && cleanPhone.length < 10) {
+    if (!isValidUsername(normalizedUsername)) {
       setError(
         isId
-          ? 'Nomor HP atau email tidak valid'
-          : 'Invalid phone number or email',
+          ? 'Username tidak valid'
+          : 'Invalid username',
       );
       return;
     }
@@ -530,8 +541,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
     setError('');
 
     try {
-      const contact = isEmail ? normalizedContact.toLowerCase() : cleanPhone;
-      const draftRoomId = buildDraftRoomId(contact);
+      const draftRoomId = buildDraftRoomId(normalizedUsername);
       setShowNewChat(false);
       setContactInput('');
       router.push(`/chat/${encodeURIComponent(draftRoomId)}`);
@@ -993,7 +1003,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                           type="text"
                           value={contactInput}
                           onChange={e => setContactInput(e.target.value)}
-                          placeholder="Cari nama, email, atau telepon"
+                          placeholder="Cari username"
                           className={`${CHAT_LAYOUT_INPUT_CLASS} pl-9`}
                         />
                       </div>
@@ -1009,14 +1019,11 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                         <div className="mt-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
                           {discoverUsers.map(entry => {
                             if (selectedMemberIds.has(entry.id)) return null;
-                            const primary =
-                              (entry.username && entry.username.trim()
-                                ? `@${entry.username.trim()}`
-                                : entry.full_name ||
-                                  entry.email ||
-                                  entry.phone ||
-                                  'User') || 'User';
-                            const secondary = entry.email || entry.phone || '';
+                            const primary = resolveUserLabel(entry);
+                            const secondary =
+                              entry.username?.trim() && entry.full_name?.trim()
+                                ? entry.full_name.trim()
+                                : '';
                             return (
                               <button
                                 key={entry.id}
@@ -1048,12 +1055,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                               key={member.id}
                               className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-2 py-1 text-[11px] font-semibold text-[color:var(--app-text)]"
                             >
-                              {(member.username && member.username.trim()
-                                ? `@${member.username.trim()}`
-                                : member.full_name ||
-                                  member.email ||
-                                  member.phone ||
-                                  'User') || 'User'}
+                              {resolveUserLabel(member)}
                               <button
                                 type="button"
                                 onClick={() => handleRemoveMember(member.id)}
@@ -1071,27 +1073,23 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                 ) : (
                   <div>
                     <label className={CHAT_LAYOUT_LABEL_CLASS}>
-                      {isId ? 'Nomor HP atau email' : 'Phone number or email'}
+                      Username
                     </label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
+                      <UserRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[color:var(--app-text-soft)]" />
                       <input
                         type="text"
                         value={contactInput}
                         onChange={e => setContactInput(e.target.value)}
-                        placeholder={
-                          isId
-                            ? '+62 812 3456 7890 atau user@email.com'
-                            : '+62 812 3456 7890 or user@example.com'
-                        }
+                        placeholder="@username"
                         className={`${CHAT_LAYOUT_INPUT_CLASS} pl-10`}
                       />
                     </div>
 
                     <p className="mt-2 text-xs text-[color:var(--app-text-soft)]">
                       {isId
-                        ? 'Masukkan kontak orang yang ingin kamu ajak chat.'
-                        : 'Enter the phone number or email of the person you want to chat with.'}
+                        ? 'Masukkan username orang yang ingin kamu ajak chat.'
+                        : 'Enter the username of the person you want to chat with.'}
                     </p>
 
                     {discoverLoading ? (
@@ -1104,14 +1102,11 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                     {!discoverLoading && discoverUsers.length > 0 ? (
                       <div className="mt-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
                         {discoverUsers.map(entry => {
-                          const primary =
-                            (entry.username && entry.username.trim()
-                              ? `@${entry.username.trim()}`
-                              : entry.full_name ||
-                                entry.email ||
-                                entry.phone ||
-                                'User') || 'User';
-                          const secondary = entry.email || entry.phone || '';
+                          const primary = resolveUserLabel(entry);
+                          const secondary =
+                            entry.username?.trim() && entry.full_name?.trim()
+                              ? entry.full_name.trim()
+                              : '';
                           return (
                             <button
                               key={entry.id}

@@ -18,6 +18,10 @@ import {
   normalizeProfileMediaList,
   normalizeProfileMediaUrl,
 } from '@/lib/profile/profileMedia';
+import {
+  prepareUploadFile,
+  prepareUploadFiles,
+} from '@/lib/media/prepareUploadMedia';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import { ArrowLeft, Globe2, Loader2, Save, Upload } from 'lucide-react';
@@ -628,8 +632,9 @@ export default function EditProfilePage() {
     setUploadingImages(true);
     setError(null);
     try {
+      const optimizedFiles = await prepareUploadFiles(Array.from(files));
       const formData = new FormData();
-      Array.from(files).forEach(file => formData.append('images', file));
+      optimizedFiles.forEach(file => formData.append('images', file));
       const res = await authFetch('/api/content/upload-images', {
         method: 'POST',
         body: formData,
@@ -655,8 +660,9 @@ export default function EditProfilePage() {
     setUploadingCover(true);
     setError(null);
     try {
+      const optimizedFile = await prepareUploadFile(file);
       const formData = new FormData();
-      formData.append('images', file);
+      formData.append('images', optimizedFile);
       const res = await authFetch('/api/content/upload-images', {
         method: 'POST',
         body: formData,
@@ -689,8 +695,9 @@ export default function EditProfilePage() {
     setUploadingAvatar(true);
     setError(null);
     try {
+      const optimizedFile = await prepareUploadFile(file);
       const formData = new FormData();
-      formData.append('images', file);
+      formData.append('images', optimizedFile);
       const res = await authFetch('/api/content/upload-images', {
         method: 'POST',
         body: formData,

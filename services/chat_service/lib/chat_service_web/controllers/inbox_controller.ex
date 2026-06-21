@@ -1,7 +1,7 @@
 defmodule ChatServiceWeb.InboxController do
   use ChatServiceWeb, :controller
 
-  alias ChatService.Repo
+  alias ChatService.{IdentityClient, Repo}
   alias ChatService.DmRoom
 
   # Fetch more rows then dedupe by room_id so we show one room per conversation (not one row per message).
@@ -54,7 +54,8 @@ defmodule ChatServiceWeb.InboxController do
           Enum.map(unique_rows, fn row ->
             room_id = row["room_id"]
             room_type = row["room_type"] || "dm"
-            {resolved_name, room_avatar} = resolve_room_display(room_id, room_type, user_id_bin)
+            {resolved_name, room_avatar, room_avatar_style} =
+              resolve_room_display(room_id, room_type, user_id_bin)
             room_name = resolved_name || row["room_name"] || room_id
             last_sender = row["last_sender"]
             unread_from_counter = to_nonneg_int(Map.get(unread_map, room_id))
@@ -67,6 +68,8 @@ defmodule ChatServiceWeb.InboxController do
               room_type: room_type,
               room_name: room_name,
               room_avatar: room_avatar,
+              avatar_style: room_avatar_style,
+              room_avatar_style: room_avatar_style,
               last_message: row["last_message"],
               last_sender: last_sender,
               last_message_at: row["last_message_at"],
@@ -84,19 +87,38 @@ defmodule ChatServiceWeb.InboxController do
 
   defp resolve_room_display(room_id, "dm", user_id_bin) do
     case DmRoom.peer_user_id_bin(room_id, user_id_bin) do
-      nil -> {room_id, nil}
+      nil -> {room_id, nil, nil}
       peer_id_bin -> get_user_display(peer_id_bin)
     end
   end
-  defp resolve_room_display(_room_id, _type, _user_id_bin), do: {nil, nil}
+  defp resolve_room_display(_room_id, _type, _user_id_bin), do: {nil, nil, nil}
 
   defp get_user_display(user_id_bin) do
-    case Repo.execute("SELECT display_name, username, avatar_url FROM core.users WHERE user_id = ? LIMIT 1", [{"uuid", user_id_bin}]) do
-      {:ok, [row | _]} ->
-        name = row["display_name"] || row["username"] || Ecto.UUID.cast!(user_id_bin)
-        {name, row["avatar_url"]}
+    user_id = Ecto.UUID.cast!(user_id_bin)
+
+    case IdentityClient.fetch_public_profile(user_id) do
+      {:ok, profile} ->
+        name =
+          IdentityClient.display_name(profile, user_id) ||
+            user_id
+
+        avatar = IdentityClient.avatar_url(profile)
+        style = IdentityClient.avatar_style(profile)
+
+        {name, avatar, style}
+
       _ ->
-        {Ecto.UUID.cast!(user_id_bin), nil}
+        case Repo.execute(
+               "SELECT display_name, username, avatar_url FROM core.users WHERE user_id = ? LIMIT 1",
+               [{"uuid", user_id_bin}]
+             ) do
+          {:ok, [row | _]} ->
+            name = row["display_name"] || row["username"] || user_id
+            {name, row["avatar_url"], nil}
+
+          _ ->
+            {user_id, nil, nil}
+        end
     end
   end
 

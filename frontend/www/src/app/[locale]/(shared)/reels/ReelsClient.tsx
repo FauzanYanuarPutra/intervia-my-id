@@ -13,17 +13,16 @@ import {
   type CSSProperties,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent,
   type TouchEvent,
   type UIEvent,
   type WheelEvent,
 } from 'react';
+import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
 import {
   ArrowLeft,
   Bookmark,
   Box,
   BriefcaseBusiness,
-  Building2,
   Camera,
   Check,
   ChevronRight,
@@ -35,7 +34,6 @@ import {
   Hash,
   Heart,
   Home,
-  ImageIcon,
   Info,
   Link2,
   Loader2,
@@ -58,7 +56,6 @@ import {
   User,
   UserPlus,
   Users,
-  Video,
   Volume2,
   VolumeX,
   WalletCards,
@@ -66,6 +63,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/system/feedback/ToastProvider';
+import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
+import { PROFILE_SOCIAL_STORAGE_KEY } from '@/components/profile/profile-hub/services/profileStorage.service';
+import {
+  mapDiscoverUserToSocialUser,
+  mergeSocialUsers,
+} from '@/components/profile/profile-hub/services/profileSocial.service';
 import {
   normalizePlayableReel,
   normalizePlayableReels,
@@ -73,8 +77,11 @@ import {
   type LajukanReel,
   type ReelsPageResult,
 } from '../../_data/reels';
+import type { InboxNotification } from '@/context/NotificationInboxContext';
+import type { DiscoverUser, SocialUser } from '@/components/profile/profile-hub/types/profileSocial';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildPublicProfileHref } from '@/lib/profile/publicProfileLink';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import {
   openNativeReelsStudio,
   requestNativePermissions,
@@ -143,8 +150,6 @@ type UploadReelForm = {
   productName: string;
   productPrice: string;
   productHref: string;
-  storeName: string;
-  storeCity: string;
 };
 
 type UploadReelStep = 'media' | 'edit' | 'post';
@@ -171,6 +176,13 @@ type PreferenceProfile = {
   signals: number;
   updatedAt: number;
 };
+
+type ShareSheetRecipient = SocialUser & {
+  source: 'creator' | 'following' | 'suggested';
+  linked: boolean;
+};
+
+type NotificationData = Record<string, unknown>;
 
 const PROFILE_STORAGE_KEY = 'lajukan.reels.preference.v1';
 const SOUND_STORAGE_KEY = 'lajukan.reels.sound.v1';
@@ -207,6 +219,158 @@ const STOP_WORDS = new Set([
   'cara',
 ]);
 
+function normalizeRecipientName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function readNotificationData(notification: InboxNotification): NotificationData {
+  const data = notification.data;
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? (data as NotificationData)
+    : {};
+}
+
+function readNotificationDataText(
+  notification: InboxNotification,
+  keys: string[],
+): string {
+  const data = readNotificationData(notification);
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+  return '';
+}
+
+function readNotificationEventName(notification: InboxNotification): string {
+  const fromData = readNotificationDataText(notification, [
+    'event_name',
+    'action',
+  ]);
+  if (fromData) return fromData;
+
+  const value = notification.event_type;
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return '';
+}
+
+function readNotificationEntityType(notification: InboxNotification): string {
+  return readNotificationDataText(notification, ['entity_type', 'entityType']);
+}
+
+function readNotificationEntityId(notification: InboxNotification): string {
+  return readNotificationDataText(notification, ['entity_id', 'entityId']);
+}
+
+function readNotificationTargetHref(notification: InboxNotification): string {
+  return readNotificationDataText(notification, [
+    'href',
+    'target_href',
+    'target_url',
+    'content_url',
+    'url',
+    'action_url',
+    'actionHref',
+  ]);
+}
+
+function resolveNotificationReelId(notification: InboxNotification): string {
+  const directEntityId = readNotificationEntityId(notification);
+  if (directEntityId) return directEntityId;
+
+  const directHref = readNotificationTargetHref(notification);
+  if (!directHref) return '';
+
+  try {
+    const base =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : 'http://localhost';
+    const parsed = new URL(directHref, base);
+    const queryReel = parsed.searchParams.get('reel')?.trim();
+    if (queryReel) return queryReel;
+    const pathParts = parsed.pathname.split('/').filter(Boolean);
+    if (pathParts[0] === 'reels' && pathParts[1]?.trim()) {
+      return pathParts[1].trim();
+    }
+    return '';
+  } catch {
+    const match = directHref.match(/[?&]reel=([^&#]+)/i);
+    if (match?.[1]) {
+      try {
+        return decodeURIComponent(match[1]).trim();
+      } catch {
+        return match[1].trim();
+      }
+    }
+    return '';
+  }
+}
+
+function isReelCommentNotification(notification: InboxNotification): boolean {
+  const eventName = readNotificationEventName(notification).toLowerCase();
+  const entityType = readNotificationEntityType(notification).toLowerCase();
+  const text = [
+    notification.category,
+    notification.event_type,
+    notification.title,
+    notification.message,
+    eventName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (eventName === 'reels.commented' || eventName === 'reels.replied') {
+    return true;
+  }
+
+  if (entityType === 'reel' || entityType === 'reels') {
+    return (
+      text.includes('comment') ||
+      text.includes('reply') ||
+      text.includes('reels.')
+    );
+  }
+
+  return false;
+}
+
+function resolveCommunityDirectBaseUrl(): string | null {
+  const base = process.env.NEXT_PUBLIC_COMMUNITY_URL?.trim();
+  if (!base) return null;
+  return base.replace(/\/$/, '');
+}
+
+function buildCommunityReelCommentsUrl(
+  reelId: string,
+  cursor: number,
+): string | null {
+  const base = resolveCommunityDirectBaseUrl();
+  if (!base) return null;
+
+  try {
+    const url = new URL(
+      `/v1/reels/${encodeURIComponent(reelId)}/comments`,
+      base.endsWith('/') ? base : `${base}/`,
+    );
+    url.searchParams.set('cursor', String(cursor));
+    url.searchParams.set('limit', '20');
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 const EMPTY_UPLOAD_FORM: UploadReelForm = {
   captureMode: 'camera',
   filterPreset: 'natural',
@@ -221,8 +385,6 @@ const EMPTY_UPLOAD_FORM: UploadReelForm = {
   productName: '',
   productPrice: '',
   productHref: '',
-  storeName: '',
-  storeCity: '',
 };
 
 const REEL_CAPTURE_MODES: Array<{
@@ -293,9 +455,9 @@ const REELS_MUSIC_TRACKS = [
 
 const REELS_STUDIO_SPEEDS = ['0,25x', '0,5x', '1x', '1,5x', '2x'] as const;
 const REELS_STUDIO_DURATIONS = ['60s', '15s', '05s'] as const;
-const REELS_CAPTURE_CANVAS_WIDTH = 720;
-const REELS_CAPTURE_CANVAS_HEIGHT = 1280;
-const REELS_CAPTURE_FPS = 30;
+const REELS_CAPTURE_CANVAS_WIDTH = 540;
+const REELS_CAPTURE_CANVAS_HEIGHT = 960;
+const REELS_CAPTURE_FPS = 24;
 
 const REEL_FILTER_PRESETS: Array<{
   id: NonNullable<LajukanReel['filterPreset']>;
@@ -500,6 +662,35 @@ function drawVideoCoverFrame(
   }
 
   context.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
+}
+
+function drawVideoContainFrame(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+) {
+  const sourceWidth = video.videoWidth || width;
+  const sourceHeight = video.videoHeight || height;
+  const targetRatio = width / height;
+  const sourceRatio = sourceWidth / sourceHeight;
+
+  let dx = 0;
+  let dy = 0;
+  let dw = width;
+  let dh = height;
+
+  if (sourceRatio > targetRatio) {
+    dh = width / sourceRatio;
+    dy = (height - dh) / 2;
+  } else {
+    dw = height * sourceRatio;
+    dx = (width - dw) / 2;
+  }
+
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, width, height);
+  context.drawImage(video, 0, 0, sourceWidth, sourceHeight, dx, dy, dw, dh);
 }
 
 function drawStudioCanvasEffect(
@@ -983,6 +1174,7 @@ export default function ReelsClient({
   initialUploadOpen = false,
 }: ReelsClientProps) {
   const { user, isAuthenticated, authFetch, loading: authLoading } = useAuth();
+  const { notify } = useToast();
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
@@ -1032,6 +1224,7 @@ export default function ReelsClient({
   const [commentsByReel, setCommentsByReel] = useState<
     Record<string, ReelCommentsBucket>
   >({});
+  const commentsByReelRef = useRef<Record<string, ReelCommentsBucket>>({});
   const [actionsByReel, setActionsByReel] = useState<
     Record<string, ReelActionState>
   >({});
@@ -1042,6 +1235,10 @@ export default function ReelsClient({
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const [chatBusyReelId, setChatBusyReelId] = useState<string | null>(null);
   const initialUploadHandledRef = useRef(false);
+
+  useEffect(() => {
+    commentsByReelRef.current = commentsByReel;
+  }, [commentsByReel]);
 
   const overlayOpen =
     searchOpen ||
@@ -1123,6 +1320,31 @@ export default function ReelsClient({
         return next;
       });
 
+      if (
+        signal === 'detail' &&
+        user?.id &&
+        reel.creatorUserId &&
+        reel.creatorUserId !== user.id
+      ) {
+        void trackLajukanEvent('reels.viewed', {
+          entityType: 'reel',
+          entityId: reel.id,
+          page: `/reels?reel=${encodeURIComponent(reel.id)}`,
+          properties: {
+            target_user_id: reel.creatorUserId,
+            target_username: reel.creator,
+            target_name: reel.creator,
+            target_href: `/reels?reel=${encodeURIComponent(reel.id)}`,
+            entity_label: reel.title,
+            actor_user_id: user.id,
+            actor_username: user.username || '',
+            actor_name: user.name || user.fullName || user.username || '',
+            actor_avatar_url: user.avatarUrl || user.avatar_url || '',
+            source: 'reels',
+          },
+        });
+      }
+
       const request = isAuthenticated ? authFetch : fetch;
       void request(`/api/reels/${encodeURIComponent(reel.id)}/events`, {
         method: 'POST',
@@ -1142,7 +1364,7 @@ export default function ReelsClient({
         })
         .catch(() => undefined);
     },
-    [authFetch, isAuthenticated, replaceReel],
+    [authFetch, isAuthenticated, replaceReel, user?.avatarUrl, user?.avatar_url, user?.fullName, user?.id, user?.name, user?.username],
   );
 
   const loadReelActionState = useCallback(
@@ -1229,6 +1451,31 @@ export default function ReelsClient({
         }
 
         if (payload.reel) replaceReel(payload.reel);
+        if (
+          nextActive &&
+          action === 'like' &&
+          reel.creatorUserId &&
+          user?.id &&
+          reel.creatorUserId !== user.id
+        ) {
+          void trackLajukanEvent('reels.liked', {
+            entityType: 'reel',
+            entityId: reel.id,
+            page: `/reels?reel=${encodeURIComponent(reel.id)}`,
+            properties: {
+              target_user_id: reel.creatorUserId,
+              target_username: reel.creator,
+              target_name: reel.creator,
+              target_href: `/reels?reel=${encodeURIComponent(reel.id)}`,
+              entity_label: reel.title,
+              actor_user_id: user.id,
+              actor_username: user.username || '',
+              actor_name: user.name || user.fullName || user.username || '',
+              actor_avatar_url: user.avatarUrl || user.avatar_url || '',
+              source: 'reels',
+            },
+          });
+        }
         setActionsByReel(current => ({
           ...current,
           [reel.id]: normalizeReelActionState(payload.actionState),
@@ -1243,7 +1490,7 @@ export default function ReelsClient({
         );
       }
     },
-    [actionsByReel, authFetch, isAuthenticated, replaceReel],
+    [actionsByReel, authFetch, isAuthenticated, replaceReel, user?.avatarUrl, user?.avatar_url, user?.fullName, user?.id, user?.name, user?.username],
   );
 
   const openShareSheet = useCallback(
@@ -1316,7 +1563,7 @@ export default function ReelsClient({
 
   const loadComments = useCallback(
     async (reelId: string, reset = false) => {
-      const current = commentsByReel[reelId];
+      const current = commentsByReelRef.current[reelId];
       if (current?.loading) return;
       if (!reset && current && !current.hasMore) return;
 
@@ -1345,16 +1592,33 @@ export default function ReelsClient({
           cursor: String(cursorValue),
           limit: '20',
         });
-        const response = await fetch(
+        const requestOptions = {
+          cache: 'no-store' as const,
+          headers: { Accept: 'application/json' },
+        };
+        let response = await fetch(
           `/api/reels/${encodeURIComponent(reelId)}/comments?${params.toString()}`,
-          { cache: 'no-store' },
+          requestOptions,
         );
-        const payload = (await response.json().catch(() => ({}))) as {
+        let payload = (await response.json().catch(() => ({}))) as {
           items?: ReelComment[];
           nextCursor?: number | null;
           hasMore?: boolean;
           error?: string;
         };
+
+        if (!response.ok || !Array.isArray(payload.items)) {
+          const fallbackUrl = buildCommunityReelCommentsUrl(reelId, cursorValue);
+          if (fallbackUrl) {
+            response = await fetch(fallbackUrl, requestOptions);
+            payload = (await response.json().catch(() => ({}))) as {
+              items?: ReelComment[];
+              nextCursor?: number | null;
+              hasMore?: boolean;
+              error?: string;
+            };
+          }
+        }
 
         if (!response.ok || !Array.isArray(payload.items)) {
           throw new Error(payload.error || 'Gagal memuat komentar');
@@ -1404,7 +1668,29 @@ export default function ReelsClient({
         });
       }
     },
-    [commentsByReel],
+    [],
+  );
+
+  const refreshReelFromServer = useCallback(
+    async (reelId: string) => {
+      const cleanReelId = String(reelId || '').trim();
+      if (!cleanReelId) return;
+
+      try {
+        const response = await fetch(
+          `/api/reels/${encodeURIComponent(cleanReelId)}`,
+          { cache: 'no-store' },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          reel?: LajukanReel | null;
+        };
+        if (!response.ok || !payload.reel) return;
+        replaceReel(payload.reel);
+      } catch {
+        // Ignore realtime refresh errors. The local UI stays usable.
+      }
+    },
+    [replaceReel],
   );
 
   const openComments = useCallback(
@@ -1419,21 +1705,25 @@ export default function ReelsClient({
     [commentsByReel, loadComments],
   );
 
-  const startChatFromReel = useCallback(
-    async (reel: LajukanReel, sourceComment?: ReelComment | null) => {
+  const startChatWithUser = useCallback(
+    async (
+      peerUserId: string | null | undefined,
+      reel: LajukanReel,
+      sourceComment?: ReelComment | null,
+    ) => {
       if (!isAuthenticated) {
         setAuthPrompt('Masuk dulu untuk chat pembuat reels ini.');
         return;
       }
 
-      const creatorUserId = reel.creatorUserId?.trim();
-      if (!creatorUserId) {
+      const targetUserId = peerUserId?.trim();
+      if (!targetUserId) {
         setAuthPrompt(
           'Creator reels ini belum terhubung ke akun chat. Coba reels yang dibuat user login.',
         );
         return;
       }
-      if (user?.id && creatorUserId === user.id) {
+      if (user?.id && targetUserId === user.id) {
         setAuthPrompt(
           'Ini reels kamu sendiri, jadi tidak perlu buka DM ke diri sendiri.',
         );
@@ -1446,7 +1736,7 @@ export default function ReelsClient({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            peer_user_id: creatorUserId,
+            peer_user_id: targetUserId,
             lead: {
               source: 'reels',
               name: `Reels: ${reel.title}`,
@@ -1503,7 +1793,15 @@ export default function ReelsClient({
     [authFetch, isAuthenticated, locale, router, user?.id],
   );
 
+  const startChatFromReel = useCallback(
+    (reel: LajukanReel, sourceComment?: ReelComment | null) =>
+      void startChatWithUser(reel.creatorUserId, reel, sourceComment),
+    [startChatWithUser],
+  );
+
   const submitComment = useCallback(async () => {
+
+
     if (!commentsReel || commentSubmitting) return;
     if (!isAuthenticated) {
       setAuthPrompt('Masuk dulu untuk ikut komentar di reels ini.');
@@ -1515,19 +1813,40 @@ export default function ReelsClient({
 
     setCommentSubmitting(true);
     try {
-      const response = await authFetch(
+      const requestBody = JSON.stringify({
+        content: body,
+        replyToPostId: replyTarget?.id,
+      });
+      const requestOptions: RequestInit = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody,
+      };
+
+      let response = await authFetch(
         `/api/reels/${encodeURIComponent(commentsReel.id)}/comments`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ body, parentCommentId: replyTarget?.id }),
-        },
+        requestOptions,
       );
-      const payload = (await response.json().catch(() => ({}))) as {
+      let payload = (await response.json().catch(() => ({}))) as {
         comment?: ReelComment;
         reel?: LajukanReel;
         error?: string;
       };
+
+      if (!response.ok || !payload.comment) {
+        const fallbackUrl = buildCommunityReelCommentsUrl(
+          commentsReel.id,
+          0,
+        );
+        if (fallbackUrl) {
+          response = await authFetch(fallbackUrl, requestOptions);
+          payload = (await response.json().catch(() => ({}))) as {
+            comment?: ReelComment;
+            reel?: LajukanReel;
+            error?: string;
+          };
+        }
+      }
 
       if (!response.ok || !payload.comment) {
         throw new Error(payload.error || 'Komentar gagal dikirim');
@@ -1552,6 +1871,43 @@ export default function ReelsClient({
       });
 
       if (payload.reel) replaceReel(payload.reel);
+      if (
+        commentsReel.creatorUserId &&
+        user?.id &&
+        commentsReel.creatorUserId !== user.id
+      ) {
+        void trackLajukanEvent(
+          Boolean(replyTarget?.id) ? 'reels.replied' : 'reels.commented',
+          {
+            entityType: 'reel',
+            entityId: commentsReel.id,
+            page: `/reels?reel=${encodeURIComponent(commentsReel.id)}`,
+            properties: {
+              target_user_id: commentsReel.creatorUserId,
+              target_username: commentsReel.creator,
+              target_name: commentsReel.creator,
+              target_href: `/reels?reel=${encodeURIComponent(commentsReel.id)}`,
+              entity_label: commentsReel.title,
+              actor_user_id: user.id,
+              actor_username: user.username || '',
+              actor_name: user.name || user.fullName || user.username || '',
+              actor_avatar_url: user.avatarUrl || user.avatar_url || '',
+              source: 'reels',
+            },
+          },
+        );
+      }
+      notify({
+        title:
+          locale === 'id'
+            ? 'Komentar terkirim'
+            : 'Comment posted',
+        description:
+          locale === 'id'
+            ? 'Komentar kamu sudah masuk dan akan ikut update realtime.'
+            : 'Your comment is live and will stay in sync in realtime.',
+        variant: 'success',
+      });
       setCommentBody('');
       setReplyTarget(null);
     } catch (error) {
@@ -1572,6 +1928,14 @@ export default function ReelsClient({
           },
         };
       });
+      notify({
+        title: locale === 'id' ? 'Komentar gagal' : 'Comment failed',
+        description:
+          error instanceof Error ? error.message : locale === 'id'
+            ? 'Coba lagi beberapa saat.'
+            : 'Please try again in a moment.',
+        variant: 'error',
+      });
     } finally {
       setCommentSubmitting(false);
     }
@@ -1583,7 +1947,45 @@ export default function ReelsClient({
     isAuthenticated,
     replaceReel,
     replyTarget?.id,
+    notify,
+    locale,
+    user?.avatarUrl,
+    user?.avatar_url,
+    user?.fullName,
+    user?.id,
+    user?.name,
+    user?.username,
   ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onMarketplaceNotification = (event: Event) => {
+      const detail = (event as CustomEvent<InboxNotification>).detail;
+      if (!detail || !isReelCommentNotification(detail)) return;
+
+      const reelId = resolveNotificationReelId(detail);
+      if (!reelId) return;
+
+      void refreshReelFromServer(reelId);
+
+      if (commentsReel?.id === reelId) {
+        void loadComments(reelId, true);
+      }
+    };
+
+    window.addEventListener(
+      'marketplace:notification',
+      onMarketplaceNotification as EventListener,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'marketplace:notification',
+        onMarketplaceNotification as EventListener,
+      );
+    };
+  }, [commentsReel?.id, loadComments, refreshReelFromServer]);
 
   const scrollToIndex = useCallback(
     (index: number, behavior: ScrollBehavior = 'smooth') => {
@@ -2023,7 +2425,6 @@ export default function ReelsClient({
             <ReelsCreateDock
               locale={locale}
               isAuthenticated={isAuthenticated}
-              activeReelId={activeReelId}
               onOpenUpload={requestUpload}
             />
           </div>
@@ -2122,6 +2523,9 @@ export default function ReelsClient({
           reel={shareReel}
           chatBusy={chatBusyReelId === shareReel?.id}
           onMessageCreator={reel => void startChatFromReel(reel)}
+          onMessageUser={(userId, reel) =>
+            void startChatWithUser(userId, reel)
+          }
           onClose={() => setShareReel(null)}
         />
 
@@ -2848,232 +3252,27 @@ function ReelsTopBar({
   );
 }
 
-const REELS_LAST_CREATE_ACTION_KEY = 'lajukan:reels-last-create-action';
-
-function buildReelsCreateHref(
-  href: string,
-  locale: string,
-  isAuthenticated: boolean,
-  activeReelId: string | null,
-) {
-  const localizedHref = `/${locale}${href}`;
-  if (isAuthenticated) return localizedHref;
-
-  const videoParam = activeReelId || '1';
-  const fallback = `/${locale}/reels?video=${encodeURIComponent(videoParam)}`;
-  return `/${locale}/login?callbackUrl=${encodeURIComponent(fallback)}`;
-}
-
 function ReelsCreateDock({
   locale,
   isAuthenticated,
-  activeReelId,
   onOpenUpload,
 }: {
   locale: string;
   isAuthenticated: boolean;
-  activeReelId: string | null;
   onOpenUpload: () => void;
 }) {
-  const isId = locale === 'id';
-  const [open, setOpen] = useState(false);
-  const [lastAction, setLastAction] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return window.localStorage.getItem(REELS_LAST_CREATE_ACTION_KEY);
-  });
-  const dragStartY = useRef<number | null>(null);
-
-  const actions = useMemo(
-    () => [
-      {
-        key: 'video',
-        label: isId ? 'Upload Video' : 'Upload Video',
-        icon: Video,
-        onClick: () => {
-          window.localStorage.setItem(REELS_LAST_CREATE_ACTION_KEY, 'video');
-          setLastAction('video');
-          setOpen(false);
-          onOpenUpload();
-        },
-      },
-      {
-        key: 'photo',
-        label: isId ? 'Upload Foto' : 'Upload Photo',
-        href: '/create/jual/produk?media=photo',
-        icon: ImageIcon,
-      },
-      {
-        key: 'listing',
-        label: isId ? 'Buat Listing' : 'Create Listing',
-        href: '/create/jual/produk',
-        icon: Store,
-      },
-      {
-        key: 'service',
-        label: isId ? 'Tawarkan Jasa' : 'Offer Service',
-        href: '/create/jual/jasa',
-        icon: BriefcaseBusiness,
-      },
-      {
-        key: 'talent',
-        label: isId ? 'Cari Talent' : 'Find Talent',
-        href: '/create/butuh/lowongan',
-        icon: Users,
-      },
-      {
-        key: 'property',
-        label: isId ? 'Tambah Properti' : 'Add Property',
-        href: '/create/jual/properti',
-        icon: Building2,
-      },
-    ],
-    [isId, onOpenUpload],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open]);
-
-  const rememberAction = (key: string) => {
-    window.localStorage.setItem(REELS_LAST_CREATE_ACTION_KEY, key);
-    setLastAction(key);
-    setOpen(false);
-  };
-
-  const handleSheetPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    dragStartY.current = event.clientY;
-  };
-
-  const handleSheetPointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    if (dragStartY.current === null) return;
-    const deltaY = event.clientY - dragStartY.current;
-    dragStartY.current = null;
-    if (deltaY > 58) setOpen(false);
-  };
-
   return (
-    <>
-      <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+20px)] right-3 z-50 flex justify-end lg:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="pointer-events-auto flex h-12 min-h-12 w-12 min-w-12 touch-manipulation items-center justify-center rounded-full bg-[#6cd698] text-slate-950 shadow-[0_18px_38px_-14px_rgba(16,185,129,0.82),0_8px_18px_-10px_rgba(0,0,0,0.72)] ring-4 ring-black/45 transition active:scale-95"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-label={isId ? 'Buat di Lajukan' : 'Create on Lajukan'}
-          data-testid="reels-create-fab"
-        >
-          <Plus className="h-7 w-7 stroke-[3]" aria-hidden="true" />
-        </button>
-      </div>
-
-      <div
-        className={cn(
-          'absolute inset-0 z-[70] bg-black/58 backdrop-blur-[3px] transition-opacity duration-200',
-          open
-            ? 'pointer-events-auto opacity-100'
-            : 'pointer-events-none opacity-0',
-        )}
-        aria-hidden={!open}
-        onClick={() => setOpen(false)}
-      />
-
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reels-create-sheet-title"
-        className={cn(
-          'absolute inset-x-0 bottom-0 z-[80] px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] transition-transform duration-300 ease-out',
-          open ? 'translate-y-0' : 'translate-y-[115%]',
-        )}
-        onPointerDown={handleSheetPointerDown}
-        onPointerUp={handleSheetPointerUp}
-        onClick={event => event.stopPropagation()}
+    <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+20px)] right-3 z-50 flex justify-end lg:hidden">
+      <button
+        type="button"
+        onClick={onOpenUpload}
+        className="pointer-events-auto flex h-12 min-h-12 w-12 min-w-12 touch-manipulation items-center justify-center rounded-full bg-[#6cd698] text-slate-950 shadow-[0_18px_38px_-14px_rgba(16,185,129,0.82),0_8px_18px_-10px_rgba(0,0,0,0.72)] ring-4 ring-black/35 transition active:scale-95 dark:ring-black/45"
+        aria-label={isAuthenticated ? (locale === 'id' ? 'Buat Reels' : 'Create Reels') : locale === 'id' ? 'Masuk untuk buat reels' : 'Sign in to create reels'}
+        data-testid="reels-create-fab"
       >
-        <div className="mx-auto max-w-[430px] rounded-t-[28px] border border-white/12 bg-[#080f0c] p-4 text-white shadow-[0_-22px_52px_-24px_rgba(0,0,0,0.86)]">
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-white/24" />
-          <div className="mb-3 px-1">
-            <p id="reels-create-sheet-title" className="text-lg font-black">
-              {isId ? 'Buat di Lajukan' : 'Create on Lajukan'}
-            </p>
-            <p className="mt-0.5 text-sm font-semibold text-white/58">
-              {isId
-                ? 'Pilih yang ingin kamu bagikan'
-                : 'Choose what you want to share'}
-            </p>
-          </div>
-
-          <div className="grid gap-2">
-            {actions.map(action => {
-              // 1. Defensively handle the Icon component casing
-              const RawIcon = action.icon;
-              const Icon =
-                typeof RawIcon === 'function' ||
-                  (RawIcon && typeof RawIcon === 'object')
-                  ? (RawIcon as LucideIcon)
-                  : null;
-
-              const selected = lastAction === action.key;
-
-              const content = (
-                <>
-                  <span className="flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full bg-[#6cd698] text-white shadow-[0_10px_22px_-16px_rgba(0,0,0,0.8)]">
-                    {/* Render safely only if it's a valid React component */}
-                    {Icon ? <Icon className="h-5 w-5" /> : null}
-                  </span>
-                  <span className="min-w-0 flex-1 text-[15px] font-black leading-tight">
-                    {action.label}
-                  </span>
-                </>
-              );
-
-              const className = cn(
-                'flex min-h-[56px] touch-manipulation items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left transition active:scale-[0.99]',
-                selected
-                  ? 'border-[#6cd698]/55 bg-[#6cd698]/16'
-                  : 'border-white/10 bg-white/[0.06] hover:border-[#6cd698]/45 hover:bg-[#6cd698]/10',
-              );
-
-              if ('onClick' in action) {
-                return (
-                  <button
-                    key={action.key}
-                    type="button"
-                    onClick={action.onClick}
-                    className={className}
-                    data-testid={`reels-create-action-${action.key}`}
-                  >
-                    {content}
-                  </button>
-                );
-              }
-
-              return (
-                <Link
-                  key={action.key}
-                  href={buildReelsCreateHref(
-                    action.href,
-                    locale,
-                    isAuthenticated,
-                    activeReelId,
-                  )}
-                  onClick={() => rememberAction(action.key)}
-                  className={className}
-                  data-testid={`reels-create-action-${action.key}`}
-                >
-                  {content}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </>
+        <Camera className="h-6 w-6 stroke-[2.6]" aria-hidden="true" />
+      </button>
+    </div>
   );
 }
 
@@ -3147,8 +3346,8 @@ function ReelsEndSlide({
       : ['supplier', 'kuliner', 'packaging', 'cashflow', 'reseller', 'promo'];
 
   return (
-    <article className="relative h-full snap-start overflow-hidden bg-[#070707] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,#101010_0%,#050505_42%,#0f172a_100%)]" />
+    <article className="relative h-full snap-start overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_34%),linear-gradient(180deg,#f8fafc_0%,#f6f9f4_46%,#eef2ff_100%)] text-slate-900">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.6)_0%,rgba(255,255,255,0.16)_42%,rgba(255,255,255,0.38)_100%)]" />
 
       <div
         className="relative z-10 h-full overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+28px)] pt-[calc(env(safe-area-inset-top)+76px)] [scrollbar-width:none] [touch-action:pan-y] [&::-webkit-scrollbar]:hidden"
@@ -3158,17 +3357,17 @@ function ReelsEndSlide({
       >
         <div className="mx-auto min-h-full w-full max-w-[380px] pb-8">
           <div className="flex items-start gap-3">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-white text-slate-950 shadow-xl">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-emerald-600 text-white shadow-xl shadow-emerald-950/18">
               <Check className="h-6 w-6" />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-300">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
                 {isId ? 'Feed selesai' : 'Feed complete'}
               </p>
-              <h2 className="mt-1 text-[26px] font-black leading-[1.05] tracking-[-0.03em]">
+              <h2 className="mt-1 text-[26px] font-black leading-[1.05] tracking-[-0.03em] text-slate-950">
                 {isId ? 'Kamu sudah sampai akhir' : 'You are all caught up'}
               </h2>
-              <p className="mt-2 text-sm font-semibold leading-6 text-white/62">
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
                 {isId
                   ? 'Lanjut dari sini: ulangi feed, cari topik lain, atau buat reels usaha baru.'
                   : 'Continue from here: restart the feed, search another topic, or create a new business reel.'}
@@ -3177,19 +3376,19 @@ function ReelsEndSlide({
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-2">
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.07] p-3">
-              <p className="text-2xl font-black">
+            <div className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.24)]">
+              <p className="text-2xl font-black text-slate-950">
                 {totalCount.toLocaleString(locale)}
               </p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/46">
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 {isId ? 'reels dimuat' : 'reels loaded'}
               </p>
             </div>
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.07] p-3">
-              <p className="text-2xl font-black">
+            <div className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.24)]">
+              <p className="text-2xl font-black text-slate-950">
                 {topicChips.length.toLocaleString(locale)}
               </p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/46">
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 {isId ? 'topik lanjut' : 'next topics'}
               </p>
             </div>
@@ -3199,7 +3398,7 @@ function ReelsEndSlide({
             <button
               type="button"
               onClick={onRestart}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] bg-white px-4 text-sm font-black text-slate-950 transition active:scale-[0.98]"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-sm font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.26)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
             >
               <RefreshCcw className="h-4.5 w-4.5" />
               {isId ? 'Ulangi feed dari awal' : 'Restart feed'}
@@ -3208,7 +3407,7 @@ function ReelsEndSlide({
               <button
                 type="button"
                 onClick={() => onSearch()}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-white/12 bg-white/[0.08] px-3 text-xs font-black text-white transition active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-3 text-xs font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.22)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
               >
                 <Search className="h-4 w-4" />
                 {isId ? 'Cari topik' : 'Search'}
@@ -3216,7 +3415,7 @@ function ReelsEndSlide({
               <button
                 type="button"
                 onClick={onUpload}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] bg-rose-500 px-3 text-xs font-black text-white transition active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-emerald-200 bg-white px-3 text-xs font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.22)] transition hover:border-emerald-300 hover:text-emerald-700 active:scale-[0.98]"
               >
                 <Camera className="h-4 w-4" />
                 {isId ? 'Buat reels' : 'Create'}
@@ -3224,8 +3423,8 @@ function ReelsEndSlide({
             </div>
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs font-black uppercase tracking-wide text-white/52">
+          <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.24)]">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
               {isId ? 'Topik yang bisa dicari' : 'Topics to search'}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -3234,7 +3433,7 @@ function ReelsEndSlide({
                   key={topic}
                   type="button"
                   onClick={() => onSearch(topic)}
-                  className="rounded-full bg-white/10 px-3 py-2 text-[11px] font-black text-white/76 ring-1 ring-white/10 transition active:scale-95"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.24)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-95"
                 >
                   #{topic}
                 </button>
@@ -3244,7 +3443,7 @@ function ReelsEndSlide({
 
           <Link
             href={`/${locale}/home`}
-            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[18px] bg-white/10 px-4 text-xs font-black text-white/72 ring-1 ring-white/10 transition active:scale-[0.98]"
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-xs font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.26)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
           >
             <Home className="h-4 w-4" />
             {isId ? 'Kembali ke beranda' : 'Back to home'}
@@ -3380,7 +3579,7 @@ function ReelSlide({
 
   return (
     <article
-      className="relative flex h-full snap-start overflow-hidden px-2.5 pb-[env(safe-area-inset-bottom)+20px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+20px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
+      className="relative flex h-full snap-start overflow-hidden !bg-black !text-white px-2.5 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-[calc(env(safe-area-inset-top)+48px)] sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+20px)] sm:pt-[calc(env(safe-area-inset-top)+58px)]"
       style={REEL_SLIDE_LOADED_STYLE}
     >
       {imageMedia ? (
@@ -3691,7 +3890,7 @@ function ActionRail({
 
             p-0
 
-            text-white
+            !text-white
             shadow-[0_8px_20px_-8px_rgba(0,0,0,0.9)]
             ring-2
             ring-black
@@ -3700,7 +3899,7 @@ function ActionRail({
             active:scale-95
             disabled:opacity-60
             `,
-            actionState.followed ? 'bg-emerald-500' : 'bg-[#ff2d55]',
+            actionState.followed ? '!bg-emerald-500' : '!bg-[#ff2d55]',
           )}
         >
           {actionState.loading === 'follow' ? (
@@ -3727,8 +3926,8 @@ function ActionRail({
           >
             <span
               className={cn(
-                'grid h-10 w-10 place-items-center rounded-full bg-black/34 text-white shadow-[0_14px_30px_-20px_rgba(0,0,0,0.9)] backdrop-blur-md ring-1 ring-white/18 transition sm:h-11 sm:w-11',
-                action.active && 'bg-white text-rose-600 ring-white',
+                '!grid !h-10 !w-10 place-items-center rounded-full !bg-black/34 !text-white shadow-[0_14px_30px_-20px_rgba(0,0,0,0.9)] backdrop-blur-md ring-1 ring-white/18 transition sm:!h-11 sm:!w-11',
+                action.active && '!bg-rose-600 !text-white !ring-rose-200',
               )}
             >
               {action.loading ? (
@@ -3736,8 +3935,8 @@ function ActionRail({
               ) : (
                 <ActionIcon
                   className={cn(
-                    'h-4.5 w-4.5 sm:h-5 sm:w-5',
-                    action.active && 'fill-current',
+                    '!h-4.5 !w-4.5 sm:!h-5 sm:!w-5',
+                    action.active && '!fill-current',
                   )}
                 />
               )}
@@ -3788,6 +3987,16 @@ function SearchOverlay({
   onSelect: (index: number, query: string) => void;
 }) {
   const [query, setQuery] = useState(initialQuery);
+  const {
+    ref: chipRailRef,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerLeave,
+    onPointerMove,
+    onPointerUp,
+    onWheel,
+  } = useHorizontalDragScroll<HTMLDivElement>();
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -3913,7 +4122,17 @@ function SearchOverlay({
           </button>
         </div>
 
-        <div className="mx-auto mt-3 flex w-full max-w-[1440px] gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={chipRailRef}
+          onClickCapture={onClickCapture}
+          onPointerCancel={onPointerCancel}
+          onPointerDown={onPointerDown}
+          onPointerLeave={onPointerLeave}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onWheel={onWheel}
+          className="mx-auto mt-3 flex w-full max-w-[1440px] gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+        >
           {chips.map(chip => {
             const active = query === chip || (!query && chip === 'Semua');
 
@@ -4183,7 +4402,7 @@ function DetailOverlay({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[92svh] w-full flex-col overflow-hidden rounded-t-[30px] bg-[#080808] shadow-2xl lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[460px] lg:rounded-none lg:border-l lg:border-white/10">
+      <section className="relative flex max-h-[92svh] w-full flex-col overflow-hidden rounded-t-[30px] bg-[#080808] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[460px] lg:rounded-none lg:border-l lg:border-white/10">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/24 lg:hidden" />
         <div className="relative min-h-[30svh] max-h-[42svh] overflow-hidden bg-black lg:min-h-[220px] lg:max-h-[260px]">
           {imageMedia ? (
@@ -4225,10 +4444,10 @@ function DetailOverlay({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-white p-5 text-slate-950 sm:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#0c0f14] p-5 text-white sm:p-6">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+              <p className="text-xs font-black uppercase tracking-wide text-emerald-300">
                 Detail Reels
               </p>
               <h2 className="mt-1 text-2xl font-black leading-tight">
@@ -4239,7 +4458,7 @@ function DetailOverlay({
             <button
               type="button"
               onClick={onClose}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 transition active:scale-95"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-white transition active:scale-95"
             >
               <X className="h-5 w-5" />
             </button>
@@ -4248,12 +4467,12 @@ function DetailOverlay({
           <div className="flex items-center gap-3">
             <Link
               href={profileHref}
-              className="shrink-0 rounded-full bg-slate-100 p-0.5 ring-1 ring-slate-200 transition active:scale-95"
+              className="shrink-0 rounded-full bg-white/10 p-0.5 ring-1 ring-white/10 transition active:scale-95"
               aria-label={`Lihat profil ${reel.creator}`}
             >
               <ReelCreatorAvatar
                 reel={reel}
-                className="h-11 w-11 bg-slate-200"
+                className="h-11 w-11 bg-white/10"
                 size={44}
               />
             </Link>
@@ -4261,18 +4480,18 @@ function DetailOverlay({
             <div className="min-w-0 flex-1">
               <Link
                 href={profileHref}
-                className="block truncate text-sm font-black text-slate-950 underline-offset-4 transition hover:underline"
+                className="block truncate text-sm font-black text-white underline-offset-4 transition hover:underline"
               >
                 {reel.creator}
               </Link>
-              <p className="text-xs font-semibold text-slate-500">
+              <p className="text-xs font-semibold text-white/55">
                 {reel.tag} / Tips bisnis
               </p>
             </div>
 
             <Link
               href={profileHref}
-              className="hidden items-center gap-1.5 rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-800 transition active:scale-[0.98] min-[430px]:inline-flex"
+              className="hidden items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white transition active:scale-[0.98] min-[430px]:inline-flex"
             >
               <User className="h-3.5 w-3.5" />
               Profil
@@ -4282,7 +4501,7 @@ function DetailOverlay({
               type="button"
               onClick={() => onMessageCreator(reel)}
               disabled={chatBusyReelId === reel.id}
-              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-4 py-2 text-xs font-black text-white disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-4 py-2 text-xs font-black text-white disabled:opacity-60"
             >
               {chatBusyReelId === reel.id ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -4299,8 +4518,8 @@ function DetailOverlay({
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-black disabled:opacity-60',
                 actionState.followed
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-slate-950 text-white',
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-white/10 text-white ring-1 ring-white/10',
               )}
             >
               {actionState.loading === 'follow' ? (
@@ -4314,7 +4533,7 @@ function DetailOverlay({
             </button>
           </div>
 
-          <p className="mt-5 text-sm leading-relaxed text-slate-700">
+          <p className="mt-5 text-sm leading-relaxed text-white/72">
             {reel.caption}
           </p>
 
@@ -4322,20 +4541,20 @@ function DetailOverlay({
             <button
               type="button"
               onClick={() => onOpenProduct(reel)}
-              className="mt-5 flex w-full items-center gap-3 rounded-[24px] bg-yellow-400 p-4 text-left text-slate-950 shadow-lg shadow-yellow-400/20"
+              className="mt-5 flex w-full items-center gap-3 rounded-[24px] border border-yellow-300/20 bg-yellow-400/10 p-4 text-left text-white shadow-lg shadow-yellow-400/10"
             >
-              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-slate-950 text-yellow-300">
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-yellow-400 text-slate-950">
                 <ShoppingBag className="h-7 w-7" />
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="mb-1 inline-flex rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-yellow-300">
+                <div className="mb-1 inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-yellow-200">
                   Produk terkait
                 </div>
                 <p className="truncate text-base font-black">
                   {reel.productName}
                 </p>
-                <p className="truncate text-sm font-bold text-slate-700">
+                <p className="truncate text-sm font-bold text-white/64">
                   {reel.productPrice}
                 </p>
               </div>
@@ -4343,12 +4562,12 @@ function DetailOverlay({
               <ChevronRight className="h-5 w-5 shrink-0" />
             </button>
           ) : (
-            <div className="mt-5 rounded-[24px] bg-slate-100 p-4">
-              <div className="flex items-center gap-2 text-sm font-black text-slate-700">
-                <Info className="h-5 w-5 text-emerald-700" />
+            <div className="mt-5 rounded-[24px] border border-white/10 bg-white/6 p-4">
+              <div className="flex items-center gap-2 text-sm font-black text-white">
+                <Info className="h-5 w-5 text-emerald-300" />
                 Konten informasi
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              <p className="mt-1 text-xs leading-relaxed text-white/55">
                 Reels ini tidak terhubung ke produk. Isinya fokus edukasi, tips,
                 atau insight bisnis.
               </p>
@@ -4374,7 +4593,7 @@ function DetailOverlay({
             <button
               type="button"
               onClick={() => onOpenComments(reel)}
-              className="rounded-2xl bg-slate-100 px-3 py-3 text-sm font-black text-slate-800"
+              className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-black text-white ring-1 ring-white/10"
             >
               Komentar
             </button>
@@ -4382,14 +4601,14 @@ function DetailOverlay({
               type="button"
               onClick={() => onAction(reel, 'save')}
               disabled={actionState.loading === 'save'}
-              className="rounded-2xl bg-slate-100 px-3 py-3 text-sm font-black text-slate-800"
+              className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-black text-white ring-1 ring-white/10"
             >
               {actionState.saved ? 'Tersimpan' : 'Simpan'}
             </button>
             <button
               type="button"
               onClick={() => onOpenShare(reel)}
-              className="rounded-2xl bg-emerald-700 px-3 py-3 text-sm font-black text-white"
+              className="rounded-2xl bg-emerald-500 px-3 py-3 text-sm font-black text-white"
             >
               Bagikan
             </button>
@@ -4414,19 +4633,36 @@ function ShareSheet({
   reel,
   chatBusy,
   onMessageCreator,
+  onMessageUser,
   onClose,
 }: {
   locale: string;
   reel: LajukanReel | null;
   chatBusy: boolean;
   onMessageCreator: (reel: LajukanReel) => void;
+  onMessageUser: (userId: string, reel: LajukanReel) => Promise<void> | void;
   onClose: () => void;
 }) {
+  const { authFetch, user } = useAuth();
+  const isId = locale === 'id';
   const [copied, setCopied] = useState(false);
+  const [followedIds, setFollowedIds] = useState<string[]>([]);
+  const [recipients, setRecipients] = useState<ShareSheetRecipient[]>([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(false);
+  const [sendingRecipientId, setSendingRecipientId] = useState<string | null>(
+    null,
+  );
   const shareUrl = useMemo(
     () => buildReelShareUrl(locale, reel),
     [locale, reel],
   );
+  const reelId = reel?.id ?? null;
+  const reelCreator = reel?.creator ?? '';
+  const reelCreatorUserId = reel?.creatorUserId ?? '';
+  const followingStorageKey = `${PROFILE_SOCIAL_STORAGE_KEY}:${user?.id || 'me'}`;
+  const recipientsRail = useHorizontalDragScroll<HTMLDivElement>();
+  const primaryActionsRail = useHorizontalDragScroll<HTMLDivElement>();
+  const utilityActionsRail = useHorizontalDragScroll<HTMLDivElement>();
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -4434,7 +4670,208 @@ function ShareSheet({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [reel?.id]);
+  }, [reelId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const raw = window.localStorage.getItem(followingStorageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setFollowedIds(
+        Array.isArray(parsed)
+          ? parsed.map(item => String(item).trim()).filter(Boolean)
+          : [],
+      );
+    } catch {
+      setFollowedIds([]);
+    }
+  }, [followingStorageKey]);
+
+  useEffect(() => {
+    if (!reelId) {
+      setRecipients([]);
+      setRecipientsLoading(false);
+      setSendingRecipientId(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const loadPublicUser = async (id: string): Promise<SocialUser | null> => {
+      try {
+        const response = await authFetch(
+          `/api/users/public/${encodeURIComponent(id)}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) return null;
+
+        const payload = (await response.json().catch(() => null)) as
+          | DiscoverUser
+          | null;
+        if (!payload) return null;
+
+        const mapped = mapDiscoverUserToSocialUser(payload, isId);
+        if (!mapped) return null;
+        if (user?.id && mapped.id === user.id) return null;
+        return mapped;
+      } catch {
+        return null;
+      }
+    };
+
+    const loadDiscoverUsers = async (
+      query?: string,
+      limit = 8,
+    ): Promise<SocialUser[]> => {
+      try {
+        const params = new URLSearchParams({
+          limit: String(limit),
+        });
+        const trimmed = query?.trim();
+        if (trimmed) {
+          params.set('q', trimmed);
+        }
+
+        const response = await authFetch(
+          `/api/users/discover?${params.toString()}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) return [];
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: DiscoverUser[];
+        };
+        return (Array.isArray(payload.data) ? payload.data : [])
+          .map(item => mapDiscoverUserToSocialUser(item, isId))
+          .filter((item): item is SocialUser => Boolean(item))
+          .filter(item => !user?.id || item.id !== user.id);
+      } catch {
+        return [];
+      }
+    };
+
+    const loadRecipients = async () => {
+      setRecipientsLoading(true);
+
+      try {
+        const normalizedCreator = normalizeRecipientName(reelCreator);
+        const creatorUserId = reelCreatorUserId.trim();
+        const currentUserId = user?.id?.trim() || '';
+        const creatorIsSelf = Boolean(
+          currentUserId && creatorUserId && creatorUserId === currentUserId,
+        );
+        const followedIdSet = new Set(followedIds);
+
+        const [creatorById, creatorBySearch, followedUsers, suggestedUsers] =
+          await Promise.all([
+            creatorUserId ? loadPublicUser(creatorUserId) : Promise.resolve(null),
+            normalizedCreator
+              ? loadDiscoverUsers(reelCreator, 6)
+              : Promise.resolve([]),
+            Promise.all(followedIds.slice(0, 6).map(id => loadPublicUser(id))),
+            loadDiscoverUsers(undefined, 8),
+          ]);
+
+        const creatorCandidate =
+          creatorById ||
+          (Array.isArray(creatorBySearch)
+            ? creatorBySearch.find(candidate => {
+              const candidateName = normalizeRecipientName(candidate.name);
+              const candidateHandle = normalizeRecipientName(candidate.handle);
+              return (
+                candidateName === normalizedCreator ||
+                candidateHandle === normalizedCreator
+              );
+            }) || null
+            : null);
+
+        const effectiveCreatorCandidate = creatorIsSelf
+          ? null
+          : creatorCandidate;
+        const creatorRecipient: ShareSheetRecipient | null =
+          effectiveCreatorCandidate
+            ? {
+              ...effectiveCreatorCandidate,
+              source: 'creator',
+              linked: true,
+            }
+            : null;
+
+        const filteredFollowedUsers = followedUsers.filter(
+          item =>
+            item?.id !== effectiveCreatorCandidate?.id &&
+            item?.id !== creatorRecipient?.id,
+        );
+        const filteredSuggestedUsers = suggestedUsers.filter(
+          item =>
+            item?.id !== effectiveCreatorCandidate?.id &&
+            item.id !== creatorRecipient?.id &&
+            !followedIdSet.has(item.id),
+        );
+        const validFollowedUsers = filteredFollowedUsers.filter(
+          (user): user is SocialUser => user !== null
+        );
+
+        const validSuggestedUsers = filteredSuggestedUsers.filter(
+          (user): user is SocialUser => user !== null
+        );
+
+        const restRecipients = mergeSocialUsers(
+          validFollowedUsers,
+          validSuggestedUsers,
+        )
+          .filter(item => item.id !== creatorRecipient?.id)
+          .filter(item => {
+            if (!creatorRecipient) return true;
+            const creatorName = normalizeRecipientName(creatorRecipient.name);
+            return (
+              normalizeRecipientName(item.name) !== creatorName &&
+              normalizeRecipientName(item.handle) !== creatorName
+            );
+          })
+          .map<ShareSheetRecipient>(item => ({
+            ...item,
+            source: followedIdSet.has(item.id) ? 'following' : 'suggested',
+            linked: true,
+          }));
+
+        const nextRecipients = creatorRecipient
+          ? [creatorRecipient, ...restRecipients]
+          : restRecipients;
+
+        if (!cancelled) {
+          setRecipients(nextRecipients.slice(0, 8));
+        }
+      } finally {
+        if (!cancelled) {
+          setRecipientsLoading(false);
+        }
+      }
+    };
+
+    void loadRecipients();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [
+    authFetch,
+    followedIds,
+    isId,
+    reelCreator,
+    reelCreatorUserId,
+    reelId,
+    user?.id,
+  ]);
 
   const copyLink = useCallback(async () => {
     if (!shareUrl) return;
@@ -4452,26 +4889,63 @@ function ShareSheet({
     window.open(url, '_blank', 'noopener,noreferrer');
   }, []);
 
+  const handleRecipientPress = useCallback(
+    async (recipient: ShareSheetRecipient) => {
+      if (!reel || sendingRecipientId) return;
+
+      setSendingRecipientId(recipient.id);
+      try {
+        if (recipient.linked) {
+          await Promise.resolve(onMessageUser(recipient.id, reel));
+        } else {
+          await Promise.resolve(onMessageCreator(reel));
+        }
+        onClose();
+      } finally {
+        setSendingRecipientId(null);
+      }
+    },
+    [onClose, onMessageCreator, onMessageUser, reel, sendingRecipientId],
+  );
+
   if (!reel) return null;
 
   const encodedUrl = encodeURIComponent(shareUrl);
   const encodedText = encodeURIComponent(`${reel.title}\n${shareUrl}`);
-  const recipients = [
-    {
-      name: reel.creator,
-      caption: 'Creator',
-      tone: 'from-emerald-500 to-teal-400',
-    },
-    { name: 'Alysa', caption: 'Buyer', tone: 'from-slate-900 to-slate-600' },
-    {
-      name: 'Ceptrisna',
-      caption: 'Review',
-      tone: 'from-amber-700 to-yellow-400',
-    },
-    { name: 'NEX', caption: 'Partner', tone: 'from-emerald-600 to-teal-400' },
-    { name: 'Jza', caption: 'Supplier', tone: 'from-zinc-950 to-zinc-500' },
-    { name: 'Al', caption: 'UMKM', tone: 'from-pink-500 to-orange-400' },
-  ];
+  const recipientCaption = (recipient: ShareSheetRecipient) => {
+    if (recipient.source === 'creator') {
+      return recipient.linked
+        ? isId
+          ? 'Pembuat reel'
+          : 'Creator'
+        : isId
+          ? 'Belum terhubung'
+          : 'Not connected';
+    }
+
+    return recipient.source === 'following'
+      ? isId
+        ? 'Di-follow'
+        : 'Following'
+      : isId
+        ? 'Rekomendasi Lajukan'
+        : 'Suggested';
+  };
+
+  const recipientTone = (recipient: ShareSheetRecipient) => {
+    if (recipient.source === 'creator') {
+      return recipient.linked
+        ? 'from-emerald-500 to-teal-400'
+        : 'from-slate-900 to-slate-600';
+    }
+
+    if (recipient.source === 'following') {
+      return 'from-emerald-600 to-teal-400';
+    }
+
+    return 'from-pink-500 to-orange-400';
+  };
+
   const primaryActions: Array<{
     label: string;
     icon?: LucideIcon;
@@ -4539,7 +5013,7 @@ function ShareSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-slate-950 backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
     >
@@ -4550,16 +5024,16 @@ function ShareSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[82svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
-        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-slate-200 lg:hidden" />
+      <section className="relative flex max-h-[82svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-900">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-white">
             <Search className="h-5 w-5" />
           </div>
 
           <div className="min-w-0 flex-1 text-center">
             <h2 className="text-xl font-black tracking-[-0.03em]">Send to</h2>
-            <p className="truncate text-xs font-semibold text-slate-500">
+            <p className="truncate text-xs font-semibold text-white/60">
               {reel.title}
             </p>
           </div>
@@ -4567,7 +5041,7 @@ function ShareSheet({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-slate-100 transition active:scale-95"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-white transition active:scale-95"
             aria-label="Tutup share"
           >
             <X className="h-6 w-6" />
@@ -4575,45 +5049,79 @@ function ShareSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+18px)] sm:px-5 sm:pb-5">
-          <div className="flex gap-3 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {recipients.map((recipient, index) => (
-              <button
-                key={`${recipient.name}-${index}`}
-                type="button"
-                disabled={index === 0 && chatBusy}
-                onClick={() => {
-                  if (index === 0) {
-                    onClose();
-                    onMessageCreator(reel);
-                    return;
+          <div
+            ref={recipientsRail.ref}
+            onClickCapture={recipientsRail.onClickCapture}
+            onPointerCancel={recipientsRail.onPointerCancel}
+            onPointerDown={recipientsRail.onPointerDown}
+            onPointerLeave={recipientsRail.onPointerLeave}
+            onPointerMove={recipientsRail.onPointerMove}
+            onPointerUp={recipientsRail.onPointerUp}
+            onWheel={recipientsRail.onWheel}
+            className="flex gap-3 overflow-x-auto pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+          >
+            {recipientsLoading && recipients.length === 0
+              ? Array.from({ length: 4 }, (_, index) => (
+                <div key={`recipient-skel-${index}`} className="w-[76px] shrink-0 text-center">
+                  <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10 ring-1 ring-white/10">
+                    <Loader2 className="h-5 w-5 animate-spin text-white/55" />
+                  </span>
+                  <span className="mt-2 block h-3 rounded-full bg-white/10" />
+                  <span className="mt-1 block h-2.5 rounded-full bg-white/6" />
+                </div>
+              ))
+              : recipients.map(recipient => (
+                <button
+                  key={recipient.id}
+                  type="button"
+                  disabled={
+                    chatBusy ||
+                    sendingRecipientId === recipient.id
                   }
-                  void copyLink();
-                }}
-                className="w-[76px] shrink-0 text-center transition active:scale-95 disabled:opacity-60"
-              >
-                <span
-                  className={cn(
-                    'mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br text-sm font-black text-white shadow-lg ring-1 ring-black/5',
-                    recipient.tone,
-                  )}
+                  onClick={() => void handleRecipientPress(recipient)}
+                  className="w-[76px] shrink-0 text-center transition active:scale-95 disabled:opacity-60"
                 >
-                  {index === 0 && chatBusy ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    recipient.name.slice(0, 2).toUpperCase()
-                  )}
-                </span>
-                <span className="mt-2 block truncate text-xs font-semibold text-slate-800">
-                  {recipient.name}
-                </span>
-                <span className="block truncate text-[10px] font-medium text-slate-400">
-                  {recipient.caption}
-                </span>
-              </button>
-            ))}
+                  <span
+                    className={cn(
+                      'mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br text-sm font-black text-white shadow-lg ring-1 ring-black/5',
+                      recipientTone(recipient),
+                    )}
+                  >
+                    {sendingRecipientId === recipient.id ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : recipient.avatarUrl ? (
+                      <NextImage
+                        src={recipient.avatarUrl}
+                        alt={recipient.name}
+                        width={64}
+                        height={64}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      recipient.name.slice(0, 2).toUpperCase()
+                    )}
+                  </span>
+                  <span className="mt-2 block truncate text-xs font-semibold text-white">
+                    {recipient.name}
+                  </span>
+                  <span className="block truncate text-[10px] font-medium text-white/48">
+                    {recipientCaption(recipient)}
+                  </span>
+                </button>
+              ))}
           </div>
 
-          <div className="flex gap-4 overflow-x-auto border-t border-slate-100 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            ref={primaryActionsRail.ref}
+            onClickCapture={primaryActionsRail.onClickCapture}
+            onPointerCancel={primaryActionsRail.onPointerCancel}
+            onPointerDown={primaryActionsRail.onPointerDown}
+            onPointerLeave={primaryActionsRail.onPointerLeave}
+            onPointerMove={primaryActionsRail.onPointerMove}
+            onPointerUp={primaryActionsRail.onPointerUp}
+            onWheel={primaryActionsRail.onWheel}
+            className="flex gap-4 overflow-x-auto border-t border-white/10 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+          >
             {primaryActions.map(action => {
               const ActionIcon = action.icon;
 
@@ -4638,7 +5146,7 @@ function ShareSheet({
                       </span>
                     )}
                   </span>
-                  <span className="mt-2 block text-xs font-semibold leading-tight text-slate-700">
+                  <span className="mt-2 block text-xs font-semibold leading-tight text-white/78">
                     {action.label}
                   </span>
                 </button>
@@ -4646,7 +5154,17 @@ function ShareSheet({
             })}
           </div>
 
-          <div className="flex gap-4 overflow-x-auto border-t border-slate-100 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            ref={utilityActionsRail.ref}
+            onClickCapture={utilityActionsRail.onClickCapture}
+            onPointerCancel={utilityActionsRail.onPointerCancel}
+            onPointerDown={utilityActionsRail.onPointerDown}
+            onPointerLeave={utilityActionsRail.onPointerLeave}
+            onPointerMove={utilityActionsRail.onPointerMove}
+            onPointerUp={utilityActionsRail.onPointerUp}
+            onWheel={utilityActionsRail.onWheel}
+            className="flex gap-4 overflow-x-auto border-t border-white/10 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+          >
             {utilityActions.map(action => {
               const ActionIcon = action.icon;
 
@@ -4657,10 +5175,10 @@ function ShareSheet({
                   onClick={action.onClick}
                   className="w-[76px] shrink-0 text-center transition active:scale-95"
                 >
-                  <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-slate-100 text-slate-700">
+                  <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white/10 text-white">
                     <ActionIcon className="h-6 w-6" />
                   </span>
-                  <span className="mt-2 block text-xs font-semibold leading-tight text-slate-700">
+                  <span className="mt-2 block text-xs font-semibold leading-tight text-white/78">
                     {action.label}
                   </span>
                 </button>
@@ -4669,7 +5187,7 @@ function ShareSheet({
           </div>
 
           {copied && (
-            <div className="mb-2 rounded-full bg-slate-950 px-4 py-2 text-center text-xs font-black text-white">
+            <div className="mb-2 rounded-full bg-emerald-500 px-4 py-2 text-center text-xs font-black text-white">
               Link reels disalin
             </div>
           )}
@@ -4769,7 +5287,7 @@ function MoreActionsSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-slate-950 backdrop-blur-sm sm:items-end lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white backdrop-blur-sm sm:items-end lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
     >
@@ -4780,11 +5298,11 @@ function MoreActionsSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative w-full overflow-hidden rounded-t-[26px] bg-white shadow-2xl lg:h-full lg:w-[420px] lg:rounded-none lg:border-l lg:border-white/10">
-        <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200 lg:hidden" />
+      <section className="relative w-full overflow-hidden rounded-t-[26px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:w-[420px] lg:rounded-none lg:border-l lg:border-white/10">
+        <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
+            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
               Aksi reels
             </p>
             <h2 className="truncate text-base font-black">{reel.title}</h2>
@@ -4792,7 +5310,7 @@ function MoreActionsSheet({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 transition active:scale-95"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 transition active:scale-95"
             aria-label="Tutup aksi"
           >
             <X className="h-5 w-5" />
@@ -4811,10 +5329,10 @@ function MoreActionsSheet({
                 className={cn(
                   'flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] px-2 text-xs font-black transition active:scale-[0.98] disabled:opacity-60',
                   action.featured
-                    ? 'bg-slate-950 text-white'
+                    ? 'bg-white/10 text-white ring-1 ring-white/10'
                     : action.active
-                      ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
-                      : 'bg-slate-100 text-slate-800',
+                      ? 'bg-emerald-500 text-white ring-1 ring-emerald-300/25'
+                      : 'bg-white/8 text-white ring-1 ring-white/10',
                 )}
               >
                 <ActionIcon
@@ -4892,7 +5410,7 @@ function CommentsSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-slate-950 backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
     >
@@ -4900,29 +5418,29 @@ function CommentsSheet({
         type="button"
         aria-label="Tutup komentar"
         onClick={onClose}
-        className="absolute inset-0"
+        className="absolute inset-0 z-0"
       />
 
-      <section className="relative flex max-h-[86svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
-        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-slate-200 lg:hidden" />
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+      <section className="relative z-10 flex max-h-[86svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
+            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
               {formatCompactMetric(metricCount(reel, 'comments'))} komentar
             </p>
-            <h2 className="truncate text-base font-black">{reel.title}</h2>
+            <h2 className="truncate text-base !text-black font-black">{reel.title}</h2>
           </div>
 
           <button
             type="button"
             onClick={() => onChatCreator(null)}
             disabled={chatBusy}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-black text-white disabled:opacity-60"
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-black text-white disabled:opacity-60 !text-black"
           >
             {chatBusy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin !text-black" />
             ) : (
-              <MessageSquareText className="h-4 w-4" />
+              <MessageSquareText className="h-4 w-4 !text-black" />
             )}
             Chat
           </button>
@@ -4930,7 +5448,7 @@ function CommentsSheet({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -4938,7 +5456,7 @@ function CommentsSheet({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {bucket?.loading && comments.length === 0 ? (
-            <div className="grid h-44 place-items-center text-sm font-bold text-slate-500">
+            <div className="grid h-44 place-items-center text-sm font-bold text-white/55">
               <span className="inline-flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Memuat komentar...
@@ -4962,27 +5480,27 @@ function CommentsSheet({
                         className="h-9 w-9 shrink-0 rounded-full object-cover"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="rounded-2xl bg-slate-100 px-3 py-2">
-                          <p className="truncate text-xs font-black text-slate-900">
+                        <div className="rounded-2xl !text-black bg-white/8 px-3 py-2 ring-1 ring-white/10">
+                          <p className="truncate text-xs font-black text-white">
                             {comment.authorName}
                           </p>
-                          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/78">
                             {comment.body}
                           </p>
                         </div>
-                        <div className="mt-1 flex items-center gap-3 px-2 text-[11px] font-bold text-slate-400">
+                        <div className="!text-black mt-1 flex items-center gap-3 px-2 text-[11px] font-bold text-white/42">
                           <span>{formatCommentTime(comment.createdAt)}</span>
                           <button
                             type="button"
                             onClick={() => onReply(comment)}
-                            className="text-slate-500 transition hover:text-emerald-700"
+                            className="text-white/55 transition hover:text-emerald-300"
                           >
                             Balas
                           </button>
                           <button
                             type="button"
                             onClick={() => onChatCreator(comment)}
-                            className="text-slate-500 transition hover:text-emerald-700"
+                            className="text-white/55 transition hover:text-emerald-300"
                           >
                             Chat creator
                           </button>
@@ -4991,7 +5509,7 @@ function CommentsSheet({
                     </div>
 
                     {replies.length > 0 && (
-                      <div className="ml-11 space-y-2 border-l border-slate-200 pl-3">
+                      <div className="ml-11 space-y-2 border-l border-white/10 pl-3">
                         {replies.map(reply => (
                           <div key={reply.id} className="flex gap-2">
                             <img
@@ -5004,15 +5522,15 @@ function CommentsSheet({
                               className="h-7 w-7 shrink-0 rounded-full object-cover"
                             />
                             <div className="min-w-0 flex-1">
-                              <div className="rounded-2xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100">
-                                <p className="truncate text-[11px] font-black text-slate-900">
+                              <div className="rounded-2xl bg-white/6 px-3 py-2 ring-1 ring-white/10">
+                                <p className="truncate text-[11px] font-black text-white">
                                   {reply.authorName}
                                 </p>
-                                <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-slate-700">
+                                <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-white/75">
                                   {reply.body}
                                 </p>
                               </div>
-                              <p className="mt-1 px-2 text-[10px] font-semibold text-slate-400">
+                              <p className="mt-1 px-2 text-[10px] font-semibold text-white/40">
                                 {formatCommentTime(reply.createdAt)}
                               </p>
                             </div>
@@ -5027,11 +5545,11 @@ function CommentsSheet({
           ) : (
             <div className="grid h-44 place-items-center text-center">
               <div>
-                <MessageCircle className="mx-auto h-9 w-9 text-slate-300" />
-                <p className="mt-2 text-sm font-black text-slate-700">
+                <MessageCircle className="mx-auto h-9 w-9 text-white/28" />
+                <p className="mt-2 text-sm font-black text-white">
                   Belum ada komentar
                 </p>
-                <p className="mt-1 text-xs font-medium text-slate-500">
+                <p className="mt-1 text-xs font-medium text-white/50">
                   Jadilah yang pertama kasih insight.
                 </p>
               </div>
@@ -5039,7 +5557,7 @@ function CommentsSheet({
           )}
 
           {bucket?.error && (
-            <div className="mt-3 rounded-2xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+            <div className="mt-3 rounded-2xl bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 ring-1 ring-rose-300/10">
               {bucket.error}
             </div>
           )}
@@ -5049,7 +5567,7 @@ function CommentsSheet({
               type="button"
               onClick={() => onLoadMore(reel.id)}
               disabled={bucket.loading}
-              className="mt-4 w-full rounded-full bg-slate-100 px-4 py-2.5 text-xs font-black text-slate-700 disabled:opacity-60"
+              className="mt-4 w-full rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white disabled:opacity-60"
             >
               {bucket.loading ? 'Memuat...' : 'Lihat komentar lainnya'}
             </button>
@@ -5061,19 +5579,19 @@ function CommentsSheet({
             event.preventDefault();
             onSubmit();
           }}
-          className="border-t border-slate-100 bg-white p-3"
+          className="border-t border-white/10 bg-[#0b0f14] p-3"
         >
           {isAuthenticated ? (
             <div className="space-y-2">
               {replyTarget && (
-                <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">
+                <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200">
                   <span className="min-w-0 truncate">
                     Membalas {replyTarget.authorName}
                   </span>
                   <button
                     type="button"
                     onClick={onCancelReply}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white text-emerald-800"
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-white"
                     aria-label="Batalkan balasan"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -5090,12 +5608,12 @@ function CommentsSheet({
                   }
                   maxLength={520}
                   rows={1}
-                  className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[20px] bg-slate-100 px-3 py-2.5 text-sm font-medium outline-none ring-emerald-600/20 transition focus:ring-4"
+                  className="max-h-28 min-h-[42px] flex-1 resize-none rounded-[20px] bg-white/8 px-3 py-2.5 text-sm font-medium text-white outline-none ring-emerald-400/20 transition focus:ring-4 placeholder:text-white/35"
                 />
                 <button
                   type="submit"
                   disabled={submitting || !body.trim()}
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-700 text-white shadow-lg shadow-emerald-700/20 disabled:opacity-45"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-700/20 disabled:opacity-45"
                 >
                   {submitting ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -5110,13 +5628,13 @@ function CommentsSheet({
               <button
                 type="button"
                 onClick={onRequireLogin}
-                className="min-w-0 flex-1 rounded-full bg-slate-100 px-4 py-3 text-left text-sm font-bold text-slate-500"
+                className="min-w-0 flex-1 rounded-full bg-white/10 px-4 py-3 text-left text-sm font-bold text-white/70"
               >
                 Masuk untuk komentar
               </button>
               <Link
                 href={loginHref}
-                className="rounded-full bg-emerald-700 px-4 py-3 text-sm font-black text-white"
+                className="rounded-full bg-emerald-500 px-4 py-3 text-sm font-black text-white"
               >
                 Masuk
               </Link>
@@ -5148,7 +5666,7 @@ function ProductSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-slate-950 backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
     >
@@ -5159,17 +5677,17 @@ function ProductSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[84svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
-        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-slate-200 lg:hidden" />
+      <section className="relative flex max-h-[84svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
+        <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-start justify-between gap-3 p-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wide text-yellow-700">
+            <p className="text-[11px] font-black uppercase tracking-wide text-yellow-300">
               Produk terkait
             </p>
             <h2 className="mt-1 text-xl font-black leading-tight">
               {reel.productName || 'Produk terkait'}
             </h2>
-            <p className="mt-1 text-sm font-bold text-slate-500">
+            <p className="mt-1 text-sm font-bold text-white/60">
               {reel.productPrice || 'Harga mengikuti detail produk'}
             </p>
           </div>
@@ -5177,20 +5695,20 @@ function ProductSheet({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/10 text-white"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-          <div className="flex items-center gap-3 rounded-[24px] border border-yellow-200 bg-yellow-50 p-3">
+          <div className="flex items-center gap-3 rounded-[24px] border border-yellow-300/20 bg-yellow-400/10 p-3">
             <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-yellow-400 text-slate-950">
               <ShoppingBag className="h-7 w-7" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black">{reel.creator}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-relaxed text-slate-600">
+              <p className="truncate text-sm font-black text-white">{reel.creator}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-relaxed text-white/72">
                 {reel.caption}
               </p>
             </div>
@@ -5199,7 +5717,7 @@ function ProductSheet({
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Link
               href={productHref}
-              className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-black text-slate-800"
+              className="rounded-2xl bg-white/10 px-4 py-3 text-center text-sm font-black text-white ring-1 ring-white/10"
             >
               Lihat produk
             </Link>
@@ -5207,7 +5725,7 @@ function ProductSheet({
             {isAuthenticated ? (
               <Link
                 href={checkoutHref}
-                className="rounded-2xl bg-emerald-700 px-4 py-3 text-center text-sm font-black text-white"
+                className="rounded-2xl bg-emerald-500 px-4 py-3 text-center text-sm font-black text-white"
               >
                 Mulai transaksi
               </Link>
@@ -5215,14 +5733,14 @@ function ProductSheet({
               <button
                 type="button"
                 onClick={onRequireLogin}
-                className="rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-black text-white"
+                className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white"
               >
                 Mulai transaksi
               </button>
             )}
           </div>
 
-          <div className="mt-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs font-semibold leading-relaxed text-slate-500">
+          <div className="mt-3 rounded-2xl bg-white/6 px-3 py-2 text-xs font-semibold leading-relaxed text-white/55 ring-1 ring-white/10">
             Produk dibuka dari reels. Detail stok, ongkir, dan pembayaran tetap
             diproses di halaman produk.
           </div>
@@ -5275,7 +5793,27 @@ function UploadReelSheet({
   );
   const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
   const hasMedia = Boolean(file || form.mediaUrl.trim());
+  const studioPanelRail = useHorizontalDragScroll<HTMLDivElement>();
+  const studioFilterRail = useHorizontalDragScroll<HTMLDivElement>();
+  const studioMusicRail = useHorizontalDragScroll<HTMLDivElement>();
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+
+    const query = window.matchMedia('(pointer: coarse)');
+    const updatePointerMode = () => setIsCoarsePointer(query.matches);
+
+    updatePointerMode();
+    if (typeof query.addEventListener === 'function') {
+      query.addEventListener('change', updatePointerMode);
+      return () => query.removeEventListener('change', updatePointerMode);
+    }
+
+    query.addListener(updatePointerMode);
+    return () => query.removeListener(updatePointerMode);
+  }, []);
 
   const setField = useCallback(
     <K extends keyof UploadReelForm>(field: K, value: UploadReelForm[K]) => {
@@ -5290,7 +5828,7 @@ function UploadReelSheet({
       recordingTimeoutRef.current = null;
     }
     if (recordingAnimationRef.current !== null) {
-      window.cancelAnimationFrame(recordingAnimationRef.current);
+      window.clearInterval(recordingAnimationRef.current);
       recordingAnimationRef.current = null;
     }
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
@@ -5329,16 +5867,19 @@ function UploadReelSheet({
       stopCamera();
 
       try {
+        const needsAudio = studioMode !== 'photo';
         const videoConstraints: MediaTrackConstraints = {
           facingMode: { ideal: facingMode },
-          width: { ideal: 1080 },
-          height: { ideal: 1920 },
+          width: { ideal: isCoarsePointer ? 540 : 720 },
+          height: { ideal: isCoarsePointer ? 960 : 1280 },
+          aspectRatio: { ideal: 9 / 16 },
+          frameRate: { ideal: 24, max: 30 },
         };
         let stream: MediaStream;
 
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
+            audio: needsAudio,
             video: videoConstraints,
           });
         } catch {
@@ -5364,7 +5905,7 @@ function UploadReelSheet({
         );
       }
     },
-    [cameraFacingMode, stopCamera],
+    [cameraFacingMode, isCoarsePointer, stopCamera, studioMode],
   );
 
   const flipCamera = useCallback(() => {
@@ -5441,7 +5982,11 @@ function UploadReelSheet({
     }
 
     context.filter = getReelFilterCss(form.filterPreset);
-    drawVideoCoverFrame(context, video, width, height);
+    if (isCoarsePointer) {
+      drawVideoContainFrame(context, video, width, height);
+    } else {
+      drawVideoCoverFrame(context, video, width, height);
+    }
     context.filter = 'none';
     drawStudioCanvasEffect(context, width, height, studioEffect);
     canvas.toBlob(
@@ -5472,7 +6017,7 @@ function UploadReelSheet({
       'image/jpeg',
       0.92,
     );
-  }, [cameraReady, form.filterPreset, setStudioMode, studioEffect]);
+  }, [cameraReady, form.filterPreset, isCoarsePointer, setStudioMode, studioEffect]);
 
   const startCameraRecording = useCallback(() => {
     setError(null);
@@ -5514,7 +6059,10 @@ function UploadReelSheet({
             !currentRecorder ||
             currentRecorder.state === 'inactive'
           ) {
-            recordingAnimationRef.current = null;
+            if (recordingAnimationRef.current !== null) {
+              window.clearInterval(recordingAnimationRef.current);
+              recordingAnimationRef.current = null;
+            }
             return;
           }
 
@@ -5525,12 +6073,21 @@ function UploadReelSheet({
             REELS_CAPTURE_CANVAS_HEIGHT,
           );
           context.filter = getReelFilterCss(form.filterPreset);
-          drawVideoCoverFrame(
-            context,
-            currentVideo,
-            REELS_CAPTURE_CANVAS_WIDTH,
-            REELS_CAPTURE_CANVAS_HEIGHT,
-          );
+          if (isCoarsePointer) {
+            drawVideoContainFrame(
+              context,
+              currentVideo,
+              REELS_CAPTURE_CANVAS_WIDTH,
+              REELS_CAPTURE_CANVAS_HEIGHT,
+            );
+          } else {
+            drawVideoCoverFrame(
+              context,
+              currentVideo,
+              REELS_CAPTURE_CANVAS_WIDTH,
+              REELS_CAPTURE_CANVAS_HEIGHT,
+            );
+          }
           context.filter = 'none';
           drawStudioCanvasEffect(
             context,
@@ -5538,12 +6095,13 @@ function UploadReelSheet({
             REELS_CAPTURE_CANVAS_HEIGHT,
             studioEffect,
           );
-          recordingAnimationRef.current =
-            window.requestAnimationFrame(paintFrame);
         };
 
-        recordingAnimationRef.current =
-          window.requestAnimationFrame(paintFrame);
+        paintFrame();
+        recordingAnimationRef.current = window.setInterval(
+          paintFrame,
+          Math.max(Math.round(1000 / REELS_CAPTURE_FPS), 16),
+        );
       }
     }
 
@@ -5552,10 +6110,24 @@ function UploadReelSheet({
       'video/webm;codecs=vp8',
       'video/webm',
     ].find(type => MediaRecorder.isTypeSupported(type));
-    const recorder = mimeType
-      ? new MediaRecorder(recorderStream, { mimeType })
-      : new MediaRecorder(recorderStream);
+    const recorderOptions = {
+      ...(mimeType ? { mimeType } : {}),
+      videoBitsPerSecond: isCoarsePointer ? 1_200_000 : 1_800_000,
+      audioBitsPerSecond: 64_000,
+    };
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(
+        recorderStream,
+        recorderOptions as MediaRecorderOptions,
+      );
+    } catch {
+      recorder = mimeType
+        ? new MediaRecorder(recorderStream, { mimeType })
+        : new MediaRecorder(recorderStream);
+    }
 
+    recorderRef.current = recorder;
     recorderChunksRef.current = [];
     recorder.ondataavailable = event => {
       if (event.data.size > 0) {
@@ -5568,7 +6140,7 @@ function UploadReelSheet({
         recordingTimeoutRef.current = null;
       }
       if (recordingAnimationRef.current !== null) {
-        window.cancelAnimationFrame(recordingAnimationRef.current);
+        window.clearInterval(recordingAnimationRef.current);
         recordingAnimationRef.current = null;
       }
       const type = recorder.mimeType || 'video/webm';
@@ -5597,7 +6169,6 @@ function UploadReelSheet({
       setRecordingElapsedMs(0);
     };
     recorder.start(250);
-    recorderRef.current = recorder;
     setRecording(true);
     setRecordingStartedAt(Date.now());
     setRecordingElapsedMs(0);
@@ -5607,7 +6178,13 @@ function UploadReelSheet({
         currentRecorder.stop();
       }
     }, getStudioDurationMs(studioDuration));
-  }, [form.filterPreset, setStudioMode, studioDuration, studioEffect]);
+  }, [
+    form.filterPreset,
+    isCoarsePointer,
+    setStudioMode,
+    studioDuration,
+    studioEffect,
+  ]);
 
   const stopCameraRecording = useCallback(() => {
     const recorder = recorderRef.current;
@@ -5619,7 +6196,7 @@ function UploadReelSheet({
         recordingTimeoutRef.current = null;
       }
       if (recordingAnimationRef.current !== null) {
-        window.cancelAnimationFrame(recordingAnimationRef.current);
+        window.clearInterval(recordingAnimationRef.current);
         recordingAnimationRef.current = null;
       }
       setRecording(false);
@@ -5808,11 +6385,17 @@ function UploadReelSheet({
     REELS_STUDIO_MODES.find(mode => mode.id === studioMode) ||
     REELS_STUDIO_MODES[2];
   const ActiveStudioIcon = activeStudioMode.icon;
-  const fieldLabelClass = 'text-xs font-black text-white/84';
+  const fieldLabelClass = 'text-xs font-black text-slate-900 dark:text-white/84';
   const inputClass =
-    'mt-1 h-10 w-full rounded-[13px] border border-white/10 bg-white/[0.08] px-3 text-[13px] font-semibold text-white outline-none placeholder:text-white/38 focus:border-emerald-300/50 focus:bg-white/[0.11]';
+    'mt-1 h-10 w-full rounded-[13px] border border-slate-200 bg-white px-3 text-[13px] font-semibold !text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-300/50 focus:bg-white dark:border-white/10 dark:bg-white/[0.08] dark:!text-white dark:placeholder:text-white/38 dark:focus:bg-white/[0.11]';
   const textareaClass =
-    'mt-1 w-full resize-none rounded-[13px] border border-white/10 bg-white/[0.08] px-3 py-2 text-[13px] font-semibold text-white outline-none placeholder:text-white/38 focus:border-emerald-300/50 focus:bg-white/[0.11]';
+    'mt-1 w-full resize-none rounded-[13px] border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold !text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-300/50 focus:bg-white dark:border-white/10 dark:bg-white/[0.08] dark:!text-white dark:placeholder:text-white/38 dark:focus:bg-white/[0.11]';
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) {
+      return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    }
+    return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+  };
 
   const handleFile = (nextFile: File | null) => {
     setFile(nextFile);
@@ -5825,6 +6408,9 @@ function UploadReelSheet({
     if (nextFile && !form.title.trim()) {
       const name = nextFile.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ');
       setField('title', name.slice(0, 90));
+    }
+    if (nextFile) {
+      setStep('edit');
     }
   };
 
@@ -5905,8 +6491,9 @@ function UploadReelSheet({
 
     try {
       if (file) {
+        const optimizedFile = await prepareUploadFile(file);
         const data = new FormData();
-        data.append('media', file);
+        data.append('media', optimizedFile);
         const uploadResponse = await authFetch('/api/forum/upload-media', {
           method: 'POST',
           body: data,
@@ -5915,15 +6502,19 @@ function UploadReelSheet({
           .json()
           .catch(() => ({}))) as {
             urls?: string[];
+            rejected?: Array<{ reason?: string }>;
             error?: string;
           };
         if (!uploadResponse.ok || !uploadPayload.urls?.[0]) {
-          throw new Error(uploadPayload.error || 'Upload media gagal');
+          throw new Error(
+            uploadPayload.error ||
+            uploadPayload.rejected?.[0]?.reason ||
+            'Upload media gagal',
+          );
         }
         mediaUrl = uploadPayload.urls[0];
       }
 
-      const productHref = form.productHref.trim();
       const response = await authFetch('/api/reels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5936,12 +6527,6 @@ function UploadReelSheet({
           videoSrc: mediaUrl,
           sourceUrl: mediaUrl,
           mediaType: isImageMedia ? 'image' : 'video',
-          productName: form.productName.trim() || undefined,
-          productPrice: form.productPrice.trim() || undefined,
-          productHref: productHref || undefined,
-          storeName:
-            form.storeName.trim() || form.productName.trim() || displayName,
-          storeCity: form.storeCity.trim() || undefined,
           hook: (form.hook.trim() || caption).slice(0, 150),
           tone: 'emerald',
           iconKey: 'marketing',
@@ -5995,7 +6580,7 @@ function UploadReelSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/86 text-[color:var(--app-text)] backdrop-blur-md lg:items-center lg:justify-center lg:p-4"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-[color:color-mix(in_srgb,_var(--app-overlay)_86%,_transparent)] text-[color:var(--app-text)] backdrop-blur-md dark:bg-black/86 lg:items-center lg:justify-center lg:p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -6010,7 +6595,7 @@ function UploadReelSheet({
         onSubmit={submit}
         data-lajukan-reels-studio="true"
         className={cn(
-          'relative flex h-[100svh] max-h-[100svh] w-full flex-col overflow-hidden bg-[#050505] text-white shadow-2xl',
+          'relative flex h-[100svh] max-h-[100svh] w-full flex-col overflow-hidden bg-[color:var(--app-surface)] text-[color:var(--app-text)] shadow-2xl dark:bg-[#050505] dark:text-white',
           step === 'media'
             ? 'lg:max-w-[460px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10'
             : 'lg:h-[calc(100svh-2rem)] lg:max-w-[960px] lg:rounded-[30px] lg:ring-1 lg:ring-white/10',
@@ -6018,24 +6603,24 @@ function UploadReelSheet({
       >
         <div
           className={cn(
-            'mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/20 lg:hidden',
+            'mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-[color:var(--app-border)]/60 dark:bg-white/20 lg:hidden',
             step === 'media' && 'hidden',
           )}
         />
         <div
           className={cn(
-            'items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 sm:px-4',
+            'items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-3 py-2.5 sm:px-4 dark:border-white/10',
             step === 'media' ? 'hidden' : 'flex',
           )}
         >
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-300">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:text-emerald-300">
               Reels
             </p>
             <h2 className="text-base font-black">Kamera Reels</h2>
           </div>
 
-          <div className="hidden items-center gap-1 rounded-full bg-white/10 p-1 sm:flex">
+          <div className="hidden items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] p-1 sm:flex dark:bg-white/10">
             {(['media', 'edit', 'post'] as UploadReelStep[]).map(
               (item, index) => (
                 <span
@@ -6043,8 +6628,8 @@ function UploadReelSheet({
                   className={cn(
                     'rounded-full px-3 py-1.5 text-[11px] font-black',
                     step === item
-                      ? 'bg-white text-slate-950 shadow-sm'
-                      : 'text-white/58',
+                      ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] shadow-sm dark:bg-white dark:text-slate-950'
+                      : 'text-[color:var(--app-text-soft)] dark:text-white/58',
                   )}
                 >
                   {index + 1}.{' '}
@@ -6061,7 +6646,7 @@ function UploadReelSheet({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white"
+            className="grid h-10 w-10 place-items-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:bg-white/10 dark:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -6087,15 +6672,15 @@ function UploadReelSheet({
               className={cn(
                 'mx-auto',
                 step === 'media'
-                  ? 'h-full w-full sm:aspect-[9/16] sm:h-[calc(100svh-1.5rem)] sm:max-h-[820px] sm:w-auto'
+                  ? 'aspect-[9/16] h-auto w-full max-w-[420px] self-center sm:max-h-[820px]'
                   : 'w-full max-w-[340px]',
               )}
             >
               <div
                 className={cn(
-                  'relative overflow-hidden bg-[#2d374b] shadow-2xl ring-1 ring-white/10',
+                  'relative overflow-hidden bg-[color:var(--app-surface-strong)] shadow-2xl ring-1 ring-[color:var(--app-border)] dark:bg-[#2d374b] dark:ring-white/10',
                   step === 'media'
-                    ? 'h-full w-full rounded-none sm:aspect-[9/16] sm:rounded-[32px]'
+                    ? 'h-full w-full rounded-[28px] sm:rounded-[32px]'
                     : 'aspect-[9/16] max-h-[calc(100svh-128px)] rounded-[24px] lg:max-h-[calc(100svh-150px)]',
                 )}
               >
@@ -6121,7 +6706,7 @@ function UploadReelSheet({
                   <>
                     <video
                       ref={cameraVideoRef}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover object-center"
                       style={previewMediaStyle}
                       muted
                       playsInline
@@ -6375,7 +6960,17 @@ function UploadReelSheet({
                               <X className="h-3.5 w-3.5" />
                             </button>
                           </div>
-                          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                          <div
+                            ref={studioPanelRail.ref}
+                            onClickCapture={studioPanelRail.onClickCapture}
+                            onPointerCancel={studioPanelRail.onPointerCancel}
+                            onPointerDown={studioPanelRail.onPointerDown}
+                            onPointerLeave={studioPanelRail.onPointerLeave}
+                            onPointerMove={studioPanelRail.onPointerMove}
+                            onPointerUp={studioPanelRail.onPointerUp}
+                            onWheel={studioPanelRail.onWheel}
+                            className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+                          >
                             {studioPanel === 'filters'
                               ? REEL_FILTER_PRESETS.map(filter => {
                                 const active =
@@ -6579,7 +7174,10 @@ function UploadReelSheet({
             </div>
 
             <div
-              className={cn('min-w-0 text-white', step === 'media' && 'hidden')}
+              className={cn(
+                'min-w-0 !text-slate-950 dark:!text-white',
+                step === 'media' && 'hidden',
+              )}
             >
               {step === 'media' && (
                 <div className="space-y-3">
@@ -6610,7 +7208,7 @@ function UploadReelSheet({
                         Galeri
                         <input
                           type="file"
-                          accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/*"
+                          accept="video/*,image/*"
                           onChange={event =>
                             handleFile(event.target.files?.[0] ?? null)
                           }
@@ -6686,7 +7284,17 @@ function UploadReelSheet({
                       <SlidersHorizontal className="h-4 w-4 text-emerald-300" />
                       Filter
                     </div>
-                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div
+                      ref={studioFilterRail.ref}
+                      onClickCapture={studioFilterRail.onClickCapture}
+                      onPointerCancel={studioFilterRail.onPointerCancel}
+                      onPointerDown={studioFilterRail.onPointerDown}
+                      onPointerLeave={studioFilterRail.onPointerLeave}
+                      onPointerMove={studioFilterRail.onPointerMove}
+                      onPointerUp={studioFilterRail.onPointerUp}
+                      onWheel={studioFilterRail.onWheel}
+                      className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+                    >
                       {REEL_FILTER_PRESETS.map(filter => {
                         const active = form.filterPreset === filter.id;
                         return (
@@ -6719,7 +7327,17 @@ function UploadReelSheet({
                       <Music className="h-4 w-4 text-yellow-300" />
                       Musik
                     </div>
-                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div
+                      ref={studioMusicRail.ref}
+                      onClickCapture={studioMusicRail.onClickCapture}
+                      onPointerCancel={studioMusicRail.onPointerCancel}
+                      onPointerDown={studioMusicRail.onPointerDown}
+                      onPointerLeave={studioMusicRail.onPointerLeave}
+                      onPointerMove={studioMusicRail.onPointerMove}
+                      onPointerUp={studioMusicRail.onPointerUp}
+                      onWheel={studioMusicRail.onWheel}
+                      className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing"
+                    >
                       {REELS_MUSIC_TRACKS.map(track => (
                         <button
                           key={track}
@@ -6752,7 +7370,7 @@ function UploadReelSheet({
                   <label className="hidden cursor-pointer rounded-[18px] border-2 border-dashed border-white/12 bg-white/[0.05] p-4 text-center transition hover:border-emerald-300">
                     <input
                       type="file"
-                      accept="video/mp4,video/webm,video/quicktime,video/x-m4v,image/*"
+                      accept="video/*,image/*"
                       onChange={event =>
                         handleFile(event.target.files?.[0] ?? null)
                       }
@@ -6771,11 +7389,14 @@ function UploadReelSheet({
                     <p className="mt-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       MP4, WebM, MOV, JPG, PNG, WebP
                     </p>
+                    <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                      Video sampai 80 MB aman, jadi 16 MB harusnya lolos kalau file-nya valid.
+                    </p>
                   </label>
 
                   {file && (
                     <div className="rounded-2xl bg-white/[0.08] px-3 py-2 text-xs font-bold text-white/62">
-                      Terpilih: {file.name}
+                      Terpilih: {file.name} · {formatFileSize(file.size)}
                     </div>
                   )}
                 </div>
@@ -6788,113 +7409,37 @@ function UploadReelSheet({
                       Langkah 2
                     </p>
                     <h3 className="text-lg font-black leading-tight">
-                      Edit tampilan reels
+                      Rapikan reels
                     </h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-white/52">
-                      Buat hook pendek biar cepat paham.
+                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-white/52">
+                      Media sudah dipilih, jadi fokusnya tinggal caption dan kategori.
                     </p>
                   </div>
 
-                  <div>
-                    <p className={fieldLabelClass}>Filter tampilan</p>
-                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {REEL_FILTER_PRESETS.map(filter => {
-                        const active = form.filterPreset === filter.id;
-                        return (
-                          <button
-                            key={filter.id}
-                            type="button"
-                            onClick={() => setField('filterPreset', filter.id)}
-                            className={cn(
-                              'flex min-w-[136px] shrink-0 items-center gap-2 rounded-[16px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
-                              active
-                                ? 'border-emerald-300 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-100'
-                                : 'border-white/10 bg-white/[0.08] text-white',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'h-8 w-8 shrink-0 rounded-[12px] ring-1 ring-black/5',
-                                filter.swatch,
-                              )}
-                            />
-                            <span className="min-w-0">
-                              <span className="block truncate text-[12px] font-black">
-                                {filter.label}
-                              </span>
-                              <span className="block truncate text-[10px] font-semibold opacity-70">
-                                {filter.helper}
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      })}
+                  {file && (
+                    <div className="rounded-[18px] border border-emerald-300/20 bg-emerald-500/10 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black uppercase tracking-wide text-emerald-200">
+                            Media terpilih
+                          </p>
+                          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
+                            {file.name}
+                          </p>
+                          <p className="text-xs font-semibold text-slate-500 dark:text-white/58">
+                            {file.type || 'Media'} | {formatFileSize(file.size)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setStep('media')}
+                          className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-slate-950"
+                        >
+                          Ganti
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  <div>
-                    <p className={fieldLabelClass}>Efek kamera gratis</p>
-                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                      {REELS_STUDIO_EFFECTS.map(effect => {
-                        const active = studioEffect === effect.id;
-                        return (
-                          <button
-                            key={effect.id}
-                            type="button"
-                            onClick={() => setStudioEffect(effect.id)}
-                            className={cn(
-                              'flex min-w-[140px] shrink-0 items-center gap-2 rounded-[16px] border px-2.5 py-2 text-left transition active:scale-[0.98]',
-                              active
-                                ? 'border-yellow-200 bg-yellow-300 text-slate-950 ring-2 ring-yellow-100'
-                                : 'border-white/10 bg-white/[0.08] text-white',
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'h-8 w-8 shrink-0 rounded-[12px] ring-1 ring-black/5',
-                                effect.swatch,
-                              )}
-                            />
-                            <span className="min-w-0">
-                              <span className="block truncate text-[12px] font-black">
-                                {effect.label}
-                              </span>
-                              <span className="block truncate text-[10px] font-semibold opacity-70">
-                                {effect.helper}
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <label className="block">
-                    <span
-                      className={`${fieldLabelClass} inline-flex items-center gap-1`}
-                    >
-                      <Camera className="h-3.5 w-3.5" />
-                      Teks hook di video
-                    </span>
-                    <input
-                      value={form.hook}
-                      onChange={event => setField('hook', event.target.value)}
-                      maxLength={150}
-                      placeholder="Contoh: 3 cara packing aman untuk kirim luar kota"
-                      className={inputClass}
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className={fieldLabelClass}>Judul reels</span>
-                    <input
-                      value={form.title}
-                      onChange={event => setField('title', event.target.value)}
-                      maxLength={120}
-                      placeholder="Judul singkat untuk detail dan search"
-                      className={inputClass}
-                    />
-                  </label>
+                  )}
 
                   <label className="block">
                     <span
@@ -6929,13 +7474,14 @@ function UploadReelSheet({
                           'rounded-full px-3 py-2 text-xs font-black',
                           form.tag === chip
                             ? 'bg-emerald-700 text-white'
-                            : 'bg-white/[0.08] text-white/64',
+                            : 'bg-slate-100 text-slate-700 dark:bg-white/[0.08] dark:text-white/64',
                         )}
                       >
                         {chip}
                       </button>
                     ))}
                   </div>
+
                 </div>
               )}
 
@@ -6943,14 +7489,13 @@ function UploadReelSheet({
                 <div className="space-y-3">
                   <div>
                     <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
-                      Langkah 3
+                      Posting
                     </p>
                     <h3 className="text-lg font-black leading-tight">
-                      Caption dan produk
+                      Teks singkat
                     </h3>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-white/52">
-                      Tambahkan konteks usaha, produk, dan link transaksi kalau
-                      ada.
+                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-white/52">
+                      Isi yang penting saja. Sisanya opsional.
                     </p>
                   </div>
 
@@ -7004,76 +7549,6 @@ function UploadReelSheet({
                     />
                   </label>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label>
-                      <span
-                        className={`${fieldLabelClass} inline-flex items-center gap-1`}
-                      >
-                        <Store className="h-3.5 w-3.5" />
-                        Nama toko
-                      </span>
-                      <input
-                        value={form.storeName}
-                        onChange={event =>
-                          setField('storeName', event.target.value)
-                        }
-                        maxLength={90}
-                        placeholder={displayName}
-                        className={inputClass}
-                      />
-                    </label>
-
-                    <label>
-                      <span className={fieldLabelClass}>Kota toko</span>
-                      <input
-                        value={form.storeCity}
-                        onChange={event =>
-                          setField('storeCity', event.target.value)
-                        }
-                        maxLength={64}
-                        placeholder="Jakarta"
-                        className={inputClass}
-                      />
-                    </label>
-
-                    <label>
-                      <span className={fieldLabelClass}>Nama produk</span>
-                      <input
-                        value={form.productName}
-                        onChange={event =>
-                          setField('productName', event.target.value)
-                        }
-                        maxLength={90}
-                        placeholder="Opsional"
-                        className={inputClass}
-                      />
-                    </label>
-
-                    <label>
-                      <span className={fieldLabelClass}>Harga</span>
-                      <input
-                        value={form.productPrice}
-                        onChange={event =>
-                          setField('productPrice', event.target.value)
-                        }
-                        maxLength={60}
-                        placeholder="Rp 75.000"
-                        className={inputClass}
-                      />
-                    </label>
-
-                    <label className="sm:col-span-2">
-                      <span className={fieldLabelClass}>Link produk</span>
-                      <input
-                        value={form.productHref}
-                        onChange={event =>
-                          setField('productHref', event.target.value)
-                        }
-                        placeholder="/id/content/... atau /home?product=..."
-                        className={inputClass}
-                      />
-                    </label>
-                  </div>
                 </div>
               )}
 
@@ -7097,7 +7572,7 @@ function UploadReelSheet({
               <button
                 type="button"
                 onClick={() => setStep(step === 'post' ? 'edit' : 'media')}
-                className="h-11 rounded-full border border-white/14 px-4 text-sm font-black text-white"
+                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 dark:border-white/14 dark:bg-transparent dark:text-white"
               >
                 Kembali
               </button>

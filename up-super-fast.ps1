@@ -12,6 +12,10 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+if (-not $PSBoundParameters.ContainsKey('SkipCleanup')) {
+    $SkipCleanup = $true
+}
+
 $RuntimeDir = Join-Path $PSScriptRoot ".runtime"
 $StartupStateFile = Join-Path $RuntimeDir "stack-startup.json"
 
@@ -69,7 +73,7 @@ Write-StartupState -Active $true -Status "starting" -Phase "initializing" -Messa
 
 $env:DOCKER_BUILDKIT = "1"
 $env:COMPOSE_DOCKER_CLI_BUILD = "1"
-$env:COMPOSE_PARALLEL_LIMIT = "3"
+$env:COMPOSE_PARALLEL_LIMIT = "6"
 $env:BUILDKIT_PROGRESS = "plain"
 
 $composeV2Available = $false
@@ -660,6 +664,7 @@ $defaultDevServices = @(
     "identity_service",
     "marketplace_service",
     "community_service",
+    "chat_service",
     "www",
     "cms",
     "crm",

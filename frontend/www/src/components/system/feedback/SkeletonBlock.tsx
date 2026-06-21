@@ -14,10 +14,8 @@ export function SkeletonBlock({ lines = 3, className }: SkeletonBlockProps) {
       {Array.from({ length: safeLines }).map((_, idx) => (
         <Skeleton
           key={idx}
-          className={cn(
-            'h-3.5 rounded',
-            idx === safeLines - 1 && 'w-2/3',
-          )}
+          variant="line"
+          className={cn(idx === safeLines - 1 && 'w-2/3')}
         />
       ))}
     </div>

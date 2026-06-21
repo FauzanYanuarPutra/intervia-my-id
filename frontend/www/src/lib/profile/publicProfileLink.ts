@@ -71,9 +71,8 @@ export function extractPublicProfileIdFromSlug(
 export function buildPublicProfileSlug(identity: PublicProfileIdentity): string {
   const id = readString(identity.id);
   const usernameSlug = slugifySegment(identity.username);
-  if (usernameSlug) return usernameSlug;
-
   const base =
+    usernameSlug ||
     slugifySegment(identity.full_name) ||
     slugifySegment(identity.title) ||
     'member';
@@ -139,6 +138,10 @@ function readMetadataPublicPath(
   return raw.startsWith('/profile/') ? raw : '';
 }
 
+function readPublicProfileSlugFromPath(path: string): string {
+  return decodePublicProfileSlug(path.split('/').filter(Boolean).pop() || '');
+}
+
 export function resolveOwnerUserIdFromContent(
   item: ProfileRouteContentItem,
 ): string | null {
@@ -160,16 +163,13 @@ export function buildPublicProfileHrefFromContent(
   item: ProfileRouteContentItem,
 ): string | null {
   const metadata = asRecord(item.metadata);
-  const embeddedPath = readMetadataPublicPath(metadata);
-  if (embeddedPath) return embeddedPath;
-
   const ownerProfile =
     asRecord(item.owner_profile) || readMetadataProfile(metadata);
   const id = resolveOwnerUserIdFromContent(item) || '';
 
   if (!id) return null;
 
-  return buildPublicProfileHref({
+  const identity = {
     id,
     username:
       ownerProfile?.username || metadata?.username || metadata?.owner_username,
@@ -179,5 +179,15 @@ export function buildPublicProfileHrefFromContent(
       metadata?.display_name ||
       item.title,
     title: item.title,
-  });
+  };
+
+  const embeddedPath = readMetadataPublicPath(metadata);
+  if (embeddedPath) {
+    const embeddedSlug = readPublicProfileSlugFromPath(embeddedPath);
+    if (embeddedSlug && matchesPublicProfileSlug(embeddedSlug, identity)) {
+      return embeddedPath;
+    }
+  }
+
+  return buildPublicProfileHref(identity);
 }

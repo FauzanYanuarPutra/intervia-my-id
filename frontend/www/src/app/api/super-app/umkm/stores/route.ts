@@ -5,6 +5,7 @@ import { enforceRateLimit } from '@/lib/rateLimit';
 import { requireAuth } from '@/lib/serverAuth';
 import { parseJsonBodyWithSchema } from '@/lib/serverRequest';
 import { haversineKm } from '@/lib/super-app/location-guard';
+import { getUmkmBusinessCategoryLabel } from '@/lib/super-app/umkm-taxonomy';
 import {
   createUmkmStore,
   ensureUmkmQrToken,
@@ -32,6 +33,7 @@ const CreateStoreSchema = z.object({
   name: z.string().min(3).max(120),
   slug: z.string().min(2).max(80).optional(),
   description: z.string().max(500).optional(),
+  business_category: z.string().min(2).max(64).optional(),
   city: z.string().min(2).max(80),
   address: z.string().min(3).max(240),
   lat: z.number().min(-90).max(90),
@@ -204,6 +206,16 @@ export async function POST(req: NextRequest) {
       onlineOrderEnabled: payload.online_order_enabled,
       offlineOrderEnabled: payload.offline_order_enabled,
       metadata: {
+        ...(payload.business_category
+          ? {
+              umkm_category: payload.business_category,
+              business_type: payload.business_category,
+              segment: getUmkmBusinessCategoryLabel(
+                payload.business_category,
+                true,
+              ),
+            }
+          : {}),
         recommended_qr: (payload.table_count || 0) > 0 ? 'offline' : 'online',
         ...(payload.metadata || {}),
       },

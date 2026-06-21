@@ -45,6 +45,7 @@ services:
       APP_PORT: "8082"
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum
       COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
+      INTERNAL_API_URL: http://identity_service:8080
 
   ai_service:
     image: ${DOCKERHUB_NAMESPACE}/lajukan-ai:${IMAGE_TAG:-latest}

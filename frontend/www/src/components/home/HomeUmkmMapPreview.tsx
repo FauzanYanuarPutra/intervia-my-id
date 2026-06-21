@@ -13,10 +13,10 @@ import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import { cn } from '@/lib/utils';
 import {
   ArrowRight,
+  Heart,
   MapPinned,
   MessageCircle,
   Navigation,
-  Star,
   Store,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -132,9 +132,9 @@ function HomeUmkmCard({ item, isId }: { item: PreparedStore; isId: boolean }) {
           </span>
         </div>
         <div className="absolute right-2.5 top-2.5">
-          <span className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-white/92 px-2.5 text-[10px] font-semibold text-amber-700 shadow-sm backdrop-blur-sm dark:bg-slate-950/82 dark:text-amber-200">
-            <Star className="h-3 w-3 fill-current" />
-            {item.ui.ratingLabel}
+          <span className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-white/92 px-2.5 text-[10px] font-semibold text-rose-700 shadow-sm backdrop-blur-sm dark:bg-slate-950/82 dark:text-rose-200">
+            <Heart className="h-3 w-3 fill-current" />
+            {item.ui.reviewCountLabel} likes
           </span>
         </div>
         <div className="absolute bottom-2.5 right-2.5">
@@ -216,9 +216,9 @@ export function HomeUmkmMapPreview({ locale }: HomeUmkmMapPreviewProps) {
         if (!res.ok || !payload.data?.items) {
           throw new Error(
             payload.error ||
-              (isId
-                ? 'Peta usaha belum siap.'
-                : 'The business map preview is unavailable.'),
+            (isId
+              ? 'Peta usaha belum siap.'
+              : 'The business map preview is unavailable.'),
           );
         }
 
@@ -262,8 +262,8 @@ export function HomeUmkmMapPreview({ locale }: HomeUmkmMapPreviewProps) {
   );
 
   return (
-    <section className="ui-page-section ui-home-section-shell">
-      <article className="ui-home-section-content bg-transparent px-0 py-0 shadow-none">
+    <section className="ui-page-section ui-home-section-shell !bg-transparent">
+      <article className="ui-home-section-content !bg-transparent px-0 py-0 shadow-none">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-[1.02rem] font-black tracking-[-0.035em] text-[color:var(--app-text)] sm:text-[1.12rem]">

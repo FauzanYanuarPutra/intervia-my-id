@@ -29,16 +29,16 @@ export function buildEntryOverviewCards({
     },
     {
       desc: isId
-        ? 'Ikuti alur singkat, satu langkah sekali.'
-        : 'Follow a short flow, one step at a time.',
+        ? 'Bantu isi cepat.'
+        : 'Fill faster.',
       href: routes.assistant(),
       icon: icons.assistant,
       label: isId ? 'Pakai asisten' : 'Use assistant',
     },
     {
       desc: isId
-        ? 'Lihat referensi usaha di sekitar.'
-        : 'See nearby business references.',
+        ? 'Cek usaha sekitar.'
+        : 'Check nearby businesses.',
       href: routes.discoveryPath,
       icon: icons.discovery,
       label: isId ? 'Cari usaha sekitar' : 'Browse nearby businesses',

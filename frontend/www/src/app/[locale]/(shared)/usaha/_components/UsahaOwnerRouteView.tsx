@@ -1,4 +1,5 @@
-import { UmkmHubClient } from '@/components/super-app/UmkmHubClient';
+import { SimpleUsahaCreateFlow } from '@/features/umkm-owner/setup';
+import { SimpleUsahaHub } from '@/features/umkm-owner/workspace';
 import type { UmkmManageWorkspaceId } from '@/lib/super-app/umkm-manage-profiles';
 
 type UsahaOwnerRouteViewProps = {
@@ -16,14 +17,16 @@ export function UsahaOwnerRouteView({
 }: UsahaOwnerRouteViewProps) {
   const resolvedLocale = locale === 'en' ? 'en' : 'id';
 
+  if (workspace === 'setup' && setupView === 'create') {
+    return <SimpleUsahaCreateFlow isId={resolvedLocale === 'id'} />;
+  }
+
   return (
-    <UmkmHubClient
+    <SimpleUsahaHub
       locale={resolvedLocale}
       isId={resolvedLocale === 'id'}
-      initialWorkspace={workspace}
-      setupView={setupView}
+      workspace={workspace}
       forcedStoreId={forcedStoreId}
-      uiVariant="simple"
     />
   );
 }

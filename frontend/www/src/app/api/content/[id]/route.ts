@@ -30,6 +30,15 @@ const marketplaceBase =
   process.env.NEXT_PUBLIC_MARKETPLACE_URL ||
   'http://localhost:8081';
 
+function readForwardToken(req: NextRequest): string | null {
+  const bearer = req.headers
+    .get('authorization')
+    ?.replace(/^Bearer\s+/i, '')
+    .trim();
+  if (bearer) return bearer;
+  return req.cookies.get('access_token')?.value?.trim() || null;
+}
+
 function setNestedString(
   target: Record<string, unknown>,
   path: string,
@@ -309,10 +318,13 @@ export async function GET(
   const includeOwnerProfiles = shouldIncludeOwnerProfiles(
     new URL(req.url).searchParams,
   );
+  const token = readForwardToken(req);
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const backendRes = await fetch(
     `${marketplaceBase}/v1/content/${resolvedContentId || resolvedParams.id}`,
-    { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+    { method: 'GET', headers },
   );
 
   let data = await backendRes.json().catch(() => null);

@@ -11,11 +11,11 @@ import {
   BriefcaseBusiness,
   CircleDollarSign,
   Clock3,
+  Heart,
   Handshake,
   House,
   MapPin,
   Package2,
-  Star,
   Store,
   UserRound,
   Wrench,
@@ -504,7 +504,7 @@ function CategoryPreview({
   const valueLabel = showPrice
     ? item.priceLabel
     : item.ratingLabel
-      ? item.ratingLabel
+      ? `${item.ratingLabel} likes`
       : item.verified
         ? locale === 'id'
           ? 'Terverifikasi'
@@ -514,7 +514,7 @@ function CategoryPreview({
   const ValueIcon = showPrice
     ? CircleDollarSign
     : item.ratingLabel
-      ? Star
+      ? Heart
       : item.verified
         ? BadgeCheck
         : null;

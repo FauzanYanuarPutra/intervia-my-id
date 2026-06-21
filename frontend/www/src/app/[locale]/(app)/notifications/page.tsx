@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useLocale } from 'next-intl';
+import { LocalizedLink as Link } from '@/components/ui-kit';
 import {
   Bell,
   CheckCheck,
@@ -16,6 +17,11 @@ import {
   isMoneyRelatedNotification,
   notificationPresentation,
 } from '@/lib/notifications/presentation';
+import {
+  notificationSocialContext,
+  notificationTargetHref,
+  notificationTargetLabel,
+} from '@/lib/notifications/social';
 import { cn } from '@/lib/utils';
 
 type LocaleCode = 'id' | 'en';
@@ -101,6 +107,26 @@ function pickNotificationEmoji(input: {
     return '🛡️';
   }
   if (text.includes('chat') || text.includes('message')) return '💬';
+  if (
+    text.includes('social') ||
+    text.includes('profile.viewed') ||
+    text.includes('reels.viewed') ||
+    text.includes('reels.liked') ||
+    text.includes('reels.commented') ||
+    text.includes('reels.replied') ||
+    text.includes('content.viewed') ||
+    text.includes('content.liked') ||
+    text.includes('content.commented') ||
+    text.includes('content.replied') ||
+    text.includes('maps.profile_opened') ||
+    text.includes('maps.route_clicked') ||
+    text.includes('viewed') ||
+    text.includes('liked') ||
+    text.includes('comment') ||
+    text.includes('reply')
+  ) {
+    return '💗';
+  }
   if (text.includes('offer') || text.includes('tawaran')) return '🤝';
   if (
     text.includes('failed') ||
@@ -289,11 +315,13 @@ export default function NotificationsPage() {
                 message: item.message,
                 label: visual.label,
               });
+              const href = notificationTargetHref(item);
+              const social = notificationSocialContext(item);
 
               return (
-                <button
+                <Link
                   key={item.id}
-                  type="button"
+                  href={href}
                   onClick={() => {
                     if (!item.is_read) void markRead(item.id);
                   }}
@@ -388,9 +416,35 @@ export default function NotificationsPage() {
                               : 'New'}
                         </span>
                       </span>
+
+                      {(social.actorName ||
+                        social.actorHandle ||
+                        social.entityLabel ||
+                        social.entityType) ? (
+                        <span className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+                          {social.actorName || social.actorHandle ? (
+                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-white/8">
+                              {social.actorName ||
+                                (social.actorHandle
+                                  ? `@${social.actorHandle}`
+                                  : '')}
+                            </span>
+                          ) : null}
+                          {social.entityLabel ? (
+                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
+                              {social.entityLabel}
+                            </span>
+                          ) : null}
+                          {social.entityType ? (
+                            <span className="rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
+                              {notificationTargetLabel(social.entityType)}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
-                </button>
+                </Link>
               );
             })}
           </div>

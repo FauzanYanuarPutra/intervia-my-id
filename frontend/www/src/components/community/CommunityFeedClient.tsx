@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
   type FormEvent,
@@ -37,11 +38,14 @@ import {
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
+import { Footer } from '@/components/layout/Footer';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   isPreviewableContentMediaUrl,
   normalizeContentMediaUrl,
 } from '@/lib/content/catalog';
+import { prepareUploadFiles } from '@/lib/media/prepareUploadMedia';
 import { cn } from '@/lib/utils';
 import type {
   CommunityFeedItem,
@@ -1373,34 +1377,38 @@ export function CommunityComposer({
       return;
     }
 
-    const formData = new FormData();
-    Array.from(files)
-      .slice(0, 6)
-      .forEach(file => formData.append('media', file));
-
     setUploading(true);
-    const response = await authFetch('/api/forum/upload-media', {
-      method: 'POST',
-      body: formData,
-    });
-    const payload = await response.json().catch(() => ({}));
-    setUploading(false);
+    try {
+      const optimizedFiles = await prepareUploadFiles(
+        Array.from(files).slice(0, 6),
+      );
+      const formData = new FormData();
+      optimizedFiles.forEach(file => formData.append('media', file));
 
-    if (!response.ok || !Array.isArray(payload.urls)) {
-      notify({
-        title: isId ? 'Upload media gagal' : 'Media upload failed',
-        description: payload.error || '',
-        variant: 'error',
+      const response = await authFetch('/api/forum/upload-media', {
+        method: 'POST',
+        body: formData,
       });
-      return;
-    }
+      const payload = await response.json().catch(() => ({}));
 
-    const uploadedUrls = payload.urls
-      .map((url: unknown) =>
-        typeof url === 'string' ? resolveCommunityMediaSrc(url) : '',
-      )
-      .filter(Boolean);
-    setMediaUrls(current => [...current, ...uploadedUrls].slice(0, 6));
+      if (!response.ok || !Array.isArray(payload.urls)) {
+        notify({
+          title: isId ? 'Upload media gagal' : 'Media upload failed',
+          description: payload.error || '',
+          variant: 'error',
+        });
+        return;
+      }
+
+      const uploadedUrls = payload.urls
+        .map((url: unknown) =>
+          typeof url === 'string' ? resolveCommunityMediaSrc(url) : '',
+        )
+        .filter(Boolean);
+      setMediaUrls(current => [...current, ...uploadedUrls].slice(0, 6));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleMediaDrop = (event: DragEvent<HTMLLabelElement>) => {
@@ -1720,7 +1728,7 @@ export function CommunityPostCard({
   isId: boolean;
   onOpenDetail: (threadId: string) => void;
 }) {
-  const { isAuthenticated, authFetch } = useAuth();
+  const { isAuthenticated, authFetch, user } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1735,6 +1743,40 @@ export function CommunityPostCard({
   const displayBody = poll ? poll.body : item.body;
   const feedMediaItems = getFeedMediaItems(item);
   const safeMedia = feedMediaItems[0] || null;
+  const actorId = String(user?.id || '').trim();
+  const actorName =
+    user?.fullName || user?.full_name || user?.username || user?.email || '';
+  const actorUsername = String(user?.username || '').trim();
+
+  const trackCommunityEvent = (
+    eventName: 'content.viewed' | 'content.liked' | 'content.commented' | 'content.replied',
+    action: string,
+    replyId?: string,
+  ) => {
+    const targetUserId = String(item.author?.id || '').trim();
+    if (!actorId || !targetUserId || actorId === targetUserId) return;
+
+    void trackLajukanEvent(eventName, {
+      entityType: 'content',
+      entityId: item.threadId || item.id,
+      page: item.href,
+      properties: {
+        entity_label: item.title,
+        target_user_id: targetUserId,
+        target_username: item.author?.name || '',
+        target_name: item.author?.name || '',
+        target_href: item.href,
+        actor_user_id: actorId,
+        actor_username: actorUsername,
+        actor_name: actorName,
+        actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
+        source: 'community',
+        surface: 'community',
+        action,
+        reply_id: replyId || '',
+      },
+    });
+  };
 
   const handleLike = async () => {
     if (item.kind !== 'discussion' || !item.threadId) return;
@@ -1759,6 +1801,11 @@ export function CommunityPostCard({
     if (!response.ok) {
       setLocalVote(wasLiked ? 1 : 0);
       setReactionCount(current => Math.max(0, current + (wasLiked ? 1 : -1)));
+      return;
+    }
+
+    if (!wasLiked) {
+      trackCommunityEvent('content.liked', 'like');
     }
   };
 
@@ -1922,7 +1969,7 @@ export function CommunityDetailModal({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { isAuthenticated, authFetch } = useAuth();
+  const { isAuthenticated, authFetch, user } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1933,6 +1980,7 @@ export function CommunityDetailModal({
   const [comment, setComment] = useState('');
   const [replyTarget, setReplyTarget] = useState<ForumPostDetail | null>(null);
   const [saving, setSaving] = useState(false);
+  const trackedThreadViewRef = useRef<string | null>(null);
   const loginHref = buildLoginHref(pathname, searchParams.toString());
 
   useEffect(() => {
@@ -1992,6 +2040,43 @@ export function CommunityDetailModal({
       alive = false;
     };
   }, [threadId]);
+
+  useEffect(() => {
+    if (!thread?.id || !thread.author?.id || !isAuthenticated) return;
+
+    const actorId = String(user?.id || '').trim();
+    const targetUserId = String(thread.author.id || '').trim();
+    if (!actorId || !targetUserId || actorId === targetUserId) return;
+
+    const trackingKey = `${thread.id}:${actorId}`;
+    if (trackedThreadViewRef.current === trackingKey) return;
+    trackedThreadViewRef.current = trackingKey;
+
+    void trackLajukanEvent('content.viewed', {
+      entityType: 'content',
+      entityId: thread.id,
+      page: `/community?thread=${encodeURIComponent(thread.id)}`,
+      properties: {
+        entity_label: thread.title,
+        target_user_id: targetUserId,
+        target_username: thread.author?.name || '',
+        target_name: thread.author?.name || '',
+        target_href: `/community?thread=${encodeURIComponent(thread.id)}`,
+        actor_user_id: actorId,
+        actor_username: String(user?.username || '').trim(),
+        actor_name:
+          user?.fullName ||
+          user?.full_name ||
+          user?.username ||
+          user?.email ||
+          '',
+        actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
+        source: 'community',
+        surface: 'community',
+        action: 'view',
+      },
+    });
+  }, [isAuthenticated, thread, user]);
 
   if (!threadId) return null;
 
@@ -2066,6 +2151,42 @@ export function CommunityDetailModal({
         payload.post as ForumPostDetail,
       ]);
     }
+    const actorId = String(user?.id || '').trim();
+    const targetUserId = String(
+      replyTarget?.author?.id || thread?.author?.id || '',
+    ).trim();
+    if (payload.post && actorId && targetUserId && actorId !== targetUserId) {
+      void trackLajukanEvent(
+        replyTarget ? 'content.replied' : 'content.commented',
+        {
+          entityType: 'content',
+          entityId: threadId,
+          page: `/community?thread=${encodeURIComponent(threadId)}`,
+          properties: {
+            entity_label: thread?.title || '',
+            target_user_id: targetUserId,
+            target_username:
+              replyTarget?.author?.name || thread?.author?.name || '',
+            target_name:
+              replyTarget?.author?.name || thread?.author?.name || '',
+            target_href: `/community?thread=${encodeURIComponent(threadId)}`,
+            actor_user_id: actorId,
+            actor_username: String(user?.username || '').trim(),
+            actor_name:
+              user?.fullName ||
+              user?.full_name ||
+              user?.username ||
+              user?.email ||
+              '',
+            actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
+            source: 'community',
+            surface: 'community',
+            action: replyTarget ? 'reply' : 'comment',
+            reply_id: replyTarget?.id || '',
+          },
+        },
+      );
+    }
     onChanged();
     const postsResponse = await fetch(
       `/api/forum/threads/${encodeURIComponent(threadId)}/posts?page_size=80`,
@@ -2094,6 +2215,34 @@ export function CommunityDetailModal({
     const payload = await response.json().catch(() => ({}));
     if (response.ok && payload.thread) {
       setThread(payload.thread);
+      const actorId = String(user?.id || '').trim();
+      const targetUserId = String(thread?.author?.id || '').trim();
+      if (actorId && targetUserId && actorId !== targetUserId) {
+        void trackLajukanEvent('content.liked', {
+          entityType: 'content',
+          entityId: threadId,
+          page: `/community?thread=${encodeURIComponent(threadId)}`,
+          properties: {
+            entity_label: thread?.title || '',
+            target_user_id: targetUserId,
+            target_username: thread?.author?.name || '',
+            target_name: thread?.author?.name || '',
+            target_href: `/community?thread=${encodeURIComponent(threadId)}`,
+            actor_user_id: actorId,
+            actor_username: String(user?.username || '').trim(),
+            actor_name:
+              user?.fullName ||
+              user?.full_name ||
+              user?.username ||
+              user?.email ||
+              '',
+            actor_avatar_url: user?.avatarUrl || user?.avatar_url || '',
+            source: 'community',
+            surface: 'community',
+            action: 'like',
+          },
+        });
+      }
       onChanged();
     }
   };
@@ -4600,6 +4749,9 @@ export default function CommunityFeedClient({
 
           <RightRail isId={isId} overview={overview} />
         </div>
+      </div>
+      <div className="mt-4">
+        <Footer />
       </div>
       <CommunityDetailModal
         isId={isId}

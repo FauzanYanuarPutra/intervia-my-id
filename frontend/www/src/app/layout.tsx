@@ -3,11 +3,13 @@ import '@/styles/globals.css';
 import '@/styles/ux-overhaul-foundation.css';
 import 'leaflet/dist/leaflet.css';
 import React from 'react';
+import { cookies } from 'next/headers';
 import { Providers } from '@/components/Providers';
 import AutoHideScrollbars from '@/components/common/AutoHideScrollbars';
 import ScrollToTop from '@/components/common/ScrollToTop';
 import Script from 'next/script';
 import { Metadata, Viewport } from 'next';
+import { isSupportedLanguage } from '@/lib/languagePreference';
 
 const SITE_URL = 'https://www.lajukan.com';
 const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image-home.png`;
@@ -140,14 +142,19 @@ const websiteSchema = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const localeCookie =
+    cookieStore.get('NEXT_LOCALE')?.value ?? cookieStore.get('locale')?.value;
+  const htmlLang = isSupportedLanguage(localeCookie) ? localeCookie : 'id';
+
   return (
     <html
-      lang="id"
+      lang={htmlLang}
       className="scroll-smooth overflow-x-hidden"
       suppressHydrationWarning
     >

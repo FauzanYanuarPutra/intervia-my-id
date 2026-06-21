@@ -23,6 +23,11 @@ import {
   isMoneyRelatedNotification,
   notificationPresentation,
 } from '@/lib/notifications/presentation';
+import {
+  notificationSocialContext,
+  notificationTargetHref,
+  notificationTargetLabel,
+} from '@/lib/notifications/social';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 
@@ -78,6 +83,26 @@ function notificationEmoji(item: InboxNotification, label: string): string {
     return '🛡️';
   }
   if (text.includes('chat') || text.includes('message')) return '💬';
+  if (
+    text.includes('social') ||
+    text.includes('profile.viewed') ||
+    text.includes('reels.viewed') ||
+    text.includes('reels.liked') ||
+    text.includes('reels.commented') ||
+    text.includes('reels.replied') ||
+    text.includes('content.viewed') ||
+    text.includes('content.liked') ||
+    text.includes('content.commented') ||
+    text.includes('content.replied') ||
+    text.includes('maps.profile_opened') ||
+    text.includes('maps.route_clicked') ||
+    text.includes('viewed') ||
+    text.includes('liked') ||
+    text.includes('comment') ||
+    text.includes('reply')
+  ) {
+    return '💗';
+  }
   if (text.includes('offer') || text.includes('tawaran')) return '🤝';
   if (
     text.includes('failed') ||
@@ -165,13 +190,6 @@ function roomUnread(room: InboxRoom): number {
 
 function notificationHref(item: InboxNotification): string {
   const data = item.data || {};
-  const directHref =
-    toText(data.href) ||
-    toText(data.url) ||
-    toText(data.action_url) ||
-    toText(data.actionHref);
-  if (directHref.startsWith('/')) return directHref;
-
   const transactionId =
     toText(data.transaction_id) || toText(data.order_id) || toText(data.txn_id);
   if (
@@ -189,7 +207,7 @@ function notificationHref(item: InboxNotification): string {
   if (topupId || item.category === 'wallet') return '/payments';
   if (item.category === 'transaction') return '/transactions';
   if (item.category === 'security') return '/settings';
-  return '/notifications';
+  return notificationTargetHref(item);
 }
 
 function EmptyState({
@@ -540,6 +558,7 @@ export function HeaderInboxDropdown({
                 });
                 const Icon = visual.Icon;
                 const emoji = notificationEmoji(item, visual.label);
+                const social = notificationSocialContext(item);
 
                 return (
                   <Link
@@ -605,6 +624,31 @@ export function HeaderInboxDropdown({
                       <span className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
                         {item.message}
                       </span>
+                      {(social.actorName ||
+                        social.actorHandle ||
+                        social.entityLabel ||
+                        social.entityType) ? (
+                        <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+                          {social.actorName || social.actorHandle ? (
+                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-white/8">
+                              {social.actorName ||
+                                (social.actorHandle
+                                  ? `@${social.actorHandle}`
+                                  : '')}
+                            </span>
+                          ) : null}
+                          {social.entityLabel ? (
+                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
+                              {social.entityLabel}
+                            </span>
+                          ) : null}
+                          {social.entityType ? (
+                            <span className="rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
+                              {notificationTargetLabel(social.entityType)}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : null}
                       <span className="mt-1.5 flex items-center justify-between gap-2">
                         <span
                           className={cn(

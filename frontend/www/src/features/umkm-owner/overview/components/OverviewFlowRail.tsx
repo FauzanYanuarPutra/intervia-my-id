@@ -19,22 +19,18 @@ export function OverviewFlowRail({
           <div className="flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                {isId ? 'Flow usaha' : 'Business flow'}
+                {isId ? 'Langkah' : 'Steps'}
               </p>
               <h2 className="mt-1 text-[1rem] font-black text-[color:var(--app-text)]">
-                {isId
-                  ? 'Urutan kerja dari awal sampai publish'
-                  : 'Work order from setup to publish'}
+                {isId ? 'Langsung beresin' : 'Get it done'}
               </h2>
             </div>
             <p className="max-w-xl text-[11px] leading-5 text-[color:var(--app-text-soft)]">
-              {isId
-                ? 'Ikuti dari kiri ke kanan. Kalau bingung, mulai dari langkah yang aktif.'
-                : 'Move left to right. If unsure, start from the active step.'}
+              {isId ? 'Mulai dari yang aktif.' : 'Start from the active step.'}
             </p>
           </div>
 
-          <div className="mt-3 grid gap-2 md:grid-cols-4">
+          <div className="mt-3 grid gap-2 md:grid-cols-3">
             {steps.map((step, index) => (
               <FlowStepCard
                 index={index}

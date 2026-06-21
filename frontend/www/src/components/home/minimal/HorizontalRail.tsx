@@ -5,9 +5,9 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
+import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
 
 type HorizontalRailProps = {
   children: ReactNode;
@@ -24,7 +24,16 @@ export function HorizontalRail({
   showMobileControls = true,
   minimal = false,
 }: HorizontalRailProps) {
-  const railRef = useRef<HTMLDivElement | null>(null);
+  const {
+    ref: railRef,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerLeave,
+    onPointerMove,
+    onPointerUp,
+    onWheel,
+  } = useHorizontalDragScroll<HTMLDivElement>();
 
   const items = useMemo(() => Children.toArray(children), [children]);
   const childCount = items.length;
@@ -67,11 +76,11 @@ export function HorizontalRail({
     }
 
     setActiveIndex(nearestIndex);
-  }, []);
+  }, [railRef]);
 
   useEffect(() => {
     syncRailState();
-  }, [syncRailState, childCount]);
+  }, [syncRailState, childCount, railRef]);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -100,7 +109,7 @@ export function HorizontalRail({
       window.removeEventListener('resize', syncRailState);
       resizeObserver.disconnect();
     };
-  }, [syncRailState, childCount]);
+  }, [syncRailState, childCount, railRef]);
 
   const scrollToIndex = useCallback((index: number) => {
     const rail = railRef.current;
@@ -119,7 +128,7 @@ export function HorizontalRail({
       left: Math.max(0, left),
       behavior: 'smooth',
     });
-  }, []);
+  }, [railRef]);
 
   const scrollByViewport = useCallback((direction: 'prev' | 'next') => {
     const rail = railRef.current;
@@ -131,7 +140,7 @@ export function HorizontalRail({
       left: direction === 'next' ? delta : -delta,
       behavior: 'smooth',
     });
-  }, []);
+  }, [railRef]);
 
   return (
     <div className="group relative w-full min-w-0 max-w-full">
@@ -150,13 +159,20 @@ export function HorizontalRail({
       <div className={minimal ? 'overflow-visible' : '-mx-3 px-3 sm:mx-0 sm:px-0'}>
         <div
           ref={railRef}
+          onClickCapture={onClickCapture}
+          onPointerCancel={onPointerCancel}
+          onPointerDown={onPointerDown}
+          onPointerLeave={onPointerLeave}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onWheel={onWheel}
           className={[
             'flex w-full min-w-0 max-w-full overflow-x-auto overflow-y-visible',
             'overscroll-x-contain no-scrollbar scroll-smooth',
             '[scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]',
             '[scroll-snap-type:x_mandatory]',
             minimal ? 'gap-2 p-0' : 'gap-3 py-2',
-            hasOverflow && !minimal ? 'cursor-ew-resize' : '',
+            hasOverflow ? 'cursor-grab active:cursor-grabbing' : '',
             className,
           ].join(' ')}
         >

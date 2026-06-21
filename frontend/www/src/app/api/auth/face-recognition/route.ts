@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { enforceAuthRouteSecurity } from '@/lib/authSecurity';
 import { fetchWithTimeout } from '@/lib/server/fetchWithTimeout';
 import { validateUploadCandidate } from '@/lib/server/uploadFiles';
+import { IMAGE_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
 
 const AI_URL = process.env.INTERNAL_AI_URL || 'http://ai_service:8080';
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,11 +49,11 @@ export async function POST(req: NextRequest) {
 
     const ktpError = validateUploadCandidate(ktp, {
       accept: 'image',
-      maxBytes: MAX_UPLOAD_BYTES,
+      maxBytes: IMAGE_UPLOAD_RAW_MAX_BYTES,
     });
     const selfieError = validateUploadCandidate(selfie, {
       accept: 'image',
-      maxBytes: MAX_UPLOAD_BYTES,
+      maxBytes: IMAGE_UPLOAD_RAW_MAX_BYTES,
     });
     if (ktpError || selfieError) {
       return NextResponse.json(

@@ -19,6 +19,11 @@ import {
   type IdentityVerificationRecord,
   readIdentityVerification,
 } from '@/lib/identityVerification';
+import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
+import {
+  IMAGE_UPLOAD_RAW_MAX_BYTES,
+  IMAGE_UPLOAD_RAW_MAX_MB,
+} from '@/lib/media/uploadStandard';
 
 type Props = {
   verificationSource?: unknown;
@@ -33,14 +38,11 @@ type DocumentPreview = {
   ttl?: string;
 };
 
-const KYC_MAX_UPLOAD_MB = 25;
-const KYC_MAX_UPLOAD_BYTES = KYC_MAX_UPLOAD_MB * 1024 * 1024;
-
 function validateKycImage(file: File): string {
   if (!file.type.startsWith('image/')) return 'File harus berupa gambar.';
   if (file.size <= 0) return 'File tidak boleh kosong.';
-  if (file.size > KYC_MAX_UPLOAD_BYTES) {
-    return `Ukuran maksimal ${KYC_MAX_UPLOAD_MB}MB per file.`;
+  if (file.size > IMAGE_UPLOAD_RAW_MAX_BYTES) {
+    return `Ukuran maksimal ${IMAGE_UPLOAD_RAW_MAX_MB}MB per file.`;
   }
   return '';
 }
@@ -186,9 +188,13 @@ export function IdentityVerificationPanel({
     setMessage(null);
 
     try {
+      const [optimizedKtp, optimizedSelfie] = await Promise.all([
+        prepareUploadFile(ktpFile),
+        prepareUploadFile(selfieFile),
+      ]);
       const formData = new FormData();
-      formData.set('ktp', ktpFile);
-      formData.set('selfie', selfieFile);
+      formData.set('ktp', optimizedKtp);
+      formData.set('selfie', optimizedSelfie);
 
       const res = await authFetch('/api/auth/identity-verification', {
         method: 'POST',

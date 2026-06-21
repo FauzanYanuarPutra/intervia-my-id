@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { Modal } from '@/components/common/Modal';
 import { useAuth } from '@/context/AuthContext';
@@ -52,6 +52,7 @@ import {
 import type { CommunityFeedItem } from '@/lib/community/types';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
 import type { LajukanReel } from '../../../_data/reels';
 
@@ -710,6 +711,7 @@ export default function PublicProfileClient({
   const [shareMessage, setShareMessage] = useState('');
   const [startingChatKey, setStartingChatKey] = useState<string | null>(null);
   const [profileChatError, setProfileChatError] = useState('');
+  const trackedProfileViewRef = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -970,6 +972,34 @@ export default function PublicProfileClient({
     void loadPublicActivity();
     return () => controller.abort();
   }, [profile]);
+
+  useEffect(() => {
+    if (!profile?.id || !user?.id) return;
+    if (profile.id === user.id) return;
+
+    const trackingKey = `${profile.id}:${user.id}`;
+    if (trackedProfileViewRef.current === trackingKey) return;
+    trackedProfileViewRef.current = trackingKey;
+
+    void trackLajukanEvent('profile.viewed', {
+      entityType: 'profile',
+      entityId: profile.id,
+      page: pathname || `/profile/${slug}`,
+      properties: {
+        target_user_id: profile.id,
+        target_username: profile.username || '',
+        target_name: profile.full_name || profile.username || profile.id,
+        target_href:
+          pathname || `/profile/${slug}`,
+        profile_slug: slug,
+        actor_user_id: user.id,
+        actor_username: user.username || '',
+        actor_name: user.name || user.fullName || user.username || '',
+        actor_avatar_url: user.avatarUrl || user.avatar_url || '',
+        source: 'public_profile',
+      },
+    });
+  }, [pathname, profile?.full_name, profile?.id, profile?.username, slug, user?.avatarUrl, user?.avatar_url, user?.fullName, user?.id, user?.name, user?.username]);
 
   const detail = useMemo(
     () => (profile ? buildProfileDetail(profile, localeCode) : null),

@@ -12,10 +12,10 @@ import {
   MyListingsSkeleton,
 } from '@/components/system/feedback/RouteSkeletons';
 import {
-  AlertCircle,
   BookmarkCheck,
   Clock3,
   Eye,
+  EyeOff,
   Heart,
   ImageIcon,
   Megaphone,
@@ -25,11 +25,8 @@ import {
   Search,
   Trash2,
   X,
+  type LucideIcon,
 } from 'lucide-react';
-import {
-  PHONE_VERIFICATION_SETTINGS_PATH,
-  readPhoneVerifiedStatus,
-} from '@/lib/identityVerification';
 import {
   readSearchCartSession,
   removeSearchCartItem,
@@ -363,13 +360,44 @@ function listingNextStep(status: ListingStatus, locale: string): string {
     : 'Not live yet. Complete it so people can view it.';
 }
 
+function listingStatusToggle(
+  status: ListingStatus,
+  locale: string,
+): {
+  label: string;
+  nextStatus: 'active' | 'archived';
+  icon: LucideIcon;
+  className: string;
+} | null {
+  if (status === 'active') {
+    return {
+      label: locale === 'id' ? 'Sembunyikan' : 'Hide',
+      nextStatus: 'archived',
+      icon: EyeOff,
+      className:
+        'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white',
+    };
+  }
+
+  if (status === 'archived') {
+    return {
+      label: locale === 'id' ? 'Tampilkan' : 'Unhide',
+      nextStatus: 'active',
+      icon: Eye,
+      className:
+        'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-400/12 dark:text-emerald-200',
+    };
+  }
+
+  return null;
+}
+
 export default function MyListingsPage() {
   const locale = useLocale() || 'id';
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, loading: authLoading, authFetch } = useAuth();
-  const phoneVerified = readPhoneVerifiedStatus(user);
   const currentSearch = searchParams?.toString() || '';
   const filterParam = (searchParams?.get('filter') || '').toLowerCase();
   const isFavoritesMode = filterParam === 'favorites';
@@ -390,18 +418,10 @@ export default function MyListingsPage() {
     ListingViewHistoryItem[]
   >([]);
   const [updatingActivityId, setUpdatingActivityId] = useState('');
+  const [updatingStatusId, setUpdatingStatusId] = useState('');
   const [activityNotice, setActivityNotice] = useState('');
-  const createHref = phoneVerified
-    ? '/create'
-    : PHONE_VERIFICATION_SETTINGS_PATH;
-  const createLabel =
-    locale === 'id'
-      ? phoneVerified
-        ? 'Buat baru'
-        : 'Verifikasi'
-      : phoneVerified
-        ? 'Post new'
-        : 'Verify Phone';
+  const createHref = '/create';
+  const createLabel = locale === 'id' ? 'Buat baru' : 'Create new';
 
   const statusTabs = useMemo(
     () => [
@@ -655,6 +675,81 @@ export default function MyListingsPage() {
     }
   };
 
+  const updateListingStatus = async (
+    item: ListingItem,
+    nextStatus: 'active' | 'archived',
+  ) => {
+    const id = parseId(item.id);
+    if (!id || updatingStatusId) return;
+
+    const currentStatus = (item.content_status || item.status || activeStatus)
+      .toString()
+      .toLowerCase();
+    if (currentStatus === nextStatus) return;
+
+    const optimisticItem: ListingItem = {
+      ...item,
+      content_status: nextStatus,
+      status: nextStatus,
+      updated_at: new Date().toISOString(),
+    };
+
+    setUpdatingStatusId(item.id);
+    setError('');
+    setItems(current =>
+      current.map(entry => (entry.id === item.id ? optimisticItem : entry)),
+    );
+
+    try {
+      const response = await authFetch(`/api/content/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content_type: payloadListingType(item),
+          category: payloadListingType(item),
+          title: item.title || 'Untitled listing',
+          summary: item.summary || undefined,
+          cover_image: item.cover_image || undefined,
+          content_status: nextStatus,
+          metadata: readRecord(item.metadata) || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          typeof payload?.error === 'string'
+            ? payload.error
+            : 'Failed to update listing status',
+        );
+      }
+
+      setItems(current =>
+        current.map(entry =>
+          entry.id === item.id
+            ? mergeUpdatedListing(
+                optimisticItem,
+                payload,
+                optimisticItem.metadata || {},
+              )
+            : entry,
+        ),
+      );
+    } catch (err) {
+      setItems(current =>
+        current.map(entry => (entry.id === item.id ? item : entry)),
+      );
+      setError(
+        err instanceof Error
+          ? err.message
+          : locale === 'id'
+            ? 'Status belum tersimpan'
+            : 'Status update was not saved',
+      );
+    } finally {
+      setUpdatingStatusId('');
+    }
+  };
+
   const pageTitle =
     collectionMode === 'favorites'
       ? locale === 'id'
@@ -799,36 +894,6 @@ export default function MyListingsPage() {
               </div>
             </div>
           </section>
-
-          {!phoneVerified && collectionMode === 'mine' ? (
-            <section className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-100">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex gap-2">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[12px] bg-amber-100 text-amber-700 dark:bg-amber-400/12 dark:text-amber-200">
-                    <AlertCircle className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-[13px] font-black">
-                      {locale === 'id'
-                        ? 'Nomor HP perlu diverifikasi dulu'
-                        : 'Verify your phone first'}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold leading-4 text-amber-800/78 dark:text-amber-100/78">
-                      {locale === 'id'
-                        ? 'Draft lama tetap aman. Setelah nomor beres, kamu bisa buat postingan baru.'
-                        : 'Older drafts stay safe. After verification, you can create new posts.'}
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href={PHONE_VERIFICATION_SETTINGS_PATH}
-                  className="inline-flex min-h-9 items-center justify-center rounded-full bg-amber-600 px-4 text-xs font-black text-white transition hover:bg-amber-700"
-                >
-                  {locale === 'id' ? 'Verifikasi sekarang' : 'Verify now'}
-                </Link>
-              </div>
-            </section>
-          ) : null}
 
           <section className="rounded-[20px] border border-slate-200 bg-white p-2.5 shadow-[0_14px_34px_-32px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 sm:p-3">
             <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(250px,340px)] lg:items-center">
@@ -1184,26 +1249,18 @@ export default function MyListingsPage() {
                     ? locale === 'id'
                       ? 'Tidak ketemu'
                       : 'No match'
-                    : !phoneVerified
-                      ? locale === 'id'
-                        ? 'Verifikasi nomor dulu'
-                        : 'Verify your phone first'
-                      : locale === 'id'
-                        ? 'Belum ada postingan'
-                        : 'No posts yet'
+                    : locale === 'id'
+                      ? 'Belum ada postingan'
+                      : 'No posts yet'
                 }
                 description={
                   query
                     ? locale === 'id'
                       ? 'Coba kata lain atau pindah tab Draft, Tayang, atau Arsip.'
                       : 'Try another keyword or switch Draft, Live, or Archived tabs.'
-                    : !phoneVerified
-                      ? locale === 'id'
-                        ? 'Nomor beres, tombol buat postingan baru langsung aktif.'
-                        : 'After phone verification, creating a new post becomes available.'
-                      : locale === 'id'
-                        ? 'Mulai dari satu postingan produk, jasa, atau profil usaha yang paling mudah dijelaskan.'
-                        : 'Start with one product, service, or business profile that is easy to explain.'
+                    : locale === 'id'
+                      ? 'Mulai dari satu postingan produk, jasa, atau profil usaha yang paling mudah dijelaskan.'
+                      : 'Start with one product, service, or business profile that is easy to explain.'
                 }
                 action={
                   query ? (
@@ -1243,9 +1300,13 @@ export default function MyListingsPage() {
                   const imageUrl = resolveListingImage(item);
                   const imageStyle = imageUrl
                     ? {
-                        backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")`,
-                      }
+                      backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")`,
+                    }
                     : undefined;
+                  const statusToggle = listingStatusToggle(cardStatus, locale);
+                  const actionGridClass = statusToggle
+                    ? 'grid-cols-3'
+                    : 'grid-cols-2';
                   const activity = readListingActivity(item);
                   const activityLabel = activity
                     ? locale === 'id'
@@ -1392,11 +1453,11 @@ export default function MyListingsPage() {
                         ) : null}
                       </div>
 
-                      <div className="mt-2 grid grid-cols-2 gap-1.5">
-                        {cardStatus === 'draft' ? (
-                          <Link
-                            href={`/create?draft=${id}`}
-                            className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-black text-white transition hover:bg-amber-700"
+                    <div className={`mt-2 grid gap-1.5 ${actionGridClass}`}>
+                      {cardStatus === 'draft' ? (
+                        <Link
+                          href={`/create?draft=${id}`}
+                          className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-black text-white transition hover:bg-amber-700"
                           >
                             <PencilLine className="h-4 w-4" />
                             {locale === 'id'
@@ -1419,6 +1480,22 @@ export default function MyListingsPage() {
                               <Eye className="h-4 w-4" />
                               {locale === 'id' ? 'Lihat' : 'View'}
                             </Link>
+                            {statusToggle ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void updateListingStatus(
+                                    item,
+                                    statusToggle.nextStatus,
+                                  )
+                                }
+                                disabled={updatingStatusId === item.id}
+                                className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border-2 px-3 text-xs font-black transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
+                              >
+                                <statusToggle.icon className="h-4 w-4" />
+                                {statusToggle.label}
+                              </button>
+                            ) : null}
                           </>
                         )}
                       </div>
@@ -1476,31 +1553,6 @@ export default function MyListingsPage() {
               </Link>
             </div>
           </div>
-
-          {!phoneVerified && (
-            <div className="mt-4 rounded-2xl border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] px-3 py-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-[color:var(--app-warning)]">
-                    {locale === 'id'
-                      ? 'Verifikasi dulu'
-                      : 'Verify your phone before creating a new listing'}
-                  </p>
-                  <p className="mt-1 text-xs text-[color:var(--app-text)]">
-                    {locale === 'id'
-                      ? 'Draft aman. Posting baru aktif setelah nomor beres.'
-                      : 'You can still view older drafts, but the new listing flow is gated until an active phone number is verified.'}
-                  </p>
-                </div>
-                <Link
-                  href={PHONE_VERIFICATION_SETTINGS_PATH}
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[color:var(--app-warning)] px-4 text-sm font-semibold text-[color:var(--app-text-inverse)]"
-                >
-                  {locale === 'id' ? 'Verifikasi' : 'Open verification'}
-                </Link>
-              </div>
-            </div>
-          )}
 
           <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(230px,320px)] lg:items-center">
             <div className="grid grid-cols-3 gap-1 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-1 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
@@ -1762,26 +1814,18 @@ export default function MyListingsPage() {
                   ? locale === 'id'
                     ? 'Tidak ketemu'
                     : 'No match'
-                  : !phoneVerified
-                    ? locale === 'id'
-                      ? 'Verifikasi dulu'
-                      : 'Verify your phone to start creating listings'
-                    : locale === 'id'
-                      ? 'Belum ada'
-                      : 'No listings found for this status'
+                  : locale === 'id'
+                    ? 'Belum ada'
+                    : 'No listings found for this status'
               }
               description={
                 query
                   ? locale === 'id'
                     ? 'Coba kata lain atau pindah tab.'
                     : 'Try another keyword or switch tabs.'
-                  : !phoneVerified
-                    ? locale === 'id'
-                      ? 'Nomor beres, tombol buat baru aktif.'
-                      : 'After your active phone number is verified, posting a new offer becomes available again. Older drafts can still be reviewed here.'
-                    : locale === 'id'
-                      ? 'Buat baru atau pindah tab.'
-                      : 'Start a new post or switch tabs to see the others.'
+                  : locale === 'id'
+                    ? 'Buat baru atau pindah tab.'
+                    : 'Start a new post or switch tabs to see the others.'
               }
               action={
                 query ? (
@@ -1811,6 +1855,12 @@ export default function MyListingsPage() {
                 const rawStatus =
                   item.content_status || item.status || activeStatus;
                 const itemStatus = listingStatusLabel(rawStatus, locale);
+                const normalizedStatus = rawStatus.toLowerCase();
+                const cardStatus: ListingStatus =
+                  normalizedStatus === 'active' ||
+                  normalizedStatus === 'archived'
+                    ? normalizedStatus
+                    : 'draft';
                 const progress = readProgress(item);
                 const imageUrl = resolveListingImage(item);
                 const imageStyle = imageUrl
@@ -1818,6 +1868,10 @@ export default function MyListingsPage() {
                       backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")`,
                     }
                   : undefined;
+                const statusToggle = listingStatusToggle(cardStatus, locale);
+                const actionGridClass = statusToggle
+                  ? 'grid-cols-3'
+                  : 'grid-cols-2';
 
                 return (
                   <div
@@ -1879,7 +1933,7 @@ export default function MyListingsPage() {
                       </div>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className={`mt-3 grid gap-2 ${actionGridClass}`}>
                       {activeStatus === 'draft' ? (
                         <Link
                           href={`/create?draft=${id}`}
@@ -1901,6 +1955,22 @@ export default function MyListingsPage() {
                           >
                             {locale === 'id' ? 'Lihat' : 'View'}
                           </Link>
+                          {statusToggle ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void updateListingStatus(
+                                  item,
+                                  statusToggle.nextStatus,
+                                )
+                              }
+                              disabled={updatingStatusId === item.id}
+                              className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border-2 px-3 text-sm font-black transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
+                            >
+                              <statusToggle.icon className="h-4 w-4" />
+                              {statusToggle.label}
+                            </button>
+                          ) : null}
                         </>
                       )}
                     </div>

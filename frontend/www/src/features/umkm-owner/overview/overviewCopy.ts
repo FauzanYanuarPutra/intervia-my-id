@@ -20,20 +20,20 @@ export function formatBusinessCountLabel(count: number, isId: boolean): string {
 }
 
 export function getOverviewTitle(count: number, isId: boolean): string {
-  if (count > 0) return isId ? 'Kelola semua usaha' : 'Manage all businesses';
-  return isId ? 'Buat usaha pertama' : 'Create the first business';
+  if (count > 0) return isId ? 'Usaha kamu' : 'Your businesses';
+  return isId ? 'Buat usaha' : 'Create business';
 }
 
 export function getOverviewSubtitle(count: number, isId: boolean): string {
   if (count > 0) {
     return isId
-      ? `Kamu punya ${count} usaha. Pilih satu sebagai fokus kerja sekarang, atau tambah usaha baru kapan saja.`
-      : `You have ${count} businesses. Pick one as the current work focus, or add another anytime.`;
+      ? 'Pilih usaha, lalu lanjut kerja.'
+      : 'Pick a business, then continue.';
   }
 
   return isId
-    ? 'Belum ada usaha. Buat usaha pertama dulu, nanti bisa tambah usaha lain lagi.'
-    : 'No business yet. Create the first one first; you can add more later.';
+    ? 'Isi profil singkat. Detail bisa nanti.'
+    : 'Fill a short profile. Details can wait.';
 }
 
 export function getOverviewNextAction(
@@ -48,8 +48,8 @@ export function getOverviewNextAction(
     desc:
       nextOwnerStep?.desc ||
       (isId
-        ? 'Aksi di bawah hanya untuk usaha yang sedang dipilih. Usaha lain tetap ada di daftar.'
-        : 'Actions below only affect the selected business. Other businesses remain in your list.'),
+        ? 'Aksi untuk usaha ini.'
+        : 'Actions for this business.'),
     title:
       nextOwnerStep?.label ||
       (isId

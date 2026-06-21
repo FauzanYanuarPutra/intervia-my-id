@@ -9,10 +9,10 @@ import {
   LocateFixed,
   Lock,
   LockOpen,
+  Heart,
   MapPin,
   Route,
   ShoppingBag,
-  Star,
   Store,
   UtensilsCrossed,
   Wrench,
@@ -64,7 +64,6 @@ export function RatingStars({
   isId,
   className,
   compact = false,
-  showScore = false,
 }: {
   rating: number;
   countLabel: string;
@@ -76,38 +75,32 @@ export function RatingStars({
   const safeRating = Number.isFinite(rating)
     ? Math.max(0, Math.min(5, rating))
     : 0;
-  const filledStars = safeRating > 0 ? Math.round(safeRating) : 0;
-  const countText = `${countLabel} ${isId ? 'penilai' : 'ratings'}`;
+  const hasLikes = safeRating > 0;
+  const countText = `${countLabel} ${isId ? 'like' : 'likes'}`;
 
   return (
     <span
       className={cn(
-        'inline-flex min-w-0 items-center gap-1.5 text-amber-600',
+        'inline-flex min-w-0 items-center gap-1.5 text-rose-600',
         className,
       )}
-      aria-label={`${safeRating.toFixed(1)} dari 5, ${countText}`}
+      aria-label={countText}
     >
-      <span className="inline-flex shrink-0 items-center gap-0.5">
-        {Array.from({ length: 5 }).map((_, index) => {
-          const active = index < filledStars;
-          return (
-            <Star
-              key={index}
-              className={cn(
-                compact ? 'h-3 w-3' : 'h-3.5 w-3.5',
-                active
-                  ? 'fill-current text-amber-500'
-                  : 'fill-transparent text-amber-300',
-              )}
-            />
-          );
-        })}
+      <span
+        className={cn(
+          'inline-flex shrink-0 items-center justify-center rounded-full p-1',
+          hasLikes
+            ? 'bg-rose-50 text-rose-500'
+            : 'bg-slate-100 text-slate-400',
+        )}
+      >
+        <Heart
+          className={cn(
+            compact ? 'h-3 w-3' : 'h-3.5 w-3.5',
+            hasLikes && 'fill-current',
+          )}
+        />
       </span>
-      {showScore ? (
-        <span className="shrink-0 text-[10px] font-black text-amber-700">
-          {safeRating.toFixed(1)}
-        </span>
-      ) : null}
       <span className="shrink-0 text-[10px] font-black text-[color:var(--app-text-soft)]">
         {countText}
       </span>

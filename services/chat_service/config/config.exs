@@ -2,7 +2,11 @@ import Config
 
 config :chat_service,
   env: Mix.env(),
-  namespace: ChatService
+  namespace: ChatService,
+  identity_service_url:
+    System.get_env("INTERNAL_API_URL") ||
+      System.get_env("IDENTITY_SERVICE_URL") ||
+      "http://localhost:8080"
 
 config :chat_service, ChatServiceWeb.Endpoint,
   url: [host: "localhost"],

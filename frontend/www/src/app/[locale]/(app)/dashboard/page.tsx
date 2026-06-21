@@ -189,9 +189,9 @@ function getLaunchScore(stats: DashboardStats, profileScore: number) {
   const trustScore = getTrustScore(stats.user_rating, profileScore);
   return Math.round(
     listingScore * 0.36 +
-      responseScore * 0.24 +
-      profileScore * 0.24 +
-      trustScore * 0.16,
+    responseScore * 0.24 +
+    profileScore * 0.24 +
+    trustScore * 0.16,
   );
 }
 
@@ -865,9 +865,9 @@ export default function DashboardPage() {
                           {item.value}%
                         </span>
                       </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white ring-1 ring-slate-100 dark:bg-slate-950 dark:ring-slate-800">
+                      <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white ring-1 ring-slate-100 dark:bg-slate-950 dark:ring-slate-800">
                         <span
-                          className="block h-full rounded-full bg-[color:var(--app-accent)]"
+                          className="absolute left-0 top-0 block h-full rounded-full bg-[color:var(--app-accent)]"
                           style={{ width: `${item.value}%` }}
                         />
                       </div>

@@ -4,10 +4,10 @@ import {
   readUploadToken,
   storeValidatedUploads,
 } from '@/lib/server/uploadFiles';
+import { MEDIA_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
 
 const APP_ENV = process.env.ENV || process.env.APP_ENV || process.env.NODE_ENV;
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
-const MAX_FILE_BYTES = 80 * 1024 * 1024;
 const CHAT_FILE_KEYS = ['file', 'media', 'attachment'];
 
 export const runtime = 'nodejs';
@@ -72,7 +72,7 @@ export async function POST(
       accept: 'media',
       concurrency: 1,
       folder: `chat/${id}`,
-      maxBytes: MAX_FILE_BYTES,
+      maxBytes: MEDIA_UPLOAD_RAW_MAX_BYTES,
       minioTarget: id,
       minioTimeoutMs: 2600,
     });

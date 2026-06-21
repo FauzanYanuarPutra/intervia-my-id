@@ -3,6 +3,7 @@
 import { type ReactNode } from 'react';
 import {
   ClipboardList,
+  Clapperboard,
   FolderKanban,
   Home,
   MapPin,
@@ -173,6 +174,32 @@ function CreateDesktopSidebar({
         ]
     ),
   ];
+  const manageItems: CreateNavItem[] = [
+    {
+      href: '/my-listings',
+      label: isId ? 'Kelola posting' : 'Manage posts',
+      caption: isId ? 'Edit, sembunyikan, tampilkan' : 'Edit, hide, restore',
+      icon: FolderKanban,
+    },
+    {
+      href: '/usaha',
+      label: isId ? 'Kelola usaha' : 'Manage business',
+      caption: isId ? 'Profil, katalog, tim' : 'Profile, catalog, team',
+      icon: Store,
+    },
+    {
+      href: '/reels',
+      label: isId ? 'Kelola reels' : 'Manage reels',
+      caption: isId ? 'Upload, edit, tayang' : 'Upload, edit, publish',
+      icon: Clapperboard,
+    },
+    {
+      href: '/community',
+      label: isId ? 'Kelola komunitas' : 'Manage community',
+      caption: isId ? 'Posting, grup, diskusi' : 'Posts, groups, discussions',
+      icon: Users,
+    },
+  ];
   const renderNavItem = (item: CreateNavItem) => {
     const itemPath = item.href.split('?')[0];
     const active =
@@ -242,6 +269,13 @@ function CreateDesktopSidebar({
             </p>
           </div>
           <div className="space-y-1">{businessItems.map(renderNavItem)}</div>
+          <div className="my-2 h-px bg-[color:var(--app-border)]" />
+          <div className="px-2 py-1">
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+              {isId ? 'Kelola konten' : 'Manage content'}
+            </p>
+          </div>
+          <div className="space-y-1">{manageItems.map(renderNavItem)}</div>
           <Link
             href="/create"
             aria-current={currentPath === '/create' ? 'page' : undefined}

@@ -16,11 +16,106 @@ function isUuidLike(value: string | undefined): boolean {
   );
 }
 
+function normalizeUsername(value: string): string {
+  return value.trim().replace(/^@+/, '').toLowerCase();
+}
+
+function isValidUsername(value: string): boolean {
+  return /^[a-z0-9_.]{3,30}$/.test(value) && !value.includes('..');
+}
+
+async function resolvePeerUserIdByUsername(
+  username: string,
+  token: string,
+): Promise<
+  { id: string; username?: string | null; full_name?: string | null } | null
+> {
+  const normalized = normalizeUsername(username);
+  if (!normalized || !isValidUsername(normalized)) return null;
+
+  const searchQueries = Array.from(
+    new Set([normalized, `@${normalized}`].map(value => value.trim()).filter(Boolean)),
+  );
+
+  for (const query of searchQueries) {
+    const params = new URLSearchParams({ q: query, limit: '32' });
+    const res = await fetch(`${API_URL}/users/discover?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) continue;
+
+    const payload = (await res.json().catch(() => ({}))) as {
+      data?: Array<{
+        id?: unknown;
+        username?: unknown;
+        full_name?: unknown;
+      }>;
+    };
+
+    const exact = Array.isArray(payload.data)
+      ? payload.data.find(
+          item => normalizeUsername(String(item.username || '')) === normalized,
+        )
+      : undefined;
+
+    if (exact) {
+      const id = typeof exact.id === 'string' ? exact.id.trim() : '';
+      if (!id) continue;
+      return {
+        id,
+        username:
+          typeof exact.username === 'string' ? exact.username.trim() : null,
+        full_name:
+          typeof exact.full_name === 'string' ? exact.full_name.trim() : null,
+      };
+    }
+  }
+
+  const fallback = await fetch(
+    `${API_URL}/users/discover?${new URLSearchParams({ q: normalized, limit: '100' }).toString()}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    },
+  );
+  if (!fallback.ok) return null;
+
+  const fallbackPayload = (await fallback.json().catch(() => ({}))) as {
+    data?: Array<{
+      id?: unknown;
+      username?: unknown;
+      full_name?: unknown;
+    }>;
+  };
+  const fallbackExact = Array.isArray(fallbackPayload.data)
+    ? fallbackPayload.data.find(
+        item => normalizeUsername(String(item.username || '')) === normalized,
+      )
+    : undefined;
+  if (!fallbackExact) return null;
+
+  const id = typeof fallbackExact.id === 'string' ? fallbackExact.id.trim() : '';
+  if (!id) return null;
+
+  return {
+    id,
+    username:
+      typeof fallbackExact.username === 'string'
+        ? fallbackExact.username.trim()
+        : null,
+    full_name:
+      typeof fallbackExact.full_name === 'string'
+        ? fallbackExact.full_name.trim()
+        : null,
+  };
+}
+
 function buildLeadPayload(
   input: any,
   roomId: string,
   peerUserId?: string,
-  contact?: string,
+  username?: string,
 ): Record<string, any> {
   const lead: Record<string, any> = {};
   if (input && typeof input === 'object') {
@@ -39,7 +134,7 @@ function buildLeadPayload(
 
   if (!lead.source) lead.source = 'chat';
   if (!lead.name) {
-    lead.name = contact ? `Chat with ${contact}` : 'Chat lead';
+    lead.name = username ? `Chat with @${username}` : 'Chat lead';
   }
   if (!lead.chat_room_id) lead.chat_room_id = roomId;
   if (peerUserId && isUuidLike(peerUserId)) {
@@ -80,22 +175,21 @@ export async function POST(req: NextRequest) {
         ? (payload.lead as Record<string, unknown>)
         : null;
     const skipLead = payload.skip_lead === true;
-    const peerUserId = typeof payload.peer_user_id === 'string' ? payload.peer_user_id.trim() : '';
+    const peerUserId =
+      typeof payload.peer_user_id === 'string' ? payload.peer_user_id.trim() : '';
     const roomType = typeof payload.room_type === 'string' ? payload.room_type.trim() : '';
     const roomName = typeof payload.room_name === 'string' ? payload.room_name.trim() : '';
     const memberIds = Array.isArray(payload.member_ids)
-      ? payload.member_ids.filter((id) => typeof id === 'string')
+      ? payload.member_ids.filter(id => typeof id === 'string')
       : [];
-    const rawContact =
-      typeof payload.contact === 'string'
-        ? payload.contact
-        : typeof payload.phone === 'string'
-          ? payload.phone
-          : typeof payload.email === 'string'
-            ? payload.email
-            : '';
+    const rawUsername =
+      typeof payload.username === 'string'
+        ? payload.username
+        : typeof payload.contact === 'string'
+          ? payload.contact
+          : '';
 
-    if ((roomType === 'group' || memberIds.length > 0) && !rawContact.trim()) {
+    if ((roomType === 'group' || memberIds.length > 0) && !rawUsername.trim()) {
       const res = await fetch(`${CHAT_URL}/api/v1/rooms`, {
         method: 'POST',
         headers: {
@@ -112,7 +206,11 @@ export async function POST(req: NextRequest) {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         return NextResponse.json(
-          { error: (errorData as { error?: string }).error || 'Failed to create group room' },
+          {
+            error:
+              (errorData as { error?: string }).error ||
+              'Failed to create group room',
+          },
           { status: res.status },
         );
       }
@@ -124,7 +222,9 @@ export async function POST(req: NextRequest) {
       };
       const roomId = data?.data?.room_id ?? data?.room_id;
       return NextResponse.json(
-        roomId ? { room_id: roomId, room_name: data?.data?.room_name ?? data?.room_name } : data,
+        roomId
+          ? { room_id: roomId, room_name: data?.data?.room_name ?? data?.room_name }
+          : data,
         { status: 201 },
       );
     }
@@ -142,7 +242,11 @@ export async function POST(req: NextRequest) {
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         return NextResponse.json(
-          { error: (errorData as { error?: string }).error || 'Failed to create chat room' },
+          {
+            error:
+              (errorData as { error?: string }).error ||
+              'Failed to create chat room',
+          },
           { status: res.status },
         );
       }
@@ -175,78 +279,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!rawContact.trim()) {
-      return NextResponse.json(
-        { error: 'Phone number or email is required' },
-        { status: 400 },
-      );
-    }
-
-    const normalizedContact = rawContact.trim().slice(0, 160);
-    const cleanPhone = normalizedContact.replace(/\D/g, '');
-    const isEmail = normalizedContact.includes('@');
-
-    if (!isEmail && cleanPhone.length < 10) {
-      return NextResponse.json(
-        { error: 'Invalid phone number' },
-        { status: 400 },
-      );
-    }
-
-    // Resolve contact to peer_user_id via identity service (chat service expects peer_user_id).
-    const resolvePath = isEmail
-      ? `/users/by-email/${encodeURIComponent(normalizedContact.toLowerCase())}`
-      : `/users/by-phone/${encodeURIComponent(cleanPhone)}`;
-
-    const identityRes = await fetch(
-      `${API_URL}${resolvePath}`,
-      {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${auth.ctx.token}` },
-      }
-    );
-
-    if (identityRes.status === 404) {
+    const normalizedUsername = normalizeUsername(rawUsername).slice(0, 30);
+    if (!isValidUsername(normalizedUsername)) {
       return NextResponse.json(
         {
-          error: isEmail
-            ? 'No user found with this email address.'
-            : 'No user found with this phone number.',
+          error:
+            'Username is required. Use a valid username, not email or phone number.',
         },
-        { status: 404 }
-      );
-    }
-    if (!identityRes.ok) {
-      const err = await identityRes.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: (err as { error?: string }).error || 'Failed to lookup user' },
-        { status: identityRes.status }
+        { status: 400 },
       );
     }
 
-    const { id: resolvedPeerUserId } = (await identityRes.json()) as { id: string };
-    if (!resolvedPeerUserId) {
+    const resolved = await resolvePeerUserIdByUsername(
+      normalizedUsername,
+      auth.ctx.token,
+    );
+    if (!resolved) {
       return NextResponse.json(
-        { error: 'Invalid response from user lookup' },
-        { status: 502 }
+        { error: 'No user found with that username.' },
+        { status: 404 },
       );
     }
 
-    // Call chat service to create DM room by peer_user_id
     const res = await fetch(`${CHAT_URL}/api/v1/dm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${auth.ctx.token}`,
       },
-      body: JSON.stringify({ peer_user_id: resolvedPeerUserId }),
+      body: JSON.stringify({ peer_user_id: resolved.id }),
     });
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       return NextResponse.json(
-        { error: (errorData as { error?: string }).error || 'Failed to create chat room' },
-        { status: res.status }
+        {
+          error:
+            (errorData as { error?: string }).error || 'Failed to create chat room',
+        },
+        { status: res.status },
       );
     }
 
@@ -260,8 +331,8 @@ export async function POST(req: NextRequest) {
       const leadPayload = buildLeadPayload(
         leadInput,
         roomId,
-        resolvedPeerUserId,
-        normalizedContact
+        resolved.id,
+        resolved.username || normalizedUsername,
       );
       try {
         await fetch(`${MARKETPLACE_URL}/v1/crm/leads`, {
@@ -279,7 +350,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       roomId ? { room_id: roomId, room_name: data?.room_name } : data,
-      { status: 201 }
+      { status: 201 },
     );
   } catch (e) {
     console.error('Create room error:', e);

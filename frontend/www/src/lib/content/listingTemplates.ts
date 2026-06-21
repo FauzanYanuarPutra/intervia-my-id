@@ -29,7 +29,7 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleEn:
       'Need skincare resellers and live-commerce channels for a new launch',
     summaryId:
-      'Butuh partner channel yang bisa bantu aktivasi launch batch awal dengan cepat.',
+      'Butuh partner channel untuk aktivasi launch batch awal.',
     summaryEn:
       'Need channel partners who can quickly activate the first launch batch.',
     badgeId: 'Channel launch',
@@ -63,9 +63,9 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleId: 'Butuh supplier bahan baku untuk restock mingguan outlet',
     titleEn: 'Need raw-material suppliers for weekly outlet restock',
     summaryId:
-      'Template cepat untuk cari supplier, MOQ, area kirim, dan target datang.',
+      'Cari supplier yang jelas soal MOQ, area kirim, dan target datang.',
     summaryEn:
-      'Fast template to request suppliers, MOQ, delivery area, and arrival target.',
+      'Find suppliers with clear MOQ, delivery area, and arrival target.',
     badgeId: 'Cari supplier',
     badgeEn: 'Find suppliers',
     fields: {
@@ -94,9 +94,9 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleId: 'Distributor snack grosir untuk reseller dan toko',
     titleEn: 'Wholesale snack distributor for resellers and shops',
     summaryId:
-      'Untuk user yang mau cepat publish stok usaha tanpa mikir dari nol.',
+      'Stok grosir siap tayang untuk reseller dan toko.',
     summaryEn:
-      'For users who want to quickly publish business stock without starting from zero.',
+      'Ready-to-publish wholesale stock for resellers and shops.',
     badgeId: 'Jual stok',
     badgeEn: 'Sell stock',
     fields: {
@@ -126,9 +126,9 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleId: 'Paket admin marketplace 30 hari',
     titleEn: '30-day marketplace admin package',
     summaryId:
-      'Template cepat untuk jasa operasional yang ingin langsung tayang.',
+      'Jasa operasional marketplace yang siap langsung tayang.',
     summaryEn:
-      'Fast template for operational services that should go live quickly.',
+      'Marketplace operations support that is ready to go live.',
     badgeId: 'Tawarkan jasa',
     badgeEn: 'Offer service',
     fields: {
@@ -158,9 +158,9 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleId: 'Paket mentoring UMKM 1-on-1',
     titleEn: '1-on-1 SME mentoring package',
     summaryId:
-      'Template untuk mentor, konsultan, atau praktisi yang menjual sesi pendampingan.',
+      'Paket mentoring untuk sesi pendampingan bisnis.',
     summaryEn:
-      'Template for mentors, consultants, or operators selling guidance sessions.',
+      'Mentoring package for practical business guidance sessions.',
     badgeId: 'Jadi mentor',
     badgeEn: 'Offer mentoring',
     fields: {
@@ -191,9 +191,9 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleId: 'Cari mentor untuk rapikan usaha',
     titleEn: 'Find a mentor to improve the business',
     summaryId:
-      'Template untuk founder/owner yang butuh arahan praktis sebelum eksekusi.',
+      'Butuh mentor dengan arahan praktis sebelum eksekusi.',
     summaryEn:
-      'Template for founders/owners who need practical guidance before execution.',
+      'Need a mentor who can give practical guidance before execution.',
     badgeId: 'Cari mentor',
     badgeEn: 'Find mentor',
     fields: {
@@ -225,9 +225,9 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleId: 'Oper laundry kiloan aktif lengkap dengan aset dan SOP',
     titleEn: 'Running laundry business with assets and SOP',
     summaryId:
-      'Template cepat untuk jual usaha berjalan dengan info risiko yang jelas.',
+      'Usaha laundry berjalan dengan aset dan SOP yang jelas.',
     summaryEn:
-      'Fast template to transfer a running business with clear risk notes.',
+      'Running laundry business with clear assets and SOP.',
     badgeId: 'Oper usaha',
     badgeEn: 'Business transfer',
     fields: {
@@ -278,8 +278,8 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     listingMode: 'detail',
     titleId: 'Cari kios atau booth untuk titik jualan baru',
     titleEn: 'Looking for kiosks or booths for a new selling point',
-    summaryId: 'Template cepat untuk cari lokasi jualan yang siap dipakai.',
-    summaryEn: 'Fast template to find a ready-to-use selling location.',
+    summaryId: 'Cari lokasi jualan yang siap dipakai.',
+    summaryEn: 'Find a selling location that is ready to use.',
     badgeId: 'Cari lokasi',
     badgeEn: 'Find location',
     fields: {
@@ -309,8 +309,8 @@ export const LISTING_TEMPLATES: ListingTemplate[] = [
     titleId: 'Kios siap pakai untuk tenant makanan atau retail kecil',
     titleEn: 'Ready-to-use kiosk for food tenants or small retail',
     summaryId:
-      'Template cepat untuk publish lokasi usaha yang langsung bisa disewa.',
-    summaryEn: 'Fast template to publish a business location ready for rent.',
+      'Lokasi usaha siap sewa untuk tenant yang mau langsung jalan.',
+    summaryEn: 'Business location ready to rent for tenants who want to start now.',
     badgeId: 'Jual lokasi',
     badgeEn: 'Offer location',
     fields: {

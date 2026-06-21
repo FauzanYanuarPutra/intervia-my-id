@@ -114,13 +114,27 @@ struct AuthActor {
     name: Option<String>,
 }
 
+#[derive(Debug, Deserialize, Default)]
+struct IdentityPublicProfile {
+    username: Option<String>,
+    full_name: Option<String>,
+    avatar_url: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct ForumIdentityProfile {
+    username: Option<String>,
+    name: Option<String>,
+    avatar_url: Option<String>,
+}
+
 #[derive(Debug, Serialize, FromRow, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ForumUser {
     id: String,
     username: String,
     name: String,
-    avatar_url: String,
+    avatar_url: Option<String>,
     title: String,
     reputation: i32,
     base_reputation: i32,
@@ -475,7 +489,9 @@ struct ReelCommentsQuery {
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct CreateReelCommentRequest {
+    #[serde(alias = "content", alias = "message")]
     body: Option<String>,
+    #[serde(alias = "replyToPostId", alias = "parentCommentId")]
     parent_comment_id: Option<String>,
 }
 
@@ -560,7 +576,7 @@ struct CommunityFeedAuthor {
     id: String,
     name: String,
     title: String,
-    avatar_url: String,
+    avatar_url: Option<String>,
     reputation: i32,
 }
 
@@ -608,7 +624,7 @@ struct ForumGroupMember {
     updated_at: DateTime<Utc>,
     username: String,
     name: String,
-    avatar_url: String,
+    avatar_url: Option<String>,
     title: String,
     reputation: i32,
     badges: Vec<String>,
@@ -766,6 +782,7 @@ struct ReelCommentRow {
     parent_comment_id: Option<String>,
     author_user_id: String,
     author_name: String,
+    author_avatar_url: Option<String>,
     body: String,
     reply_count: i32,
     created_at: DateTime<Utc>,
@@ -931,6 +948,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     ensure_runtime_schema(&db).await?;
+    sync_forum_users_from_identity(&db).await;
 
     let state = Arc::new(AppState {
         db,
@@ -1120,7 +1138,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         )
         "#,
         r#"
-        CREATE TABLE IF NOT EXISTS lajukan_forum_users (
+        CREATE TABLE IF NOT EXISTS forum.lajukan_forum_users (
           id text PRIMARY KEY,
           username text NOT NULL UNIQUE,
           name text NOT NULL,
@@ -1152,7 +1170,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
           title text NOT NULL,
           slug text NOT NULL,
           category_id text NOT NULL REFERENCES forum.lajukan_forum_categories(id),
-          author_id text NOT NULL REFERENCES lajukan_forum_users(id),
+          author_id text NOT NULL REFERENCES forum.lajukan_forum_users(id),
           group_id text NULL,
           created_at timestamptz NOT NULL DEFAULT now(),
           last_activity_at timestamptz NOT NULL DEFAULT now(),
@@ -1180,7 +1198,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         CREATE TABLE IF NOT EXISTS forum.lajukan_forum_posts (
           id text PRIMARY KEY,
           thread_id text NOT NULL REFERENCES forum.lajukan_forum_threads(id) ON DELETE CASCADE,
-          author_id text NOT NULL REFERENCES lajukan_forum_users(id),
+          author_id text NOT NULL REFERENCES forum.lajukan_forum_users(id),
           content text NOT NULL,
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NULL,
@@ -1196,7 +1214,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
           id text PRIMARY KEY,
           target_type text NOT NULL,
           target_id text NOT NULL,
-          user_id text NOT NULL REFERENCES lajukan_forum_users(id) ON DELETE CASCADE,
+          user_id text NOT NULL REFERENCES forum.lajukan_forum_users(id) ON DELETE CASCADE,
           value integer NOT NULL CHECK (value IN (-1, 1)),
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now(),
@@ -1226,7 +1244,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
           membership_permission text NOT NULL DEFAULT 'open',
           cover_url text NULL,
           rules text [] NOT NULL DEFAULT '{}',
-          created_by_user_id text NULL REFERENCES lajukan_forum_users(id) ON DELETE SET NULL,
+          created_by_user_id text NULL REFERENCES forum.lajukan_forum_users(id) ON DELETE SET NULL,
           status text NOT NULL DEFAULT 'active',
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now()
@@ -1235,7 +1253,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         r#"
         CREATE TABLE IF NOT EXISTS lajukan_group_members (
           group_id text NOT NULL REFERENCES lajukan_groups(id) ON DELETE CASCADE,
-          user_id text NOT NULL REFERENCES lajukan_forum_users(id) ON DELETE CASCADE,
+          user_id text NOT NULL REFERENCES forum.lajukan_forum_users(id) ON DELETE CASCADE,
           role text NOT NULL DEFAULT 'member',
           status text NOT NULL DEFAULT 'active',
           notifications_enabled boolean NOT NULL DEFAULT true,
@@ -1327,6 +1345,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS live_title text NULL",
         "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS live_scheduled_at timestamptz NULL",
         "ALTER TABLE reel.lajukan_reels ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb",
+        "ALTER TABLE reel.lajukan_reel_comments ADD COLUMN IF NOT EXISTS author_avatar text NULL",
     ];
 
     for statement in alter_statements {
@@ -1338,9 +1357,10 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         CREATE TABLE IF NOT EXISTS reel.lajukan_reel_comments (
           id text PRIMARY KEY,
           reel_id text NOT NULL REFERENCES reel.lajukan_reels(id) ON DELETE CASCADE,
-          author_user_id text NOT NULL REFERENCES lajukan_forum_users(id) ON DELETE CASCADE,
+          author_user_id text NOT NULL REFERENCES forum.lajukan_forum_users(id) ON DELETE CASCADE,
           author_name text NOT NULL,
           author_avatar_url text NULL,
+          author_avatar text NULL,
           body text NOT NULL,
           status text NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'deleted', 'blocked')),
           created_at timestamptz NOT NULL DEFAULT now(),
@@ -1411,7 +1431,7 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         CREATE TABLE IF NOT EXISTS lajukan_reel_user_actions (
           id text PRIMARY KEY,
           reel_id text NOT NULL REFERENCES reel.lajukan_reels(id) ON DELETE CASCADE,
-          actor_user_id text NOT NULL REFERENCES lajukan_forum_users(id) ON DELETE CASCADE,
+          actor_user_id text NOT NULL REFERENCES forum.lajukan_forum_users(id) ON DELETE CASCADE,
           target_user_id text NULL,
           action text NOT NULL CHECK (action IN ('like', 'save', 'follow')),
           created_at timestamptz NOT NULL DEFAULT now(),
@@ -2181,20 +2201,172 @@ fn normalize_tag_slug(value: &str) -> String {
     build_slug(value).chars().take(40).collect()
 }
 
+fn clean_profile_text(value: Option<String>) -> Option<String> {
+    value
+        .map(|item| {
+            item.chars()
+                .filter(|ch| !ch.is_control())
+                .collect::<String>()
+                .trim()
+                .to_string()
+        })
+        .filter(|item| !item.is_empty())
+}
+
+fn clean_profile_avatar(value: Option<String>) -> Option<String> {
+    value
+        .map(|item| item.trim().to_string())
+        .filter(|item| {
+            !item.is_empty()
+                && item != "/default-avatar.svg"
+                && item.len() <= MAX_REEL_URL_LEN
+                && !item.chars().any(|ch| ch.is_control())
+                && (item.starts_with('/')
+                    || item.starts_with("http://")
+                    || item.starts_with("https://")
+                    || item.starts_with("data:image/svg+xml"))
+        })
+}
+
+async fn fetch_identity_public_profile(identity_user_id: &str) -> ForumIdentityProfile {
+    let base_url = env::var("INTERNAL_API_URL")
+        .ok()
+        .or_else(|| env::var("IDENTITY_SERVICE_URL").ok())
+        .unwrap_or_else(|| "http://identity_service:8080".to_string())
+        .trim_end_matches('/')
+        .to_string();
+    let url = format!(
+        "{}/users/public/{}",
+        base_url,
+        identity_user_id
+    );
+
+    let client = match reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_millis(600))
+        .timeout(std::time::Duration::from_millis(1_500))
+        .build()
+    {
+        Ok(client) => client,
+        Err(error) => {
+            tracing::warn!("identity profile client build failed: {:?}", error);
+            return ForumIdentityProfile::default();
+        }
+    };
+
+    match client.get(url).send().await {
+        Ok(response) if response.status().is_success() => {
+            match response.json::<IdentityPublicProfile>().await {
+                Ok(profile) => ForumIdentityProfile {
+                    username: clean_profile_text(profile.username),
+                    name: clean_profile_text(profile.full_name),
+                    avatar_url: clean_profile_avatar(profile.avatar_url),
+                },
+                Err(error) => {
+                    tracing::warn!("identity profile decode failed: {:?}", error);
+                    ForumIdentityProfile::default()
+                }
+            }
+        }
+        Ok(response) => {
+            tracing::warn!(
+                "identity profile fetch returned status {} for {}",
+                response.status(),
+                identity_user_id
+            );
+            ForumIdentityProfile::default()
+        }
+        Err(error) => {
+            tracing::warn!(
+                "identity profile fetch failed for {}: {:?}",
+                identity_user_id,
+                error
+            );
+            ForumIdentityProfile::default()
+        }
+    }
+}
+
+async fn fetch_identity_forum_profile(actor: &AuthActor) -> ForumIdentityProfile {
+    let Some(identity_user_id) = public_identity_user_id(Some(actor.user_id.clone())) else {
+        return ForumIdentityProfile::default();
+    };
+    fetch_identity_public_profile(&identity_user_id).await
+}
+
+async fn sync_forum_users_from_identity(db: &PgPool) {
+    let rows = match sqlx::query_as::<_, (String,)>(
+        r#"
+        SELECT id
+        FROM forum.lajukan_forum_users
+        WHERE id LIKE 'auth-%' OR id LIKE 'u-%'
+        ORDER BY updated_at DESC
+        LIMIT 250
+        "#,
+    )
+    .fetch_all(db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::warn!("forum identity sync load failed: {:?}", error);
+            return;
+        }
+    };
+
+    for (forum_id,) in rows {
+        let Some(identity_user_id) = public_identity_user_id(Some(forum_id.clone())) else {
+            continue;
+        };
+        let profile = fetch_identity_public_profile(&identity_user_id).await;
+        if profile.username.is_none() && profile.name.is_none() && profile.avatar_url.is_none() {
+            continue;
+        }
+
+        if let Err(error) = sqlx::query(
+            r#"
+            UPDATE forum.lajukan_forum_users
+            SET
+              username = COALESCE($2, username),
+              name = COALESCE($3, name),
+              avatar_url = COALESCE($4, avatar_url),
+              identity_synced_at = now(),
+              updated_at = now()
+            WHERE id = $1
+            "#,
+        )
+        .bind(&forum_id)
+        .bind(profile.username)
+        .bind(profile.name)
+        .bind(profile.avatar_url)
+        .execute(db)
+        .await
+        {
+            tracing::warn!("forum identity sync update failed for {}: {:?}", forum_id, error);
+        }
+    }
+}
+
 async fn ensure_forum_user(db: &PgPool, actor: &AuthActor) -> ApiResult<ForumUser> {
     let id = forum_user_id(actor);
-    let name = actor
-        .name
-        .clone()
-        .or_else(|| actor.username.clone())
-        .or_else(|| actor.email.clone())
-        .unwrap_or_else(|| format!("User {}", actor.user_id));
-    let username = forum_username(actor, &name);
-    let avatar_url = "/default-avatar.svg".to_string();
+    let identity_profile = fetch_identity_forum_profile(actor).await;
+    let name = identity_profile.name.or_else(|| {
+        actor
+            .name
+            .clone()
+            .or_else(|| actor.username.clone())
+            .or_else(|| actor.email.clone())
+    })
+    .unwrap_or_else(|| format!("User {}", actor.user_id));
+    let username = identity_profile
+        .username
+        .unwrap_or_else(|| forum_username(actor, &name));
+    let avatar_url = identity_profile
+        .avatar_url
+        .unwrap_or_else(|| "/default-avatar.svg".to_string());
 
     sqlx::query_as::<_, ForumUser>(
         r#"
-        INSERT INTO lajukan_forum_users
+        INSERT INTO forum.lajukan_forum_users
           (id, username, name, avatar_url, title, reputation, base_reputation, badges, created_at, updated_at)
         VALUES ($1, $2, $3, $4, 'Community Member', 0, 0, '{}', now(), now())
         ON CONFLICT (id) DO UPDATE
@@ -2725,7 +2897,7 @@ async fn fetch_group_member(
           u.reputation,
           u.badges
         FROM lajukan_group_members gm
-        JOIN lajukan_forum_users u ON u.id = gm.user_id
+        JOIN forum.lajukan_forum_users u ON u.id = gm.user_id
         WHERE gm.group_id = $1 AND gm.user_id = $2
         LIMIT 1
         "#,
@@ -2785,7 +2957,7 @@ async fn list_group_members(
           u.reputation,
           u.badges
         FROM lajukan_group_members gm
-        JOIN lajukan_forum_users u ON u.id = gm.user_id
+        JOIN forum.lajukan_forum_users u ON u.id = gm.user_id
         WHERE gm.group_id = $1
           AND gm.status = $2
           AND ($3::text IS NULL OR gm.role = $3)
@@ -2828,7 +3000,7 @@ async fn list_group_members(
           u.reputation,
           u.badges
         FROM lajukan_group_members gm
-        JOIN lajukan_forum_users u ON u.id = gm.user_id
+        JOIN forum.lajukan_forum_users u ON u.id = gm.user_id
         WHERE gm.group_id = $1
           AND gm.status = 'active'
           AND gm.role IN ('owner', 'moderator')
@@ -2848,7 +3020,7 @@ async fn list_group_members(
             r#"
             SELECT COUNT(*)::bigint
             FROM lajukan_group_members gm
-            JOIN lajukan_forum_users u ON u.id = gm.user_id
+            JOIN forum.lajukan_forum_users u ON u.id = gm.user_id
             WHERE gm.group_id = $1
               AND gm.status = $2
               AND ($3::text IS NULL OR gm.role = $3)
@@ -3271,7 +3443,7 @@ async fn list_threads(
         SELECT COUNT(DISTINCT t.id)::bigint
         FROM forum.lajukan_forum_threads t
         JOIN forum.lajukan_forum_categories c ON c.id = t.category_id
-        JOIN lajukan_forum_users u ON u.id = t.author_id
+        JOIN forum.lajukan_forum_users u ON u.id = t.author_id
         LEFT JOIN lajukan_groups g ON g.id = t.group_id
         LEFT JOIN lajukan_group_members viewer_member
           ON viewer_member.group_id = g.id AND viewer_member.user_id = $5
@@ -3330,7 +3502,7 @@ async fn list_threads(
           ) AS tag_slugs
         FROM forum.lajukan_forum_threads t
         JOIN forum.lajukan_forum_categories c ON c.id = t.category_id
-        JOIN lajukan_forum_users u ON u.id = t.author_id
+        JOIN forum.lajukan_forum_users u ON u.id = t.author_id
         LEFT JOIN lajukan_groups g ON g.id = t.group_id
         LEFT JOIN lajukan_group_members viewer_member
           ON viewer_member.group_id = g.id AND viewer_member.user_id = $5
@@ -4726,7 +4898,7 @@ async fn search_forum(
             '{}'
           ) AS tag_slugs
         FROM forum.lajukan_forum_threads t
-        JOIN lajukan_forum_users u ON u.id = t.author_id
+        JOIN forum.lajukan_forum_users u ON u.id = t.author_id
         JOIN forum.lajukan_forum_categories c ON c.id = t.category_id
         LEFT JOIN lajukan_groups g ON g.id = t.group_id
         LEFT JOIN forum.lajukan_forum_thread_tags tt ON tt.thread_id = t.id
@@ -5756,6 +5928,7 @@ async fn list_reel_comments(
         r#"
         SELECT
           id, reel_id, author_user_id, author_name,
+          COALESCE(author_avatar_url, author_avatar) AS author_avatar_url,
           parent_comment_id, body, reply_count, created_at
         FROM reel.lajukan_reel_comments
         WHERE reel_id = $1 AND status = 'published'
@@ -5830,6 +6003,7 @@ async fn create_reel_comment(
         VALUES ($1, $2, $3, $4, $5, $6, $7, 'published', now(), now())
         RETURNING
           id, reel_id, author_user_id, author_name,
+          author_avatar_url,
           parent_comment_id, body, reply_count, created_at
         "#,
     )
@@ -6044,7 +6218,7 @@ fn map_reel_comment(row: ReelCommentRow) -> ReelComment {
         parent_comment_id: row.parent_comment_id,
         author_user_id: row.author_user_id,
         author_name: row.author_name,
-        author_avatar_url: Some("/default-avatar.svg".to_string()),
+        author_avatar_url: row.author_avatar_url,
         body: row.body,
         reply_count: row.reply_count,
         created_at: row.created_at,
@@ -6153,7 +6327,7 @@ async fn get_community_feed(
             LEFT JOIN lajukan_groups g
             ON g.id = t.group_id
 
-            LEFT JOIN lajukan_forum_users p
+            LEFT JOIN forum.lajukan_forum_users p
             ON p.id = t.author_id
 
             LEFT JOIN forum.lajukan_forum_thread_tags tt
@@ -6194,6 +6368,7 @@ async fn get_community_feed(
             GROUP BY
             t.id,
             p.id,
+            p.avatar_url,
             p.metadata
         "#,
     )
@@ -6282,7 +6457,7 @@ async fn search_community(
               ) AS tag_slugs
             FROM forum.lajukan_forum_threads t
             JOIN forum.lajukan_forum_categories c ON c.id = t.category_id
-            JOIN lajukan_forum_users u ON u.id = t.author_id
+            JOIN forum.lajukan_forum_users u ON u.id = t.author_id
             LEFT JOIN lajukan_groups g ON g.id = t.group_id
             LEFT JOIN lajukan_group_members viewer_member
               ON viewer_member.group_id = g.id AND viewer_member.user_id = $2
@@ -6341,7 +6516,7 @@ async fn search_community(
         sqlx::query_as::<_, ForumUser>(
             r#"
             SELECT id, username, name, avatar_url, title, reputation, base_reputation, badges, created_at, updated_at
-            FROM lajukan_forum_users
+            FROM forum.lajukan_forum_users
             WHERE lower(name) LIKE '%' || lower($1) || '%'
                OR lower(username) LIKE '%' || lower($1) || '%'
                OR lower(title) LIKE '%' || lower($1) || '%'
@@ -6440,7 +6615,7 @@ async fn build_reel_community_items(
                 id: row.store_id.clone(),
                 name: row.creator.clone(),
                 title: row.tag.clone(),
-                avatar_url: "/default-avatar.svg".to_string(),
+                avatar_url: Some("/default-avatar.svg".to_string()),
                 reputation: 0,
             },
             category: None,
@@ -6547,7 +6722,7 @@ async fn build_overview(db: &PgPool, viewer_id: Option<&str>) -> ApiResult<Commu
         .fetch_one(db)
         .await
         .map_err(internal_error)?;
-    let total_users: i64 = sqlx::query_scalar("SELECT COUNT(*)::bigint FROM lajukan_forum_users")
+    let total_users: i64 = sqlx::query_scalar("SELECT COUNT(*)::bigint FROM forum.lajukan_forum_users")
         .fetch_one(db)
         .await
         .map_err(internal_error)?;
@@ -6587,7 +6762,7 @@ async fn build_overview(db: &PgPool, viewer_id: Option<&str>) -> ApiResult<Commu
     let top_contributors = sqlx::query_as::<_, ForumUser>(
         r#"
         SELECT id, username, name, avatar_url, title, reputation, base_reputation, badges, created_at, updated_at
-        FROM lajukan_forum_users
+        FROM forum.lajukan_forum_users
         ORDER BY reputation DESC, updated_at DESC
         LIMIT 6
         "#,
@@ -6616,7 +6791,7 @@ async fn build_overview(db: &PgPool, viewer_id: Option<&str>) -> ApiResult<Commu
 
 async fn fetch_top_contributor_ids(db: &PgPool) -> ApiResult<HashSet<String>> {
     let rows: Vec<(String,)> =
-        sqlx::query_as("SELECT id FROM lajukan_forum_users ORDER BY reputation DESC LIMIT 50")
+        sqlx::query_as("SELECT id FROM forum.lajukan_forum_users ORDER BY reputation DESC LIMIT 50")
             .fetch_all(db)
             .await
             .map_err(internal_error)?;
@@ -6779,7 +6954,7 @@ async fn fetch_users_map(
     let rows = sqlx::query_as::<_, ForumUser>(
         r#"
         SELECT id, username, name, avatar_url, title, reputation, base_reputation, badges, created_at, updated_at
-        FROM lajukan_forum_users
+        FROM forum.lajukan_forum_users
         WHERE id = ANY($1)
         "#,
     )
@@ -7006,7 +7181,7 @@ fn system_user() -> ForumUser {
         id: "community".to_string(),
         username: "community".to_string(),
         name: "Lajukan Community".to_string(),
-        avatar_url: "/default-avatar.svg".to_string(),
+        avatar_url: Some("/default-avatar.svg".to_string()),
         title: "Community Member".to_string(),
         reputation: 0,
         base_reputation: 0,
@@ -7021,7 +7196,7 @@ fn map_feed_author(user: &ForumUser) -> CommunityFeedAuthor {
         id: user.id.clone(),
         name: user.name.clone(),
         title: user.title.clone(),
-        avatar_url: "/default-avatar.svg".to_string(),
+        avatar_url: Some(user.avatar_url.clone().unwrap_or_else(|| "/default-avatar.svg".to_string())),
         reputation: user.reputation,
     }
 }

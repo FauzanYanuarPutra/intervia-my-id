@@ -31,6 +31,7 @@ import {
   extractFirstUploadedImageUrl,
   normalizeProfileMediaUrl,
 } from '@/lib/profile/profileMedia';
+import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import {
   saveProfileAvatar,
@@ -900,8 +901,9 @@ export default function SuperProfile() {
       throw new Error('Avatar harus berupa file gambar');
     }
 
+    const optimizedFile = await prepareUploadFile(file);
     const formData = new FormData();
-    formData.append('images', file);
+    formData.append('images', optimizedFile);
 
     const res = await authFetch('/api/content/upload-images', {
       method: 'POST',
@@ -943,8 +945,9 @@ export default function SuperProfile() {
     if (!file.type.startsWith('image/')) {
       throw new Error('Cover harus berupa file gambar');
     }
+    const optimizedFile = await prepareUploadFile(file);
     const formData = new FormData();
-    formData.append('images', file);
+    formData.append('images', optimizedFile);
     const res = await authFetch('/api/content/upload-images', {
       method: 'POST',
       body: formData,

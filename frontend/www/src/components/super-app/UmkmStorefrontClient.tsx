@@ -14,6 +14,7 @@ import {
   BadgeCheck,
   Clapperboard,
   Clock3,
+  Heart,
   ImageIcon,
   LayoutDashboard,
   Loader2,
@@ -32,6 +33,7 @@ import {
   Star,
   Table2,
   Truck,
+  Video,
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { LocalizedAnchor } from '@/components/navigation/LocalizedAnchor';
@@ -142,6 +144,21 @@ type TablesResponse = {
   data?: {
     items: TableRecord[];
   };
+  error?: string;
+};
+
+type StoreGalleryLikesResponse = {
+  store_id?: string;
+  liked_media_keys?: string[];
+  error?: string;
+};
+
+type StoreGalleryLikeUpdateResponse = {
+  store_id?: string;
+  media_key?: string;
+  liked?: boolean;
+  like_count?: number;
+  liked_media_keys?: string[];
   error?: string;
 };
 
@@ -319,6 +336,7 @@ type StoreGalleryItem = {
   src: string;
   title: string;
   caption: string;
+  mediaType: 'image' | 'video';
 };
 
 type StoreReelItem = {
@@ -582,6 +600,31 @@ function readStoreImageUrls(store: StoreRecord): string[] {
   ]);
 }
 
+function readStoreGalleryMedia(store: StoreRecord): { src: string; mediaType: 'image' | 'video' }[] {
+  const metadata = asRecord(store.metadata);
+  const raw = uniqueTexts([
+    ...readTextArray(metadata.gallery_media),
+    ...readTextArray(metadata.gallery_images),
+    ...readTextArray(metadata.gallery_videos),
+    ...readTextArray(metadata.gallery),
+    ...readTextArray(metadata.images),
+    ...readTextArray(metadata.photos),
+    ...readTextArray(metadata.video_urls),
+    ...readTextArray(metadata.business_videos),
+    ...readTextArray(metadata.media_videos),
+    ...readTextArray(metadata.videos),
+  ]);
+
+  return raw.map(src => ({
+    src,
+    mediaType: isVideoUrl(src) ? 'video' : 'image',
+  }));
+}
+
+function getStoreGalleryLikeKey(item: StoreGalleryItem): string {
+  return item.src.trim();
+}
+
 function parseStoreForumTopics(
   value: unknown,
   isId: boolean,
@@ -649,7 +692,7 @@ function buildStorePublicProfile(
       : clampNumber(Math.round(completionRateValue), 0, 100);
   const deliveryEtaMinutes =
     store.online_order_enabled === false ||
-    readNumber(metadata.delivery_eta_minutes) === null
+      readNumber(metadata.delivery_eta_minutes) === null
       ? null
       : Math.max(0, Math.round(readNumber(metadata.delivery_eta_minutes) || 0));
   const establishedYearValue = readNumber(metadata.established_year);
@@ -657,10 +700,10 @@ function buildStorePublicProfile(
     establishedYearValue === null
       ? null
       : clampNumber(
-          Math.round(establishedYearValue),
-          1800,
-          new Date().getFullYear(),
-        );
+        Math.round(establishedYearValue),
+        1800,
+        new Date().getFullYear(),
+      );
   const ownerName = readText(metadata.owner_name) || null;
   const openHours = readText(metadata.open_hours) || null;
   const priceBand =
@@ -790,14 +833,14 @@ export function UmkmStorefrontClient({
   const tableId = searchParams.get('table_id') || '';
   const tableCodeParam = normalizeTableCode(
     searchParams.get('table_code') ||
-      searchParams.get('table') ||
-      searchParams.get('table_no') ||
-      searchParams.get('table_number') ||
-      '',
+    searchParams.get('table') ||
+    searchParams.get('table_no') ||
+    searchParams.get('table_number') ||
+    '',
   );
   const mode =
     explicitMode === 'offline' ||
-    ((tableId || tableCodeParam) && explicitMode !== 'online')
+      ((tableId || tableCodeParam) && explicitMode !== 'online')
       ? 'offline'
       : 'online';
   const isOnline = mode === 'online';
@@ -852,6 +895,9 @@ export function UmkmStorefrontClient({
   const [cartSwitchConfirmOpen, setCartSwitchConfirmOpen] = useState(false);
   const [pendingCartAction, setPendingCartAction] =
     useState<PendingCartAction | null>(null);
+  const [galleryLikeSaving, setGalleryLikeSaving] = useState<
+    Record<string, boolean>
+  >({});
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -924,6 +970,7 @@ export function UmkmStorefrontClient({
   const [activeGalleryIndex, setActiveGalleryIndex] = useState<number | null>(
     null,
   );
+  const [galleryLikes, setGalleryLikes] = useState<Record<string, boolean>>({});
   const [checkoutOpen, setCheckoutOpen] = useState(checkoutRequestedFromUrl);
   const mapTheme: UmkmMapTheme = 'default';
   const [routeSummary, setRouteSummary] = useState<UmkmMapRouteSummary | null>(
@@ -1360,9 +1407,9 @@ export function UmkmStorefrontClient({
   const serviceFeeCents =
     isOnline && subtotalCents > 0
       ? Number(
-          store?.metadata?.online_service_fee_cents ||
-            DEFAULT_ONLINE_SERVICE_FEE_CENTS,
-        )
+        store?.metadata?.online_service_fee_cents ||
+        DEFAULT_ONLINE_SERVICE_FEE_CENTS,
+      )
       : 0;
   const visibleShippingOptions = useMemo(
     () => shippingOptions.filter(option => option.mode === fulfillmentMode),
@@ -1381,7 +1428,7 @@ export function UmkmStorefrontClient({
     const seen = new Set<'courier' | 'pickup' | 'digital'>();
     const baseModes =
       shippingProfile?.available_modes?.length &&
-      shippingProfile.available_modes.length > 0
+        shippingProfile.available_modes.length > 0
         ? shippingProfile.available_modes
         : localComposition.available_modes;
     const next: Array<'courier' | 'pickup' | 'digital'> = [];
@@ -1415,26 +1462,26 @@ export function UmkmStorefrontClient({
     () =>
       store
         ? [
-            {
-              id: store.id,
-              slug: store.slug,
-              name: store.name,
-              city: store.city,
-              address: store.address,
-              lat: store.lat,
-              lng: store.lng,
-              description: store.description,
-              phone: store.phone,
-              metadata: store.metadata,
-              recommended_qr: store.recommended_qr,
-              online_order_enabled: store.online_order_enabled,
-              offline_order_enabled: store.offline_order_enabled,
-              reservation_enabled: store.reservation_enabled,
-              table_count: effectiveTableCount,
-              available_table_count: store.available_table_count,
-              max_table_capacity: effectiveMaxTableCapacity,
-            },
-          ]
+          {
+            id: store.id,
+            slug: store.slug,
+            name: store.name,
+            city: store.city,
+            address: store.address,
+            lat: store.lat,
+            lng: store.lng,
+            description: store.description,
+            phone: store.phone,
+            metadata: store.metadata,
+            recommended_qr: store.recommended_qr,
+            online_order_enabled: store.online_order_enabled,
+            offline_order_enabled: store.offline_order_enabled,
+            reservation_enabled: store.reservation_enabled,
+            table_count: effectiveTableCount,
+            available_table_count: store.available_table_count,
+            max_table_capacity: effectiveMaxTableCapacity,
+          },
+        ]
         : [],
     [effectiveMaxTableCapacity, effectiveTableCount, store],
   );
@@ -1495,21 +1542,21 @@ export function UmkmStorefrontClient({
     store?.online_order_enabled === false
       ? null
       : {
-          key: 'online' as const,
-          label: isId ? 'Pesan online' : 'Online ordering',
-          desc: isId
-            ? 'Bisa kirim, pickup, atau digital'
-            : 'Courier, pickup, or digital',
-        },
+        key: 'online' as const,
+        label: isId ? 'Pesan online' : 'Online ordering',
+        desc: isId
+          ? 'Bisa kirim, pickup, atau digital'
+          : 'Courier, pickup, or digital',
+      },
     store?.offline_order_enabled === false
       ? null
       : {
-          key: 'offline' as const,
-          label: isId ? 'Meja / pickup' : 'Dine-in / pickup',
-          desc: isId
-            ? 'Buat makan di tempat atau ambil sendiri'
-            : 'Table bill and store pickup',
-        },
+        key: 'offline' as const,
+        label: isId ? 'Meja / pickup' : 'Dine-in / pickup',
+        desc: isId
+          ? 'Buat makan di tempat atau ambil sendiri'
+          : 'Table bill and store pickup',
+      },
   ].filter(
     (
       item,
@@ -1612,9 +1659,9 @@ export function UmkmStorefrontClient({
 
   const orderTabEnabled = store
     ? !(
-        store.online_order_enabled === false &&
-        store.offline_order_enabled === false
-      )
+      store.online_order_enabled === false &&
+      store.offline_order_enabled === false
+    )
     : true;
   const reservationTabEnabled = effectiveTableCount > 0;
 
@@ -1687,9 +1734,9 @@ export function UmkmStorefrontClient({
         if (!res.ok) {
           throw new Error(
             payload.error ||
-              (isId
-                ? 'Gagal mencari tujuan ongkir.'
-                : 'Failed to search shipping destination.'),
+            (isId
+              ? 'Gagal mencari tujuan ongkir.'
+              : 'Failed to search shipping destination.'),
           );
         }
 
@@ -1810,12 +1857,12 @@ export function UmkmStorefrontClient({
         )
           ? fulfillmentMode
           : (data.recommended_option_id
-              ? data.options.find(
-                  option => option.id === data.recommended_option_id,
-                )?.mode
-              : null) ||
-            data.options[0]?.mode ||
-            data.profile.default_mode;
+            ? data.options.find(
+              option => option.id === data.recommended_option_id,
+            )?.mode
+            : null) ||
+          data.options[0]?.mode ||
+          data.profile.default_mode;
 
         if (nextMode !== fulfillmentMode) {
           setFulfillmentMode(nextMode);
@@ -1830,8 +1877,8 @@ export function UmkmStorefrontClient({
         const recommended =
           (data.recommended_option_id
             ? data.options.find(
-                option => option.id === data.recommended_option_id,
-              )
+              option => option.id === data.recommended_option_id,
+            )
             : null) ||
           data.options.find(option => option.mode === nextMode) ||
           data.options[0] ||
@@ -1938,15 +1985,15 @@ export function UmkmStorefrontClient({
     (isOnline &&
       (normalizeSingleLineInput(customerName).length < 2 ||
         normalizeSingleLineInput(customerName).length >
-          CHECKOUT_LIMITS.customerName ||
+        CHECKOUT_LIMITS.customerName ||
         normalizeSingleLineInput(customerPhone).length < 6 ||
         normalizeSingleLineInput(customerPhone).length >
-          CHECKOUT_LIMITS.customerPhone ||
+        CHECKOUT_LIMITS.customerPhone ||
         normalizeTextBlock(notes).length > CHECKOUT_LIMITS.notes ||
         (requiresOnlineAddress &&
           (normalizeTextBlock(deliveryAddress).length < 6 ||
             normalizeTextBlock(deliveryAddress).length >
-              CHECKOUT_LIMITS.deliveryAddress ||
+            CHECKOUT_LIMITS.deliveryAddress ||
             !addressConfirmed)))) ||
     (!isOnline && !selectedTable);
 
@@ -1960,10 +2007,10 @@ export function UmkmStorefrontClient({
     !store ||
     normalizeSingleLineInput(customerName).length < 2 ||
     normalizeSingleLineInput(customerName).length >
-      CHECKOUT_LIMITS.customerName ||
+    CHECKOUT_LIMITS.customerName ||
     normalizeSingleLineInput(customerPhone).length < 6 ||
     normalizeSingleLineInput(customerPhone).length >
-      CHECKOUT_LIMITS.customerPhone ||
+    CHECKOUT_LIMITS.customerPhone ||
     !reservationIso ||
     !/^\d+$/.test(guestCount.trim()) ||
     Number.parseInt(guestCount || '0', 10) < 1 ||
@@ -2633,7 +2680,7 @@ export function UmkmStorefrontClient({
             : 'Add to bill';
   const PlaceTypeIcon = placeHeader ? getPlaceIcon(placeHeader.kind) : null;
   const utilityActionClass =
-    'ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/28 bg-slate-950/46 px-3 py-1.5 text-[10px] font-black text-white shadow-[0_14px_24px_-22px_rgba(15,23,42,0.45)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:text-[color:var(--app-text)] sm:text-[11px]';
+    'ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/28 bg-slate-950/46 px-3 py-1.5 text-[10px] font-black text-[color:var(--app-text)] dark:text-white shadow-[0_14px_24px_-22px_rgba(15,23,42,0.45)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:text-[color:var(--app-text)] sm:text-[11px]';
   const detailActionClass =
     'ui-pressable inline-flex min-h-[42px] min-w-0 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-[11px] font-black text-[color:var(--app-text)] shadow-[0_12px_22px_-21px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950 sm:text-[12px]';
   const heroShellClass =
@@ -2646,11 +2693,11 @@ export function UmkmStorefrontClient({
     'min-w-0 rounded-[22px] border border-[color:var(--app-border)] bg-white px-3.5 py-3.5 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.12)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[24px] sm:px-4 sm:py-4';
   const fullMapHref = store
     ? buildUmkmDiscoveryPath({
-        store: store.slug,
-        q: store.name,
-        city: store.city,
-        storeId: store.id,
-      })
+      store: store.slug,
+      q: store.name,
+      city: store.city,
+      storeId: store.id,
+    })
     : UMKM_DISCOVERY_PATH;
   const hasRating =
     publicProfile?.ratingAverage !== null &&
@@ -2660,22 +2707,29 @@ export function UmkmStorefrontClient({
     : isId
       ? 'Belum ada rating'
       : 'No rating yet';
+  const likeCountLabel =
+    publicProfile?.ratingCount !== null &&
+      publicProfile?.ratingCount !== undefined
+      ? formatCount(publicProfile.ratingCount)
+      : null;
+  const likeSummaryLabel = likeCountLabel
+    ? `${likeCountLabel} likes`
+    : isId
+      ? 'Belum ada like'
+      : 'No likes yet';
   const reviewCountLabel =
     publicProfile?.ratingCount !== null &&
-    publicProfile?.ratingCount !== undefined
+      publicProfile?.ratingCount !== undefined
       ? `${formatCount(publicProfile.ratingCount)} ${isId ? 'ulasan' : 'reviews'}`
       : isId
         ? 'Ulasan backend belum ada'
         : 'No backend reviews yet';
-  const ratingSummaryLabel = hasRating
-    ? `${ratingValueLabel} (${reviewCountLabel})`
-    : reviewCountLabel;
   const detailSummaryLine = placeHeader
-    ? `${hasRating ? `${ratingSummaryLabel} / ` : ''}${placeHeader.categoryLabel}`
+    ? `${likeCountLabel ? `${likeSummaryLabel} / ` : ''}${placeHeader.categoryLabel}`
     : store?.city ||
-      (isId
-        ? 'Lagi siapin detail lokasinya...'
-        : 'Preparing location details...');
+    (isId
+      ? 'Lagi siapin detail lokasinya...'
+      : 'Preparing location details...');
   const detailLocationLine =
     placeHeader?.secondaryLine ||
     (store
@@ -2686,23 +2740,31 @@ export function UmkmStorefrontClient({
   const storeGallery = useMemo<StoreGalleryItem[]>(() => {
     if (!store) return [];
 
-    const metadataImages = readStoreImageUrls(store).map((src, index) => ({
+    const metadataMedia: StoreGalleryItem[] = readStoreGalleryMedia(store).map(
+      (item, index): StoreGalleryItem => ({
       id: `place-${index}`,
-      src,
+      src: item.src,
       title:
-        index === 0
+        item.mediaType === 'video'
           ? isId
-            ? 'Tampak usaha'
-            : 'Business cover'
-          : isId
-            ? 'Foto usaha'
-            : 'Business photo',
+            ? 'Video usaha'
+            : 'Business video'
+          : index === 0
+            ? isId
+              ? 'Tampak usaha'
+              : 'Business cover'
+            : isId
+              ? 'Foto usaha'
+              : 'Business photo',
       caption:
         index === 0
           ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
           : store.address || store.city,
-    }));
-    const placeImages = (placeHeader?.gallery || []).map((src, index) => ({
+      mediaType: item.mediaType,
+      }),
+    );
+    const placeImages: StoreGalleryItem[] = (placeHeader?.gallery || []).map(
+      (src, index): StoreGalleryItem => ({
       id: `generated-place-${index}`,
       src,
       title:
@@ -2717,9 +2779,11 @@ export function UmkmStorefrontClient({
         index === 0
           ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
           : store.address || store.city,
-    }));
+      mediaType: 'image' as const,
+      }),
+    );
     const productItems = products
-      .map(product => {
+      .map((product): StoreGalleryItem | null => {
         const src =
           getProductImage(product) ||
           localProductImageForCategory(
@@ -2732,12 +2796,13 @@ export function UmkmStorefrontClient({
           src,
           title: product.name,
           caption: `${formatProductCategory(product.category, isId)} / ${formatIdr(product.price_cents)}`,
+          mediaType: 'image' as const,
         };
       })
       .filter((item): item is StoreGalleryItem => Boolean(item));
     const seen = new Set<string>();
 
-    return [...metadataImages, ...placeImages, ...productItems]
+    return [...metadataMedia, ...placeImages, ...productItems]
       .filter(item => {
         const key = item.src.trim();
         if (!key || seen.has(key)) return false;
@@ -2746,14 +2811,20 @@ export function UmkmStorefrontClient({
       })
       .slice(0, 8);
   }, [isId, placeHeader?.categoryLabel, placeHeader?.gallery, products, store]);
-  const heroCoverItem = storeGallery[0] || null;
-  const heroVisualSrc = heroCoverItem?.src || DEFAULT_STOREFRONT_HERO_IMAGE;
+  const heroCoverItem =
+    storeGallery.find(item => item.mediaType === 'image') || storeGallery[0] || null;
+  const heroVisualSrc =
+    heroCoverItem?.mediaType === 'video'
+      ? DEFAULT_STOREFRONT_HERO_IMAGE
+      : heroCoverItem?.src || DEFAULT_STOREFRONT_HERO_IMAGE;
   const heroDisplaySrc =
     failedHeroImageSrc === heroVisualSrc
       ? DEFAULT_STOREFRONT_HERO_IMAGE
       : heroVisualSrc;
   const heroVisualAlt =
-    heroCoverItem?.title ||
+    heroCoverItem?.mediaType === 'video'
+      ? store?.name || (isId ? 'Foto usaha' : 'Business photo')
+      : heroCoverItem?.title ||
     store?.name ||
     (isId ? 'Foto usaha' : 'Business photo');
   const storeKeywords = store
@@ -2807,17 +2878,21 @@ export function UmkmStorefrontClient({
       icon: Clock3,
     },
     {
-      id: 'rating',
-      label: isId ? 'Rating' : 'Rating',
-      value: ratingValueLabel,
-      icon: Star,
+      id: 'likes',
+      label: isId ? 'Like' : 'Likes',
+      value: likeSummaryLabel,
+      icon: Heart,
     },
   ];
   const galleryTabEnabled = storeGallery.length > 0;
+  const galleryHasVideo = storeGallery.some(item => item.mediaType === 'video');
   const activeGalleryItem =
     activeGalleryIndex !== null
       ? (storeGallery[activeGalleryIndex] ?? null)
       : null;
+  const activeGalleryLikeKey = activeGalleryItem
+    ? getStoreGalleryLikeKey(activeGalleryItem)
+    : '';
   const forumPath = useMemo(() => {
     const params = new URLSearchParams();
     if (store?.name) params.set('q', store.name);
@@ -2878,8 +2953,8 @@ export function UmkmStorefrontClient({
     const metadata = asRecord(store.metadata);
     return parseStoreForumTopics(
       metadata.forum_topics ||
-        metadata.business_topics ||
-        metadata.discussion_topics,
+      metadata.business_topics ||
+      metadata.discussion_topics,
       isId,
     );
   }, [isId, store]);
@@ -2968,12 +3043,169 @@ export function UmkmStorefrontClient({
     },
     [storeGallery.length],
   );
+  useEffect(() => {
+    if (!store) {
+      setGalleryLikes({});
+      setGalleryLikeSaving({});
+      return;
+    }
+
+    let active = true;
+
+    const loadGalleryLikes = async () => {
+      setGalleryLikes({});
+
+      try {
+        const res = await authFetch(
+          `/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/gallery-likes`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          },
+        );
+        const payload = (await res.json().catch(() => ({}))) as StoreGalleryLikesResponse;
+
+        if (!res.ok) {
+          throw new Error(payload.error || 'Failed to load gallery likes');
+        }
+
+        if (!active) return;
+
+        const likedMediaKeys = Array.isArray(payload.liked_media_keys)
+          ? payload.liked_media_keys
+              .map(value => (typeof value === 'string' ? value.trim() : ''))
+              .filter(Boolean)
+          : [];
+
+        setGalleryLikes(
+          Object.fromEntries(likedMediaKeys.map(key => [key, true])),
+        );
+      } catch {
+        if (!active) return;
+        setGalleryLikes({});
+      }
+    };
+
+    void loadGalleryLikes();
+
+    return () => {
+      active = false;
+    };
+  }, [authFetch, store]);
+
+  const toggleGalleryLike = useCallback(
+    async (item: StoreGalleryItem) => {
+      if (!store) return;
+
+      const mediaKey = getStoreGalleryLikeKey(item);
+      if (!mediaKey) return;
+
+      if (!user) {
+        if (!authLoading) {
+          router.push(loginHref);
+        }
+        return;
+      }
+
+      if (galleryLikeSaving[mediaKey]) return;
+
+      const previousLiked = Boolean(galleryLikes[mediaKey]);
+      const nextLiked = !previousLiked;
+
+      setGalleryLikeSaving(current => ({ ...current, [mediaKey]: true }));
+      setGalleryLikes(current => {
+        const next = { ...current };
+        if (nextLiked) next[mediaKey] = true;
+        else delete next[mediaKey];
+        return next;
+      });
+
+      try {
+        const res = await authFetch(
+          `/api/super-app/umkm/stores/${encodeURIComponent(store.id)}/gallery-likes`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              media_key: mediaKey,
+              liked: nextLiked,
+            }),
+            cache: 'no-store',
+          },
+        );
+        const payload =
+          (await res.json().catch(() => ({}))) as StoreGalleryLikeUpdateResponse;
+
+        if (!res.ok) {
+          throw new Error(payload.error || 'Failed to save gallery like');
+        }
+
+        const serverLikedMediaKeys = Array.isArray(payload.liked_media_keys)
+          ? payload.liked_media_keys
+              .map(value => (typeof value === 'string' ? value.trim() : ''))
+              .filter(Boolean)
+          : null;
+
+        if (serverLikedMediaKeys) {
+          setGalleryLikes(
+            Object.fromEntries(serverLikedMediaKeys.map(key => [key, true])),
+          );
+        } else {
+          const serverLiked = Boolean(payload.liked ?? nextLiked);
+          setGalleryLikes(current => {
+            const next = { ...current };
+            if (serverLiked) next[mediaKey] = true;
+            else delete next[mediaKey];
+            return next;
+          });
+        }
+      } catch (error) {
+        setGalleryLikes(current => {
+          const next = { ...current };
+          if (previousLiked) next[mediaKey] = true;
+          else delete next[mediaKey];
+          return next;
+        });
+
+        const message = resolveActionErrorMessage(
+          error,
+          isId ? 'Gagal menyimpan like.' : 'Failed to save like.',
+        );
+        showStorefrontToast(
+          'error',
+          isId ? 'Like belum tersimpan' : 'Like not saved',
+          message,
+        );
+      } finally {
+        setGalleryLikeSaving(current => {
+          const next = { ...current };
+          delete next[mediaKey];
+          return next;
+        });
+      }
+    },
+    [
+      authFetch,
+      authLoading,
+      galleryLikeSaving,
+      galleryLikes,
+      isId,
+      loginHref,
+      resolveActionErrorMessage,
+      router,
+      showStorefrontToast,
+      store,
+      user,
+    ],
+  );
   const showTabIntroPanel = Boolean(
     !loading &&
-      store &&
-      tabHighlights &&
-      activeTab !== 'menu' &&
-      activeTab !== 'overview',
+    store &&
+    tabHighlights &&
+    activeTab !== 'menu' &&
+    activeTab !== 'overview',
   );
 
   return (
@@ -2984,7 +3216,7 @@ export function UmkmStorefrontClient({
             {store ? (
               <div className="grid min-w-0 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)]">
                 <div
-                  className="relative isolate min-h-[450px] overflow-hidden bg-slate-950 bg-cover bg-center lg:min-h-[590px]"
+                  className="relative isolate min-h-[320px] overflow-hidden bg-slate-950 bg-cover bg-center sm:min-h-[420px] lg:min-h-[590px]"
                   style={{
                     backgroundImage: `url(${DEFAULT_STOREFRONT_HERO_IMAGE})`,
                   }}
@@ -3037,34 +3269,34 @@ export function UmkmStorefrontClient({
                     ) : null}
                   </div>
 
-                  <div className="absolute bottom-0 left-0 right-0 z-10 p-4 text-white sm:p-6 lg:p-7">
+                  <div className="hidden lg:absolute lg:inset-x-0 lg:bottom-0 lg:z-10 lg:block lg:p-7 text-white">
                     <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
-                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-white/92 px-3 text-slate-900 shadow-sm">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[color:var(--app-text)] shadow-sm dark:border-transparent dark:bg-white/92 dark:text-slate-900">
                         <MapPin className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                         {store.city}
                       </span>
-                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-white/18 px-3 text-white backdrop-blur">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] backdrop-blur dark:border-white/20 dark:bg-white/18 dark:text-white">
                         <Clock3 className="h-3.5 w-3.5" />
                         {placeHeader?.statusLabel ||
                           publicProfile?.openHours ||
                           (isId ? 'Cek jam buka' : 'Check hours')}
                       </span>
-                      {hasRating ? (
-                        <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-amber-400 px-3 text-slate-950">
-                          <Star className="h-3.5 w-3.5 fill-current" />
-                          {ratingValueLabel}
+                      {likeCountLabel ? (
+                        <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-rose-400 px-3 text-slate-950">
+                          <Heart className="h-3.5 w-3.5 fill-current" />
+                          {likeSummaryLabel}
                         </span>
                       ) : null}
                     </div>
 
-                    <div className="mt-4 inline-flex min-h-[30px] items-center rounded-full border border-white/18 bg-white/12 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-white/86 backdrop-blur">
+                    <div className="mt-4 inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)] dark:text-white/86 backdrop-blur">
                       {isId ? 'Toko Lajukan' : 'Lajukan Store'}
                     </div>
 
                     <h1 className="mt-3 max-w-3xl text-[2.15rem] font-black leading-[1.02] text-white sm:text-[3rem] lg:text-[3.45rem]">
                       {store.name}
                     </h1>
-                    <p className="mt-3 max-w-2xl text-sm leading-6 text-white/82 sm:text-base">
+                    <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)] dark:text-white/82 sm:text-base">
                       {store.description ||
                         (isId
                           ? 'Profil usaha, kontak, lokasi, dan katalog dalam satu halaman.'
@@ -3076,7 +3308,7 @@ export function UmkmStorefrontClient({
                         {heroBadges.map(item => (
                           <span
                             key={item}
-                            className="inline-flex min-h-[30px] items-center rounded-full border border-white/20 bg-white/12 px-3 text-[11px] font-semibold text-white backdrop-blur"
+                            className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-white/20 dark:bg-white/12 dark:text-white backdrop-blur"
                           >
                             {item}
                           </span>
@@ -3109,6 +3341,74 @@ export function UmkmStorefrontClient({
                 </div>
 
                 <aside className="flex min-w-0 flex-col gap-3 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-3 dark:bg-[color:var(--app-surface-strong)] sm:p-4 lg:p-5">
+                  <div className="rounded-[18px] border border-white/15 bg-slate-950 p-4 text-white shadow-[0_18px_40px_-30px_rgba(15,23,42,0.45)] lg:hidden">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[color:var(--app-text)] shadow-sm dark:border-transparent dark:bg-white/92 dark:text-slate-900">
+                        <MapPin className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
+                        {store.city}
+                      </span>
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] backdrop-blur dark:border-white/20 dark:bg-white/18 dark:text-white">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {placeHeader?.statusLabel ||
+                          publicProfile?.openHours ||
+                          (isId ? 'Cek jam buka' : 'Check hours')}
+                      </span>
+                      {likeCountLabel ? (
+                        <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full bg-rose-400 px-3 text-slate-950">
+                          <Heart className="h-3.5 w-3.5 fill-current" />
+                          {likeSummaryLabel}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)] dark:text-white/86 backdrop-blur">
+                      {isId ? 'Toko Lajukan' : 'Lajukan Store'}
+                    </div>
+
+                    <h1 className="mt-3 text-[1.75rem] font-black leading-[1.05] text-[color:var(--app-text)] dark:text-white sm:text-[2.15rem]">
+                      {store.name}
+                    </h1>
+                    <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)] dark:text-white/82">
+                      {store.description ||
+                        (isId
+                          ? 'Profil usaha, kontak, lokasi, dan katalog dalam satu halaman.'
+                          : 'Business profile, contact, location, and catalog in one page.')}
+                    </p>
+
+                    {heroBadges.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {heroBadges.map(item => (
+                          <span
+                            key={`mobile-${item}`}
+                            className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-white/20 dark:bg-white/12 dark:text-white backdrop-blur"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 grid grid-cols-1 gap-2">
+                      {heroProofItems.map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <div
+                            key={`mobile-${item.id}`}
+                            className="min-w-0 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] dark:border-white/18 dark:bg-white/10 px-3 py-2.5 backdrop-blur"
+                          >
+                            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)] dark:text-white/72">
+                              <Icon className="h-3.5 w-3.5" />
+                              {item.label}
+                            </p>
+                            <p className="mt-1 truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                              {item.value}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className={heroContentCardClass}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -3387,10 +3687,10 @@ export function UmkmStorefrontClient({
 
                 {activeTab === 'overview' ? (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {hasRating ? (
-                      <span className="inline-flex min-h-[30px] items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-semibold text-amber-700">
-                        <Star className="mr-1.5 h-3.5 w-3.5 fill-current" />
-                        {ratingSummaryLabel}
+                    {likeCountLabel ? (
+                      <span className="inline-flex min-h-[30px] items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[10px] font-semibold text-rose-700">
+                        <Heart className="mr-1.5 h-3.5 w-3.5 fill-current" />
+                        {likeSummaryLabel}
                       </span>
                     ) : null}
                     <span className="inline-flex min-h-[30px] items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold text-slate-700">
@@ -3827,7 +4127,13 @@ export function UmkmStorefrontClient({
                   </div>
                   <div className="rounded-2xl border border-[color:var(--app-accent-border)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text)]">
                     {storeGallery.length}{' '}
-                    {isId ? 'foto aktif' : 'active photos'}
+                    {galleryHasVideo
+                      ? isId
+                        ? 'media aktif'
+                        : 'active media'
+                      : isId
+                        ? 'foto aktif'
+                        : 'active photos'}
                   </div>
                 </div>
 
@@ -3838,32 +4144,90 @@ export function UmkmStorefrontClient({
                 </p>
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {storeGallery.map((item, index) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => openGalleryPreview(index)}
-                      className="group overflow-hidden rounded-[22px] border border-[color:var(--app-accent-border)] bg-white text-left shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 dark:bg-slate-950"
-                    >
-                      <div className="relative aspect-[4/4.4] overflow-hidden bg-slate-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.src}
-                          alt={item.title}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02)_0%,rgba(15,23,42,0.82)_100%)] p-3 text-white">
-                          <p className="text-[12px] font-semibold">
-                            {item.title}
-                          </p>
-                          <p className="mt-1 line-clamp-2 text-[11px] text-white/78">
-                            {item.caption}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                  {storeGallery.map((item, index) => {
+                    const mediaKey = getStoreGalleryLikeKey(item);
+                    const liked = Boolean(galleryLikes[mediaKey]);
+                    const saving = Boolean(galleryLikeSaving[mediaKey]);
+                    return (
+                      <article
+                        key={item.id}
+                        className="group relative overflow-hidden rounded-[22px] border border-[color:var(--app-accent-border)] bg-white text-left shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 dark:bg-slate-950"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openGalleryPreview(index)}
+                          className="block w-full text-left"
+                        >
+                          <div className="relative aspect-[4/4.4] overflow-hidden bg-slate-100">
+                            {item.mediaType === 'video' ? (
+                              <video
+                                src={item.src}
+                                className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                                muted
+                                playsInline
+                                preload="metadata"
+                              />
+                            ) : (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img
+                                src={item.src}
+                                alt={item.title}
+                                className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                                loading="lazy"
+                              />
+                            )}
+                            <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/62 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+                              {item.mediaType === 'video' ? (
+                                <Video className="h-3.5 w-3.5" />
+                              ) : (
+                                <ImageIcon className="h-3.5 w-3.5" />
+                              )}
+                              {item.mediaType === 'video'
+                                ? isId
+                                  ? 'Video'
+                                  : 'Video'
+                                : isId
+                                  ? 'Foto'
+                                  : 'Photo'}
+                            </div>
+                            <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02)_0%,rgba(15,23,42,0.82)_100%)] p-3 text-white">
+                              <p className="text-[12px] font-semibold">
+                                {item.title}
+                              </p>
+                              <p className="mt-1 line-clamp-2 text-[11px] text-white/78">
+                                {item.caption}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleGalleryLike(item)}
+                          disabled={saving}
+                          className={cn(
+                            'absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold backdrop-blur transition disabled:cursor-wait disabled:opacity-75',
+                            liked
+                              ? 'bg-rose-500 text-white shadow-[0_10px_18px_-14px_rgba(244,63,94,0.55)]'
+                              : 'bg-white/90 text-[color:var(--app-text)]',
+                          )}
+                          aria-pressed={liked}
+                        >
+                          <Heart className={cn('h-3.5 w-3.5', liked && 'fill-current')} />
+                          {saving
+                            ? isId
+                              ? 'Menyimpan'
+                              : 'Saving'
+                            : liked
+                            ? isId
+                              ? 'Disukai'
+                              : 'Liked'
+                            : isId
+                              ? 'Suka'
+                              : 'Like'}
+                        </button>
+                      </article>
+                    );
+                  })}
                 </div>
 
                 <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -4217,7 +4581,7 @@ export function UmkmStorefrontClient({
                               href={placeHeader.whatsappHref}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-white"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text)] dark:text-white"
                             >
                               <MessageCircle className="h-4 w-4" />
                               {isId ? 'Tanya menu' : 'Ask for menu'}
@@ -4225,7 +4589,7 @@ export function UmkmStorefrontClient({
                           ) : placeHeader?.telHref ? (
                             <a
                               href={placeHeader.telHref}
-                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-white"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text)] dark:text-white"
                             >
                               <Phone className="h-4 w-4" />
                               {isId ? 'Telepon usaha' : 'Call business'}
@@ -4235,7 +4599,7 @@ export function UmkmStorefrontClient({
                               type="button"
                               onClick={() => void startChat()}
                               disabled={chatLoading}
-                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-white disabled:opacity-60"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text)] dark:text-white disabled:opacity-60"
                             >
                               {chatLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -4501,11 +4865,10 @@ export function UmkmStorefrontClient({
                     {tables.slice(0, 6).map(table => (
                       <div
                         key={table.id}
-                        className={`rounded-2xl border px-3 py-2 text-[11px] ${
-                          selectedTable?.id === table.id
-                            ? ' border-[color:var(--app-accent-border)] text-[color:var(--app-text)]  border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
-                            : ' border-[color:var(--app-accent-border)] text-[color:var(--app-text)]  border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
-                        }`}
+                        className={`rounded-2xl border px-3 py-2 text-[11px] ${selectedTable?.id === table.id
+                          ? ' border-[color:var(--app-accent-border)] text-[color:var(--app-text)]  border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
+                          : ' border-[color:var(--app-accent-border)] text-[color:var(--app-text)]  border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
+                          }`}
                       >
                         <p className="font-semibold">{table.table_code}</p>
                         <p className="text-[11px] opacity-80">
@@ -4656,12 +5019,22 @@ export function UmkmStorefrontClient({
         {activeGalleryItem ? (
           <div className="space-y-3">
             <div className="overflow-hidden rounded-[24px] border border-[color:var(--app-accent-border)] bg-slate-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={activeGalleryItem.src}
-                alt={activeGalleryItem.title}
-                className="max-h-[72svh] w-full object-contain"
-              />
+              {activeGalleryItem.mediaType === 'video' ? (
+                <video
+                  src={activeGalleryItem.src}
+                  className="max-h-[72svh] w-full object-contain"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={activeGalleryItem.src}
+                  alt={activeGalleryItem.title}
+                  className="max-h-[72svh] w-full object-contain"
+                />
+              )}
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -4671,6 +5044,36 @@ export function UmkmStorefrontClient({
                 <p className="mt-1 text-[12px] leading-6 text-[color:var(--app-text-soft)]">
                   {activeGalleryItem.caption}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => void toggleGalleryLike(activeGalleryItem)}
+                  disabled={Boolean(galleryLikeSaving[activeGalleryLikeKey])}
+                  className={cn(
+                    'mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold transition disabled:cursor-wait disabled:opacity-75',
+                    galleryLikes[activeGalleryLikeKey]
+                      ? 'bg-rose-500 text-white'
+                      : 'border border-[color:var(--app-accent-border)] text-[color:var(--app-text)]',
+                  )}
+                  aria-pressed={Boolean(galleryLikes[activeGalleryLikeKey])}
+                >
+                  <Heart
+                    className={cn(
+                      'h-3.5 w-3.5',
+                      galleryLikes[activeGalleryLikeKey] && 'fill-current',
+                    )}
+                  />
+                  {galleryLikeSaving[activeGalleryLikeKey]
+                    ? isId
+                      ? 'Menyimpan'
+                      : 'Saving'
+                    : galleryLikes[activeGalleryLikeKey]
+                    ? isId
+                      ? 'Disukai'
+                      : 'Liked'
+                    : isId
+                      ? 'Suka media ini'
+                      : 'Like this media'}
+                </button>
               </div>
               {activeGalleryIndex !== null ? (
                 <span className="inline-flex min-h-[32px] items-center rounded-full border border-[color:var(--app-accent-border)] px-3 py-1 text-[11px] font-semibold text-[color:var(--app-text)]">
@@ -4861,11 +5264,10 @@ export function UmkmStorefrontClient({
                   <button
                     type="button"
                     onClick={() => openOrderPanel('online')}
-                    className={`inline-flex min-h-[32px] items-center justify-center rounded-full border px-3 text-[11px] font-semibold ${
-                      isOnline
-                        ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
-                        : 'border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
-                    }`}
+                    className={`inline-flex min-h-[32px] items-center justify-center rounded-full border px-3 text-[11px] font-semibold ${isOnline
+                      ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                      : 'border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
+                      }`}
                   >
                     {isId ? 'Antar atau pickup' : 'Delivery / pickup'}
                   </button>
@@ -4874,11 +5276,10 @@ export function UmkmStorefrontClient({
                   <button
                     type="button"
                     onClick={() => openOrderPanel('offline')}
-                    className={`inline-flex min-h-[32px] items-center justify-center rounded-full border px-3 text-[11px] font-semibold ${
-                      !isOnline
-                        ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
-                        : 'border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
-                    }`}
+                    className={`inline-flex min-h-[32px] items-center justify-center rounded-full border px-3 text-[11px] font-semibold ${!isOnline
+                      ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                      : 'border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
+                      }`}
                   >
                     {isId ? 'Meja' : 'Table'}
                   </button>
@@ -4973,11 +5374,10 @@ export function UmkmStorefrontClient({
                                   setSelectedShippingOptionId(preferred.id);
                                 }
                               }}
-                              className={`inline-flex min-h-[36px] items-center justify-center rounded-full border px-3 text-[11px] font-semibold ${
-                                active
-                                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
-                                  : 'border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
-                              }`}
+                              className={`inline-flex min-h-[36px] items-center justify-center rounded-full border px-3 text-[11px] font-semibold ${active
+                                ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                                : 'border-[color:var(--app-accent-border)] text-[color:var(--app-text)]'
+                                }`}
                             >
                               {formatFulfillmentMode(optionMode, isId)}
                             </button>
@@ -5020,7 +5420,7 @@ export function UmkmStorefrontClient({
 
                   {visibleShippingOptions.length > 0 ? (
                     visibleShippingOptions.length === 1 &&
-                    activeShippingOption ? (
+                      activeShippingOption ? (
                       <div className="rounded-2xl border border-[color:var(--app-accent-border)] px-3 py-3 text-xs text-[color:var(--app-text)]">
                         <p className="font-semibold">
                           {activeShippingOption.label}
@@ -5056,11 +5456,10 @@ export function UmkmStorefrontClient({
                               onClick={() =>
                                 setSelectedShippingOptionId(option.id)
                               }
-                              className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left ${
-                                activeShippingOption?.id === option.id
-                                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)]/5'
-                                  : 'border-[color:var(--app-accent-border)]'
-                              }`}
+                              className={`flex w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left ${activeShippingOption?.id === option.id
+                                ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)]/5'
+                                : 'border-[color:var(--app-accent-border)]'
+                                }`}
                             >
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-xs font-semibold text-[color:var(--app-text)]">
@@ -5176,10 +5575,10 @@ export function UmkmStorefrontClient({
                               ? 'Mencari tujuan...'
                               : 'Searching destination...'
                             : deliveryDestinationError ||
-                              deliveryDestinationNotice ||
-                              (isId
-                                ? 'Dipakai buat hitung ongkir. Kalau belum dipilih, sistem pakai estimasi.'
-                                : 'Used for shipping rates. Without it, checkout uses an estimate.')}
+                            deliveryDestinationNotice ||
+                            (isId
+                              ? 'Dipakai buat hitung ongkir. Kalau belum dipilih, sistem pakai estimasi.'
+                              : 'Used for shipping rates. Without it, checkout uses an estimate.')}
                         </p>
                       </div>
                       <div>
@@ -5287,7 +5686,7 @@ export function UmkmStorefrontClient({
                         void startOrderPayment(orderResult.order.id)
                       }
                       disabled={orderPaymentLoading}
-                      className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-xs font-black text-[color:var(--app-text)] dark:text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {orderPaymentLoading
                         ? isId
@@ -5370,9 +5769,9 @@ export function UmkmStorefrontClient({
                       <span>
                         {activeShippingOption
                           ? formatFulfillmentMode(
-                              activeShippingOption.mode,
-                              isId,
-                            )
+                            activeShippingOption.mode,
+                            isId,
+                          )
                           : isId
                             ? 'Pilih kirim'
                             : 'Choose delivery'}
@@ -5384,7 +5783,7 @@ export function UmkmStorefrontClient({
               <button
                 type="button"
                 onClick={() => openOrderPanel()}
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-sm font-black text-white"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text)] dark:text-white"
               >
                 <ShoppingBag className="h-4 w-4" />
                 {isId ? 'Pesan sekarang' : 'Order now'}

@@ -135,12 +135,19 @@ function buildTelHref(phone: string | null | undefined): string | null {
   return normalized ? `tel:${normalized}` : null;
 }
 
-function buildWhatsAppHref(phone: string | null | undefined, label: string): string | null {
+function buildWhatsAppHref(
+  phone: string | null | undefined,
+  label: string,
+  message?: string | null,
+): string | null {
   const normalized = normalizePhone(phone || '');
   if (!normalized) return null;
   const digits = normalized.replace(/[^\d]/g, '');
+  const text =
+    message?.trim() ||
+    `Halo, saya menemukan usaha ini dari www.lajukan.com dan ingin tanya tentang ${label}.`;
   const params = new URLSearchParams({
-    text: `Halo, saya ingin tanya tentang ${label}.`,
+    text,
   });
   return `https://wa.me/${digits}?${params.toString()}`;
 }
@@ -671,6 +678,13 @@ export function buildUmkmPlacePresentation(
       .filter(Boolean)
       .join(' · '),
   };
+  const whatsappPhone =
+    readMetaText(place, 'whatsapp_phone', 'whatsapp_number', 'whatsapp_contact') ||
+    place.phone ||
+    '';
+  const whatsappMessage =
+    readMetaText(place, 'whatsapp_message', 'whatsapp_text', 'contact_message') ||
+    '';
 
   return {
     kind,
@@ -708,6 +722,6 @@ export function buildUmkmPlacePresentation(
     googleMapsDirectionsUrl: googleMapsDirectionsByMode.driving,
     googleMapsDirectionsByMode,
     telHref: buildTelHref(place.phone),
-    whatsappHref: buildWhatsAppHref(place.phone, place.name),
+    whatsappHref: buildWhatsAppHref(whatsappPhone, place.name, whatsappMessage),
   };
 }

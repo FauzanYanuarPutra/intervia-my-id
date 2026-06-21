@@ -19,7 +19,7 @@ const UmkmLocationPickerClient = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[220px] w-full items-center justify-center rounded-[24px] border border-[color:var(--app-accent-border)] bg-white text-xs font-semibold text-[color:var(--app-accent)] sm:h-[280px]">
+      <div className="flex h-[320px] w-full items-center justify-center rounded-[24px] border border-[color:var(--app-accent-border)] bg-white text-xs font-semibold text-[color:var(--app-accent)] sm:h-[420px]">
         Loading map...
       </div>
     ),

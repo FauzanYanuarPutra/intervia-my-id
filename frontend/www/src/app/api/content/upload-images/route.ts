@@ -6,12 +6,12 @@ import {
   uploadErrorResponse,
   uploadSuccessResponse,
 } from '@/lib/server/uploadFiles';
+import { IMAGE_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 12;
 const IMAGE_KEYS = [
   'images',
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       accept: 'image',
       concurrency: 4,
       folder: 'content',
-      maxBytes: MAX_FILE_BYTES,
+      maxBytes: IMAGE_UPLOAD_RAW_MAX_BYTES,
       minioTarget: 'content',
       minioTimeoutMs: 2200,
     });

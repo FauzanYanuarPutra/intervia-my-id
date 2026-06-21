@@ -365,6 +365,25 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
     };
   }, [userId, accessToken, refetch]);
 
+  useEffect(() => {
+    if (!userId || !accessToken) return;
+
+    const syncInbox = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+      void refetch({ silent: true });
+    };
+
+    window.addEventListener('focus', syncInbox);
+    document.addEventListener('visibilitychange', syncInbox);
+
+    return () => {
+      window.removeEventListener('focus', syncInbox);
+      document.removeEventListener('visibilitychange', syncInbox);
+    };
+  }, [userId, accessToken, refetch]);
+
   const value: ChatInboxContextValue = useMemo(
     () => ({
       rooms,

@@ -180,9 +180,10 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 60s
       retries: 5
+      start_period: 120s
     networks:
       - web
 
@@ -234,7 +235,7 @@ services:
       ENV: ${ENV}
       PHX_SERVER: "true"
       PHX_HOST: auth.${APP_DOMAIN}
-      SECRET_KEY_BASE: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
       SCYLLA_HOST: scylla_db
       SCYLLA_PORT: "9042"
       SCYLLA_KEYSPACE: laju_chat
@@ -246,9 +247,9 @@ services:
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:4000/api/health" ]
       interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+      timeout: 15s
+      retries: 10
+      start_period: 90s
     networks:
       - web
     restart: unless-stopped
@@ -343,12 +344,14 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003}
       COMMUNITY_UPLOAD_DIR: /app/uploads/forum
       COMMUNITY_MEDIA_PUBLIC_PATH: /api/forum/media
+      INTERNAL_API_URL: http://identity_service:8080
       RUN_MIGRATIONS: ${RUN_MIGRATIONS_COMMUNITY:-true}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - community_uploads:/app/uploads/forum
     depends_on:
       community_db: { condition: service_healthy }
+      identity_service: { condition: service_healthy }
       redis_cache: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
     healthcheck:
@@ -842,6 +845,88 @@ services:
     restart: always
     profiles:
       - mailserver
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: prometheus
+  #   volumes:
+  #     - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   ports:
+  #     - "9091:9090"
+  #   networks:
+  #     - web
+  #   restart: unless-stopped
+
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   container_name: grafana
+  #   ports:
+  #     - "3006:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_USER=admin
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+  #   networks:
+  #     - web
+  #   restart: unless-stopped
+
+  # cadvisor:
+  #   image: gcr.io/cadvisor/cadvisor:latest
+  #   container_name: cadvisor
+  #   ports:
+  #     - "8088:8080"
+  #   volumes:
+  #     - /:/rootfs:ro
+  #     - /var/run:/var/run:ro
+  #     - /sys:/sys:ro
+  #     - /var/lib/docker/:/var/lib/docker:ro
+  #   networks:
+  #     - web
+  #   restart: unless-stopped
+
+  # node_exporter:
+  #   image: prom/node-exporter:latest
+  #   container_name: node_exporter
+  #   ports:
+  #     - "9100:9100"
+  #   networks:
+  #     - web
+  #   restart: unless-stopped
+
+  # alertmanager:
+  #   image: prom/alertmanager
+  #   ports:
+  #     - "9093:9093"
+  #   volumes:
+  #     - ./observability/alertmanager.yml:/etc/alertmanager/config.yml
+  #   networks:
+  #     - web
+
+  # loki:
+  #   image: grafana/loki:latest
+  #   ports:
+  #     - "3100:3100"
+  #   command: -config.file=/etc/loki/local-config.yaml
+  #   networks:
+  #     - web
+
+  # promtail:
+  #   image: grafana/promtail:latest
+  #   volumes:
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #     - /var/log:/var/log
+  #     - ./observability/promtail.yml:/etc/promtail/config.yml
+  #   command: -config.file=/etc/promtail/config.yml
+  #   networks:
+  #     - web
+
+  # otel_collector:
+  #   image: otel/opentelemetry-collector:latest
+  #   ports:
+  #     - "4317:4317"
+  #     - "4318:4318"
+  #   networks:
+  #     - web
 
 volumes:
   # postgres_data:
@@ -857,6 +942,7 @@ volumes:
   identity_postgres_data:
   community_postgres_data:
   marketplace_postgres_data:
+    # grafana_data:
 
 networks:
   web:

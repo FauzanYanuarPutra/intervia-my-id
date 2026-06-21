@@ -1,7 +1,7 @@
 defmodule ChatServiceWeb.UserSocket do
   use Phoenix.Socket
 
-  alias ChatService.{Repo, PresenceCache, Guardian}
+  alias ChatService.{Repo, PresenceCache, Guardian, IdentityClient}
   require Logger
 
   # Channel definitions
@@ -32,6 +32,7 @@ defmodule ChatServiceWeb.UserSocket do
         |> assign(:username, user_ctx.username)
         |> assign(:role, user_ctx.role)
         |> assign(:avatar, user_ctx.avatar)
+        |> assign(:avatar_style, user_ctx.avatar_style)
         |> assign(:permissions, user_ctx.permissions)
 
       # PERFORMANCE: Background Task untuk Sync (Non-blocking connect)
@@ -119,15 +120,40 @@ defmodule ChatServiceWeb.UserSocket do
     # Gunakan Ecto.UUID.dump untuk konversi ke binary (Scylla/Cassandra Friendly)
     case Ecto.UUID.dump(sub) do
       {:ok, binary_uuid} ->
-        username = claims["username"] || "user_#{String.slice(sub, -4..-1)}"
+        fallback_username = claims["username"] || "user_#{String.slice(sub, -4..-1)}"
+        fallback_avatar = claims["avatar"] || default_avatar(fallback_username)
 
-        {:ok, %{
-          user_id_bin: binary_uuid,
-          username: username,
-          role: extract_primary_role(claims["roles"]),
-          avatar: claims["avatar"] || default_avatar(username),
-          permissions: claims["perms"] || [] # Tambahan keamanan per-level
-        }}
+        case IdentityClient.fetch_public_profile(sub) do
+          {:ok, profile} ->
+            username =
+              IdentityClient.display_name(profile, fallback_username) ||
+                fallback_username
+
+            avatar =
+              IdentityClient.avatar_url(profile, fallback_avatar) ||
+                fallback_avatar
+
+            {:ok,
+             %{
+               user_id_bin: binary_uuid,
+               username: username,
+               role: extract_primary_role(claims["roles"]),
+               avatar: avatar,
+               avatar_style: IdentityClient.avatar_style(profile),
+               permissions: claims["perms"] || []
+             }}
+
+          _ ->
+            {:ok,
+             %{
+               user_id_bin: binary_uuid,
+               username: fallback_username,
+               role: extract_primary_role(claims["roles"]),
+               avatar: fallback_avatar,
+               avatar_style: nil,
+               permissions: claims["perms"] || []
+             }}
+        end
       :error ->
         {:error, :malformed_uuid}
     end

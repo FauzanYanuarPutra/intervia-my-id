@@ -1,0 +1,22 @@
+container,cpu,memory
+intervia-my-id-www-1,67.49%,184.7MiB / 9.391GiB
+intervia-my-id-usaha-1,0.00%,72.8MiB / 9.391GiB
+intervia-my-id-community_service-1,0.00%,11.55MiB / 9.391GiB
+intervia-my-id-crm-1,0.00%,72.22MiB / 9.391GiB
+intervia-my-id-cms-1,0.00%,61.17MiB / 9.391GiB
+intervia-my-id-marketplace_service-1,0.00%,19.35MiB / 9.391GiB
+intervia-my-id-chat_service-1,0.27%,175MiB / 9.391GiB
+laju_identity_service,0.00%,62.58MiB / 512MiB
+intervia-my-id-community_db-1,0.00%,37.62MiB / 9.391GiB
+intervia-my-id-identity_db-1,0.00%,44.09MiB / 9.391GiB
+intervia-my-id-redis_cache-1,0.76%,21.98MiB / 9.391GiB
+intervia-my-id-rabbitmq-1,0.57%,143.1MiB / 9.391GiB
+intervia-my-id-caddy-1,0.00%,20.13MiB / 9.391GiB
+intervia-my-id-marketplace_db-1,0.03%,49.56MiB / 9.391GiB
+intervia-my-id-db_ui-1,0.05%,35.16MiB / 9.391GiB
+intervia-my-id-cloudflare_tunnel-1,0.00%,29.21MiB / 9.391GiB
+intervia-my-id-meilisearch-1,0.24%,34.22MiB / 9.391GiB
+intervia-my-id-pgadmin-1,0.04%,254.6MiB / 9.391GiB
+intervia-my-id-scylla_db-1,1.53%,108MiB / 1GiB
+intervia-my-id-minio-1,0.15%,119.1MiB / 9.391GiB
+intervia-my-id-mailhog-1,0.00%,10.91MiB / 9.391GiB

@@ -30,7 +30,6 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  Star,
   Target,
   ThumbsUp,
   TrendingUp,
@@ -66,20 +65,14 @@ import {
 import { resolveContentPriceUnitLabel } from '@/lib/content/priceUnit';
 import { buildContentHref } from '@/lib/content/routes';
 import { MarketplacePageFrame } from '@/components/layout/MarketplacePageFrame';
-import type { UmkmMapStore } from '@/components/super-app/UmkmStoreMap';
 import type {
   CommunityFeedItem,
   CommunityFeedOverview,
   CommunityFeedResponse,
 } from '@/lib/community/types';
 import { CommunityComposer } from '@/components/community/CommunityFeedClient';
-import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
-import {
-  UMKM_DISCOVERY_PATH,
-  buildUmkmDiscoveryPath,
-  buildUmkmStorefrontPath,
-} from '@/lib/umkmSurface';
+import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 
@@ -234,28 +227,8 @@ type HomeWalletBalancesResponse = {
   error?: string;
 };
 
-type HomeUmkmRecommendationStore = UmkmMapStore & {
-  description?: string | null;
-  phone?: string | null;
-  offline_order_enabled?: boolean;
-  online_order_enabled?: boolean;
-  reservation_enabled?: boolean;
-  table_count?: number | null;
-  available_table_count?: number | null;
-  max_table_capacity?: number | null;
-  metadata?: Record<string, unknown>;
-};
-
-type HomeUmkmStoresResponse = {
-  data?: {
-    items?: HomeUmkmRecommendationStore[];
-    count?: number;
-  };
-  error?: string;
-};
-
 const HERO_TAGS = ['Bahan Lokal', 'Siap Ekspor', 'Kemasan', 'Mesin UMKM'];
-const HOME_HERO_IMAGE = '/images/hero/lajukan-id-1.png';
+const HOME_HERO_IMAGE = '/images/hero/lajukan-id-2.png';
 
 type HomeAvatarProp =
   | 'crate'
@@ -740,60 +713,6 @@ function mapContentToRecommendation(
     badgeTone: item.promo_label ? 'rose' : undefined,
     typeLabel: labelForContentType(isId, type),
     createHref: createHrefForContentType(type),
-  };
-}
-
-function mapUmkmStoreToRecommendation(
-  store: HomeUmkmRecommendationStore,
-  isId: boolean,
-): RecommendationItem | null {
-  if (!store.id || !store.name) return null;
-
-  const ui = buildUmkmPlacePresentation(store, isId);
-  const detailHref = store.slug
-    ? buildUmkmStorefrontPath(store.slug)
-    : buildUmkmDiscoveryPath({
-      q: store.name,
-      city: store.city,
-      storeId: store.id,
-    });
-  const mapHref = store.slug
-    ? buildUmkmDiscoveryPath({ store: store.slug, storeId: store.id })
-    : buildUmkmDiscoveryPath({
-      q: store.name,
-      city: store.city,
-      storeId: store.id,
-    });
-  const images = Array.from(
-    new Set([ui.coverImage, ...ui.gallery].filter(Boolean)),
-  ).slice(0, 4);
-  const badge =
-    ui.openNow === true
-      ? isId
-        ? 'Buka sekarang'
-        : 'Open now'
-      : ui.serviceBadges[0] || ui.statusLabel;
-
-  return {
-    id: `umkm-store-${store.id}`,
-    title: store.name,
-    vendor: ui.categoryLabel,
-    location: store.city || ui.addressLine,
-    rating: ui.ratingLabel,
-    reviews: formatCompactCount(ui.ratingCount, '0'),
-    price: ui.priceLabel,
-    unit: ui.statusLabel || ui.locationModeLabel,
-    image: images[0],
-    images,
-    href: detailHref,
-    badge,
-    badgeTone: ui.openNow === true ? 'emerald' : 'teal',
-    typeLabel: ui.kindLabel,
-    createHref: mapHref,
-    entityType: 'umkm_store',
-    detailActionLabel: isId ? 'Profil' : 'Profile',
-    secondaryActionLabel: isId ? 'Lihat peta' : 'Open map',
-    secondaryEventName: 'umkm.map_opened',
   };
 }
 
@@ -1744,6 +1663,168 @@ function DesktopHeroSection({
 }) {
   const metrics = getHeroMetrics(isId, summary);
 
+  if (!isAuthenticated) {
+    return (
+      <div>
+        <HeroVisualStage
+          isId={isId}
+          metrics={metrics}
+          className="mb-3"
+        />
+        <section className="overflow-hidden rounded-[26px] border border-emerald-200/70 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_46%,#ecfff2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)] xl:p-5">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_296px] xl:items-start">
+            <div className="relative z-10 min-w-0">
+              <p className="mb-2 inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
+                {isId ? 'Sebelum login' : 'Before login'}
+              </p>
+              <h1 className="max-w-[23ch] text-[1.78rem] font-semibold leading-[1.04] tracking-[-0.045em] text-[color:var(--app-text)] xl:text-[2rem]">
+                {isId
+                  ? 'Masuk dulu, lalu simpan peluang yang paling pas'
+                  : 'Log in first, then save the opportunities that matter most'}
+                <span className="text-[color:var(--app-accent)]"> Lajukan</span>
+              </h1>
+              <p className="mt-3 max-w-[39rem] text-[13px] leading-6 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Lihat listing, komunitas, dan reels bisnis yang relevan. Setelah login, favorit, chat, dan riwayat pencarian akan tetap mengikuti Anda.'
+                  : 'Browse suppliers, services, communities, and business reels. After login, favorites, chats, and search history stay with you everywhere.'}
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
+                  <Heart className="h-3.5 w-3.5 text-rose-500" />
+                  {isId ? 'Simpan favorit' : 'Save favorites'}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  {isId ? 'Lebih rapi' : 'Stay organized'}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
+                  <Zap className="h-3.5 w-3.5 text-amber-500" />
+                  {isId ? 'Lanjut cepat' : 'Continue fast'}
+                </span>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
+                >
+                  {isId ? 'Masuk' : 'Login'}
+                </Link>
+                <Link
+                  href="/register"
+                  className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-xs font-semibold text-[color:var(--app-text-inverse)]"
+                >
+                  {isId ? 'Daftar Sekarang' : 'Register Now'}
+                </Link>
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Gratis untuk mulai. Masuk sekarang biar peluang yang Anda suka tidak hilang.'
+                  : 'Free to start. Log in now so the opportunities you like do not slip away.'}
+              </p>
+            </div>
+
+            <div className="rounded-[24px] border border-white/80 bg-white/80 p-4 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] backdrop-blur">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,#059669,#047857)] text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.85)]">
+                  <Sparkles className="h-4.5 w-4.5" />
+                </span>
+                <div>
+                  <p className="text-sm font-black leading-5 text-[color:var(--app-text)]">
+                    {isId ? 'Kenapa login dulu?' : 'Why log in first?'}
+                  </p>
+                  <p className="text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+                    {isId
+                      ? 'Biar setiap interaksi jadi lebih personal.'
+                      : 'So every interaction feels more personal.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {[
+                  {
+                    icon: Heart,
+                    title: isId ? 'Favorit tersimpan' : 'Favorites stay saved',
+                    description: isId
+                      ? 'Listing yang Anda suka lebih mudah dibuka lagi.'
+                      : 'The listings you like are easier to revisit.',
+                  },
+                  {
+                    icon: MessageCircle,
+                    title: isId ? 'Chat tetap nyambung' : 'Chats keep flowing',
+                    description: isId
+                      ? 'Lanjut dari percakapan terakhir tanpa mulai ulang.'
+                      : 'Continue from the last conversation without starting over.',
+                  },
+                  {
+                    icon: Target,
+                    title: isId ? 'Lebih cepat ambil keputusan' : 'Decide faster',
+                    description: isId
+                      ? 'Rekomendasi yang tampil jadi lebih relevan buat Anda.'
+                      : 'The recommendations you see become more relevant to you.',
+                  },
+                ].map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.title}
+                      className="flex gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3"
+                    >
+                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold leading-5 text-[color:var(--app-text)]">
+                          {item.title}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+                          {item.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center">
+            <SearchInput
+              value={query}
+              onValueChange={onQueryChange}
+              onSearch={onSubmit}
+              placeholder={placeholder}
+              buttonLabel={buttonLabel}
+              layout="row"
+              variant="hero"
+              ariaLabel={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
+              inputAriaLabel={isId ? 'Kata kunci pencarian' : 'Search keyword'}
+              testId="home-hero-search-form"
+              inputTestId="home-hero-search-input"
+            />
+            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+              <Link
+                href={primaryCtaHref}
+                className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-xs font-semibold text-[color:var(--app-text-inverse)]"
+              >
+                {isId ? 'Daftar Sekarang' : 'Register Now'}
+              </Link>
+              <Link
+                href={UMKM_DISCOVERY_PATH}
+                className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)]"
+              >
+                {isId ? 'Jelajah dulu' : 'Browse first'}
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div>
       <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_8%)] bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_48%,#eefbf2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)] xl:p-5">
@@ -1804,8 +1885,8 @@ function DesktopHeroSection({
                   ? 'Buat Permintaan'
                   : 'Create Request'
                 : isId
-                  ? 'Daftar Gratis'
-                  : 'Join Free'}
+                  ? 'Daftar Sekarang'
+                  : 'Register Now'}
             </Link>
             <Link
               href={isAuthenticated ? '/dashboard' : UMKM_DISCOVERY_PATH}
@@ -1861,6 +1942,64 @@ function MobileHeroSection({
   summary: LajukanSummary | null;
 }) {
   const metrics = getHeroMetrics(isId, summary);
+
+  if (!isAuthenticated) {
+    return (
+      <div>
+        <MobileHeroVisualBanner
+          isId={isId}
+          metrics={metrics}
+          className="mb-2.5"
+        />
+        <section className="overflow-hidden rounded-[26px] border border-emerald-200/70 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_46%,#ecfff2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)]">
+          <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+            {isId ? 'Sebelum login' : 'Before login'}
+          </p>
+          <h1 className="max-w-[18ch] text-[1.36rem] font-semibold leading-[1.05] tracking-[-0.04em] text-[color:var(--app-text)]">
+            {isId
+              ? 'Masuk dulu, biar peluang terbaik tidak lewat begitu saja'
+              : 'Log in first so the best opportunities do not pass by'}
+            <span className="text-[color:var(--app-accent)]"> Lajukan</span>
+          </h1>
+          <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+            {isId
+              ? 'Lihat listing, komunitas, dan reels bisnis yang relevan. Login supaya favorit, chat, dan riwayat pencarian ikut tersimpan.'
+              : 'Browse suppliers, services, communities, and business reels. Log in so favorites, chats, and search history stay with you.'}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
+              <Heart className="h-3.5 w-3.5 text-rose-500" />
+              {isId ? 'Simpan favorit' : 'Save favorites'}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              {isId ? 'Lebih rapi' : 'Stay organized'}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
+              <Zap className="h-3.5 w-3.5 text-amber-500" />
+              {isId ? 'Lanjut cepat' : 'Continue fast'}
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Link
+              href="/login"
+              className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] border border-emerald-200 bg-white px-3 text-[12px] font-black text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/[0.08] dark:text-emerald-100 dark:hover:bg-white/[0.12]"
+            >
+              {isId ? 'Masuk' : 'Login'}
+            </Link>
+            <Link
+              href="/register"
+              className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-black text-white shadow-[0_12px_22px_-17px_rgba(4,120,87,0.82)] transition hover:bg-[color:var(--app-accent-strong)]"
+            >
+              {isId ? 'Daftar Sekarang' : 'Register Now'}
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -1959,7 +2098,7 @@ function GameProgressCard({
                 href="/register"
                 className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-black text-white shadow-[0_12px_22px_-17px_rgba(4,120,87,0.82)] transition hover:bg-[color:var(--app-accent-strong)]"
               >
-                {isId ? 'Daftar' : 'Join'}
+                {isId ? 'Daftar Sekarang' : 'Register Now'}
               </Link>
             </div>
           </div>
@@ -2336,9 +2475,9 @@ function RecommendationCard({
             </p>
           ) : null}
           <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[color:var(--app-text-soft)]">
-            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-            <span className="font-semibold text-amber-500">{item.rating}</span>
-            <span>({item.reviews})</span>
+            <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
+            <span className="font-semibold text-rose-500">{item.reviews}</span>
+            <span>likes</span>
           </div>
           <div className="mt-auto flex items-end justify-between gap-2 pt-2">
             <div className="min-w-0">
@@ -3341,7 +3480,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     let active = true;
 
     const loadHomeContent = async () => {
-      const loadListingRecommendations = async () => {
+      try {
         const response = await fetch(
           '/api/content?limit=16&status=active&include_owner=1&database_only=1',
           {
@@ -3350,37 +3489,20 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           },
         );
         const payload = await response.json().catch(() => null);
-        if (!response.ok) return [];
-        return extractContentItems(payload)
+        if (!response.ok) {
+          if (active) setRecommendations([]);
+          return;
+        }
+        const listingItems = extractContentItems(payload)
           .map(item => mapContentToRecommendation(item, isId))
           .filter((item): item is RecommendationItem => Boolean(item));
-      };
-
-      const loadUmkmRecommendations = async () => {
-        const response = await fetch('/api/super-app/umkm/stores?limit=18', {
-          cache: 'no-store',
-          credentials: 'include',
-        });
-        const payload = (await response
-          .json()
-          .catch(() => ({}))) as HomeUmkmStoresResponse;
-        if (!response.ok || !payload.data?.items) return [];
-        return payload.data.items
-          .map(store => mapUmkmStoreToRecommendation(store, isId))
-          .filter((item): item is RecommendationItem => Boolean(item));
-      };
-
-      try {
-        const [listingItems, umkmItems] = await Promise.all([
-          loadListingRecommendations().catch(() => []),
-          loadUmkmRecommendations().catch(() => []),
-        ]);
         if (!active) return;
-        const mergedItems = [...listingItems, ...umkmItems].filter(
-          (item, index, allItems) =>
-            allItems.findIndex(candidate => candidate.id === item.id) === index,
+        setRecommendations(
+          listingItems.filter(
+            (item, index, allItems) =>
+              allItems.findIndex(candidate => candidate.id === item.id) === index,
+          ).slice(0, 12),
         );
-        setRecommendations(mergedItems.slice(0, 12));
       } catch {
         if (active) setRecommendations([]);
       }
@@ -3523,21 +3645,22 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     ? {
       help: 'Bantuan',
       login: 'Masuk',
-      register: 'Daftar Gratis',
-      inviteTitle: 'Siap jalan?',
-      inviteDescription: 'Gabung, cari peluang, lanjut chat.',
-      inviteButton: 'Daftar Gratis',
+      register: 'Daftar Sekarang',
+      inviteTitle: 'Masuk dulu, peluangnya ikut nempel',
+      inviteDescription:
+        'Login untuk simpan favorit, lanjut chat, dan dapat rekomendasi yang makin relevan.',
+      inviteButton: 'Daftar Sekarang',
       searchPlaceholder: 'Cari supplier, jasa, lokasi...',
       searchButton: 'Cari',
     }
     : {
       help: 'Help',
       login: 'Login',
-      register: 'Join Free',
-      inviteTitle: 'Ready to grow your business?',
+      register: 'Register Now',
+      inviteTitle: 'Log in first, then the best leads follow you',
       inviteDescription:
-        'Join Lajukan and unlock more supplier, service, and operating opportunities for your business.',
-      inviteButton: 'Join Free',
+        'Save favorites, continue chats, and get recommendations that feel more personal.',
+      inviteButton: 'Register Now',
       searchPlaceholder: 'Search suppliers, services, places...',
       searchButton: 'Search',
     };
@@ -3686,14 +3809,14 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           caption: isId ? 'Siap bantu' : 'Qualified talent',
           href: '/search?type=freelancer&q=talent',
           icon: UserRound,
-        },
-        {
-          id: 'opportunity',
-          label: isId ? 'Peluang' : 'Business Opportunities',
-          caption: isId ? 'Ide tumbuh' : 'Growth and expansion ideas',
-          href: '/learn',
-          icon: TrendingUp,
-        },
+        }
+        // {
+        //   id: 'opportunity',
+        //   label: isId ? 'Peluang' : 'Business Opportunities',
+        //   caption: isId ? 'Ide tumbuh' : 'Growth and expansion ideas',
+        //   href: '/learn',
+        //   icon: TrendingUp,
+        // },
       ],
       secondary: [
         {

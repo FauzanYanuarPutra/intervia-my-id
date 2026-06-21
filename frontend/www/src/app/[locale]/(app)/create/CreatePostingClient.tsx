@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
@@ -51,8 +51,10 @@ import {
   extractUploadedContentDocumentFiles,
   extractUploadedContentImageUrls,
 } from '@/lib/content/uploadMedia';
+import { prepareUploadFiles } from '@/lib/media/prepareUploadMedia';
 import { validateListingPayload } from '@/lib/content/listingFlowRules';
 import { useAppBack } from '@/lib/navigation/useAppBack';
+import { IMAGE_UPLOAD_RAW_MAX_MB } from '@/lib/media/uploadStandard';
 import { DetailAccordion } from '@/components/ui/DetailAccordion';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { CreatePageSkeleton } from '@/components/system/feedback/RouteSkeletons';
@@ -335,37 +337,29 @@ function buildSimpleModeFallbackCopy({
   if (listingSide === 'demand') {
     return {
       summary: isId
-        ? `${title}. Yang penting buat kebutuhannya udah kepasang.${summaryPrice}${summaryLocation}`
+        ? `${title}.${summaryPrice}${summaryLocation}`
         : `${title}. This core need is posted fast.${summaryPrice}${summaryLocation}`,
       body: isId
-        ? `${title}. Brief ini dibikin cepat biar penawaran yang nyambung bisa masuk duluan. ${
-            formattedPrice ? `Kisaran budget ${formattedPrice}. ` : ''
-          }${
-            cleanLocation ? `Area kerja atau kirim di ${cleanLocation}. ` : ''
-          }Detail lain bisa dirapiin lagi setelah respon mulai masuk.`
-        : `${title}. This brief was created quickly so relevant offers can arrive first. ${
-            formattedPrice ? `Reference budget ${formattedPrice}. ` : ''
-          }${
-            cleanLocation ? `Work or delivery area: ${cleanLocation}. ` : ''
-          }More detail can be added after responses start coming in.`,
+        ? `Kebutuhan inti sudah ditulis. ${formattedPrice ? `Budget ${formattedPrice}. ` : ''
+        }${cleanLocation ? `Area ${cleanLocation}. ` : ''
+        }Detail tambahan bisa ditulis kalau perlu.`
+        : `${title}. This brief was created quickly so relevant offers can arrive first. ${formattedPrice ? `Reference budget ${formattedPrice}. ` : ''
+        }${cleanLocation ? `Work or delivery area: ${cleanLocation}. ` : ''
+        }More detail can be added after responses start coming in.`,
     };
   }
 
   return {
     summary: isId
-      ? `${title}. Yang penting dari penawarannya udah kepasang.${summaryPrice}${summaryLocation}`
+      ? `${title}.${summaryPrice}${summaryLocation}`
       : `${title}. This core offer is posted fast.${summaryPrice}${summaryLocation}`,
     body: isId
-      ? `${title}. Listing ini dibikin cepat biar orang langsung nangkep inti penawarannya. ${
-          formattedPrice ? `Kisaran harga ${formattedPrice}. ` : ''
-        }${
-          cleanLocation ? `Area utamanya ${cleanLocation}. ` : ''
-        }Detail lain bisa ditambahin setelah listing mulai jalan.`
-      : `${title}. This listing was created quickly so people can grasp the main offer first. ${
-          formattedPrice ? `Reference price ${formattedPrice}. ` : ''
-        }${
-          cleanLocation ? `Primary area ${cleanLocation}. ` : ''
-        }More detail can be added after the listing starts getting traction.`,
+      ? `Penawaran inti sudah ditulis. ${formattedPrice ? `Harga ${formattedPrice}. ` : ''
+      }${cleanLocation ? `Area ${cleanLocation}. ` : ''
+      }Detail tambahan bisa ditulis kalau perlu.`
+      : `${title}. This listing was created quickly so people can grasp the main offer first. ${formattedPrice ? `Reference price ${formattedPrice}. ` : ''
+      }${cleanLocation ? `Primary area ${cleanLocation}. ` : ''
+      }More detail can be added after the listing starts getting traction.`,
   };
 }
 
@@ -524,11 +518,10 @@ function CreateChoiceCard({
     >
       <span className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-current/20" />
       <span
-        className={`absolute left-3 top-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] sm:h-10 sm:w-10 sm:rounded-[15px] ${
-          selected
+        className={`absolute left-3 top-3 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] sm:h-10 sm:w-10 sm:rounded-[15px] ${selected
             ? 'bg-[color:var(--app-accent)] text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.72)]'
             : theme.cardIcon
-        }`}
+          }`}
       >
         <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
       </span>
@@ -653,146 +646,146 @@ function getQuickCreateExamples(
   if (type === 'job') {
     return isId
       ? [
-          'Judul: Cari admin live TikTok untuk brand F&B Jakarta',
-          'Budget: Rp 4.500.000 / bulan',
-          'Lokasi: Jakarta Barat, shift sore',
-        ]
+        'Judul: Cari admin live TikTok untuk brand F&B Jakarta',
+        'Budget: Rp 4.500.000 / bulan',
+        'Lokasi: Jakarta Barat, shift sore',
+      ]
       : [
-          'Title: Need a TikTok live admin for an F&B brand in Jakarta',
-          'Budget: IDR 4,500,000 / month',
-          'Location: West Jakarta, afternoon shift',
-        ];
+        'Title: Need a TikTok live admin for an F&B brand in Jakarta',
+        'Budget: IDR 4,500,000 / month',
+        'Location: West Jakarta, afternoon shift',
+      ];
   }
 
   if (type === 'property') {
     return listingSide === 'demand'
       ? isId
         ? [
-            'Judul: Cari booth bazaar untuk brand cemilan area BSD',
-            'Budget: Maks Rp 1.000.000 / minggu',
-            'Lokasi: BSD, traffic event atau kampus',
-          ]
+          'Judul: Cari booth bazaar untuk brand cemilan area BSD',
+          'Budget: Maks Rp 1.000.000 / minggu',
+          'Lokasi: BSD, traffic event atau kampus',
+        ]
         : [
-            'Title: Looking for a bazaar booth for a snack brand in BSD',
-            'Budget: Max IDR 1,000,000 / week',
-            'Location: BSD, event or campus traffic',
-          ]
+          'Title: Looking for a bazaar booth for a snack brand in BSD',
+          'Budget: Max IDR 1,000,000 / week',
+          'Location: BSD, event or campus traffic',
+        ]
       : isId
         ? [
-            'Judul: Booth bazaar BSD untuk brand kuliner dan cemilan',
-            'Harga: Rp 950.000 / minggu',
-            'Lokasi: BSD, Tangerang',
-          ]
+          'Judul: Booth bazaar BSD untuk brand kuliner dan cemilan',
+          'Harga: Rp 950.000 / minggu',
+          'Lokasi: BSD, Tangerang',
+        ]
         : [
-            'Title: BSD bazaar booth for food and snack brands',
-            'Price: IDR 950,000 / week',
-            'Location: BSD, Tangerang',
-          ];
+          'Title: BSD bazaar booth for food and snack brands',
+          'Price: IDR 950,000 / week',
+          'Location: BSD, Tangerang',
+        ];
   }
 
   if (type === 'service') {
     return listingSide === 'demand'
       ? isId
         ? [
-            'Judul: Cari channel reseller skincare dan host live commerce',
-            'Budget: Rp 12.000.000 / aktivasi awal',
-            'Lokasi: Bandung / hybrid',
-          ]
+          'Judul: Cari channel reseller skincare dan host live commerce',
+          'Budget: Rp 12.000.000 / aktivasi awal',
+          'Lokasi: Bandung / hybrid',
+        ]
         : [
-            'Title: Need reseller channel support and live-commerce hosts',
-            'Budget: IDR 12,000,000 / initial activation',
-            'Location: Bandung / hybrid',
-          ]
+          'Title: Need reseller channel support and live-commerce hosts',
+          'Budget: IDR 12,000,000 / initial activation',
+          'Location: Bandung / hybrid',
+        ]
       : isId
         ? [
-            'Judul: Paket admin Shopee dan Tokopedia 30 hari',
-            'Harga: Rp 1.250.000',
-            'Lokasi: Jakarta Selatan / remote',
-          ]
+          'Judul: Paket admin Shopee dan Tokopedia 30 hari',
+          'Harga: Rp 1.250.000',
+          'Lokasi: Jakarta Selatan / remote',
+        ]
         : [
-            'Title: Shopee and Tokopedia admin package for 30 days',
-            'Price: IDR 1,250,000',
-            'Location: South Jakarta / remote',
-          ];
+          'Title: Shopee and Tokopedia admin package for 30 days',
+          'Price: IDR 1,250,000',
+          'Location: South Jakarta / remote',
+        ];
   }
 
   if (type === 'tool_rental') {
     return listingSide === 'demand'
       ? isId
         ? [
-            'Judul: Cari sewa freezer display untuk bazaar minuman',
-            'Budget: Rp 700.000 / 3 hari',
-            'Lokasi: Depok, pick up fleksibel',
-          ]
+          'Judul: Cari sewa freezer display untuk bazaar minuman',
+          'Budget: Rp 700.000 / 3 hari',
+          'Lokasi: Depok, pick up fleksibel',
+        ]
         : [
-            'Title: Need a freezer display rental for a beverage bazaar',
-            'Budget: IDR 700,000 / 3 days',
-            'Location: Depok, flexible pickup',
-          ]
+          'Title: Need a freezer display rental for a beverage bazaar',
+          'Budget: IDR 700,000 / 3 days',
+          'Location: Depok, flexible pickup',
+        ]
       : isId
         ? [
-            'Judul: Sewa vacuum sealer dan mesin label usaha Bekasi',
-            'Harga: Rp 450.000 / 3 hari',
-            'Lokasi: Bekasi',
-          ]
+          'Judul: Sewa vacuum sealer dan mesin label usaha Bekasi',
+          'Harga: Rp 450.000 / 3 hari',
+          'Lokasi: Bekasi',
+        ]
         : [
-            'Title: Vacuum sealer and label machine rental for businesses in Bekasi',
-            'Price: IDR 450,000 / 3 days',
-            'Location: Bekasi',
-          ];
+          'Title: Vacuum sealer and label machine rental for businesses in Bekasi',
+          'Price: IDR 450,000 / 3 days',
+          'Location: Bekasi',
+        ];
   }
 
   if (type === 'business_transfer') {
     return isId
       ? [
-          'Judul: Oper usaha laundry berjalan area Bekasi',
-          'Harga: Rp 185.000.000 nego',
-          'Lokasi: Bekasi, omzet 6 bulan siap dicek',
-        ]
+        'Judul: Oper usaha laundry berjalan area Bekasi',
+        'Harga: Rp 185.000.000 nego',
+        'Lokasi: Bekasi, omzet 6 bulan siap dicek',
+      ]
       : [
-          'Title: Running laundry business transfer in Bekasi',
-          'Price: IDR 185,000,000 negotiable',
-          'Location: Bekasi, six-month revenue can be reviewed',
-        ];
+        'Title: Running laundry business transfer in Bekasi',
+        'Price: IDR 185,000,000 negotiable',
+        'Location: Bekasi, six-month revenue can be reviewed',
+      ];
   }
 
   if (type === 'company') {
     return isId
       ? [
-          'Nama: PT Sumber Niaga Nusantara',
-          'Bidang: Distribusi bahan baku dan kemasan usaha',
-          'Lokasi: Tangerang',
-        ]
+        'Nama: PT Sumber Niaga Nusantara',
+        'Bidang: Distribusi bahan baku dan kemasan usaha',
+        'Lokasi: Tangerang',
+      ]
       : [
-          'Name: PT Sumber Niaga Nusantara',
-          'Field: Raw material and packaging distribution for businesses',
-          'Location: Tangerang',
-        ];
+        'Name: PT Sumber Niaga Nusantara',
+        'Field: Raw material and packaging distribution for businesses',
+        'Location: Tangerang',
+      ];
   }
 
   return listingSide === 'demand'
     ? isId
       ? [
-          'Judul: Cari supplier sembako untuk warung & toko area Tangerang',
-          'Budget: Mulai Rp 8.000.000 / pengiriman',
-          'Lokasi: Tangerang Selatan, kirim rutin',
-        ]
+        'Judul: Cari supplier sembako untuk warung & toko area Tangerang',
+        'Budget: Mulai Rp 8.000.000 / pengiriman',
+        'Lokasi: Tangerang Selatan, kirim rutin',
+      ]
       : [
-          'Title: Looking for a grocery supplier for stores in Tangerang',
-          'Budget: Starting at IDR 8,000,000 / shipment',
-          'Location: South Tangerang, recurring delivery',
-        ]
+        'Title: Looking for a grocery supplier for stores in Tangerang',
+        'Budget: Starting at IDR 8,000,000 / shipment',
+        'Location: South Tangerang, recurring delivery',
+      ]
     : isId
       ? [
-          'Judul: Distributor cemilan kemasan untuk reseller Cikarang',
-          'Harga: Rp 185.000 / karton',
-          'Lokasi: Cikarang, kirim Jabodetabek',
-        ]
+        'Judul: Distributor cemilan kemasan untuk reseller Cikarang',
+        'Harga: Rp 185.000 / karton',
+        'Lokasi: Cikarang, kirim Jabodetabek',
+      ]
       : [
-          'Title: Packaged snack distributor for resellers in Cikarang',
-          'Price: IDR 185,000 / carton',
-          'Location: Cikarang, ships across Greater Jakarta',
-        ];
+        'Title: Packaged snack distributor for resellers in Cikarang',
+        'Price: IDR 185,000 / carton',
+        'Location: Cikarang, ships across Greater Jakarta',
+      ];
 }
 
 function getFieldExample(
@@ -1862,8 +1855,8 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
     descId: 'Tawarkan jasa admin, konten, desain, legal, dan operasional.',
     descEn:
       'Offer marketplace admin, content, packaging, design, legal, or other operational services for businesses.',
-    stepsId: ['Informasi Jasa', 'Paket & Area', 'Portfolio', 'Selesai'],
-    stepsEn: ['Service Info', 'Package & Area', 'Portfolio', 'Finish'],
+    stepsId: ['Informasi Jasa', 'Paket & Area', 'Foto & Portofolio', 'Selesai'],
+    stepsEn: ['Service Info', 'Package & Area', 'Photos & Portfolio', 'Finish'],
     step1Keys: [
       'title',
       'summary',
@@ -1881,6 +1874,9 @@ const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
     step2HintId: 'Tambah scope, output, revisi.',
     step2HintEn:
       'Complete service scope, deliverables, revisions, and client requirements.',
+    step3Title: 'Foto, portofolio, dan lampiran',
+    step3Description:
+      'Upload foto hasil kerja, contoh portofolio, atau dokumen pendukung. Foto pertama jadi thumbnail.',
   },
   job: {
     headlineId: 'Brief Talent',
@@ -2443,7 +2439,7 @@ const DEMAND_FIELD_OVERRIDES: Record<string, Record<string, FieldOverride>> = {
         'e.g. Need live hosts and a marketplace admin for a launch',
     },
     summary: {
-      labelId: 'Ringkasan jasa yang dicari',
+      labelId: 'Inti jasa yang dicari',
       labelEn: 'Need summary',
       placeholderId:
         'Contoh: cari partner untuk live, closing, dan operasional selama 2 minggu.',
@@ -2846,187 +2842,187 @@ const TYPE_COMPLIANCE_GUIDANCE: Record<ListingTypeId, TypeChecklistMeta> = {
 };
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const TYPE_COMPLIANCE_VISUALS: Record<ListingTypeId, TypeVisualChecklistMeta> =
-  {
-    product: {
-      itemsId: [
-        'Produk, stok, retur jelas',
-        'Tanpa klaim palsu',
-        'Tambah GTIN/MPN bila ada',
-      ],
-      itemsEn: [
-        'Product, stock, and returns are clear',
-        'No false claims',
-        'Add GTIN/MPN when available',
-      ],
-    },
-    service: {
-      itemsId: [
-        'Scope dan timeline jelas',
-        'No bayar di luar app',
-        'Data klien seperlunya',
-      ],
-      itemsEn: [
-        'Scope and timeline are clear',
-        'No off-platform payment',
-        'Only necessary client data',
-      ],
-    },
-    job: {
-      itemsId: [
-        'Role dan kompensasi jelas',
-        'Kandidat tidak bayar',
-        'Data pelamar seperlunya',
-      ],
-      itemsEn: [
-        'Role and compensation are clear',
-        'Applicants never pay',
-        'Only necessary applicant data',
-      ],
-    },
-    property: {
-      itemsId: [
-        'Alamat dan legal jelas',
-        'Unit harus siap tayang',
-        'Foto sesuai unit',
-      ],
-      itemsEn: [
-        'Address and legal status are clear',
-        'Unit must be listing-ready',
-        'Photos must match the unit',
-      ],
-    },
-    tool_rental: {
-      itemsId: [
-        'Rate dan deposit jelas',
-        'Kondisi alat harus jujur',
-        'Bukti serah-terima wajib',
-      ],
-      itemsEn: [
-        'Rate and deposit are clear',
-        'Asset condition must be honest',
-        'Handover proof is required',
-      ],
-    },
-    business_transfer: {
-      itemsId: [
-        'Angka usaha bisa dicek',
-        'Aset dan akun jelas',
-        'Risiko ditulis jujur',
-      ],
-      itemsEn: [
-        'Business numbers can be checked',
-        'Assets and accounts are clear',
-        'Risks are disclosed honestly',
-      ],
-    },
-    company: {
-      itemsId: [
-        'Identitas publik harus valid',
-        'Lowongan tetap di page job',
-        'Jaga data personal minim',
-      ],
-      itemsEn: [
-        'Public identity must be valid',
-        'Roles still belong in jobs',
-        'Keep personal data minimal',
-      ],
-    },
-  };
+{
+  product: {
+    itemsId: [
+      'Produk, stok, retur jelas',
+      'Tanpa klaim palsu',
+      'Tambah GTIN/MPN bila ada',
+    ],
+    itemsEn: [
+      'Product, stock, and returns are clear',
+      'No false claims',
+      'Add GTIN/MPN when available',
+    ],
+  },
+  service: {
+    itemsId: [
+      'Scope dan timeline jelas',
+      'No bayar di luar app',
+      'Data klien seperlunya',
+    ],
+    itemsEn: [
+      'Scope and timeline are clear',
+      'No off-platform payment',
+      'Only necessary client data',
+    ],
+  },
+  job: {
+    itemsId: [
+      'Role dan kompensasi jelas',
+      'Kandidat tidak bayar',
+      'Data pelamar seperlunya',
+    ],
+    itemsEn: [
+      'Role and compensation are clear',
+      'Applicants never pay',
+      'Only necessary applicant data',
+    ],
+  },
+  property: {
+    itemsId: [
+      'Alamat dan legal jelas',
+      'Unit harus siap tayang',
+      'Foto sesuai unit',
+    ],
+    itemsEn: [
+      'Address and legal status are clear',
+      'Unit must be listing-ready',
+      'Photos must match the unit',
+    ],
+  },
+  tool_rental: {
+    itemsId: [
+      'Rate dan deposit jelas',
+      'Kondisi alat harus jujur',
+      'Bukti serah-terima wajib',
+    ],
+    itemsEn: [
+      'Rate and deposit are clear',
+      'Asset condition must be honest',
+      'Handover proof is required',
+    ],
+  },
+  business_transfer: {
+    itemsId: [
+      'Angka usaha bisa dicek',
+      'Aset dan akun jelas',
+      'Risiko ditulis jujur',
+    ],
+    itemsEn: [
+      'Business numbers can be checked',
+      'Assets and accounts are clear',
+      'Risks are disclosed honestly',
+    ],
+  },
+  company: {
+    itemsId: [
+      'Identitas publik harus valid',
+      'Lowongan tetap di page job',
+      'Jaga data personal minim',
+    ],
+    itemsEn: [
+      'Public identity must be valid',
+      'Roles still belong in jobs',
+      'Keep personal data minimal',
+    ],
+  },
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const DEMAND_FORM_GUIDANCE: Partial<Record<ListingTypeId, TypeChecklistMeta>> =
-  {
-    product: {
-      titleId: 'Agar supplier cepat respon',
-      titleEn: 'So suppliers can respond faster',
-      itemsId: [
-        'Tulis barang, qty, budget, dan deadline.',
-        'Sebut merek, MOQ, atau spesifikasi yang wajib.',
-        'Cantumkan area kirim atau titik drop.',
-      ],
-      itemsEn: [
-        'State the item, quantity, budget, and deadline.',
-        'Mention required brand, MOQ, or specifications.',
-        'Include delivery area or drop point.',
-      ],
-      noteId:
-        'Kalau ada toleransi merek atau spesifikasi alternatif, tulis juga.',
-      noteEn:
-        'If there is tolerance for alternative brands or specs, mention it too.',
-    },
-    service: {
-      titleId: 'Agar vendor cepat paham',
-      titleEn: 'So providers understand faster',
-      itemsId: [
-        'Tulis target bisnis, scope, output.',
-        'Sebut timeline, area kerja, dan mode eksekusi.',
-        'Tulis budget acuan atau range yang realistis.',
-      ],
-      itemsEn: [
-        'Describe the business target, scope, and expected output.',
-        'Mention timeline, work area, and execution mode.',
-        'Share a realistic reference budget or range.',
-      ],
-      noteId:
-        'Kalau fokusnya live, reseller, marketplace, toko, atau event, sebutkan dari awal.',
-      noteEn:
-        'If the main focus is live commerce, resellers, marketplaces, stores, or events, say it early.',
-    },
-    job: {
-      titleId: 'Agar talent tepat yang masuk',
-      titleEn: 'So the right talent responds',
-      itemsId: [
-        'Tulis role, jumlah orang, tugas utama.',
-        'Sebut sistem kerja, shift, lokasi, dan target mulai.',
-        'Tulis skill wajib dan range budget atau gaji.',
-      ],
-      itemsEn: [
-        'State the role, headcount, and core responsibilities.',
-        'Mention work setup, shifts, location, and target start date.',
-        'List must-have skills and the salary or budget range.',
-      ],
-      noteId:
-        'Fokuskan brief ke kebutuhan operasional nyata, bukan deskripsi perusahaan yang terlalu panjang.',
-      noteEn:
-        'Keep the brief focused on the actual operational need, not a long company description.',
-    },
-    property: {
-      titleId: 'Agar lokasi yang masuk lebih relevan',
-      titleEn: 'So location matches are more relevant',
-      itemsId: [
-        'Tulis tipe lokasi, area, dan budget.',
-        'Sebut kebutuhan luas, akses, dan channel jualan.',
-        'Cantumkan target kapan lokasi mulai dipakai.',
-      ],
-      itemsEn: [
-        'Write the location type, area, and budget.',
-        'Mention size, access, and sales channel needs.',
-        'Include when the location needs to start being used.',
-      ],
-      noteId:
-        'Kalau perlu parkir, dekat sekolah, dekat pasar, atau dekat gudang, tulis sejak awal.',
-      noteEn:
-        'If you need parking, school access, market proximity, or warehouse access, say it early.',
-    },
-    tool_rental: {
-      titleId: 'Agar vendor alat cepat cocok',
-      titleEn: 'So rental vendors can match faster',
-      itemsId: [
-        'Tulis alat, kapasitas, durasi sewa.',
-        'Sebut lokasi pakai, operator, dan target tanggal.',
-        'Tulis budget atau batas deposit bila ada.',
-      ],
-      itemsEn: [
-        'Describe the tool, capacity, and rental duration.',
-        'Mention usage location, operator needs, and target date.',
-        'Share the budget or deposit limit if any.',
-      ],
-      noteId:
-        'Tambahkan kondisi minimum atau akses lokasi bila alat dipakai di lapangan.',
-      noteEn:
-        'Add minimum condition or site access details if the tool will be used in the field.',
-    },
-  };
+{
+  product: {
+    titleId: 'Agar supplier cepat respon',
+    titleEn: 'So suppliers can respond faster',
+    itemsId: [
+      'Tulis barang, qty, budget, dan deadline.',
+      'Sebut merek, MOQ, atau spesifikasi yang wajib.',
+      'Cantumkan area kirim atau titik drop.',
+    ],
+    itemsEn: [
+      'State the item, quantity, budget, and deadline.',
+      'Mention required brand, MOQ, or specifications.',
+      'Include delivery area or drop point.',
+    ],
+    noteId:
+      'Kalau ada toleransi merek atau spesifikasi alternatif, tulis juga.',
+    noteEn:
+      'If there is tolerance for alternative brands or specs, mention it too.',
+  },
+  service: {
+    titleId: 'Agar vendor cepat paham',
+    titleEn: 'So providers understand faster',
+    itemsId: [
+      'Tulis target bisnis, scope, output.',
+      'Sebut timeline, area kerja, dan mode eksekusi.',
+      'Tulis budget acuan atau range yang realistis.',
+    ],
+    itemsEn: [
+      'Describe the business target, scope, and expected output.',
+      'Mention timeline, work area, and execution mode.',
+      'Share a realistic reference budget or range.',
+    ],
+    noteId:
+      'Kalau fokusnya live, reseller, marketplace, toko, atau event, sebutkan dari awal.',
+    noteEn:
+      'If the main focus is live commerce, resellers, marketplaces, stores, or events, say it early.',
+  },
+  job: {
+    titleId: 'Agar talent tepat yang masuk',
+    titleEn: 'So the right talent responds',
+    itemsId: [
+      'Tulis role, jumlah orang, tugas utama.',
+      'Sebut sistem kerja, shift, lokasi, dan target mulai.',
+      'Tulis skill wajib dan range budget atau gaji.',
+    ],
+    itemsEn: [
+      'State the role, headcount, and core responsibilities.',
+      'Mention work setup, shifts, location, and target start date.',
+      'List must-have skills and the salary or budget range.',
+    ],
+    noteId:
+      'Fokuskan brief ke kebutuhan operasional nyata, bukan deskripsi perusahaan yang terlalu panjang.',
+    noteEn:
+      'Keep the brief focused on the actual operational need, not a long company description.',
+  },
+  property: {
+    titleId: 'Agar lokasi yang masuk lebih relevan',
+    titleEn: 'So location matches are more relevant',
+    itemsId: [
+      'Tulis tipe lokasi, area, dan budget.',
+      'Sebut kebutuhan luas, akses, dan channel jualan.',
+      'Cantumkan target kapan lokasi mulai dipakai.',
+    ],
+    itemsEn: [
+      'Write the location type, area, and budget.',
+      'Mention size, access, and sales channel needs.',
+      'Include when the location needs to start being used.',
+    ],
+    noteId:
+      'Kalau perlu parkir, dekat sekolah, dekat pasar, atau dekat gudang, tulis sejak awal.',
+    noteEn:
+      'If you need parking, school access, market proximity, or warehouse access, say it early.',
+  },
+  tool_rental: {
+    titleId: 'Agar vendor alat cepat cocok',
+    titleEn: 'So rental vendors can match faster',
+    itemsId: [
+      'Tulis alat, kapasitas, durasi sewa.',
+      'Sebut lokasi pakai, operator, dan target tanggal.',
+      'Tulis budget atau batas deposit bila ada.',
+    ],
+    itemsEn: [
+      'Describe the tool, capacity, and rental duration.',
+      'Mention usage location, operator needs, and target date.',
+      'Share the budget or deposit limit if any.',
+    ],
+    noteId:
+      'Tambahkan kondisi minimum atau akses lokasi bila alat dipakai di lapangan.',
+    noteEn:
+      'Add minimum condition or site access details if the tool will be used in the field.',
+  },
+};
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const DEMAND_FORM_VISUALS: Partial<
   Record<ListingTypeId, TypeVisualChecklistMeta>
@@ -3264,13 +3260,13 @@ export function CreatePostingClient({
       query.length === 0
         ? sectors
         : sectors.filter(item => {
-            const label = getSectorLabel(item, locale).toLowerCase();
-            const description = getSectorDescription(
-              item,
-              locale,
-            ).toLowerCase();
-            return label.includes(query) || description.includes(query);
-          });
+          const label = getSectorLabel(item, locale).toLowerCase();
+          const description = getSectorDescription(
+            item,
+            locale,
+          ).toLowerCase();
+          return label.includes(query) || description.includes(query);
+        });
 
     return [...base].sort((a, b) => {
       if (a.id === sector) return -1;
@@ -3376,6 +3372,90 @@ export function CreatePostingClient({
   const isSimpleModeActive = listingMode === 'simple' && supportsSimpleMode;
   const showImages =
     typePicked && needsImageGallery(activeType, effectiveSector);
+  const coverImage = images[0] || null;
+  const setCoverImage = useCallback((index: number) => {
+    setImages(prev => {
+      if (index <= 0 || index >= prev.length) return prev;
+      const next = [...prev];
+      const [selected] = next.splice(index, 1);
+      next.unshift(selected);
+      return next;
+    });
+  }, []);
+  function renderMediaUploadPanel() {
+    if (!showImages) return null;
+    return (
+    <div className="space-y-2.5">
+      <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+              {locale === 'id' ? 'Foto utama' : 'Primary photo'}
+            </p>
+            <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)]">
+              {locale === 'id'
+                ? 'Upload foto utama dulu. Ini yang paling cepat dilihat pembeli.'
+                : 'Upload the main photo first. This is what people see first.'}
+            </p>
+          </div>
+          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
+            {images.length > 0
+              ? locale === 'id'
+                ? `${images.length} foto`
+                : `${images.length} photos`
+              : locale === 'id'
+                ? 'Belum ada foto'
+                : 'No photos yet'}
+          </span>
+        </div>
+        {coverImage ? (
+          <div className="mt-3 flex items-center gap-3">
+            <div
+              className="h-16 w-16 shrink-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] bg-cover bg-center dark:border-[color:var(--app-border-strong)]"
+              style={{
+                backgroundImage: `url(${coverImage.preview || coverImage.url || ''})`,
+              }}
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+                {locale === 'id' ? 'Foto terpilih' : 'Selected photo'}
+              </p>
+              <p className="text-[11px] text-[color:var(--app-text-soft)]">
+                {locale === 'id'
+                  ? 'Kalau mau ganti, tarik urutan foto atau pilih foto lain sebagai utama.'
+                  : 'Reorder or pick another image if you want to change the main photo.'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-lg border border-dashed border-[color:var(--app-border)] px-3 py-3 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+            {locale === 'id'
+              ? 'Upload foto dulu biar listing terasa lebih jelas.'
+              : 'Upload a photo first so the listing feels clearer.'}
+          </div>
+        )}
+      </div>
+      <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
+        <span className="inline-flex items-center gap-1.5">
+          <ImageIcon className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
+          <span>
+            {locale === 'id' ? 'Foto' : 'Images'}{' '}
+            {images.length > 0 && `(${images.length})`}
+          </span>
+        </span>
+      </label>
+      <ImageUpload
+        images={images}
+        onChange={setImages}
+        onSetCover={setCoverImage}
+        onAddFiles={handleAddImages}
+        maxImages={10}
+        maxSizeMB={IMAGE_UPLOAD_RAW_MAX_MB}
+        locale={locale}
+      />
+    </div>
+    );
+  }
   const requiredFields = useMemo(() => {
     if (!typePicked) return [];
     if (isSimpleModeActive) {
@@ -3422,9 +3502,9 @@ export function CreatePostingClient({
       new Set<string>(
         isSimpleModeActive
           ? getSimpleModePinnedFieldKeys(
-              activeType as ListingTypeId,
-              listingSide,
-            )
+            activeType as ListingTypeId,
+            listingSide,
+          )
           : [],
       ),
     [activeType, isSimpleModeActive, listingSide],
@@ -3541,11 +3621,11 @@ export function CreatePostingClient({
   const promotionAdvancedFields = useMemo(
     () =>
       selectedPromotionOfferType &&
-      !isPrimaryPromotionOfferType(selectedPromotionOfferType) &&
-      selectedPromotionOfferType !== 'discount'
+        !isPrimaryPromotionOfferType(selectedPromotionOfferType) &&
+        selectedPromotionOfferType !== 'discount'
         ? PROMOTION_BASE_FIELDS.filter(
-            field => field.key === 'promo_offer_value',
-          )
+          field => field.key === 'promo_offer_value',
+        )
         : [],
     [selectedPromotionOfferType],
   );
@@ -3584,14 +3664,8 @@ export function CreatePostingClient({
       {
         key: 'images',
         done: !requiresPrimaryImageForPublish || images.length > 0,
-        labelId:
-          activeType === 'tool_rental'
-            ? 'Tambahkan foto utama aset'
-            : 'Tambahkan foto utama',
-        labelEn:
-          activeType === 'tool_rental'
-            ? 'Add a primary asset photo'
-            : 'Add a primary photo',
+        labelId: 'Foto utama siap',
+        labelEn: 'Primary photo ready',
       },
       {
         key: 'promotion',
@@ -3981,7 +4055,7 @@ export function CreatePostingClient({
     handleTypeSelection(template.typeId, { listingSide: template.listingSide });
     setListingMode(
       template.listingMode ||
-        (supportsSimpleListingMode(template.typeId) ? 'simple' : 'detail'),
+      (supportsSimpleListingMode(template.typeId) ? 'simple' : 'detail'),
     );
     setListingSide(template.listingSide);
     if (template.typeId === 'property') {
@@ -4018,9 +4092,9 @@ export function CreatePostingClient({
       entryMode === 'root'
         ? '/create'
         : buildCreateBasePath({
-            locale,
-            sideId: entryMode === 'demand' ? 'demand' : 'supply',
-          });
+          locale,
+          sideId: entryMode === 'demand' ? 'demand' : 'supply',
+        });
     setType('');
     setTypePicked(false);
     setCurrentStep(1);
@@ -4104,96 +4178,96 @@ export function CreatePostingClient({
   const supplySupportCards = PROMO_ONLY_MODE
     ? []
     : ([
-        {
-          key: 'property',
-          href: resolveMarketplaceCreatePath(locale, 'property', 'supply'),
-          badge: locale === 'id' ? 'Lokasi' : 'Spaces',
-          title:
-            locale === 'id' ? 'Tawarkan lokasi jualan' : 'Offer selling space',
-          description:
-            locale === 'id'
-              ? 'Untuk booth, kios, ruko, atau area jual.'
-              : 'Use this for booths, kiosks, shophouses, or selling spaces.',
-          example:
-            locale === 'id'
-              ? 'Contoh: sewa booth bazaar weekend di Bekasi'
-              : 'Example: rent a weekend bazaar booth in Bekasi',
-          Icon: MapPin,
-          theme: TYPE_THEMES.property,
-          highlights:
-            locale === 'id'
-              ? ['Booth', 'Kios', 'Traffic']
-              : ['Booth', 'Kiosk', 'Traffic'],
-        },
-        {
-          key: 'tool_rental',
-          href: resolveMarketplaceCreatePath(locale, 'tool_rental', 'supply'),
-          badge: locale === 'id' ? 'Sewa alat' : 'Tool rental',
-          title: locale === 'id' ? 'Sewakan alat usaha' : 'Rent out tools',
-          description:
-            locale === 'id'
-              ? 'Untuk freezer, alat produksi, atau alat konten.'
-              : 'Use this for freezers, production gear, or content tools.',
-          example:
-            locale === 'id'
-              ? 'Contoh: sewa freezer display 7 hari untuk pop-up'
-              : 'Example: rent a display freezer for a seven-day pop-up',
-          Icon: Snowflake,
-          theme: TYPE_THEMES.tool_rental,
-          highlights:
-            locale === 'id'
-              ? ['Alat', 'Durasi', 'Pickup']
-              : ['Tools', 'Duration', 'Pickup'],
-        },
-        {
-          key: 'business_transfer',
-          href: resolveMarketplaceCreatePath(
-            locale,
-            'business_transfer',
-            'supply',
-          ),
-          badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
-          title:
-            locale === 'id' ? 'Tawarkan oper usaha' : 'Offer business transfer',
-          description:
-            locale === 'id'
-              ? 'Usaha berjalan, aset, rating, dan handover.'
-              : 'Sell a running business, assets, ratings, and handover.',
-          example:
-            locale === 'id'
-              ? 'Contoh: oper usaha laundry aktif plus SOP'
-              : 'Example: transfer an active laundry business plus SOP',
-          Icon: Handshake,
-          theme: TYPE_THEMES.business_transfer,
-          highlights:
-            locale === 'id'
-              ? ['Omzet', 'Aset', 'Handover']
-              : ['Revenue', 'Assets', 'Handover'],
-        },
-        {
-          key: 'profile',
-          href: '/profile/edit?focus=talent',
-          badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
-          title:
-            locale === 'id'
-              ? 'Tawarkan skill lewat profil'
-              : 'Offer skills via profile',
-          description:
-            locale === 'id'
-              ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
-              : 'If you want to sell personal skills, polish your user profile.',
-          example:
-            locale === 'id'
-              ? 'Contoh: profil akuntan UMKM freelance'
-              : 'Example: freelance MSME accountant profile',
-          Icon: Users,
-          theme: specialCreateThemes.profile,
-          highlights:
-            locale === 'id'
-              ? ['Headline', 'Skill', 'Rate']
-              : ['Headline', 'Skills', 'Rate'],
-        },
-      ] as const);
+      {
+        key: 'property',
+        href: resolveMarketplaceCreatePath(locale, 'property', 'supply'),
+        badge: locale === 'id' ? 'Lokasi' : 'Spaces',
+        title:
+          locale === 'id' ? 'Tawarkan lokasi jualan' : 'Offer selling space',
+        description:
+          locale === 'id'
+            ? 'Untuk booth, kios, ruko, atau area jual.'
+            : 'Use this for booths, kiosks, shophouses, or selling spaces.',
+        example:
+          locale === 'id'
+            ? 'Contoh: sewa booth bazaar weekend di Bekasi'
+            : 'Example: rent a weekend bazaar booth in Bekasi',
+        Icon: MapPin,
+        theme: TYPE_THEMES.property,
+        highlights:
+          locale === 'id'
+            ? ['Booth', 'Kios', 'Traffic']
+            : ['Booth', 'Kiosk', 'Traffic'],
+      },
+      {
+        key: 'tool_rental',
+        href: resolveMarketplaceCreatePath(locale, 'tool_rental', 'supply'),
+        badge: locale === 'id' ? 'Sewa alat' : 'Tool rental',
+        title: locale === 'id' ? 'Sewakan alat usaha' : 'Rent out tools',
+        description:
+          locale === 'id'
+            ? 'Untuk freezer, alat produksi, atau alat konten.'
+            : 'Use this for freezers, production gear, or content tools.',
+        example:
+          locale === 'id'
+            ? 'Contoh: sewa freezer display 7 hari untuk pop-up'
+            : 'Example: rent a display freezer for a seven-day pop-up',
+        Icon: Snowflake,
+        theme: TYPE_THEMES.tool_rental,
+        highlights:
+          locale === 'id'
+            ? ['Alat', 'Durasi', 'Pickup']
+            : ['Tools', 'Duration', 'Pickup'],
+      },
+      {
+        key: 'business_transfer',
+        href: resolveMarketplaceCreatePath(
+          locale,
+          'business_transfer',
+          'supply',
+        ),
+        badge: locale === 'id' ? 'Oper usaha' : 'Business transfer',
+        title:
+          locale === 'id' ? 'Tawarkan oper usaha' : 'Offer business transfer',
+        description:
+          locale === 'id'
+            ? 'Usaha berjalan, aset, rating, dan handover.'
+            : 'Sell a running business, assets, ratings, and handover.',
+        example:
+          locale === 'id'
+            ? 'Contoh: oper usaha laundry aktif plus SOP'
+            : 'Example: transfer an active laundry business plus SOP',
+        Icon: Handshake,
+        theme: TYPE_THEMES.business_transfer,
+        highlights:
+          locale === 'id'
+            ? ['Omzet', 'Aset', 'Handover']
+            : ['Revenue', 'Assets', 'Handover'],
+      },
+      {
+        key: 'profile',
+        href: '/profile/edit?focus=talent',
+        badge: locale === 'id' ? 'Profil talent' : 'Talent profile',
+        title:
+          locale === 'id'
+            ? 'Tawarkan skill lewat profil'
+            : 'Offer skills via profile',
+        description:
+          locale === 'id'
+            ? 'Kalau Anda menjual skill pribadi, rapikan profil agar mudah dipercaya.'
+            : 'If you want to sell personal skills, polish your user profile.',
+        example:
+          locale === 'id'
+            ? 'Contoh: profil akuntan UMKM freelance'
+            : 'Example: freelance MSME accountant profile',
+        Icon: Users,
+        theme: specialCreateThemes.profile,
+        highlights:
+          locale === 'id'
+            ? ['Headline', 'Skill', 'Rate']
+            : ['Headline', 'Skills', 'Rate'],
+      },
+    ] as const);
   const typeSelectorGrid = (
     <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
       {supplyCreateCards.map(card => {
@@ -4296,35 +4370,35 @@ export function CreatePostingClient({
     helper: string;
     Icon: LucideIcon;
   }> = [
-    {
-      key: 'supply',
-      href: supplyEntryHref,
-      label: locale === 'id' ? 'Tawarkan' : 'Offer',
-      helper:
-        locale === 'id'
-          ? PROMO_ONLY_MODE
-            ? 'Produk dan jasa'
-            : 'Produk, jasa, lokasi'
-          : PROMO_ONLY_MODE
-            ? 'Products and services'
-            : 'Products, services, spaces',
-      Icon: Store,
-    },
-    {
-      key: 'demand',
-      href: demandEntryHref,
-      label: locale === 'id' ? 'Cari kebutuhan' : 'Find what you need',
-      helper:
-        locale === 'id'
-          ? PROMO_ONLY_MODE
-            ? 'Supplier dan jasa'
-            : 'Supplier, jasa, talent'
-          : PROMO_ONLY_MODE
-            ? 'Find suppliers and services'
-            : 'Find suppliers, services, talent',
-      Icon: Target,
-    },
-  ];
+      {
+        key: 'supply',
+        href: supplyEntryHref,
+        label: locale === 'id' ? 'Tawarkan' : 'Offer',
+        helper:
+          locale === 'id'
+            ? PROMO_ONLY_MODE
+              ? 'Produk dan jasa'
+              : 'Produk, jasa, lokasi'
+            : PROMO_ONLY_MODE
+              ? 'Products and services'
+              : 'Products, services, spaces',
+        Icon: Store,
+      },
+      {
+        key: 'demand',
+        href: demandEntryHref,
+        label: locale === 'id' ? 'Cari kebutuhan' : 'Find what you need',
+        helper:
+          locale === 'id'
+            ? PROMO_ONLY_MODE
+              ? 'Supplier dan jasa'
+              : 'Supplier, jasa, talent'
+            : PROMO_ONLY_MODE
+              ? 'Find suppliers and services'
+              : 'Find suppliers, services, talent',
+        Icon: Target,
+      },
+    ];
   const renderCreateEntrySurface = ({
     activeIntent,
     topTitle,
@@ -5023,138 +5097,138 @@ export function CreatePostingClient({
   > =
     locale === 'id'
       ? {
-          product: {
-            step1Title: 'Produk',
-            step1Description: 'Nama, harga, stok, lokasi.',
-            step2Title: 'Spesifikasi',
-            step2Description: 'Varian, kirim, garansi, aturan order.',
-            step3Title: 'Media',
-            step3Description: 'Foto, video, dokumen.',
-          },
-          service: {
-            step1Title: 'Jasa',
-            step1Description: 'Layanan, harga, lokasi, ringkasan.',
-            step2Title: 'Scope',
-            step2Description: 'Output, revisi, kebutuhan klien.',
-            step3Title: 'Portofolio',
-            step3Description: 'Contoh kerja, sertifikat, dokumen.',
-          },
-          job: {
-            step1Title: 'Talent',
-            step1Description: 'Posisi, lokasi, kompensasi, tipe kerja.',
-            step2Title: 'Kriteria',
-            step2Description: 'Skill, tugas, benefit, jadwal.',
-            step3Title: 'Lampiran',
-            step3Description: 'Dokumen atau visual pendukung.',
-          },
-          property: {
-            step1Title: 'Lokasi',
-            step1Description: 'Nama, harga, alamat, tipe.',
-            step2Title: 'Fasilitas',
-            step2Description: 'Ukuran, akses, legalitas, aturan.',
-            step3Title: 'Foto & Maps',
-            step3Description: 'Foto lokasi dan dokumen.',
-          },
-          tool_rental: {
-            step1Title: 'Aset',
-            step1Description: 'Nama alat, tarif, kondisi, pickup.',
-            step2Title: 'Aturan Sewa',
-            step2Description: 'Deposit, durasi, batas pakai.',
-            step3Title: 'Foto Aset',
-            step3Description: 'Foto kondisi dan bukti.',
-          },
-          business_transfer: {
-            step1Title: 'Usaha',
-            step1Description: 'Nama, harga, omzet, alasan ditawarkan.',
-            step2Title: 'Handover',
-            step2Description: 'Aset, akun/rating, biaya, risiko.',
-            step3Title: 'Bukti',
-            step3Description: 'Foto, dokumen, dan checklist.',
-          },
-          company: {
-            step1Title: 'Usaha',
-            step1Description: 'Nama, kategori, logo, sampul.',
-            step2Title: 'Kontak',
-            step2Description: 'Telepon, email, alamat, titik lokasi.',
-            step3Title: 'Verifikasi',
-            step3Description: 'Dokumen legalitas dan foto usaha.',
-          },
-        }
+        product: {
+          step1Title: 'Produk',
+          step1Description: 'Foto utama, nama, harga, stok, lokasi.',
+          step2Title: 'Spesifikasi',
+          step2Description: 'Varian, kirim, garansi, aturan order.',
+          step3Title: 'Lampiran',
+          step3Description: 'Video, catatan, atau dokumen pendukung.',
+        },
+        service: {
+          step1Title: 'Jasa',
+          step1Description: 'Foto utama, layanan, harga, lokasi, ringkasan.',
+          step2Title: 'Scope',
+          step2Description: 'Output, revisi, kebutuhan klien.',
+          step3Title: 'Portofolio & lampiran',
+          step3Description: 'Contoh kerja, sertifikat, atau dokumen pendukung.',
+        },
+        job: {
+          step1Title: 'Talent',
+          step1Description: 'Posisi, lokasi, kompensasi, tipe kerja.',
+          step2Title: 'Kriteria',
+          step2Description: 'Skill, tugas, benefit, jadwal.',
+          step3Title: 'Lampiran',
+          step3Description: 'Dokumen atau visual pendukung.',
+        },
+        property: {
+          step1Title: 'Lokasi',
+          step1Description: 'Foto utama, nama, harga, alamat, tipe.',
+          step2Title: 'Fasilitas',
+          step2Description: 'Ukuran, akses, legalitas, aturan.',
+          step3Title: 'Dokumen',
+          step3Description: 'Dokumen pendukung dan catatan tambahan.',
+        },
+        tool_rental: {
+          step1Title: 'Aset',
+          step1Description: 'Foto utama, nama alat, tarif, kondisi, pickup.',
+          step2Title: 'Aturan Sewa',
+          step2Description: 'Deposit, durasi, batas pakai.',
+          step3Title: 'Lampiran',
+          step3Description: 'Bukti kondisi, dokumen, atau catatan.',
+        },
+        business_transfer: {
+          step1Title: 'Usaha',
+          step1Description: 'Foto utama, nama, harga, omzet, alasan ditawarkan.',
+          step2Title: 'Handover',
+          step2Description: 'Aset, akun/rating, biaya, risiko.',
+          step3Title: 'Bukti',
+          step3Description: 'Dokumen, catatan tambahan, dan checklist.',
+        },
+        company: {
+          step1Title: 'Usaha',
+          step1Description: 'Logo/sampul dulu, lalu nama, kategori, ringkasan.',
+          step2Title: 'Kontak',
+          step2Description: 'Telepon, email, alamat, titik lokasi.',
+          step3Title: 'Verifikasi',
+          step3Description: 'Dokumen legalitas dan catatan publik.',
+        },
+      }
       : {
-          product: {
-            step1Title: 'Product Information',
-            step1Description:
-              'Add product name, summary, price, stock, and location.',
-            step2Title: 'Product Specs',
-            step2Description:
-              'Add variants, delivery, warranty, and order rules.',
-            step3Title: 'Photos, Video, and Documents',
-            step3Description: 'Upload product visuals and supporting files.',
-          },
-          service: {
-            step1Title: 'Service Information',
-            step1Description:
-              'Add service name, starting price, location, and summary.',
-            step2Title: 'Service Details',
-            step2Description:
-              'Complete scope, deliverables, revisions, and client needs.',
-            step3Title: 'Portfolio and Attachments',
-            step3Description:
-              'Add work samples, certificates, or supporting documents.',
-          },
-          job: {
-            step1Title: 'Talent Information',
-            step1Description:
-              'Add role, company, location, compensation, and work type.',
-            step2Title: 'Criteria and Responsibilities',
-            step2Description:
-              'Complete required skills, duties, benefits, and schedule.',
-            step3Title: 'Supporting Attachments',
-            step3Description:
-              'Add documents or visuals that help candidates understand the role.',
-          },
-          property: {
-            step1Title: 'Location Information',
-            step1Description:
-              'Add location name, rent, address, and property type.',
-            step2Title: 'Facilities and Location Details',
-            step2Description:
-              'Complete size, facilities, access, legality, and usage rules.',
-            step3Title: 'Photos and Map',
-            step3Description:
-              'Upload space photos and supporting documents if needed.',
-          },
-          tool_rental: {
-            step1Title: 'Asset Information',
-            step1Description:
-              'Add tool name, rental rate, condition, and pickup location.',
-            step2Title: 'Rental Rules',
-            step2Description:
-              'Complete deposit, duration, usage limits, and complaint rules.',
-            step3Title: 'Asset Photos and Documents',
-            step3Description: 'Add condition photos and supporting proof.',
-          },
-          business_transfer: {
-            step1Title: 'Business Information',
-            step1Description:
-              'Add business name, price, revenue, and reason for sale.',
-            step2Title: 'Handover Details',
-            step2Description:
-              'Complete assets, accounts/ratings, costs, and risks.',
-            step3Title: 'Proof and Documents',
-            step3Description: 'Add photos, documents, and handover checklist.',
-          },
-          company: {
-            step1Title: 'Business Information',
-            step1Description:
-              'Complete business name, category, description, logo, and cover photo.',
-            step2Title: 'Contact and Location',
-            step2Description: 'Add phone, email, full address, and map point.',
-            step3Title: 'Business Verification',
-            step3Description:
-              'Upload legal documents and business photos to increase trust.',
-          },
-        };
+        product: {
+          step1Title: 'Product Information',
+          step1Description:
+            'Start with the main photo, then add name, summary, price, stock, and location.',
+          step2Title: 'Product Specs',
+          step2Description:
+            'Add variants, delivery, warranty, and order rules.',
+          step3Title: 'Attachments',
+          step3Description: 'Add video, notes, or supporting files.',
+        },
+        service: {
+          step1Title: 'Service Information',
+          step1Description:
+            'Start with the main photo, then add service name, starting price, location, and summary.',
+          step2Title: 'Service Details',
+          step2Description:
+            'Complete scope, deliverables, revisions, and client needs.',
+          step3Title: 'Portfolio and Attachments',
+          step3Description:
+            'Add work samples, certificates, or supporting documents.',
+        },
+        job: {
+          step1Title: 'Talent Information',
+          step1Description:
+            'Add role, company, location, compensation, and work type.',
+          step2Title: 'Criteria and Responsibilities',
+          step2Description:
+            'Complete required skills, duties, benefits, and schedule.',
+          step3Title: 'Supporting Attachments',
+          step3Description:
+            'Add documents or visuals that help candidates understand the role.',
+        },
+        property: {
+          step1Title: 'Location Information',
+          step1Description:
+            'Start with the main photo, then add location name, rent, address, and property type.',
+          step2Title: 'Facilities and Location Details',
+          step2Description:
+            'Complete size, facilities, access, legality, and usage rules.',
+          step3Title: 'Documents',
+          step3Description:
+            'Add supporting documents and extra notes if needed.',
+        },
+        tool_rental: {
+          step1Title: 'Asset Information',
+          step1Description:
+            'Start with the main photo, then add tool name, rental rate, condition, and pickup location.',
+          step2Title: 'Rental Rules',
+          step2Description:
+            'Complete deposit, duration, usage limits, and complaint rules.',
+          step3Title: 'Attachments',
+          step3Description: 'Add condition proofs, documents, or extra notes.',
+        },
+        business_transfer: {
+          step1Title: 'Business Information',
+          step1Description:
+            'Start with the main photo, then add business name, price, revenue, and reason for sale.',
+          step2Title: 'Handover Details',
+          step2Description:
+            'Complete assets, accounts/ratings, costs, and risks.',
+          step3Title: 'Proof and Documents',
+          step3Description: 'Add documents, extra photos, and handover checklist.',
+        },
+        company: {
+          step1Title: 'Business Information',
+          step1Description:
+            'Start with the logo or cover photo, then add business name, category, and description.',
+          step2Title: 'Contact and Location',
+          step2Description: 'Add phone, email, full address, and map point.',
+          step3Title: 'Business Verification',
+          step3Description:
+            'Upload legal documents and extra notes to increase trust.',
+        },
+      };
   const stepCopy =
     stepCopyByType[activeType as ListingTypeId] || stepCopyByType.product;
   const stepOneMainTitle = isNeedServiceJourney
@@ -5258,10 +5332,10 @@ export function CreatePostingClient({
     (locale === 'id' ? 'Lokasi belum diisi' : 'Location not set');
   const sideRailPriceLabel = parsedPriceCents
     ? new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US', {
-        style: 'currency',
-        currency: 'IDR',
-        maximumFractionDigits: 0,
-      }).format(parsedPriceCents / 100)
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 0,
+    }).format(parsedPriceCents / 100)
     : locale === 'id'
       ? 'Harga belum diisi'
       : 'Price not set';
@@ -5291,7 +5365,9 @@ export function CreatePostingClient({
     const locationLabel =
       cleanText(fieldValues.location) || cleanText(fieldValues.address);
     const firstVisual =
-      images.find(image => Boolean(image.url || image.preview)) || null;
+      images[0] ||
+      images.find(image => Boolean(image.url || image.preview)) ||
+      null;
     const coverImage = normalizeContentMediaUrl(
       firstVisual?.url || firstVisual?.preview || '',
     );
@@ -5304,10 +5380,10 @@ export function CreatePostingClient({
         : '';
     const priceLabel = parsedPriceCents
       ? new Intl.NumberFormat(localeCode === 'id' ? 'id-ID' : 'en-US', {
-          style: 'currency',
-          currency: 'IDR',
-          maximumFractionDigits: 0,
-        }).format(parsedPriceCents / 100)
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 0,
+      }).format(parsedPriceCents / 100)
       : '';
 
     return {
@@ -5620,7 +5696,7 @@ export function CreatePostingClient({
         if (!res.ok) {
           throw new Error(
             data.error ||
-              (locale === 'id' ? 'Draft tidak ditemukan' : 'Draft not found'),
+            (locale === 'id' ? 'Draft tidak ditemukan' : 'Draft not found'),
           );
         }
         if (user?.id && data.owner_id && data.owner_id !== user.id) {
@@ -5684,8 +5760,8 @@ export function CreatePostingClient({
           ).toLowerCase();
           setPromotionEnabled(
             enabledValue === 'true' ||
-              enabledValue === '1' ||
-              enabledValue === 'yes',
+            enabledValue === '1' ||
+            enabledValue === 'yes',
           );
           Object.entries(promotionMeta).forEach(([key, value]) => {
             if (key === 'enabled') return;
@@ -5708,9 +5784,9 @@ export function CreatePostingClient({
             meta.listing_progress as { current_step?: unknown } | undefined
           )?.current_step === 'number'
             ? Number(
-                (meta.listing_progress as { current_step?: unknown })
-                  .current_step,
-              )
+              (meta.listing_progress as { current_step?: unknown })
+                .current_step,
+            )
             : 1;
 
         const loadedTypeRaw = (
@@ -5815,11 +5891,11 @@ export function CreatePostingClient({
 
   const uploadPendingImages = async (): Promise<string[]> => {
     const pendingIndexes: number[] = [];
-    const formData = new FormData();
+    const pendingFiles: File[] = [];
     images.forEach((img, idx) => {
       if (img.file && !img.url) {
         pendingIndexes.push(idx);
-        formData.append('images', img.file);
+        pendingFiles.push(img.file);
       }
     });
 
@@ -5828,60 +5904,68 @@ export function CreatePostingClient({
     }
 
     setUploadingImages(true);
-    setImages(prev =>
-      prev.map((img, idx) =>
-        pendingIndexes.includes(idx)
-          ? { ...img, uploading: true, error: undefined }
-          : img,
-      ),
-    );
+    try {
+      const optimizedFiles = await prepareUploadFiles(pendingFiles);
+      const formData = new FormData();
+      optimizedFiles.forEach(file => formData.append('images', file));
 
-    const uploadRes = await authFetch('/api/content/upload-images', {
-      method: 'POST',
-      body: formData,
-    });
-    const uploadData = (await uploadRes.json().catch(() => ({}))) as {
-      urls?: string[];
-      error?: string;
-    };
-    if (!uploadRes.ok) {
-      throw new Error(
-        uploadData.error ||
-          (locale === 'id' ? 'Gagal upload gambar' : 'Failed to upload images'),
+      setImages(prev =>
+        prev.map((img, idx) =>
+          pendingIndexes.includes(idx)
+            ? { ...img, uploading: true, error: undefined }
+            : img,
+        ),
       );
-    }
 
-    const uploadedUrls = extractUploadedContentImageUrls(uploadData);
-
-    const next = [...images];
-    pendingIndexes.forEach((idx, order) => {
-      const nextUrl = uploadedUrls[order];
-      const previousPreview = next[idx]?.preview;
-      next[idx] = {
-        ...next[idx],
-        uploading: false,
-        preview: nextUrl || next[idx].preview,
-        url: nextUrl || next[idx].url,
-        persisted: Boolean(nextUrl || next[idx].persisted),
-        error: nextUrl
-          ? undefined
-          : locale === 'id'
-            ? 'Gagal upload'
-            : 'Upload failed',
+      const uploadRes = await authFetch('/api/content/upload-images', {
+        method: 'POST',
+        body: formData,
+      });
+      const uploadData = (await uploadRes.json().catch(() => ({}))) as {
+        urls?: string[];
+        error?: string;
       };
-      if (nextUrl && previousPreview !== nextUrl) {
-        revokePreviewUrl(previousPreview);
+      if (!uploadRes.ok) {
+        throw new Error(
+          uploadData.error ||
+            (locale === 'id' ? 'Gagal upload gambar' : 'Failed to upload images'),
+        );
       }
-    });
-    setImages(next);
-    if (uploadedUrls.length < pendingIndexes.length) {
-      throw new Error(
-        locale === 'id'
-          ? 'Sebagian gambar gagal diupload. Cek format (JPG/PNG/WEBP/GIF) dan ukuran file.'
-          : 'Some images failed to upload. Check file type (JPG/PNG/WEBP/GIF) and size.',
-      );
+
+      const uploadedUrls = extractUploadedContentImageUrls(uploadData);
+
+      const next = [...images];
+      pendingIndexes.forEach((idx, order) => {
+        const nextUrl = uploadedUrls[order];
+        const previousPreview = next[idx]?.preview;
+        next[idx] = {
+          ...next[idx],
+          uploading: false,
+          preview: nextUrl || next[idx].preview,
+          url: nextUrl || next[idx].url,
+          persisted: Boolean(nextUrl || next[idx].persisted),
+          error: nextUrl
+            ? undefined
+            : locale === 'id'
+              ? 'Gagal upload'
+              : 'Upload failed',
+        };
+        if (nextUrl && previousPreview !== nextUrl) {
+          revokePreviewUrl(previousPreview);
+        }
+      });
+      setImages(next);
+      if (uploadedUrls.length < pendingIndexes.length) {
+        throw new Error(
+          locale === 'id'
+            ? 'Sebagian gambar gagal diupload. Cek format (JPG/PNG/WEBP/GIF) dan ukuran file.'
+            : 'Some images failed to upload. Check file type (JPG/PNG/WEBP/GIF) and size.',
+        );
+      }
+      return collectImageUrls(next);
+    } finally {
+      setUploadingImages(false);
     }
-    return collectImageUrls(next);
   };
 
   const uploadPendingDocuments = async (): Promise<
@@ -5934,7 +6018,7 @@ export function CreatePostingClient({
     if (!uploadRes.ok) {
       throw new Error(
         uploadData.error ||
-          (locale === 'id' ? 'Gagal upload dokumen' : 'Failed to upload files'),
+        (locale === 'id' ? 'Gagal upload dokumen' : 'Failed to upload files'),
       );
     }
 
@@ -5976,21 +6060,27 @@ export function CreatePostingClient({
     if (files.length === 0) return;
 
     setErrorMessage('');
-
-    const pendingImages: ImageFile[] = files.map(file => ({
-      id: makeUploadDraftId('image'),
-      file,
-      preview: URL.createObjectURL(file),
-      uploading: true,
-    }));
-    const pendingIds = new Set(pendingImages.map(image => image.id));
-
-    setImages(prev => [...prev, ...pendingImages]);
     setUploadingImages(true);
-
+    let pendingIds = new Set<string>();
     try {
+      const optimizedFiles = await prepareUploadFiles(files);
+
+      const pendingImages: ImageFile[] = optimizedFiles.map(file => ({
+        id: makeUploadDraftId('image'),
+        file,
+        preview: URL.createObjectURL(file),
+        uploading: true,
+      }));
+      pendingIds = new Set(
+        pendingImages
+          .map(image => image.id)
+          .filter((id): id is string => Boolean(id)),
+      );
+
+      setImages(prev => [...prev, ...pendingImages]);
+
       const formData = new FormData();
-      files.forEach(file => formData.append('images', file));
+      optimizedFiles.forEach(file => formData.append('images', file));
 
       const uploadRes = await authFetch('/api/content/upload-images', {
         method: 'POST',
@@ -6004,9 +6094,7 @@ export function CreatePostingClient({
       if (!uploadRes.ok) {
         throw new Error(
           uploadData.error ||
-            (locale === 'id'
-              ? 'Gagal upload gambar'
-              : 'Failed to upload images'),
+            (locale === 'id' ? 'Gagal upload gambar' : 'Failed to upload images'),
         );
       }
 
@@ -6015,9 +6103,10 @@ export function CreatePostingClient({
 
       setImages(prev =>
         prev.map(image => {
-          if (!pendingIds.has(image.id)) return image;
+          const imageId = image.id;
+          if (!imageId || !pendingIds.has(imageId)) return image;
           const order = pendingImages.findIndex(
-            pendingImage => pendingImage.id === image.id,
+            pendingImage => pendingImage.id === imageId,
           );
           const nextUrl = uploadedUrls[order];
           if (!nextUrl) {
@@ -6056,7 +6145,7 @@ export function CreatePostingClient({
 
       setImages(prev =>
         prev.map(image =>
-          pendingIds.has(image.id)
+          image.id && pendingIds.has(image.id)
             ? {
                 ...image,
                 uploading: false,
@@ -6159,9 +6248,9 @@ export function CreatePostingClient({
           goToStep(4, { draftId: workingId, typeId: activeType });
           setErrorMessage(
             promotionSnapshot?.financialMessage ||
-              (locale === 'id'
-                ? 'Benefit promonya kebesaran buat buffer margin yang ada.'
-                : 'The promotion benefit is too large for the available margin buffer.'),
+            (locale === 'id'
+              ? 'Benefit promonya kebesaran buat buffer margin yang ada.'
+              : 'The promotion benefit is too large for the available margin buffer.'),
           );
           return null;
         }
@@ -6187,12 +6276,12 @@ export function CreatePostingClient({
       const fallbackCopy =
         isSimpleModeActive && (!summaryValue || !bodyValue)
           ? buildSimpleModeFallbackCopy({
-              title,
-              locale,
-              listingSide,
-              price: priceStr,
-              location: fieldValues.location,
-            })
+            title,
+            locale,
+            listingSide,
+            price: priceStr,
+            location: fieldValues.location,
+          })
           : null;
       const resolvedSummary = summaryValue || fallbackCopy?.summary;
       const resolvedBody = bodyValue || fallbackCopy?.body;
@@ -6351,8 +6440,8 @@ export function CreatePostingClient({
       const mediaCompletion = uploadedImageUrls.length > 0 ? 0.1 : 0;
       const promotionCompletion = promotionEnabled
         ? (promotionRequiredDone /
-            Math.max(promotionRequiredFields.length, 1)) *
-          0.2
+          Math.max(promotionRequiredFields.length, 1)) *
+        0.2
         : 0;
       metadata.listing_progress = {
         current_step: persistStep,
@@ -6361,7 +6450,7 @@ export function CreatePostingClient({
           100,
           Math.round(
             (coreCompletion * 0.7 + mediaCompletion + promotionCompletion) *
-              100,
+            100,
           ),
         ),
         updated_at: new Date().toISOString(),
@@ -6370,10 +6459,10 @@ export function CreatePostingClient({
 
       const derivedPromotionFields = promotionEnabled
         ? derivePromotionTopLevelFields({
-            promotionLike: metadata.promotion,
-            priceCents,
-            locale: localeCode,
-          })
+          promotionLike: metadata.promotion,
+          priceCents,
+          locale: localeCode,
+        })
         : {};
 
       const endpoint = workingId
@@ -6425,9 +6514,9 @@ export function CreatePostingClient({
         if (status === 'active' && savedId) {
           setInfoMessage(
             options?.successMessage ||
-              (locale === 'id'
-                ? 'Listing sudah aktif. Share Pack dan channel distribusi siap dipakai.'
-                : 'The listing is now active. Share Pack and distribution channels are ready.'),
+            (locale === 'id'
+              ? 'Listing sudah aktif. Share Pack dan channel distribusi siap dipakai.'
+              : 'The listing is now active. Share Pack and distribution channels are ready.'),
           );
           if (options?.redirectOnSuccess) {
             router.push(
@@ -6449,9 +6538,9 @@ export function CreatePostingClient({
           if (status !== 'active') {
             setInfoMessage(
               options?.successMessage ||
-                (locale === 'id'
-                  ? 'Draft berhasil disimpan. Bisa dilanjutkan kapan saja.'
-                  : 'Draft saved successfully. You can continue anytime.'),
+              (locale === 'id'
+                ? 'Draft berhasil disimpan. Bisa dilanjutkan kapan saja.'
+                : 'Draft saved successfully. You can continue anytime.'),
             );
           }
         }
@@ -6463,10 +6552,10 @@ export function CreatePostingClient({
             : undefined;
         throw new Error(
           issuesMessage ||
-            data.error ||
-            (locale === 'id'
-              ? 'Gagal menyimpan postingan'
-              : 'Failed to save posting'),
+          data.error ||
+          (locale === 'id'
+            ? 'Gagal menyimpan postingan'
+            : 'Failed to save posting'),
         );
       }
     } catch (error) {
@@ -6519,48 +6608,6 @@ export function CreatePostingClient({
         return;
       }
       setErrorMessage('');
-      if (isSimpleModeActive) {
-        const canPublishFromCurrentStep =
-          !promotionEnabled && (!needsPrimaryImage || currentStep >= 3);
-
-        if (canPublishFromCurrentStep) {
-          await saveListing('active', {
-            persistStep: currentStep,
-            redirectOnSuccess: true,
-            successMessage:
-              locale === 'id'
-                ? 'Postingan kamu sudah tayang.'
-                : 'Quick listing is now live.',
-          });
-          return;
-        }
-
-        const fastNextStep =
-          needsPrimaryImage && currentStep < 3
-            ? 3
-            : promotionEnabled
-              ? TOTAL_STEPS
-              : null;
-
-        if (fastNextStep && fastNextStep !== currentStep) {
-          const savedId = await saveListing('draft', {
-            persistStep: fastNextStep,
-            silentSuccess: true,
-          });
-          if (savedId) {
-            setInfoMessage(
-              locale === 'id'
-                ? fastNextStep === 3
-                  ? 'Inti tersimpan. Tambah 1 gambar lalu tayangkan.'
-                  : 'Inti tersimpan. Promo bisa diatur kalau memang perlu.'
-                : fastNextStep === 3
-                  ? 'Essentials saved. Add 1 image, then publish.'
-                  : 'Essentials saved. Configure promotion only if you need it.',
-            );
-          }
-          return;
-        }
-      }
       const nextStep = clampStep(currentStep + 1);
       const savedId = await saveListing('draft', {
         persistStep: nextStep,
@@ -6642,9 +6689,9 @@ export function CreatePostingClient({
       if (!uploadRes.ok) {
         throw new Error(
           uploadData.error ||
-            (locale === 'id'
-              ? 'Gagal upload dokumen'
-              : 'Failed to upload files'),
+          (locale === 'id'
+            ? 'Gagal upload dokumen'
+            : 'Failed to upload files'),
         );
       }
 
@@ -6707,10 +6754,10 @@ export function CreatePostingClient({
         prev.map(doc =>
           pendingIds.has(doc.id)
             ? {
-                ...doc,
-                uploading: false,
-                error: message,
-              }
+              ...doc,
+              uploading: false,
+              error: message,
+            }
             : doc,
         ),
       );
@@ -6733,11 +6780,11 @@ export function CreatePostingClient({
     const placeholder =
       locale === 'id'
         ? sideOverride?.placeholderId ||
-          override?.placeholderId ||
-          f.placeholderId
+        override?.placeholderId ||
+        f.placeholderId
         : sideOverride?.placeholderEn ||
-          override?.placeholderEn ||
-          f.placeholderEn;
+        override?.placeholderEn ||
+        f.placeholderEn;
     const hint =
       locale === 'id'
         ? sideOverride?.hintId || override?.hintId || f.hintId
@@ -7079,7 +7126,7 @@ export function CreatePostingClient({
                 </p>
               </div>
               <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
-                {locale === 'id' ? 'Mode cepat' : 'Quick mode'}
+                {locale === 'id' ? 'Mode ringkas' : 'Compact mode'}
               </span>
             </div>
           </div>
@@ -7109,15 +7156,15 @@ export function CreatePostingClient({
             <div className="mt-2 grid gap-2">
               {(locale === 'id'
                 ? [
-                    'Pilih Tawarkan atau Cari',
-                    'Isi detail yang wajib',
-                    'Tayang, lalu lanjut chat',
-                  ]
+                  'Pilih Tawarkan atau Cari',
+                  'Isi detail yang wajib',
+                  'Tayang, lalu lanjut chat',
+                ]
                 : [
-                    'Choose Sell or Need',
-                    'Fill required details',
-                    'Publish, then continue in chat',
-                  ]
+                  'Choose Sell or Need',
+                  'Fill required details',
+                  'Publish, then continue in chat',
+                ]
               ).map((item, index) => (
                 <span
                   key={item}
@@ -7255,10 +7302,10 @@ export function CreatePostingClient({
             <div className="mt-2 grid gap-1.5">
               {(locale === 'id'
                 ? [
-                    'Tulis kebutuhan jelas',
-                    'Cantumkan area',
-                    'Kasih kisaran budget',
-                  ]
+                  'Tulis kebutuhan jelas',
+                  'Cantumkan area',
+                  'Kasih kisaran budget',
+                ]
                 : ['Write a clear need', 'Add location', 'Add budget range']
               ).map(item => (
                 <span
@@ -7325,10 +7372,10 @@ export function CreatePostingClient({
             <div className="mt-2 grid gap-1.5">
               {(locale === 'id'
                 ? [
-                    'Judul langsung jelas',
-                    'Harga atau range ada',
-                    'Foto utama siap',
-                  ]
+                  'Judul langsung jelas',
+                  'Harga atau range ada',
+                  'Foto utama siap',
+                ]
                 : ['Clear title', 'Price or range added', 'Cover photo ready']
               ).map(item => (
                 <span
@@ -7347,12 +7394,7 @@ export function CreatePostingClient({
   }
 
   const primaryActionWillAdvance =
-    currentStep < TOTAL_STEPS &&
-    !(
-      isSimpleModeActive &&
-      !promotionEnabled &&
-      (!requiresPrimaryImageForType(activeType) || currentStep >= 3)
-    );
+    currentStep < TOTAL_STEPS;
   const nextStepLabel =
     stepLabels[Math.min(currentStep, TOTAL_STEPS - 1)] ||
     (locale === 'id' ? 'Berikutnya' : 'Next');
@@ -7493,8 +7535,8 @@ export function CreatePostingClient({
                         </p>
                         <p className="truncate text-xs font-medium text-[color:var(--app-text)]">
                           {locale === 'id'
-                            ? 'Pilih cepat, detail bisa diedit nanti.'
-                            : 'Pick quickly. Details can be edited later.'}
+                            ? 'Pilih ringkas kalau mau isi inti dulu. Detail bisa ditambah nanti.'
+                            : 'Pick compact if you want to fill the core info first. Add detail later.'}
                         </p>
                       </div>
                       <span className="inline-flex max-w-[54vw] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
@@ -7511,11 +7553,10 @@ export function CreatePostingClient({
                           setListingSide('demand');
                           syncCreateRoute({ sideId: 'demand' });
                         }}
-                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                          listingSide === 'demand'
+                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${listingSide === 'demand'
                             ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-warning-border)_70%,transparent)]'
                             : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
-                        }`}
+                          }`}
                       >
                         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
                           {listingSide === 'demand' ? (
@@ -7539,11 +7580,10 @@ export function CreatePostingClient({
                           setListingSide('supply');
                           syncCreateRoute({ sideId: 'supply' });
                         }}
-                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                          listingSide === 'supply'
+                        className={`inline-flex min-h-[46px] items-center gap-2 rounded-[14px] border px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${listingSide === 'supply'
                             ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-accent-border)_70%,transparent)]'
                             : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:border-[color:var(--app-border)]'
-                        }`}
+                          }`}
                       >
                         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/15 bg-[color:var(--app-surface-strong)]">
                           {listingSide === 'supply' ? (
@@ -7680,7 +7720,7 @@ export function CreatePostingClient({
                 title={stepOneMainTitle}
                 description={stepOneMainDescription}
                 aside={
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-col items-end gap-1">
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
                       {isSimpleModeActive
                         ? locale === 'id'
@@ -7690,14 +7730,16 @@ export function CreatePostingClient({
                           ? `${requiredDone}/${requiredFields.length} wajib`
                           : `${requiredDone}/${requiredFields.length} required`}
                     </span>
-                    {!isSimpleModeActive && supportsSimpleMode ? (
-                      <button
-                        type="button"
-                        onClick={() => setListingMode('simple')}
-                        className="inline-flex min-h-7 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]"
-                      >
-                        {locale === 'id' ? 'Ringkas' : 'Simplify'}
-                      </button>
+                    {supportsSimpleMode ? (
+                      <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-black text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+                        {isSimpleModeActive
+                          ? locale === 'id'
+                            ? 'Mode cepat'
+                            : 'Quick mode'
+                          : locale === 'id'
+                            ? 'Mode lengkap'
+                            : 'Full mode'}
+                      </span>
                     ) : null}
                   </div>
                 }
@@ -7711,6 +7753,7 @@ export function CreatePostingClient({
                 )}
                 {typePicked && (
                   <>
+                    {renderMediaUploadPanel()}
                     <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
                       {step1PrimaryFields.map(renderFieldBlock)}
                     </div>
@@ -7777,9 +7820,9 @@ export function CreatePostingClient({
                       <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[11px] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
                         {locale === 'id'
                           ? demandTypeMeta?.step2HintId ||
-                            typeConfig.step2HintId
+                          typeConfig.step2HintId
                           : demandTypeMeta?.step2HintEn ||
-                            typeConfig.step2HintEn}
+                          typeConfig.step2HintEn}
                       </div>
                     ) : null}
                     {step2Fields.length === 0 ? (
@@ -7842,27 +7885,20 @@ export function CreatePostingClient({
                   </span>
                 }
               >
-                {showImages && (
-                  <div>
-                    <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <ImageIcon className="w-3.5 h-3.5 text-[color:var(--app-text-soft)]" />
-                        <span>
-                          {locale === 'id' ? 'Foto' : 'Images'}{' '}
-                          {images.length > 0 && `(${images.length})`}
-                        </span>
-                      </span>
-                    </label>
-                    <ImageUpload
-                      images={images}
-                      onChange={setImages}
-                      onAddFiles={handleAddImages}
-                      maxImages={10}
-                      maxSizeMB={25}
-                      locale={locale}
-                    />
+                {showImages ? (
+                  <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 text-xs text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+                    <p className="font-semibold">
+                      {locale === 'id'
+                        ? 'Foto utama sudah dipasang di step 1.'
+                        : 'The main photo is already handled in step 1.'}
+                    </p>
+                    <p className="mt-1 leading-5">
+                      {locale === 'id'
+                        ? 'Di sini tinggal tambah dokumen pendukung, kalau memang ada.'
+                        : 'Use this step for supporting documents if needed.'}
+                    </p>
                   </div>
-                )}
+                ) : null}
 
                 <div>
                   <label className="block text-xs font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mb-1.5">
@@ -7987,11 +8023,10 @@ export function CreatePostingClient({
                       setPromotionEnabled(true);
                       setErrorMessage('');
                     }}
-                    className={`px-3 py-1 rounded-md transition ${
-                      promotionEnabled
+                    className={`px-3 py-1 rounded-md transition ${promotionEnabled
                         ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                         : 'text-[color:var(--app-text)]'
-                    }`}
+                      }`}
                   >
                     <span className="inline-flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
@@ -8004,11 +8039,10 @@ export function CreatePostingClient({
                       setPromotionEnabled(false);
                       setErrorMessage('');
                     }}
-                    className={`px-3 py-1 rounded-md transition ${
-                      !promotionEnabled
+                    className={`px-3 py-1 rounded-md transition ${!promotionEnabled
                         ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
                         : 'text-[color:var(--app-text)]'
-                    }`}
+                      }`}
                   >
                     <span className="inline-flex items-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5" />
@@ -8093,20 +8127,18 @@ export function CreatePostingClient({
                               });
                               setErrorMessage('');
                             }}
-                            className={`rounded-2xl border p-3 text-left transition-all ${
-                              selected
+                            className={`rounded-2xl border p-3 text-left transition-all ${selected
                                 ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] shadow-sm'
                                 : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)]'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2">
                                 <span
-                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${
-                                    selected
+                                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${selected
                                       ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                                       : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                                  }`}
+                                    }`}
                                 >
                                   <CardIcon className="h-4 w-4" />
                                 </span>
@@ -8146,12 +8178,11 @@ export function CreatePostingClient({
                             updateField('promo_offer_type', 'none');
                             setErrorMessage('');
                           }}
-                          className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
-                            !selectedPromotionOfferType &&
-                            cleanText(fieldValues.promo_offer_type) === 'none'
+                          className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${!selectedPromotionOfferType &&
+                              cleanText(fieldValues.promo_offer_type) === 'none'
                               ? 'border-[color:var(--app-text)] bg-[color:var(--app-text)] text-[color:var(--app-text-inverse)]'
                               : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
-                          }`}
+                            }`}
                         >
                           {getPromotionOfferLabel('none')}
                         </button>
@@ -8166,11 +8197,10 @@ export function CreatePostingClient({
                                 updateField('promo_offer_type', offerType);
                                 setErrorMessage('');
                               }}
-                              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
-                                selected
+                              className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${selected
                                   ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                                   : 'border-[color:var(--app-border)] text-[color:var(--app-text)]'
-                              }`}
+                                }`}
                             >
                               {getPromotionOfferLabel(offerType)}
                             </button>
@@ -8197,15 +8227,14 @@ export function CreatePostingClient({
                           </p>
                         </div>
                         <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
-                            promotionSnapshot?.status === 'safe'
+                          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold ${promotionSnapshot?.status === 'safe'
                               ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                               : promotionSnapshot?.status === 'watch'
                                 ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
                                 : promotionSnapshot?.status === 'unsafe'
                                   ? 'border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
                                   : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
-                          }`}
+                            }`}
                         >
                           {promotionSnapshot?.status === 'safe'
                             ? locale === 'id'
@@ -8248,15 +8277,15 @@ export function CreatePostingClient({
                           <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
                             {promotionSnapshot?.estimatedBenefitCents
                               ? new Intl.NumberFormat(
-                                  locale === 'id' ? 'id-ID' : 'en-US',
-                                  {
-                                    style: 'currency',
-                                    currency: 'IDR',
-                                    maximumFractionDigits: 0,
-                                  },
-                                ).format(
-                                  promotionSnapshot.estimatedBenefitCents / 100,
-                                )
+                                locale === 'id' ? 'id-ID' : 'en-US',
+                                {
+                                  style: 'currency',
+                                  currency: 'IDR',
+                                  maximumFractionDigits: 0,
+                                },
+                              ).format(
+                                promotionSnapshot.estimatedBenefitCents / 100,
+                              )
                               : locale === 'id'
                                 ? 'Datanya belum cukup'
                                 : 'Not enough data'}
@@ -8271,13 +8300,13 @@ export function CreatePostingClient({
                           <div className="mt-1 text-sm font-semibold text-[color:var(--app-text)]">
                             {promotionSnapshot?.safeCapCents
                               ? new Intl.NumberFormat(
-                                  locale === 'id' ? 'id-ID' : 'en-US',
-                                  {
-                                    style: 'currency',
-                                    currency: 'IDR',
-                                    maximumFractionDigits: 0,
-                                  },
-                                ).format(promotionSnapshot.safeCapCents / 100)
+                                locale === 'id' ? 'id-ID' : 'en-US',
+                                {
+                                  style: 'currency',
+                                  currency: 'IDR',
+                                  maximumFractionDigits: 0,
+                                },
+                              ).format(promotionSnapshot.safeCapCents / 100)
                               : locale === 'id'
                                 ? 'Isi harga + margin dulu'
                                 : 'Add price + margin'}
@@ -8486,9 +8515,9 @@ export function CreatePostingClient({
                       onClick={() =>
                         !item.done
                           ? goToStep(Math.min(index + 1, TOTAL_STEPS), {
-                              draftId: workingId,
-                              typeId: activeType,
-                            })
+                            draftId: workingId,
+                            typeId: activeType,
+                          })
                           : undefined
                       }
                       className="flex w-full items-start gap-2 rounded-[10px] px-1 py-1 text-left"
@@ -8512,7 +8541,7 @@ export function CreatePostingClient({
               <div className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.18)] dark:border-slate-800/75 dark:bg-[color:var(--app-surface-strong)]">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-[13px] font-black text-[color:var(--app-text)]">
-                    {locale === 'id' ? 'Ringkasan' : 'Summary'}
+                    {locale === 'id' ? 'Ikhtisar' : 'Summary'}
                   </p>
                   <button
                     type="button"

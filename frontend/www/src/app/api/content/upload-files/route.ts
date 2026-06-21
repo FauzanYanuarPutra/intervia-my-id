@@ -6,12 +6,12 @@ import {
   uploadErrorResponse,
   uploadSuccessResponse,
 } from '@/lib/server/uploadFiles';
+import { DOCUMENT_UPLOAD_MAX_BYTES } from '@/lib/media/uploadStandard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const MAX_FILE_BYTES = 80 * 1024 * 1024;
 const MAX_FILES = 10;
 const DOCUMENT_KEYS = [
   'files',
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       accept: 'document',
       concurrency: 3,
       folder: 'content',
-      maxBytes: MAX_FILE_BYTES,
+      maxBytes: DOCUMENT_UPLOAD_MAX_BYTES,
       minioTarget: 'content',
       minioTimeoutMs: 2600,
     });

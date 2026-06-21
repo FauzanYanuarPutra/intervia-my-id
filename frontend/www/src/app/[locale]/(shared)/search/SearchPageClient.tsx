@@ -4,9 +4,11 @@ import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
 import { Link, useRouter } from '@/i18n/navigation';
 import { Modal } from '@/components/common/Modal';
 import { AuthCtaLink } from '@/components/home/AuthCtaLink';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import { SearchUmkmPreview, type UmkmPreviewStore } from './SearchUmkmPreview';
 import {
@@ -16,6 +18,7 @@ import {
   BookmarkPlus,
   Briefcase,
   ChevronLeft,
+  ChevronRight,
   Clock3,
   Eye,
   Filter,
@@ -61,7 +64,10 @@ import {
   formatPriceWithUnit,
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
-import { buildPublicProfileHrefFromContent } from '@/lib/profile/publicProfileLink';
+import {
+  buildPublicProfileHref,
+  buildPublicProfileHrefFromContent,
+} from '@/lib/profile/publicProfileLink';
 import {
   getListingSideContextLabel,
   getListingSideLabel,
@@ -121,6 +127,45 @@ type SearchCard = {
   productId?: string | null;
 };
 
+type DiscoverUser = {
+  id: string;
+  email?: string | null;
+  phone?: string | null;
+  username?: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  avatar_style?: unknown;
+  metadata?: unknown;
+  location?: string | null;
+  bio?: string | null;
+  headline?: string | null;
+  roles?: string[] | null;
+  metadata_roles?: unknown;
+  level?: string | null;
+  rating?: number | null;
+  completed_jobs?: number | null;
+  hourly_rate?: number | null;
+  freelancer_profile?: unknown;
+  provider_profile?: unknown;
+  buyer_profile?: unknown;
+  created_at?: string | null;
+};
+
+type SearchProfileCard = {
+  id: string;
+  href: string;
+  name: string;
+  handle: string;
+  headline: string;
+  location: string;
+  avatarUrl: string;
+  verified: boolean;
+  roleLabel: string;
+  ratingLabel: string | null;
+  roles: string[];
+  createdAt: number;
+};
+
 const PAGE_SIZE = 12;
 const FALLBACK_CITIES = [
   'Jakarta',
@@ -137,31 +182,31 @@ const TYPE_OPTIONS: Array<{
   labelEn: string;
   icon: LucideIcon;
 }> = [
-  { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
-  { value: 'product', labelId: 'Supplier', labelEn: 'Supplier', icon: Store },
-  { value: 'service', labelId: 'Jasa', labelEn: 'Services', icon: Wrench },
-  { value: 'property', labelId: 'Lokasi', labelEn: 'Locations', icon: MapPin },
-  {
-    value: 'freelancer',
-    labelId: 'Talent',
-    labelEn: 'Talent',
-    icon: UserRound,
-  },
-  { value: 'job', labelId: 'Loker', labelEn: 'Jobs', icon: Briefcase },
-  {
-    value: 'tool_rental',
-    labelId: 'Sewa',
-    labelEn: 'Rentals',
-    icon: ShieldCheck,
-  },
-  {
-    value: 'business_transfer',
-    labelId: 'Oper Usaha',
-    labelEn: 'Business Transfer',
-    icon: Handshake,
-  },
-  { value: 'umkm', labelId: 'Usaha', labelEn: 'Business', icon: Store },
-];
+    { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
+    { value: 'product', labelId: 'Supplier', labelEn: 'Supplier', icon: Store },
+    { value: 'service', labelId: 'Jasa', labelEn: 'Services', icon: Wrench },
+    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations', icon: MapPin },
+    {
+      value: 'freelancer',
+      labelId: 'Talent',
+      labelEn: 'Talent',
+      icon: UserRound,
+    },
+    { value: 'job', labelId: 'Loker', labelEn: 'Jobs', icon: Briefcase },
+    {
+      value: 'tool_rental',
+      labelId: 'Sewa',
+      labelEn: 'Rentals',
+      icon: ShieldCheck,
+    },
+    {
+      value: 'business_transfer',
+      labelId: 'Oper Usaha',
+      labelEn: 'Business Transfer',
+      icon: Handshake,
+    },
+    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business', icon: Store },
+  ];
 
 const SEARCH_FILTER_TABS: Array<{
   value: SearchFilterTabKey;
@@ -169,41 +214,41 @@ const SEARCH_FILTER_TABS: Array<{
   labelEn: string;
   icon: LucideIcon;
 }> = [
-  { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
-  { value: 'product', labelId: 'Supplier', labelEn: 'Supplier', icon: Store },
-  {
-    value: 'used_goods',
-    labelId: 'Barang Bekas',
-    labelEn: 'Used Goods',
-    icon: Package,
-  },
-  { value: 'service', labelId: 'Jasa', labelEn: 'Services', icon: Wrench },
-  { value: 'property', labelId: 'Lokasi', labelEn: 'Locations', icon: MapPin },
-  {
-    value: 'business_transfer',
-    labelId: 'Oper Usaha',
-    labelEn: 'Business Transfer',
-    icon: Handshake,
-  },
-  {
-    value: 'freelancer',
-    labelId: 'Talent',
-    labelEn: 'Talent',
-    icon: UserRound,
-  },
-  { value: 'umkm', labelId: 'Usaha', labelEn: 'Business', icon: Store },
-];
+    { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
+    { value: 'product', labelId: 'Supplier', labelEn: 'Supplier', icon: Store },
+    {
+      value: 'used_goods',
+      labelId: 'Barang Bekas',
+      labelEn: 'Used Goods',
+      icon: Package,
+    },
+    { value: 'service', labelId: 'Jasa', labelEn: 'Services', icon: Wrench },
+    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations', icon: MapPin },
+    {
+      value: 'business_transfer',
+      labelId: 'Oper Usaha',
+      labelEn: 'Business Transfer',
+      icon: Handshake,
+    },
+    {
+      value: 'freelancer',
+      labelId: 'Talent',
+      labelEn: 'Talent',
+      icon: UserRound,
+    },
+    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business', icon: Store },
+  ];
 
 const SORT_OPTIONS: Array<{
   value: SortKey;
   labelId: string;
   labelEn: string;
 }> = [
-  { value: 'relevance', labelId: 'Paling relevan', labelEn: 'Most relevant' },
-  { value: 'newest', labelId: 'Terbaru', labelEn: 'Newest' },
-  { value: 'price_low', labelId: 'Kisaran rendah', labelEn: 'Lower range' },
-  { value: 'price_high', labelId: 'Kisaran tinggi', labelEn: 'Higher range' },
-];
+    { value: 'relevance', labelId: 'Paling relevan', labelEn: 'Most relevant' },
+    { value: 'newest', labelId: 'Terbaru', labelEn: 'Newest' },
+    { value: 'price_low', labelId: 'Kisaran rendah', labelEn: 'Lower range' },
+    { value: 'price_high', labelId: 'Kisaran tinggi', labelEn: 'Higher range' },
+  ];
 
 type CategoryVisual = {
   icon: LucideIcon;
@@ -424,28 +469,28 @@ const CATEGORY_VISUALS: Record<SearchVisualKey, CategoryVisual> = {
 };
 
 const SIMPLE_SEARCH_VISUAL: Omit<CategoryVisual, 'icon' | 'hintId' | 'hintEn'> =
-  {
-    cardClass:
-      'border-[color:var(--app-border)] bg-white dark:bg-[color:var(--app-surface-strong)]',
-    imageClass:
-      'bg-[linear-gradient(145deg,#f8fafc,#ffffff)] dark:bg-[color:var(--app-surface)]',
-    iconBubbleClass:
-      'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]',
-    activeFilterClass:
-      'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
-    inactiveFilterClass:
-      'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]',
-    chipClass:
-      'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] border-[color:var(--app-border)]',
-    ribbonClass: 'bg-slate-950/76 text-white',
-    priceClass: 'text-[color:var(--app-accent)]',
-    outlineButtonClass:
-      'border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]',
-    solidButtonClass:
-      'bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-20px_rgba(22,163,74,0.48)]',
-    sidePanelClass:
-      'bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] dark:bg-[color:var(--app-surface)]',
-  };
+{
+  cardClass:
+    'border-[color:var(--app-border)] bg-white dark:bg-[color:var(--app-surface-strong)]',
+  imageClass:
+    'bg-[linear-gradient(145deg,#f8fafc,#ffffff)] dark:bg-[color:var(--app-surface)]',
+  iconBubbleClass:
+    'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]',
+  activeFilterClass:
+    'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+  inactiveFilterClass:
+    'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-strong)]',
+  chipClass:
+    'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] border-[color:var(--app-border)]',
+  ribbonClass: 'bg-slate-950/76 text-white',
+  priceClass: 'text-[color:var(--app-accent)]',
+  outlineButtonClass:
+    'border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]',
+  solidButtonClass:
+    'bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] text-[color:var(--app-text-inverse)] shadow-[0_14px_26px_-20px_rgba(22,163,74,0.48)]',
+  sidePanelClass:
+    'bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] dark:bg-[color:var(--app-surface)]',
+};
 
 function getCategoryVisual(typeKey: SearchVisualKey): CategoryVisual {
   const current = CATEGORY_VISUALS[typeKey] || CATEGORY_VISUALS.other;
@@ -842,6 +887,85 @@ function mapContentItem(
   };
 }
 
+function toTextList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map(entry => asString(entry))
+      .filter((entry): entry is string => Boolean(entry));
+  }
+
+  const raw = asString(value);
+  if (!raw) return [];
+
+  return raw
+    .split(/[\n,;|]/g)
+    .map(entry => entry.trim())
+    .filter(Boolean);
+}
+
+function formatRoleLabel(value: string): string {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, token => token.toUpperCase());
+}
+
+function normalizeDiscoverUser(
+  user: DiscoverUser,
+  locale: 'id' | 'en',
+): SearchProfileCard | null {
+  const id = String(user.id || '').trim();
+  if (!id) return null;
+
+  const name =
+    user.full_name ||
+    user.username ||
+    user.email ||
+    (locale === 'id' ? 'Akun aktif' : 'Active account');
+  const handle = user.username ? `@${user.username}` : '';
+  const roles = [
+    ...toTextList(user.roles),
+    ...toTextList(user.metadata_roles),
+  ];
+  const headline =
+    user.headline || user.bio || roles.slice(0, 2).join(' · ') ||
+    (locale === 'id'
+      ? 'Sudah register di Lajukan dan bisa dibuka profilnya.'
+      : 'Registered on Lajukan and ready to open as a profile.');
+  const location = user.location || (locale === 'id' ? 'Indonesia' : 'Indonesia');
+  const profileHref = buildPublicProfileHref({
+    id,
+    username: user.username || undefined,
+    full_name: user.full_name || name,
+    title: name,
+  });
+  const avatarUrl = profileAvatarSrc(
+    user.avatar_url,
+    readProfileAvatarStyle(user),
+    name,
+  );
+  const roleLabel =
+    roles[0] || (locale === 'id' ? 'Profil aktif' : 'Active profile');
+  const ratingLabel =
+    typeof user.rating === 'number' && Number.isFinite(user.rating)
+      ? `${user.rating.toFixed(1)}★`
+      : null;
+
+  return {
+    id,
+    href: profileHref,
+    name,
+    handle,
+    headline,
+    location,
+    avatarUrl,
+    verified: false,
+    roleLabel: formatRoleLabel(roleLabel),
+    ratingLabel,
+    roles,
+    createdAt: Date.parse(String(user.created_at || '')) || 0,
+  };
+}
+
 function searchCartKindFromCard(item: SearchCard): SearchCartItemKind {
   if (item.typeKey === 'product') return 'product';
   if (item.typeKey === 'service') return 'service';
@@ -984,11 +1108,29 @@ function SearchFilterTabs({
   className?: string;
 }) {
   const isId = locale === 'id';
+  const {
+    ref: railRef,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerLeave,
+    onPointerMove,
+    onPointerUp,
+    onWheel,
+  } = useHorizontalDragScroll<HTMLDivElement>();
 
   return (
     <div
+      ref={railRef}
+      onClickCapture={onClickCapture}
+      onPointerCancel={onPointerCancel}
+      onPointerDown={onPointerDown}
+      onPointerLeave={onPointerLeave}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onWheel={onWheel}
       className={cn(
-        'flex max-w-full gap-2 overflow-x-auto pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        'flex max-w-full gap-2 overflow-x-auto pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing',
         className,
       )}
       role="tablist"
@@ -1380,6 +1522,180 @@ function SearchResultListingCard({
   );
 }
 
+function SearchResultProfileCard({
+  item,
+  locale,
+}: {
+  item: SearchProfileCard;
+  locale: 'id' | 'en';
+}) {
+  const isId = locale === 'id';
+  const activeLabel = isId ? 'Profil aktif' : 'Active profile';
+
+  return (
+    <article
+      data-testid="search-profile-card"
+      className="group/card overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.98)_100%)] shadow-[0_18px_38px_-30px_rgba(15,23,42,0.2)] ring-1 ring-white/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_58px_-40px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98)_0%,rgba(2,6,23,0.96)_100%)]"
+    >
+      <div className="flex min-w-0 gap-3 p-3 sm:p-4">
+        <Link
+          href={item.href}
+          className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[20px] ring-1 ring-black/5 transition group-hover/card:scale-[1.01] sm:h-18 sm:w-18"
+          aria-label={isId ? 'Buka profil' : 'Open profile'}
+        >
+          {item.avatarUrl ? (
+            <Image
+              src={item.avatarUrl}
+              alt={item.name}
+              fill
+              sizes="72px"
+              className="object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <UserRound className="h-7 w-7" />
+            </div>
+          )}
+        </Link>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+              <UserRound className="h-3 w-3" />
+              {activeLabel}
+            </span>
+            {item.ratingLabel ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+                <BadgeCheck className="h-3 w-3" />
+                {item.ratingLabel}
+              </span>
+            ) : null}
+          </div>
+
+          <Link href={item.href} className="group mt-1 block">
+            <h3 className="line-clamp-1 text-[0.96rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.05rem]">
+              {item.name}
+            </h3>
+          </Link>
+
+          {item.handle ? (
+            <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+              {item.handle}
+            </p>
+          ) : null}
+
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
+            {item.headline}
+          </p>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5" />
+              {item.location}
+            </span>
+            {item.roles.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5">
+                <UserRound className="h-3.5 w-3.5" />
+                {item.roles.slice(0, 2).join(' · ')}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3 py-2.5 sm:px-4">
+        <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+          {isId
+            ? 'Sudah register dan bisa dibuka profilnya'
+            : 'Registered and searchable'}
+        </p>
+        <Link
+          href={item.href}
+          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold text-[color:var(--app-accent)] transition hover:-translate-y-0.5"
+        >
+          {isId ? 'Buka profil' : 'Open profile'}
+          <ChevronRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function SearchProfileResultsSection({
+  locale,
+  activeTab,
+  profiles,
+  loading,
+  error,
+}: {
+  locale: 'id' | 'en';
+  activeTab: SearchFilterTabKey;
+  profiles: SearchProfileCard[];
+  loading: boolean;
+  error: string | null;
+}) {
+  const isId = locale === 'id';
+  const shouldRender = profiles.length > 0 || loading || error;
+  if (!shouldRender) return null;
+  if (!loading && !error && profiles.length === 0) return null;
+
+  const title =
+    activeTab === 'freelancer'
+      ? isId
+        ? 'Profil talent aktif'
+        : 'Active talent profiles'
+      : isId
+        ? 'Profil akun aktif'
+        : 'Active registered profiles';
+  const subtitle = isId
+    ? 'Orang yang sudah register di Lajukan tampil di sini.'
+    : 'Registered users appear here as active profiles.';
+
+  return (
+    <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.18)] sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+            {title}
+          </p>
+          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+            {subtitle}
+          </p>
+        </div>
+        <span className="inline-flex min-h-[32px] shrink-0 items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold text-[color:var(--app-accent)]">
+          {profiles.length.toLocaleString(isId ? 'id-ID' : 'en-US')}{' '}
+          {isId ? 'profil' : 'profiles'}
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div
+              key={`profile-skeleton-${index}`}
+              className="ui-skeleton ui-skeleton-pulse h-[172px] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
+            />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="mt-3 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+          {error}
+        </div>
+      ) : (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {profiles.map(profile => (
+            <SearchResultProfileCard
+              key={profile.id}
+              item={profile}
+              locale={locale}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SearchCartDock({
   cart,
   isId,
@@ -1401,9 +1717,8 @@ function SearchCartDock({
   const previewItems = cart.items.slice(0, 3);
   const firstItem = cart.items[0];
   const savedCount = cart.items.length;
-  const countLabel = `${savedCount} ${
-    isId ? 'referensi tersimpan' : 'saved references'
-  }`;
+  const countLabel = `${savedCount} ${isId ? 'referensi tersimpan' : 'saved references'
+    }`;
 
   return (
     <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-[70] lg:bottom-5 lg:left-auto lg:right-5 lg:w-[390px]">
@@ -1769,6 +2084,9 @@ export default function SearchPageClient() {
   const [umkmStores, setUmkmStores] = useState<UmkmPreviewStore[]>([]);
   const [umkmLoading, setUmkmLoading] = useState(false);
   const [umkmError, setUmkmError] = useState<string | null>(null);
+  const [discoverProfiles, setDiscoverProfiles] = useState<SearchProfileCard[]>([]);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [searchCart, setSearchCart] = useState<SearchCartSession>(
     EMPTY_SEARCH_CART_SESSION,
   );
@@ -1779,10 +2097,21 @@ export default function SearchPageClient() {
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const searchSuggestionsId = useId();
   const searchSuggestionsTimeoutRef = useRef<number | undefined>(undefined);
+  const {
+    ref: mobileActionsRailRef,
+    onClickCapture: onMobileActionsClickCapture,
+    onPointerCancel: onMobileActionsPointerCancel,
+    onPointerDown: onMobileActionsPointerDown,
+    onPointerLeave: onMobileActionsPointerLeave,
+    onPointerMove: onMobileActionsPointerMove,
+    onPointerUp: onMobileActionsPointerUp,
+    onWheel: onMobileActionsWheel,
+  } = useHorizontalDragScroll<HTMLDivElement>();
 
   const canToggleUmkmView = type === 'all' || type === 'umkm';
   const shouldShowUmkmPreview = resultsView === 'umkm' || type === 'umkm';
   const shouldShowResultCards = !shouldShowUmkmPreview;
+  const shouldShowDiscoverProfiles = true;
 
   useEffect(() => {
     const syncCart = () => setSearchCart(readSearchCartSession());
@@ -1870,10 +2199,10 @@ export default function SearchPageClient() {
       const payload = (await res.json().catch(() => ({}))) as { suggestions?: unknown };
       const suggestions = Array.isArray(payload.suggestions)
         ? payload.suggestions
-            .filter((item): item is string => typeof item === 'string')
-            .map(item => item.trim())
-            .filter(Boolean)
-            .slice(0, 5)
+          .filter((item): item is string => typeof item === 'string')
+          .map(item => item.trim())
+          .filter(Boolean)
+          .slice(0, 5)
         : [];
       setSearchSuggestions(suggestions);
       setShowSearchSuggestions(suggestions.length > 0);
@@ -1972,9 +2301,9 @@ export default function SearchPageClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-              (isId
-                ? 'Gagal memuat hasil pencarian'
-                : 'Failed to load search results'),
+            (isId
+              ? 'Gagal memuat hasil pencarian'
+              : 'Failed to load search results'),
           );
         }
 
@@ -2032,7 +2361,7 @@ export default function SearchPageClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-              (isId ? 'Gagal memuat usaha' : 'Failed to load businesses'),
+            (isId ? 'Gagal memuat usaha' : 'Failed to load businesses'),
           );
         }
 
@@ -2052,6 +2381,80 @@ export default function SearchPageClient() {
 
     void load();
   }, [isId, location, query, type]);
+
+  useEffect(() => {
+    if (!shouldShowDiscoverProfiles) {
+      setDiscoverProfiles([]);
+      setDiscoverLoading(false);
+      setDiscoverError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadProfiles = async () => {
+      setDiscoverLoading(true);
+      setDiscoverError(null);
+
+      try {
+        const params = new URLSearchParams();
+        params.set('limit', String(PAGE_SIZE));
+        if (query.trim()) params.set('q', query.trim());
+
+        const response = await fetch(
+          `/api/users/discover?${params.toString()}`,
+          {
+            cache: 'no-store',
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: unknown[];
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(
+            payload.error || (isId ? 'Gagal memuat profil' : 'Failed to load profiles'),
+          );
+        }
+
+        const nextProfiles = Array.isArray(payload.data)
+          ? payload.data
+            .map(item => normalizeDiscoverUser(item as DiscoverUser, locale))
+            .filter((item): item is SearchProfileCard => Boolean(item))
+            .filter(profile =>
+              location.trim()
+                ? profile.location
+                  .toLowerCase()
+                  .includes(location.trim().toLowerCase())
+                : true,
+            )
+          : [];
+
+        setDiscoverProfiles(nextProfiles);
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setDiscoverProfiles([]);
+        setDiscoverError(
+          err instanceof Error
+            ? err.message
+            : isId
+              ? 'Gagal memuat profil'
+              : 'Failed to load profiles',
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setDiscoverLoading(false);
+        }
+      }
+    };
+
+    void loadProfiles();
+
+    return () => controller.abort();
+  }, [isId, locale, location, query, shouldShowDiscoverProfiles]);
 
   const visibleItems = useMemo(() => {
     const next = [...items].filter(item => {
@@ -2075,6 +2478,15 @@ export default function SearchPageClient() {
 
     return next;
   }, [items, sideFilter, sort]);
+
+  const visibleProfiles = useMemo(
+    () =>
+      discoverProfiles.filter(profile => {
+        if (!location.trim()) return true;
+        return profile.location.toLowerCase().includes(location.trim().toLowerCase());
+      }),
+    [discoverProfiles, location],
+  );
 
   const resultCountLabel = new Intl.NumberFormat(
     isId ? 'id-ID' : 'en-US',
@@ -2123,11 +2535,11 @@ export default function SearchPageClient() {
         : `${hasMore ? `${resultCountLabel}+` : resultCountLabel} results found`;
   const activeTypeLabel =
     TYPE_OPTIONS.find(option => option.value === type)?.[
-      isId ? 'labelId' : 'labelEn'
+    isId ? 'labelId' : 'labelEn'
     ] || (isId ? 'Semua' : 'All');
   const activeSortLabel =
     SORT_OPTIONS.find(option => option.value === sort)?.[
-      isId ? 'labelId' : 'labelEn'
+    isId ? 'labelId' : 'labelEn'
     ] || (isId ? 'Paling relevan' : 'Most relevant');
   const topResult = visibleItems[0];
   const activeSearchTab: SearchFilterTabKey = usedOnly ? 'used_goods' : type;
@@ -2445,7 +2857,17 @@ export default function SearchPageClient() {
               className="mt-3"
             />
 
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <div
+              ref={mobileActionsRailRef}
+              onClickCapture={onMobileActionsClickCapture}
+              onPointerCancel={onMobileActionsPointerCancel}
+              onPointerDown={onMobileActionsPointerDown}
+              onPointerLeave={onMobileActionsPointerLeave}
+              onPointerMove={onMobileActionsPointerMove}
+              onPointerUp={onMobileActionsPointerUp}
+              onWheel={onMobileActionsWheel}
+              className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
+            >
               <button
                 type="button"
                 onClick={() => setFiltersOpen(true)}
@@ -2485,6 +2907,14 @@ export default function SearchPageClient() {
             />
           ) : null}
 
+          <SearchProfileResultsSection
+            locale={locale}
+            activeTab={activeSearchTab}
+            profiles={visibleProfiles}
+            loading={discoverLoading}
+            error={discoverError}
+          />
+
           {shouldShowResultCards ? (
             loading ? (
               <div className="space-y-3">
@@ -2507,7 +2937,7 @@ export default function SearchPageClient() {
                   {isId ? 'Coba lagi' : 'Retry'}
                 </button>
               </div>
-            ) : visibleItems.length === 0 ? (
+            ) : visibleItems.length === 0 && visibleProfiles.length === 0 ? (
               <div className="rounded-[28px] border border-[color:var(--app-border)] bg-[radial-gradient(circle_at_top,#ecfdf5_0%,#ffffff_46%,#f8fafc_100%)] px-5 py-8 text-center shadow-[0_20px_42px_-30px_rgba(15,23,42,0.18)]">
                 <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-[20px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                   <Search className="h-5 w-5" />
@@ -2517,8 +2947,8 @@ export default function SearchPageClient() {
                 </p>
                 <p className="mx-auto mt-1 max-w-[26rem] text-[13px] leading-5 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Coba longgarkan filter, pakai kata kunci lain, atau jadilah listing pertama untuk kebutuhan ini.'
-                    : 'Try broader filters, another keyword, or become the first listing for this need.'}
+                    ? 'Coba longgarkan filter, pakai kata kunci lain, atau buka tab Talent untuk lihat profil yang sudah register.'
+                    : 'Try broader filters, another keyword, or open the Talent tab to see registered profiles.'}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                   <AuthCtaLink
@@ -2898,6 +3328,14 @@ export default function SearchPageClient() {
                   />
                 ) : null}
 
+                <SearchProfileResultsSection
+                  locale={locale}
+                  activeTab={activeSearchTab}
+                  profiles={visibleProfiles}
+                  loading={discoverLoading}
+                  error={discoverError}
+                />
+
                 {shouldShowResultCards ? (
                   loading ? (
                     <div className="space-y-3">
@@ -2920,7 +3358,7 @@ export default function SearchPageClient() {
                         {isId ? 'Coba lagi' : 'Retry'}
                       </button>
                     </div>
-                  ) : visibleItems.length === 0 ? (
+                  ) : visibleItems.length === 0 && visibleProfiles.length === 0 ? (
                     <div className="rounded-[30px] border border-[color:var(--app-border)] bg-[radial-gradient(circle_at_top,#ecfdf5_0%,#ffffff_44%,#f8fafc_100%)] px-6 py-11 text-center shadow-[0_22px_48px_-32px_rgba(15,23,42,0.18)]">
                       <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-[22px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                         <Search className="h-6 w-6" />
@@ -2962,8 +3400,8 @@ export default function SearchPageClient() {
                 ) : null}
 
                 {visibleItems.length > 0 &&
-                shouldShowResultCards &&
-                !loading ? (
+                  shouldShowResultCards &&
+                  !loading ? (
                   <div className="flex items-center justify-between gap-3 px-1">
                     <p className="text-[13px] text-[color:var(--app-text-soft)]">
                       {isId

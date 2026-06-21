@@ -1,9 +1,14 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { ReactNode } from 'react';
 import ClientLayoutWrapper from '@/components/layout/ClientLayoutWrapper';
 import type { Metadata } from 'next';
 import { readStackStartupState } from '@/lib/system/startupState';
+import {
+  LANGUAGE_CONFIRM_COOKIE,
+  hasConfirmedLanguageSelection,
+} from '@/lib/languagePreference';
 
 export const dynamic = 'force-dynamic';
 
@@ -126,6 +131,13 @@ export default async function LocaleLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  const cookieStore = await cookies();
+  const localeCookie =
+    cookieStore.get('NEXT_LOCALE')?.value ?? cookieStore.get('locale')?.value;
+  const languageConfirmCookie =
+    cookieStore.get(LANGUAGE_CONFIRM_COOKIE)?.value ?? null;
+  const initialLanguageSelectionRequired =
+    !hasConfirmedLanguageSelection(localeCookie, languageConfirmCookie);
   const messages = await getCommonMessages(locale);
   const startupState = readStackStartupState();
 
@@ -133,6 +145,7 @@ export default async function LocaleLayout({
     <NextIntlClientProvider locale={locale} messages={messages}>
       <ClientLayoutWrapper
         initialMaintenanceState={startupState}
+        initialLanguageSelectionRequired={initialLanguageSelectionRequired}
         locale={locale}
       >
         {children}

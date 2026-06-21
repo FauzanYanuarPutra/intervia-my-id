@@ -245,7 +245,7 @@ export default async function EducationPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-white/18 bg-white/12 p-4 shadow-[0_32px_80px_-42px_rgba(0,0,0,0.85)] backdrop-blur-xl">
+          <div className="rounded-[32px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 p-4 shadow-[0_32px_80px_-42px_rgba(0,0,0,0.85)] backdrop-blur-xl">
             <div className="overflow-hidden rounded-[24px] bg-white text-slate-950">
               <div className="relative aspect-video bg-slate-900">
                 <LajukanImage

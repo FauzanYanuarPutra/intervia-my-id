@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { normalizeContentMediaUrl } from '@/lib/content/catalog';
 import { fetchWithTimeout } from '@/lib/server/fetchWithTimeout';
 
@@ -11,19 +11,32 @@ function getCommunityBackendBase(): string | null {
   return base.trim() || null;
 }
 
-function readForwardToken(req: NextRequest): string | null {
+function readCookieValue(cookieHeader: string | null, name: string): string | null {
+  if (!cookieHeader) return null;
+  const pattern = new RegExp(`(?:^|;\\s*)${name}=([^;]*)`);
+  const match = cookieHeader.match(pattern);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function readForwardToken(req: Request): string | null {
   const bearer = req.headers
     .get('authorization')
     ?.replace(/^Bearer\s+/i, '')
     .trim();
   if (bearer) return bearer;
-  return req.cookies.get('access_token')?.value?.trim() || null;
+  return readCookieValue(req.headers.get('cookie'), 'access_token')?.trim() || null;
 }
 
-function appendSearch(req: NextRequest, upstream: URL) {
-  req.nextUrl.searchParams.forEach((value, key) => {
-    upstream.searchParams.append(key, value);
-  });
+function appendSearch(req: Request, upstream: URL) {
+  try {
+    const currentSearch = new URL(req.url).search;
+    if (!currentSearch) return;
+    new URLSearchParams(currentSearch).forEach((value, key) => {
+      upstream.searchParams.append(key, value);
+    });
+  } catch {
+    // Ignore malformed URLs and continue without query parameters.
+  }
 }
 
 function normalizeCommunityMediaString(value: string): string {
@@ -57,7 +70,7 @@ function normalizeCommunityPayloadUrls(value: unknown): unknown {
 }
 
 export async function proxyCommunityBackend(
-  req: NextRequest,
+  req: Request,
   path: string,
   options: {
     method?: string;

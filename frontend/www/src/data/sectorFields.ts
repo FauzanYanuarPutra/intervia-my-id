@@ -32,9 +32,10 @@ export interface SectorField {
   inDetail: boolean;
 }
 
-/** Fields that need images (gallery/carousel) - typically product, property, retail */
+/** Fields that need images (gallery/carousel) - typically product, service, property, retail */
 export const IMAGE_HEAVY_TYPES = [
   'product',
+  'service',
   'property',
   'company',
   'tool_rental',

@@ -32,7 +32,11 @@ if config_env() == :prod do
 
   config :chat_service,
     jwt_issuer: jwt_issuer,
-    jwt_audiences: jwt_audiences
+    jwt_audiences: jwt_audiences,
+    identity_service_url:
+      System.get_env("INTERNAL_API_URL") ||
+        System.get_env("IDENTITY_SERVICE_URL") ||
+        "http://identity_service:8080"
 
   # 3. Redis Config (Rate Limiter)
   config :hammer,

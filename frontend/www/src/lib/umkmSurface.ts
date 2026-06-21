@@ -58,24 +58,24 @@ const UMKM_SURFACE_COPY = {
   id: {
     discovery: 'Peta usaha',
     discoveryShort: 'Peta',
-    owner: 'Kelola usaha',
     ownerShort: 'Usaha',
     ownerDashboard: 'Kelola Usaha',
     onboarding: 'Buka usaha',
     profile: 'Profil usaha',
     storefront: 'Toko',
     listing: 'Listing',
+    owner: 'Kelola usaha',
   },
   en: {
     discovery: 'Business map',
     discoveryShort: 'Map',
-    owner: 'Manage business',
     ownerShort: 'Business',
     ownerDashboard: 'Business control',
     onboarding: 'Open business',
     profile: 'Business profile',
     storefront: 'Store',
     listing: 'Listing',
+    owner: 'Manage business',
   },
 } as const;
 

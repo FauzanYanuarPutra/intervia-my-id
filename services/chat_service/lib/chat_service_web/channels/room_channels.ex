@@ -2,7 +2,7 @@
 defmodule ChatServiceWeb.RoomChannel do
   use ChatServiceWeb, :channel
 
-  alias ChatService.{AidaBot, Repo, Security}
+  alias ChatService.{AidaBot, IdentityClient, Repo, Security}
   alias ChatServiceWeb.Presence
   require Logger
 
@@ -99,12 +99,14 @@ defmodule ChatServiceWeb.RoomChannel do
         end
 
       call_type = normalize_call_type(Map.get(payload, "call_type"))
+      profile = current_user_profile(socket)
 
       broadcast_from!(socket, "call_incoming", %{
         call_id: call_id,
         caller_id: socket.assigns.user_id,
-        caller_username: socket.assigns.username,
-        caller_avatar: socket.assigns.avatar,
+        caller_username: profile.username,
+        caller_avatar: profile.avatar,
+        caller_avatar_style: profile.avatar_style,
         call_type: call_type
       })
 
@@ -112,8 +114,9 @@ defmodule ChatServiceWeb.RoomChannel do
         call_id: call_id,
         room_id: socket.assigns.room_id,
         caller_id: socket.assigns.user_id,
-        caller_username: socket.assigns.username,
-        caller_avatar: socket.assigns.avatar,
+        caller_username: profile.username,
+        caller_avatar: profile.avatar,
+        caller_avatar_style: profile.avatar_style,
         call_type: call_type
       })
 
@@ -210,6 +213,7 @@ defmodule ChatServiceWeb.RoomChannel do
          :ok <- check_permission(socket, "chat:send"),
          {:ok, clean_body} <- sanitize(body, attachments),
          {:ok, scan_result} <- scan_content(clean_body) do
+      profile = current_user_profile(socket)
       message_id = Ecto.UUID.generate()
       sent_at = DateTime.utc_now()
       normalized_type = normalize_message_type(message_type)
@@ -243,8 +247,9 @@ defmodule ChatServiceWeb.RoomChannel do
         client_ref: ref,
         room_id: socket.assigns.room_id,
         sender_id: socket.assigns.user_id,
-        sender_username: socket.assigns.username,
-        sender_avatar: socket.assigns.avatar,
+        sender_username: profile.username,
+        sender_avatar: profile.avatar,
+        sender_avatar_style: profile.avatar_style,
         body: display_body,
         content: display_body,
         message_type: normalized_type,
@@ -330,9 +335,12 @@ defmodule ChatServiceWeb.RoomChannel do
   end
 
   defp track_presence(socket) do
+    profile = current_user_profile(socket)
+
     Presence.track(socket, socket.assigns.user_id, %{
-      username: socket.assigns.username,
-      avatar: socket.assigns.avatar,
+      username: profile.username,
+      avatar: profile.avatar,
+      avatar_style: profile.avatar_style,
       online_at: System.system_time(:second)
     })
   end
@@ -618,6 +626,31 @@ defmodule ChatServiceWeb.RoomChannel do
   end
 
   defp maybe_reply_as_aida(_), do: :ok
+
+  defp current_user_profile(socket) do
+    user_id = socket.assigns.user_id
+    fallback_username = socket.assigns.username
+    fallback_avatar = socket.assigns.avatar
+    fallback_style = socket.assigns[:avatar_style]
+
+    case IdentityClient.fetch_public_profile(user_id) do
+      {:ok, profile} ->
+        %{
+          username:
+            IdentityClient.display_name(profile, fallback_username) ||
+              fallback_username,
+          avatar: IdentityClient.avatar_url(profile, fallback_avatar) || fallback_avatar,
+          avatar_style: IdentityClient.avatar_style(profile, fallback_style)
+        }
+
+      _ ->
+        %{
+          username: fallback_username,
+          avatar: fallback_avatar,
+          avatar_style: fallback_style
+        }
+    end
+  end
 
   defp ensure_bot_projection(bot_id_bin, now) do
     Repo.execute(

@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle, CheckCircle2, type LucideIcon } from 'lucide-react';
+import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
 
 type CreatePageHeaderProps = {
   locale: string;
@@ -78,6 +79,16 @@ export function CreatePageHeader({
   const isCompact = uiVariant === 'compact';
   const isMinimal = minimal;
   const isQuickMode = supportsSimpleMode && listingMode === 'simple';
+  const {
+    ref: stepRailRef,
+    onClickCapture,
+    onPointerCancel,
+    onPointerDown,
+    onPointerLeave,
+    onPointerMove,
+    onPointerUp,
+    onWheel,
+  } = useHorizontalDragScroll<HTMLDivElement>();
   const stepProgress = Math.round((currentStep / totalSteps) * 100);
   const steps = Array.from({ length: totalSteps }, (_, index) => index + 1);
   const showModeSwitch = supportsSimpleMode && !hideModeSwitch;
@@ -115,9 +126,8 @@ export function CreatePageHeader({
   return (
     <div
       data-section-shell-hero="true"
-      className={`min-w-0 rounded-[16px] border border-[color:var(--app-border)] bg-white shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] ${
-        isMinimal ? 'p-2 sm:p-2.5' : 'p-2.5 sm:p-3'
-      }`}
+      className={`min-w-0 rounded-[16px] border border-[color:var(--app-border)] bg-white shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] ${isMinimal ? 'p-2 sm:p-2.5' : 'p-2.5 sm:p-3'
+        }`}
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -149,11 +159,10 @@ export function CreatePageHeader({
           </span>
           {!isMinimal ? (
             <span
-              className={`inline-flex min-h-[26px] items-center gap-1 rounded-full border px-2 text-[10px] font-black ${
-                publishBlockersCount > 0
+              className={`inline-flex min-h-[26px] items-center gap-1 rounded-full border px-2 text-[10px] font-black ${publishBlockersCount > 0
                   ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
                   : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-              }`}
+                }`}
             >
               {publishBlockersCount > 0 ? (
                 <AlertTriangle className="h-3.5 w-3.5" />
@@ -171,9 +180,9 @@ export function CreatePageHeader({
       </div>
 
       {isMinimal ? (
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-slate-950/55">
+        <div className="relative mt-2 h-1 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)] dark:bg-slate-950/55">
           <div
-            className="h-full rounded-full bg-[color:var(--app-accent)] transition-all"
+            className="absolute top-0 left-0 h-full rounded-full bg-[color:var(--app-accent)] transition-all"
             style={{ width: `${stepProgress}%` }}
           />
         </div>
@@ -202,7 +211,17 @@ export function CreatePageHeader({
       )}
 
       {!isMinimal ? (
-        <div className="mt-2 flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={stepRailRef}
+          onClickCapture={onClickCapture}
+          onPointerCancel={onPointerCancel}
+          onPointerDown={onPointerDown}
+          onPointerLeave={onPointerLeave}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onWheel={onWheel}
+          className="mt-2 flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] select-none [&::-webkit-scrollbar]:hidden cursor-grab active:cursor-grabbing"
+        >
           {steps.map(step => {
             const active = currentStep === step;
             const done = currentStep > step;
@@ -218,13 +237,12 @@ export function CreatePageHeader({
                 onClick={() => {
                   if (clickable) onStepSelect(step);
                 }}
-                className={`min-h-[28px] shrink-0 rounded-full border px-2.5 text-center text-[10px] font-black transition ${
-                  active
+                className={`min-h-[28px] shrink-0 rounded-full border px-2.5 text-center text-[10px] font-black transition ${active
                     ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
                     : done
                       ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] dark:bg-slate-950/70'
                       : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] dark:bg-slate-950/55'
-                } ${clickable ? 'hover:border-[color:var(--app-accent)]' : 'cursor-default'}`}
+                  } ${clickable ? 'hover:border-[color:var(--app-accent)]' : 'cursor-default'}`}
               >
                 <span className="inline-flex items-center justify-center gap-1">
                   {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : step}
@@ -239,69 +257,72 @@ export function CreatePageHeader({
       ) : null}
 
       {!isMinimal ? (
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {showModeSwitch ? (
-            <div className="inline-flex rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-0.5 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
-              <button
-                type="button"
-                onClick={() => onListingModeChange('simple')}
-                className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${
-                  listingMode === 'simple'
-                    ? 'bg-[color:var(--app-accent)] text-white'
-                    : 'text-[color:var(--app-text)]'
-                }`}
-              >
-                {isId ? 'Cepat' : 'Quick'}
-              </button>
-              <button
-                type="button"
-                onClick={() => onListingModeChange('detail')}
-                className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${
-                  listingMode === 'detail'
-                    ? 'bg-[color:var(--app-accent)] text-white'
-                    : 'text-[color:var(--app-text)]'
-                }`}
-              >
-                {isId ? 'Detail' : 'Detail'}
-              </button>
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                {isId ? 'Mode isi' : 'Input mode'}
+              </span>
+              <div className="inline-flex rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-0.5 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+                <button
+                  type="button"
+                  onClick={() => onListingModeChange('simple')}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${listingMode === 'simple'
+                      ? 'bg-[color:var(--app-accent)] text-white'
+                      : 'text-[color:var(--app-text)]'
+                    }`}
+                >
+                  {isId ? 'Cepat' : 'Quick'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onListingModeChange('detail')}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${listingMode === 'detail'
+                      ? 'bg-[color:var(--app-accent)] text-white'
+                      : 'text-[color:var(--app-text)]'
+                    }`}
+                >
+                  {isId ? 'Lengkap' : 'Full'}
+                </button>
+              </div>
             </div>
           ) : null}
 
-          {canChangeTypeBeforeDraft ? (
-            <button
-              type="button"
-              onClick={onChangeType}
-              className="inline-flex min-h-[28px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 text-[10px] font-black text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
-            >
-              {isId ? 'Tipe' : 'Category'}
-            </button>
-          ) : null}
-        </div>
-
-        <details className="group relative">
-          <summary className="inline-flex min-h-[28px] cursor-pointer list-none items-center rounded-full bg-[color:var(--app-surface-muted)] px-2.5 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)] [&::-webkit-details-marker]:hidden">
-            {isId ? 'Status' : 'Status'}
-          </summary>
-          <div className="absolute right-0 z-30 mt-2 w-[min(88vw,280px)] rounded-[16px] border border-[color:var(--app-border)] bg-white p-3 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">
-            <div className="grid gap-2">
-              <span>
-                {isQuickMode
-                  ? isId
-                    ? 'Mode cepat: detail bisa diedit nanti.'
-                    : 'Quick mode: details can be edited later.'
-                  : formSubtitle}
-              </span>
-              <span>{progressText}</span>
-              <span>{mediaText}</span>
-              {!isCompact ? <span>{promoText}</span> : null}
-              <span>
-                {publishReadyCount}/{Math.max(publishReadinessTotal, 1)}{' '}
-                {isId ? 'siap' : 'ready'}
-              </span>
-            </div>
+            {canChangeTypeBeforeDraft ? (
+              <button
+                type="button"
+                onClick={onChangeType}
+                className="inline-flex min-h-[28px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 text-[10px] font-black text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
+              >
+                {isId ? 'Tipe' : 'Category'}
+              </button>
+            ) : null}
           </div>
-        </details>
+
+          <details className="group relative">
+            <summary className="inline-flex min-h-[28px] cursor-pointer list-none items-center rounded-full bg-[color:var(--app-surface-muted)] px-2.5 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)] [&::-webkit-details-marker]:hidden">
+              {isId ? 'Status' : 'Status'}
+            </summary>
+            <div className="absolute right-0 z-30 mt-2 w-[min(88vw,280px)] rounded-[16px] border border-[color:var(--app-border)] bg-white p-3 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">
+              <div className="grid gap-2">
+                <span>
+                  {isQuickMode
+                    ? isId
+                      ? 'Mode ringkas: isi inti dulu, detail bisa ditambah nanti.'
+                      : 'Compact mode: fill the core info first, add detail later.'
+                    : formSubtitle}
+                </span>
+                <span>{progressText}</span>
+                <span>{mediaText}</span>
+                {!isCompact ? <span>{promoText}</span> : null}
+                <span>
+                  {publishReadyCount}/{Math.max(publishReadinessTotal, 1)}{' '}
+                  {isId ? 'siap' : 'ready'}
+                </span>
+              </div>
+            </div>
+          </details>
         </div>
       ) : null}
 

@@ -163,6 +163,7 @@ export type StoreFormState = {
   business_category: UmkmBusinessCategoryId;
   business_focus: string;
   business_capabilities: UmkmBusinessCapabilityId[];
+  store_photo_url: string;
   lat: string;
   lng: string;
   phone: string;
@@ -278,6 +279,7 @@ export function createStoreFormState(
     business_category: businessCategory,
     business_focus: '',
     business_capabilities: getUmkmDefaultCapabilities(businessCategory),
+    store_photo_url: '',
     lat: '-6.200000',
     lng: '106.816666',
     phone: '',

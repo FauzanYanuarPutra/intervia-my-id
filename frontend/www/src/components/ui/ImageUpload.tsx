@@ -4,6 +4,10 @@ import { useState, useRef, useCallback } from 'react';
 import { Icon, IconEnum } from '@/components/ui-kit';
 import Image from 'next/image';
 import clsx from 'clsx';
+import {
+  IMAGE_UPLOAD_RAW_MAX_MB,
+  IMAGE_UPLOAD_TARGET_MB,
+} from '@/lib/media/uploadStandard';
 
 const IMAGE_EXTENSIONS = new Set([
   '.jpg',
@@ -31,6 +35,7 @@ interface ImageUploadProps {
   images: ImageFile[];
   onChange: (images: ImageFile[]) => void;
   onAddFiles?: (files: File[]) => void | Promise<void>;
+  onSetCover?: (index: number) => void;
   maxImages?: number;
   maxSizeMB?: number;
   locale?: string;
@@ -47,8 +52,9 @@ export function ImageUpload({
   images,
   onChange,
   onAddFiles,
+  onSetCover,
   maxImages = 10,
-  maxSizeMB = 25,
+  maxSizeMB = IMAGE_UPLOAD_RAW_MAX_MB,
   locale = 'id',
 }: ImageUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -206,8 +212,8 @@ export function ImageUpload({
               </p>
               <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] mt-1">
                 {locale === 'id'
-                  ? `PNG, JPG, WEBP, GIF, HEIC hingga ${maxSizeMB}MB (maks ${maxImages} gambar)`
-                  : `PNG, JPG, WEBP, GIF, HEIC up to ${maxSizeMB}MB (max ${maxImages} images)`}
+                  ? `PNG, JPG, WEBP, GIF, HEIC hingga ${maxSizeMB}MB (akan dioptimalkan ke sekitar ${IMAGE_UPLOAD_TARGET_MB}MB, maks ${maxImages} gambar)`
+                  : `PNG, JPG, WEBP, GIF, HEIC up to ${maxSizeMB}MB (optimized to around ${IMAGE_UPLOAD_TARGET_MB}MB, max ${maxImages} images)`}
               </p>
             </div>
           </button>
@@ -239,6 +245,27 @@ export function ImageUpload({
 
               {/* Overlay dengan Actions */}
               <div className="absolute inset-0 bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
+                {index > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onSetCover) {
+                        onSetCover(index);
+                        return;
+                      }
+                      moveImage(index, 0);
+                    }}
+                    className="rounded-lg bg-[color:var(--app-accent)] px-2.5 py-2 text-xs font-bold text-[color:var(--app-text-inverse)]"
+                    title={
+                      locale === 'id'
+                        ? 'Jadikan thumbnail'
+                        : 'Set as thumbnail'
+                    }
+                  >
+                    {locale === 'id' ? 'Thumbnail' : 'Cover'}
+                  </button>
+                )}
+
                 {/* Move Left */}
                 {index > 0 && (
                   <button

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import Image from 'next/image';
 import {
   Compass,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
 import { useAuth } from '@/context/AuthContext';
 import { resolveLocaleFromPathname } from '@/lib/locale';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 import { useRouteLayout } from '@/lib/useRouteLayout';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
@@ -30,6 +32,7 @@ type MobileNavItem = {
 type CreateAction = {
   key: string;
   label: string;
+  description: string;
   href: string;
   icon: LucideIcon;
 };
@@ -68,7 +71,15 @@ export default function ClientBottomNav() {
 
   const { pathname, showBottomNavMobile } = useRouteLayout();
   const locale = resolveLocaleFromPathname(pathname);
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const profileAvatar = profileAvatarSrc(
+    user?.avatarUrl || user?.avatar_url,
+    readProfileAvatarStyle(user),
+    user?.fullName ||
+      user?.full_name ||
+      user?.username ||
+      (locale === 'id' ? 'Profil' : 'Profile'),
+  );
   const [sheetOpen, setSheetOpen] = useState(false);
   const [lastAction, setLastAction] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -129,19 +140,31 @@ export default function ClientBottomNav() {
     () => [
       {
         key: 'reels',
-        label: locale === 'id' ? 'Create Reels' : 'Create Reels',
+        label: locale === 'id' ? 'Buat Reels' : 'Create Reels',
+        description:
+          locale === 'id'
+            ? 'Langsung rekam video atau upload media pendek.'
+            : 'Go straight to video capture or short media upload.',
         href: '/reels?create=1',
         icon: Video,
       },
       {
         key: 'listing',
-        label: locale === 'id' ? 'Create Listing' : 'Create Listing',
+        label: locale === 'id' ? 'Buat Listing' : 'Create Listing',
+        description:
+          locale === 'id'
+            ? 'Bikin produk, jasa, atau kebutuhan dengan rapi.'
+            : 'Create a clean product, service, or request listing.',
         href: '/create',
         icon: SquarePen,
       },
       {
         key: 'full',
-        label: locale === 'id' ? 'Open Create' : 'Open Create',
+        label: locale === 'id' ? 'Layar penuh' : 'Full create',
+        description:
+          locale === 'id'
+            ? 'Buka semua opsi kalau butuh alur yang lebih lengkap.'
+            : 'Open the full page when you need more options.',
         href: '/create',
         icon: ChevronRight,
       },
@@ -260,6 +283,7 @@ export default function ClientBottomNav() {
             {items.slice(2).map(item => {
               const Icon = item.icon;
               const active = isNavItemActive(item, pathname);
+              const isProfileItem = item.key === 'profile';
 
               return (
                 <li key={item.key} className="min-w-0">
@@ -285,13 +309,27 @@ export default function ClientBottomNav() {
                   >
                     <span
                       className={cn(
-                        'pointer-events-none inline-flex h-[34px] w-[34px] items-center justify-center rounded-[15px] transition',
+                        'pointer-events-none inline-flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full transition',
                         active
                           ? 'bg-white text-[color:var(--app-accent)]'
                           : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
                       )}
                     >
-                      <Icon className="h-[19px] w-[19px]" />
+                      {isProfileItem && isAuthenticated ? (
+                        <Image
+                          src={profileAvatar}
+                          alt={
+                            locale === 'id'
+                              ? 'Foto profil'
+                              : 'Profile photo'
+                          }
+                          width={34}
+                          height={34}
+                          className="h-full w-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <Icon className="h-[19px] w-[19px]" />
+                      )}
                     </span>
                     <span className="pointer-events-none max-w-full truncate leading-none">
                       {item.label}
@@ -346,8 +384,8 @@ export default function ClientBottomNav() {
                   </h2>
                   <p className="mt-2 max-w-[320px] text-sm leading-6 text-zinc-600 dark:text-zinc-400">
                     {locale === 'id'
-                      ? 'Pilih yang paling sering dipakai. Video kami kasih jalur cepat dulu.'
-                      : 'Pick the thing you use most. Video gets the fastest path first.'}
+                      ? 'Pilih jalur yang paling cepat. Kamu tetap bisa buka layar lengkap.'
+                      : 'Pick the fastest path. You can still open the full page.'}
                   </p>
                 </div>
                 <button
@@ -401,34 +439,16 @@ export default function ClientBottomNav() {
                           </p>
                           {action.key === 'reels' ? (
                             <span className="rounded-full bg-white/18 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
-                              {locale === 'id' ? 'Utama' : 'Primary'}
+                              {locale === 'id' ? 'Cepat' : 'Fast'}
+                            </span>
+                          ) : selected ? (
+                            <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
+                              {locale === 'id' ? 'Terakhir' : 'Last used'}
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-current/72">
-                          {action.key === 'video'
-                            ? locale === 'id'
-                              ? 'Langsung ke kamera, tanpa ribet pilihan dulu.'
-                              : 'Go straight to the camera, no extra choice screen.'
-                            : action.key === 'photo'
-                              ? locale === 'id'
-                                ? 'Unggah foto produk atau katalog.'
-                                : 'Upload product or catalog photos.'
-                              : action.key === 'listing'
-                                ? locale === 'id'
-                                  ? 'Bikin listing jualan yang rapi.'
-                                  : 'Create a clean selling listing.'
-                                : action.key === 'service'
-                                  ? locale === 'id'
-                                    ? 'Tawarkan jasa dengan cepat.'
-                                    : 'Offer a service quickly.'
-                                  : action.key === 'talent'
-                                    ? locale === 'id'
-                                      ? 'Cari orang yang pas untuk pekerjaan.'
-                                      : 'Find the right people for the job.'
-                                    : locale === 'id'
-                                      ? 'Tambahkan properti untuk dijual atau disewa.'
-                                      : 'Add property to sell or rent.'}
+                        <p className="mt-1 max-w-[320px] text-xs leading-5 text-current/72">
+                          {action.description}
                         </p>
                       </div>
 
@@ -452,12 +472,12 @@ export default function ClientBottomNav() {
                 >
                   <div className="min-w-0">
                     <p className="text-[15px] font-black leading-tight">
-                      {locale === 'id' ? 'Open Create' : 'Open Create'}
+                      {locale === 'id' ? 'Lihat semua opsi' : 'View all options'}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-white/58">
                       {locale === 'id'
-                        ? 'Buka halaman create penuh kalau butuh pilihan lain.'
-                        : 'Open the full create page if you need more options.'}
+                        ? 'Kalau belum cocok, buka halaman create penuh.'
+                        : 'Use the full create page if none of the quick paths fit.'}
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" />

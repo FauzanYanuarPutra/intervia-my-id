@@ -167,14 +167,6 @@ function formatShortDate(value: number, locale: 'id' | 'en'): string | null {
   });
 }
 
-function formatRatingLabel(value: number, locale: 'id' | 'en'): string | null {
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return value.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US', {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
-}
-
 function resolveCardType(value: string): DiscoveryCardType {
   const normalized = value.toLowerCase();
   if (/(job|career|loker|job_listing|job_posting)/.test(normalized))
@@ -451,7 +443,7 @@ function mapContentItem(
     title,
     summary,
     location,
-    ratingLabel: formatRatingLabel(ratingValue, locale),
+    ratingLabel: reviewCount > 0 ? reviewCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US') : null,
     priceLabel,
     typeLabel,
     typeKey,
@@ -974,8 +966,8 @@ export function HomeDiscoveryFeed({
       : 'Daily services, operations support, and tools.',
     businessTransfers: isId ? 'Oper usaha' : 'Business transfers',
     businessTransfersDescription: isId
-      ? 'Usaha berjalan yang bisa dicek aset, rating, dan risikonya.'
-      : 'Running businesses with assets, ratings, and risks to review.',
+      ? 'Usaha berjalan yang bisa dicek aset, like, dan risikonya.'
+      : 'Running businesses with assets, likes, and risks to review.',
     freelancers: isId ? 'Talent' : 'Talent',
     freelancersDescription: isId
       ? 'Eksekutor cepat untuk admin, konten, dan support.'

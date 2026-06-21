@@ -3,22 +3,19 @@
 import {
   createContext,
   ReactNode,
-  useEffect,
   useCallback,
   useContext,
   useMemo,
   useState,
 } from 'react';
+import {
+  LANGUAGE_CONFIRM_COOKIE,
+  LANGUAGE_PREFERENCE_MAX_AGE_SECONDS,
+  isSupportedLanguage,
+} from '@/lib/languagePreference';
+import type { SupportedLocale } from '@/lib/locale';
 
 const LOCALE_COOKIE = 'NEXT_LOCALE';
-const LOCALE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
-const LANGUAGE_CONFIRM_COOKIE = 'LAJUKAN_LANG_SELECTED';
-const LANGUAGE_CONFIRM_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-type SupportedLocale = 'en' | 'id';
-
-function isSupportedLocale(value: string | null): value is SupportedLocale {
-  return value === 'en' || value === 'id';
-}
 
 function readCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -36,23 +33,11 @@ function writeCookie(name: string, value: string, maxAgeSeconds: number) {
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secure}`;
 }
 
-function hasValidLanguageSelection(): boolean {
-  const marker = readCookie(LANGUAGE_CONFIRM_COOKIE);
-  const locale = readCookie(LOCALE_COOKIE);
-  return marker === '1' && isSupportedLocale(locale);
-}
-
 function getInitialLocale(locale: string): SupportedLocale {
   const savedLocale = readCookie(LOCALE_COOKIE);
-  if (isSupportedLocale(savedLocale)) return savedLocale;
-  if (isSupportedLocale(locale)) return locale;
+  if (isSupportedLanguage(savedLocale)) return savedLocale;
+  if (isSupportedLanguage(locale)) return locale;
   return 'id';
-}
-
-function shouldForceLanguageSelection(locale?: string): boolean {
-  if (locale != null && isSupportedLocale(locale)) return false;
-  if (typeof document === 'undefined') return false;
-  return !hasValidLanguageSelection();
 }
 
 type Context = {
@@ -70,14 +55,14 @@ const Ctx = createContext<Context | null>(null);
 export function LanguageModalProvider({
   children,
   locale,
+  initialPromptVisible,
 }: {
   children: ReactNode;
   locale: string;
+  initialPromptVisible: boolean;
 }) {
-  const [isMandatory, setMandatory] = useState(() =>
-    shouldForceLanguageSelection(locale),
-  );
-  const [isOpen, setOpen] = useState(() => shouldForceLanguageSelection(locale));
+  const [isMandatory, setMandatory] = useState(initialPromptVisible);
+  const [isOpen, setOpen] = useState(initialPromptVisible);
   const [currentLocale, setCurrentLocale] = useState<SupportedLocale>(() =>
     getInitialLocale(locale),
   );
@@ -90,25 +75,26 @@ export function LanguageModalProvider({
   }, [isMandatory]);
 
   const setLocale = useCallback((nextLocale: string) => {
-    if (!isSupportedLocale(nextLocale)) return;
+    if (!isSupportedLanguage(nextLocale)) return;
     setCurrentLocale(nextLocale);
   }, []);
 
   const confirmLocale = useCallback((nextLocale: string) => {
-    if (!isSupportedLocale(nextLocale)) return;
+    if (!isSupportedLanguage(nextLocale)) return;
     setCurrentLocale(nextLocale);
-    writeCookie(LOCALE_COOKIE, nextLocale, LOCALE_MAX_AGE_SECONDS);
-    writeCookie(LANGUAGE_CONFIRM_COOKIE, '1', LANGUAGE_CONFIRM_MAX_AGE_SECONDS);
+    writeCookie(
+      LOCALE_COOKIE,
+      nextLocale,
+      LANGUAGE_PREFERENCE_MAX_AGE_SECONDS,
+    );
+    writeCookie(
+      LANGUAGE_CONFIRM_COOKIE,
+      '1',
+      LANGUAGE_PREFERENCE_MAX_AGE_SECONDS,
+    );
     setMandatory(false);
     setOpen(false);
   }, []);
-
-  useEffect(() => {
-    if (!isSupportedLocale(locale)) return;
-    if (hasValidLanguageSelection()) return;
-    writeCookie(LOCALE_COOKIE, locale, LOCALE_MAX_AGE_SECONDS);
-    writeCookie(LANGUAGE_CONFIRM_COOKIE, '1', LANGUAGE_CONFIRM_MAX_AGE_SECONDS);
-  }, [locale]);
 
   const value = useMemo(
     () => ({

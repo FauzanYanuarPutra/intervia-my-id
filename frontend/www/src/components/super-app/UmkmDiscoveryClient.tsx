@@ -257,7 +257,14 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
             onSubmit={handleSearch}
             className="pointer-events-auto overflow-hidden rounded-full bg-white/96 shadow-[0_16px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-900/5 backdrop-blur-2xl dark:bg-slate-950/92 dark:ring-white/10"
           >
-            <div className="flex min-h-[44px] items-center gap-1.5 px-2 sm:min-h-[48px] sm:gap-2 sm:px-3">
+            <div className="flex min-h-[44px] items-center gap-1.5 px-2 sm:min-h-[48px] sm:gap-2 sm:px-3    !border-0
+    !ring-0
+    !outline-none
+    !shadow-none
+    focus:!border-0
+    focus:!ring-0
+    focus:!outline-none
+    focus:!shadow-none">
               <button
                 type="button"
                 onClick={handleBack}

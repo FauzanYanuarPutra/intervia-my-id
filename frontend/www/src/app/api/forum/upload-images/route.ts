@@ -7,12 +7,12 @@ import {
   uploadErrorResponse,
   uploadSuccessResponse,
 } from '@/lib/server/uploadFiles';
+import { IMAGE_UPLOAD_RAW_MAX_BYTES } from '@/lib/media/uploadStandard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES = 12;
 const IMAGE_KEYS = ['images', 'image', 'file', 'files', 'media', 'photo'];
 
@@ -23,7 +23,21 @@ export async function POST(req: NextRequest) {
     '/v1/forum/upload-images',
     { timeoutMs: 2200 },
   );
-  if (proxied.status < 500) return proxied;
+  if (proxied.status < 500) {
+    const payload = await proxied.clone().json().catch(() => null);
+    const errorMessage =
+      payload && typeof payload === 'object' && 'error' in payload
+        ? String((payload as Record<string, unknown>).error || '')
+        : '';
+    const shouldFallbackToLocal =
+      proxied.status === 400 &&
+      /invalid media payload|invalid multipart upload|no valid images uploaded/i.test(
+        errorMessage,
+      );
+    if (!shouldFallbackToLocal) {
+      return proxied;
+    }
+  }
   return uploadForumImagesLocally(req);
 }
 
@@ -50,7 +64,7 @@ async function uploadForumImagesLocally(req: NextRequest) {
       accept: 'image',
       concurrency: 4,
       folder: 'forum',
-      maxBytes: MAX_FILE_BYTES,
+      maxBytes: IMAGE_UPLOAD_RAW_MAX_BYTES,
       minioTarget: 'forum',
       minioTimeoutMs: 2200,
     });

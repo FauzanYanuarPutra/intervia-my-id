@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  Clapperboard,
   Bot,
   Briefcase,
   CircleDot,
@@ -17,6 +18,7 @@ import {
   Search,
   ShieldCheck,
   Zap,
+  Users,
   Workflow,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -344,6 +346,36 @@ export function BusinessOsCommandCenter() {
         description: isId
           ? 'Cek yang tayang dan yang belum rapi.'
           : 'Check live listings and unfinished ones.',
+      },
+      {
+        id: 'business',
+        href: '/usaha',
+        icon: Briefcase,
+        tone: 'emerald',
+        title: isId ? 'Kelola usaha' : 'Manage business',
+        description: isId
+          ? 'Edit profil, katalog, dan tim usaha.'
+          : 'Edit profile, catalog, and team.',
+      },
+      {
+        id: 'reels',
+        href: '/reels',
+        icon: Clapperboard,
+        tone: 'sky',
+        title: isId ? 'Kelola reels' : 'Manage reels',
+        description: isId
+          ? 'Upload, edit, dan pantau reels.'
+          : 'Upload, edit, and review reels.',
+      },
+      {
+        id: 'community',
+        href: '/community',
+        icon: Users,
+        tone: 'slate',
+        title: isId ? 'Kelola komunitas' : 'Manage community',
+        description: isId
+          ? 'Posting dan diskusi komunitas di satu tempat.'
+          : 'Manage posts and discussions in one place.',
       },
       {
         id: 'create',

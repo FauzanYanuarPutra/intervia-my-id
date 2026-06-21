@@ -247,6 +247,58 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
     )
     .execute(db)
     .await?;
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS content_item_likes (
+          content_id uuid NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
+          user_id uuid NOT NULL REFERENCES users_read_model(user_id) ON DELETE CASCADE,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (content_id, user_id)
+        )
+        "#,
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_content_item_likes_content_id ON content_item_likes (content_id)",
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_content_item_likes_user_id ON content_item_likes (user_id)",
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS umkm_store_gallery_likes (
+          store_id uuid NOT NULL REFERENCES umkm_stores(id) ON DELETE CASCADE,
+          media_key text NOT NULL,
+          user_id uuid NOT NULL REFERENCES users_read_model(user_id) ON DELETE CASCADE,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (store_id, media_key, user_id)
+        )
+        "#,
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_umkm_store_gallery_likes_store_id ON umkm_store_gallery_likes (store_id)",
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_umkm_store_gallery_likes_user_id ON umkm_store_gallery_likes (user_id)",
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_umkm_store_gallery_likes_store_media ON umkm_store_gallery_likes (store_id, media_key)",
+    )
+    .execute(db)
+    .await?;
     Ok(())
 }
 
@@ -275,6 +327,40 @@ struct ListContentQuery {
     owner_id: Option<Uuid>,
     limit: Option<i64>,
     offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ContentLikeRequest {
+    liked: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct UmkmStoreGalleryLikeRequest {
+    media_key: String,
+    liked: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContentLikeResponse {
+    content_id: Uuid,
+    liked: bool,
+    like_count: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct UmkmStoreGalleryLikeStateResponse {
+    store_id: Uuid,
+    liked_media_keys: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct UmkmStoreGalleryLikeResponse {
+    store_id: Uuid,
+    media_key: String,
+    liked: bool,
+    like_count: i64,
+    liked_media_keys: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -645,6 +731,7 @@ struct ContentRow {
     promo_end_at: Option<DateTime<Utc>>,
     rating: Option<f32>,
     review_count: Option<i32>,
+    like_count: i64,
     metadata: Value,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -714,6 +801,7 @@ struct ContentResponse {
     promo_end_at: Option<DateTime<Utc>>,
     rating: Option<f32>,
     review_count: Option<i32>,
+    like_count: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     seller_stats: Option<SellerStats>,
     metadata: Value,
@@ -760,6 +848,7 @@ impl ContentResponse {
             promo_end_at: value.promo_end_at,
             rating: value.rating,
             review_count: value.review_count,
+            like_count: value.like_count,
             seller_stats,
             metadata,
             created_at: value.created_at,
@@ -1572,6 +1661,10 @@ async fn main() -> anyhow::Result<()> {
             "/v1/content/{id}",
             get(get_content).put(update_content).patch(update_content),
         )
+        .route(
+            "/v1/content/{id}/like",
+            get(get_content_like_state).put(update_content_like),
+        )
         .route("/v1/content/{id}/reviews", get(list_reviews))
         .route("/v1/content/{id}/offers", post(create_offer))
         .route("/v1/events", post(collect_events))
@@ -1606,6 +1699,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/umkm/stores/{store_ref}",
             get(get_umkm_store).put(update_umkm_store),
+        )
+        .route(
+            "/v1/umkm/stores/{store_ref}/gallery-likes",
+            get(get_umkm_store_gallery_like_state).put(update_umkm_store_gallery_like),
         )
         .route(
             "/v1/umkm/stores/{store_ref}/products",
@@ -1873,7 +1970,8 @@ async fn collect_events(
         }
 
         if let Err(error) =
-            write_ai_os_event_side_effects(&mut tx, actor_user_id, &event, workflow_key).await
+            write_ai_os_event_side_effects(&state, &mut tx, actor_user_id, &event, workflow_key)
+                .await
         {
             tracing::warn!("collect_events ai-os side effect error: {:?}", error);
         }
@@ -6050,6 +6148,7 @@ async fn upsert_crm_lead_from_event(
 }
 
 async fn write_ai_os_event_side_effects(
+    state: &Arc<AppState>,
     tx: &mut sqlx::Transaction<'_, Postgres>,
     actor_user_id: Option<Uuid>,
     event: &NormalizedEvent,
@@ -6259,6 +6358,8 @@ async fn write_ai_os_event_side_effects(
     if let Some(signal) = crm_lead_signal_for_event(event) {
         upsert_crm_lead_from_event(tx, actor_user_id, event, signal).await?;
     }
+
+    push_social_notification_for_event(state, actor_user_id, event).await;
 
     Ok(())
 }
@@ -6545,6 +6646,425 @@ async fn push_notification_best_effort(
             tracing::warn!("push_notification_best_effort error: {:?}", e);
         }
     }
+}
+
+fn event_property_uuid(event: &NormalizedEvent, keys: &[&str]) -> Option<Uuid> {
+    for key in keys {
+        if let Some(value) = json_text_at(&event.properties, &[*key]) {
+            if let Ok(parsed) = Uuid::parse_str(value.trim()) {
+                return Some(parsed);
+            }
+        }
+    }
+    None
+}
+
+fn event_property_clean_text(event: &NormalizedEvent, keys: &[&str]) -> Option<String> {
+    for key in keys {
+        if let Some(value) = json_text_at(&event.properties, &[*key]) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn social_notification_copy(event_name: &str, is_id: bool) -> Option<(String, String)> {
+    let title = match event_name {
+        "profile.viewed" => {
+            if is_id {
+                "Profil dilihat"
+            } else {
+                "Profile viewed"
+            }
+        }
+        "reels.viewed" => {
+            if is_id {
+                "Reels dilihat"
+            } else {
+                "Reel viewed"
+            }
+        }
+        "reels.liked" | "content.liked" => {
+            if is_id {
+                "Disukai"
+            } else {
+                "Liked"
+            }
+        }
+        "reels.commented" | "content.commented" => {
+            if is_id {
+                "Komentar baru"
+            } else {
+                "New comment"
+            }
+        }
+        "reels.replied" | "content.replied" => {
+            if is_id {
+                "Balasan baru"
+            } else {
+                "New reply"
+            }
+        }
+        "content.viewed" => {
+            if is_id {
+                "Konten dilihat"
+            } else {
+                "Content viewed"
+            }
+        }
+        "maps.profile_opened" => {
+            if is_id {
+                "Profil dibuka"
+            } else {
+                "Profile opened"
+            }
+        }
+        "maps.route_clicked" => {
+            if is_id {
+                "Rute dibuka"
+            } else {
+                "Route opened"
+            }
+        }
+        "chat.message_sent" => {
+            if is_id {
+                "Pesan baru"
+            } else {
+                "New message"
+            }
+        }
+        _ => return None,
+    }
+    .to_string();
+
+    let action = match event_name {
+        "profile.viewed" => {
+            if is_id {
+                "melihat profilmu"
+            } else {
+                "viewed your profile"
+            }
+        }
+        "reels.viewed" => {
+            if is_id {
+                "melihat reelsmu"
+            } else {
+                "viewed your reel"
+            }
+        }
+        "reels.liked" | "content.liked" => {
+            if is_id {
+                "menyukai kontenmu"
+            } else {
+                "liked your content"
+            }
+        }
+        "reels.commented" | "content.commented" => {
+            if is_id {
+                "mengomentari kontenmu"
+            } else {
+                "commented on your content"
+            }
+        }
+        "reels.replied" | "content.replied" => {
+            if is_id {
+                "membalas komentar di kontenmu"
+            } else {
+                "replied to a comment on your content"
+            }
+        }
+        "content.viewed" => {
+            if is_id {
+                "melihat kontenmu"
+            } else {
+                "viewed your content"
+            }
+        }
+        "maps.profile_opened" => {
+            if is_id {
+                "membuka profil bisnismu"
+            } else {
+                "opened your business profile"
+            }
+        }
+        "maps.route_clicked" => {
+            if is_id {
+                "membuka rute ke bisnismu"
+            } else {
+                "opened a route to your business"
+            }
+        }
+        "chat.message_sent" => {
+            if is_id {
+                "mengirim pesan baru"
+            } else {
+                "sent you a new message"
+            }
+        }
+        _ => return None,
+    }
+    .to_string();
+
+    Some((title, action))
+}
+
+async fn push_social_notification_for_event(
+    state: &Arc<AppState>,
+    actor_user_id: Option<Uuid>,
+    event: &NormalizedEvent,
+) {
+    let Some(target_user_id) = event_property_uuid(
+        event,
+        &[
+            "target_user_id",
+            "owner_user_id",
+            "owner_id",
+            "recipient_user_id",
+            "profile_owner_id",
+            "business_owner_id",
+        ],
+    )
+    .or_else(|| {
+        if event.event_name == "profile.viewed" {
+            event.entity_id.as_ref().and_then(|raw| Uuid::parse_str(raw).ok())
+        } else {
+            None
+        }
+    }) else {
+        return;
+    };
+
+    if actor_user_id == Some(target_user_id) {
+        return;
+    }
+
+    let is_id = event
+        .locale
+        .as_deref()
+        .map(|locale| locale.eq_ignore_ascii_case("id"))
+        .unwrap_or(true);
+    let Some((title, action)) = social_notification_copy(event.event_name.as_str(), is_id) else {
+        return;
+    };
+
+    let actor_label = event_property_clean_text(
+        event,
+        &[
+            "actor_name",
+            "actor_full_name",
+            "actor_username",
+            "viewer_name",
+            "viewer_username",
+            "sender_name",
+            "sender_username",
+        ],
+    )
+    .map(|value| {
+        if value.starts_with('@') {
+            value
+        } else if value.contains(' ') || value.contains('.') {
+            value
+        } else if value == "Seseorang" || value == "Someone" {
+            value
+        } else {
+            format!("@{value}")
+        }
+    })
+    .unwrap_or_else(|| {
+        if is_id {
+            "Seseorang".to_string()
+        } else {
+            "Someone".to_string()
+        }
+    });
+
+    let entity_label = event_property_clean_text(
+        event,
+        &[
+            "entity_label",
+            "content_title",
+            "reel_title",
+            "profile_name",
+            "title",
+            "name",
+        ],
+    )
+    .unwrap_or_else(|| {
+        match event.event_name.as_str() {
+            "profile.viewed" => {
+                if is_id {
+                    "profilmu".to_string()
+                } else {
+                    "your profile".to_string()
+                }
+            }
+            "reels.viewed" | "reels.liked" | "reels.commented" | "reels.replied" => {
+                if is_id {
+                    "reelsmu".to_string()
+                } else {
+                    "your reel".to_string()
+                }
+            }
+            "content.viewed" | "content.liked" | "content.commented" | "content.replied" => {
+                if is_id {
+                    "kontenmu".to_string()
+                } else {
+                    "your content".to_string()
+                }
+            }
+            "maps.profile_opened" | "maps.route_clicked" => {
+                if is_id {
+                    "profil bisnismu".to_string()
+                } else {
+                    "your business profile".to_string()
+                }
+            }
+            _ => {
+                if is_id {
+                    "kontenmu".to_string()
+                } else {
+                    "your content".to_string()
+                }
+            }
+        }
+    });
+
+    let message = match event.event_name.as_str() {
+        "profile.viewed" => {
+            if is_id {
+                format!("{actor_label} melihat {entity_label}.")
+            } else {
+                format!("{actor_label} viewed {entity_label}.")
+            }
+        }
+        "reels.viewed" | "content.viewed" => {
+            if is_id {
+                format!("{actor_label} melihat {entity_label}.")
+            } else {
+                format!("{actor_label} viewed {entity_label}.")
+            }
+        }
+        "reels.liked" | "content.liked" => {
+            if is_id {
+                format!("{actor_label} menyukai {entity_label}.")
+            } else {
+                format!("{actor_label} liked {entity_label}.")
+            }
+        }
+        "reels.commented" | "content.commented" => {
+            if is_id {
+                format!("{actor_label} mengomentari {entity_label}.")
+            } else {
+                format!("{actor_label} commented on {entity_label}.")
+            }
+        }
+        "reels.replied" | "content.replied" => {
+            if is_id {
+                format!("{actor_label} membalas komentar di {entity_label}.")
+            } else {
+                format!("{actor_label} replied to a comment on {entity_label}.")
+            }
+        }
+        "maps.profile_opened" => {
+            if is_id {
+                format!("{actor_label} membuka {entity_label}.")
+            } else {
+                format!("{actor_label} opened {entity_label}.")
+            }
+        }
+        "maps.route_clicked" => {
+            if is_id {
+                format!("{actor_label} membuka rute ke {entity_label}.")
+            } else {
+                format!("{actor_label} opened a route to {entity_label}.")
+            }
+        }
+        "chat.message_sent" => {
+            if is_id {
+                format!("{actor_label} mengirim pesan baru.")
+            } else {
+                format!("{actor_label} sent a new message.")
+            }
+        }
+        _ => return,
+    };
+
+    let href = event_property_clean_text(
+        event,
+        &[
+            "href",
+            "target_href",
+            "target_url",
+            "content_url",
+            "url",
+            "action_url",
+            "actionHref",
+            "profile_href",
+            "profile_url",
+        ],
+    )
+    .unwrap_or_else(|| {
+        if let Some(entity_type) = event.entity_type.as_deref() {
+            if let Some(entity_id) = event.entity_id.as_deref() {
+                match entity_type {
+                    "profile" => format!("/profile/{entity_id}"),
+                    "reel" | "reels" => format!("/reels?reel={entity_id}"),
+                    "content" => format!("/content/{entity_id}"),
+                    "map" | "maps" => format!("/umkm?item={entity_id}"),
+                    _ => "/notifications".to_string(),
+                }
+            } else {
+                "/notifications".to_string()
+            }
+        } else {
+            "/notifications".to_string()
+        }
+    });
+
+    let actor_username = event_property_clean_text(
+        event,
+        &["actor_username", "viewer_username", "sender_username"],
+    );
+    let actor_name = event_property_clean_text(
+        event,
+        &["actor_name", "actor_full_name", "viewer_name", "sender_name"],
+    );
+    let actor_avatar_url = event_property_clean_text(
+        event,
+        &["actor_avatar_url", "viewer_avatar_url", "sender_avatar_url"],
+    );
+
+    let data = json!({
+        "href": href,
+        "entity_type": event.entity_type,
+        "entity_id": event.entity_id,
+        "entity_label": entity_label,
+        "target_user_id": target_user_id,
+        "actor_user_id": actor_user_id,
+        "actor_username": actor_username,
+        "actor_name": actor_name,
+        "actor_avatar_url": actor_avatar_url,
+        "target_href": href,
+        "event_name": event.event_name,
+        "source_page": event.page,
+        "surface": event_property_clean_text(event, &["surface", "section"]),
+        "action_copy": action,
+        "action": event.event_name.split('.').next_back().unwrap_or(event.event_name.as_str()),
+    });
+
+    push_notification_best_effort(
+        state,
+        target_user_id,
+        "social",
+        event.event_name.as_str(),
+        &title,
+        &message,
+        data,
+    )
+    .await;
 }
 
 async fn notify_linked_transaction_funding_outcome(
@@ -7835,6 +8355,11 @@ async fn list_content(
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM content_item_likes cil
+                WHERE cil.content_id = content_items.id
+            ), 0) AS like_count,
             metadata, created_at, updated_at
         FROM content_items
         WHERE content_status <> 'deleted'
@@ -7997,6 +8522,391 @@ async fn get_content(
             err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content").into_response()
         }
     }
+}
+
+async fn get_content_like_state(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid content id").into_response(),
+    };
+
+    match find_content(&state.db, &content_id.to_string()).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(error) => {
+            tracing::error!("get_content_like_state load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content")
+                .into_response();
+        }
+    };
+
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    match fetch_content_like_state(&state.db, content_id, actor_user_id).await {
+        Ok(state) => (StatusCode::OK, Json(state)).into_response(),
+        Err(error) => {
+            tracing::error!("get_content_like_state error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load like state").into_response()
+        }
+    }
+}
+
+async fn update_content_like(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<ContentLikeRequest>,
+) -> impl IntoResponse {
+    let actor_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid content id").into_response(),
+    };
+
+    match find_content(&state.db, &content_id.to_string()).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(error) => {
+            tracing::error!("update_content_like load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content")
+                .into_response();
+        }
+    };
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("update_content_like begin tx error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                .into_response();
+        }
+    };
+
+    let _changed = if payload.liked {
+        let inserted: i64 = match sqlx::query_scalar(
+            r#"
+            WITH inserted AS (
+              INSERT INTO content_item_likes (
+                content_id, user_id, created_at, updated_at
+              )
+              VALUES ($1, $2, now(), now())
+              ON CONFLICT DO NOTHING
+              RETURNING 1
+            )
+            SELECT COUNT(*)::bigint FROM inserted
+            "#,
+        )
+        .bind(content_id)
+        .bind(actor_user_id)
+        .fetch_one(&mut *tx)
+        .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::error!("update_content_like insert error: {:?}", error);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                    .into_response();
+            }
+        };
+        inserted > 0
+    } else {
+        match sqlx::query(
+            r#"
+            DELETE FROM content_item_likes
+            WHERE content_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(content_id)
+        .bind(actor_user_id)
+        .execute(&mut *tx)
+        .await
+        {
+            Ok(result) => result.rows_affected() > 0,
+            Err(error) => {
+                tracing::error!("update_content_like delete error: {:?}", error);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                    .into_response();
+            }
+        }
+    };
+
+    let like_count: i64 = match sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM content_item_likes
+        WHERE content_id = $1
+        "#,
+    )
+    .bind(content_id)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("update_content_like count error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                .into_response();
+        }
+    };
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("update_content_like commit error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
+    }
+
+    let response = ContentLikeResponse {
+        content_id,
+        liked: payload.liked,
+        like_count,
+    };
+
+    (StatusCode::OK, Json(response)).into_response()
+}
+
+async fn fetch_content_like_state(
+    db: &PgPool,
+    content_id: Uuid,
+    actor_user_id: Option<Uuid>,
+) -> Result<ContentLikeResponse, sqlx::Error> {
+    let like_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM content_item_likes
+        WHERE content_id = $1
+        "#,
+    )
+    .bind(content_id)
+    .fetch_one(db)
+    .await?;
+
+    let liked = if let Some(user_id) = actor_user_id {
+        sqlx::query_scalar::<_, bool>(
+            r#"
+            SELECT EXISTS(
+              SELECT 1
+              FROM content_item_likes
+              WHERE content_id = $1 AND user_id = $2
+            )
+            "#,
+        )
+        .bind(content_id)
+        .bind(user_id)
+        .fetch_one(db)
+        .await?
+    } else {
+        false
+    };
+
+    Ok(ContentLikeResponse {
+        content_id,
+        liked,
+        like_count,
+    })
+}
+
+async fn fetch_umkm_store_gallery_like_state(
+    db: &PgPool,
+    store_id: Uuid,
+    actor_user_id: Option<Uuid>,
+) -> Result<UmkmStoreGalleryLikeStateResponse, sqlx::Error> {
+    let liked_media_keys = if let Some(user_id) = actor_user_id {
+        sqlx::query_scalar::<_, String>(
+            r#"
+            SELECT media_key
+            FROM umkm_store_gallery_likes
+            WHERE store_id = $1 AND user_id = $2
+            ORDER BY media_key ASC
+            "#,
+        )
+        .bind(store_id)
+        .bind(user_id)
+        .fetch_all(db)
+        .await?
+    } else {
+        Vec::new()
+    };
+
+    Ok(UmkmStoreGalleryLikeStateResponse {
+        store_id,
+        liked_media_keys,
+    })
+}
+
+async fn get_umkm_store_gallery_like_state(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(store_ref): Path<String>,
+) -> impl IntoResponse {
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(store)) => store,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "store not found").into_response(),
+        Err(error) => {
+            tracing::error!("get_umkm_store_gallery_like_state load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store")
+                .into_response();
+        }
+    };
+
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+    match fetch_umkm_store_gallery_like_state(&state.db, store.id, actor_user_id).await {
+        Ok(state) => (StatusCode::OK, Json(state)).into_response(),
+        Err(error) => {
+            tracing::error!("get_umkm_store_gallery_like_state error: {:?}", error);
+            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load like state")
+                .into_response()
+        }
+    }
+}
+
+async fn update_umkm_store_gallery_like(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(store_ref): Path<String>,
+    Json(payload): Json<UmkmStoreGalleryLikeRequest>,
+) -> impl IntoResponse {
+    let UmkmStoreGalleryLikeRequest { media_key, liked } = payload;
+    let actor_user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+
+    let store = match find_umkm_store_row(&state.db, store_ref.as_str()).await {
+        Ok(Some(store)) => store,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "store not found").into_response(),
+        Err(error) => {
+            tracing::error!("update_umkm_store_gallery_like load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store")
+                .into_response();
+        }
+    };
+
+    let Some(media_key) = clean_text(Some(media_key)) else {
+        return err(StatusCode::BAD_REQUEST, "media key is required").into_response();
+    };
+    if media_key.len() > 2_048 {
+        return err(StatusCode::BAD_REQUEST, "media key is too long").into_response();
+    }
+
+    let mut tx = match state.db.begin().await {
+        Ok(tx) => tx,
+        Err(error) => {
+            tracing::error!("update_umkm_store_gallery_like begin tx error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                .into_response();
+        }
+    };
+
+    let liked = if liked {
+        match sqlx::query(
+            r#"
+            INSERT INTO umkm_store_gallery_likes (
+              store_id, media_key, user_id, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, now(), now())
+            ON CONFLICT (store_id, media_key, user_id)
+            DO UPDATE SET updated_at = EXCLUDED.updated_at
+            "#,
+        )
+        .bind(store.id)
+        .bind(&media_key)
+        .bind(actor_user_id)
+        .execute(&mut *tx)
+        .await
+        {
+            Ok(_) => true,
+            Err(error) => {
+                tracing::error!("update_umkm_store_gallery_like insert error: {:?}", error);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                    .into_response();
+            }
+        }
+    } else {
+        match sqlx::query(
+            r#"
+            DELETE FROM umkm_store_gallery_likes
+            WHERE store_id = $1 AND media_key = $2 AND user_id = $3
+            "#,
+        )
+        .bind(store.id)
+        .bind(&media_key)
+        .bind(actor_user_id)
+        .execute(&mut *tx)
+        .await
+        {
+            Ok(_) => false,
+            Err(error) => {
+                tracing::error!("update_umkm_store_gallery_like delete error: {:?}", error);
+                return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                    .into_response();
+            }
+        }
+    };
+
+    let like_count: i64 = match sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM umkm_store_gallery_likes
+        WHERE store_id = $1 AND media_key = $2
+        "#,
+    )
+    .bind(store.id)
+    .bind(&media_key)
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("update_umkm_store_gallery_like count error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                .into_response();
+        }
+    };
+
+    let liked_media_keys = match sqlx::query_scalar::<_, String>(
+        r#"
+        SELECT media_key
+        FROM umkm_store_gallery_likes
+        WHERE store_id = $1 AND user_id = $2
+        ORDER BY media_key ASC
+        "#,
+    )
+    .bind(store.id)
+    .bind(actor_user_id)
+    .fetch_all(&mut *tx)
+    .await
+    {
+        Ok(values) => values,
+        Err(error) => {
+            tracing::error!(
+                "update_umkm_store_gallery_like liked keys error: {:?}",
+                error
+            );
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
+                .into_response();
+        }
+    };
+
+    if let Err(error) = tx.commit().await {
+        tracing::error!("update_umkm_store_gallery_like commit error: {:?}", error);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
+    }
+
+    let response = UmkmStoreGalleryLikeResponse {
+        store_id: store.id,
+        media_key,
+        liked,
+        like_count,
+        liked_media_keys,
+    };
+
+    (StatusCode::OK, Json(response)).into_response()
 }
 
 async fn create_content(
@@ -8182,6 +9092,11 @@ async fn create_content(
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM content_item_likes cil
+                WHERE cil.content_id = id
+            ), 0) AS like_count,
             metadata, created_at, updated_at
         "#,
     )
@@ -8513,6 +9428,11 @@ async fn update_content(
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM content_item_likes cil
+                WHERE cil.content_id = id
+            ), 0) AS like_count,
             metadata, created_at, updated_at
         "#,
     )
@@ -18730,6 +19650,11 @@ async fn find_content(db: &PgPool, id_or_slug: &str) -> Result<Option<ContentRow
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
             promo_label, promo_start_at, promo_end_at, rating, review_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM content_item_likes cil
+                WHERE cil.content_id = content_items.id
+            ), 0) AS like_count,
             metadata, created_at, updated_at
         FROM content_items
         WHERE id::text = $1 OR slug = $1

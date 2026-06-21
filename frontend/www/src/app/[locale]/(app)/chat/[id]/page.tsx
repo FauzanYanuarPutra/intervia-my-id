@@ -40,6 +40,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { joinRoom, onMessage, sendMessageViaSocket } from '@/lib/chat';
 import { createIdempotencyKey } from '@/lib/clientIdempotency';
 import { useAppBack } from '@/lib/navigation/useAppBack';
+import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { buildAiChatPayload } from '@/lib/aiChat';
 import {
@@ -77,6 +78,7 @@ import { VideoCall } from '@/components/chat/VideoCall';
 import { VoiceCall } from '@/components/chat/VoiceCall';
 import { IncomingCall } from '@/components/chat/IncomingCall';
 import { ChatDetailSkeleton } from '@/components/system/feedback/RouteSkeletons';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 
 type PublicProfile = {
   id: string;
@@ -1815,6 +1817,10 @@ export default function ChatRoomPage() {
     Record<string, string>
   >({});
   const [roomName, setRoomName] = useState('Chat');
+  const peerUserId = useMemo(
+    () => parseDmPeerId(canonicalRoomId, user?.id),
+    [canonicalRoomId, user?.id],
+  );
 
   useEffect(() => {
     if (!user?.id || inboxRooms.length === 0) return;
@@ -2931,8 +2937,9 @@ export default function ChatRoomPage() {
         ),
       );
       try {
+        const optimizedFile = await prepareUploadFile(file);
         const form = new FormData();
-        form.append('file', file);
+        form.append('file', optimizedFile);
         const uploadRes = await authFetch(
           `/api/chat/rooms/${encodedRoomId}/upload`,
           { method: 'POST', body: form },
@@ -3094,6 +3101,32 @@ export default function ChatRoomPage() {
     const ch = channelRef.current;
     const useSocket = !!(ch && channelReady);
     let targetRoomId = canonicalRoomId;
+    const trackChatMessage = (roomId: string) => {
+      if (!user?.id || !peerUserId || peerUserId === user.id) return;
+      const recipientLabel =
+        dmNamesByUserId[peerUserId] ||
+        (roomName && roomName !== 'Chat' ? roomName : '') ||
+        peerUserId;
+      void trackLajukanEvent('chat.message_sent', {
+        entityType: 'chat',
+        entityId: roomId,
+        page: `/chat/${encodeURIComponent(roomId)}`,
+        properties: {
+          target_user_id: peerUserId,
+          target_username: recipientLabel.replace(/^@/, ''),
+          target_name: recipientLabel.replace(/^@/, ''),
+          target_href: `/chat/${encodeURIComponent(roomId)}`,
+          actor_user_id: user.id,
+          actor_username: user.username || '',
+          actor_name: user.name || user.fullName || user.username || '',
+          actor_avatar_url: user.avatarUrl || user.avatar_url || '',
+          source: 'chat',
+          surface: 'chat',
+          action: 'message',
+          message_type: messageType,
+        },
+      });
+    };
 
     const ensureRoomForDraft = async (): Promise<string> => {
       if (!isDraftRoom || !draftContact) return targetRoomId;
@@ -3101,8 +3134,8 @@ export default function ChatRoomPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contact: draftContact,
-          lead: { source: 'manual_chat', name: draftContact },
+          username: draftContact,
+          lead: { source: 'manual_chat', name: `@${draftContact}` },
         }),
         credentials: 'include',
       });
@@ -3117,7 +3150,7 @@ export default function ChatRoomPage() {
       return targetRoomId;
     };
 
-    const doPostFallback = async () => {
+    const doPostFallback = async (): Promise<boolean> => {
       const roomId = await ensureRoomForDraft();
       const encodedRoomId = encodeURIComponent(roomId);
       const res = await authFetch(`/api/chat/rooms/${encodedRoomId}/messages`, {
@@ -3147,6 +3180,7 @@ export default function ChatRoomPage() {
             }
           : { ...tempMessage, status: 'sent' as MessageStatus };
         setMessages(prev => prev.map(m => (m.id === clientRef ? resolved : m)));
+        return true;
       } else {
         setMessages(prev =>
           prev.map(m =>
@@ -3155,12 +3189,14 @@ export default function ChatRoomPage() {
               : m,
           ),
         );
+        return false;
       }
     };
 
     try {
       if (isDraftRoom) {
-        await doPostFallback();
+        const posted = await doPostFallback();
+        if (posted) trackChatMessage(targetRoomId);
         return;
       }
       if (useSocket && ch) {
@@ -3186,14 +3222,17 @@ export default function ChatRoomPage() {
                 : m,
             ),
           );
+          trackChatMessage(targetRoomId);
         } else {
-          await doPostFallback();
+          const posted = await doPostFallback();
+          if (posted) trackChatMessage(targetRoomId);
         }
       } else {
-        await doPostFallback();
+        const posted = await doPostFallback();
+        if (posted) trackChatMessage(targetRoomId);
       }
     } catch {
-      await doPostFallback().catch(() => {
+      const posted = await doPostFallback().catch(() => {
         setMessages(prev =>
           prev.map(m =>
             m.id === clientRef
@@ -3201,7 +3240,9 @@ export default function ChatRoomPage() {
               : m,
           ),
         );
+        return false;
       });
+      if (posted) trackChatMessage(targetRoomId);
     } finally {
       setSending(false);
     }

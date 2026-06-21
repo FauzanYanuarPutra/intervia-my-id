@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 type StackMaintenanceGateProps = {
   children: ReactNode;
   chrome?: ReactNode;
+  footer?: ReactNode;
   initialState?: StackStartupState;
   locale: string;
 };
@@ -137,6 +138,7 @@ function MaintenanceScreen({ locale, state }: MaintenanceScreenProps) {
 export function StackMaintenanceGate({
   children,
   chrome,
+  footer,
   initialState,
   locale,
 }: StackMaintenanceGateProps) {
@@ -192,10 +194,13 @@ export function StackMaintenanceGate({
     return (
       <>
         {chrome}
-        {children}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {children}
+          {footer ? <div className="mt-auto">{footer}</div> : null}
+        </div>
       </>
     );
-  }, [active, children, chrome, locale, state]);
+  }, [active, children, chrome, footer, locale, state]);
 
   return <div className={cn(active && 'min-h-[100svh]')}>{content}</div>;
 }

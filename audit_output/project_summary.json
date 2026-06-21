@@ -1,0 +1,471 @@
+{
+  "summary": {
+    "generated": "2026-06-17 18:16:17.206199",
+    "project_size_gb": 0.16,
+    "total_files": 1554,
+    "total_loc": 344412,
+    "docker_containers": 21,
+    "ram_total_gb": 19.35,
+    "ram_used_gb": 16.31,
+    "disk_total_gb": 307.28,
+    "disk_used_gb": 201.5
+  },
+  "folders": [
+    {
+      "folder": "frontend",
+      "size_gb": 0.159
+    },
+    {
+      "folder": "services",
+      "size_gb": 0.002
+    },
+    {
+      "folder": ".cursorrules",
+      "size_gb": 0.0
+    },
+    {
+      "folder": ".docker-build-state.json",
+      "size_gb": 0.0
+    },
+    {
+      "folder": ".env.development",
+      "size_gb": 0.0
+    },
+    {
+      "folder": ".env.production",
+      "size_gb": 0.0
+    },
+    {
+      "folder": ".gitattributes",
+      "size_gb": 0.0
+    },
+    {
+      "folder": ".gitignore",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "audit_project.py",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "dev-live.ps1",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "dev-live.sh",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "dev-stack.ps1",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "docker-compose.dev.yml",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "docker-compose.prod.yml",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "docker-compose.staging.yml",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "docker-compose.yml",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "legacy-compose-cleanup.ps1",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "legacy-compose-cleanup.sh",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "project_audit.py",
+      "size_gb": 0.0
+    },
+    {
+      "folder": "README.md",
+      "size_gb": 0.0
+    }
+  ],
+  "languages": [
+    {
+      "language": "TypeScript React",
+      "files": 352,
+      "lines": 167715
+    },
+    {
+      "language": "TypeScript",
+      "files": 454,
+      "lines": 70464
+    },
+    {
+      "language": "JSON",
+      "files": 48,
+      "lines": 39117
+    },
+    {
+      "language": "Rust",
+      "files": 26,
+      "lines": 33784
+    },
+    {
+      "language": "SQL",
+      "files": 104,
+      "lines": 13952
+    },
+    {
+      "language": "CSS",
+      "files": 7,
+      "lines": 6914
+    },
+    {
+      "language": "Markdown",
+      "files": 13,
+      "lines": 5132
+    },
+    {
+      "language": "YAML",
+      "files": 6,
+      "lines": 2044
+    },
+    {
+      "language": "Shell",
+      "files": 11,
+      "lines": 1611
+    },
+    {
+      "language": "JavaScript",
+      "files": 7,
+      "lines": 1486
+    },
+    {
+      "language": "PowerShell",
+      "files": 4,
+      "lines": 1218
+    },
+    {
+      "language": "Python",
+      "files": 5,
+      "lines": 937
+    },
+    {
+      "language": "HTML",
+      "files": 1,
+      "lines": 38
+    }
+  ],
+  "largest_files": [
+    {
+      "path": "frontend\\www\\public\\fonts\\Inter-4.1\\Inter.ttc",
+      "size_mb": 12.56
+    },
+    {
+      "path": "frontend\\www\\public\\models\\YBot.babylon",
+      "size_mb": 7.6
+    },
+    {
+      "path": "frontend\\www\\public\\images\\1.jpg",
+      "size_mb": 5.89
+    },
+    {
+      "path": "frontend\\www\\public\\images\\4.jpg",
+      "size_mb": 4.39
+    },
+    {
+      "path": "frontend\\www\\public\\images\\person\\4.jpg",
+      "size_mb": 2.97
+    },
+    {
+      "path": "frontend\\www\\public\\images\\3.jpg",
+      "size_mb": 2.58
+    },
+    {
+      "path": "frontend\\www\\public\\images\\person\\2.jpg",
+      "size_mb": 2.51
+    },
+    {
+      "path": "frontend\\www\\public\\twitter-image.png",
+      "size_mb": 2.4
+    },
+    {
+      "path": "frontend\\www\\public\\images\\umkm\\human.png",
+      "size_mb": 2.31
+    },
+    {
+      "path": "frontend\\www\\public\\images\\umkm\\home-hero.png",
+      "size_mb": 2.26
+    },
+    {
+      "path": "frontend\\www\\public\\images\\brand\\laju-ride-mascot-v3.png",
+      "size_mb": 2.04
+    },
+    {
+      "path": "frontend\\www\\public\\images\\agents\\3.jpg",
+      "size_mb": 1.95
+    },
+    {
+      "path": "frontend\\www\\public\\images\\hero\\lajukan-id-2.png",
+      "size_mb": 1.72
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\pinjam.png",
+      "size_mb": 1.71
+    },
+    {
+      "path": "frontend\\www\\public\\images\\person\\1.jpg",
+      "size_mb": 1.67
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\jobs.png",
+      "size_mb": 1.66
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\produk.png",
+      "size_mb": 1.66
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\ride.png",
+      "size_mb": 1.66
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\jasa.png",
+      "size_mb": 1.64
+    },
+    {
+      "path": "frontend\\www\\public\\images\\hero\\produksi.png",
+      "size_mb": 1.63
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\umkm.png",
+      "size_mb": 1.63
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\freelancer.png",
+      "size_mb": 1.61
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\services.png",
+      "size_mb": 1.61
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\mart.png",
+      "size_mb": 1.6
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\send.png",
+      "size_mb": 1.57
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\food.png",
+      "size_mb": 1.54
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\properti.png",
+      "size_mb": 1.54
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\belajar.png",
+      "size_mb": 1.51
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\edukasi.png",
+      "size_mb": 1.49
+    },
+    {
+      "path": "frontend\\www\\public\\images\\hero\\bisnis.png",
+      "size_mb": 1.47
+    },
+    {
+      "path": "frontend\\www\\public\\images\\property\\2.jpg",
+      "size_mb": 1.46
+    },
+    {
+      "path": "frontend\\www\\public\\images\\home\\menu\\v1\\car.png",
+      "size_mb": 1.44
+    },
+    {
+      "path": "frontend\\www\\public\\images\\hero\\lajukan1.png",
+      "size_mb": 1.41
+    },
+    {
+      "path": "frontend\\www\\public\\images\\hero\\logistik.png",
+      "size_mb": 1.38
+    },
+    {
+      "path": "frontend\\www\\public\\images\\hero\\publik.png",
+      "size_mb": 1.36
+    },
+    {
+      "path": "frontend\\www\\public\\opengraph-image.png",
+      "size_mb": 1.35
+    },
+    {
+      "path": "frontend\\www\\public\\images\\hero\\masa-depan.png",
+      "size_mb": 1.26
+    },
+    {
+      "path": "frontend\\www\\public\\images\\property\\3.jpg",
+      "size_mb": 1.25
+    },
+    {
+      "path": "frontend\\usaha\\.codex-login-mobile-3100.png",
+      "size_mb": 1.18
+    },
+    {
+      "path": "frontend\\usaha\\.codex-onboarding-mobile-3100.png",
+      "size_mb": 1.18
+    },
+    {
+      "path": "frontend\\usaha\\.codex-register-mobile-3100.png",
+      "size_mb": 1.18
+    },
+    {
+      "path": "frontend\\www\\public\\images\\agents\\2.jpg",
+      "size_mb": 1.08
+    },
+    {
+      "path": "frontend\\www\\public\\images\\person\\3.jpg",
+      "size_mb": 0.98
+    },
+    {
+      "path": "frontend\\www\\public\\images\\2.jpg",
+      "size_mb": 0.94
+    },
+    {
+      "path": "frontend\\www\\public\\images\\property\\1.jpg",
+      "size_mb": 0.9
+    },
+    {
+      "path": "frontend\\www\\public\\images\\ui-property.png",
+      "size_mb": 0.89
+    },
+    {
+      "path": "frontend\\www\\public\\fonts\\Inter-4.1\\InterVariable-Italic.ttf",
+      "size_mb": 0.87
+    },
+    {
+      "path": "frontend\\www\\public\\fonts\\Inter-4.1\\InterVariable.ttf",
+      "size_mb": 0.84
+    },
+    {
+      "path": "frontend\\www\\public\\images\\ui-digital-transactions.png",
+      "size_mb": 0.78
+    },
+    {
+      "path": "frontend\\www\\public\\images\\ui-dashboard.png",
+      "size_mb": 0.77
+    }
+  ],
+  "docker": [
+    {
+      "name": "intervia-my-id-www-1",
+      "cpu": "0.00%",
+      "memory": "186.4MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-usaha-1",
+      "cpu": "0.00%",
+      "memory": "71.61MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-community_service-1",
+      "cpu": "0.00%",
+      "memory": "11.2MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-crm-1",
+      "cpu": "0.00%",
+      "memory": "72.51MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-cms-1",
+      "cpu": "6.67%",
+      "memory": "62MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-marketplace_service-1",
+      "cpu": "0.12%",
+      "memory": "18.4MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-chat_service-1",
+      "cpu": "0.41%",
+      "memory": "174.2MiB / 9.391GiB"
+    },
+    {
+      "name": "laju_identity_service",
+      "cpu": "3.29%",
+      "memory": "63.26MiB / 512MiB"
+    },
+    {
+      "name": "intervia-my-id-community_db-1",
+      "cpu": "4.05%",
+      "memory": "38.75MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-identity_db-1",
+      "cpu": "4.78%",
+      "memory": "45.07MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-redis_cache-1",
+      "cpu": "0.65%",
+      "memory": "21.01MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-rabbitmq-1",
+      "cpu": "0.39%",
+      "memory": "143.2MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-caddy-1",
+      "cpu": "0.00%",
+      "memory": "20.12MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-marketplace_db-1",
+      "cpu": "4.51%",
+      "memory": "49.79MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-db_ui-1",
+      "cpu": "0.00%",
+      "memory": "35.17MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-cloudflare_tunnel-1",
+      "cpu": "0.10%",
+      "memory": "29.11MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-meilisearch-1",
+      "cpu": "0.22%",
+      "memory": "34.55MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-pgadmin-1",
+      "cpu": "0.04%",
+      "memory": "255.3MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-scylla_db-1",
+      "cpu": "0.89%",
+      "memory": "107.9MiB / 1GiB"
+    },
+    {
+      "name": "intervia-my-id-minio-1",
+      "cpu": "0.00%",
+      "memory": "119.2MiB / 9.391GiB"
+    },
+    {
+      "name": "intervia-my-id-mailhog-1",
+      "cpu": "0.04%",
+      "memory": "11.16MiB / 9.391GiB"
+    }
+  ]
+}

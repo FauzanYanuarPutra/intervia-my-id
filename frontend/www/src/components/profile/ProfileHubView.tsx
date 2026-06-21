@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { Modal } from '@/components/common/Modal';
 import { IdentityVerificationPanel } from '@/components/profile/IdentityVerificationPanel';
 import { LocalizedLink } from '@/components/ui-kit';
+import { useNotificationInbox, type InboxNotification } from '@/context/NotificationInboxContext';
 import { readIdentityVerification } from '@/lib/identityVerification';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
@@ -26,6 +27,7 @@ import { cn } from '@/lib/utils';
 import {
   BadgeCheck,
   BarChart3,
+  Briefcase,
   BriefcaseBusiness,
   Camera,
   CheckCircle2,
@@ -265,6 +267,85 @@ const INPUT_CLASS =
 const REELS_PROFILE_STORAGE_KEY = 'lajukan.reels.preference.v1';
 const PROFILE_SOCIAL_STORAGE_KEY = 'lajukan.profile.following.v1';
 
+type ProfileSocialActivity = {
+  id: string;
+  title: string;
+  message: string;
+  href: string;
+  actorName: string;
+  actorHandle: string;
+  actorAvatarUrl: string;
+  eventType: string;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+  isRead: boolean;
+};
+
+function readNotificationText(value: unknown): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : '';
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return '';
+}
+
+function readNotificationData(notification: InboxNotification): Record<string, unknown> {
+  const data = notification.data;
+  return data && typeof data === 'object' && !Array.isArray(data)
+    ? data
+    : {};
+}
+
+function readNotificationDataText(
+  notification: InboxNotification,
+  keys: string[],
+): string {
+  const data = readNotificationData(notification);
+  for (const key of keys) {
+    const value = readNotificationText(data[key]);
+    if (value) return value;
+  }
+  return '';
+}
+
+function buildNotificationTargetHref(notification: InboxNotification): string {
+  const directHref =
+    readNotificationDataText(notification, ['href', 'url', 'action_url', 'actionHref']) || '';
+  if (directHref.startsWith('/')) return directHref;
+
+  const entityType = readNotificationDataText(notification, [
+    'entity_type',
+    'entityType',
+  ]).toLowerCase();
+  const entityId = readNotificationDataText(notification, ['entity_id', 'entityId']);
+  if (entityType === 'profile' && entityId) return `/profile/${entityId}`;
+  if ((entityType === 'reel' || entityType === 'reels') && entityId) {
+    return `/reels?reel=${encodeURIComponent(entityId)}`;
+  }
+  if (entityType === 'content' && entityId) {
+    return `/content/${encodeURIComponent(entityId)}`;
+  }
+  if ((entityType === 'map' || entityType === 'maps') && entityId) {
+    return `/umkm?item=${encodeURIComponent(entityId)}`;
+  }
+  return '/notifications';
+}
+
+function normalizeNotificationActorKey(notification: InboxNotification): string {
+  return [
+    readNotificationDataText(notification, ['actor_user_id']),
+    readNotificationDataText(notification, ['actor_username']),
+    readNotificationDataText(notification, ['actor_name']),
+  ]
+    .filter(Boolean)
+    .join('|')
+    .toLowerCase();
+}
+
 function SectionBlock({
   title,
   subtitle,
@@ -415,12 +496,12 @@ function mapRecordToSocialUser(
         readSocialText(record.name),
       avatar_url: profileAvatarSrc(
         readSocialText(record.avatar_url) ||
-          readSocialText(record.avatarUrl) ||
-          readSocialText(record.avatar),
+        readSocialText(record.avatarUrl) ||
+        readSocialText(record.avatar),
         readProfileAvatarStyle(record),
         readSocialText(record.full_name) ||
-          readSocialText(record.fullName) ||
-          readSocialText(record.name),
+        readSocialText(record.fullName) ||
+        readSocialText(record.name),
       ),
       avatar_style: record.avatar_style,
       avatarStyle: record.avatarStyle,
@@ -958,6 +1039,7 @@ function ProfileGameProgress({
 
 export function ProfileHubView(props: ProfileHubViewProps) {
   const pathname = usePathname();
+  const { items: inboxNotifications } = useNotificationInbox();
   const [activeHubTab, setActiveHubTab] = useState<HubTab>('ringkas');
   const [quickEditOpen, setQuickEditOpen] = useState(false);
   const [socialModal, setSocialModal] = useState<SocialModalTab | null>(null);
@@ -1039,10 +1121,10 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         const terms =
           parsed.terms && typeof parsed.terms === 'object'
             ? Object.entries(parsed.terms)
-                .sort((a, b) => Number(b[1]) - Number(a[1]))
-                .map(([key]) => key)
-                .filter(Boolean)
-                .slice(0, 8)
+              .sort((a, b) => Number(b[1]) - Number(a[1]))
+              .map(([key]) => key)
+              .filter(Boolean)
+              .slice(0, 8)
             : [];
 
         setReelsSignalCount(
@@ -1063,6 +1145,100 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       window.removeEventListener('storage', readReelsPreference);
     };
   }, []);
+
+  const profileOwnerId = detail?.id || user.id || '';
+  const socialNotifications = useMemo(() => {
+    if (!profileOwnerId) return [];
+
+    return inboxNotifications
+      .filter(item => item.category === 'social')
+      .filter(item => {
+        const targetId = readNotificationDataText(item, [
+          'target_user_id',
+          'profile_owner_id',
+          'owner_user_id',
+          'recipient_user_id',
+        ]);
+        return targetId === profileOwnerId;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+  }, [inboxNotifications, profileOwnerId]);
+
+  const profileViewNotifications = useMemo(
+    () =>
+      socialNotifications.filter(item => {
+        const eventType = item.event_type.toLowerCase();
+        return (
+          eventType === 'profile.viewed' ||
+          eventType === 'reels.viewed' ||
+          eventType === 'content.viewed'
+        );
+      }),
+    [socialNotifications],
+  );
+
+  const uniqueProfileViewers = useMemo(() => {
+    const seen = new Set<string>();
+    const result: ProfileSocialActivity[] = [];
+
+    for (const item of profileViewNotifications) {
+      const key = normalizeNotificationActorKey(item) || item.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const actorName =
+        readNotificationDataText(item, ['actor_name']) ||
+        readNotificationDataText(item, ['actor_username']) ||
+        'Someone';
+      const actorHandle = readNotificationDataText(item, ['actor_username']);
+      const actorAvatarUrl = readNotificationDataText(item, ['actor_avatar_url']);
+
+      result.push({
+        id: item.id,
+        title: item.title || 'Profile view',
+        message: item.message,
+        href: buildNotificationTargetHref(item),
+        actorName,
+        actorHandle,
+        actorAvatarUrl,
+        eventType: item.event_type,
+        entityType: readNotificationDataText(item, ['entity_type']),
+        entityId: readNotificationDataText(item, ['entity_id']),
+        createdAt: item.created_at,
+        isRead: item.is_read,
+      });
+    }
+
+    return result.slice(0, 8);
+  }, [profileViewNotifications]);
+
+  const socialActivityEntries = useMemo(
+    () =>
+      socialNotifications.slice(0, 6).map(item => {
+        const actorName =
+          readNotificationDataText(item, ['actor_name']) ||
+          readNotificationDataText(item, ['actor_username']) ||
+          'Someone';
+        return {
+          id: item.id,
+          title: item.title || actorName,
+          message: item.message,
+          href: buildNotificationTargetHref(item),
+          actorName,
+          actorHandle: readNotificationDataText(item, ['actor_username']),
+          actorAvatarUrl: readNotificationDataText(item, ['actor_avatar_url']),
+          eventType: item.event_type,
+          entityType: readNotificationDataText(item, ['entity_type']),
+          entityId: readNotificationDataText(item, ['entity_id']),
+          createdAt: item.created_at,
+          isRead: item.is_read,
+        } satisfies ProfileSocialActivity;
+      }),
+    [socialNotifications],
+  );
 
   const locale = useMemo(() => resolveLocaleFromPathname(pathname), [pathname]);
   const isId = locale === 'id';
@@ -1123,156 +1299,156 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     () =>
       isId
         ? {
-            editQuick: 'Edit cepat',
-            openPublic: 'Buka publik',
-            copyLink: 'Salin link',
-            copied: 'Link tersalin',
-            copyFailed: 'Gagal menyalin',
-            call: 'Telepon',
-            chat: 'Chat',
-            noPhone: 'No HP',
-            overview: 'Ringkas',
-            activity: 'Aktivitas',
-            showcase: 'Etalase',
-            cv: 'CV & Link',
-            trust: 'Trust',
-            activityTitle: 'Aktivitas Lajukan',
-            activitySubtitle: PROMO_ONLY_MODE
-              ? 'Reels, komunitas, listing, chat, dan data profil dibuat kelihatan dari satu profil.'
-              : 'Reels, komunitas, listing, chat, dan transaksi dibuat kelihatan dari satu profil.',
-            quickMoves: 'Satset dari profil',
-            footprint: 'Jejak terbaru',
-            signalMap: 'Sinyal minat',
-            uploadReel: 'Buat Reels',
-            reelsAction: 'Reels',
-            reelsDesc: 'Buka Reels untuk upload, like, komentar, dan simpan.',
-            communityAction: 'Komunitas',
-            communityDesc:
-              'Posting diskusi, foto/video, polling, dan ikut grup.',
-            listingAction: 'Upload listing',
-            listingDesc: 'Produk, jasa, properti, talent, rental, sampai UMKM.',
-            dealAction: PROMO_ONLY_MODE ? 'Chat & minat' : 'Deal & chat',
-            dealDesc: PROMO_ONLY_MODE
-              ? 'Lanjut chat, simpan sinyal kebutuhan, dan rapikan listing dari pertanyaan user.'
-              : 'Lanjut chat, negosiasi, transaksi, wallet, dan riwayat.',
-            storeAction: 'Toko UMKM',
-            storeDesc: PROMO_ONLY_MODE
-              ? 'Kelola storefront, katalog, profil, dan chat usaha.'
-              : 'Kelola storefront, katalog, order, QR, dan operasional.',
-            profileAction: 'CV / Trust',
-            profileDesc: 'Lengkapi skill, link, dokumen, dan verifikasi.',
-            open: 'Buka',
-            upload: 'Upload',
-            create: 'Buat',
-            manage: 'Kelola',
-            noActivity: 'Belum ada jejak aktivitas',
-            noActivityDesc:
-              'Buat Reels, posting komunitas, atau buat listing. Nanti aktivitas penting tampil di sini.',
-            completeProfile: 'Lengkapi profil',
-            mainData: 'Data utama',
-            publicProfile: 'Profil publik',
-            setup: 'Setup satset',
-            listings: 'Listing aktif',
-            transactions: PROMO_ONLY_MODE ? 'Chat & minat' : 'Transaksi',
-            professional: 'Profesional',
-            skills: 'Skill',
-            experience: 'Pengalaman',
-            education: 'Pendidikan',
-            links: 'Link',
-            quickApply: 'Quick Apply',
-            saveQuickApply: 'Simpan Quick Apply',
-            uploadCv: 'Upload CV',
-            verification: 'Verifikasi',
-            social: 'Koneksi',
-            followers: 'Pengikut',
-            following: 'Mengikuti',
-            findPeople: 'Cari orang',
-            socialTitle: 'Koneksi profil',
-            socialSubtitle:
-              'Pengikut dan akun yang kamu ikuti akan tampil di sini saat sudah ada data.',
-            emptyConnections: 'Belum ada koneksi',
-            emptyFollowers: 'Belum ada pengikut yang tercatat.',
-            emptyFollowing: 'Belum mengikuti siapa pun.',
-            editFull: 'Edit lengkap',
-            close: 'Tutup',
-            save: 'Simpan',
-          }
+          editQuick: 'Edit cepat',
+          openPublic: 'Buka publik',
+          copyLink: 'Salin link',
+          copied: 'Link tersalin',
+          copyFailed: 'Gagal menyalin',
+          call: 'Telepon',
+          chat: 'Chat',
+          noPhone: 'No HP',
+          overview: 'Ringkas',
+          activity: 'Aktivitas',
+          showcase: 'Etalase',
+          cv: 'CV & Link',
+          trust: 'Trust',
+          activityTitle: 'Aktivitas Lajukan',
+          activitySubtitle: PROMO_ONLY_MODE
+            ? 'Reels, komunitas, listing, chat, dan data profil dibuat kelihatan dari satu profil.'
+            : 'Reels, komunitas, listing, chat, dan transaksi dibuat kelihatan dari satu profil.',
+          quickMoves: 'Satset dari profil',
+          footprint: 'Jejak terbaru',
+          signalMap: 'Sinyal minat',
+          uploadReel: 'Buat Reels',
+          reelsAction: 'Reels',
+          reelsDesc: 'Buka Reels untuk upload, like, komentar, dan simpan.',
+          communityAction: 'Komunitas',
+          communityDesc:
+            'Posting diskusi, foto/video, polling, dan ikut grup.',
+          listingAction: 'Upload listing',
+          listingDesc: 'Produk, jasa, properti, talent, rental, sampai UMKM.',
+          dealAction: PROMO_ONLY_MODE ? 'Chat & minat' : 'Deal & chat',
+          dealDesc: PROMO_ONLY_MODE
+            ? 'Lanjut chat, simpan sinyal kebutuhan, dan rapikan listing dari pertanyaan user.'
+            : 'Lanjut chat, negosiasi, transaksi, wallet, dan riwayat.',
+          storeAction: 'Toko UMKM',
+          storeDesc: PROMO_ONLY_MODE
+            ? 'Kelola storefront, katalog, profil, dan chat usaha.'
+            : 'Kelola storefront, katalog, order, QR, dan operasional.',
+          profileAction: 'CV / Trust',
+          profileDesc: 'Lengkapi skill, link, dokumen, dan verifikasi.',
+          open: 'Buka',
+          upload: 'Upload',
+          create: 'Buat',
+          manage: 'Kelola',
+          noActivity: 'Belum ada jejak aktivitas',
+          noActivityDesc:
+            'Buat Reels, posting komunitas, atau buat listing. Nanti aktivitas penting tampil di sini.',
+          completeProfile: 'Lengkapi profil',
+          mainData: 'Data utama',
+          publicProfile: 'Profil publik',
+          setup: 'Setup satset',
+          listings: 'Listing aktif',
+          transactions: PROMO_ONLY_MODE ? 'Chat & minat' : 'Transaksi',
+          professional: 'Profesional',
+          skills: 'Skill',
+          experience: 'Pengalaman',
+          education: 'Pendidikan',
+          links: 'Link',
+          quickApply: 'Quick Apply',
+          saveQuickApply: 'Simpan Quick Apply',
+          uploadCv: 'Upload CV',
+          verification: 'Verifikasi',
+          social: 'Koneksi',
+          followers: 'Pengikut',
+          following: 'Mengikuti',
+          findPeople: 'Cari orang',
+          socialTitle: 'Koneksi profil',
+          socialSubtitle:
+            'Pengikut dan akun yang kamu ikuti akan tampil di sini saat sudah ada data.',
+          emptyConnections: 'Belum ada koneksi',
+          emptyFollowers: 'Belum ada pengikut yang tercatat.',
+          emptyFollowing: 'Belum mengikuti siapa pun.',
+          editFull: 'Edit lengkap',
+          close: 'Tutup',
+          save: 'Simpan',
+        }
         : {
-            editQuick: 'Quick edit',
-            openPublic: 'Open public',
-            copyLink: 'Copy link',
-            copied: 'Link copied',
-            copyFailed: 'Copy failed',
-            call: 'Call',
-            chat: 'Chat',
-            noPhone: 'No phone',
-            overview: 'Overview',
-            activity: 'Activity',
-            showcase: 'Showcase',
-            cv: 'CV & Links',
-            trust: 'Trust',
-            activityTitle: 'Lajukan activity',
-            activitySubtitle: PROMO_ONLY_MODE
-              ? 'Reels, community, listings, chats, and profile data are visible from one profile.'
-              : 'Reels, community, listings, chat, and transactions are visible from one profile.',
-            quickMoves: 'Fast moves',
-            footprint: 'Latest footprint',
-            signalMap: 'Interest signals',
-            uploadReel: 'Create Reels',
-            reelsAction: 'Reels',
-            reelsDesc: 'Open Reels to upload, like, comment, and save.',
-            communityAction: 'Community',
-            communityDesc:
-              'Post discussions, photos/videos, polls, and join groups.',
-            listingAction: 'Upload listing',
-            listingDesc:
-              'Products, services, property, talent, rental, and UMKM.',
-            dealAction: PROMO_ONLY_MODE ? 'Chats & interest' : 'Deals & chat',
-            dealDesc: PROMO_ONLY_MODE
-              ? 'Continue chats, save demand signals, and improve listings from user questions.'
-              : 'Continue chats, negotiations, transactions, wallet, and history.',
-            storeAction: 'UMKM store',
-            storeDesc: PROMO_ONLY_MODE
-              ? 'Manage storefront, catalog, profile, and business chats.'
-              : 'Manage storefront, catalog, orders, QR, and operations.',
-            profileAction: 'CV / Trust',
-            profileDesc: 'Complete skills, links, documents, and verification.',
-            open: 'Open',
-            upload: 'Upload',
-            create: 'Create',
-            manage: 'Manage',
-            noActivity: 'No activity footprint yet',
-            noActivityDesc:
-              'Upload reels, post in community, or create a listing. Important activity will appear here.',
-            completeProfile: 'Complete profile',
-            mainData: 'Main data',
-            publicProfile: 'Public profile',
-            setup: 'Fast setup',
-            listings: 'Active listings',
-            transactions: PROMO_ONLY_MODE ? 'Chats' : 'Transactions',
-            professional: 'Professional',
-            skills: 'Skills',
-            experience: 'Experience',
-            education: 'Education',
-            links: 'Links',
-            quickApply: 'Quick Apply',
-            saveQuickApply: 'Save Quick Apply',
-            uploadCv: 'Upload CV',
-            verification: 'Verification',
-            social: 'Connections',
-            followers: 'Followers',
-            following: 'Following',
-            findPeople: 'Find people',
-            socialTitle: 'Profile connections',
-            socialSubtitle:
-              'Followers and accounts you follow will appear here once data exists.',
-            emptyConnections: 'No connections yet',
-            emptyFollowers: 'No recorded followers yet.',
-            emptyFollowing: 'Not following anyone yet.',
-            editFull: 'Full edit',
-            close: 'Close',
-            save: 'Save',
-          },
+          editQuick: 'Quick edit',
+          openPublic: 'Open public',
+          copyLink: 'Copy link',
+          copied: 'Link copied',
+          copyFailed: 'Copy failed',
+          call: 'Call',
+          chat: 'Chat',
+          noPhone: 'No phone',
+          overview: 'Overview',
+          activity: 'Activity',
+          showcase: 'Showcase',
+          cv: 'CV & Links',
+          trust: 'Trust',
+          activityTitle: 'Lajukan activity',
+          activitySubtitle: PROMO_ONLY_MODE
+            ? 'Reels, community, listings, chats, and profile data are visible from one profile.'
+            : 'Reels, community, listings, chat, and transactions are visible from one profile.',
+          quickMoves: 'Fast moves',
+          footprint: 'Latest footprint',
+          signalMap: 'Interest signals',
+          uploadReel: 'Create Reels',
+          reelsAction: 'Reels',
+          reelsDesc: 'Open Reels to upload, like, comment, and save.',
+          communityAction: 'Community',
+          communityDesc:
+            'Post discussions, photos/videos, polls, and join groups.',
+          listingAction: 'Upload listing',
+          listingDesc:
+            'Products, services, property, talent, rental, and UMKM.',
+          dealAction: PROMO_ONLY_MODE ? 'Chats & interest' : 'Deals & chat',
+          dealDesc: PROMO_ONLY_MODE
+            ? 'Continue chats, save demand signals, and improve listings from user questions.'
+            : 'Continue chats, negotiations, transactions, wallet, and history.',
+          storeAction: 'UMKM store',
+          storeDesc: PROMO_ONLY_MODE
+            ? 'Manage storefront, catalog, profile, and business chats.'
+            : 'Manage storefront, catalog, orders, QR, and operations.',
+          profileAction: 'CV / Trust',
+          profileDesc: 'Complete skills, links, documents, and verification.',
+          open: 'Open',
+          upload: 'Upload',
+          create: 'Create',
+          manage: 'Manage',
+          noActivity: 'No activity footprint yet',
+          noActivityDesc:
+            'Upload reels, post in community, or create a listing. Important activity will appear here.',
+          completeProfile: 'Complete profile',
+          mainData: 'Main data',
+          publicProfile: 'Public profile',
+          setup: 'Fast setup',
+          listings: 'Active listings',
+          transactions: PROMO_ONLY_MODE ? 'Chats' : 'Transactions',
+          professional: 'Professional',
+          skills: 'Skills',
+          experience: 'Experience',
+          education: 'Education',
+          links: 'Links',
+          quickApply: 'Quick Apply',
+          saveQuickApply: 'Save Quick Apply',
+          uploadCv: 'Upload CV',
+          verification: 'Verification',
+          social: 'Connections',
+          followers: 'Followers',
+          following: 'Following',
+          findPeople: 'Find people',
+          socialTitle: 'Profile connections',
+          socialSubtitle:
+            'Followers and accounts you follow will appear here once data exists.',
+          emptyConnections: 'No connections yet',
+          emptyFollowers: 'No recorded followers yet.',
+          emptyFollowing: 'Not following anyone yet.',
+          editFull: 'Full edit',
+          close: 'Close',
+          save: 'Save',
+        },
     [isId],
   );
 
@@ -1407,8 +1583,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       activeMarketplaceTab === 'all'
         ? listings
         : listings.filter(
-            item => classifyListing(item) === activeMarketplaceTab,
-          ),
+          item => classifyListing(item) === activeMarketplaceTab,
+        ),
     [activeMarketplaceTab, listings],
   );
 
@@ -1517,6 +1693,18 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   const activityMetrics = useMemo(
     () => [
       {
+        label: isId ? 'Kunjungan profil' : 'Profile views',
+        value: profileViewNotifications.length.toLocaleString(locale),
+        hint: uniqueProfileViewers.length
+          ? isId
+            ? `${uniqueProfileViewers.length.toLocaleString(locale)} unik`
+            : `${uniqueProfileViewers.length.toLocaleString(locale)} unique`
+          : isId
+            ? 'dilihat'
+            : 'views',
+        icon: Users,
+      },
+      {
         label: isId ? 'Interaksi reels' : 'Reels interactions',
         value: reelsSignalCount.toLocaleString(locale),
         hint: isId ? 'like/share/save' : 'like/share/save',
@@ -1530,13 +1718,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       },
       ...(!PROMO_ONLY_MODE
         ? [
-            {
-              label: isId ? 'Transaksi terbaru' : 'Latest deals',
-              value: txPreview.length.toLocaleString(locale),
-              hint: isId ? 'deal' : 'deals',
-              icon: BarChart3,
-            },
-          ]
+          {
+            label: isId ? 'Transaksi terbaru' : 'Latest deals',
+            value: txPreview.length.toLocaleString(locale),
+            hint: isId ? 'deal' : 'deals',
+            icon: BarChart3,
+          },
+        ]
         : []),
       {
         label: isId ? 'Profil siap' : 'Profile ready',
@@ -1549,7 +1737,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
       isId,
       listings.length,
       locale,
+      profileViewNotifications.length,
       reelsSignalCount,
+      uniqueProfileViewers.length,
       setupPercent,
       txPreview.length,
     ],
@@ -1819,7 +2009,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     </button>
                     <LocalizedLink
                       href={publicProfilePath}
-                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full bg-slate-950 px-3 text-xs font-black text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full !bg-slate-950 px-3 text-xs font-black !text-white transition !hover:bg-slate-800 !dark:bg-white !dark:text-slate-950"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                       {isId ? 'Lihat publik' : 'Public'}
@@ -1961,7 +2151,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 </div>
                 <LocalizedLink
                   href="/create"
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-slate-950 px-3 text-xs font-black text-white dark:bg-white dark:text-slate-950"
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full !bg-slate-950 px-3 text-xs font-black !text-white !dark:bg-white !dark:text-slate-950"
                 >
                   <Upload className="h-3.5 w-3.5" />
                   {isId ? 'Posting' : 'Post'}
@@ -2062,6 +2252,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 >
                   <Store className="h-4 w-4" />
                   {isId ? 'Kelola postingan' : 'Manage posts'}
+                </LocalizedLink>
+                <LocalizedLink
+                  href="/usaha"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                >
+                  <Briefcase className="h-4 w-4" />
+                  {isId ? 'Kelola Usaha' : 'Manage business'}
                 </LocalizedLink>
                 {dialPhone ? (
                   <a
@@ -2414,6 +2611,81 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   </SectionBlock>
 
                   <SectionBlock
+                    title={isId ? 'Siapa yang lihat profilmu' : 'Who viewed your profile'}
+                    tone="social"
+                    subtitle={
+                      isId
+                        ? 'Ringkas, siapa saja yang buka profil, reel, atau kontenmu.'
+                        : 'A quick look at who opened your profile, reels, or content.'
+                    }
+                  >
+                    {uniqueProfileViewers.length === 0 ? (
+                      <EmptyState
+                        title={isId ? 'Belum ada viewer' : 'No viewers yet'}
+                        description={
+                          isId
+                            ? 'Saat ada yang membuka profilmu, nama dan tautan mereka akan muncul di sini.'
+                            : 'When people open your profile, their names and links will appear here.'
+                        }
+                        action={
+                          <LocalizedLink href="/profile" className={TONAL_ACTION_CLASS}>
+                            <Users className="h-4 w-4" />
+                            {isId ? 'Buka profil' : 'Open profile'}
+                          </LocalizedLink>
+                        }
+                      />
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {uniqueProfileViewers.map(item => (
+                          <LocalizedLink
+                            key={item.id}
+                            href={item.href}
+                            className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                          >
+                            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-[16px] bg-[color:var(--app-accent-soft)]">
+                              {item.actorAvatarUrl ? (
+                                <Image
+                                  src={profileAvatarSrc(item.actorAvatarUrl)}
+                                  alt={item.actorName}
+                                  fill
+                                  sizes="44px"
+                                  className="object-cover"
+                                  unoptimized
+                                />
+                              ) : (
+                                <span className="grid h-full w-full place-items-center text-sm font-black text-[color:var(--app-accent)]">
+                                  {item.actorName.slice(0, 1).toUpperCase()}
+                                </span>
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                {item.actorName}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                                {item.eventType}
+                              </span>
+                            </span>
+                          </LocalizedLink>
+                        ))}
+                      </div>
+                    )}
+                    {socialActivityEntries.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {socialActivityEntries.map(item => (
+                          <ActivityTimelineRow
+                            key={item.id}
+                            title={item.title}
+                            description={item.message}
+                            href={item.href}
+                            icon={Heart}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </SectionBlock>
+
+                  <SectionBlock
                     title={copy.signalMap}
                     tone="insight"
                     subtitle={
@@ -2445,13 +2717,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       </span>
                       {reelsPreferenceTags.length > 0
                         ? reelsPreferenceTags.map(tag => (
-                            <span
-                              key={tag}
-                              className="inline-flex min-h-[30px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 text-[11px] font-semibold text-[color:var(--app-accent)]"
-                            >
-                              #{tag}
-                            </span>
-                          ))
+                          <span
+                            key={tag}
+                            className="inline-flex min-h-[30px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 text-[11px] font-semibold text-[color:var(--app-accent)]"
+                          >
+                            #{tag}
+                          </span>
+                        ))
                         : null}
                     </div>
                   </SectionBlock>

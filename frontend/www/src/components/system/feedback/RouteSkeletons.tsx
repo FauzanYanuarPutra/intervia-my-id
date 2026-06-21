@@ -97,7 +97,10 @@ export function SharedPageSkeleton() {
 
 export function AppPageSkeleton() {
   return (
-    <div className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
+    <div
+      className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]"
+      data-skeleton-route="true"
+    >
       <div className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-5 sm:py-5">
         <section className="ui-panel rounded-[32px] p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -239,7 +242,7 @@ export function AuthPageSkeleton() {
 
 export function HomePageSkeleton() {
   return (
-    <div className="page-shell page-rhythm py-4 sm:py-6">
+    <div className="page-shell page-rhythm py-4 sm:py-6" data-skeleton-route="true">
       <section className="ui-panel ui-hero-panel rounded-[32px] p-5 sm:p-6">
         <div className="flex flex-wrap gap-2">
           <Pulse className="h-9 w-28 rounded-full" />
@@ -366,7 +369,10 @@ export function HomePageSkeleton() {
 
 export function DashboardPageSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-5">
+    <div
+      className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-5"
+      data-skeleton-route="true"
+    >
       <section className="rounded-[32px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -460,7 +466,10 @@ function SettingsRowSkeleton({
 
 export function SettingsPageSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 px-3 py-4 sm:px-5 sm:py-6">
+    <div
+      className="mx-auto w-full max-w-5xl space-y-4 px-3 py-4 sm:px-5 sm:py-6"
+      data-skeleton-route="true"
+    >
       <section className="rounded-[32px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-sm dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -930,7 +939,7 @@ export function TrackerPageSkeleton() {
 
 export function SearchPageSkeleton() {
   return (
-    <div className="min-h-screen ui-surface-muted ui-text">
+    <div className="min-h-screen ui-surface-muted ui-text" data-skeleton-route="true">
       <div className="page-shell py-4 sm:py-6">
         <section className="ui-panel ui-hero-panel p-4 sm:p-6">
           <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
@@ -1050,7 +1059,10 @@ export function CreatePageSkeleton() {
 
 export function TransactionPageSkeleton() {
   return (
-    <div className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
+    <div
+      className="min-h-[100svh] bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]"
+      data-skeleton-route="true"
+    >
       <div className="content-width py-5 sm:py-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -1098,7 +1110,10 @@ export function TransactionPageSkeleton() {
 
 export function ContentDetailSkeleton() {
   return (
-    <div className="min-h-[100svh] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)]">
+    <div
+      className="min-h-[100svh] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)]"
+      data-skeleton-route="true"
+    >
       <div className="content-width py-5 sm:py-7">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
@@ -1221,7 +1236,10 @@ export function ChatIndexSkeleton() {
 
 export function ChatDetailSkeleton() {
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[color:var(--app-surface)]">
+    <div
+      className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[color:var(--app-surface)]"
+      data-skeleton-route="true"
+    >
       <header className="sticky top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] pt-[env(safe-area-inset-top)]">
         <div className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-5 sm:py-3.5">
           <Pulse className="h-9 w-9 rounded-full lg:hidden" />
@@ -1409,7 +1427,10 @@ export function MyProjectsSkeleton() {
 
 export function PaymentsPageSkeleton() {
   return (
-    <section className="mx-auto w-full max-w-[var(--app-max-width)] space-y-3 px-0 py-3 sm:p-6">
+    <section
+      className="mx-auto w-full max-w-[var(--app-max-width)] space-y-3 px-0 py-3 sm:p-6"
+      data-skeleton-route="true"
+    >
       <div className="space-y-3 sm:hidden">
         <div className="hidden rounded-[1.05rem] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
@@ -1694,7 +1715,10 @@ export function ProfileEditSkeleton() {
 
 export function ProfileViewSkeleton() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[color:var(--app-surface-muted)] via-[color:var(--app-surface-strong)] to-[color:var(--app-surface-muted)] pb-8 pt-2 dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_12%,_transparent)] sm:pt-6">
+    <div
+      className="min-h-screen bg-gradient-to-br from-[color:var(--app-surface-muted)] via-[color:var(--app-surface-strong)] to-[color:var(--app-surface-muted)] pb-8 pt-2 dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_12%,_transparent)] sm:pt-6"
+      data-skeleton-route="true"
+    >
       <div className="page-shell">
         <section className="overflow-hidden rounded-3xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm dark:border-[color:var(--app-border-strong)]">
           <Pulse className="h-28 w-full rounded-none sm:h-36 lg:h-48" />

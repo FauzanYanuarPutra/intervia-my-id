@@ -1,7 +1,7 @@
 defmodule ChatServiceWeb.MessageController do
   use ChatServiceWeb, :controller
 
-  alias ChatService.{AidaBot, Repo}
+  alias ChatService.{AidaBot, IdentityClient, Repo}
   alias ChatService.DmRoom
   alias ChatService.Security
 
@@ -300,11 +300,20 @@ defmodule ChatServiceWeb.MessageController do
         nil
 
       peer_id_bin ->
-        case Repo.execute("SELECT display_name, username FROM core.users WHERE user_id = ? LIMIT 1", [
-               {"uuid", peer_id_bin}
-             ]) do
-          {:ok, [row | _]} -> row["display_name"] || row["username"]
-          _ -> nil
+        peer_id = Ecto.UUID.cast!(peer_id_bin)
+
+        case IdentityClient.fetch_public_profile(peer_id) do
+          {:ok, profile} ->
+            IdentityClient.display_name(profile, peer_id) || peer_id
+
+          _ ->
+            case Repo.execute(
+                   "SELECT display_name, username FROM core.users WHERE user_id = ? LIMIT 1",
+                   [{"uuid", peer_id_bin}]
+                 ) do
+              {:ok, [row | _]} -> row["display_name"] || row["username"]
+              _ -> nil
+            end
         end
     end
   end

@@ -8,6 +8,7 @@ import {
   CreditCard,
   Handshake,
   Info,
+  Heart,
   PackageCheck,
   RefreshCcw,
   ShieldAlert,
@@ -293,6 +294,41 @@ export function notificationPresentation({
       surfaceClassName:
         'border-orange-200/80 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_64%,#ffedd5_100%)] dark:border-orange-400/20 dark:bg-orange-400/10',
       titleClassName: 'text-orange-800 dark:text-orange-100',
+    });
+  }
+
+  if (
+    has(
+      text,
+      'social',
+      'profile.viewed',
+      'reels.viewed',
+      'reels.liked',
+      'reels.commented',
+      'reels.replied',
+      'content.viewed',
+      'content.liked',
+      'content.commented',
+      'content.replied',
+      'maps.profile_opened',
+      'maps.route_clicked',
+      'chat.message_sent',
+      'like',
+      'liked',
+      'comment',
+      'reply',
+      'viewed',
+    )
+  ) {
+    return makeTone({
+      Icon: Heart,
+      label: 'Aktivitas',
+      accentClassName: 'bg-rose-500',
+      iconClassName:
+        'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/12 dark:text-rose-100',
+      surfaceClassName:
+        'border-rose-200/80 bg-[linear-gradient(135deg,#fff7f7_0%,#ffffff_68%,#fff1f2_100%)] dark:border-rose-400/20 dark:bg-rose-400/10',
+      titleClassName: 'text-rose-700 dark:text-rose-100',
     });
   }
 

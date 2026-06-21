@@ -1,8 +1,6 @@
 'use client';
 
 import { ReactNode, Suspense } from 'react';
-import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
 
 import GlobalLoader from '@/components/GlobalLoader';
 import NetworkStatus from '@/components/common/NetworkStatus';
@@ -11,23 +9,17 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import StackMaintenanceGate from '@/components/layout/StackMaintenanceGate';
 import { LanguageModalProvider } from '@/components/modal/LanguageModal/LanguageModalContext';
+import { LanguageModal } from '@/components/modal/LanguageModal/LanguageModal';
 import type { StackStartupState } from '@/lib/system/startupState';
 import { cn } from '@/lib/utils';
 import { useRouteLayout } from '@/lib/useRouteLayout';
 import { MobileRouteChrome } from './MobileRouteChrome';
 
-const LanguageModal = dynamic(
-  () =>
-    import('@/components/modal/LanguageModal/LanguageModal').then(
-      m => m.LanguageModal,
-    ),
-  { ssr: false, loading: () => null },
-);
-
 type Props = {
   children: ReactNode;
   locale: string;
   initialMaintenanceState?: StackStartupState;
+  initialLanguageSelectionRequired: boolean;
 };
 
 function DesktopRouteHeader() {
@@ -48,14 +40,12 @@ export default function ClientLayoutWrapper({
   children,
   initialMaintenanceState,
   locale,
+  initialLanguageSelectionRequired,
 }: Props) {
   const {
-    pathname,
-    showHeaderMobile,
     showHeaderDesktop,
     showBottomNavMobile,
     showTopBarMobile,
-    showTopBarDesktop,
     showFooterMobile,
     showFooterDesktop,
     meta,
@@ -70,14 +60,17 @@ export default function ClientLayoutWrapper({
     eyebrow: '',
   };
 
-
   return (
     <>
       <Suspense fallback={null}>
         <GlobalLoader />
       </Suspense>
       <NetworkStatus />
-      <LanguageModalProvider locale={locale}>
+      <LanguageModalProvider
+        key={locale}
+        locale={locale}
+        initialPromptVisible={initialLanguageSelectionRequired}
+      >
         <div
           className={cn(
             'lajukan-route-surface',
@@ -101,26 +94,26 @@ export default function ClientLayoutWrapper({
                 ) : null}
               </>
             }
+            footer={
+              showFooter && !isImmersiveRoute ? (
+                <div
+                  className={cn(
+                    !showFooterMobile && 'hidden lg:block',
+                    !showFooterDesktop && 'lg:hidden',
+                  )}
+                >
+                  <Footer />
+                </div>
+              ) : null
+            }
             initialState={initialMaintenanceState}
             locale={locale}
           >
             {children}
           </StackMaintenanceGate>
-          {showFooter && !isImmersiveRoute ? (
-            <div
-              className={cn(
-                !showFooterMobile && 'hidden lg:block',
-                !showFooterDesktop && 'lg:hidden',
-              )}
-            >
-              <Footer />
-            </div>
-          ) : null}
         </div>
         {!isImmersiveRoute ? <GlobalPreferenceDock /> : null}
-        <Suspense fallback={null}>
-          <LanguageModal />
-        </Suspense>
+        <LanguageModal />
       </LanguageModalProvider>
     </>
   );

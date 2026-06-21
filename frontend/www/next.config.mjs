@@ -91,6 +91,9 @@ const nextConfig = {
     cssChunking: false,
     externalDir: true,
     optimizePackageImports: ['lucide-react', 'framer-motion', 'recharts'],
+    // Upload multipart bodies are streamed through Next's proxy/body clone path.
+    // Keep the cap comfortably above the largest media upload used in the app.
+    proxyClientMaxBodySize: '128mb',
   },
 
   async headers() {

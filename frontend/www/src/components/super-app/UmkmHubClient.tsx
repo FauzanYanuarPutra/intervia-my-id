@@ -44,6 +44,7 @@ import {
   buildUsahaPathFromWorkspace,
 } from '@/lib/umkmSurface';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+import { prepareUploadFile } from '@/lib/media/prepareUploadMedia';
 import { cn } from '@/lib/utils';
 import {
   buildDefaultCustomFieldsForBusiness,
@@ -252,8 +253,6 @@ type SetupDetailStep = {
 };
 
 const STORE_CREATE_STEP_ORDER: StoreCreateStepId[] = [
-  'intro',
-  'group',
   'identity',
   'location',
   'operations',
@@ -461,7 +460,7 @@ export function UmkmHubClient({
     createBasicStoreEditFormState,
   );
   const [storeCreateStep, setStoreCreateStep] =
-    useState<StoreCreateStepId>('intro');
+    useState<StoreCreateStepId>('identity');
   const [storeSetupMode, setStoreSetupMode] = useState<'guided' | 'full'>(
     'guided',
   );
@@ -1020,13 +1019,6 @@ export function UmkmHubClient({
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
     return { lat, lng };
   }, [storeForm.lat, storeForm.lng]);
-  const selectedRegistrationPath = useMemo(
-    () =>
-      registrationPathOptions.find(
-        option => option.groupId === selectedStoreCategoryGroup,
-      ) || null,
-    [registrationPathOptions, selectedStoreCategoryGroup],
-  );
   const isGuidedStoreSetup = storeSetupMode === 'guided';
   const compactStoreControlClass =
     'min-h-[46px] rounded-[14px] border-slate-200 px-3.5 text-[13px] shadow-[0_10px_22px_-20px_rgba(15,23,42,0.16)]';
@@ -1134,34 +1126,10 @@ export function UmkmHubClient({
   const storeCreateSteps = useMemo(
     () => [
       {
-        id: 'intro' as const,
-        icon: Clipboard,
-        title: isId ? 'Informasi Dasar' : 'Basic Info',
-        desc: isId ? 'Jenis dan profil awal.' : 'Type and core profile.',
-        summary: isId
-          ? 'Lengkapi data dasar supaya orang cepat paham usahamu.'
-          : 'Complete the core data so people understand the business quickly.',
-      },
-      {
-        id: 'group' as const,
-        icon: Store,
-        title: isId ? 'Jenis Usaha' : 'Business Type',
-        desc: isId
-          ? 'Produk, jasa, atau keduanya.'
-          : 'Product, service, or both.',
-        summary: selectedRegistrationPath
-          ? `${selectedRegistrationPath.title} - ${getUmkmBusinessCategoryLabel(storeForm.business_category, isId)}`
-          : isId
-            ? 'Pilih kategori usaha yang paling dekat dengan aktivitasmu.'
-            : 'Pick one first.',
-      },
-      {
         id: 'identity' as const,
-        icon: FileText,
-        title: isId ? 'Kontak & Media' : 'Contact & Media',
-        desc: isId
-          ? 'Nama, kota, WA, dan cerita.'
-          : 'Name, city, WhatsApp, story.',
+        icon: Store,
+        title: isId ? 'Profil' : 'Profile',
+        desc: isId ? 'Nama, jenis, foto.' : 'Name, type, photo.',
         summary:
           storeForm.name.trim() || storeForm.city.trim()
             ? [
@@ -1172,14 +1140,14 @@ export function UmkmHubClient({
                 .filter(Boolean)
                 .join(' - ')
             : isId
-              ? 'Isi nama usaha, kota, dan alamat atau patokan.'
+              ? 'Isi nama, jenis, kota, dan alamat.'
               : 'Fill the core data.',
       },
       {
         id: 'location' as const,
         icon: Map,
         title: isId ? 'Lokasi' : 'Location',
-        desc: isId ? 'Alamat dan titik peta.' : 'Address and map pin.',
+        desc: isId ? 'Titik peta.' : 'Map pin.',
         summary: storeLocationPoint
           ? `${storeLocationPoint.lat.toFixed(4)}, ${storeLocationPoint.lng.toFixed(4)}`
           : isId
@@ -1189,8 +1157,8 @@ export function UmkmHubClient({
       {
         id: 'operations' as const,
         icon: ShieldCheck,
-        title: isId ? 'Review & Simpan' : 'Review & Save',
-        desc: isId ? 'Cek lalu publikasikan.' : 'Check, then publish.',
+        title: isId ? 'Simpan' : 'Save',
+        desc: isId ? 'Cek lalu simpan.' : 'Check, then save.',
         summary: supportsDineIn(storeForm.business_capabilities)
           ? isId
             ? `${Math.max(0, Number(storeForm.table_count) || 0)} meja awal`
@@ -1202,9 +1170,7 @@ export function UmkmHubClient({
     ],
     [
       isId,
-      selectedRegistrationPath,
       storeForm.business_capabilities,
-      storeForm.business_category,
       storeForm.city,
       storeForm.name,
       storeForm.table_count,
@@ -1241,34 +1207,23 @@ export function UmkmHubClient({
   const storeCreateChecklist = useMemo(
     () => [
       {
-        id: 'intro',
-        done: true,
-        label: isId ? 'Mulai' : 'Start',
-      },
-      {
-        id: 'group-profile',
-        done: Boolean(selectedRegistrationPath),
-        label: isId ? 'Jenis' : 'Type',
-      },
-      {
-        id: 'identity-core',
+        id: 'profile',
         done: storeCreateValidation.identity,
-        label: isId ? 'Data' : 'Details',
+        label: isId ? 'Profil' : 'Profile',
       },
       {
-        id: 'location-point',
+        id: 'location',
         done: storeCreateValidation.location,
         label: isId ? 'Lokasi' : 'Location',
       },
       {
-        id: 'operations-capabilities',
+        id: 'save',
         done: storeCreateValidation.operations,
-        label: isId ? 'Cek' : 'Review',
+        label: isId ? 'Simpan' : 'Save',
       },
     ],
     [
       isId,
-      selectedRegistrationPath,
       storeCreateValidation.identity,
       storeCreateValidation.location,
       storeCreateValidation.operations,
@@ -3409,8 +3364,9 @@ export function UmkmHubClient({
   );
 
   const uploadImage = async (file: File) => {
+    const optimizedFile = await prepareUploadFile(file);
     const formData = new FormData();
-    formData.append('images', file);
+    formData.append('images', optimizedFile);
 
     const res = await authFetch('/api/content/upload-images', {
       method: 'POST',
@@ -3657,6 +3613,9 @@ export function UmkmHubClient({
       const tableCount = supportsTables ? Number(tableCountInput || '0') : 0;
       const businessCategory = storeForm.business_category;
       const businessFocus = storeForm.business_focus.trim();
+      const storePhotoUrl = normalizeSingleLineInput(
+        storeForm.store_photo_url,
+      );
       const businessProfile = getUmkmManageProfile(businessCategory);
       const defaultCapacity = supportsTables
         ? Number(defaultCapacityInput || '2')
@@ -3810,6 +3769,7 @@ export function UmkmHubClient({
             business_profile: businessProfile.id,
             business_capabilities: storeForm.business_capabilities,
             location_mode: storeForm.location_mode,
+            store_photo_url: storePhotoUrl || undefined,
             outlet_active: false,
             live_now: false,
             ...(businessFocus
@@ -3827,7 +3787,7 @@ export function UmkmHubClient({
       }
 
       setStoreForm(createStoreFormState('culinary'));
-      setStoreCreateStep('intro');
+      setStoreCreateStep('identity');
       setStoreSetupMode('guided');
       setShowStoreBusinessFocus(false);
       setShowOptionalStoreIdentity(false);
@@ -4082,6 +4042,10 @@ export function UmkmHubClient({
             address,
             phone,
             description,
+            metadata: {
+              store_photo_url:
+                verificationForm.store_photo_url.trim() || undefined,
+            },
           }),
         },
       );
@@ -9387,8 +9351,8 @@ export function UmkmHubClient({
                                   <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                     {isGuidedStoreSetup
                                       ? isId
-                                        ? 'Data dasar usaha'
-                                        : 'Fill these 3 fields first'
+                                        ? 'Profil usaha'
+                                        : 'Business profile'
                                       : isId
                                         ? 'Identitas inti usaha'
                                         : 'Core business identity'}
@@ -9396,12 +9360,59 @@ export function UmkmHubClient({
                                   <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/72">
                                     {isGuidedStoreSetup
                                       ? isId
-                                        ? 'Cukup isi nama, kota, dan alamat atau patokan supaya pembeli mudah mengenali usaha.'
-                                        : 'Name, city, and address are enough for now. Phone and description can wait.'
+                                        ? 'Isi yang penting. Foto bikin usaha lebih cepat dikenali.'
+                                        : 'Fill the essentials. A photo helps people recognize it faster.'
                                       : isId
                                         ? 'Lengkapi identitas dasar yang dipakai owner dan tim untuk operasional harian.'
                                         : 'Complete the core identity used by the owner and team for daily operations.'}
                                   </p>
+                                  {useSimpleSetupCreateLayout ? (
+                                    <div className="mt-3 grid gap-2 min-[420px]:grid-cols-2 sm:grid-cols-4">
+                                      {registrationPathOptions.map(option => {
+                                        const active =
+                                          selectedStoreCategoryGroup ===
+                                          option.groupId;
+                                        const Icon = option.icon;
+
+                                        return (
+                                          <button
+                                            key={option.groupId}
+                                            type="button"
+                                            onClick={() =>
+                                              applyStoreCategoryGroup(
+                                                option.groupId,
+                                              )
+                                            }
+                                            className={cn(
+                                              'flex min-h-[74px] items-start gap-2 rounded-[14px] border px-2.5 py-2 text-left transition',
+                                              active
+                                                ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)]'
+                                                : 'border-slate-200 bg-white hover:border-[color:var(--app-accent-border)]',
+                                            )}
+                                          >
+                                            <span
+                                              className={cn(
+                                                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] border',
+                                                active
+                                                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                                                  : 'border-emerald-100 bg-emerald-50 text-[color:var(--app-accent)]',
+                                              )}
+                                            >
+                                              <Icon className="h-3.5 w-3.5" />
+                                            </span>
+                                            <span className="min-w-0">
+                                              <span className="line-clamp-2 text-[11px] font-black leading-4 text-[color:var(--app-text)]">
+                                                {option.title}
+                                              </span>
+                                              <span className="mt-0.5 block truncate text-[9px] font-black uppercase tracking-[0.08em] text-[color:var(--app-accent)]">
+                                                {option.badge}
+                                              </span>
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : null}
                                   <div
                                     className={cn(
                                       'mt-3 grid gap-3 sm:grid-cols-2',
@@ -9469,6 +9480,95 @@ export function UmkmHubClient({
                                       }
                                       required
                                     />
+                                    <SelectInput
+                                      label={
+                                        isId ? 'Jenis usaha' : 'Business type'
+                                      }
+                                      className={compactStoreControlClass}
+                                      value={storeForm.business_category}
+                                      onChange={event =>
+                                        applyStoreCategory(
+                                          event.target
+                                            .value as UmkmBusinessCategoryId,
+                                        )
+                                      }
+                                    >
+                                      {filteredStoreBusinessCategoryOptions.map(
+                                        option => (
+                                          <option
+                                            key={option.id}
+                                            value={option.id}
+                                          >
+                                            {isId
+                                              ? option.labelId
+                                              : option.labelEn}
+                                          </option>
+                                        ),
+                                      )}
+                                    </SelectInput>
+                                  </div>
+                                  <div className="mt-3 rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] p-3">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                      <div className="min-w-0">
+                                        <p className="text-[12px] font-black text-[color:var(--app-accent)]">
+                                          {isId
+                                            ? 'Foto usaha'
+                                            : 'Business photo'}
+                                        </p>
+                                        <p className="mt-0.5 truncate text-[11px] text-[color:var(--app-accent)]/72">
+                                          {storeForm.store_photo_url
+                                            ? isId
+                                              ? 'Foto sudah dipilih'
+                                              : 'Photo selected'
+                                            : isId
+                                              ? 'Upload foto tempat, produk, atau aktivitas usaha.'
+                                              : 'Upload the place, product, or activity.'}
+                                        </p>
+                                      </div>
+                                      <label className="ui-button-secondary ui-button-compact inline-flex cursor-pointer items-center justify-center gap-2 px-3 text-xs font-bold">
+                                        {uploadingKey ===
+                                        'new_store_photo_url' ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <UploadCloud className="h-3.5 w-3.5" />
+                                        )}
+                                        {isId ? 'Upload foto' : 'Upload photo'}
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          accept="image/*"
+                                          onChange={event => {
+                                            const file =
+                                              event.target.files?.[0] || null;
+                                            void handleUpload(
+                                              'new_store_photo_url',
+                                              file,
+                                              'image',
+                                              url => {
+                                                setStoreForm(current => ({
+                                                  ...current,
+                                                  store_photo_url: url,
+                                                }));
+                                              },
+                                            );
+                                            event.currentTarget.value = '';
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                    {storeForm.store_photo_url ? (
+                                      <div className="mt-3 overflow-hidden rounded-[16px] border border-[color:var(--app-accent-border)] bg-white">
+                                        <img
+                                          src={storeForm.store_photo_url}
+                                          alt={
+                                            isId
+                                              ? 'Preview foto usaha'
+                                              : 'Business photo preview'
+                                          }
+                                          className="h-40 w-full object-cover"
+                                        />
+                                      </div>
+                                    ) : null}
                                   </div>
                                   {storeSuggestedBaseAddress &&
                                   normalizeSingleLineInput(storeForm.address)
@@ -11074,6 +11174,67 @@ export function UmkmHubClient({
                                   : 'Street, landmark, or business area'
                               }
                             />
+
+                            <div className="rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] p-4">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-black text-[color:var(--app-accent)]">
+                                    {isId ? 'Foto usaha' : 'Business photo'}
+                                  </p>
+                                  <p className="mt-0.5 truncate text-xs text-[color:var(--app-accent)]/72">
+                                    {verificationForm.store_photo_url
+                                      ? isId
+                                        ? 'Foto siap disimpan.'
+                                        : 'Photo ready to save.'
+                                      : isId
+                                        ? 'Upload foto usaha.'
+                                        : 'Upload a business photo.'}
+                                  </p>
+                                </div>
+                                <label className="ui-button-secondary ui-button-compact inline-flex cursor-pointer items-center justify-center gap-2 px-3 text-xs font-bold">
+                                  {uploadingKey === 'store_photo_url' ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <UploadCloud className="h-3.5 w-3.5" />
+                                  )}
+                                  {isId ? 'Upload' : 'Upload'}
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={event => {
+                                      const file =
+                                        event.target.files?.[0] || null;
+                                      void handleUpload(
+                                        'store_photo_url',
+                                        file,
+                                        'image',
+                                        url => {
+                                          setVerificationForm(current => ({
+                                            ...current,
+                                            store_photo_url: url,
+                                          }));
+                                        },
+                                      );
+                                      event.currentTarget.value = '';
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              {verificationForm.store_photo_url ? (
+                                <div className="mt-3 overflow-hidden rounded-[18px] border border-[color:var(--app-accent-border)] bg-white">
+                                  <img
+                                    src={verificationForm.store_photo_url}
+                                    alt={
+                                      isId
+                                        ? 'Preview foto usaha'
+                                        : 'Business photo preview'
+                                    }
+                                    className="h-48 w-full object-cover"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
 
                             <TextArea
                               label={
@@ -12859,12 +13020,12 @@ export function UmkmHubClient({
                                 return (
                                   <div
                                     key={item.key}
-                                    className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
+                                    className="rounded-2xl border border-[color:var(--app-accent-border)] p-4 text-[color:var(--app-accent)]"
                                   >
-                                    <p className="text-sm font-bold  text-[color:var(--app-accent)]">
+                                    <p className="text-sm font-bold text-[color:var(--app-accent)]">
                                       {item.label}
                                     </p>
-                                    <label className="mt-3 inline-flex min-h-[42px] cursor-pointer items-center gap-2 rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-4 text-sm font-bold  border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]  border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
+                                    <label className="mt-3 inline-flex min-h-[42px] cursor-pointer items-center gap-2 rounded-2xl border border-[color:var(--app-accent-border)] px-4 text-sm font-bold text-[color:var(--app-accent)]">
                                       {uploadingKey === item.key ? (
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                       ) : (

@@ -490,7 +490,7 @@ export const routes: RouteConfig[] = [
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
-      footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
+      footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
     },
     access: AUTH_ACCESS,
     children: [

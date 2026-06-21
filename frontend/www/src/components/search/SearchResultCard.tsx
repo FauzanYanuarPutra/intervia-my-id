@@ -8,7 +8,7 @@ import { findSubSector, getSubSectorName } from '@/data/subSectors';
 import { WORK_MODE_OPTIONS } from '@/data/sectorFields';
 import { parseImages } from '@/lib/content/catalog';
 import { createPromotionSnapshot } from '@/lib/content/promotionPrograms';
-import { BadgePercent, Gift, Star, Trophy } from 'lucide-react';
+import { BadgePercent, Gift, Heart, Trophy } from 'lucide-react';
 
 type ContentItem = {
   id: string;
@@ -70,12 +70,6 @@ export default function SearchResultCard({
     : null;
   const ct = CONTENT_TYPES.find(c => c.id === (item.type || 'product'));
   const localeCode = locale === 'id' ? 'id' : 'en';
-  const ratingValue =
-    typeof item.rating === 'number'
-      ? item.rating
-      : typeof item.seller_stats?.rating === 'number'
-        ? item.seller_stats.rating
-        : 0;
   const reviewCount =
     typeof item.review_count === 'number'
       ? item.review_count
@@ -186,10 +180,10 @@ export default function SearchResultCard({
                   {locale === 'id' ? workModeOpt.shortId : workModeOpt.shortEn}
                 </span>
               )}
-            {ratingValue > 0 && (
+            {reviewCount > 0 && (
               <span className="flex items-center gap-1 text-[color:var(--app-warning)] dark:text-[color:var(--app-warning)]">
-                <Star className="w-3 h-3 fill-current" />
-                {ratingValue.toFixed(1)} ({reviewCount || 0})
+                <Heart className="h-3 w-3 fill-current" />
+                {reviewCount.toLocaleString(localeCode === 'id' ? 'id-ID' : 'en-US')} likes
               </span>
             )}
             {item.tags && item.tags.length > 0 && (
