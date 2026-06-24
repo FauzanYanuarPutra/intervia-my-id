@@ -6,6 +6,10 @@ http://localhost, http://127.0.0.1 {
     encode gzip zstd
 }
 
+http://{$APP_DOMAIN} {
+    redir https://www.{$APP_DOMAIN}{uri} permanent
+}
+
 # Blok Utama: WWW
 http://www.{$APP_DOMAIN} {
     @chat_socket path /socket /socket/*
