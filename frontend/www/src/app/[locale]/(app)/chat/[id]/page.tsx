@@ -508,20 +508,20 @@ type ListingActionDraft = {
   currency: string;
   contentUrl?: string;
   dealKind:
-    | 'job'
-    | 'service'
-    | 'product'
-    | 'property'
-    | 'tool_rental'
-    | 'profile'
-    | 'other';
+  | 'job'
+  | 'service'
+  | 'product'
+  | 'property'
+  | 'tool_rental'
+  | 'profile'
+  | 'other';
   fulfillmentMode:
-    | 'standard'
-    | 'shipping'
-    | 'pickup'
-    | 'remote'
-    | 'onsite'
-    | 'instant';
+  | 'standard'
+  | 'shipping'
+  | 'pickup'
+  | 'remote'
+  | 'onsite'
+  | 'instant';
   pricingMode: 'fixed' | 'request';
 };
 
@@ -1779,7 +1779,7 @@ export default function ChatRoomPage() {
                   : 'Support Room',
               member_ids: [user.id],
             }),
-          }).catch(() => {});
+          }).catch(() => { });
         }
         await refetchInbox();
       } finally {
@@ -1853,7 +1853,7 @@ export default function ChatRoomPage() {
               (typeof payload.username === 'string' && payload.username.trim()
                 ? `@${payload.username.trim()}`
                 : typeof payload.full_name === 'string' &&
-                    payload.full_name.trim()
+                  payload.full_name.trim()
                   ? payload.full_name.trim()
                   : null) || null;
             return label ? { id, label } : null;
@@ -2376,7 +2376,7 @@ export default function ChatRoomPage() {
     if (!canonicalRoomId) return;
     authFetch(`/api/chat/rooms/${encodeURIComponent(canonicalRoomId)}/read`, {
       method: 'POST',
-    }).catch(() => {});
+    }).catch(() => { });
     try {
       channelRef.current?.push('read', {});
     } catch {
@@ -2552,7 +2552,7 @@ export default function ChatRoomPage() {
           if (channelRef.current && channelRef.current !== channel) {
             try {
               channelRef.current.leave();
-            } catch {}
+            } catch { }
           }
 
           channelRef.current = channel;
@@ -2611,7 +2611,7 @@ export default function ChatRoomPage() {
               setMessages(prev =>
                 prev.map(m =>
                   normId(m.sender_id) === normId(user.id) &&
-                  (m.status === 'sent' || m.status === 'sending')
+                    (m.status === 'sent' || m.status === 'sending')
                     ? { ...m, status: 'read' as MessageStatus }
                     : m,
                 ),
@@ -2693,11 +2693,11 @@ export default function ChatRoomPage() {
                 return prev.map(m =>
                   m.id === payload.client_ref
                     ? {
-                        ...m,
-                        id: msgId,
-                        status: 'sent' as MessageStatus,
-                        created_at: payload.sent_at ?? m.created_at,
-                      }
+                      ...m,
+                      id: msgId,
+                      status: 'sent' as MessageStatus,
+                      created_at: payload.sent_at ?? m.created_at,
+                    }
                     : m,
                 );
               }
@@ -2709,8 +2709,8 @@ export default function ChatRoomPage() {
                 message_type: payload.message_type ?? 'text',
                 attachments: Array.isArray(payload.attachments)
                   ? payload.attachments
-                      .map(normalizeAttachmentUrl)
-                      .filter(Boolean)
+                    .map(normalizeAttachmentUrl)
+                    .filter(Boolean)
                   : [],
                 created_at: payload.sent_at ?? new Date().toISOString(),
                 status: 'sent',
@@ -2732,15 +2732,15 @@ export default function ChatRoomPage() {
               channel.off('call_incoming', incomingCallRef);
               channel.off('call_rejected', callRejectedRef);
               channel.off('call_ended', callEndedRef);
-            } catch {}
+            } catch { }
 
             try {
               messageHandlerDispose?.();
-            } catch {}
+            } catch { }
 
             try {
               channel.leave();
-            } catch {}
+            } catch { }
 
             if (channelRef.current === channel) channelRef.current = null;
             setChannelReady(false);
@@ -2764,7 +2764,7 @@ export default function ChatRoomPage() {
       if (channelRef.current) {
         try {
           channelRef.current.leave();
-        } catch {}
+        } catch { }
         channelRef.current = null;
       }
       setChannelReady(false);
@@ -2887,7 +2887,7 @@ export default function ChatRoomPage() {
         try {
           channelRef.current.push('typing', { is_typing: true });
           lastTypingSentRef.current = now;
-        } catch {}
+        } catch { }
       }
 
       if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
@@ -2900,7 +2900,7 @@ export default function ChatRoomPage() {
               channelRef.current.push('typing', { is_typing: false });
               lastTypingSentRef.current = 0;
             }
-          } catch {}
+          } catch { }
           typingStopTimerRef.current = null;
         }, TYPING_STOP_MS);
         typingDebounceRef.current = null;
@@ -2955,11 +2955,11 @@ export default function ChatRoomPage() {
           prev.map(att =>
             att.id === attachmentId
               ? {
-                  ...att,
-                  serverUrl: fileUrl,
-                  status: 'uploaded',
-                  type: uploadType,
-                }
+                ...att,
+                serverUrl: fileUrl,
+                status: 'uploaded',
+                type: uploadType,
+              }
               : att,
           ),
         );
@@ -3145,7 +3145,7 @@ export default function ChatRoomPage() {
         throw new Error((createData as any)?.error || 'Failed to create chat');
       }
       targetRoomId = newRoomId;
-      await refetchInbox().catch(() => {});
+      await refetchInbox().catch(() => { });
       router.replace(`/chat/${encodeURIComponent(newRoomId)}`);
       return targetRoomId;
     };
@@ -3163,21 +3163,21 @@ export default function ChatRoomPage() {
         const serverMsg = (data as any).message ?? (data as any).data;
         const resolved: Message = serverMsg
           ? {
-              id: serverMsg.id ?? serverMsg.sent_at ?? clientRef,
-              content: serverMsg.content ?? content,
-              sender_id: serverMsg.sender_id ?? user?.id ?? '',
-              message_type: serverMsg.message_type ?? messageType,
-              attachments: Array.isArray(serverMsg.attachments)
-                ? serverMsg.attachments
-                    .map(normalizeAttachmentUrl)
-                    .filter(Boolean)
-                : attachments.map(normalizeAttachmentUrl).filter(Boolean),
-              created_at:
-                serverMsg.created_at ??
-                serverMsg.sent_at ??
-                tempMessage.created_at,
-              status: 'sent',
-            }
+            id: serverMsg.id ?? serverMsg.sent_at ?? clientRef,
+            content: serverMsg.content ?? content,
+            sender_id: serverMsg.sender_id ?? user?.id ?? '',
+            message_type: serverMsg.message_type ?? messageType,
+            attachments: Array.isArray(serverMsg.attachments)
+              ? serverMsg.attachments
+                .map(normalizeAttachmentUrl)
+                .filter(Boolean)
+              : attachments.map(normalizeAttachmentUrl).filter(Boolean),
+            created_at:
+              serverMsg.created_at ??
+              serverMsg.sent_at ??
+              tempMessage.created_at,
+            status: 'sent',
+          }
           : { ...tempMessage, status: 'sent' as MessageStatus };
         setMessages(prev => prev.map(m => (m.id === clientRef ? resolved : m)));
         return true;
@@ -3209,16 +3209,16 @@ export default function ChatRoomPage() {
             prev.map(m =>
               m.id === clientRef
                 ? {
-                    id: result.message_id,
-                    content: result.content ?? content,
-                    sender_id: user?.id ?? '',
-                    message_type: result.message_type ?? messageType,
-                    attachments: (result.attachments ?? attachments)
-                      .map(normalizeAttachmentUrl)
-                      .filter(Boolean),
-                    created_at: result.sent_at,
-                    status: 'sent',
-                  }
+                  id: result.message_id,
+                  content: result.content ?? content,
+                  sender_id: user?.id ?? '',
+                  message_type: result.message_type ?? messageType,
+                  attachments: (result.attachments ?? attachments)
+                    .map(normalizeAttachmentUrl)
+                    .filter(Boolean),
+                  created_at: result.sent_at,
+                  status: 'sent',
+                }
                 : m,
             ),
           );
@@ -3322,9 +3322,9 @@ export default function ChatRoomPage() {
           Array.isArray(data.issues) && data.issues.length > 0
             ? formatValidationIssues(data.issues, chatLocale)
             : data.error ||
-                (chatLocale === 'id'
-                  ? 'Gagal membuat draft listing.'
-                  : 'Failed to create the draft.'),
+            (chatLocale === 'id'
+              ? 'Gagal membuat draft listing.'
+              : 'Failed to create the draft.'),
         );
       }
 
@@ -3396,6 +3396,7 @@ export default function ChatRoomPage() {
           : typeof meta?.content_id === 'string' && meta.content_id.trim()
             ? meta.content_id.trim()
             : '';
+
       if (!draftId || publishingDraftId === draftId) return;
 
       setPublishingDraftId(draftId);
@@ -3417,9 +3418,9 @@ export default function ChatRoomPage() {
             Array.isArray(data.issues) && data.issues.length > 0
               ? formatValidationIssues(data.issues, chatLocale)
               : data.error ||
-                  (chatLocale === 'id'
-                    ? 'Draft belum bisa dipublish.'
-                    : 'The draft cannot be published yet.'),
+              (chatLocale === 'id'
+                ? 'Draft belum bisa dipublish.'
+                : 'The draft cannot be published yet.'),
           );
         }
 
@@ -3436,7 +3437,7 @@ export default function ChatRoomPage() {
             typeof data.title === 'string' && data.title.trim()
               ? data.title
               : typeof meta?.content_title === 'string' &&
-                  meta.content_title.trim()
+                meta.content_title.trim()
                 ? meta.content_title
                 : 'Listing',
             typeof data.slug === 'string' && data.slug.trim()
@@ -3638,7 +3639,7 @@ export default function ChatRoomPage() {
         try {
           channelRef.current.push('typing', { is_typing: false });
           lastTypingSentRef.current = 0;
-        } catch {}
+        } catch { }
       }
 
       const attachmentUrls = hasAttachments
@@ -3771,10 +3772,10 @@ export default function ChatRoomPage() {
           typeof meta.content_url === 'string' && meta.content_url.trim()
             ? meta.content_url
             : buildContentHref(
-                contentId,
-                String(meta.content_title || 'Listing'),
-                typeof meta.slug === 'string' ? meta.slug : '',
-              ),
+              contentId,
+              String(meta.content_title || 'Listing'),
+              typeof meta.slug === 'string' ? meta.slug : '',
+            ),
         dealKind: mapDealKind(meta.deal_kind ?? meta.content_type),
         fulfillmentMode: mapFulfillmentMode(
           meta.deal_kind ?? meta.content_type,
@@ -4343,11 +4344,11 @@ export default function ChatRoomPage() {
         Object.keys(asObject(txn.safety_checklist)).length > 0
           ? asObject(txn.safety_checklist)
           : {
-              identity_confirmed: true,
-              platform_payment_confirmed: true,
-              item_detail_confirmed: true,
-              anti_scam_acknowledged: true,
-            };
+            identity_confirmed: true,
+            platform_payment_confirmed: true,
+            item_detail_confirmed: true,
+            anti_scam_acknowledged: true,
+          };
       const riskFlags = detectFraudSignals(message).map(signal =>
         signal.severity === 'high'
           ? 'off_platform_or_otp_risk'
@@ -4409,14 +4410,14 @@ export default function ChatRoomPage() {
               ? latest.snapshot_listing.content_url
               : latest.content_id
                 ? buildContentHref(
-                    latest.content_id,
-                    typeof latest.snapshot_listing?.title === 'string'
-                      ? latest.snapshot_listing.title
-                      : 'Listing',
-                    typeof latest.snapshot_listing?.slug === 'string'
-                      ? latest.snapshot_listing.slug
-                      : '',
-                  )
+                  latest.content_id,
+                  typeof latest.snapshot_listing?.title === 'string'
+                    ? latest.snapshot_listing.title
+                    : 'Listing',
+                  typeof latest.snapshot_listing?.slug === 'string'
+                    ? latest.snapshot_listing.slug
+                    : '',
+                )
                 : undefined,
           amount_cents: latest.amount_cents,
           currency: latest.currency,
@@ -4599,7 +4600,7 @@ export default function ChatRoomPage() {
   }, [roomSummaryTransactionId]);
   const roomSummaryTxnStatus = normalizeTransactionStatus(
     roomSummaryTransaction?.status ||
-      roomSummaryTransaction?.transaction_status,
+    roomSummaryTransaction?.transaction_status,
   );
   const roomSummaryTxnIsTerminal =
     roomSummaryTxnStatus === 'completed' ||
@@ -4614,10 +4615,10 @@ export default function ChatRoomPage() {
   );
   const roomSummaryTxnTitle =
     typeof roomSummaryTransaction?.snapshot_listing?.title === 'string' &&
-    roomSummaryTransaction.snapshot_listing.title.trim()
+      roomSummaryTransaction.snapshot_listing.title.trim()
       ? roomSummaryTransaction.snapshot_listing.title
       : typeof roomSummaryTransaction?.content_id === 'string' &&
-          roomSummaryTransaction.content_id.trim()
+        roomSummaryTransaction.content_id.trim()
         ? roomSummaryTransaction.content_id
         : chatLocale === 'id'
           ? 'Transaksi aktif'
@@ -4721,17 +4722,17 @@ export default function ChatRoomPage() {
   );
   const selectedTxnSide = selectedTransaction
     ? resolveListingSide({
-        type:
-          selectedTransaction.deal_kind ??
-          selectedTransaction.snapshot_listing?.content_type,
-        metadata: selectedTxnMeta,
-        title: selectedTransaction.snapshot_listing?.title,
-      })
+      type:
+        selectedTransaction.deal_kind ??
+        selectedTransaction.snapshot_listing?.content_type,
+      metadata: selectedTxnMeta,
+      title: selectedTransaction.snapshot_listing?.title,
+    })
     : 'supply';
   const selectedTxnSideLabel = getListingSideContextLabel(
     selectedTxnSide,
     selectedTransaction?.deal_kind ??
-      selectedTransaction?.snapshot_listing?.content_type,
+    selectedTransaction?.snapshot_listing?.content_type,
     chatLocale,
   );
   const canListingActionDirect = Boolean(
@@ -4803,15 +4804,15 @@ export default function ChatRoomPage() {
     : null;
   const structuredDraftPublishValidation = structuredDraftPayload
     ? validateListingPayload(
-        {
-          ...structuredDraftPayload,
-          content_status: 'active',
-        },
-        {
-          mode: 'create',
-          strictActiveValidation: true,
-        },
-      )
+      {
+        ...structuredDraftPayload,
+        content_status: 'active',
+      },
+      {
+        mode: 'create',
+        strictActiveValidation: true,
+      },
+    )
     : null;
   const structuredDraftPublishIssues =
     structuredDraftPublishValidation && !structuredDraftPublishValidation.ok
@@ -5003,9 +5004,8 @@ export default function ChatRoomPage() {
             {/* 1. STATUS & TYPING INDICATOR */}
             <span className="inline-flex min-h-[26px] min-w-0 max-w-full items-center gap-1.5 rounded-md bg-zinc-100/70 px-2 text-[11px] font-medium text-zinc-500 dark:bg-zinc-800/40 dark:text-zinc-400 sm:text-xs">
               <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusInfo.dotClass} ${
-                  typingUser ? 'animate-pulse scale-110' : ''
-                }`}
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusInfo.dotClass} ${typingUser ? 'animate-pulse scale-110' : ''
+                  }`}
               />
               <span className="min-w-0 truncate tracking-wide">
                 {typingUser
@@ -5019,11 +5019,10 @@ export default function ChatRoomPage() {
             {/* 2. ROOM KIND BADGE (GROUP / SUPPORT) */}
             {roomKind !== 'direct' && (
               <span
-                className={`inline-flex min-h-[26px] shrink-0 items-center rounded-md px-2 text-[10px] font-bold uppercase tracking-wider ${
-                  roomKind === 'group'
-                    ? 'bg-zinc-200/60 text-zinc-600 dark:bg-zinc-800/70 dark:text-zinc-400'
-                    : 'bg-amber-100/60 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                }`}
+                className={`inline-flex min-h-[26px] shrink-0 items-center rounded-md px-2 text-[10px] font-bold uppercase tracking-wider ${roomKind === 'group'
+                  ? 'bg-zinc-200/60 text-zinc-600 dark:bg-zinc-800/70 dark:text-zinc-400'
+                  : 'bg-amber-100/60 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                  }`}
               >
                 {roomKind === 'group'
                   ? chatLocale === 'id'
@@ -5119,11 +5118,10 @@ export default function ChatRoomPage() {
               </div>
 
               <div
-                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                  roomSummaryExpanded
-                    ? 'mt-3 grid-rows-[1fr] opacity-100'
-                    : 'mt-0 grid-rows-[0fr] opacity-0'
-                }`}
+                className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${roomSummaryExpanded
+                  ? 'mt-3 grid-rows-[1fr] opacity-100'
+                  : 'mt-0 grid-rows-[0fr] opacity-0'
+                  }`}
               >
                 <div className="min-h-0 overflow-hidden">
                   <div className="flex flex-wrap gap-2 border-t border-black/5 pt-3 dark:border-white/8">
@@ -5200,7 +5198,7 @@ export default function ChatRoomPage() {
                           : 'Progress'}
                       </p>
                       {roomSummaryTxnIsTerminal &&
-                      roomSummaryTxnStatus !== 'completed' ? (
+                        roomSummaryTxnStatus !== 'completed' ? (
                         <p className="mt-1 text-sm font-medium text-[#111b21] dark:text-[#dfe7ea]">
                           {formatTransactionStatusLabel(
                             roomSummaryTxnStatus,
@@ -5247,11 +5245,10 @@ export default function ChatRoomPage() {
             data-auto-scrollbar
           >
             <div
-              className={`mx-auto flex min-h-full w-full max-w-[920px] flex-col space-y-1.5 ${
-                !loading && !loadError && messages.length > 0
-                  ? ''
-                  : 'justify-center'
-              }`}
+              className={`mx-auto flex min-h-full w-full max-w-[920px] flex-col space-y-1.5 ${!loading && !loadError && messages.length > 0
+                ? ''
+                : 'justify-center'
+                }`}
             >
               {loading ? (
                 <div className="flex justify-center py-20">
@@ -5325,37 +5322,37 @@ export default function ChatRoomPage() {
                     const structuredSideContext = getListingSideContextLabel(
                       structuredSide,
                       meta?.content_type ??
-                        meta?.deal_kind ??
-                        listingSnapshot.content_type,
+                      meta?.deal_kind ??
+                      listingSnapshot.content_type,
                       chatLocale,
                     );
                     const structuredContentUrl =
                       typeof meta?.content_url === 'string' &&
-                      meta.content_url.trim()
+                        meta.content_url.trim()
                         ? meta.content_url
                         : typeof listingSnapshot.content_url === 'string' &&
-                            listingSnapshot.content_url.trim()
+                          listingSnapshot.content_url.trim()
                           ? String(listingSnapshot.content_url)
                           : typeof meta?.content_id === 'string' &&
-                              meta.content_id.trim()
+                            meta.content_id.trim()
                             ? buildContentHref(
-                                String(meta.content_id),
-                                String(
-                                  meta?.content_title ||
-                                    listingSnapshot.title ||
-                                    'Listing',
-                                ),
-                                typeof listingSnapshot.slug === 'string'
-                                  ? listingSnapshot.slug
-                                  : '',
-                              )
+                              String(meta.content_id),
+                              String(
+                                meta?.content_title ||
+                                listingSnapshot.title ||
+                                'Listing',
+                              ),
+                              typeof listingSnapshot.slug === 'string'
+                                ? listingSnapshot.slug
+                                : '',
+                            )
                             : '';
                     const structuredContentId =
                       typeof meta?.content_id === 'string' &&
-                      meta.content_id.trim()
+                        meta.content_id.trim()
                         ? meta.content_id.trim()
                         : typeof listingSnapshot.content_id === 'string' &&
-                            listingSnapshot.content_id.trim()
+                          listingSnapshot.content_id.trim()
                           ? String(listingSnapshot.content_id).trim()
                           : '';
                     const isAiRoomDraftCard =
@@ -5366,109 +5363,109 @@ export default function ChatRoomPage() {
                       typeof meta?.draft_id === 'string' && meta.draft_id.trim()
                         ? meta.draft_id.trim()
                         : typeof meta?.content_id === 'string' &&
-                            meta.content_id.trim()
+                          meta.content_id.trim()
                           ? meta.content_id.trim()
                           : '';
                     const structuredDraftStatus =
                       typeof meta?.content_status === 'string' &&
-                      meta.content_status.trim()
+                        meta.content_status.trim()
                         ? meta.content_status.trim().toLowerCase()
                         : 'draft';
                     const structuredDraftPublishIssues = Array.isArray(
                       meta?.publish_issues,
                     )
                       ? meta.publish_issues
-                          .map(item => String(item).trim())
-                          .filter(Boolean)
+                        .map(item => String(item).trim())
+                        .filter(Boolean)
                       : [];
                     const structuredDraftReviewNotes = Array.isArray(
                       meta?.review_notes,
                     )
                       ? meta.review_notes
-                          .map(item => String(item).trim())
-                          .filter(Boolean)
+                        .map(item => String(item).trim())
+                        .filter(Boolean)
                       : [];
                     const structuredDraftAssumptions = Array.isArray(
                       meta?.assumptions,
                     )
                       ? meta.assumptions
-                          .map(item => String(item).trim())
-                          .filter(Boolean)
+                        .map(item => String(item).trim())
+                        .filter(Boolean)
                       : [];
                     const structuredDraftFollowUpQuestions = Array.isArray(
                       meta?.follow_up_questions,
                     )
                       ? meta.follow_up_questions
-                          .map(item => String(item).trim())
-                          .filter(Boolean)
+                        .map(item => String(item).trim())
+                        .filter(Boolean)
                       : [];
                     const structuredDraftEditHref = structuredDraftId
                       ? `${buildCreatePath({
-                          locale: chatLocale,
-                          side: structuredSide,
-                          type:
-                            typeof meta?.content_type === 'string'
-                              ? meta.content_type
-                              : 'service',
-                        })}?draft=${encodeURIComponent(structuredDraftId)}`
+                        locale: chatLocale,
+                        side: structuredSide,
+                        type:
+                          typeof meta?.content_type === 'string'
+                            ? meta.content_type
+                            : 'service',
+                      })}?draft=${encodeURIComponent(structuredDraftId)}`
                       : '';
                     const transactionCardTxn =
                       msg.message_type === 'transaction'
                         ? (() => {
-                            const fallback =
-                              toRoomTransactionFromStructuredPayload(meta);
-                            if (!fallback) return null;
-                            return (
-                              roomTransactionsById.get(fallback.id) || fallback
-                            );
-                          })()
+                          const fallback =
+                            toRoomTransactionFromStructuredPayload(meta);
+                          if (!fallback) return null;
+                          return (
+                            roomTransactionsById.get(fallback.id) || fallback
+                          );
+                        })()
                         : null;
                     const transactionCardMeta =
                       msg.message_type === 'transaction' && transactionCardTxn
                         ? ({
-                            ...meta,
-                            ...transactionCardTxn,
-                            transaction_id: transactionCardTxn.id,
-                            status:
-                              transactionCardTxn.status ||
-                              transactionCardTxn.transaction_status ||
-                              meta?.status,
-                            transaction_status:
-                              transactionCardTxn.transaction_status ||
-                              transactionCardTxn.status ||
-                              meta?.transaction_status,
-                            protection_status:
-                              transactionCardTxn.protection_status ||
-                              meta?.protection_status,
-                            snapshot_listing:
-                              transactionCardTxn.snapshot_listing ||
-                              meta?.snapshot_listing,
-                            transaction_meta:
-                              transactionCardTxn.transaction_meta ||
-                              meta?.transaction_meta,
-                            response_message:
-                              transactionCardTxn.response_message ||
-                              meta?.response_message,
-                            offer_message:
-                              transactionCardTxn.offer_message ||
-                              meta?.offer_message,
-                            buyer_id:
-                              transactionCardTxn.buyer_id || meta?.buyer_id,
-                            seller_id:
-                              transactionCardTxn.seller_id || meta?.seller_id,
-                            content_id:
-                              transactionCardTxn.content_id || meta?.content_id,
-                            amount_cents:
-                              transactionCardTxn.amount_cents ??
-                              meta?.amount_cents,
-                            currency:
-                              transactionCardTxn.currency || meta?.currency,
-                            deal_kind:
-                              transactionCardTxn.deal_kind || meta?.deal_kind,
-                            fulfillment_mode:
-                              transactionCardTxn.fulfillment_mode ||
-                              meta?.fulfillment_mode,
-                          } as StructuredChatPayload)
+                          ...meta,
+                          ...transactionCardTxn,
+                          transaction_id: transactionCardTxn.id,
+                          status:
+                            transactionCardTxn.status ||
+                            transactionCardTxn.transaction_status ||
+                            meta?.status,
+                          transaction_status:
+                            transactionCardTxn.transaction_status ||
+                            transactionCardTxn.status ||
+                            meta?.transaction_status,
+                          protection_status:
+                            transactionCardTxn.protection_status ||
+                            meta?.protection_status,
+                          snapshot_listing:
+                            transactionCardTxn.snapshot_listing ||
+                            meta?.snapshot_listing,
+                          transaction_meta:
+                            transactionCardTxn.transaction_meta ||
+                            meta?.transaction_meta,
+                          response_message:
+                            transactionCardTxn.response_message ||
+                            meta?.response_message,
+                          offer_message:
+                            transactionCardTxn.offer_message ||
+                            meta?.offer_message,
+                          buyer_id:
+                            transactionCardTxn.buyer_id || meta?.buyer_id,
+                          seller_id:
+                            transactionCardTxn.seller_id || meta?.seller_id,
+                          content_id:
+                            transactionCardTxn.content_id || meta?.content_id,
+                          amount_cents:
+                            transactionCardTxn.amount_cents ??
+                            meta?.amount_cents,
+                          currency:
+                            transactionCardTxn.currency || meta?.currency,
+                          deal_kind:
+                            transactionCardTxn.deal_kind || meta?.deal_kind,
+                          fulfillment_mode:
+                            transactionCardTxn.fulfillment_mode ||
+                            meta?.fulfillment_mode,
+                        } as StructuredChatPayload)
                         : meta;
                     const transactionCardId =
                       transactionCardTxn?.id ||
@@ -5477,12 +5474,12 @@ export default function ChatRoomPage() {
                         : '');
                     const transactionCardStatus = transactionCardTxn
                       ? normalizeTransactionStatus(
-                          transactionCardTxn.status ||
-                            transactionCardTxn.transaction_status,
-                        )
+                        transactionCardTxn.status ||
+                        transactionCardTxn.transaction_status,
+                      )
                       : normalizeTransactionStatus(
-                          meta?.status || meta?.transaction_status,
-                        );
+                        meta?.status || meta?.transaction_status,
+                      );
                     const transactionCardPaymentStatus =
                       resolveTransactionPaymentStatus(transactionCardTxn);
                     const transactionCardListingSnapshot = asObject(
@@ -5496,14 +5493,14 @@ export default function ChatRoomPage() {
                         'string' && transactionCardListingSnapshot.title.trim()
                         ? String(transactionCardListingSnapshot.title)
                         : typeof transactionCardMeta?.content_title ===
-                              'string' &&
-                            transactionCardMeta.content_title.trim()
+                          'string' &&
+                          transactionCardMeta.content_title.trim()
                           ? transactionCardMeta.content_title
                           : 'Item';
                     const transactionCardNextStep = transactionCardTxn
                       ? getTransactionWaitingParty(transactionCardTxn, user?.id)
                       : typeof ticketMeta.next_step === 'string' &&
-                          ticketMeta.next_step.trim()
+                        ticketMeta.next_step.trim()
                         ? String(ticketMeta.next_step)
                         : '';
                     const transactionCardProgress =
@@ -5548,16 +5545,14 @@ export default function ChatRoomPage() {
                       msg.message_type === 'transaction'
                         ? 'max-w-[94%] sm:max-w-[520px]'
                         : 'max-w-[86%] sm:max-w-[72%]';
-                    const bubbleClass = `relative ${bubbleMaxWidthClass} overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:px-3 sm:py-2.5 sm:text-sm ${
-                      isOwn
-                        ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
-                        : 'rounded-bl-[6px] bg-white text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#202c33] dark:text-[#e9edef]'
-                    }`;
-                    const bubbleTailClass = `absolute bottom-1 h-3 w-3 rotate-45 ${
-                      isOwn
-                        ? 'right-[-4px] rounded-bl-[2px] bg-[#d9fdd3] dark:bg-[#005c4b]'
-                        : 'left-[-4px] rounded-br-[2px] bg-white dark:bg-[#202c33]'
-                    }`;
+                    const bubbleClass = `relative ${bubbleMaxWidthClass} overflow-visible rounded-[18px] px-2.5 py-2 text-[13px] leading-[1.45] break-words whitespace-pre-wrap sm:px-3 sm:py-2.5 sm:text-sm ${isOwn
+                      ? 'rounded-br-[6px] bg-[#d9fdd3] text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#005c4b] dark:text-[#e9edef]'
+                      : 'rounded-bl-[6px] bg-white text-[#111b21] shadow-[0_1px_1px_rgba(17,27,33,0.16)] dark:bg-[#202c33] dark:text-[#e9edef]'
+                      }`;
+                    const bubbleTailClass = `absolute bottom-1 h-3 w-3 rotate-45 ${isOwn
+                      ? 'right-[-4px] rounded-bl-[2px] bg-[#d9fdd3] dark:bg-[#005c4b]'
+                      : 'left-[-4px] rounded-br-[2px] bg-white dark:bg-[#202c33]'
+                      }`;
                     const bubbleMetaClass = isOwn
                       ? 'text-[#667781] dark:text-[#d1f4cc]'
                       : 'text-[#667781] dark:text-[#8696a0]';
@@ -5654,9 +5649,9 @@ export default function ChatRoomPage() {
                                     <p className="mt-1 text-xs font-semibold">
                                       {String(
                                         meta?.content_title ||
-                                          (chatLocale === 'id'
-                                            ? 'Offer baru'
-                                            : 'New offer'),
+                                        (chatLocale === 'id'
+                                          ? 'Offer baru'
+                                          : 'New offer'),
                                       )}
                                     </p>
                                     <p className="mt-1 text-base font-black text-[color:var(--app-accent)]">
@@ -5710,21 +5705,21 @@ export default function ChatRoomPage() {
                                         )}
                                       {(structuredContentUrl ||
                                         structuredContentId) && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            void handleOpenStructuredContent(
-                                              structuredContentId,
-                                              structuredContentUrl,
-                                            )
-                                          }
-                                          className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
-                                        >
-                                          {chatLocale === 'id'
-                                            ? 'Buka listing'
-                                            : 'Open Listing'}
-                                        </button>
-                                      )}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              void handleOpenStructuredContent(
+                                                structuredContentId,
+                                                structuredContentUrl,
+                                              )
+                                            }
+                                            className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
+                                          >
+                                            {chatLocale === 'id'
+                                              ? 'Buka listing'
+                                              : 'Open Listing'}
+                                          </button>
+                                        )}
                                     </div>
                                   </div>
                                 )}
@@ -5753,24 +5748,24 @@ export default function ChatRoomPage() {
                                     <p className="mt-1 text-xs font-semibold">
                                       {String(
                                         meta?.content_title ||
-                                          (chatLocale === 'id'
-                                            ? 'Lamaran kerja'
-                                            : 'Job application'),
+                                        (chatLocale === 'id'
+                                          ? 'Lamaran kerja'
+                                          : 'Job application'),
                                       )}
                                     </p>
                                     <p className="mt-1 text-xs opacity-95">
                                       {String(
                                         (applicantMeta.full_name as string) ||
-                                          (applicantMeta.email as string) ||
-                                          'Applicant submitted',
+                                        (applicantMeta.email as string) ||
+                                        'Applicant submitted',
                                       )}
                                     </p>
                                     {typeof applicantMeta.headline ===
                                       'string' && (
-                                      <p className="mt-1 text-[11px] opacity-80">
-                                        {String(applicantMeta.headline)}
-                                      </p>
-                                    )}
+                                        <p className="mt-1 text-[11px] opacity-80">
+                                          {String(applicantMeta.headline)}
+                                        </p>
+                                      )}
                                     <div className="mt-2 grid gap-2 text-[11px] opacity-90 sm:grid-cols-2">
                                       {typeof applicantMeta.location ===
                                         'string' &&
@@ -5800,19 +5795,19 @@ export default function ChatRoomPage() {
                                       {(typeof applicantMeta.expected_salary_cents ===
                                         'number' ||
                                         typeof applicantMeta.expected_salary_cents ===
-                                          'string') && (
-                                        <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
-                                          <p className="font-semibold opacity-75">
-                                            Expectation
-                                          </p>
-                                          <p>
-                                            {formatMoney(
-                                              applicantMeta.expected_salary_cents,
-                                              meta?.currency || 'IDR',
-                                            )}
-                                          </p>
-                                        </div>
-                                      )}
+                                        'string') && (
+                                          <div className="rounded-lg bg-[color:color-mix(in_srgb,_var(--app-overlay)_12%,_transparent)] px-2 py-1.5">
+                                            <p className="font-semibold opacity-75">
+                                              Expectation
+                                            </p>
+                                            <p>
+                                              {formatMoney(
+                                                applicantMeta.expected_salary_cents,
+                                                meta?.currency || 'IDR',
+                                              )}
+                                            </p>
+                                          </div>
+                                        )}
                                       {typeof applicantMeta.phone ===
                                         'string' &&
                                         applicantMeta.phone.trim() && (
@@ -5850,21 +5845,21 @@ export default function ChatRoomPage() {
                                         )}
                                       {(structuredContentUrl ||
                                         structuredContentId) && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            void handleOpenStructuredContent(
-                                              structuredContentId,
-                                              structuredContentUrl,
-                                            )
-                                          }
-                                          className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
-                                        >
-                                          {chatLocale === 'id'
-                                            ? 'Buka listing'
-                                            : 'Open Listing'}
-                                        </button>
-                                      )}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              void handleOpenStructuredContent(
+                                                structuredContentId,
+                                                structuredContentUrl,
+                                              )
+                                            }
+                                            className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)]"
+                                          >
+                                            {chatLocale === 'id'
+                                              ? 'Buka listing'
+                                              : 'Open Listing'}
+                                          </button>
+                                        )}
                                     </div>
                                   </div>
                                 )}
@@ -5891,21 +5886,20 @@ export default function ChatRoomPage() {
                                       </span>
                                       {isAiRoomDraftCard && (
                                         <span
-                                          className={`rounded-full border px-2 py-0.5 ${
-                                            structuredDraftStatus === 'active'
-                                              ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_18%,_transparent)] text-[color:var(--app-accent)]'
-                                              : structuredDraftPublishIssues.length ===
-                                                  0
-                                                ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_14%,_transparent)] text-[color:var(--app-info)]'
-                                                : 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
-                                          }`}
+                                          className={`rounded-full border px-2 py-0.5 ${structuredDraftStatus === 'active'
+                                            ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_18%,_transparent)] text-[color:var(--app-accent)]'
+                                            : structuredDraftPublishIssues.length ===
+                                              0
+                                              ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_14%,_transparent)] text-[color:var(--app-info)]'
+                                              : 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
+                                            }`}
                                         >
                                           {structuredDraftStatus === 'active'
                                             ? chatLocale === 'id'
                                               ? 'Sudah aktif'
                                               : 'Published'
                                             : structuredDraftPublishIssues.length ===
-                                                0
+                                              0
                                               ? chatLocale === 'id'
                                                 ? 'Siap publish'
                                                 : 'Ready to publish'
@@ -5940,21 +5934,21 @@ export default function ChatRoomPage() {
                                     <div className="mt-1 flex items-end gap-1.5">
                                       <p className="text-base font-black text-[color:var(--app-accent)]">
                                         {inferPricingMode(meta || {}) ===
-                                        'request'
+                                          'request'
                                           ? 'Price on request'
                                           : formatMoney(
-                                              meta?.price_cents,
-                                              meta?.currency,
-                                            )}
+                                            meta?.price_cents,
+                                            meta?.currency,
+                                          )}
                                       </p>
                                       {inferPricingMode(meta || {}) ===
                                         'fixed' &&
                                         parseMoneyCents(
                                           meta?.original_price_cents,
                                         ) >
-                                          parseMoneyCents(
-                                            meta?.price_cents,
-                                          ) && (
+                                        parseMoneyCents(
+                                          meta?.price_cents,
+                                        ) && (
                                           <span className="text-[11px] line-through opacity-70">
                                             {formatMoney(
                                               meta?.original_price_cents,
@@ -6011,7 +6005,7 @@ export default function ChatRoomPage() {
                                       )}
                                     {isAiRoomDraftCard &&
                                       structuredDraftFollowUpQuestions.length >
-                                        0 && (
+                                      0 && (
                                         <div className="mt-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-info-border)_38%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-info)_10%,_transparent)] px-3 py-2 text-[11px] text-[color:var(--app-text)]">
                                           <p className="font-semibold">
                                             {chatLocale === 'id'
@@ -6033,7 +6027,7 @@ export default function ChatRoomPage() {
                                       )}
                                     {isAiRoomDraftCard &&
                                       structuredDraftPublishIssues.length >
-                                        0 && (
+                                      0 && (
                                         <div className="mt-2 rounded-xl border border-[color:color-mix(in_srgb,_var(--app-warning-border)_42%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] px-3 py-2 text-[11px] text-[color:var(--app-warning)]">
                                           <p className="font-semibold">
                                             {chatLocale === 'id'
@@ -6062,7 +6056,7 @@ export default function ChatRoomPage() {
                                         )}
                                         {structuredDraftId &&
                                           structuredDraftStatus !==
-                                            'active' && (
+                                          'active' && (
                                             <button
                                               type="button"
                                               onClick={() =>
@@ -6078,7 +6072,7 @@ export default function ChatRoomPage() {
                                               className="inline-flex items-center gap-1 rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-accent)] hover:bg-[color:color-mix(in_srgb,_var(--app-accent)_30%,_transparent)] disabled:opacity-60"
                                             >
                                               {publishingDraftId ===
-                                              structuredDraftId ? (
+                                                structuredDraftId ? (
                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                               ) : null}
                                               {chatLocale === 'id'
@@ -6089,23 +6083,23 @@ export default function ChatRoomPage() {
                                         {(structuredDraftStatus === 'active'
                                           ? structuredContentUrl
                                           : structuredDraftEditHref) && (
-                                          <Link
-                                            href={
-                                              structuredDraftStatus === 'active'
-                                                ? structuredContentUrl
-                                                : structuredDraftEditHref
-                                            }
-                                            className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_18%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_28%,_transparent)]"
-                                          >
-                                            {structuredDraftStatus === 'active'
-                                              ? chatLocale === 'id'
-                                                ? 'Buka listing'
-                                                : 'Open listing'
-                                              : chatLocale === 'id'
-                                                ? 'Lihat draft'
-                                                : 'Open draft'}
-                                          </Link>
-                                        )}
+                                            <Link
+                                              href={
+                                                structuredDraftStatus === 'active'
+                                                  ? structuredContentUrl
+                                                  : structuredDraftEditHref
+                                              }
+                                              className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_18%,_transparent)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-info)] hover:bg-[color:color-mix(in_srgb,_var(--app-info)_28%,_transparent)]"
+                                            >
+                                              {structuredDraftStatus === 'active'
+                                                ? chatLocale === 'id'
+                                                  ? 'Buka listing'
+                                                  : 'Open listing'
+                                                : chatLocale === 'id'
+                                                  ? 'Lihat draft'
+                                                  : 'Open draft'}
+                                            </Link>
+                                          )}
                                       </div>
                                     )}
                                     {!isOwn &&
@@ -6137,21 +6131,21 @@ export default function ChatRoomPage() {
                                           </button>
                                           {(structuredContentUrl ||
                                             structuredContentId) && (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                void handleOpenStructuredContent(
-                                                  structuredContentId,
-                                                  structuredContentUrl,
-                                                )
-                                              }
-                                              className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
-                                            >
-                                              {chatLocale === 'id'
-                                                ? 'Buka listing'
-                                                : 'Open Listing'}
-                                            </button>
-                                          )}
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  void handleOpenStructuredContent(
+                                                    structuredContentId,
+                                                    structuredContentUrl,
+                                                  )
+                                                }
+                                                className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border-strong)]"
+                                              >
+                                                {chatLocale === 'id'
+                                                  ? 'Buka listing'
+                                                  : 'Open Listing'}
+                                              </button>
+                                            )}
                                         </div>
                                       )}
                                   </div>
@@ -6267,7 +6261,7 @@ export default function ChatRoomPage() {
                                       </span>
                                       {typeof ticketMeta.reference ===
                                         'string' &&
-                                      ticketMeta.reference.trim() ? (
+                                        ticketMeta.reference.trim() ? (
                                         <span className="rounded-full border border-[#d8e3df] px-2 py-0.5 text-[#667781] dark:border-white/10 dark:text-[#aebac1]">
                                           {ticketMeta.reference}
                                         </span>
@@ -6532,7 +6526,7 @@ export default function ChatRoomPage() {
               >
                 <div className="flex min-h-[230px] items-center justify-center sm:min-h-[320px]">
                   {activeDraftAttachment.type === 'image' &&
-                  activeDraftAttachment.previewUrl ? (
+                    activeDraftAttachment.previewUrl ? (
                     <img
                       src={activeDraftAttachment.previewUrl}
                       alt={activeDraftAttachment.name}
@@ -6645,15 +6639,14 @@ export default function ChatRoomPage() {
                         onClick={() =>
                           setActiveDraftAttachmentId(attachment.id)
                         }
-                        className={`relative h-[58px] w-[58px] shrink-0 overflow-hidden rounded-[14px] border transition ${
-                          isActive
-                            ? 'border-[#25d366] ring-2 ring-[#25d366]/28'
-                            : 'border-black/5 opacity-72 hover:opacity-100 dark:border-white/8'
-                        }`}
+                        className={`relative h-[58px] w-[58px] shrink-0 overflow-hidden rounded-[14px] border transition ${isActive
+                          ? 'border-[#25d366] ring-2 ring-[#25d366]/28'
+                          : 'border-black/5 opacity-72 hover:opacity-100 dark:border-white/8'
+                          }`}
                         aria-label={`Open attachment ${index + 1}`}
                       >
                         {attachment.type === 'image' &&
-                        attachment.previewUrl ? (
+                          attachment.previewUrl ? (
                           <img
                             src={attachment.previewUrl}
                             alt={attachment.name}
@@ -6692,11 +6685,10 @@ export default function ChatRoomPage() {
 
           {activeFraudSignal && (
             <div
-              className={`flex items-start gap-2 rounded-[18px] border bg-white/84 px-3 py-2 text-xs shadow-sm dark:bg-[#111b21]/84 ${
-                activeFraudSignal.severity === 'high'
-                  ? 'border-[#ffb4a2] text-[#c65b3d] dark:border-[#6b4f3b] dark:text-[#ffb199]'
-                  : 'border-[#f7d794] text-[#b07c00] dark:border-[#6b5a2e] dark:text-[#f6d87a]'
-              }`}
+              className={`flex items-start gap-2 rounded-[18px] border bg-white/84 px-3 py-2 text-xs shadow-sm dark:bg-[#111b21]/84 ${activeFraudSignal.severity === 'high'
+                ? 'border-[#ffb4a2] text-[#c65b3d] dark:border-[#6b4f3b] dark:text-[#ffb199]'
+                : 'border-[#f7d794] text-[#b07c00] dark:border-[#6b5a2e] dark:text-[#f6d87a]'
+                }`}
             >
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
               <p>{activeFraudSignal.message}</p>
@@ -6949,11 +6941,10 @@ export default function ChatRoomPage() {
                     }
                     openAiWorkspace(workspace.id);
                   }}
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                    aiWorkspaceMode === workspace.id
-                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                  }`}
+                  className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiWorkspaceMode === workspace.id
+                    ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                    : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                    }`}
                 >
                   {chatLocale === 'id' ? workspace.labelId : workspace.labelEn}
                 </button>
@@ -7037,11 +7028,10 @@ export default function ChatRoomPage() {
                       key={template.id}
                       type="button"
                       onClick={() => setAiTemplateId(template.id)}
-                      className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${
-                        aiTemplateId === template.id
-                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                      }`}
+                      className={`rounded-full px-2 py-1 text-[10px] font-semibold transition ${aiTemplateId === template.id
+                        ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                        : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
+                        }`}
                     >
                       {template.label}
                     </button>
@@ -7247,11 +7237,10 @@ export default function ChatRoomPage() {
                         {aiStructuredDraft.listingSide}
                       </span>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          structuredDraftPublishIssues.length === 0
-                            ? 'bg-[color:color-mix(in_srgb,_var(--app-accent)_16%,_transparent)] text-[color:var(--app-accent)]'
-                            : 'bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${structuredDraftPublishIssues.length === 0
+                          ? 'bg-[color:color-mix(in_srgb,_var(--app-accent)_16%,_transparent)] text-[color:var(--app-accent)]'
+                          : 'bg-[color:color-mix(in_srgb,_var(--app-warning)_14%,_transparent)] text-[color:var(--app-warning)]'
+                          }`}
                       >
                         {structuredDraftPublishIssues.length === 0
                           ? chatLocale === 'id'
@@ -7449,11 +7438,10 @@ export default function ChatRoomPage() {
                     type="button"
                     onClick={() => setAiUseContext(prev => !prev)}
                     aria-pressed={aiUseContext}
-                    className={`rounded-[18px] border p-3 text-left transition ${
-                      aiUseContext
-                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                        : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                    }`}
+                    className={`rounded-[18px] border p-3 text-left transition ${aiUseContext
+                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
+                      }`}
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="text-sm font-black">
@@ -7471,11 +7459,10 @@ export default function ChatRoomPage() {
                     type="button"
                     onClick={() => setAiAutoSend(prev => !prev)}
                     aria-pressed={aiAutoSend}
-                    className={`rounded-[18px] border p-3 text-left transition ${
-                      aiAutoSend
-                        ? 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_12%,_transparent)] text-[color:var(--app-warning)]'
-                        : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                    }`}
+                    className={`rounded-[18px] border p-3 text-left transition ${aiAutoSend
+                      ? 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-warning)_12%,_transparent)] text-[color:var(--app-warning)]'
+                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
+                      }`}
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="text-sm font-black">
@@ -7501,11 +7488,10 @@ export default function ChatRoomPage() {
                         key={tone.id}
                         type="button"
                         onClick={() => setAiToneId(tone.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${
-                          aiToneId === tone.id
-                            ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
-                        }`}
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiToneId === tone.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                          }`}
                       >
                         {tone.label}
                       </button>
@@ -7515,11 +7501,10 @@ export default function ChatRoomPage() {
                         key={length.id}
                         type="button"
                         onClick={() => setAiLengthId(length.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${
-                          aiLengthId === length.id
-                            ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
-                        }`}
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiLengthId === length.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                          }`}
                       >
                         {length.label}
                       </button>
@@ -7537,11 +7522,10 @@ export default function ChatRoomPage() {
                         key={template.id}
                         type="button"
                         onClick={() => setAiTemplateId(template.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${
-                          aiTemplateId === template.id
-                            ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
-                            : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
-                        }`}
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiTemplateId === template.id
+                          ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
+                          }`}
                       >
                         {template.label}
                       </button>
@@ -7673,11 +7657,10 @@ export default function ChatRoomPage() {
                   onClick={() =>
                     applyListingActionMode(listingActionDraft, 'direct')
                   }
-                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
-                    listingActionMode === 'direct'
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)]'
-                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
-                  }`}
+                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${listingActionMode === 'direct'
+                    ? 'border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,_var(--app-accent)_14%,_transparent)]'
+                    : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
+                    }`}
                 >
                   <p className="text-[11px] font-semibold text-[color:var(--app-accent)]">
                     {chatLocale === 'id'
@@ -7695,11 +7678,10 @@ export default function ChatRoomPage() {
                   onClick={() =>
                     applyListingActionMode(listingActionDraft, 'offer')
                   }
-                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${
-                    listingActionMode === 'offer'
-                      ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_12%,_transparent)]'
-                      : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
-                  }`}
+                  className={`ui-feed-tile rounded-2xl border px-3 py-3 text-left transition ${listingActionMode === 'offer'
+                    ? 'border-[color:var(--app-info-border)] bg-[color:color-mix(in_srgb,_var(--app-info)_12%,_transparent)]'
+                    : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)]'
+                    }`}
                 >
                   <p className="text-[11px] font-semibold text-[color:var(--app-info)]">
                     {chatLocale === 'id' ? 'Nego dulu' : 'Negotiate first'}
@@ -7731,10 +7713,9 @@ export default function ChatRoomPage() {
                     setShowListingActionModal(false);
                     setNewMessage(
                       prev =>
-                        `${prev}${prev ? ' ' : ''}${
-                          chatLocale === 'id'
-                            ? 'Halo, boleh kirim detail harga dan ketentuan utamanya?'
-                            : 'Could you share the price details and key terms?'
+                        `${prev}${prev ? ' ' : ''}${chatLocale === 'id'
+                          ? 'Halo, boleh kirim detail harga dan ketentuan utamanya?'
+                          : 'Could you share the price details and key terms?'
                         }`,
                     );
                   }}
@@ -7756,11 +7737,10 @@ export default function ChatRoomPage() {
               value={listingActionAmount}
               onChange={e => setListingActionAmount(e.target.value)}
               readOnly={isListingActionAmountLocked}
-              className={`${CHAT_CONTROL_CLASS} ${
-                isListingActionAmountLocked
-                  ? 'cursor-not-allowed opacity-80'
-                  : ''
-              }`}
+              className={`${CHAT_CONTROL_CLASS} ${isListingActionAmountLocked
+                ? 'cursor-not-allowed opacity-80'
+                : ''
+                }`}
               placeholder={listingActionAmountPlaceholder}
             />
             <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
@@ -7950,11 +7930,10 @@ export default function ChatRoomPage() {
                         key={txn.id}
                         type="button"
                         onClick={() => setSelectedTransaction(txn)}
-                        className={`ui-feed-row w-full rounded-2xl border p-3 text-left transition ${
-                          isSelected
-                            ? 'border-[color:color-mix(in_srgb,_var(--app-accent)_70%,_transparent)] bg-[color:var(--app-accent-soft)]'
-                            : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] hover:bg-[color:var(--app-surface-muted)]'
-                        }`}
+                        className={`ui-feed-row w-full rounded-2xl border p-3 text-left transition ${isSelected
+                          ? 'border-[color:color-mix(in_srgb,_var(--app-accent)_70%,_transparent)] bg-[color:var(--app-accent-soft)]'
+                          : 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] hover:bg-[color:var(--app-surface-muted)]'
+                          }`}
                       >
                         <div className="flex items-start gap-3">
                           {txnCoverImage ? (
@@ -8006,11 +7985,10 @@ export default function ChatRoomPage() {
                                 )}
                               </span>
                               <span
-                                className={`rounded-full border px-2 py-0.5 ${
-                                  protection === 'refunded'
-                                    ? protectionTone(protection)
-                                    : paymentTone(paymentStatus)
-                                }`}
+                                className={`rounded-full border px-2 py-0.5 ${protection === 'refunded'
+                                  ? protectionTone(protection)
+                                  : paymentTone(paymentStatus)
+                                  }`}
                               >
                                 {formatPaymentStatusLabel(txn, chatLocale)}
                               </span>
@@ -8027,9 +8005,9 @@ export default function ChatRoomPage() {
                                 <span>
                                   {txnIsTerminal
                                     ? formatTransactionStatusLabel(
-                                        status,
-                                        chatLocale,
-                                      )
+                                      status,
+                                      chatLocale,
+                                    )
                                     : `${txnProgressPercent}%`}
                                 </span>
                               </div>
@@ -8068,8 +8046,8 @@ export default function ChatRoomPage() {
                 <h3 className="mt-1 truncate text-sm font-semibold text-[color:var(--app-text-soft)] sm:text-base">
                   {String(
                     selectedTransaction.snapshot_listing?.title ||
-                      selectedTransaction.content_id ||
-                      'Transaction',
+                    selectedTransaction.content_id ||
+                    'Transaction',
                   )}
                 </h3>
                 <p className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
@@ -8102,11 +8080,10 @@ export default function ChatRoomPage() {
                 )}
               </span>
               <span
-                className={`rounded-full border px-2 py-0.5 ${
-                  selectedTxnProtectionStatus === 'refunded'
-                    ? protectionTone(selectedTxnProtectionStatus)
-                    : paymentTone(selectedTxnPaymentStatus)
-                }`}
+                className={`rounded-full border px-2 py-0.5 ${selectedTxnProtectionStatus === 'refunded'
+                  ? protectionTone(selectedTxnProtectionStatus)
+                  : paymentTone(selectedTxnPaymentStatus)
+                  }`}
               >
                 {chatLocale === 'id' ? 'Pembayaran' : 'Payment'}:{' '}
                 {formatPaymentStatusLabel(selectedTransaction, chatLocale)}
@@ -8127,18 +8104,18 @@ export default function ChatRoomPage() {
             </div>
             {(Object.keys(selectedTxnTicket).length > 0 ||
               selectedTxnSideLabel) && (
-              <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-                {typeof selectedTxnTicket.reference === 'string' &&
-                  selectedTxnTicket.reference.trim() && (
-                    <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                      Ref: {selectedTxnTicket.reference}
-                    </span>
-                  )}
-                <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
-                  {selectedTxnSideLabel}
-                </span>
-              </div>
-            )}
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  {typeof selectedTxnTicket.reference === 'string' &&
+                    selectedTxnTicket.reference.trim() && (
+                      <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
+                        Ref: {selectedTxnTicket.reference}
+                      </span>
+                    )}
+                  <span className="rounded-full border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] px-2 py-0.5 text-[color:var(--app-text-soft)]">
+                    {selectedTxnSideLabel}
+                  </span>
+                </div>
+              )}
 
             <div
               className={`mb-3 rounded-xl border p-3 ${outcomeToneClass(
@@ -8184,7 +8161,7 @@ export default function ChatRoomPage() {
                 </span>
               </div>
               {!selectedTxnOutcome.terminal ||
-              selectedTxnStatus === 'completed' ? (
+                selectedTxnStatus === 'completed' ? (
                 <div className="h-2 w-full overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-[color:var(--app-info)] via-[color:var(--app-accent)] to-[color:var(--app-accent)] transition-all"
@@ -8266,7 +8243,7 @@ export default function ChatRoomPage() {
                 <p className="mt-0.5 font-semibold text-[color:var(--app-text-soft)]">
                   {formatDateTimeLabel(
                     selectedTransaction.updated_at ||
-                      selectedTransaction.created_at,
+                    selectedTransaction.created_at,
                   )}
                 </p>
               </div>
@@ -8303,7 +8280,7 @@ export default function ChatRoomPage() {
                         ? 'Diterima'
                         : 'Accepted'
                       : selectedTxnLatestDelivery.reviewStatus ===
-                          'revision_requested'
+                        'revision_requested'
                         ? chatLocale === 'id'
                           ? 'Perlu revisi'
                           : 'Revision requested'
@@ -8387,8 +8364,8 @@ export default function ChatRoomPage() {
                         {timelineStatusLabel(item, chatLocale)}
                       </p>
                       {'description' in item &&
-                      typeof item.description === 'string' &&
-                      item.description.trim() ? (
+                        typeof item.description === 'string' &&
+                        item.description.trim() ? (
                         <p className="text-[11px] text-[color:color-mix(in_srgb,_var(--app-text-soft)_90%,_transparent)]">
                           {timelineDescriptionLabel(
                             item.description,
@@ -8407,41 +8384,41 @@ export default function ChatRoomPage() {
 
             {(selectedTransaction.offer_message ||
               selectedTransaction.response_message) && (
-              <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
-                <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                  {chatLocale === 'id'
-                    ? 'Catatan negosiasi'
-                    : 'Negotiation notes'}
-                </summary>
-                <div className="mt-2 space-y-2">
-                  {selectedTransaction.offer_message ? (
-                    <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                      <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                        {chatLocale === 'id' ? 'Catatan pembeli' : 'Buyer note'}
-                      </p>
-                      <p>{selectedTransaction.offer_message}</p>
-                    </div>
-                  ) : null}
-                  {selectedTransaction.response_message ? (
-                    <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
-                      <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
-                        {chatLocale === 'id'
-                          ? 'Catatan penjual'
-                          : 'Seller note'}
-                      </p>
-                      <p>{selectedTransaction.response_message}</p>
-                    </div>
-                  ) : null}
-                </div>
-              </details>
-            )}
+                <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
+                  <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                    {chatLocale === 'id'
+                      ? 'Catatan negosiasi'
+                      : 'Negotiation notes'}
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {selectedTransaction.offer_message ? (
+                      <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
+                        <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                          {chatLocale === 'id' ? 'Catatan pembeli' : 'Buyer note'}
+                        </p>
+                        <p>{selectedTransaction.offer_message}</p>
+                      </div>
+                    ) : null}
+                    {selectedTransaction.response_message ? (
+                      <div className="rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-2.5 text-xs text-[color:var(--app-text-soft)]">
+                        <p className="mb-1 text-[11px] uppercase tracking-wide text-[color:var(--app-text-soft)]">
+                          {chatLocale === 'id'
+                            ? 'Catatan penjual'
+                            : 'Seller note'}
+                        </p>
+                        <p>{selectedTransaction.response_message}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
+              )}
 
             <details className="mt-3 rounded-lg border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-2.5">
               <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text-soft)]">
                 {chatLocale === 'id' ? 'Keamanan & risiko' : 'Safety & risk'}
               </summary>
               {Array.isArray(selectedTransaction.risk_flags) &&
-              selectedTransaction.risk_flags.length > 0 ? (
+                selectedTransaction.risk_flags.length > 0 ? (
                 <div className="mt-2 rounded-lg border border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-warning)_10%,_transparent)] p-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-warning)]">
                     Risk Flags
@@ -8478,11 +8455,10 @@ export default function ChatRoomPage() {
                         className="flex items-center gap-2 text-xs text-[color:var(--app-text-soft)]"
                       >
                         <span
-                          className={`inline-block h-2 w-2 rounded-full ${
-                            Boolean(value)
-                              ? 'bg-[color:var(--app-accent)]'
-                              : 'bg-[color:var(--app-surface)]'
-                          }`}
+                          className={`inline-block h-2 w-2 rounded-full ${Boolean(value)
+                            ? 'bg-[color:var(--app-accent)]'
+                            : 'bg-[color:var(--app-surface)]'
+                            }`}
                         />
                         <span>{humanizeStatus(key)}</span>
                       </div>
@@ -8719,7 +8695,7 @@ export default function ChatRoomPage() {
               channelRef.current?.push('call_reject', {
                 call_id: incomingCall.callId,
               });
-            } catch {}
+            } catch { }
             setIncomingCall(null);
           }}
         />

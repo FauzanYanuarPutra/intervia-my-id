@@ -1726,7 +1726,7 @@ function DesktopHeroSection({
               </p>
             </div>
 
-            <div className="rounded-[24px] border border-white/80 bg-white/80 p-4 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] backdrop-blur">
+            {/* <div className="rounded-[24px] border border-white/80 bg-white/80 p-4 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] backdrop-blur">
               <div className="flex items-center gap-2.5">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,#059669,#047857)] text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.85)]">
                   <Sparkles className="h-4.5 w-4.5" />
@@ -1788,10 +1788,10 @@ function DesktopHeroSection({
                   );
                 })}
               </div>
-            </div>
+            </div> */}
           </div>
 
-          <div className="mt-4 grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center">
+          {/* <div className="mt-4 grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center">
             <SearchInput
               value={query}
               onValueChange={onQueryChange}
@@ -1819,7 +1819,7 @@ function DesktopHeroSection({
                 {isId ? 'Jelajah dulu' : 'Browse first'}
               </Link>
             </div>
-          </div>
+          </div> */}
         </section>
       </div>
     );
@@ -2386,7 +2386,6 @@ function RecommendationCard({
   mobile?: boolean;
 }) {
   const badgeTone = toneClassNames(item.badgeTone || 'emerald');
-  const favoriteHref = `/login?callbackUrl=${encodeURIComponent(item.href)}`;
   const entityType = item.entityType || 'listing';
 
   return (
@@ -2394,135 +2393,103 @@ function RecommendationCard({
       className={cn(
         'flex h-full shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_30px_-28px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.2)]',
         mobile
-          ? 'w-[222px] min-w-[222px] max-w-[222px]'
-          : 'w-[238px] min-w-[238px] max-w-[238px] sm:w-[248px] sm:min-w-[248px] sm:max-w-[248px] xl:w-[260px] xl:min-w-[260px] xl:max-w-[260px]',
+          ? 'w-[190px] min-w-[190px]'
+          : 'w-[220px] min-w-[220px]'
       )}
       data-testid="home-recommendation-card"
     >
-      <div className="relative h-32 overflow-hidden sm:h-36">
+      {/* IMAGE */}
+      <div className="relative aspect-square overflow-hidden">
         <Link
           href={item.href}
           className="block h-full"
-          aria-label={`${isId ? 'Buka detail' : 'Open detail'} ${item.title}`}
-          data-lajukan-event="home.card_clicked"
-          data-lajukan-surface="home_recommendations"
-          data-lajukan-entity-type={entityType}
-          data-lajukan-entity-id={item.id}
-          data-lajukan-label={item.title}
         >
           {item.images.length > 0 ? (
             <MediaPreviewCarousel
               items={item.images}
               alt={item.title}
               aspectClassName="h-full w-full"
-              className="h-full w-full bg-transparent"
-              sizes="260px"
-              loading="eager"
+              className="h-full w-full"
               controls={false}
               lightbox={false}
-              showCounter={item.images.length > 1}
               showDots={item.images.length > 1}
-              mediaClassName="transition duration-500 group-hover:scale-[1.03]"
             />
           ) : (
-            <span className="flex h-full items-center justify-center bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]">
-              <Package className="h-9 w-9" />
-            </span>
+            <div className="flex h-full items-center justify-center bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]">
+              <Package className="h-8 w-8" />
+            </div>
           )}
         </Link>
-        {item.badge ? (
-          <span
-            className={cn(
-              'absolute left-3 top-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold',
-              badgeTone.soft,
-            )}
-          >
+
+        {/* BADGE */}
+        {item.badge && (
+          <span className={cn('absolute left-2 top-2 rounded-full px-2 py-1 text-[9px] font-bold', badgeTone.soft)}>
             {item.badge}
           </span>
-        ) : null}
-        <span className="absolute bottom-2.5 left-3 inline-flex rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-black uppercase text-[color:var(--app-accent)] shadow-[0_12px_22px_-18px_rgba(15,23,42,0.22)]">
+        )}
+
+        <span className="flex justify-center items-center absolute bottom-2 left-2 rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase text-[color:var(--app-accent)]">
           {item.typeLabel}
         </span>
-        <Link
-          href={favoriteHref}
-          className="absolute right-2.5 top-2.5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[color:var(--app-text)] shadow-[0_12px_22px_-18px_rgba(15,23,42,0.22)] transition hover:text-rose-500"
-          aria-label={isId ? `Simpan ${item.title}` : `Save ${item.title}`}
-          data-lajukan-event="recommendation.clicked"
-          data-lajukan-surface="home_recommendations_save"
-          data-lajukan-entity-type={entityType}
-          data-lajukan-entity-id={item.id}
-          data-lajukan-label={item.title}
-        >
-          <Heart className="h-4 w-4" />
-        </Link>
       </div>
-      <Link
-        href={item.href}
-        className="flex flex-1 flex-col"
-        data-lajukan-event="home.card_clicked"
-        data-lajukan-surface="home_recommendations"
-        data-lajukan-entity-type={entityType}
-        data-lajukan-entity-id={item.id}
-        data-lajukan-label={item.title}
-      >
-        <div className="flex flex-1 flex-col p-3">
-          <h3 className="line-clamp-3 min-h-[3.25rem] break-words text-[0.9rem] font-bold leading-[1.2] text-[color:var(--app-text)]">
+
+      {/* CONTENT */}
+      <Link href={item.href} className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col p-2.5">
+
+          {/* TITLE (FIXED HEIGHT 2 LINES STABLE) */}
+          <h3 className="line-clamp-2 h-[2rem] text-[13px] font-bold leading-snug text-[color:var(--app-text)]">
             {item.title}
           </h3>
-          {item.vendor ? (
-            <p className="mt-1 truncate text-xs text-[color:var(--app-text-soft)]">
-              {item.vendor}
-            </p>
-          ) : null}
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-[color:var(--app-text-soft)]">
-            <Heart className="h-3.5 w-3.5 fill-rose-500 text-rose-500" />
-            <span className="font-semibold text-rose-500">{item.reviews}</span>
-            <span>likes</span>
+
+          {/* VENDOR (FIXED SLOT) */}
+          <div className="mt-1 h-[14px]">
+            {item.vendor && (
+              <p className="truncate text-[10px] text-[color:var(--app-text-soft)]">
+                {item.vendor}
+              </p>
+            )}
           </div>
-          <div className="mt-auto flex items-end justify-between gap-2 pt-2">
-            <div className="min-w-0">
-              <p className="truncate text-[1rem] font-black tracking-[-0.04em] text-[color:var(--app-accent)]">
-                {item.price}
-              </p>
-              <p className="mt-0.5 truncate text-[11px] text-[color:var(--app-text-soft)]">
-                {item.unit || item.location}
-              </p>
-            </div>
-            {item.unit ? (
-              <p className="min-w-0 max-w-[6.5rem] truncate text-right text-[11px] text-[color:var(--app-text-soft)]">
+
+          {/* PRICE BLOCK (FIXED HEIGHT SLOT) */}
+          <div className="mt-auto pt-2">
+            <div className="flex items-end justify-between gap-2">
+
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-black text-[color:var(--app-accent)]">
+                  {item.price}
+                </p>
+
+                <p className="truncate text-[10px] text-[color:var(--app-text-soft)]">
+                  {item.unit || ' '}
+                </p>
+              </div>
+
+              <p className="max-w-[80px] truncate text-right text-[10px] text-[color:var(--app-text-soft)]">
                 {item.location}
               </p>
-            ) : null}
+
+            </div>
           </div>
         </div>
       </Link>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 px-3 pb-3">
+
+      {/* CTA (OUTSIDE FLOW → NO HEIGHT IMPACT) */}
+      {/* <div className="grid grid-cols-[1fr_auto] gap-2 px-2.5 pb-2.5">
         <Link
           href={item.href}
-          className="inline-flex min-h-[34px] items-center justify-center rounded-[12px] bg-[color:var(--app-surface-muted)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
-          data-lajukan-event="home.card_clicked"
-          data-lajukan-surface="home_recommendations_detail"
-          data-lajukan-entity-type={entityType}
-          data-lajukan-entity-id={item.id}
-          data-lajukan-label={item.title}
+          className="rounded-[10px] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[10px] font-semibold text-[color:var(--app-text)] hover:text-[color:var(--app-accent)]"
         >
-          {item.detailActionLabel || (isId ? 'Detail' : 'Detail')}
+          {item.detailActionLabel || 'Detail'}
         </Link>
+
         <Link
           href={item.createHref}
-          className="inline-flex min-h-[34px] items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[11px] font-semibold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)]"
-          data-lajukan-event={
-            item.secondaryEventName || 'listing.create_started'
-          }
-          data-lajukan-surface="home_recommendations_similar"
-          data-lajukan-entity-type={entityType}
-          data-lajukan-entity-id={item.id}
-          data-lajukan-label={item.title}
+          className="rounded-[10px] bg-[color:var(--app-accent)] px-3 py-2 text-[10px] font-semibold text-[color:var(--app-text-inverse)]"
         >
-          {item.secondaryActionLabel ||
-            (isId ? 'Buat serupa' : 'Create similar')}
+          {item.secondaryActionLabel || 'Create similar'}
         </Link>
-      </div>
+      </div> */}
     </article>
   );
 }
@@ -2875,12 +2842,7 @@ function CommunityPanel({
           {postMediaItems.length > 0 ? (
             <Link
               href={communityPostHref}
-              className={cn(
-                'relative block overflow-hidden bg-slate-100',
-                post.kind === 'reel'
-                  ? 'h-[220px] sm:h-[280px]'
-                  : 'h-[140px] sm:h-[190px]',
-              )}
+              className="relative block overflow-hidden rounded-3xl aspect-[4/5] bg-slate-100"
             >
               {postIsVideo && postMediaItems.length === 1 ? (
                 <video
@@ -2903,6 +2865,7 @@ function CommunityPanel({
                   showDots={false}
                 />
               )}
+
               {post.kind === 'reel' ? (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/18 text-white">
                   <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-black/45">

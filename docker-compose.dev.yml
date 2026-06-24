@@ -122,6 +122,10 @@ services:
       - "5432:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d identity_db" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - web
 
@@ -138,6 +142,10 @@ services:
       - "5433:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d community_db" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - web
 
@@ -154,6 +162,10 @@ services:
       - "5434:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d marketplace_db" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - web
 

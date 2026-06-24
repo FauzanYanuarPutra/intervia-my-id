@@ -36,6 +36,7 @@ import {
   UserRound,
   Wrench,
   X,
+  Bookmark,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -944,7 +945,7 @@ function normalizeDiscoverUser(
     name,
   );
   const roleLabel =
-    roles[0] || (locale === 'id' ? 'Profil aktif' : 'Active profile');
+    roles[0] || (locale === 'id' ? 'Profil' : 'Profile');
   const ratingLabel =
     typeof user.rating === 'number' && Number.isFinite(user.rating)
       ? `${user.rating.toFixed(1)}★`
@@ -1212,313 +1213,415 @@ function SearchResultScopeCard({
   );
 }
 
+// function SearchResultListingCard({
+//   item,
+//   locale,
+//   cartQuantity,
+//   onAddToCart,
+//   onRemoveFromCart,
+//   onOpenCart,
+// }: {
+//   item: SearchCard;
+//   locale: 'id' | 'en';
+//   cartQuantity: number;
+//   onAddToCart: (item: SearchCard) => void;
+//   onRemoveFromCart: (itemId: string) => void;
+//   onOpenCart: () => void;
+// }) {
+//   const isId = locale === 'id';
+//   const previewImages =
+//     item.images.length > 0 ? item.images : item.image ? [item.image] : [];
+//   const updatedLabel = formatShortDate(item.updatedAt, locale);
+//   const visual = getCategoryVisual(item.typeKey);
+//   const CategoryIcon = visual.icon;
+//   const isSaved = cartQuantity > 0;
+//   const badgeTone =
+//     'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] border-[color:var(--app-border)]';
+//   const detailLabel = isId ? 'Detail / chat' : 'Details / chat';
+//   const savedLabel = isSaved
+//     ? isId
+//       ? 'Tersimpan'
+//       : 'Saved'
+//     : isId
+//       ? 'Simpan'
+//       : 'Save';
+//   const saveAriaLabel = isSaved
+//     ? isId
+//       ? 'Buka referensi tersimpan'
+//       : 'Open saved references'
+//     : isId
+//       ? 'Simpan sebagai referensi'
+//       : 'Save as reference';
+//   const ownerLabel = item.storeName || item.ownerName || null;
+//   const mediaLabel =
+//     previewImages.length > 1
+//       ? isId
+//         ? `${previewImages.length} foto`
+//         : `${previewImages.length} photos`
+//       : item.hasMedia
+//         ? isId
+//           ? 'Ada foto'
+//           : 'Has media'
+//         : null;
+
+//   return (
+//     <article
+//       data-testid="search-result-card"
+//       className={cn(
+//         'group/card overflow-hidden rounded-[22px] border shadow-[0_18px_38px_-30px_rgba(15,23,42,0.2)] ring-1 ring-white/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_58px_-40px_rgba(15,23,42,0.28)]',
+//         visual.cardClass,
+//       )}
+//     >
+//       <div className="grid min-w-0 grid-cols-[112px_minmax(0,1fr)] items-stretch gap-0 sm:grid-cols-[148px_minmax(0,1fr)] xl:grid-cols-[172px_minmax(0,1fr)_176px] 2xl:grid-cols-[184px_minmax(0,1fr)_190px]">
+//         <Link
+//           href={item.href}
+//           className={cn(
+//             'relative h-full min-h-[112px] w-full self-stretch overflow-hidden sm:min-h-[148px] xl:min-h-full',
+//             visual.imageClass,
+//           )}
+//           aria-label={isId ? 'Buka detail' : 'Open details'}
+//         >
+//           {previewImages.length > 0 ? (
+//             <MediaPreviewCarousel
+//               items={previewImages}
+//               alt={item.title}
+//               aspectClassName="h-full w-full"
+//               className="absolute inset-0 h-full w-full bg-transparent"
+//               mediaClassName="transition duration-500 group-hover/card:scale-[1.035]"
+//               sizes="(max-width: 640px) 112px, (max-width: 1280px) 148px, 184px"
+//               controls={false}
+//               lightbox={false}
+//               showCounter={previewImages.length > 1}
+//               showDots={previewImages.length > 1}
+//             />
+//           ) : (
+//             <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
+//               <span
+//                 className={cn(
+//                   'inline-flex h-16 w-16 items-center justify-center rounded-[24px]',
+//                   visual.iconBubbleClass,
+//                 )}
+//               >
+//                 <CategoryIcon className="h-8 w-8" />
+//               </span>
+//             </div>
+//           )}
+//           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/20 to-transparent" />
+//           <div className="absolute left-2 top-2 sm:left-3 sm:top-3">
+//             <span
+//               className={cn(
+//                 'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-black shadow-sm backdrop-blur sm:text-[10px]',
+//                 visual.chipClass,
+//               )}
+//             >
+//               <CategoryIcon className="h-3.5 w-3.5" />
+//               <span className="truncate">{item.typeLabel}</span>
+//             </span>
+//           </div>
+//           {mediaLabel ? (
+//             <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3">
+//               <span className="inline-flex max-w-full items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-black text-slate-700 shadow-sm backdrop-blur">
+//                 {mediaLabel}
+//               </span>
+//             </div>
+//           ) : null}
+//         </Link>
+
+//         <div className="min-w-0 border-l border-[color:var(--app-border)] bg-white/58 p-3 backdrop-blur-sm sm:p-4">
+//           <div className="min-w-0">
+//             <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:mb-2">
+//               <span
+//                 className={cn(
+//                   'inline-flex min-h-[22px] items-center rounded-full border px-2 py-0.5 text-[9px] font-bold',
+//                   badgeTone,
+//                 )}
+//               >
+//                 {item.sideLabel}
+//               </span>
+//               {item.verified ? (
+//                 <span className="inline-flex min-h-[22px] items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+//                   <BadgeCheck className="h-3 w-3" />
+//                   Verified
+//                 </span>
+//               ) : null}
+//             </div>
+//             <Link href={item.href} className="group block">
+//               <h3 className="line-clamp-2 text-[0.92rem] font-black leading-[1.08] tracking-[-0.035em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.1rem]">
+//                 {item.title}
+//               </h3>
+//             </Link>
+//             {ownerLabel ? (
+//               <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[11px]">
+//                 {ownerLabel}
+//               </p>
+//             ) : null}
+//             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:mt-1.5 sm:gap-x-3 sm:text-[11px]">
+//               <span className="inline-flex items-center gap-1.5">
+//                 <MapPin className="h-3.5 w-3.5" />
+//                 {item.location}
+//               </span>
+//               {updatedLabel ? (
+//                 <span className="inline-flex items-center gap-1.5">
+//                   <Clock3 className="h-3.5 w-3.5" />
+//                   {updatedLabel}
+//                 </span>
+//               ) : null}
+//             </div>
+//           </div>
+
+//           <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:mt-2 sm:text-[12px]">
+//             {item.summary ||
+//               (isId
+//                 ? 'Siap dibuka. Lanjut chat.'
+//                 : 'Listing ready to open and follow up.')}
+//           </p>
+
+//           <div className="mt-2 xl:hidden">
+//             <div className="rounded-[14px] border border-white/70 bg-white/76 px-2.5 py-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)] sm:rounded-[16px] sm:px-3">
+//               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+//                 {isId ? 'Info' : 'Info'}
+//               </p>
+//               <p
+//                 className={cn(
+//                   'mt-0.5 truncate text-[0.88rem] font-black leading-tight sm:text-[0.95rem]',
+//                   visual.priceClass,
+//                 )}
+//               >
+//                 {item.priceLabel}
+//               </p>
+//               {item.priceUnitLabel ? (
+//                 <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+//                   {isId ? 'Per' : 'Per'} {item.priceUnitLabel}
+//                 </p>
+//               ) : null}
+//             </div>
+
+//             <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+//               <Link
+//                 href={item.profileHref || item.href}
+//                 className={cn(
+//                   'inline-flex min-h-[40px] min-w-0 items-center justify-center gap-2 rounded-[14px] border px-3 text-[12px] font-black',
+//                   visual.outlineButtonClass,
+//                 )}
+//               >
+//                 <Eye className="h-3.5 w-3.5 shrink-0" />
+//                 <span className="truncate">{detailLabel}</span>
+//               </Link>
+//               <button
+//                 type="button"
+//                 onClick={() =>
+//                   isSaved ? onOpenCart() : onAddToCart(item)
+//                 }
+//                 aria-label={saveAriaLabel}
+//                 className={cn(
+//                   'relative inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-black',
+//                   visual.solidButtonClass,
+//                 )}
+//               >
+//                 {isSaved ? (
+//                   <BookmarkCheck className="h-3.5 w-3.5" />
+//                 ) : (
+//                   <BookmarkPlus className="h-3.5 w-3.5" />
+//                 )}
+//                 <span className="hidden sm:inline">{savedLabel}</span>
+//               </button>
+//             </div>
+//             {isSaved ? (
+//               <button
+//                 type="button"
+//                 onClick={() => onRemoveFromCart(item.id)}
+//                 className="mt-2 inline-flex min-h-[28px] items-center gap-1.5 rounded-full px-1 text-[10px] font-bold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
+//               >
+//                 <X className="h-3 w-3" />
+//                 {isId ? 'Hapus dari referensi' : 'Remove reference'}
+//               </button>
+//             ) : null}
+//           </div>
+//         </div>
+
+//         <div
+//           className={cn(
+//             'hidden border-l border-[color:var(--app-border)] p-3 xl:flex xl:flex-col xl:justify-between',
+//             visual.sidePanelClass,
+//           )}
+//         >
+//           <div>
+//             <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+//               {isId ? 'Info' : 'Info'}
+//             </p>
+//             <p
+//               className={cn(
+//                 'mt-1 text-[1.06rem] font-black leading-tight',
+//                 visual.priceClass,
+//               )}
+//             >
+//               {item.priceLabel}
+//             </p>
+//             {item.priceUnitLabel ? (
+//               <p className="mt-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+//                 {isId ? 'Harga per' : 'Price per'} {item.priceUnitLabel}
+//               </p>
+//             ) : null}
+//             <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+//               {item.sideContextLabel}
+//             </p>
+//           </div>
+
+//           <div className="space-y-2">
+//             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+//               <button
+//                 type="button"
+//                 onClick={() =>
+//                   isSaved ? onOpenCart() : onAddToCart(item)
+//                 }
+//                 aria-label={saveAriaLabel}
+//                 className={cn(
+//                   'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] px-3 text-[12px] font-semibold',
+//                   visual.solidButtonClass,
+//                 )}
+//               >
+//                 {isSaved ? (
+//                   <BookmarkCheck className="h-3.5 w-3.5" />
+//                 ) : (
+//                   <BookmarkPlus className="h-3.5 w-3.5" />
+//                 )}
+//                 {savedLabel}
+//               </button>
+//               {isSaved ? (
+//                 <button
+//                   type="button"
+//                   onClick={() => onRemoveFromCart(item.id)}
+//                   aria-label={
+//                     isId
+//                       ? 'Hapus dari referensi'
+//                       : 'Remove from saved references'
+//                   }
+//                   className={cn(
+//                     'inline-flex h-[38px] w-[38px] items-center justify-center rounded-[12px] border text-[12px] font-semibold',
+//                     visual.outlineButtonClass,
+//                   )}
+//                 >
+//                   <X className="h-3.5 w-3.5" />
+//                 </button>
+//               ) : null}
+//             </div>
+//             <Link
+//               href={item.profileHref || item.href}
+//               className={cn(
+//                 'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] border px-3 text-[12px] font-semibold',
+//                 visual.outlineButtonClass,
+//               )}
+//             >
+//               <Eye className="h-3.5 w-3.5" />
+//               {detailLabel}
+//               <ArrowRight className="h-3.5 w-3.5" />
+//             </Link>
+//           </div>
+//         </div>
+//       </div>
+//     </article>
+//   );
+// }
+
 function SearchResultListingCard({
   item,
   locale,
   cartQuantity,
   onAddToCart,
   onRemoveFromCart,
-  onOpenCart,
 }: {
   item: SearchCard;
   locale: 'id' | 'en';
   cartQuantity: number;
   onAddToCart: (item: SearchCard) => void;
   onRemoveFromCart: (itemId: string) => void;
-  onOpenCart: () => void;
 }) {
-  const isId = locale === 'id';
-  const previewImages =
-    item.images.length > 0 ? item.images : item.image ? [item.image] : [];
-  const updatedLabel = formatShortDate(item.updatedAt, locale);
-  const visual = getCategoryVisual(item.typeKey);
-  const CategoryIcon = visual.icon;
   const isSaved = cartQuantity > 0;
-  const badgeTone =
-    'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] border-[color:var(--app-border)]';
-  const detailLabel = isId ? 'Detail / chat' : 'Details / chat';
-  const savedLabel = isSaved
-    ? isId
-      ? 'Tersimpan'
-      : 'Saved'
-    : isId
-      ? 'Simpan'
-      : 'Save';
-  const saveAriaLabel = isSaved
-    ? isId
-      ? 'Buka referensi tersimpan'
-      : 'Open saved references'
-    : isId
-      ? 'Simpan sebagai referensi'
-      : 'Save as reference';
-  const ownerLabel = item.storeName || item.ownerName || null;
-  const mediaLabel =
-    previewImages.length > 1
-      ? isId
-        ? `${previewImages.length} foto`
-        : `${previewImages.length} photos`
-      : item.hasMedia
-        ? isId
-          ? 'Ada foto'
-          : 'Has media'
-        : null;
+
+  const images =
+    item.images?.length > 0 ? item.images : item.image ? [item.image] : [];
+
+  const toggleSave = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isSaved) onRemoveFromCart(item.id);
+    else onAddToCart(item);
+  };
+
+  // const getTypeLabel = () => {
+  //   if (item.storeName) return 'Supplier';
+  //   if (item.ownerName) return 'Individual';
+  //   return 'Listing';
+  // };
 
   return (
-    <article
-      data-testid="search-result-card"
-      className={cn(
-        'group/card overflow-hidden rounded-[22px] border shadow-[0_18px_38px_-30px_rgba(15,23,42,0.2)] ring-1 ring-white/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_58px_-40px_rgba(15,23,42,0.28)]',
-        visual.cardClass,
-      )}
-    >
-      <div className="grid min-w-0 grid-cols-[112px_minmax(0,1fr)] items-stretch gap-0 sm:grid-cols-[148px_minmax(0,1fr)] xl:grid-cols-[172px_minmax(0,1fr)_176px] 2xl:grid-cols-[184px_minmax(0,1fr)_190px]">
-        <Link
-          href={item.href}
-          className={cn(
-            'relative h-full min-h-[112px] w-full self-stretch overflow-hidden sm:min-h-[148px] xl:min-h-full',
-            visual.imageClass,
-          )}
-          aria-label={isId ? 'Buka detail' : 'Open details'}
-        >
-          {previewImages.length > 0 ? (
+    <Link href={item.href} className="block">
+      <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md">
+
+        {/* IMAGE */}
+        <div className="relative aspect-square w-full bg-gray-100">
+          {images.length > 0 ? (
             <MediaPreviewCarousel
-              items={previewImages}
+              items={images}
               alt={item.title}
               aspectClassName="h-full w-full"
-              className="absolute inset-0 h-full w-full bg-transparent"
-              mediaClassName="transition duration-500 group-hover/card:scale-[1.035]"
-              sizes="(max-width: 640px) 112px, (max-width: 1280px) 148px, 184px"
+              className="h-full w-full"
               controls={false}
               lightbox={false}
-              showCounter={previewImages.length > 1}
-              showDots={previewImages.length > 1}
+              showDots={images.length > 1}
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
-              <span
-                className={cn(
-                  'inline-flex h-16 w-16 items-center justify-center rounded-[24px]',
-                  visual.iconBubbleClass,
-                )}
-              >
-                <CategoryIcon className="h-8 w-8" />
-              </span>
+            <div className="flex h-full items-center justify-center text-xs text-gray-400">
+              No Image
             </div>
           )}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/20 to-transparent" />
-          <div className="absolute left-2 top-2 sm:left-3 sm:top-3">
-            <span
-              className={cn(
-                'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-black shadow-sm backdrop-blur sm:text-[10px]',
-                visual.chipClass,
-              )}
-            >
-              <CategoryIcon className="h-3.5 w-3.5" />
-              <span className="truncate">{item.typeLabel}</span>
-            </span>
-          </div>
-          {mediaLabel ? (
-            <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3">
-              <span className="inline-flex max-w-full items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-black text-slate-700 shadow-sm backdrop-blur">
-                {mediaLabel}
-              </span>
-            </div>
-          ) : null}
-        </Link>
 
-        <div className="min-w-0 border-l border-[color:var(--app-border)] bg-white/58 p-3 backdrop-blur-sm sm:p-4">
-          <div className="min-w-0">
-            <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:mb-2">
-              <span
-                className={cn(
-                  'inline-flex min-h-[22px] items-center rounded-full border px-2 py-0.5 text-[9px] font-bold',
-                  badgeTone,
-                )}
-              >
-                {item.sideLabel}
-              </span>
-              {item.verified ? (
-                <span className="inline-flex min-h-[22px] items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
-                  <BadgeCheck className="h-3 w-3" />
-                  Verified
-                </span>
-              ) : null}
-            </div>
-            <Link href={item.href} className="group block">
-              <h3 className="line-clamp-2 text-[0.92rem] font-black leading-[1.08] tracking-[-0.035em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.1rem]">
-                {item.title}
-              </h3>
-            </Link>
-            {ownerLabel ? (
-              <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[11px]">
-                {ownerLabel}
-              </p>
-            ) : null}
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:mt-1.5 sm:gap-x-3 sm:text-[11px]">
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5" />
-                {item.location}
-              </span>
-              {updatedLabel ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  {updatedLabel}
-                </span>
-              ) : null}
-            </div>
-          </div>
+          {/* BOOKMARK */}
+          <button
+            onClick={toggleSave}
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur hover:bg-white"
+          >
+            <Bookmark
+              size={16}
+              className={isSaved ? 'fill-black text-black' : 'text-gray-500'}
+            />
+          </button>
+        </div>
 
-          <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:mt-2 sm:text-[12px]">
-            {item.summary ||
-              (isId
-                ? 'Siap dibuka. Lanjut chat.'
-                : 'Listing ready to open and follow up.')}
+        {/* CONTENT */}
+        <div className="flex flex-1 flex-col p-3">
+
+          {/* LABEL */}
+          <span className="mb-1 w-fit rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+            {item.content_type}
+          </span>
+
+          {/* TITLE (FIXED 2 LINES HEIGHT) */}
+          <h3 className="line-clamp-2 h-[2.25rem] text-sm font-semibold leading-snug text-gray-900">
+            {item.title}
+          </h3>
+
+          {/* META */}
+          <p className="mt-1 line-clamp-1 text-xs text-gray-500">
+            {item.location}
           </p>
 
-          <div className="mt-2 xl:hidden">
-            <div className="rounded-[14px] border border-white/70 bg-white/76 px-2.5 py-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)] sm:rounded-[16px] sm:px-3">
-              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                {isId ? 'Info' : 'Info'}
-              </p>
-              <p
-                className={cn(
-                  'mt-0.5 truncate text-[0.88rem] font-black leading-tight sm:text-[0.95rem]',
-                  visual.priceClass,
-                )}
-              >
-                {item.priceLabel}
-              </p>
-              {item.priceUnitLabel ? (
-                <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                  {isId ? 'Per' : 'Per'} {item.priceUnitLabel}
-                </p>
-              ) : null}
-            </div>
+          {/* PRICE */}
+          <div className="mt-2">
+            <p className="text-base font-extrabold text-green-500">
+              {item.priceLabel.split('/')[0]}
+            </p>
 
-            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-              <Link
-                href={item.profileHref || item.href}
-                className={cn(
-                  'inline-flex min-h-[40px] min-w-0 items-center justify-center gap-2 rounded-[14px] border px-3 text-[12px] font-black',
-                  visual.outlineButtonClass,
-                )}
-              >
-                <Eye className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{detailLabel}</span>
-              </Link>
-              <button
-                type="button"
-                onClick={() =>
-                  isSaved ? onOpenCart() : onAddToCart(item)
-                }
-                aria-label={saveAriaLabel}
-                className={cn(
-                  'relative inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-black',
-                  visual.solidButtonClass,
-                )}
-              >
-                {isSaved ? (
-                  <BookmarkCheck className="h-3.5 w-3.5" />
-                ) : (
-                  <BookmarkPlus className="h-3.5 w-3.5" />
-                )}
-                <span className="hidden sm:inline">{savedLabel}</span>
-              </button>
-            </div>
-            {isSaved ? (
-              <button
-                type="button"
-                onClick={() => onRemoveFromCart(item.id)}
-                className="mt-2 inline-flex min-h-[28px] items-center gap-1.5 rounded-full px-1 text-[10px] font-bold text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]"
-              >
-                <X className="h-3 w-3" />
-                {isId ? 'Hapus dari referensi' : 'Remove reference'}
-              </button>
-            ) : null}
+            {item.priceUnitLabel && (
+              <p className="text-[11px] text-gray-500">
+                Per {item.priceUnitLabel}
+              </p>
+            )}
           </div>
         </div>
-
-        <div
-          className={cn(
-            'hidden border-l border-[color:var(--app-border)] p-3 xl:flex xl:flex-col xl:justify-between',
-            visual.sidePanelClass,
-          )}
-        >
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-              {isId ? 'Info' : 'Info'}
-            </p>
-            <p
-              className={cn(
-                'mt-1 text-[1.06rem] font-black leading-tight',
-                visual.priceClass,
-              )}
-            >
-              {item.priceLabel}
-            </p>
-            {item.priceUnitLabel ? (
-              <p className="mt-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                {isId ? 'Harga per' : 'Price per'} {item.priceUnitLabel}
-              </p>
-            ) : null}
-            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
-              {item.sideContextLabel}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  isSaved ? onOpenCart() : onAddToCart(item)
-                }
-                aria-label={saveAriaLabel}
-                className={cn(
-                  'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] px-3 text-[12px] font-semibold',
-                  visual.solidButtonClass,
-                )}
-              >
-                {isSaved ? (
-                  <BookmarkCheck className="h-3.5 w-3.5" />
-                ) : (
-                  <BookmarkPlus className="h-3.5 w-3.5" />
-                )}
-                {savedLabel}
-              </button>
-              {isSaved ? (
-                <button
-                  type="button"
-                  onClick={() => onRemoveFromCart(item.id)}
-                  aria-label={
-                    isId
-                      ? 'Hapus dari referensi'
-                      : 'Remove from saved references'
-                  }
-                  className={cn(
-                    'inline-flex h-[38px] w-[38px] items-center justify-center rounded-[12px] border text-[12px] font-semibold',
-                    visual.outlineButtonClass,
-                  )}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              ) : null}
-            </div>
-            <Link
-              href={item.profileHref || item.href}
-              className={cn(
-                'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[12px] border px-3 text-[12px] font-semibold',
-                visual.outlineButtonClass,
-              )}
-            >
-              <Eye className="h-3.5 w-3.5" />
-              {detailLabel}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }
 
@@ -1572,11 +1675,6 @@ function SearchResultProfileCard({
             ) : null}
           </div>
 
-          <Link href={item.href} className="group mt-1 block">
-            <h3 className="line-clamp-1 text-[0.96rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.05rem]">
-              {item.name}
-            </h3>
-          </Link>
 
           {item.handle ? (
             <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1584,9 +1682,16 @@ function SearchResultProfileCard({
             </p>
           ) : null}
 
-          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
+          <Link href={item.href} className="group mt-1 block">
+            <h3 className="line-clamp-1 text-[0.96rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.05rem]">
+              {item.name}
+            </h3>
+          </Link>
+
+
+          {/* <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
             {item.headline}
-          </p>
+          </p> */}
 
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
             <span className="inline-flex items-center gap-1.5">
@@ -1603,7 +1708,7 @@ function SearchResultProfileCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3 py-2.5 sm:px-4">
+      {/* <div className="flex items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3 py-2.5 sm:px-4">
         <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
           {isId
             ? 'Sudah register dan bisa dibuka profilnya'
@@ -1616,7 +1721,7 @@ function SearchResultProfileCard({
           {isId ? 'Buka profil' : 'Open profile'}
           <ChevronRight className="h-3.5 w-3.5" />
         </Link>
-      </div>
+      </div> */}
     </article>
   );
 }
@@ -1652,7 +1757,7 @@ function SearchProfileResultsSection({
     : 'Registered users appear here as active profiles.';
 
   return (
-    <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.18)] sm:p-4">
+    <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.18)] sm:p-4 overflow-hidden">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
@@ -1669,11 +1774,11 @@ function SearchProfileResultsSection({
       </div>
 
       {loading ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
+        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={`profile-skeleton-${index}`}
-              className="ui-skeleton ui-skeleton-pulse h-[172px] rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
+              className="ui-skeleton ui-skeleton-pulse h-[172px] w-[280px] min-w-[280px] shrink-0 rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
             />
           ))}
         </div>
@@ -1682,14 +1787,20 @@ function SearchProfileResultsSection({
           {error}
         </div>
       ) : (
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {profiles.map(profile => (
-            <SearchResultProfileCard
-              key={profile.id}
-              item={profile}
-              locale={locale}
-            />
-          ))}
+        <div className="-mx-4 mt-3 overflow-x-auto px-4 pb-2 scrollbar-hide">
+          <div className="flex gap-3">
+            {profiles.map(profile => (
+              <div
+                key={profile.id}
+                className="w-[280px] min-w-[280px] shrink-0"
+              >
+                <SearchResultProfileCard
+                  item={profile}
+                  locale={locale}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
@@ -1713,199 +1824,135 @@ function SearchCartDock({
 }) {
   if (cart.items.length <= 0) return null;
 
-  const visibleItems = cart.items;
-  const previewItems = cart.items.slice(0, 3);
-  const firstItem = cart.items[0];
-  const savedCount = cart.items.length;
-  const countLabel = `${savedCount} ${isId ? 'referensi tersimpan' : 'saved references'
-    }`;
+  const items = cart.items;
+  const firstItem = items[0];
+
+  const countLabel = `${items.length} ${isId ? 'tersimpan' : 'saved'}`;
 
   return (
-    <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-[70] lg:bottom-5 lg:left-auto lg:right-5 lg:w-[390px]">
+    <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] z-[70] lg:bottom-5 lg:right-5 lg:left-auto lg:w-[360px]">
+
+      {/* COLLAPSED */}
       {!open ? (
         <button
-          type="button"
           onClick={() => onOpenChange(true)}
-          className="ui-pressable pointer-events-auto mx-auto flex min-h-[60px] w-full max-w-[440px] items-center justify-between gap-3 rounded-[22px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-left shadow-[0_24px_54px_-28px_rgba(15,23,42,0.36)] backdrop-blur-xl"
+          className="pointer-events-auto flex w-full items-center justify-between rounded-[18px] border bg-white/90 px-3 py-2.5 shadow-lg backdrop-blur"
         >
-          <span className="inline-flex min-w-0 items-center gap-3">
-            <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent)] text-white shadow-[0_14px_26px_-18px_rgba(22,163,74,0.58)]">
-              <BookmarkCheck className="h-4.5 w-4.5" />
-              <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[color:var(--app-text)] px-1 text-[10px] font-black text-white">
-                {savedCount}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-[12px] bg-black text-white">
+              <BookmarkCheck className="h-4 w-4" />
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-black text-[9px] text-white">
+                {items.length}
               </span>
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-[13px] font-black text-[color:var(--app-text)]">
-                {isId ? 'Referensi tersimpan' : 'Saved references'}
-              </span>
-              <span className="block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-[12px] font-bold">
+                {isId ? 'Tersimpan' : 'Saved'}
+              </p>
+              <p className="truncate text-[10px] text-gray-500">
                 {firstItem?.title || countLabel}
-              </span>
-            </span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-2">
-            {previewItems.length > 0 ? (
-              <span className="hidden -space-x-2 sm:flex">
-                {previewItems.map(item => (
-                  <span
-                    key={item.id}
-                    className="relative h-8 w-8 overflow-hidden rounded-full border-2 border-white bg-[color:var(--app-surface-muted)]"
-                  >
-                    {item.image ? (
-                      <Image
-                        src={item.image}
-                        alt=""
-                        fill
-                        sizes="32px"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-[color:var(--app-accent)]">
-                        <Package className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </span>
-            ) : null}
-            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
-              {isId ? 'Buka' : 'Open'}
-            </span>
+              </p>
+            </div>
+          </div>
+
+          <span className="rounded-full bg-black px-3 py-1 text-[10px] font-bold text-white">
+            {isId ? 'Buka' : 'Open'}
           </span>
         </button>
       ) : (
-        <section className="pointer-events-auto mx-auto max-h-[min(74svh,560px)] w-full max-w-[440px] overflow-hidden rounded-[26px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_64px_-28px_rgba(15,23,42,0.38)] backdrop-blur-xl lg:max-w-none">
-          <div className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)] px-3.5 py-3.5">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                <BookmarkCheck className="h-4.5 w-4.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[14px] font-black text-[color:var(--app-text)]">
-                  {isId ? 'Referensi tersimpan' : 'Saved references'}
-                </p>
-                <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  {countLabel}
-                </p>
-              </div>
+        /* EXPANDED */
+        <section className="pointer-events-auto flex max-h-[60vh] flex-col overflow-hidden rounded-[20px] border bg-white shadow-xl">
+
+          {/* HEADER */}
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-bold">
+                {isId ? 'Referensi' : 'Saved'}
+              </p>
+              <p className="truncate text-[10px] text-gray-500">
+                {countLabel}
+              </p>
             </div>
+
             <button
-              type="button"
               onClick={() => onOpenChange(false)}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]"
-              aria-label={isId ? 'Tutup referensi' : 'Close references'}
+              className="rounded-full bg-gray-100 p-1"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 px-3.5 py-3">
-            <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2">
-              <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                {isId ? 'Siap ditanya' : 'Ready to ask'}
-              </p>
-              <p className="mt-0.5 truncate text-[13px] font-black text-[color:var(--app-text)]">
-                {countLabel}
-              </p>
-            </div>
-            <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2">
-              <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                {isId ? 'Mulai dari' : 'Start from'}
-              </p>
-              <p className="mt-0.5 truncate text-[13px] font-black text-[color:var(--app-text)]">
-                {firstItem?.typeLabel || (isId ? 'Item pertama' : 'First item')}
-              </p>
-            </div>
-          </div>
+          {/* LIST */}
+          <div className="flex-1 overflow-auto px-2 py-2 space-y-2">
 
-          <div
-            className="max-h-[min(46svh,360px)] overflow-y-auto px-2.5 pb-2.5"
-            data-auto-scrollbar
-          >
-            <div className="space-y-2">
-              {visibleItems.map(item => (
-                <div
-                  key={item.id}
-                  className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5"
+            {items.map(item => (
+              <div
+                key={item.id}
+                className="flex gap-2 rounded-[14px] bg-gray-50 p-2"
+              >
+                {/* IMAGE */}
+                <Link
+                  href={item.href}
+                  className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[10px] bg-white"
                 >
-                  <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-2.5">
-                    <Link
-                      href={item.href}
-                      className="relative h-[52px] w-[52px] overflow-hidden rounded-[16px] bg-white"
-                    >
-                      {item.image ? (
-                        <Image
-                          src={item.image}
-                          alt={item.title}
-                          fill
-                          sizes="52px"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-[color:var(--app-accent)]">
-                          <Package className="h-5 w-5" />
-                        </span>
-                      )}
-                    </Link>
-                    <div className="min-w-0">
-                      <Link
-                        href={item.href}
-                        className="line-clamp-2 text-[12px] font-black leading-snug text-[color:var(--app-text)]"
-                      >
-                        {item.title}
-                      </Link>
-                      <p className="mt-1 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
-                        {item.typeLabel} - {item.location}
-                      </p>
-                      <p className="mt-0.5 truncate text-[11px] font-black text-[color:var(--app-accent)]">
-                        {item.priceLabel}
-                      </p>
+                  {item.image ? (
+                    <Image
+                      src={item.image}
+                      alt={item.title}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-gray-400">
+                      <Package className="h-4 w-4" />
                     </div>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <Link
-                      href={item.href}
-                      className="inline-flex min-h-[32px] items-center justify-center rounded-full bg-white px-3 text-[11px] font-bold text-[color:var(--app-text)]"
-                    >
-                      {isId ? 'Detail / chat' : 'Details / chat'}
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => onRemove(item.id)}
-                      className="inline-flex min-h-[32px] items-center justify-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:text-[color:var(--app-text)]"
-                      aria-label={
-                        isId
-                          ? 'Hapus dari referensi'
-                          : 'Remove from saved references'
-                      }
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      {isId ? 'Hapus' : 'Remove'}
-                    </button>
-                  </div>
+                  )}
+                </Link>
+
+                {/* TEXT */}
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={item.href}
+                    className="line-clamp-1 text-[12px] font-bold"
+                  >
+                    {item.title}
+                  </Link>
+
+                  <p className="truncate text-[10px] text-gray-500">
+                    {item.typeLabel} • {item.location}
+                  </p>
+
+                  <p className="text-[11px] font-bold text-black">
+                    {item.priceLabel}
+                  </p>
                 </div>
-              ))}
-            </div>
+
+                {/* REMOVE */}
+                <button
+                  onClick={() => onRemove(item.id)}
+                  className="text-gray-400"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
           </div>
 
-          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 border-t border-[color:var(--app-border)] p-3">
+          {/* FOOTER */}
+          <div className="flex gap-2 border-t p-2">
             <button
-              type="button"
               onClick={onClear}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[15px] border border-[color:var(--app-border)] px-3 text-[12px] font-bold text-[color:var(--app-text-soft)]"
+              className="flex-1 rounded-[12px] border py-2 text-[11px] font-bold text-gray-500"
             >
-              <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">
-                {isId ? 'Kosongkan' : 'Clear'}
-              </span>
+              {isId ? 'Hapus' : 'Clear'}
             </button>
+
             <Link
               href={firstItem?.href || '/search'}
-              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-[15px] bg-[color:var(--app-accent)] px-4 text-[12px] font-black text-white shadow-[0_18px_30px_-20px_rgba(22,163,74,0.5)]"
+              className="flex-1 rounded-[12px] bg-black py-2 text-center text-[11px] font-bold text-white"
             >
-              {firstItem?.actionLabel || (isId ? 'Lanjut' : 'Continue')}
-              <ArrowRight className="h-4 w-4" />
+              {isId ? 'Lanjut' : 'Continue'}
             </Link>
           </div>
         </section>
@@ -2962,7 +3009,7 @@ export default function SearchPageClient() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {visibleItems.map(item => (
                   <SearchResultListingCard
                     key={item.id}
@@ -3383,7 +3430,7 @@ export default function SearchPageClient() {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                       {visibleItems.map(item => (
                         <SearchResultListingCard
                           key={item.id}

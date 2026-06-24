@@ -96,99 +96,78 @@ function HomeUmkmCard({ item, isId }: { item: PreparedStore; isId: boolean }) {
     ? buildUmkmDiscoveryPath({ store: item.store.slug, storeId: item.store.id })
     : UMKM_DISCOVERY_PATH;
   const contactHref = item.ui.whatsappHref || item.ui.telHref || detailHref;
-  const contactIsExternal = contactHref.startsWith('http');
-  const contactLabel = item.ui.whatsappHref
-    ? 'Chat'
-    : item.ui.telHref
-      ? isId
-        ? 'Telepon'
-        : 'Call'
-      : isId
-        ? 'Profil'
-        : 'Profile';
+  // const contactIsExternal = contactHref.startsWith('http');
+  // const contactLabel = item.ui.whatsappHref
+  //   ? 'Chat'
+  //   : item.ui.telHref
+  //     ? isId
+  //       ? 'Telepon'
+  //       : 'Call'
+  //     : isId
+  //       ? 'Profil'
+  //       : 'Profile';
   const locationLine =
     item.store.city || item.store.address || item.ui.categoryLabel;
 
   return (
-    <article className="ui-pressable-card flex h-[228px] w-[222px] min-w-[222px] max-w-[222px] shrink-0 flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_16px_30px_-26px_rgba(15,23,42,0.16)] dark:bg-slate-950 sm:h-[236px] sm:w-[242px] sm:min-w-[242px] sm:max-w-[242px] lg:h-[242px] lg:w-[256px] lg:min-w-[256px] lg:max-w-[256px]">
-      <div className="relative h-[96px] shrink-0 overflow-hidden bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-accent)_10%,white),#ecfdf5_60%,#ffffff_100%)] sm:h-[104px] lg:h-[108px]">
-        <LajukanImage
-          src={item.ui.coverImage}
-          alt={item.store.name}
-          fill
-          sizes="(max-width: 639px) 222px, (max-width: 1023px) 242px, 256px"
-          className="object-cover"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/52 via-slate-950/6 to-transparent" />
-        <div className="absolute left-2.5 top-2.5 flex min-w-0 items-center gap-1.5">
-          <span
-            className={cn(
-              'inline-flex min-h-[28px] items-center rounded-full px-2.5 text-[10px] font-semibold backdrop-blur-sm',
-              getKindBadgeTone(item.ui.kind),
-            )}
-          >
-            {item.ui.kindLabel}
-          </span>
+    <Link
+      href={detailHref}>
+      <article className="ui-pressable-card flex w-[190px] min-w-[190px] max-w-[190px] shrink-0 flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_16px_30px_-26px_rgba(15,23,42,0.16)] dark:bg-slate-950 sm:w-[210px] sm:min-w-[210px] sm:max-w-[210px]">
+        <div className="relative aspect-square shrink-0 overflow-hidden bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-accent)_10%,white),#ecfdf5_60%,#ffffff_100%)]">
+          <LajukanImage
+            src={item.ui.coverImage}
+            alt={item.store.name}
+            fill
+            sizes="(max-width: 639px) 190px, 210px"
+            className="object-cover"
+            loading="lazy"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/52 via-slate-950/6 to-transparent" />
+
+          <div className="absolute left-2 top-2 flex min-w-0 items-center gap-1">
+            <span
+              className={cn(
+                'inline-flex min-h-[24px] items-center rounded-full px-2 text-[9px] font-semibold backdrop-blur-sm',
+                getKindBadgeTone(item.ui.kind),
+              )}
+            >
+              {item.ui.kindLabel}
+            </span>
+          </div>
+
+          {/* <div className="absolute right-2 top-2">
+            <span className="inline-flex min-h-[24px] items-center gap-1 rounded-full bg-white/92 px-2 text-[9px] font-semibold text-rose-700 shadow-sm backdrop-blur-sm dark:bg-slate-950/82 dark:text-rose-200">
+              <Heart className="h-3 w-3 fill-current" />
+              {item.ui.reviewCountLabel}
+            </span>
+          </div> */}
+
+          <div className="absolute bottom-2 right-2">
+            <a
+              href={mapHref}
+              className="ui-pressable inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white"
+              aria-label={isId ? 'Buka di Lajukan Maps' : 'Open in Lajukan Maps'}
+            >
+              <MapPinned className="h-5 w-5" />
+            </a>
+          </div>
         </div>
-        <div className="absolute right-2.5 top-2.5">
-          <span className="inline-flex min-h-[28px] items-center gap-1 rounded-full bg-white/92 px-2.5 text-[10px] font-semibold text-rose-700 shadow-sm backdrop-blur-sm dark:bg-slate-950/82 dark:text-rose-200">
-            <Heart className="h-3 w-3 fill-current" />
-            {item.ui.reviewCountLabel} likes
-          </span>
+
+        <div className="flex min-h-0 flex-1 flex-col p-2.5">
+          <p className="line-clamp-2 break-words text-[13px] font-black leading-4 text-[color:var(--app-text)]">
+            {item.store.name}
+          </p>
+
+          <p className="mt-1 flex items-center gap-1 text-[10px] text-[color:var(--app-text-soft)]">
+            <MapPinned className="h-5 w-5 shrink-0" />
+            <span className="line-clamp-1">{locationLine}</span>
+          </p>
+
+
         </div>
-        <div className="absolute bottom-2.5 right-2.5">
-          <a
-            href={mapHref}
-            className="ui-pressable inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur-sm transition hover:bg-white"
-            aria-label={isId ? 'Buka di Lajukan Maps' : 'Open in Lajukan Maps'}
-          >
-            <MapPinned className="h-3.5 w-3.5" />
-          </a>
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col p-2.5 sm:p-3">
-        <p className="line-clamp-3 break-words text-[14px] font-black leading-5 text-[color:var(--app-text)] sm:text-[15px]">
-          {item.store.name}
-        </p>
-
-        <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-[color:var(--app-text-soft)]">
-          <MapPinned className="h-3.5 w-3.5 shrink-0" />
-          <span className="line-clamp-1">{locationLine}</span>
-        </p>
-
-        <div className="mt-auto grid grid-cols-3 gap-1.5 pt-2">
-          <Link
-            href={detailHref}
-            className="ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-2 text-[11px] font-semibold text-white shadow-[0_16px_30px_-22px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105"
-          >
-            <Store className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{isId ? 'Profil' : 'Profile'}</span>
-          </Link>
-
-          <a
-            href={contactHref}
-            target={contactIsExternal ? '_blank' : undefined}
-            rel={contactIsExternal ? 'noreferrer' : undefined}
-            className="ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1 rounded-full bg-[color:var(--app-accent-soft)] px-2 text-[11px] font-semibold text-[color:var(--app-accent)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_72%,white)]"
-          >
-            <MessageCircle className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{contactLabel}</span>
-          </a>
-
-          <a
-            href={item.ui.googleMapsDirectionsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1 rounded-full bg-white px-2 text-[11px] font-semibold text-slate-700 transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_24%,white)] hover:text-[color:var(--app-accent)] dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))]"
-          >
-            <Navigation className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{isId ? 'Rute' : 'Route'}</span>
-          </a>
-        </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }
 

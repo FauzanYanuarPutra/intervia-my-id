@@ -1218,7 +1218,7 @@ export function canTransitionContentStatus(
     draft: new Set(['active', 'archived']),
     active: new Set(['paused', 'archived']),
     paused: new Set(['active', 'archived']),
-    archived: new Set(['active']),
+    archived: new Set(['draft', 'active']),
     deleted: new Set([]),
   };
 

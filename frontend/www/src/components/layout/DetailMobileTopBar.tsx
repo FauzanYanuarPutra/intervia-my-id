@@ -72,7 +72,7 @@ export function DetailMobileTopBar({
       </header>
       <div
         aria-hidden="true"
-        className="h-[calc(3.25rem+env(safe-area-inset-top))] lg:hidden"
+        className="h-[calc(1rem+env(safe-area-inset-top))] lg:hidden"
       />
     </>
   );
