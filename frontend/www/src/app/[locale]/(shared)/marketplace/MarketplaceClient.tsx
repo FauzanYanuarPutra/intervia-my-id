@@ -41,10 +41,17 @@ type ProductItem = {
   priceValue: number;
   location: string;
   category: string;
+  type: string;
+  content_type: string;
   brand: string;
+  seller_type: string;
+  work_mode: string;
+  price_unit: string;
+  stock?: number;
   condition: string;
   inStock: boolean;
   description: string;
+  subtitle: string;
 };
 
 type Filters = {
@@ -70,6 +77,7 @@ function mapContentToProduct(
   const price = formatIDRFromCents(item.price_cents);
   const priceUnitLabel = resolveContentPriceUnitLabel(item, locale);
   const fallbackPriceLabel = asString(meta.price_label);
+  const itemType = asString(item.content_type) || asString(item.category) || 'listing';
 
   return {
     id,
@@ -95,13 +103,36 @@ function mapContentToProduct(
       asString(meta.category) ||
       asString(item.content_type) ||
       'General',
+    type: itemType,
+    content_type: itemType,
     brand: asString(meta.brand) || 'Unknown',
+    seller_type: asString(meta.seller_type) || '',
+    work_mode: asString(meta.work_mode) || asString(meta.delivery_mode) || '',
+    price_unit: priceUnitLabel || '',
+    stock:
+      typeof meta.stock === 'number'
+        ? meta.stock
+        : Number.isFinite(Number(meta.stock))
+          ? Number(meta.stock)
+          : undefined,
     condition: asString(meta.condition) || 'n/a',
     inStock:
       typeof meta.stock === 'number'
         ? meta.stock > 0
         : asString(meta.availability)?.toLowerCase() === 'in_stock',
-    description: item.summary || asString(meta.description) || '',
+    description:
+      item.summary ||
+      asString(meta.description) ||
+      asString(meta.body) ||
+      '',
+    subtitle:
+      [
+        asString(meta.seller_type),
+        asString(meta.work_mode),
+        asString(meta.location),
+      ]
+        .filter(Boolean)
+        .join(' • ') || asString(meta.price_label) || '',
   };
 }
 

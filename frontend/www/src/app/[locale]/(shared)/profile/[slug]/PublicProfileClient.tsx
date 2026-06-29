@@ -520,8 +520,8 @@ function buildPublicListingChatPayload(
     cover_image: item.cover_image || '',
     pricing_mode:
       !PROMO_ONLY_MODE &&
-      typeof item.price_cents === 'number' &&
-      item.price_cents > 0
+        typeof item.price_cents === 'number' &&
+        item.price_cents > 0
         ? 'fixed'
         : 'request',
     price_cents:
@@ -756,7 +756,7 @@ export default function PublicProfileClient({
           );
           let candidate =
             directSlugProfile &&
-            matchesPublicProfileSlug(slug, directSlugProfile)
+              matchesPublicProfileSlug(slug, directSlugProfile)
               ? directSlugProfile
               : null;
 
@@ -886,10 +886,10 @@ export default function PublicProfileClient({
         };
         const users = Array.isArray(payload.data)
           ? payload.data
-              .map(item => normalizePublicUserProfile(item))
-              .filter((item): item is PublicUserProfile => Boolean(item))
-              .filter(item => item.id !== profileId)
-              .map(item => mapProfileToSocialUser(item, localeCode))
+            .map(item => normalizePublicUserProfile(item))
+            .filter((item): item is PublicUserProfile => Boolean(item))
+            .filter(item => item.id !== profileId)
+            .map(item => mapProfileToSocialUser(item, localeCode))
           : [];
         if (!controller.signal.aborted) {
           setSocialUsers(users);
@@ -939,22 +939,22 @@ export default function PublicProfileClient({
           (reelsPayload as PublicProfileActivityPayload<LajukanReel>).items,
         )
           ? (reelsPayload as PublicProfileActivityPayload<LajukanReel>)
-              .items!.filter(item =>
-                matchesPublicProfileReel(item, activeProfile),
-              )
-              .slice(0, 6)
+            .items!.filter(item =>
+              matchesPublicProfileReel(item, activeProfile),
+            )
+            .slice(0, 6)
           : [];
         const nextCommunityItems = Array.isArray(
           (communityPayload as PublicProfileActivityPayload<CommunityFeedItem>)
             .items,
         )
           ? (
-              communityPayload as PublicProfileActivityPayload<CommunityFeedItem>
+            communityPayload as PublicProfileActivityPayload<CommunityFeedItem>
+          )
+            .items!.filter(item =>
+              matchesPublicProfileCommunityItem(item, activeProfile),
             )
-              .items!.filter(item =>
-                matchesPublicProfileCommunityItem(item, activeProfile),
-              )
-              .slice(0, 6)
+            .slice(0, 6)
           : [];
 
         setProfileReels(nextReels);
@@ -1096,35 +1096,35 @@ export default function PublicProfileClient({
     publicActivityCount > 0;
   const trustItems = PROMO_ONLY_MODE
     ? [
-        {
-          label: localeCode === 'id' ? 'Identitas' : 'Identity',
-          ready: Boolean(profile.identity_verified),
-        },
-        { label: 'Email', ready: Boolean(profile.email_verified) },
-        {
-          label: localeCode === 'id' ? 'Telepon' : 'Phone',
-          ready: Boolean(profile.phone_verified),
-        },
-        {
-          label: localeCode === 'id' ? 'Profil lengkap' : 'Profile ready',
-          ready: profileReady,
-        },
-      ]
+      {
+        label: localeCode === 'id' ? 'Identitas' : 'Identity',
+        ready: Boolean(profile.identity_verified),
+      },
+      { label: 'Email', ready: Boolean(profile.email_verified) },
+      {
+        label: localeCode === 'id' ? 'Telepon' : 'Phone',
+        ready: Boolean(profile.phone_verified),
+      },
+      {
+        label: localeCode === 'id' ? 'Profil lengkap' : 'Profile ready',
+        ready: profileReady,
+      },
+    ]
     : [
-        {
-          label: localeCode === 'id' ? 'Identitas' : 'Identity',
-          ready: Boolean(profile.identity_verified),
-        },
-        {
-          label: localeCode === 'id' ? 'Transaksi' : 'Transaction',
-          ready: Boolean(profile.transaction_eligible),
-        },
-        { label: 'Email', ready: Boolean(profile.email_verified) },
-        {
-          label: localeCode === 'id' ? 'Telepon' : 'Phone',
-          ready: Boolean(profile.phone_verified),
-        },
-      ];
+      {
+        label: localeCode === 'id' ? 'Identitas' : 'Identity',
+        ready: Boolean(profile.identity_verified),
+      },
+      {
+        label: localeCode === 'id' ? 'Transaksi' : 'Transaction',
+        ready: Boolean(profile.transaction_eligible),
+      },
+      { label: 'Email', ready: Boolean(profile.email_verified) },
+      {
+        label: localeCode === 'id' ? 'Telepon' : 'Phone',
+        ready: Boolean(profile.phone_verified),
+      },
+    ];
   const trustScore = trustItems.filter(item => item.ready).length;
   const trustScoreLabel = `${trustScore}/${trustItems.length}`;
   const statCards = [
@@ -1243,29 +1243,29 @@ export default function PublicProfileClient({
     label: string;
     icon: typeof Sparkles;
   }> = [
-    {
-      key: 'ringkas',
-      label: localeCode === 'id' ? 'Tentang' : 'About',
-      icon: Sparkles,
-    },
-    {
-      key: 'etalase',
-      label: localeCode === 'id' ? 'Karya' : 'Work',
-      icon: Store,
-    },
-    { key: 'reels', label: 'Reels', icon: Clapperboard },
-    {
-      key: 'komunitas',
-      label: localeCode === 'id' ? 'Aktivitas' : 'Activity',
-      icon: Users,
-    },
-    { key: 'trust', label: 'Trust', icon: ShieldCheck },
-  ];
+      {
+        key: 'ringkas',
+        label: localeCode === 'id' ? 'Tentang' : 'About',
+        icon: Sparkles,
+      },
+      {
+        key: 'etalase',
+        label: localeCode === 'id' ? 'Karya' : 'Work',
+        icon: Store,
+      },
+      { key: 'reels', label: 'Reels', icon: Clapperboard },
+      {
+        key: 'komunitas',
+        label: localeCode === 'id' ? 'Aktivitas' : 'Activity',
+        icon: Users,
+      },
+      { key: 'trust', label: 'Trust', icon: ShieldCheck },
+    ];
   const followerCount =
     Math.max(
       socialUsers.length +
-        listings.length * 2 +
-        (profile.identity_verified ? 8 : 3),
+      listings.length * 2 +
+      (profile.identity_verified ? 8 : 3),
       typeof profile.completed_jobs === 'number' ? profile.completed_jobs : 0,
     ) + (isFollowing ? 1 : 0);
   const followingCount = Math.max(
@@ -1370,8 +1370,8 @@ export default function PublicProfileClient({
     icon: typeof Sparkles;
     onSelect: () => void;
   }> = [
-    ...(detail.roles.length > 0
-      ? [
+      ...(detail.roles.length > 0
+        ? [
           {
             key: 'roles',
             label: localeCode === 'id' ? 'Mode profil' : 'Profile modes',
@@ -1388,10 +1388,10 @@ export default function PublicProfileClient({
             onSelect: () => setActiveProfileTab('ringkas'),
           },
         ]
-      : []),
-    ...listingCapabilityCards,
-    ...(detail.skills.length > 0
-      ? [
+        : []),
+      ...listingCapabilityCards,
+      ...(detail.skills.length > 0
+        ? [
           {
             key: 'skills',
             label: localeCode === 'id' ? 'Skill inti' : 'Core skills',
@@ -1408,9 +1408,9 @@ export default function PublicProfileClient({
             onSelect: () => setActiveProfileTab('ringkas'),
           },
         ]
-      : []),
-    ...(profileReels.length > 0
-      ? [
+        : []),
+      ...(profileReels.length > 0
+        ? [
           {
             key: 'reels',
             label: 'Reels',
@@ -1428,9 +1428,9 @@ export default function PublicProfileClient({
             onSelect: () => setActiveProfileTab('reels'),
           },
         ]
-      : []),
-    ...(profileCommunityItems.length > 0
-      ? [
+        : []),
+      ...(profileCommunityItems.length > 0
+        ? [
           {
             key: 'community',
             label: localeCode === 'id' ? 'Komunitas' : 'Community',
@@ -1451,24 +1451,24 @@ export default function PublicProfileClient({
             onSelect: () => setActiveProfileTab('komunitas'),
           },
         ]
-      : []),
-    {
-      key: 'trust',
-      label: localeCode === 'id' ? 'Siap dipercaya' : 'Trust ready',
-      helper:
-        localeCode === 'id'
-          ? 'Status verifikasi yang membantu orang cepat yakin.'
-          : 'Verification signals that help visitors trust faster.',
-      meta: trustScoreLabel,
-      preview:
-        detail.verificationBadges.slice(0, 3).join(' / ') ||
-        (localeCode === 'id'
-          ? 'Verifikasi belum lengkap'
-          : 'Verification is not complete yet'),
-      icon: ShieldCheck,
-      onSelect: () => setActiveProfileTab('trust'),
-    },
-  ];
+        : []),
+      {
+        key: 'trust',
+        label: localeCode === 'id' ? 'Siap dipercaya' : 'Trust ready',
+        helper:
+          localeCode === 'id'
+            ? 'Status verifikasi yang membantu orang cepat yakin.'
+            : 'Verification signals that help visitors trust faster.',
+        meta: trustScoreLabel,
+        preview:
+          detail.verificationBadges.slice(0, 3).join(' / ') ||
+          (localeCode === 'id'
+            ? 'Verifikasi belum lengkap'
+            : 'Verification is not complete yet'),
+        icon: ShieldCheck,
+        onSelect: () => setActiveProfileTab('trust'),
+      },
+    ];
   const topRoleLabel =
     detail.roles.length > 0
       ? detail.roles.slice(0, 2).map(formatRole).join(' / ')
@@ -1512,15 +1512,15 @@ export default function PublicProfileClient({
   const conversationPrompts = (
     localeCode === 'id'
       ? [
-          `Halo ${detail.displayName}, boleh tahu detail produk/jasa yang sedang aktif?`,
-          `Halo ${detail.displayName}, saya mau tanya apakah bisa konsultasi kebutuhan dulu?`,
-          `Halo ${detail.displayName}, ada katalog, contoh karya, atau info terbaru yang bisa saya lihat?`,
-        ]
+        `Halo ${detail.displayName}, boleh tahu detail produk/jasa yang sedang aktif?`,
+        `Halo ${detail.displayName}, saya mau tanya apakah bisa konsultasi kebutuhan dulu?`,
+        `Halo ${detail.displayName}, ada katalog, contoh karya, atau info terbaru yang bisa saya lihat?`,
+      ]
       : [
-          `Hi ${detail.displayName}, can I ask about your active products or services?`,
-          `Hi ${detail.displayName}, can we discuss my needs first?`,
-          `Hi ${detail.displayName}, do you have a catalog, samples, or recent updates I can review?`,
-        ]
+        `Hi ${detail.displayName}, can I ask about your active products or services?`,
+        `Hi ${detail.displayName}, can we discuss my needs first?`,
+        `Hi ${detail.displayName}, do you have a catalog, samples, or recent updates I can review?`,
+      ]
   ).slice(0, 3);
 
   const handleFollowToggle = () => {
@@ -1593,13 +1593,13 @@ export default function PublicProfileClient({
             content_id: listing?.id,
             metadata: listing
               ? {
-                  content_url: buildPublicListingHref(listing),
-                  content_type: listing.content_type || listing.category,
-                }
+                content_url: buildPublicListingHref(listing),
+                content_type: listing.content_type || listing.category,
+              }
               : {
-                  profile_id: profile.id,
-                  profile_slug: slug,
-                },
+                profile_id: profile.id,
+                profile_slug: slug,
+              },
           },
         }),
       });
@@ -1614,9 +1614,9 @@ export default function PublicProfileClient({
       if (!res.ok || !roomId) {
         throw new Error(
           payload.error ||
-            (localeCode === 'id'
-              ? 'Room chat belum bisa dibuat.'
-              : 'Chat room could not be created.'),
+          (localeCode === 'id'
+            ? 'Room chat belum bisa dibuat.'
+            : 'Chat room could not be created.'),
         );
       }
 
@@ -1809,9 +1809,9 @@ export default function PublicProfileClient({
                       key={prompt}
                       type="button"
                       onClick={() => handleOpenChat(prompt)}
-                      className={`min-h-[30px] max-w-full shrink-0 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-[11px] font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] ${index > 0 ? 'hidden sm:inline-flex' : 'inline-flex'}`}
+                      className={`max-w-full shrink-0 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-left text-[11px] font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] ${index > 0 ? 'hidden sm:inline-flex' : 'inline-flex'}`}
                     >
-                      <span className="max-w-[220px] truncate">
+                      <span className="max-w-[220px] flex justify-center items-center truncate">
                         {prompt.replace(
                           /^Halo\s+[^,]+,\s+|^Hi\s+[^,]+,\s+/i,
                           '',
@@ -1820,14 +1820,14 @@ export default function PublicProfileClient({
                     </button>
                   ))}
                 </div>
-                <div className="mt-2 flex items-center gap-2 rounded-[14px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] font-black text-[color:var(--app-accent)]">
+                {/* <div className="mt-2 flex items-center gap-2 rounded-[14px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] font-black text-[color:var(--app-accent)]">
                   <ShieldCheck className="h-4 w-4" />
                   <span>Trust {trustScoreLabel}</span>
                   <span className="h-1 w-1 rounded-full bg-current opacity-50" />
                   <span>
                     {localeCode === 'id' ? 'Chat dulu' : 'Chat first'}
                   </span>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -2065,7 +2065,7 @@ export default function PublicProfileClient({
         </section>
 
         <section className="space-y-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          {/* <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                 {localeCode === 'id'
@@ -2094,7 +2094,7 @@ export default function PublicProfileClient({
               <Store className="h-4 w-4" />
               {localeCode === 'id' ? 'Lihat semua' : 'View all'}
             </button>
-          </div>
+          </div> */}
 
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {capabilityCards.map(item => {
@@ -2140,11 +2140,10 @@ export default function PublicProfileClient({
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveProfileTab(tab.key)}
-                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 text-sm font-black transition ${
-                    active
-                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_12px_24px_-18px_rgba(22,163,74,0.56)]'
-                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface)]'
-                  }`}
+                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 text-sm font-black transition ${active
+                    ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_12px_24px_-18px_rgba(22,163,74,0.56)]'
+                    : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface)]'
+                    }`}
                 >
                   <Icon className="h-4 w-4" />
                   {tab.label}
@@ -2233,7 +2232,7 @@ export default function PublicProfileClient({
               ) : null}
 
               {detail.education.length > 0 ||
-              detail.certifications.length > 0 ? (
+                detail.certifications.length > 0 ? (
                 <div className="grid gap-3 lg:grid-cols-2">
                   {detail.education.length > 0 ? (
                     <section className={profileSectionClass}>
@@ -2346,11 +2345,10 @@ export default function PublicProfileClient({
                         key={tab}
                         type="button"
                         onClick={() => setActiveContentTab(tab)}
-                        className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
-                          resolvedActiveContentTab === tab
-                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
-                        }`}
+                        className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${resolvedActiveContentTab === tab
+                          ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                          : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
+                          }`}
                       >
                         <span>
                           {getProfileContentTabLabel(tab, localeCode)}
@@ -2472,11 +2470,10 @@ export default function PublicProfileClient({
                     key={tab}
                     type="button"
                     onClick={() => setActiveContentTab(tab)}
-                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${
-                      resolvedActiveContentTab === tab
-                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
-                    }`}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${resolvedActiveContentTab === tab
+                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                      : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
+                      }`}
                   >
                     {getProfileContentTabLabel(tab, localeCode)}
                     <span className="rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)]">

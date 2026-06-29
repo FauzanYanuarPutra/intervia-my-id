@@ -32,6 +32,13 @@ export interface SectorField {
   inDetail: boolean;
 }
 
+function cloneField(field: SectorField): SectorField {
+  return {
+    ...field,
+    options: field.options ? field.options.map(option => ({ ...option })) : undefined,
+  };
+}
+
 /** Fields that need images (gallery/carousel) - typically product, service, property, retail */
 export const IMAGE_HEAVY_TYPES = [
   'product',
@@ -119,8 +126,34 @@ export const BASE_FIELDS: SectorField[] = [
       { value: 'bal', labelEn: 'Per bale', labelId: 'Per bal' },
       { value: 'box', labelEn: 'Per box', labelId: 'Per box' },
       { value: 'carton', labelEn: 'Per carton', labelId: 'Per karton' },
+      { value: 'ton', labelEn: 'Per ton', labelId: 'Per ton' },
+      { value: 'ml', labelEn: 'Per ml', labelId: 'Per ml' },
       { value: 'kg', labelEn: 'Per kg', labelId: 'Per kg' },
+      { value: 'gram', labelEn: 'Per gram', labelId: 'Per gram' },
+      { value: 'liter', labelEn: 'Per liter', labelId: 'Per liter' },
+      { value: 'meter', labelEn: 'Per meter', labelId: 'Per meter' },
+      { value: 'sqm', labelEn: 'Per m²', labelId: 'Per m²' },
+      { value: 'm3', labelEn: 'Per m³', labelId: 'Per m³' },
+      { value: 'sak', labelEn: 'Per sack', labelId: 'Per sak' },
+      { value: 'karung', labelEn: 'Per sack bag', labelId: 'Per karung' },
+      { value: 'roll', labelEn: 'Per roll', labelId: 'Per roll' },
+      { value: 'lembar', labelEn: 'Per sheet', labelId: 'Per lembar' },
+      { value: 'batang', labelEn: 'Per bar', labelId: 'Per batang' },
+      { value: 'ikat', labelEn: 'Per bundle', labelId: 'Per ikat' },
+      { value: 'dozen', labelEn: 'Per dozen', labelId: 'Per lusin' },
+      { value: 'kodi', labelEn: 'Per kodi', labelId: 'Per kodi' },
+      { value: 'rim', labelEn: 'Per ream', labelId: 'Per rim' },
+      { value: 'pallet', labelEn: 'Per pallet', labelId: 'Per pallet' },
+      {
+        value: 'kontainer',
+        labelEn: 'Per container',
+        labelId: 'Per kontainer',
+      },
+      { value: 'set', labelEn: 'Per set', labelId: 'Per set' },
+      { value: 'pasang', labelEn: 'Per pair', labelId: 'Per pasang' },
       { value: 'shipment', labelEn: 'Per shipment', labelId: 'Per pengiriman' },
+      { value: 'order', labelEn: 'Per order', labelId: 'Per order' },
+      { value: 'orang', labelEn: 'Per person', labelId: 'Per orang' },
       { value: 'hour', labelEn: 'Per hour', labelId: 'Per jam' },
       { value: 'day', labelEn: 'Per day', labelId: 'Per hari' },
       { value: 'week', labelEn: 'Per week', labelId: 'Per minggu' },
@@ -130,6 +163,8 @@ export const BASE_FIELDS: SectorField[] = [
       { value: 'project', labelEn: 'Per project', labelId: 'Per proyek' },
       { value: 'event', labelEn: 'Per event', labelId: 'Per event' },
       { value: 'deal', labelEn: 'Per deal', labelId: 'Per deal' },
+      { value: 'nego', labelEn: 'Negotiable', labelId: 'Nego' },
+      { value: 'custom', labelEn: 'Custom unit', labelId: 'Lainnya' },
     ],
     inCreate: true,
     inCard: true,
@@ -824,6 +859,53 @@ const PRODUCT_FIELDS: SectorField[] = [
       { value: 'out_of_stock', labelEn: 'Out of stock', labelId: 'Stok habis' },
       { value: 'preorder', labelEn: 'Pre-order', labelId: 'Pre-order' },
       { value: 'backorder', labelEn: 'Backorder', labelId: 'Backorder' },
+    ],
+  },
+  {
+    key: 'seller_type',
+    kind: 'select',
+    labelEn: 'Seller role',
+    labelId: 'Peran supplier',
+    placeholderEn: 'Select seller role',
+    placeholderId: 'Pilih peran supplier',
+    hintEn: 'Pick whether this is a product-only listing, a first-hand supplier, or another seller role.',
+    hintId:
+      'Pilih apakah listing ini produk biasa, supplier tangan pertama, atau peran seller lain.',
+    required: true,
+    inCreate: true,
+    inCard: true,
+    inDetail: true,
+    options: [
+      {
+        value: 'product_only',
+        labelEn: 'Product only',
+        labelId: 'Produk saja',
+      },
+      {
+        value: 'supplier_first_hand',
+        labelEn: 'First-hand supplier',
+        labelId: 'Supplier tangan pertama',
+      },
+      {
+        value: 'supplier_non_first_hand',
+        labelEn: 'Non-first-hand supplier',
+        labelId: 'Supplier bukan tangan pertama',
+      },
+      {
+        value: 'manufacturer',
+        labelEn: 'Manufacturer',
+        labelId: 'Produsen',
+      },
+      {
+        value: 'distributor',
+        labelEn: 'Distributor',
+        labelId: 'Distributor',
+      },
+      { value: 'reseller', labelEn: 'Reseller', labelId: 'Reseller' },
+      { value: 'retailer', labelEn: 'Retailer', labelId: 'Retailer' },
+      { value: 'farmer', labelEn: 'Farmer', labelId: 'Petani' },
+      { value: 'breeder', labelEn: 'Breeder', labelId: 'Peternak' },
+      { value: 'other', labelEn: 'Other', labelId: 'Lainnya' },
     ],
   },
   {
@@ -1767,6 +1849,55 @@ const SERVICE_FIELDS: SectorField[] = [
   },
 ];
 
+const PRICE_UNIT_OPTIONS_BY_TYPE: Record<string, SectorField['options']> = {
+  product: [
+    { value: 'pcs', labelEn: 'Per piece', labelId: 'Per pcs' },
+    { value: 'pack', labelEn: 'Per pack', labelId: 'Per paket' },
+    { value: 'box', labelEn: 'Per box', labelId: 'Per box' },
+    { value: 'carton', labelEn: 'Per carton', labelId: 'Per karton' },
+    { value: 'kg', labelEn: 'Per kg', labelId: 'Per kg' },
+    { value: 'gram', labelEn: 'Per gram', labelId: 'Per gram' },
+    { value: 'liter', labelEn: 'Per liter', labelId: 'Per liter' },
+    { value: 'meter', labelEn: 'Per meter', labelId: 'Per meter' },
+    { value: 'shipment', labelEn: 'Per shipment', labelId: 'Per pengiriman' },
+  ],
+  service: [
+    { value: 'hour', labelEn: 'Per hour', labelId: 'Per jam' },
+    { value: 'day', labelEn: 'Per day', labelId: 'Per hari' },
+    { value: 'week', labelEn: 'Per week', labelId: 'Per minggu' },
+    { value: 'month', labelEn: 'Per month', labelId: 'Per bulan' },
+    { value: 'project', labelEn: 'Per project', labelId: 'Per proyek' },
+    { value: 'session', labelEn: 'Per session', labelId: 'Per sesi' },
+  ],
+  job: [
+    { value: 'hour', labelEn: 'Per hour', labelId: 'Per jam' },
+    { value: 'day', labelEn: 'Per day', labelId: 'Per hari' },
+    { value: 'month', labelEn: 'Per month', labelId: 'Per bulan' },
+    { value: 'year', labelEn: 'Per year', labelId: 'Per tahun' },
+    { value: 'project', labelEn: 'Per project', labelId: 'Per proyek' },
+  ],
+  property: [
+    { value: 'day', labelEn: 'Per day', labelId: 'Per hari' },
+    { value: 'week', labelEn: 'Per week', labelId: 'Per minggu' },
+    { value: 'month', labelEn: 'Per month', labelId: 'Per bulan' },
+    { value: 'year', labelEn: 'Per year', labelId: 'Per tahun' },
+    { value: 'event', labelEn: 'Per event', labelId: 'Per event' },
+  ],
+  tool_rental: [
+    { value: 'day', labelEn: 'Per day', labelId: 'Per hari' },
+    { value: 'week', labelEn: 'Per week', labelId: 'Per minggu' },
+    { value: 'month', labelEn: 'Per month', labelId: 'Per bulan' },
+    { value: 'event', labelEn: 'Per event', labelId: 'Per event' },
+  ],
+  business_transfer: [
+    { value: 'deal', labelEn: 'Per deal', labelId: 'Per deal' },
+  ],
+};
+
+function resolvePriceUnitOptions(type: string): SectorField['options'] | undefined {
+  return PRICE_UNIT_OPTIONS_BY_TYPE[type];
+}
+
 /** Sector-specific overrides (additional fields per sector) */
 const SECTOR_EXTRA: Record<string, SectorField[]> = {
   realestate: [...PROPERTY_FIELDS],
@@ -1843,11 +1974,20 @@ export function getFieldsForCreate(
     f =>
       f.inCreate &&
       f.key !== 'images' &&
-      !(type === 'company' && ['price_cents', 'price_unit'].includes(f.key)),
+      !(type === 'company' && ['price_cents', 'price_unit'].includes(f.key)) &&
+      !(type === 'business_transfer' && f.key === 'price_unit'),
   );
+  const priceUnitOptions = resolvePriceUnitOptions(type);
+  const adjustedBase = base.map(field => {
+    if (field.key !== 'price_unit' || !priceUnitOptions) return cloneField(field);
+    return {
+      ...cloneField(field),
+      options: priceUnitOptions.map(option => ({ ...option })),
+    };
+  });
   const needsImages = needsImageGallery(type, sector);
   if (needsImages) {
-    base.push(BASE_FIELDS.find(f => f.key === 'images')!);
+    adjustedBase.push(cloneField(BASE_FIELDS.find(f => f.key === 'images')!));
   }
 
   const typeFields: SectorField[] = [];
@@ -1863,7 +2003,7 @@ export function getFieldsForCreate(
   const sectorExtra = sector ? SECTOR_EXTRA[sector] || [] : [];
   const seen = new Set<string>();
   const merged: SectorField[] = [];
-  for (const f of [...base, ...typeFields, ...sectorExtra]) {
+  for (const f of [...adjustedBase, ...typeFields, ...sectorExtra]) {
     if (!seen.has(f.key)) {
       seen.add(f.key);
       merged.push(f);

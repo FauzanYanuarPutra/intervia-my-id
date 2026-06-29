@@ -38,6 +38,8 @@ const UPSERT_LISTING_KEYS = [
   'price_cents',
   'price_unit',
   'original_price_cents',
+  'seller_type',
+  'minimum_order',
   'promo_label',
   'promo_start_at',
   'promo_end_at',
@@ -154,6 +156,8 @@ const TRUST_SAFETY_FIELD_LIMITS: Record<string, number> = {
   handover_risks: 5000,
   microgig_brief: 2000,
   microgig_category: 80,
+  seller_type: 120,
+  minimum_order: 1200,
   promo_headline: 200,
   promo_caption: 1500,
   promo_offer_value: 500,
@@ -174,6 +178,8 @@ const UpsertListingSchema = z
     price_cents: z.union([z.number(), z.string()]).optional(),
     price_unit: z.string().optional(),
     original_price_cents: z.union([z.number(), z.string()]).optional(),
+    seller_type: z.string().optional(),
+    minimum_order: z.string().optional(),
     promo_label: z.string().optional(),
     promo_start_at: z.string().optional(),
     promo_end_at: z.string().optional(),
@@ -963,6 +969,20 @@ export function validateListingPayload(
   }
   if (payload.pricing_mode === 'request') {
     delete payload.price_unit;
+  }
+
+  const sellerType = normalizeText(payload.seller_type, 80)?.toLowerCase();
+  if (sellerType) {
+    payload.seller_type = sellerType.replace(/[^a-z0-9_-]+/g, '_');
+  } else {
+    delete payload.seller_type;
+  }
+
+  const minimumOrder = normalizeText(payload.minimum_order, 1200);
+  if (minimumOrder) {
+    payload.minimum_order = minimumOrder;
+  } else {
+    delete payload.minimum_order;
   }
 
   const currency = normalizeText(payload.currency, 8)?.toUpperCase();

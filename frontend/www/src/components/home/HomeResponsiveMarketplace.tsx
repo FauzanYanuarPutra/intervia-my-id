@@ -38,6 +38,7 @@ import {
   Users,
   X,
   Zap,
+  ArrowRight,
   type LucideIcon,
 } from 'lucide-react';
 import { HomeUmkmMapPreview } from '@/components/home/HomeUmkmMapPreview';
@@ -228,7 +229,7 @@ type HomeWalletBalancesResponse = {
 };
 
 const HERO_TAGS = ['Bahan Lokal', 'Siap Ekspor', 'Kemasan', 'Mesin UMKM'];
-const HOME_HERO_IMAGE = '/images/hero/lajukan-id-2.png';
+const HOME_HERO_IMAGE = '/images/hero/lajukan-id-3.png';
 
 type HomeAvatarProp =
   | 'crate'
@@ -1525,120 +1526,145 @@ function DesktopSidebar({
 
 function HeroVisualStage({
   isId,
-  metrics,
-  compact = false,
   className,
 }: {
   isId: boolean;
-  metrics: HeroMetric[];
-  compact?: boolean;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        'min-w-0 rounded-[20px] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_38%,var(--app-surface-strong))] p-2 ring-1 ring-[color:color-mix(in_srgb,var(--app-accent-border)_44%,transparent)]',
+        "min-w-0 rounded-[24px]",
         className,
       )}
     >
-      <div
-        className={cn(
-          'relative overflow-hidden rounded-[16px] bg-emerald-100',
-          compact ? 'aspect-[3/2]' : 'aspect-[3/2]',
-        )}
-      >
+      <div className="relative aspect-[1734/907] overflow-hidden rounded-[20px]">
         <Image
           src={HOME_HERO_IMAGE}
           alt="Lajukan hero"
           fill
-          loading="lazy"
-          fetchPriority="low"
-          quality={1000}
+          quality={95}
           sizes="100vw"
-          className="object-cover object-center"
+          className="object-cover object-center scale-[1.08]"
         />
 
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,46,26,0.02),rgba(5,46,26,0.24))]" />
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-transparent" />
 
-        <Link
-          href="/reels"
-          className="absolute bottom-2 right-2 inline-flex min-h-[28px] items-center gap-1.5 rounded-full bg-white/92 px-2.5 text-[10px] font-black text-[color:var(--app-accent)] shadow-[0_14px_24px_-18px_rgba(15,23,42,0.2)]"
-        >
-          <PlayCircle className="h-3.5 w-3.5" />
-          Reels
-        </Link>
-      </div>
+        {/* Content */}
+        <div className="absolute inset-0 flex items-center">
+          <div
+            className="
+              w-[58%]
+              pl-[clamp(1rem,3vw,3.5rem)]
+              pr-[clamp(0.5rem,1vw,1rem)]
+            "
+          >
+            <h2
+              className="
+                text-white
+                font-black
+                leading-[0.92]
+                tracking-[-0.04em]
+                drop-shadow-[0_8px_32px_rgba(0,0,0,0.45)]
 
-      <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5">
-        {metrics.map((item, index) => {
-          const Icon = item.icon;
-          const tone = toneClassNames(item.tone);
-
-          return (
-            <div
-              key={item.id}
-              className={cn(
-                'min-w-0 rounded-[13px] bg-[color:var(--app-surface-strong)] px-2 py-1.5 ring-1 ring-[color:var(--app-border)]',
-                index === 2 ? 'col-span-2' : '',
-              )}
+                text-[clamp(1.6rem,3.6vw,5.6rem)]
+              "
             >
-              <div className="flex min-w-0 items-center gap-1.5">
-                <span
-                  className={cn(
-                    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[9px]',
-                    tone.icon,
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                </span>
+              {isId ? (
+                <>
+                  Semua kebutuhan bisnis
+                  <br />
+                  semakin mudah di{" "}
+                  <span className="text-emerald-100">
+                    Lajukan
+                  </span>
+                  .
+                </>
+              ) : (
+                <>
+                  All business needs
+                  <br />
+                  made easier with{" "}
+                  <span className="text-emerald-100">
+                    Lajukan
+                  </span>
+                  .
+                </>
+              )}
+            </h2>
 
-                <div className="min-w-0">
-                  <p className="text-[0.78rem] font-black leading-4 text-[color:var(--app-text)]">
-                    {item.value}
-                  </p>
+            <Link
+              href="/register"
+              className="
+                mt-[clamp(1rem,2vw,2rem)]
+                inline-flex
+                items-center
+                gap-[clamp(0.5rem,1vw,1rem)]
 
-                  <p className="text-[9.5px] font-semibold leading-3 text-[color:var(--app-text-soft)]">
-                    {item.label}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                rounded-full
+                bg-yellow-500
+
+                px-[clamp(1.25rem,2vw,2.5rem)]
+                py-[clamp(0.75rem,1vw,1rem)]
+
+                text-[clamp(0.95rem,1.35vw,1.7rem)]
+                font-bold
+                text-black
+
+                shadow-xl
+                transition-all
+                duration-200
+
+                hover:bg-yellow-400
+                hover:scale-105
+              "
+            >
+              {isId ? "Gabung Gratis" : "Join Free"}
+
+              <ArrowRight
+                className="
+                  h-[clamp(1rem,1.3vw,1.7rem)]
+                  w-[clamp(1rem,1.3vw,1.7rem)]
+                "
+              />
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function MobileHeroVisualBanner({
-  isId,
-  metrics,
-  className,
-}: {
-  isId: boolean;
-  metrics: HeroMetric[];
-  className?: string;
-}) {
-  return (
-    <section
-      className={cn(
-        'relative aspect-[3/2] w-full overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_76%,white_16%)] bg-emerald-100 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.22)]',
-        className,
-      )}
-    >
-      <Image
-        src={HOME_HERO_IMAGE}
-        alt={isId ? 'Visual Lajukan' : 'Lajukan visual'}
-        fill
-        loading="lazy"
-        fetchPriority="low"
-        quality={1000}
-        sizes="100vw"
-        className="object-cover object-center"
-      />
-    </section>
-  );
-}
+// function MobileHeroVisualBanner({
+//   isId,
+//   metrics,
+//   className,
+// }: {
+//   isId: boolean;
+//   metrics: HeroMetric[];
+//   className?: string;
+// }) {
+//   return (
+//     <section
+//       className={cn(
+//         'relative aspect-[3/2] w-full overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_76%,white_16%)] bg-emerald-100 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.22)]',
+//         className,
+//       )}
+//     >
+//       <Image
+//         src={HOME_HERO_IMAGE}
+//         alt={isId ? 'Visual Lajukan' : 'Lajukan visual'}
+//         fill
+//         loading="lazy"
+//         fetchPriority="low"
+//         quality={1000}
+//         sizes="100vw"
+//         className="object-cover object-center"
+//       />
+//     </section>
+//   );
+// }
 
 function DesktopHeroSection({
   isId,
@@ -1668,166 +1694,16 @@ function DesktopHeroSection({
       <div>
         <HeroVisualStage
           isId={isId}
-          metrics={metrics}
           className="mb-3"
         />
-        <section className="overflow-hidden rounded-[26px] border border-emerald-200/70 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_46%,#ecfff2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)] xl:p-5">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_296px] xl:items-start">
-            <div className="relative z-10 min-w-0">
-              <p className="mb-2 inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
-                {isId ? 'Sebelum login' : 'Before login'}
-              </p>
-              <h1 className="max-w-[23ch] text-[1.78rem] font-semibold leading-[1.04] tracking-[-0.045em] text-[color:var(--app-text)] xl:text-[2rem]">
-                {isId
-                  ? 'Masuk dulu, lalu simpan peluang yang paling pas'
-                  : 'Log in first, then save the opportunities that matter most'}
-                <span className="text-[color:var(--app-accent)]"> Lajukan</span>
-              </h1>
-              <p className="mt-3 max-w-[39rem] text-[13px] leading-6 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? 'Lihat listing, komunitas, dan reels bisnis yang relevan. Setelah login, favorit, chat, dan riwayat pencarian akan tetap mengikuti Anda.'
-                  : 'Browse suppliers, services, communities, and business reels. After login, favorites, chats, and search history stay with you everywhere.'}
-              </p>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
-                  <Heart className="h-3.5 w-3.5 text-rose-500" />
-                  {isId ? 'Simpan favorit' : 'Save favorites'}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  {isId ? 'Lebih rapi' : 'Stay organized'}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
-                  <Zap className="h-3.5 w-3.5 text-amber-500" />
-                  {isId ? 'Lanjut cepat' : 'Continue fast'}
-                </span>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-2.5">
-                <Link
-                  href="/login"
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
-                >
-                  {isId ? 'Masuk' : 'Login'}
-                </Link>
-                <Link
-                  href="/register"
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-xs font-semibold text-[color:var(--app-text-inverse)]"
-                >
-                  {isId ? 'Daftar Sekarang' : 'Register Now'}
-                </Link>
-              </div>
-
-              <p className="mt-3 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                {isId
-                  ? 'Gratis untuk mulai. Masuk sekarang biar peluang yang Anda suka tidak hilang.'
-                  : 'Free to start. Log in now so the opportunities you like do not slip away.'}
-              </p>
-            </div>
-
-            {/* <div className="rounded-[24px] border border-white/80 bg-white/80 p-4 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] backdrop-blur">
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,#059669,#047857)] text-white shadow-[0_14px_26px_-18px_rgba(4,120,87,0.85)]">
-                  <Sparkles className="h-4.5 w-4.5" />
-                </span>
-                <div>
-                  <p className="text-sm font-black leading-5 text-[color:var(--app-text)]">
-                    {isId ? 'Kenapa login dulu?' : 'Why log in first?'}
-                  </p>
-                  <p className="text-[11px] leading-4 text-[color:var(--app-text-soft)]">
-                    {isId
-                      ? 'Biar setiap interaksi jadi lebih personal.'
-                      : 'So every interaction feels more personal.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {[
-                  {
-                    icon: Heart,
-                    title: isId ? 'Favorit tersimpan' : 'Favorites stay saved',
-                    description: isId
-                      ? 'Listing yang Anda suka lebih mudah dibuka lagi.'
-                      : 'The listings you like are easier to revisit.',
-                  },
-                  {
-                    icon: MessageCircle,
-                    title: isId ? 'Chat tetap nyambung' : 'Chats keep flowing',
-                    description: isId
-                      ? 'Lanjut dari percakapan terakhir tanpa mulai ulang.'
-                      : 'Continue from the last conversation without starting over.',
-                  },
-                  {
-                    icon: Target,
-                    title: isId ? 'Lebih cepat ambil keputusan' : 'Decide faster',
-                    description: isId
-                      ? 'Rekomendasi yang tampil jadi lebih relevan buat Anda.'
-                      : 'The recommendations you see become more relevant to you.',
-                  },
-                ].map(item => {
-                  const Icon = item.icon;
-                  return (
-                    <div
-                      key={item.title}
-                      className="flex gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] p-3"
-                    >
-                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold leading-5 text-[color:var(--app-text)]">
-                          {item.title}
-                        </p>
-                        <p className="mt-0.5 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div> */}
-          </div>
-
-          {/* <div className="mt-4 grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center">
-            <SearchInput
-              value={query}
-              onValueChange={onQueryChange}
-              onSearch={onSubmit}
-              placeholder={placeholder}
-              buttonLabel={buttonLabel}
-              layout="row"
-              variant="hero"
-              ariaLabel={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
-              inputAriaLabel={isId ? 'Kata kunci pencarian' : 'Search keyword'}
-              testId="home-hero-search-form"
-              inputTestId="home-hero-search-input"
-            />
-            <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-              <Link
-                href={primaryCtaHref}
-                className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-xs font-semibold text-[color:var(--app-text-inverse)]"
-              >
-                {isId ? 'Daftar Sekarang' : 'Register Now'}
-              </Link>
-              <Link
-                href={UMKM_DISCOVERY_PATH}
-                className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)]"
-              >
-                {isId ? 'Jelajah dulu' : 'Browse first'}
-              </Link>
-            </div>
-          </div> */}
-        </section>
-      </div>
+      </div >
     );
   }
 
   return (
     <div>
-      <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_8%)] bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_48%,#eefbf2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)] xl:p-5">
+      {/* <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_8%)] bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_48%,#eefbf2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)] xl:p-5">
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_268px] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_292px]">
           <div className="relative z-10 min-w-0">
             <p className="mb-2 inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
@@ -1917,16 +1793,16 @@ function DesktopHeroSection({
             </Link>
           ))}
         </div>
-      </section>
-      <MobileHeroVisualBanner
+      </section> */}
+      {/* <MobileHeroVisualBanner
         isId={isId}
         metrics={metrics}
         className="mt-3 xl:hidden"
-      />
+      /> */}
       <HeroVisualStage
         isId={isId}
         metrics={metrics}
-        className="mt-3 hidden xl:block"
+        className="mt-3"
       />
     </div>
   );
@@ -1946,12 +1822,12 @@ function MobileHeroSection({
   if (!isAuthenticated) {
     return (
       <div>
-        <MobileHeroVisualBanner
+        {/* <MobileHeroVisualBanner
           isId={isId}
           metrics={metrics}
           className="mb-2.5"
-        />
-        <section className="overflow-hidden rounded-[26px] border border-emerald-200/70 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_46%,#ecfff2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)]">
+        /> */}
+        {/* <section className="overflow-hidden rounded-[26px] border border-emerald-200/70 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_46%,#ecfff2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)]">
           <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
             {isId ? 'Sebelum login' : 'Before login'}
           </p>
@@ -1996,19 +1872,19 @@ function MobileHeroSection({
               {isId ? 'Daftar Sekarang' : 'Register Now'}
             </Link>
           </div>
-        </section>
+        </section> */}
       </div>
     );
   }
 
   return (
     <div>
-      <MobileHeroVisualBanner
+      {/* <MobileHeroVisualBanner
         isId={isId}
         metrics={metrics}
         className="mb-2.5"
-      />
-      <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_8%)] bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_48%,#eefbf2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)]">
+      /> */}
+      {/* <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_8%)] bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_48%,#eefbf2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)]">
         <div className="min-w-0">
           <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
             {isAuthenticated
@@ -2039,7 +1915,7 @@ function MobileHeroSection({
                 : 'Find suppliers, places, services, and talent for your business.'}
           </p>
         </div>
-      </section>
+      </section> */}
     </div>
   );
 }
@@ -2261,8 +2137,8 @@ function QuickCategoriesSection({
 
   if (mobile) {
     return (
-      <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.12)]">
-        <div className="flex items-center gap-2.5 px-0.5 pb-3">
+      <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.12)]">
+        {/* <div className="flex items-center gap-2.5 px-0.5 pb-3">
           <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-emerald-100 bg-emerald-50 text-emerald-600">
             <Sparkles className="h-5 w-5" />
           </span>
@@ -2276,7 +2152,7 @@ function QuickCategoriesSection({
                 : 'Find business needs fast.'}
             </p>
           </div>
-        </div>
+        </div> */}
         <div className="grid grid-cols-4 gap-1">
           {categories.map(item => {
             const tone = toneClassNames(item.tone);
@@ -2393,8 +2269,8 @@ function RecommendationCard({
       className={cn(
         'flex h-full shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_30px_-28px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.2)]',
         mobile
-          ? 'w-[190px] min-w-[190px]'
-          : 'w-[220px] min-w-[220px]'
+          ? 'w-[150px] min-w-[150px]'
+          : 'w-[170px] min-w-[170px]'
       )}
       data-testid="home-recommendation-card"
     >
@@ -2438,7 +2314,7 @@ function RecommendationCard({
         <div className="flex flex-1 flex-col p-2.5">
 
           {/* TITLE (FIXED HEIGHT 2 LINES STABLE) */}
-          <h3 className="line-clamp-2 h-[2rem] text-[13px] font-bold leading-snug text-[color:var(--app-text)]">
+          <h3 className="line-clamp-2 h-[2.2rem] lg:h-[2.35rem] text-[13px] font-bold leading-snug text-[color:var(--app-text)]">
             {item.title}
           </h3>
 
@@ -2526,7 +2402,7 @@ function RecommendationsSection({
       ) : null}
       {mobile ? (
         <div
-          className="flex max-w-full snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-1"
+          className="flex max-w-full snap-x snap-mandatory gap-1 overflow-x-auto pb-2 pr-1"
           data-auto-scrollbar
           data-testid="home-recommendations-rail"
         >
@@ -3038,7 +2914,7 @@ function ReelsPanel({
       ) : null}
       {mobile ? (
         <div
-          className="flex max-w-full snap-x snap-mandatory gap-2.5 overflow-x-auto pb-2 pr-1"
+          className="flex max-w-full snap-x snap-mandatory gap-1 overflow-x-auto pb-2 pr-1"
           data-auto-scrollbar
           data-testid="home-reels-rail"
         >
@@ -3103,7 +2979,7 @@ function ReelsPanel({
             <Link
               key={item.id}
               href={item.href}
-              className="group relative aspect-[9/16] min-h-[250px] w-[172px] min-w-[172px] max-w-[172px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-slate-950 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] xl:w-[186px] xl:min-w-[186px] xl:max-w-[186px]"
+              className="group relative aspect-[9/16] w-[140px] min-w-[140px] max-w-[140px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-slate-950 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] xl:w-[150px] xl:min-w-[150px] xl:max-w-[150px]"
               data-testid="home-reel-card"
               data-lajukan-event="home.card_clicked"
               data-lajukan-surface="home_reels"
@@ -3826,10 +3702,9 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   return (
     <MarketplacePageFrame>
       <main className="mx-auto w-full max-w-[720px] space-y-3.5 sm:space-y-4 lg:hidden">
-        <MobileHeroSection
+        <HeroVisualStage
           isId={isId}
-          isAuthenticated={isAuthenticated}
-          summary={summary}
+          className="mb-3"
         />
         <GameProgressCard
           isId={isId}
@@ -3877,7 +3752,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
             data-auto-scrollbar
           >
             <div className="space-y-4 pb-5">
-              <DesktopHeroSection
+              {/* <DesktopHeroSection
                 isId={isId}
                 isAuthenticated={isAuthenticated}
                 summary={summary}
@@ -3887,6 +3762,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 onSubmit={handleSearchSubmit}
                 placeholder={text.searchPlaceholder}
                 buttonLabel={text.searchButton}
+              /> */}
+              <HeroVisualStage
+                isId={isId}
+                className="mb-3"
               />
               <div className="xl:hidden">
                 <GameProgressCard

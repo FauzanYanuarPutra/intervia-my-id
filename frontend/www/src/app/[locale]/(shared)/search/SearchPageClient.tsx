@@ -65,6 +65,7 @@ import {
   formatPriceWithUnit,
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
+import { resolveSupplierListingBadges } from '@/lib/content/supplierInfo';
 import {
   buildPublicProfileHref,
   buildPublicProfileHrefFromContent,
@@ -101,6 +102,7 @@ type SearchFilterTabKey = TypeKey | 'used_goods';
 
 type SearchCard = {
   id: string;
+  content_type: string;
   title: string;
   summary: string;
   location: string;
@@ -111,6 +113,7 @@ type SearchCard = {
   side: ListingSide;
   sideLabel: string;
   sideContextLabel: string;
+  supplierBadges: string[];
   image?: string;
   images: string[];
   href: string;
@@ -814,6 +817,7 @@ function mapContentItem(
   });
   const sideLabel = getListingSideLabel(side, locale);
   const sideContextLabel = resolveSearchSideContextLabel(side, typeKey, locale);
+  const supplierBadges = resolveSupplierListingBadges(item, locale);
   const gallery = parseImages(item);
   const image = gallery[0];
   const profileHref = buildPublicProfileHrefFromContent(item);
@@ -870,6 +874,7 @@ function mapContentItem(
     side,
     sideLabel,
     sideContextLabel,
+    supplierBadges,
     image,
     images: gallery,
     href: detailHref,
@@ -1593,14 +1598,27 @@ function SearchResultListingCard({
         <div className="flex flex-1 flex-col p-3">
 
           {/* LABEL */}
-          <span className="mb-1 w-fit rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+          {/* <span className="mb-1 w-fit rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
             {item.content_type}
-          </span>
+          </span> */}
 
           {/* TITLE (FIXED 2 LINES HEIGHT) */}
           <h3 className="line-clamp-2 h-[2.25rem] text-sm font-semibold leading-snug text-gray-900">
             {item.title}
           </h3>
+
+          {item.supplierBadges.length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {item.supplierBadges.slice(0, 3).map(badge => (
+                <span
+                  key={badge}
+                  className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600"
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           {/* META */}
           <p className="mt-1 line-clamp-1 text-xs text-gray-500">
@@ -3009,7 +3027,7 @@ export default function SearchPageClient() {
                 </div>
               </div>
             ) : (
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-1 md:gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {visibleItems.map(item => (
                   <SearchResultListingCard
                     key={item.id}
@@ -3430,7 +3448,7 @@ export default function SearchPageClient() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                    <div className="mt-3 grid grid-cols-2 gap-1 md:gap-2 sm:grid-cols-3 lg:grid-cols-4">
                       {visibleItems.map(item => (
                         <SearchResultListingCard
                           key={item.id}

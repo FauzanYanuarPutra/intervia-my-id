@@ -112,7 +112,7 @@ function HomeUmkmCard({ item, isId }: { item: PreparedStore; isId: boolean }) {
   return (
     <Link
       href={detailHref}>
-      <article className="ui-pressable-card flex w-[190px] min-w-[190px] max-w-[190px] shrink-0 flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_16px_30px_-26px_rgba(15,23,42,0.16)] dark:bg-slate-950 sm:w-[210px] sm:min-w-[210px] sm:max-w-[210px]">
+      <article className="ui-pressable-card flex w-[120px] min-w-[120px] max-w-[120px] shrink-0 flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_16px_30px_-26px_rgba(15,23,42,0.16)] dark:bg-slate-950 sm:w-[160px] sm:min-w-[160px] sm:max-w-[160px]">
         <div className="relative aspect-square shrink-0 overflow-hidden bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-accent)_10%,white),#ecfdf5_60%,#ffffff_100%)]">
           <LajukanImage
             src={item.ui.coverImage}

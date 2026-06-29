@@ -4676,7 +4676,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                       overlay={
                         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-slate-950/68 via-slate-950/12 to-transparent p-2.5 text-white sm:p-3">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[11px] font-semibold">
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               {PROMO_ONLY_MODE
                                 ? locale === 'id'

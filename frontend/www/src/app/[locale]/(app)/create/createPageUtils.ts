@@ -46,13 +46,15 @@ export type ListingTypeId =
   | 'service'
   | 'job'
   | 'property'
+  | 'auction'
+  | 'tender'
   | 'tool_rental'
   | 'business_transfer'
   | 'company';
 
 export type CreateFlowIntent = 'demand' | 'supply';
 
-export const TOTAL_STEPS = 4;
+export const TOTAL_STEPS = 1;
 export const DOC_ACCEPT =
   '.pdf,.txt,.csv,.rtf,.doc,.docx,.odt,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.zip,.rar,.7z';
 export const DOC_MAX_FILES = 8;
@@ -303,6 +305,16 @@ const CREATE_TYPE_SEGMENTS: Record<
     id: 'properti',
     en: 'property',
     aliases: ['properti', 'property', 'properties'],
+  },
+  auction: {
+    id: 'lelang',
+    en: 'auction',
+    aliases: ['lelang', 'auction', 'auctions', 'bidding'],
+  },
+  tender: {
+    id: 'tender',
+    en: 'tender',
+    aliases: ['tender', 'tenders', 'bid', 'bidding-request'],
   },
   tool_rental: {
     id: 'sewa-alat',

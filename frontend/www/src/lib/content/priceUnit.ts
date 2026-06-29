@@ -9,6 +9,8 @@ const UNIT_LABELS: Record<string, { id: string; en: string }> = {
   bal: { id: 'bal', en: 'bale' },
   box: { id: 'box', en: 'box' },
   carton: { id: 'karton', en: 'carton' },
+  ton: { id: 'ton', en: 'ton' },
+  ml: { id: 'ml', en: 'ml' },
   dozen: { id: 'lusin', en: 'dozen' },
   set: { id: 'set', en: 'set' },
   kg: { id: 'kg', en: 'kg' },
@@ -16,6 +18,18 @@ const UNIT_LABELS: Record<string, { id: string; en: string }> = {
   liter: { id: 'liter', en: 'liter' },
   meter: { id: 'meter', en: 'meter' },
   sqm: { id: 'm2', en: 'sqm' },
+  m3: { id: 'm3', en: 'm3' },
+  sak: { id: 'sak', en: 'sack' },
+  karung: { id: 'karung', en: 'sack' },
+  roll: { id: 'roll', en: 'roll' },
+  lembar: { id: 'lembar', en: 'sheet' },
+  batang: { id: 'batang', en: 'bar' },
+  ikat: { id: 'ikat', en: 'bundle' },
+  kodi: { id: 'kodi', en: 'kodi' },
+  rim: { id: 'rim', en: 'ream' },
+  pallet: { id: 'pallet', en: 'pallet' },
+  kontainer: { id: 'kontainer', en: 'container' },
+  pasang: { id: 'pasang', en: 'pair' },
   hour: { id: 'jam', en: 'hour' },
   day: { id: 'hari', en: 'day' },
   week: { id: 'minggu', en: 'week' },
@@ -25,7 +39,11 @@ const UNIT_LABELS: Record<string, { id: string; en: string }> = {
   project: { id: 'proyek', en: 'project' },
   shipment: { id: 'pengiriman', en: 'shipment' },
   event: { id: 'event', en: 'event' },
+  order: { id: 'order', en: 'order' },
+  orang: { id: 'orang', en: 'person' },
   deal: { id: 'deal', en: 'deal' },
+  nego: { id: 'nego', en: 'negotiable' },
+  custom: { id: 'custom', en: 'custom' },
 };
 
 function text(value: unknown): string {
@@ -49,6 +67,8 @@ export function normalizePriceUnit(value: unknown): string {
   if (/\b(bal|bale)\b/.test(normalized)) return 'bal';
   if (/\b(box|dus)\b/.test(normalized)) return 'box';
   if (/\b(karton|carton|kartus)\b/.test(normalized)) return 'carton';
+  if (/\b(ton|tonne|tonel)\b/.test(normalized)) return 'ton';
+  if (/\b(ml|milliliter|millilitre)\b/.test(normalized)) return 'ml';
   if (/\b(lusin|dozen|dz)\b/.test(normalized)) return 'dozen';
   if (/\b(set)\b/.test(normalized)) return 'set';
   if (/\b(kg|kilogram)\b/.test(normalized)) return 'kg';
@@ -56,6 +76,18 @@ export function normalizePriceUnit(value: unknown): string {
   if (/\b(liter|litre|ltr)\b/.test(normalized)) return 'liter';
   if (/\b(meter|metre)\b/.test(normalized)) return 'meter';
   if (/\b(m2|sqm|luas|square meter)\b/.test(normalized)) return 'sqm';
+  if (/\b(m3|cubic meter|meter kubik)\b/.test(normalized)) return 'm3';
+  if (/\b(sak|sack)\b/.test(normalized)) return 'sak';
+  if (/\b(karung|bag)\b/.test(normalized)) return 'karung';
+  if (/\b(roll)\b/.test(normalized)) return 'roll';
+  if (/\b(lembar|sheet)\b/.test(normalized)) return 'lembar';
+  if (/\b(batang|stick|bar)\b/.test(normalized)) return 'batang';
+  if (/\b(ikat|bundle)\b/.test(normalized)) return 'ikat';
+  if (/\b(kodi)\b/.test(normalized)) return 'kodi';
+  if (/\b(rim|ream)\b/.test(normalized)) return 'rim';
+  if (/\b(pallet)\b/.test(normalized)) return 'pallet';
+  if (/\b(kontainer|container)\b/.test(normalized)) return 'kontainer';
+  if (/\b(pasang|pair)\b/.test(normalized)) return 'pasang';
   if (/\b(jam|hour|hourly)\b/.test(normalized)) return 'hour';
   if (/\b(hari|day|daily|harian)\b/.test(normalized)) return 'day';
   if (/\b(minggu|week|weekly|mingguan)\b/.test(normalized)) return 'week';
@@ -69,6 +101,10 @@ export function normalizePriceUnit(value: unknown): string {
     return 'shipment';
   if (/\b(event|acara)\b/.test(normalized)) return 'event';
   if (/\b(deal|handover|oper usaha|transfer)\b/.test(normalized)) return 'deal';
+  if (/\b(order|pesanan)\b/.test(normalized)) return 'order';
+  if (/\b(orang|person|pax)\b/.test(normalized)) return 'orang';
+  if (/\b(nego|negotiable|negoisasi)\b/.test(normalized)) return 'nego';
+  if (/\b(custom|lainnya|other)\b/.test(normalized)) return 'custom';
 
   return normalized
     .replace(/[^a-z0-9]+/g, '_')
@@ -130,7 +166,8 @@ export function formatPriceWithUnit(
     !trimmed ||
     trimmed === '-' ||
     /nego|request|menyesuaikan|hubungi|contact/i.test(trimmed) ||
-    /(^|[\s(])per\s+\S+|\/\s*\S+/i.test(trimmed)
+    /(^|[\s(])per\s+\S+|\/\s*\S+/i.test(trimmed) ||
+    /^(nego|custom)$/i.test(unitLabel.trim())
   ) {
     return trimmed;
   }

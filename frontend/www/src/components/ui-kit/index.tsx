@@ -442,6 +442,8 @@ function extractSubtitle(props: GenericCardProps): string {
     props.description ||
     props.user?.tagline ||
     props.location ||
+    props.seller_type ||
+    props.work_mode ||
     props.type ||
     ''
   );
@@ -471,7 +473,15 @@ function extractMeta(props: GenericCardProps): string[] {
     props.salary,
     props.level,
     props.category,
+    props.type,
+    props.content_type,
+    props.seller_type,
+    props.work_mode,
+    props.price_unit,
+    props.stock ? `${props.stock} stock` : undefined,
+    props.minimum_order,
     props.status,
+    props.location,
     props.rating ? `Rating ${props.rating}` : undefined,
   ];
   return values.filter(
@@ -487,6 +497,8 @@ function GenericCard({ kind, ...props }: GenericCardProps & { kind: string }) {
   const href = extractHref(props);
   const meta = extractMeta(props);
   const imageSrc = image || DEFAULT_CARD_IMAGE;
+  const badge = props.content_type || props.type || kind;
+  const highlight = props.seller_type || props.work_mode || props.price_unit;
 
   const body = (
     <article className="relative min-w-0 overflow-hidden rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_-32px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
@@ -501,11 +513,16 @@ function GenericCard({ kind, ...props }: GenericCardProps & { kind: string }) {
           target.src = DEFAULT_CARD_IMAGE;
         }}
       />
-      {!image ? (
-        <div className="pointer-events-none absolute left-2 top-2 rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_86%,_transparent)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_86%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-          {kind}
-        </div>
-      ) : null}
+      <div className="pointer-events-none absolute left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1">
+        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text)] shadow-sm backdrop-blur dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+          {badge}
+        </span>
+        {highlight ? (
+          <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-accent)] shadow-sm">
+            {highlight}
+          </span>
+        ) : null}
+      </div>
       <div className="min-w-0 space-y-1.5 p-2.5 sm:p-3">
         <h3 className="line-clamp-2 text-[0.82rem] font-bold leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
           {title}
@@ -516,8 +533,8 @@ function GenericCard({ kind, ...props }: GenericCardProps & { kind: string }) {
           </p>
         ) : null}
         {meta.length ? (
-          <div className="flex min-w-0 gap-1 overflow-hidden">
-            {meta.slice(0, 3).map(item => (
+          <div className="flex min-w-0 flex-wrap gap-1 overflow-hidden">
+            {meta.slice(0, 4).map(item => (
               <span
                 key={item}
                 className="min-w-0 truncate rounded-full bg-[color:var(--app-surface-muted)] px-1.5 py-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
