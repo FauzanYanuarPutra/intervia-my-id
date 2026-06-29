@@ -3353,9 +3353,28 @@ export default function ContentDetailPage({ params }: PageProps) {
   const extraTagCount = Math.max(0, tags.length - previewTags.length);
   const detailTags = PROMO_ONLY_MODE ? tags.slice(0, 8) : tags;
   const hiddenDetailTagCount = Math.max(0, tags.length - detailTags.length);
-  const summaryPreview =
-    cleanListingCopyText(item.summary, item.title) ||
-    buildPreviewText(undefined, item.body, item.title, PROMO_ONLY_MODE ? 62 : 110);
+  const normalizeText = (text?: string) =>
+    (text || '')
+      .replace(/\u00A0/g, ' ')
+      .replace(/┬á/g, ' ')
+      .replace(/Â/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const safeSummary = normalizeText(
+    cleanListingCopyText(item.summary, item.title)
+  );
+
+  const safeBodyPreview = normalizeText(
+    buildPreviewText(
+      undefined,
+      item.body,
+      item.title,
+      PROMO_ONLY_MODE ? 62 : 110
+    )
+  );
+
+  const summaryPreview = safeSummary || safeBodyPreview;
   const bodyPreview = buildPreviewText(
     item.summary,
     item.body,
@@ -3983,18 +4002,23 @@ export default function ContentDetailPage({ params }: PageProps) {
   const detailInsetClass = `rounded-[16px] px-2.5 py-2.5 ring-1 sm:px-3 sm:py-3 ${detailTone.inset}`;
   const detailInsetCompactClass = `rounded-[14px] px-2.5 py-2 ring-1 sm:rounded-[16px] sm:px-3 sm:py-2.5 ${detailTone.compact}`;
   const detailPrimaryButtonClass =
-    'inline-flex min-h-[40px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3.5 text-xs font-black text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_48%,transparent)] ring-1 ring-transparent transition duration-200 hover:-translate-y-0.5 hover:brightness-[1.03] hover:shadow-[0_20px_40px_-24px_color-mix(in_srgb,var(--app-accent)_58%,transparent)] active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[42px] sm:px-4 sm:text-sm';
+    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-[color:var(--app-accent)] px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_60%,transparent)] transition hover:brightness-110';
+
   const detailSecondaryButtonClass =
-    'inline-flex min-h-[40px] items-center justify-center gap-1 rounded-full bg-slate-100 px-3.5 text-xs font-black text-slate-700 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.24)] ring-1 ring-slate-200 transition duration-200 hover:-translate-y-0.5 hover:bg-slate-200 active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 disabled:opacity-60 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800 sm:min-h-[42px] sm:px-4 sm:text-sm';
+    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-white px-5 py-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]';
+
+  const detailDangerButtonClass =
+    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_-24px_rgba(225,29,72,0.55)] transition hover:bg-rose-500';
+
   const detailTextLinkClass =
-    'text-sm font-semibold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]';
+    'text-sm font-bold text-[color:var(--app-accent)] transition hover:underline';
   const actionCardClass = `${detailSectionClass} border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(255,255,255,0.98))] dark:border-emerald-400/20 dark:bg-[linear-gradient(180deg,rgba(4,20,13,0.36),rgba(2,6,23,0.96))]`;
   const priceValueClass =
     'text-4xl font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-300 sm:text-5xl';
   const priceSupportClass =
     'mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-500/12 dark:text-emerald-200';
   const detailChatButtonClass =
-    'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 text-sm font-black text-white shadow-[0_18px_34px_-24px_rgba(34,197,94,0.7)] ring-1 ring-transparent transition duration-200 hover:-translate-y-0.5 hover:bg-emerald-500 active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
+    '!inline-flex !min-h-[44px] !items-center !justify-center !gap-2 !rounded-full !bg-emerald-800 !px-4 !text-sm !font-black !text-white !shadow-[0_18px_34px_-24px_rgba(16,185,129,0.6)] !ring-1 !ring-transparent !transition !duration-200 hover:!-translate-y-0.5 hover:!bg-emerald-700 active:!translate-y-0 active:!scale-[0.98] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-emerald-500 focus-visible:!ring-offset-2 disabled:!cursor-not-allowed disabled:!opacity-60';
   const heroSummaryCard =
     summaryPreview || bodyPreview ? (
       <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 text-sm leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800 sm:p-3 sm:leading-6">
@@ -4167,10 +4191,7 @@ export default function ContentDetailPage({ params }: PageProps) {
       <div className={`mt-2 ${priceValueClass}`}>
         {primaryPrice}
       </div>
-      <div className={priceSupportClass}>
-        <MessageCircle className="h-3.5 w-3.5" />
-        {primaryActionHint}
-      </div>
+
       {hasOriginalPrice && (
         <div className="mt-1 flex items-center gap-2 text-xs">
           <span className="text-[color:var(--app-text-soft)] line-through">
@@ -4191,35 +4212,7 @@ export default function ContentDetailPage({ params }: PageProps) {
             )}
         </div>
       )}
-      {canStartChat ? (
-        <div className="mt-4 hidden gap-2 sm:grid sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => void handleStartChat()}
-            disabled={chatStarting}
-            className={detailChatButtonClass}
-          >
-            <MessageCircle className="h-4 w-4" />
-            {chatStarting
-              ? locale === 'id'
-                ? 'Membuka chat...'
-                : 'Opening chat...'
-              : locale === 'id'
-                ? 'Chat pemilik'
-                : 'Chat owner'}
-          </button>
-          {!PROMO_ONLY_MODE ? (
-            <button
-              type="button"
-              onClick={openDealFlowPicker}
-              disabled={!peerUserId}
-              className={detailSecondaryButtonClass}
-            >
-              {primaryActionLabel}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+
       {!PROMO_ONLY_MODE && promotionSnapshot?.offerType && (
         <div className="mt-3 rounded-[20px] bg-[color:var(--app-warning-soft)] p-3">
           <div className="flex items-start justify-between gap-3">
@@ -4262,32 +4255,47 @@ export default function ContentDetailPage({ params }: PageProps) {
           </p>
         </div>
       )}
-      {!isOwner && (
+      {/* {!isOwner && (
         <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
           <MessageCircle className="h-3.5 w-3.5" />
           {listingSideLabel}
         </div>
-      )}
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-        <button
+      )} */}
+      {/* <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"> */}
+
+      {/* Like button */}
+      {/* <button
           type="button"
           onClick={() => void toggleListingLike()}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-2 font-semibold shadow-[0_12px_24px_-18px_rgba(15,23,42,0.28)] ring-1 transition duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] focus-visible:ring-offset-2 ${contentLiked
-            ? 'bg-rose-500 text-white ring-rose-300 shadow-[0_14px_30px_-20px_rgba(244,63,94,0.7)]'
-            : 'cursor-pointer bg-white ring-slate-200 hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.24)] dark:bg-slate-950 dark:ring-slate-800 dark:hover:bg-slate-900'
+          className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-2 font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] ${contentLiked
+            ? "bg-rose-500 text-white ring-rose-300"
+            : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-900"
             }`}
         >
-          <Heart className={`h-3.5 w-3.5 ${contentLiked ? 'fill-current' : ''}`} />
-          {contentLiked ? (locale === 'id' ? 'Disukai' : 'Liked') : (locale === 'id' ? 'Suka listing' : 'Like listing')}
-        </button>
-        <span className="inline-flex min-h-9 items-center rounded-full bg-[color:var(--app-surface-muted)] px-3 py-2 font-semibold ring-1 ring-[color:var(--app-border)]">
-          {listingLikeCount} {locale === 'id' ? 'like' : 'likes'}
-        </span>
-        <span className="inline-flex min-h-9 items-center rounded-full bg-[color:var(--app-surface-muted)] px-3 py-2 font-semibold ring-1 ring-[color:var(--app-border)]">
-          {listingCommentCount} {locale === 'id' ? 'komentar' : 'comments'}
-        </span>
+          <Heart className={`h-3.5 w-3.5 ${contentLiked ? "fill-current" : ""}`} />
+          {contentLiked
+            ? locale === "id"
+              ? "Disukai"
+              : "Liked"
+            : locale === "id"
+              ? "Suka"
+              : "Like"}
+        </button> */}
+
+      {/* Like count */}
+      {/* <span className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800">
+          {listingLikeCount} {locale === "id" ? "like" : "likes"}
+        </span> */}
+
+      {/* Comment count */}
+      {/* <span className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800">
+          {listingCommentCount} {locale === "id" ? "komentar" : "comments"}
+        </span> */}
+
+      {/* </div> */}
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {actionButtons}
       </div>
-      <div className="mt-4">{actionButtons}</div>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[color:var(--app-text-soft)]">
         <Link href="/search" className={detailTextLinkClass}>
           {locale === 'id' ? 'Kembali ke search' : 'Back to search'}
@@ -4316,7 +4324,9 @@ export default function ContentDetailPage({ params }: PageProps) {
         </p>
       )}
       {!PROMO_ONLY_MODE && user && !isOwner && displayType !== 'company' && (
-        <div className={`mt-3 ${detailInsetClass}`}>
+        <div
+          className={`mt-4 ${detailInsetClass} border border-[color:var(--app-border)] bg-[color:var(--app-surface)] shadow-[0_18px_36px_-28px_rgba(15,23,42,0.18)]`}
+        >
           <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
               {locale === 'id'
@@ -4430,7 +4440,7 @@ export default function ContentDetailPage({ params }: PageProps) {
           )}
         </div>
       )}
-      <div className="mt-4">
+      {/* <div className="mt-4">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
             {locale === 'id' ? 'Langkah cepat' : 'Quick steps'}
@@ -4453,7 +4463,7 @@ export default function ContentDetailPage({ params }: PageProps) {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
     </section>
   );
 
@@ -4666,7 +4676,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                       overlay={
                         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-slate-950/68 via-slate-950/12 to-transparent p-2.5 text-white sm:p-3">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[11px] font-semibold">
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               {PROMO_ONLY_MODE
                                 ? locale === 'id'
@@ -4689,7 +4699,9 @@ export default function ContentDetailPage({ params }: PageProps) {
                 {heroSummaryCard}
 
                 <div className="min-w-0 space-y-3">
-                  <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
+                  {/* 
+
+ <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
@@ -4736,7 +4748,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                                 <p className="mt-2 line-clamp-3 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                                   {summaryPreview || bodyPreview || bodyDisplayText}
                                 </p>
-                                {/* <details className="group mt-2">
+                              <details className="group mt-2">
                                   <summary className="cursor-pointer list-none text-xs font-black text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]">
                                     {locale === 'id'
                                       ? 'Lihat detail'
@@ -4745,7 +4757,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                                   <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
                                     {bodyDisplayText}
                                   </div>
-                                </details> */}
+                                </details> 
                               </>
                             ) : (
                               <div className="prose prose-sm mt-2 max-w-none whitespace-pre-line leading-6 text-[color:var(--app-text)] dark:prose-invert dark:text-[color:var(--app-text-soft)]">
@@ -4851,7 +4863,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                       </div>
                     ) : null}
                   </section>
-
+*/}
                   {reviewsLoading || reviews.length > 0 || listingLikeCount > 0 ? (
                     <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
                       <div className="grid gap-3 md:grid-cols-[170px_minmax(0,1fr)]">
@@ -5007,6 +5019,7 @@ export default function ContentDetailPage({ params }: PageProps) {
               <aside className="hidden lg:block lg:self-start">
                 <div className="sticky top-[calc(4.75rem+env(safe-area-inset-top))] space-y-2.5 lg:max-w-[348px]">
                   {!PROMO_ONLY_MODE ? actionCard : null}
+                  {mobileActionCard}
                   {ownerProfileCard}
                   <section className={`${detailSurfaceClass} p-3.5`}>
                     <div className="flex items-center justify-between gap-2">

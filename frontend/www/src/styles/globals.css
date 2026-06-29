@@ -59,6 +59,10 @@
   --ring-offset: 0 0 0;
 }
 
+.all-unset {
+  all: unset;
+}
+
 /* ==============================
    Self-host WOFF2 Font Inter
    ============================== */

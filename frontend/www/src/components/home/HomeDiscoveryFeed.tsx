@@ -17,6 +17,7 @@ import {
   formatPriceWithUnit,
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
+import { resolveSupplierListingBadges } from '@/lib/content/supplierInfo';
 import {
   getListingSideContextLabel,
   getListingSideLabel,
@@ -80,6 +81,7 @@ type DiscoveryCard = {
   side: ListingSide;
   sideLabel: string;
   sideContextLabel: string;
+  supplierBadges: string[];
   group: GroupKey;
   image?: string;
   images: string[];
@@ -415,6 +417,7 @@ function mapContentItem(
 
   const sideLabel = getListingSideLabel(side, locale);
   const sideContextLabel = resolveSideContextLabel(side, typeKey, locale);
+  const supplierBadges = resolveSupplierListingBadges(item, locale);
   const gallery = parseImages(item);
   const image = gallery[0];
   const profileHref = buildPublicProfileHrefFromContent(item);
@@ -450,6 +453,7 @@ function mapContentItem(
     side,
     sideLabel,
     sideContextLabel,
+    supplierBadges,
     group,
     image,
     images: gallery,
@@ -604,6 +608,7 @@ function DiscoveryCardRail({
             side: item.side,
             sideLabel: item.sideLabel,
             sideContextLabel: item.sideContextLabel,
+            supplierBadges: item.supplierBadges,
             image: item.image,
             images: item.images,
             profileHref: item.profileHref,

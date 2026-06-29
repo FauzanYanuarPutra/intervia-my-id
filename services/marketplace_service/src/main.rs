@@ -375,6 +375,8 @@ struct UpsertContentRequest {
     price_cents: Option<i64>,
     price_unit: Option<String>,
     original_price_cents: Option<i64>,
+    seller_type: Option<String>,
+    minimum_order: Option<String>,
     promo_label: Option<String>,
     promo_start_at: Option<DateTime<Utc>>,
     promo_end_at: Option<DateTime<Utc>>,
@@ -726,6 +728,8 @@ struct ContentRow {
     content_status: String,
     pricing_mode: String,
     original_price_cents: Option<i64>,
+    seller_type: Option<String>,
+    minimum_order: Option<String>,
     promo_label: Option<String>,
     promo_start_at: Option<DateTime<Utc>>,
     promo_end_at: Option<DateTime<Utc>>,
@@ -796,6 +800,8 @@ struct ContentResponse {
     status: String,
     pricing_mode: String,
     original_price_cents: Option<i64>,
+    seller_type: Option<String>,
+    minimum_order: Option<String>,
     promo_label: Option<String>,
     promo_start_at: Option<DateTime<Utc>>,
     promo_end_at: Option<DateTime<Utc>>,
@@ -822,6 +828,11 @@ impl ContentResponse {
         let metadata = attach_response_image_urls(value.metadata, &image_urls);
         let price_unit = value.price_unit.or_else(|| metadata_price_unit(&metadata));
         let metadata = attach_price_unit_metadata(metadata, price_unit.as_deref());
+        let metadata = attach_supplier_metadata(
+            metadata,
+            value.seller_type.as_deref(),
+            value.minimum_order.as_deref(),
+        );
 
         Self {
             id: value.id,
@@ -843,6 +854,8 @@ impl ContentResponse {
             content_status: value.content_status,
             pricing_mode: value.pricing_mode,
             original_price_cents: value.original_price_cents,
+            seller_type: value.seller_type,
+            minimum_order: value.minimum_order,
             promo_label: value.promo_label,
             promo_start_at: value.promo_start_at,
             promo_end_at: value.promo_end_at,
@@ -4519,6 +4532,8 @@ fn canonical_content_type(value: &str) -> String {
         "properties" | "property_listing" | "real_estate" | "realestate" => "property".to_string(),
         "products" => "product".to_string(),
         "services" => "service".to_string(),
+        "auction" | "auctions" => "auction".to_string(),
+        "tender" | "tenders" => "tender".to_string(),
         "tool-rental" | "rental" | "rentals" | "equipment_rental" | "sewa_alat" | "alat_sewa" => {
             "tool_rental".to_string()
         }
@@ -4703,6 +4718,7 @@ fn infer_price_unit(content_type: &str, metadata: &Value) -> Option<String> {
             "job" => Some("month"),
             "freelancer" => Some("project"),
             "service" => Some("project"),
+            "auction" | "tender" => Some("deal"),
             "business_transfer" => Some("deal"),
             "product" => Some("pcs"),
             _ => None,
@@ -4727,6 +4743,47 @@ fn attach_price_unit_metadata(metadata: Value, price_unit: Option<&str>) -> Valu
     Value::Object(map)
 }
 
+fn attach_supplier_metadata(
+    metadata: Value,
+    seller_type: Option<&str>,
+    minimum_order: Option<&str>,
+) -> Value {
+    let mut map = match metadata {
+        Value::Object(map) => map,
+        other => return other,
+    };
+    let seller_type_value = seller_type
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            map.get("seller_type")
+                .and_then(Value::as_str)
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        });
+    if let Some(value) = seller_type_value {
+        map.insert("seller_type".to_string(), Value::String(value));
+    } else {
+        map.remove("seller_type");
+    }
+
+    let minimum_order_value = minimum_order
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            map.get("minimum_order")
+                .and_then(Value::as_str)
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+        });
+    if let Some(value) = minimum_order_value {
+        map.insert("minimum_order".to_string(), Value::String(value));
+    } else {
+        map.remove("minimum_order");
+    }
+    Value::Object(map)
+}
+
 fn is_valid_content_type(value: &str) -> bool {
     matches!(
         value,
@@ -4734,6 +4791,8 @@ fn is_valid_content_type(value: &str) -> bool {
             | "service"
             | "job"
             | "property"
+            | "auction"
+            | "tender"
             | "guide"
             | "project"
             | "material"
@@ -8346,7 +8405,9 @@ async fn list_content(
     let level = clean_text(query.level);
     let sector = clean_text(query.sector).map(|s| s.to_lowercase());
     let sub_sector = clean_text(query.sub_sector).map(|s| s.to_lowercase());
-    let status = clean_text(query.status).map(|s| s.to_lowercase());
+    let status = clean_text(query.status)
+        .map(|s| s.to_lowercase())
+        .unwrap_or_else(|| "active".to_string());
     let owner_id = query.owner_id;
 
     let rows = sqlx::query_as::<_, ContentRow>(
@@ -8354,7 +8415,7 @@ async fn list_content(
         SELECT
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
-            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
             COALESCE((
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
@@ -8380,7 +8441,10 @@ async fn list_content(
               coalesce(metadata->>'brand', '') ILIKE ('%' || $2 || '%') OR
               coalesce(metadata->>'company', '') ILIKE ('%' || $2 || '%') OR
               coalesce(metadata->>'company_name', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(content_items.seller_type, '') ILIKE ('%' || $2 || '%') OR
               coalesce(metadata->>'seller_type', '') ILIKE ('%' || $2 || '%') OR
+              coalesce(content_items.minimum_order, '') ILIKE ('%' || $2 || '%') OR
+              coalesce(metadata->>'minimum_order', '') ILIKE ('%' || $2 || '%') OR
               coalesce(metadata->>'service_scope', '') ILIKE ('%' || $2 || '%') OR
               coalesce(metadata->>'skills', '') ILIKE ('%' || $2 || '%') OR
               coalesce(metadata->>'profession', '') ILIKE ('%' || $2 || '%') OR
@@ -8409,10 +8473,7 @@ async fn list_content(
                 regexp_replace(lower($6), '[^a-z0-9]+', '', 'g') OR
               coalesce(metadata->>'sub_sector', '') ILIKE ('%' || $6 || '%')
           )
-          AND (
-              $7::text IS NULL OR
-              lower(content_status) = $7
-          )
+          AND lower(content_status) = $7
           AND (
               $8::uuid IS NULL OR owner_id = $8
           )
@@ -9050,6 +9111,15 @@ async fn create_content(
         None
     };
     let metadata = attach_price_unit_metadata(metadata, price_unit.as_deref());
+    let seller_type = clean_text(payload.seller_type)
+        .or_else(|| json_text_at(&metadata, &["seller_type"]));
+    let minimum_order = clean_text(payload.minimum_order)
+        .or_else(|| json_text_at(&metadata, &["minimum_order"]));
+    let metadata = attach_supplier_metadata(
+        metadata,
+        seller_type.as_deref(),
+        minimum_order.as_deref(),
+    );
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
@@ -9082,16 +9152,17 @@ async fn create_content(
         r#"
         INSERT INTO content_items (
             owner_id, content_type, slug, title, summary, body, pricing_mode, price_cents,
-            price_unit, original_price_cents, promo_label, promo_start_at, promo_end_at, currency,
-            tags, cover_image, category, content_status, metadata
+            price_unit, original_price_cents, seller_type, minimum_order, promo_label,
+            promo_start_at, promo_end_at, currency, tags, cover_image, category, content_status,
+            metadata
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
-            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
         )
         RETURNING
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
-            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
             COALESCE((
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
@@ -9110,6 +9181,8 @@ async fn create_content(
     .bind(price_cents)
     .bind(price_unit)
     .bind(original_price_cents)
+    .bind(seller_type)
+    .bind(minimum_order)
     .bind(promo_label)
     .bind(promo_start_at)
     .bind(promo_end_at)
@@ -9377,6 +9450,17 @@ async fn update_content(
         None
     };
     let metadata = attach_price_unit_metadata(metadata, price_unit.as_deref());
+    let seller_type = clean_text(payload.seller_type)
+        .or_else(|| json_text_at(&metadata, &["seller_type"]))
+        .or_else(|| existing.seller_type.clone());
+    let minimum_order = clean_text(payload.minimum_order)
+        .or_else(|| json_text_at(&metadata, &["minimum_order"]))
+        .or_else(|| existing.minimum_order.clone());
+    let metadata = attach_supplier_metadata(
+        metadata,
+        seller_type.as_deref(),
+        minimum_order.as_deref(),
+    );
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
@@ -9413,21 +9497,23 @@ async fn update_content(
             price_cents = $8,
             price_unit = $9,
             original_price_cents = $10,
-            promo_label = $11,
-            promo_start_at = $12,
-            promo_end_at = $13,
-            currency = $14,
-            tags = $15,
-            cover_image = $16,
-            category = $17,
-            content_status = $18,
-            metadata = $19,
+            seller_type = $11,
+            minimum_order = $12,
+            promo_label = $13,
+            promo_start_at = $14,
+            promo_end_at = $15,
+            currency = $16,
+            tags = $17,
+            cover_image = $18,
+            category = $19,
+            content_status = $20,
+            metadata = $21,
             updated_at = NOW()
         WHERE id = $1
         RETURNING
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
-            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
             COALESCE((
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil
@@ -9446,6 +9532,8 @@ async fn update_content(
     .bind(price_cents)
     .bind(price_unit)
     .bind(original_price_cents)
+    .bind(seller_type)
+    .bind(minimum_order)
     .bind(promo_label)
     .bind(promo_start_at)
     .bind(promo_end_at)
@@ -19649,7 +19737,7 @@ async fn find_content(db: &PgPool, id_or_slug: &str) -> Result<Option<ContentRow
         SELECT
             id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
             currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
-            promo_label, promo_start_at, promo_end_at, rating, review_count,
+            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
             COALESCE((
                 SELECT COUNT(*)::bigint
                 FROM content_item_likes cil

@@ -59,6 +59,7 @@ export type MarketplaceDiscoveryCardItem = {
   side: DiscoveryCardSide;
   sideLabel: string;
   sideContextLabel: string;
+  supplierBadges?: string[];
   image?: string;
   images?: string[];
   updatedLabel?: string | null;
@@ -500,6 +501,7 @@ function CategoryPreview({
   const locationLabel = String(item.location || '').trim();
   const updatedLabel = String(item.updatedLabel || '').trim();
   const summaryLabel = String(item.sideContextLabel || item.summary || '').trim();
+  const supplierBadges = (item.supplierBadges || []).filter(Boolean);
 
   const valueLabel = showPrice
     ? item.priceLabel
@@ -571,6 +573,19 @@ function CategoryPreview({
       <h3 className="font-semibold text-slate-900 dark:text-white text-[15px] line-clamp-2">
         {item.title}
       </h3>
+
+      {supplierBadges.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {supplierBadges.slice(0, 3).map(badge => (
+            <span
+              key={badge}
+              className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              {badge}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {/* META */}
       <div className="flex flex-wrap gap-1.5">

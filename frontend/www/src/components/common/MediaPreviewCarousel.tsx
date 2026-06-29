@@ -272,7 +272,7 @@ export function MediaPreviewCarousel({
 
         {/* Counter Badge */}
         {visibleMediaItems.length > 1 && showCounter ? (
-          <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm select-none">
+          <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm select-none">
             {active + 1} / {visibleMediaItems.length}
           </span>
         ) : null}
@@ -335,11 +335,11 @@ export function MediaPreviewCarousel({
         {showDots && hasMany ? (
           <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5 pointer-events-none">
             {visibleMediaItems.map((_, index) => (
-              <span
+              <div
                 key={`dot-${index}`}
                 className={cn(
-                  'h-1.5 rounded-full bg-white/50 shadow-sm transition-all duration-200',
-                  index === active ? 'w-5 bg-white' : 'w-1.5',
+                  'all-unset !h-1 !min-h-1 !min-w-1 !p-0 !m-0 rounded-full bg-white/50 shadow-sm transition-all duration-200',
+                  index === active ? '!w-1 bg-white' : '!w-1',
                 )}
               />
             ))}

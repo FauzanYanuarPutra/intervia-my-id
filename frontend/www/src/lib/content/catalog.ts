@@ -53,6 +53,8 @@ export type ContentItem = {
   currency?: string | null;
   rating?: number | null;
   review_count?: number | null;
+  seller_type?: string | null;
+  minimum_order?: string | null;
   seller_stats?: {
     rating?: number | null;
     review_count?: number | null;
@@ -431,6 +433,8 @@ export function matchAnyFilter(item: ContentItem, query: string): boolean {
     item.summary,
     item.content_type,
     item.category,
+    asString(item.seller_type),
+    asString(item.minimum_order),
     asString(meta.location),
     asString(meta.city),
     asString(meta.company),

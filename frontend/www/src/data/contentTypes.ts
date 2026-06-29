@@ -1,4 +1,4 @@
-import { Package, Wrench, Briefcase, Home, Building2, ShieldCheck, Handshake } from 'lucide-react';
+import { Package, Wrench, Briefcase, Home, Building2, ShieldCheck, Handshake, Gavel } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
 /**
@@ -19,6 +19,8 @@ export const CONTENT_TYPES: ContentType[] = [
   { id: 'job', icon: Briefcase, nameEn: 'Jobs', nameId: 'Lowongan', shortEn: 'Jobs', shortId: 'Lowongan' },
   { id: 'tool_rental', icon: ShieldCheck, nameEn: 'Rentals', nameId: 'Sewa Alat', shortEn: 'Rentals', shortId: 'Sewa' },
   { id: 'business_transfer', icon: Handshake, nameEn: 'Business Transfers', nameId: 'Oper Usaha', shortEn: 'Transfer', shortId: 'Oper Usaha' },
+  { id: 'auction', icon: Gavel, nameEn: 'Auction', nameId: 'Lelang', shortEn: 'Auction', shortId: 'Lelang' },
+  { id: 'tender', icon: Gavel, nameEn: 'Tender', nameId: 'Tender', shortEn: 'Tender', shortId: 'Tender' },
   { id: 'company', icon: Building2, nameEn: 'Companies', nameId: 'Perusahaan', shortEn: 'Companies', shortId: 'Perusahaan' },
   { id: 'property', icon: Home, nameEn: 'Property', nameId: 'Properti', shortEn: 'Property', shortId: 'Properti' },
 ];

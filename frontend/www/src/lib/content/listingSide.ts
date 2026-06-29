@@ -58,6 +58,8 @@ const DEMAND_HIDDEN_FIELDS_BY_TYPE: Record<string, string[]> = {
     'sku',
     'gtin',
     'mpn',
+    'seller_type',
+    'minimum_order',
     'availability',
     'shipping_method',
     'shipping_fee',

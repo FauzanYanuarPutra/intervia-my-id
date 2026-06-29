@@ -264,7 +264,10 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
     focus:!border-0
     focus:!ring-0
     focus:!outline-none
-    focus:!shadow-none">
+    focus:!shadow-none"   style={{
+                borderColor: 'transparent',
+                boxShadow: 'none',
+              }}>
               <button
                 type="button"
                 onClick={handleBack}

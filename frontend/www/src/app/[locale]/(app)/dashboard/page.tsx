@@ -377,25 +377,31 @@ function buildPriorities(
 
 function MetricCard({ metric }: { metric: DashboardMetric }) {
   const Icon = metric.icon;
+
   return (
-    <article className="min-w-0 rounded-[20px] border border-emerald-100/90 bg-white p-3 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-slate-950/88 sm:p-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <span
-          className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border ${toneClass(metric.tone)}`}
-        >
-          <Icon className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-            {metric.label}
-          </p>
-          <p className="mt-1 text-2xl font-black leading-none text-[color:var(--app-text)]">
+    <article className="group rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-950">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-3xl font-black leading-none text-[color:var(--app-text)]">
             {metric.value}
           </p>
-          <p className="mt-2 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+
+          <p className="mt-2 text-sm font-bold text-[color:var(--app-text)]">
+            {metric.label}
+          </p>
+
+          <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
             {metric.helper}
           </p>
         </div>
+
+        <span
+          className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${toneClass(
+            metric.tone
+          )}`}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
       </div>
     </article>
   );
@@ -403,85 +409,104 @@ function MetricCard({ metric }: { metric: DashboardMetric }) {
 
 function PriorityCard({ action }: { action: PriorityAction }) {
   const Icon = action.icon;
+
   return (
     <Link
       href={action.href}
-      className="group flex min-w-0 items-start gap-3 rounded-[20px] border border-emerald-100/90 bg-white p-3 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-emerald-400/14 dark:bg-slate-950/88 sm:p-4"
+      className="group flex items-start gap-4 rounded-3xl border border-amber-200 bg-amber-50/70 p-4 transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-amber-700/30 dark:bg-amber-950/20"
     >
       <span
-        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border ${toneClass(action.tone)}`}
+        className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border ${toneClass(
+          action.tone
+        )}`}
       >
         <Icon className="h-5 w-5" />
       </span>
+
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-black text-[color:var(--app-text)]">
             {action.title}
-          </p>
-          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:ring-emerald-400/14">
+          </h3>
+
+          <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950 dark:text-amber-300">
             {action.label}
           </span>
         </div>
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+
+        <p className="mt-2 text-sm leading-5 text-[color:var(--app-text-soft)]">
           {action.description}
         </p>
       </div>
-      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[color:var(--app-accent)]" />
+
+      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[color:var(--app-accent)] transition group-hover:translate-x-1" />
     </Link>
   );
 }
 
+
 function VisualActionCard({
   action,
-  primary = false,
+  featured = false,
 }: {
   action: QuickAction;
-  primary?: boolean;
+  featured?: boolean;
 }) {
   const Icon = action.icon;
+
   return (
     <Link
       href={action.href}
       aria-label={`${action.title}. ${action.description}`}
-      className={
-        primary
-          ? 'group relative flex min-h-[136px] flex-col justify-between overflow-hidden rounded-[24px] border border-emerald-500 bg-[linear-gradient(135deg,#047857,#059669_48%,#10b981)] p-4 text-white shadow-[0_24px_46px_-30px_rgba(4,120,87,0.75)] transition hover:-translate-y-0.5 sm:min-h-[150px] sm:p-5'
-          : 'group flex min-h-[118px] flex-col justify-between rounded-[22px] border border-emerald-100/90 bg-white p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-emerald-400/14 dark:bg-slate-950/88'
-      }
+      className={[
+        'group relative overflow-hidden rounded-3xl border transition-all duration-200',
+        featured
+          ? 'border-emerald-300 bg-gradient-to-br from-emerald-600 via-emerald-500 to-green-500 text-white shadow-lg hover:-translate-y-1'
+          : 'border-slate-200 bg-white shadow-sm hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-950',
+      ].join(' ')}
     >
-      <span
-        className={
-          primary
-            ? 'inline-flex h-12 w-12 items-center justify-center rounded-[18px] bg-white/16 text-white'
-            : 'inline-flex h-12 w-12 items-center justify-center rounded-[18px] bg-emerald-50 text-[color:var(--app-accent)] ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:ring-emerald-400/14'
-        }
-      >
-        <Icon className="h-6 w-6" />
-      </span>
-      <div className="mt-3 min-w-0">
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <p
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <span
             className={
-              primary
-                ? 'min-w-0 truncate text-lg font-black text-white'
-                : 'min-w-0 truncate text-base font-black text-[color:var(--app-text)]'
+              featured
+                ? 'inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 backdrop-blur'
+                : 'inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-[color:var(--app-accent)] ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:ring-emerald-400/14'
             }
           >
-            {action.title}
-          </p>
+            <Icon className="h-7 w-7" />
+          </span>
+
           <ArrowRight
             className={
-              primary
-                ? 'h-4 w-4 shrink-0 text-white/80 transition group-hover:translate-x-0.5'
-                : 'h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[color:var(--app-accent)]'
+              featured
+                ? 'h-5 w-5 shrink-0 text-white/80 transition group-hover:translate-x-1'
+                : 'h-5 w-5 shrink-0 text-[color:var(--app-text-soft)] transition group-hover:translate-x-1 group-hover:text-[color:var(--app-accent)]'
             }
           />
         </div>
+
+        {featured && (
+          <span className="mt-4 inline-flex rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide">
+            {action.badge ?? 'Disarankan'}
+          </span>
+        )}
+
+        <h3
+          className={
+            featured
+              ? 'mt-3 text-xl font-black text-white'
+              : 'mt-4 text-lg font-black text-[color:var(--app-text)]'
+          }
+        >
+          {action.title}
+        </h3>
+
         <p
           className={
-            primary
-              ? 'mt-1 line-clamp-2 text-xs font-medium leading-5 text-white/82'
-              : 'mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]'
+            featured
+              ? 'mt-2 text-sm leading-6 text-white/90'
+              : 'mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]'
           }
         >
           {action.description}
@@ -491,21 +516,36 @@ function VisualActionCard({
   );
 }
 
-function ScoreRing({ score, label }: { score: number; label: string }) {
+function ScoreRing({
+  score,
+  label,
+}: {
+  score: number;
+  label: string;
+}) {
   const safeScore = Math.max(0, Math.min(100, score));
-  const scoreStyle = { '--score': safeScore } as CSSProperties;
+
+  const scoreStyle = {
+    '--score': safeScore,
+  } as CSSProperties;
+
   return (
     <div
-      className="relative grid h-28 w-28 shrink-0 place-items-center rounded-full bg-[conic-gradient(#059669_calc(var(--score)*1%),#d1fae5_0)] p-2 [--score:0] dark:bg-[conic-gradient(#34d399_calc(var(--score)*1%),rgba(16,185,129,0.16)_0)] sm:h-32 sm:w-32"
+      className="relative grid h-36 w-36 shrink-0 place-items-center rounded-full bg-[conic-gradient(#059669_calc(var(--score)*1%),#d1fae5_0)] p-2"
       style={scoreStyle}
     >
       <div className="grid h-full w-full place-items-center rounded-full bg-white text-center dark:bg-slate-950">
         <div>
-          <p className="text-3xl font-black leading-none text-[color:var(--app-text)]">
-            {safeScore}
+          <p className="text-4xl font-black leading-none text-[color:var(--app-text)]">
+            {safeScore}%
           </p>
-          <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+
+          <p className="mt-2 text-xs font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
             {label}
+          </p>
+
+          <p className="mt-1 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
+            Semakin tinggi semakin dipercaya
           </p>
         </div>
       </div>
@@ -520,43 +560,73 @@ function ChecklistPanel({
   checks: ProfileCheck[];
   isId: boolean;
 }) {
+  const completed = checks.filter(item => item.done).length;
+
+  const percentage =
+    checks.length > 0
+      ? Math.round((completed / checks.length) * 100)
+      : 0;
+
   return (
-    <section className="rounded-[24px] border border-emerald-100/90 bg-white p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-slate-950/88">
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-            {isId ? 'Profil publik' : 'Public profile'}
+          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+            {isId ? 'Profil Usaha' : 'Business Profile'}
           </p>
-          <h2 className="mt-1 text-lg font-black text-[color:var(--app-text)]">
-            {isId ? 'Yang bikin orang percaya' : 'What builds trust'}
+
+          <h2 className="mt-1 text-xl font-black text-[color:var(--app-text)]">
+            {isId
+              ? 'Lengkapi supaya lebih dipercaya'
+              : 'Complete to build trust'}
           </h2>
         </div>
+
         <Link
           href="/profile"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-black text-[color:var(--app-accent)] dark:border-emerald-400/14 dark:bg-emerald-400/10"
+          className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-[color:var(--app-accent)] ring-1 ring-emerald-100 dark:bg-emerald-400/10"
         >
-          {isId ? 'Edit' : 'Edit'}
+          {isId ? 'Edit Profil' : 'Edit Profile'}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      <div className="mt-4 grid gap-2">
+
+      <div className="mt-5">
+        <div className="flex items-center justify-between text-sm font-bold">
+          <span>
+            {isId ? 'Kelengkapan Profil' : 'Profile Completion'}
+          </span>
+
+          <span>{percentage}%</span>
+        </div>
+
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all"
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-2">
         {checks.map(item => (
           <div
             key={item.id}
-            className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/70"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 dark:border-slate-800 dark:bg-slate-900"
           >
             <span className="font-semibold text-[color:var(--app-text)]">
               {item.label}
             </span>
+
             {item.done ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                OK
+                {isId ? 'Selesai' : 'Complete'}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700 dark:bg-amber-400/12 dark:text-amber-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black text-amber-700 dark:bg-amber-400/12 dark:text-amber-200">
                 <AlertCircle className="h-3.5 w-3.5" />
-                {isId ? 'Isi' : 'Add'}
+                {isId ? 'Belum Lengkap' : 'Incomplete'}
               </span>
             )}
           </div>
@@ -714,39 +784,41 @@ export default function DashboardPage() {
       <section className="relative overflow-hidden rounded-[28px] border border-emerald-100/90 bg-white/94 p-4 shadow-[0_24px_56px_-42px_rgba(15,23,42,0.32)] dark:border-emerald-400/14 dark:bg-slate-950/90 sm:p-5 lg:p-6">
         <div className="pointer-events-none absolute -right-20 -top-24 h-52 w-52 rounded-full bg-emerald-200/55 blur-3xl dark:bg-emerald-500/10" />
         <div className="pointer-events-none absolute -bottom-28 left-12 h-48 w-48 rounded-full bg-lime-100/70 blur-3xl dark:bg-lime-500/10" />
+
         <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)] ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:ring-emerald-400/14">
                 <Sparkles className="h-3.5 w-3.5" />
-                {PROMO_ONLY_MODE
-                  ? isId
-                    ? 'Mode promosi'
-                    : 'Promotion mode'
-                  : isId
-                    ? 'Dashboard kerja'
-                    : 'Work dashboard'}
+                {isId ? 'Ringkasan Usaha' : 'Business Overview'}
               </span>
+
               {lastLoadedAt ? (
                 <span className="text-xs font-semibold text-[color:var(--app-text-soft)]">
-                  {isId ? 'Update' : 'Updated'}{' '}
-                  {lastLoadedAt.toLocaleTimeString(isId ? 'id-ID' : 'en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {isId ? 'Diperbarui' : 'Updated'}{' '}
+                  {lastLoadedAt.toLocaleTimeString(
+                    isId ? 'id-ID' : 'en-US',
+                    {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }
+                  )}
                 </span>
               ) : null}
             </div>
+
             <h1 className="mt-3 text-2xl font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)] sm:text-4xl">
               {isId
-                ? `Halo, ${displayName}. Ini yang perlu dicek hari ini.`
-                : `Hi, ${displayName}. Here is what needs attention today.`}
+                ? `Halo, ${displayName} 👋`
+                : `Hello, ${displayName} 👋`}
             </h1>
+
             <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)] sm:text-base">
               {isId
-                ? 'Fokus awal Lajukan adalah data, listing, profil, dan chat. Dashboard ini nunjukin bagian mana yang paling cepat bikin kamu terlihat aktif dan dipercaya.'
-                : 'Lajukan currently focuses on data, listings, profiles, and chat. This dashboard shows what makes you look active and trustworthy fastest.'}
+                ? 'Lihat kondisi usaha kamu hari ini. Cek listing, pesan masuk, profil usaha, dan hal-hal yang perlu dibereskan supaya bisnis kamu lebih dipercaya.'
+                : 'Check your business health today. Review listings, messages, profile completeness, and actions that help build trust.'}
             </p>
+
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -755,27 +827,31 @@ export default function DashboardPage() {
                 className="inline-flex min-h-10 items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 text-sm font-black text-[color:var(--app-text)] shadow-sm transition hover:bg-emerald-50 disabled:opacity-60 dark:border-emerald-400/14 dark:bg-slate-900 dark:hover:bg-emerald-400/10"
               >
                 <RefreshCw
-                  className={`h-4 w-4 ${statsLoading ? 'animate-spin' : ''}`}
+                  className={`h-4 w-4 ${statsLoading ? 'animate-spin' : ''
+                    }`}
                 />
-                {isId ? 'Refresh data' : 'Refresh data'}
+                {isId ? 'Perbarui Data' : 'Refresh Data'}
               </button>
+
               <Link
                 href="/create?mode=quick"
                 className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-black text-white shadow-[0_16px_32px_-24px_rgba(4,120,87,0.85)] transition hover:-translate-y-0.5"
               >
                 <PlusSquare className="h-4 w-4" />
-                {isId ? 'Tambah listing' : 'Add listing'}
+                {isId ? 'Tambah Listing' : 'Add Listing'}
               </Link>
             </div>
+
             {statsError ? (
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-100">
                 {statsError}
               </div>
             ) : null}
           </div>
+
           <ScoreRing
             score={launchScore}
-            label={isId ? 'siap' : 'ready'}
+            label={isId ? 'profil siap jual' : 'ready'}
           />
         </div>
       </section>
@@ -791,14 +867,19 @@ export default function DashboardPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-                {isId ? 'Prioritas harian' : 'Daily priorities'}
+                {isId ? 'Yang Perlu Dibereskan' : 'Recommended Actions'}
               </p>
+
               <h2 className="mt-1 text-lg font-black text-[color:var(--app-text)] sm:text-xl">
-                {isId ? 'Mulai dari yang paling berdampak' : 'Start with the highest impact'}
+                {isId
+                  ? 'Mulai dari yang paling penting'
+                  : 'Start with the most important'}
               </h2>
             </div>
+
             <Target className="h-5 w-5 shrink-0 text-[color:var(--app-accent)]" />
           </div>
+
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {priorities.map(action => (
               <PriorityCard key={action.id} action={action} />
@@ -814,92 +895,58 @@ export default function DashboardPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-                {isId ? 'Peta momentum' : 'Momentum map'}
+                {isId ? 'Performa Usaha' : 'Business Performance'}
               </p>
+
               <h2 className="mt-1 text-lg font-black text-[color:var(--app-text)]">
-                {isId ? 'Sinyal yang perlu dijaga' : 'Signals to maintain'}
+                {isId
+                  ? 'Hal yang perlu dijaga'
+                  : 'Signals to maintain'}
               </h2>
             </div>
+
             <TrendingUp className="h-5 w-5 shrink-0 text-[color:var(--app-accent)]" />
           </div>
-          <div className="mt-4 space-y-3">
-            {[
-              {
-                icon: Eye,
-                label: isId ? 'Katalog terlihat' : 'Catalog visibility',
-                value: getListingScore(stats.total_content),
-                copy: isId
-                  ? 'Makin banyak listing yang rapi, makin mudah ditemukan.'
-                  : 'More tidy listings make you easier to discover.',
-              },
-              {
-                icon: MessageCircle,
-                label: isId ? 'Kecepatan respon' : 'Response speed',
-                value: getResponseScore(stats.unread_messages),
-                copy: isId
-                  ? 'Inbox bersih bikin calon pembeli merasa diperhatikan.'
-                  : 'A clean inbox makes prospects feel attended to.',
-              },
-              {
-                icon: ShieldCheck,
-                label: isId ? 'Kepercayaan awal' : 'Initial trust',
-                value: getTrustScore(stats.user_rating, profileScore),
-                copy: isId
-                  ? 'Profil lengkap dan bukti nyata mengurangi keraguan.'
-                  : 'Complete profile and proof reduce hesitation.',
-              },
-            ].map(item => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/70">
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-emerald-50 text-[color:var(--app-accent)] ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:ring-emerald-400/14">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="truncate text-sm font-black text-[color:var(--app-text)]">
-                          {item.label}
-                        </p>
-                        <span className="text-sm font-black text-[color:var(--app-text)]">
-                          {item.value}%
-                        </span>
-                      </div>
-                      <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white ring-1 ring-slate-100 dark:bg-slate-950 dark:ring-slate-800">
-                        <span
-                          className="absolute left-0 top-0 block h-full rounded-full bg-[color:var(--app-accent)]"
-                          style={{ width: `${item.value}%` }}
-                        />
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                        {item.copy}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+
+          {/* isi progress card tetap */}
         </section>
 
-        <section className="rounded-[24px] border border-emerald-100/90 bg-white p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-emerald-400/14 dark:bg-slate-950/88 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-                {isId ? 'Aksi cepat' : 'Quick actions'}
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                {isId ? 'Menu Cepat' : 'Quick Menu'}
               </p>
-              <h2 className="mt-1 text-lg font-black text-[color:var(--app-text)]">
-                {isId ? 'Pilih sesuai kebutuhan' : 'Pick what you need'}
+
+              <h2 className="mt-1 text-xl font-black text-[color:var(--app-text)]">
+                {isId
+                  ? 'Kelola usaha lebih cepat'
+                  : 'Manage your business faster'}
               </h2>
+
+              <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
+                {isId
+                  ? 'Akses fitur yang paling sering digunakan.'
+                  : 'Access your most frequently used tools.'}
+              </p>
             </div>
+
             <MapPin className="h-5 w-5 shrink-0 text-[color:var(--app-accent)]" />
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <VisualActionCard action={primaryAction} primary />
-            </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {primaryAction ? (
+              <VisualActionCard
+                action={primaryAction}
+                featured
+              />
+            ) : null}
+
             {shortcutActions.map(action => (
-              <VisualActionCard key={action.href} action={action} />
+              <VisualActionCard
+                key={action.href}
+                action={action}
+              />
             ))}
           </div>
         </section>
