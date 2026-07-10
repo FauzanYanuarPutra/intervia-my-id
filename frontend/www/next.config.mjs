@@ -13,6 +13,10 @@ const GOOGLE_SCRIPT_SOURCES = [
   'https://accounts.google.com',
   'https://apis.google.com',
 ];
+const TRUSTED_SCRIPT_SOURCES = [
+  ...GOOGLE_SCRIPT_SOURCES,
+  'https://static.cloudflareinsights.com',
+];
 
 const GOOGLE_API_SOURCES = [
   'https://oauth2.googleapis.com',
@@ -21,8 +25,8 @@ const GOOGLE_API_SOURCES = [
 ];
 
 const scriptSrc = IS_PROD
-  ? `script-src 'self' 'unsafe-inline' blob: ${GOOGLE_SCRIPT_SOURCES.join(' ')};`
-  : `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: ${GOOGLE_SCRIPT_SOURCES.join(' ')};`;
+  ? `script-src 'self' 'unsafe-inline' blob: ${TRUSTED_SCRIPT_SOURCES.join(' ')};`
+  : `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: ${TRUSTED_SCRIPT_SOURCES.join(' ')};`;
 
 const ContentSecurityPolicy = `
   default-src 'self';

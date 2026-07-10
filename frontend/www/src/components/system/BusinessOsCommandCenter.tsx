@@ -325,17 +325,17 @@ export function BusinessOsCommandCenter() {
       },
       ...(!PROMO_ONLY_MODE
         ? [
-            {
-              id: 'transactions',
-              href: '/transactions',
-              icon: Workflow,
-              tone: 'amber' as Tone,
-              title: isId ? 'Transaksi' : 'Transactions',
-              description: isId
-                ? 'Pantau order yang masih jalan.'
-                : 'Review orders that are still moving.',
-            },
-          ]
+          {
+            id: 'transactions',
+            href: '/transactions',
+            icon: Workflow,
+            tone: 'amber' as Tone,
+            title: isId ? 'Transaksi' : 'Transactions',
+            description: isId
+              ? 'Pantau order yang masih jalan.'
+              : 'Review orders that are still moving.',
+          },
+        ]
         : []),
       {
         id: 'listings',
@@ -477,7 +477,7 @@ export function BusinessOsCommandCenter() {
       <section className="overflow-hidden rounded-[32px] border border-[color:var(--app-border)] bg-[linear-gradient(160deg,color-mix(in_srgb,var(--app-surface-strong)_96%,white_4%),color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong)_78%))] p-5 shadow-[0_24px_54px_-36px_rgba(15,23,42,0.28)] sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <div className="inline-flex max-w-full items-center gap-3 rounded-[22px] border border-[color:var(--app-border)] bg-white/80 px-3 py-2 shadow-sm backdrop-blur">
+            <div className="inline-flex max-w-full items-center gap-3 rounded-[22px] border border-[color:var(--app-border)] bg-white/80 px-3 py-2 shadow-sm ">
               <Image
                 src={dashboardAvatar}
                 alt={displayName}
@@ -495,10 +495,10 @@ export function BusinessOsCommandCenter() {
               </div>
             </div>
 
-            <p className="mt-4 text-[10px] font-black uppercase tracking-[0.22em] text-[color:var(--app-accent)]">
+            <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.22em] text-[color:var(--app-accent)]">
               {isId ? 'Dashboard kerja' : 'Work dashboard'}
             </p>
-            <h1 className="mt-2 text-[1.9rem] font-black leading-tight tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[2.4rem]">
+            <h1 className="mt-2 text-[1.9rem] font-bold leading-tight tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[2.4rem]">
               {isId
                 ? 'Buka yang perlu dikerjakan sekarang.'
                 : 'Open what needs your attention now.'}
@@ -553,14 +553,14 @@ export function BusinessOsCommandCenter() {
           },
           ...(!PROMO_ONLY_MODE
             ? [
-                {
-                  id: 'stat-transactions',
-                  label: isId ? 'Transaksi aktif' : 'Active transactions',
-                  value: activeTransactions,
-                  icon: Workflow,
-                  tone: 'amber' as Tone,
-                },
-              ]
+              {
+                id: 'stat-transactions',
+                label: isId ? 'Transaksi aktif' : 'Active transactions',
+                value: activeTransactions,
+                icon: Workflow,
+                tone: 'amber' as Tone,
+              },
+            ]
             : []),
           {
             id: 'stat-content',
@@ -588,7 +588,7 @@ export function BusinessOsCommandCenter() {
               >
                 <Icon className="h-[18px] w-[18px]" />
               </span>
-              <p className="mt-3 text-[1.55rem] font-black leading-none tracking-[-0.04em] text-[color:var(--app-text)]">
+              <p className="mt-3 text-[1.55rem] font-bold leading-none tracking-[-0.04em] text-[color:var(--app-text)]">
                 {item.value}
               </p>
               <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -604,10 +604,10 @@ export function BusinessOsCommandCenter() {
           <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
                   {isId ? 'Operating system' : 'Operating system'}
                 </p>
-                <h2 className="mt-2 text-lg font-black tracking-[-0.02em] text-[color:var(--app-text)]">
+                <h2 className="mt-2 text-lg font-bold tracking-[-0.02em] text-[color:var(--app-text)]">
                   {operatingSystem.focus_lane.title}
                 </h2>
                 <p className="mt-2 text-[13px] leading-5 text-[color:var(--app-text-soft)]">
@@ -615,10 +615,10 @@ export function BusinessOsCommandCenter() {
                 </p>
               </div>
               <div className="shrink-0 rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-3 text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
                   {isId ? 'Skor' : 'Score'}
                 </p>
-                <p className="mt-1 text-3xl font-black tracking-[-0.06em] text-[color:var(--app-text)]">
+                <p className="mt-1 text-3xl font-bold tracking-[-0.06em] text-[color:var(--app-text)]">
                   {operatingSystem.health_score}
                 </p>
               </div>
@@ -649,14 +649,14 @@ export function BusinessOsCommandCenter() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <span
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black ${relationPriorityClass(relation.priority)}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold ${relationPriorityClass(relation.priority)}`}
                       >
                         <GitBranch className="h-3.5 w-3.5" />
                         {relation.from}
                         {' -> '}
                         {relation.to}
                       </span>
-                      <h3 className="mt-2 text-sm font-black text-[color:var(--app-text)]">
+                      <h3 className="mt-2 text-sm font-bold text-[color:var(--app-text)]">
                         {relation.title}
                       </h3>
                       <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -674,7 +674,7 @@ export function BusinessOsCommandCenter() {
             <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
                     AI + automation
                   </p>
                   <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
@@ -694,7 +694,7 @@ export function BusinessOsCommandCenter() {
                       href={action.href}
                       className="block rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
                     >
-                      <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                      <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
                         <Bot className="h-4 w-4 text-[color:var(--app-accent)]" />
                         {action.title}
                       </p>
@@ -711,7 +711,7 @@ export function BusinessOsCommandCenter() {
                       href={action.href}
                       className="block rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
                     >
-                      <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                      <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
                         <Workflow className="h-4 w-4 text-[color:var(--app-accent)]" />
                         {action.title}
                       </p>
@@ -726,7 +726,7 @@ export function BusinessOsCommandCenter() {
 
             <section className="grid gap-5 lg:grid-cols-2">
               <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
-                <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
                   <ShieldCheck className="h-4 w-4 text-[color:var(--app-accent)]" />
                   {isId ? 'Trust guardrail' : 'Trust guardrail'}
                 </p>
@@ -736,7 +736,7 @@ export function BusinessOsCommandCenter() {
                       key={item.id}
                       className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
                     >
-                      <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                      <p className="text-[13px] font-bold text-[color:var(--app-text)]">
                         {item.title}
                       </p>
                       <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -748,7 +748,7 @@ export function BusinessOsCommandCenter() {
               </article>
 
               <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
-                <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
                   <Database className="h-4 w-4 text-[color:var(--app-accent)]" />
                   {isId ? 'Data flow' : 'Data flow'}
                 </p>
@@ -758,7 +758,7 @@ export function BusinessOsCommandCenter() {
                       key={item.id}
                       className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
                     >
-                      <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                      <p className="text-[13px] font-bold text-[color:var(--app-text)]">
                         {item.source}
                       </p>
                       <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -772,7 +772,7 @@ export function BusinessOsCommandCenter() {
 
             {operatingSystem.retention_loops.length > 0 ? (
               <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
-                <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+                <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
                   <RotateCcw className="h-4 w-4 text-[color:var(--app-accent)]" />
                   {isId ? 'Retention loop' : 'Retention loop'}
                 </p>
@@ -782,7 +782,7 @@ export function BusinessOsCommandCenter() {
                       key={loop.id}
                       className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3"
                     >
-                      <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                      <p className="text-[13px] font-bold text-[color:var(--app-text)]">
                         {loop.title}
                       </p>
                       <p className="mt-1 line-clamp-3 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -800,7 +800,7 @@ export function BusinessOsCommandCenter() {
       <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               {isId ? 'Perlu ditindak dulu' : 'Needs attention first'}
             </p>
             <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
@@ -880,7 +880,7 @@ export function BusinessOsCommandCenter() {
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               {isId ? 'Buka cepat' : 'Quick access'}
             </p>
             <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
@@ -922,7 +922,7 @@ export function BusinessOsCommandCenter() {
 
         <article className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_46px_-36px_rgba(15,23,42,0.22)] sm:p-5">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               {isId ? 'Langkah berikutnya' : 'Next steps'}
             </p>
             <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
@@ -942,7 +942,7 @@ export function BusinessOsCommandCenter() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                         {flow.status}
                       </p>
                       <h3 className="mt-1 text-sm font-bold text-[color:var(--app-text)]">

@@ -31,7 +31,7 @@ export function DetailMobileTopBar({
     <>
       <header
         className={cn(
-          'ui-layer-mobile-topbar fixed inset-x-0 top-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2.5 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_14px_28px_-26px_rgba(15,23,42,0.26)] backdrop-blur-xl lg:hidden dark:border-[color:var(--app-border-strong)]',
+          'ui-layer-mobile-topbar fixed inset-x-0 top-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2.5 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_14px_28px_-26px_rgba(15,23,42,0.26)]  lg:hidden dark:border-[color:var(--app-border-strong)]',
           className,
         )}
       >
@@ -47,11 +47,11 @@ export function DetailMobileTopBar({
 
           <div className="min-w-0 text-center">
             {eyebrow ? (
-              <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+              <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                 {eyebrow}
               </p>
             ) : null}
-            <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+            <p className="truncate text-sm font-bold text-[color:var(--app-text)] dark:text-white">
               {title}
             </p>
           </div>

@@ -184,6 +184,8 @@ type TypeConfigMeta = {
   stepsId: [string];
   stepsEn: [string];
   step1Keys: string[];
+  step2HintId?: string;
+  step2HintEn?: string;
 };
 
 const TYPE_CONFIG: Record<ListingTypeId, TypeConfigMeta> = {
@@ -566,7 +568,7 @@ function CreateEntryActionCard({ item }: { item: CreateEntryAction }) {
         <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
       </span>
       <span className="mt-2.5 block">
-        <span className="line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
+        <span className="line-clamp-2 block text-[13px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[14px]">
           {item.title}
         </span>
         <span className="mt-1 block line-clamp-2 text-[10.5px] leading-4 text-[color:var(--app-text-soft)] sm:text-[11px] sm:leading-5">
@@ -636,10 +638,10 @@ function CreateFormSectionCard({
     >
       <div className="relative flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/70 pb-2 dark:border-slate-800/70">
         <div className="min-w-0">
-          <p className="text-[9px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+          <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
             {eyebrow}
           </p>
-          <h2 className="mt-0.5 text-[15px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h2 className="mt-0.5 text-[15px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {title}
           </h2>
           <p className="mt-0.5 hidden line-clamp-1 max-w-2xl text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:block">
@@ -701,10 +703,10 @@ function CreateChoiceCard({
         <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
       </span>
       <span className="mt-auto block min-w-0">
-        <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
+        <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
           {badge}
         </span>
-        <span className="mt-1 line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
+        <span className="mt-1 line-clamp-2 block text-[13px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[14px]">
           {title}
         </span>
         <span className="mt-1 hidden line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] min-[420px]:block">
@@ -712,7 +714,7 @@ function CreateChoiceCard({
         </span>
         {example ? (
           <span className="mt-2 block rounded-[12px] bg-white/78 px-2.5 py-1.5 text-[10.5px] font-semibold leading-4 text-[color:var(--app-text)] ring-1 ring-white/80 dark:bg-slate-950/48 dark:ring-white/10 sm:text-[11px]">
-            <span className="font-black text-[color:var(--app-accent)]">
+            <span className="font-bold text-[color:var(--app-accent)]">
               {example.startsWith('Example:')
                 ? 'Example:'
                 : example.startsWith('Contoh:')
@@ -975,6 +977,36 @@ function getFieldExample(
   if (key === 'title') {
     return getQuickCreateExamples(type, locale, listingSide)[0] || null;
   }
+  if (key === 'summary') {
+    if (type === 'business_transfer') {
+      return isId
+        ? 'Usaha berjalan, omzet stabil, aset siap dicek, alasan ditawarkan jelas.'
+        : 'Running business with stable revenue, verifiable assets, and a clear reason for sale.';
+    }
+    if (listingSide === 'demand' && type === 'product') {
+      return isId
+        ? 'Cari supplier sembako dengan qty fleksibel, harga grosir, dan kirim rutin ke toko.'
+        : 'Need a grocery supplier with flexible minimum quantity, wholesale pricing, and recurring delivery.';
+    }
+    if (listingSide === 'demand' && type === 'service') {
+      return isId
+        ? 'Cari jasa atau channel operasional seperti host live, reseller aktif, admin marketplace, atau vendor eksekusi dengan output jelas.'
+        : 'Need an operations or channel partner such as live hosts, active resellers, marketplace admins, or an execution vendor with clear output.';
+    }
+    if (listingSide === 'demand' && type === 'property') {
+      return isId
+        ? 'Cari booth, kios, atau ruko yang cocok untuk channel jualan dan budget bisnis.'
+        : 'Looking for a booth, kiosk, or shophouse that fits the sales channel and budget.';
+    }
+    if (listingSide === 'demand' && type === 'job') {
+      return isId
+        ? 'Cari talent untuk closing, konten, operasional.'
+        : 'Need talent who can immediately support sales, content, or day-to-day operations.';
+    }
+    return isId
+      ? 'Singkat. Jelas. Benefit utama.'
+      : 'Keep it short, clear, and focused on the main benefit.';
+  }
   if (key.includes('summary')) {
     if (type === 'business_transfer') {
       return isId
@@ -1210,9 +1242,9 @@ function getFieldExample(
         ? 'oper usaha, usaha berjalan, laundry, handover'
         : 'business transfer, running business, laundry, handover';
     }
-      return isId
-        ? 'supplier, sembako, area kirim'
-        : 'supplier, groceries, delivery area';
+    return isId
+      ? 'supplier, sembako, area kirim'
+      : 'supplier, groceries, delivery area';
   }
   if (
     key.includes('portfolio') ||
@@ -1235,6 +1267,16 @@ function getFieldHelperHint(
 
   if (key === 'title') {
     return isId ? 'Tulis singkat dan jelas.' : 'Keep it short and clear.';
+  }
+  if (key === 'summary') {
+    return isId
+      ? 'Taruh nilai utama, area, dan konteks yang paling dicari.'
+      : 'Include the main value, area, and the most relevant context.';
+  }
+  if (key === 'body' || key === 'description') {
+    return isId
+      ? 'Isi yang wajib jelas: spesifikasi, alur, syarat, dan batasan.'
+      : 'Cover the essentials: specs, process, requirements, and limits.';
   }
 
   if (
@@ -1270,6 +1312,41 @@ function getFieldHelperHint(
     return isId
       ? 'Pilih kota dulu, lalu tambah area atau alamat detailnya.'
       : 'Start with the city, then add the area or full address.';
+  }
+  if (key === 'sku' || key === 'asset_identity_code') {
+    return isId
+      ? 'Gunakan kode internal atau nomor seri yang mudah dicek.'
+      : 'Use an internal code or serial number that can be verified.';
+  }
+  if (key === 'stock' || key === 'openings' || key === 'business_age_months') {
+    return isId
+      ? 'Pakai angka yang realistis dan bisa dicek.'
+      : 'Use a realistic number that can be verified.';
+  }
+  if (key === 'minimum_order' || key === 'min_order_qty') {
+    return isId
+      ? 'Tulis minimum order yang benar-benar bisa dilayani.'
+      : 'Write the minimum order you can actually fulfill.';
+  }
+  if (key === 'service_scope' || key === 'deliverables') {
+    return isId
+      ? 'Semakin konkret, semakin mudah dicocokkan.'
+      : 'The more concrete it is, the easier it is to match.';
+  }
+  if (key === 'responsibilities') {
+    return isId
+      ? 'Tulis 3-5 tanggung jawab utama yang paling penting.'
+      : 'Write the 3-5 most important core responsibilities.';
+  }
+  if (key === 'included_assets' || key === 'handover_items') {
+    return isId
+      ? 'Tuliskan item satu per satu supaya jelas yang ikut apa saja.'
+      : 'List items one by one so everyone knows what is included.';
+  }
+  if (key === 'liabilities_note' || key === 'handover_risks') {
+    return isId
+      ? 'Jujur soal risiko supaya review dan publish tidak tertahan.'
+      : 'Be transparent so review and publishing do not get blocked.';
   }
 
   if (key === 'company_name') {
@@ -3579,7 +3656,7 @@ export function CreatePostingClient({
         <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
                 {locale === 'id' ? 'Foto utama' : 'Primary photo'}
               </p>
               <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)]">
@@ -3588,7 +3665,7 @@ export function CreatePostingClient({
                   : 'Upload the main photo first. This is what people see first.'}
               </p>
             </div>
-            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
+            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
               {images.length > 0
                 ? locale === 'id'
                   ? `${images.length} foto`
@@ -3607,7 +3684,7 @@ export function CreatePostingClient({
                 }}
               />
               <div className="min-w-0">
-                <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+                <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
                   {locale === 'id' ? 'Foto terpilih' : 'Selected photo'}
                 </p>
                 <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -4509,17 +4586,17 @@ export function CreatePostingClient({
               <card.Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
             </span>
             <span className="mt-auto block min-w-0">
-              <span className="text-[9px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
+              <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)] sm:text-[10px] sm:tracking-[0.12em]">
                 {card.badge}
               </span>
-              <span className="mt-1 line-clamp-2 block text-[13px] font-black leading-tight text-[color:var(--app-text)] sm:text-[14px]">
+              <span className="mt-1 line-clamp-2 block text-[13px] font-bold leading-tight text-[color:var(--app-text)] sm:text-[14px]">
                 {card.title}
               </span>
               <span className="mt-1 hidden line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)] min-[420px]:block">
                 {card.description}
               </span>
               <span className="mt-2 block rounded-[12px] bg-white/78 px-2.5 py-1.5 text-[10.5px] font-semibold leading-4 text-[color:var(--app-text)] ring-1 ring-white/80 dark:bg-slate-950/48 dark:ring-white/10 sm:text-[11px]">
-                <span className="font-black text-[color:var(--app-accent)]">
+                <span className="font-bold text-[color:var(--app-accent)]">
                   {locale === 'id' ? 'Contoh:' : 'Example:'}
                 </span>{' '}
                 {card.example.replace(/^(Contoh:|Example:)\s*/i, '')}
@@ -4611,7 +4688,7 @@ export function CreatePostingClient({
     return (
       <div className="mx-auto w-full max-w-none px-0 py-0">
         <CreateHeroShell className="border-emerald-100/90 bg-[linear-gradient(180deg,#ffffff_0%,#f7fff9_100%)] p-3 shadow-[0_20px_44px_-38px_rgba(15,23,42,0.22)] sm:p-5 lg:p-5 dark:border-emerald-900/40 dark:bg-[color:var(--app-surface-strong)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="hidden md:flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <button
                 type="button"
@@ -4622,10 +4699,10 @@ export function CreatePostingClient({
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
                   {locale === 'id' ? 'Buat Baru' : 'Create'}
                 </p>
-                <h1 className="truncate text-[1.1rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.3rem]">
+                <h1 className="truncate text-[1.1rem] font-bold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.3rem]">
                   {topTitle ??
                     (activeIntent === 'supply'
                       ? locale === 'id'
@@ -4651,10 +4728,10 @@ export function CreatePostingClient({
             <section className="min-w-0">
               {/* <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="inline-flex rounded-full border border-[color:var(--app-accent-border)] bg-white/88 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] shadow-sm">
+                  <p className="inline-flex rounded-full border border-[color:var(--app-accent-border)] bg-white/88 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)] shadow-sm">
                     {eyebrow}
                   </p>
-                  <h2 className="mt-2 text-[1.25rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.75rem]">
+                  <h2 className="mt-2 text-[1.25rem] font-bold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.75rem]">
                     {title}
                   </h2>
                   <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]">
@@ -4691,7 +4768,7 @@ export function CreatePostingClient({
                           <TabIcon className="h-4 w-4" />
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate font-black">
+                          <span className="block truncate font-bold">
                             {tab.label}
                           </span>
                           <span
@@ -4740,17 +4817,17 @@ export function CreatePostingClient({
   const industryPickerLayer =
     showSectorPicker && isSectorPickerOpen ? (
       <div
-        className="ui-layer-modal fixed inset-0 bg-slate-950/50 px-3 py-4 backdrop-blur-sm sm:p-6"
+        className="ui-layer-modal fixed inset-0 bg-slate-950/50 px-3 py-4  sm:p-6"
         onClick={() => setIsSectorPickerOpen(false)}
       >
         <div className="flex h-full items-end justify-center sm:items-center">
           <div
-            className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_26px_60px_-34px_rgba(15,23,42,0.28)] backdrop-blur-xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+            className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_26px_60px_-34px_rgba(15,23,42,0.28)]  dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             onClick={event => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-slate-200/75 px-3.5 py-3.5 dark:border-slate-800/70">
               <div className="min-w-0">
-                <p className="inline-flex rounded-full border border-teal-200/70 bg-white/85 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-teal-700 shadow-[0_16px_24px_-20px_rgba(20,184,166,0.34)] dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
+                <p className="inline-flex rounded-full border border-teal-200/70 bg-white/85 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-teal-700 shadow-[0_16px_24px_-20px_rgba(20,184,166,0.34)] dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
                   {locale === 'id'
                     ? 'Spesialisasi industri'
                     : 'Industry specialization'}
@@ -4769,7 +4846,7 @@ export function CreatePostingClient({
               <button
                 type="button"
                 onClick={() => setIsSectorPickerOpen(false)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/80 text-[color:var(--app-text)] shadow-[0_16px_24px_-20px_rgba(15,23,42,0.2)] backdrop-blur-sm dark:border-slate-800/70 dark:bg-slate-950/55"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/80 text-[color:var(--app-text)] shadow-[0_16px_24px_-20px_rgba(15,23,42,0.2)]  dark:border-slate-800/70 dark:bg-slate-950/55"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -7130,6 +7207,8 @@ export function CreatePostingClient({
       (f.kind === 'select' ||
         f.kind === 'date' ||
         f.kind === 'url' ||
+        f.kind === 'multiline' ||
+        f.kind === 'number' ||
         lowerKey.startsWith('promo_') ||
         lowerKey === 'title' ||
         lowerKey === 'summary' ||
@@ -7146,7 +7225,7 @@ export function CreatePostingClient({
         key={f.key}
         className={cn('space-y-1.5', isWide ? 'lg:col-span-2' : undefined)}
       >
-        <label className="block text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+        <label className="block text-[12px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
           <span className="inline-flex min-w-0 items-center gap-1">
             <span className="min-w-0 truncate">{meta.label}</span>
             {isRequired ? (
@@ -7215,10 +7294,10 @@ export function CreatePostingClient({
                   <Store className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                  <span className="rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
                     {locale === 'id' ? 'Saya menawarkan' : 'I offer'}
                   </span>
-                  <span className="mt-3 block text-[1.15rem] font-black leading-tight text-[color:var(--app-text)] dark:text-white">
+                  <span className="mt-3 block text-[1.15rem] font-bold leading-tight text-[color:var(--app-text)] dark:text-white">
                     {locale === 'id' ? 'Tawarkan sesuatu' : 'Want to sell'}
                   </span>
                   <span className="mt-1.5 block text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -7249,7 +7328,7 @@ export function CreatePostingClient({
                   </span>
                 ))}
               </div>
-              <span className="mt-4 inline-flex min-h-9 items-center justify-center gap-2 rounded-full bg-emerald-600 px-3.5 text-[12px] font-black text-white transition group-hover:bg-emerald-700">
+              <span className="mt-4 inline-flex min-h-9 items-center justify-center gap-2 rounded-full bg-emerald-600 px-3.5 text-[12px] font-bold text-white transition group-hover:bg-emerald-700">
                 {locale === 'id' ? 'Mulai tawarkan' : 'Start selling'}
                 <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </span>
@@ -7263,10 +7342,10 @@ export function CreatePostingClient({
                   <Target className="h-5 w-5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="rounded-full border border-amber-200 bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700">
+                  <span className="rounded-full border border-amber-200 bg-white/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-700">
                     {locale === 'id' ? 'Saya mencari' : 'I need'}
                   </span>
-                  <span className="mt-3 block text-[1.15rem] font-black leading-tight text-[color:var(--app-text)] dark:text-white">
+                  <span className="mt-3 block text-[1.15rem] font-bold leading-tight text-[color:var(--app-text)] dark:text-white">
                     {locale === 'id'
                       ? 'Cari kebutuhan usaha'
                       : 'Need something'}
@@ -7299,7 +7378,7 @@ export function CreatePostingClient({
                   </span>
                 ))}
               </div>
-              <span className="mt-4 inline-flex min-h-9 items-center justify-center gap-2 rounded-full bg-amber-500 px-3.5 text-[12px] font-black text-white transition group-hover:bg-amber-600">
+              <span className="mt-4 inline-flex min-h-9 items-center justify-center gap-2 rounded-full bg-amber-500 px-3.5 text-[12px] font-bold text-white transition group-hover:bg-amber-600">
                 {locale === 'id' ? 'Mulai cari' : 'Create request'}
                 <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </span>
@@ -7309,7 +7388,7 @@ export function CreatePostingClient({
           <div className="mt-4 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/45">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[12px] font-black text-[color:var(--app-text)]">
+                <p className="text-[12px] font-bold text-[color:var(--app-text)]">
                   {locale === 'id'
                     ? 'Langsung pilih yang paling mirip'
                     : 'Pick the closest shortcut'}
@@ -7320,7 +7399,7 @@ export function CreatePostingClient({
                     : 'You can still edit before publishing.'}
                 </p>
               </div>
-              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
+              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
                 {locale === 'id' ? 'Mode ringkas' : 'Compact mode'}
               </span>
             </div>
@@ -7345,7 +7424,7 @@ export function CreatePostingClient({
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/55 dark:text-emerald-200">
               <ClipboardList className="h-4 w-4" />
             </span>
-            <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+            <p className="mt-2 text-[13px] font-bold text-[color:var(--app-text)]">
               {locale === 'id' ? 'Alurnya simpel' : 'Simple flow'}
             </p>
             <div className="mt-2 grid gap-2">
@@ -7365,7 +7444,7 @@ export function CreatePostingClient({
                   key={item}
                   className="flex items-start gap-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]"
                 >
-                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-black text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-900">
                     {index + 1}
                   </span>
                   {item}
@@ -7374,7 +7453,7 @@ export function CreatePostingClient({
             </div>
           </div>
           <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
-            <p className="text-[13px] font-black text-[color:var(--app-text)]">
+            <p className="text-[13px] font-bold text-[color:var(--app-text)]">
               {locale === 'id'
                 ? 'Proses cepat & aman'
                 : 'Fast and safe process'}
@@ -7470,7 +7549,7 @@ export function CreatePostingClient({
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/55 dark:text-emerald-200">
               <Store className="h-4 w-4" />
             </span>
-            <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+            <p className="mt-2 text-[13px] font-bold text-[color:var(--app-text)]">
               {locale === 'id' ? 'Ingin menawarkan?' : 'Want to offer?'}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -7491,7 +7570,7 @@ export function CreatePostingClient({
             </Link>
           </div>
           <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
-            <p className="text-[13px] font-black text-[color:var(--app-text)]">
+            <p className="text-[13px] font-bold text-[color:var(--app-text)]">
               {locale === 'id' ? 'Biar cepat dibalas' : 'Get faster replies'}
             </p>
             <div className="mt-2 grid gap-1.5">
@@ -7547,7 +7626,7 @@ export function CreatePostingClient({
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/55 dark:text-emerald-200">
               <ClipboardList className="h-4 w-4" />
             </span>
-            <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+            <p className="mt-2 text-[13px] font-bold text-[color:var(--app-text)]">
               {locale === 'id' ? 'Yang dicari orang' : 'What buyers need'}
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -7561,7 +7640,7 @@ export function CreatePostingClient({
             </p>
           </div>
           <div className="rounded-[14px] bg-white/80 p-3 ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/45 dark:ring-[color:var(--app-border-strong)]">
-            <p className="text-[13px] font-black text-[color:var(--app-text)]">
+            <p className="text-[13px] font-bold text-[color:var(--app-text)]">
               {locale === 'id' ? 'Tips singkat' : 'Quick tips'}
             </p>
             <div className="mt-2 grid gap-1.5">
@@ -7674,7 +7753,7 @@ export function CreatePostingClient({
               {errorDetails.slice(0, 6).map(detail => (
                 <span
                   key={detail}
-                  className="rounded-full border border-[color:var(--app-danger-border)] bg-[color:var(--app-surface-strong)]/88 px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-danger)] backdrop-blur-sm"
+                  className="rounded-full border border-[color:var(--app-danger-border)] bg-[color:var(--app-surface-strong)]/88 px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-danger)] "
                 >
                   {detail}
                 </span>
@@ -7712,7 +7791,7 @@ export function CreatePostingClient({
         <div className="space-y-3">
           {showStepOneSetupCard && (
             <details className="rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-2 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/35">
-              <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 rounded-[12px] px-1 text-left text-[12px] font-black text-[color:var(--app-text)] [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 rounded-[12px] px-1 text-left text-[12px] font-bold text-[color:var(--app-text)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0 truncate">
                   {locale === 'id' ? 'Opsi lanjutan' : 'Advanced options'}
                 </span>
@@ -7725,7 +7804,7 @@ export function CreatePostingClient({
                   <section className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.22)] dark:border-[color:var(--app-border-strong)]">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                       <div className="min-w-0">
-                        <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                           {locale === 'id' ? 'Arah posting' : 'Post direction'}
                         </p>
                         <p className="truncate text-xs font-medium text-[color:var(--app-text)]">
@@ -7760,7 +7839,7 @@ export function CreatePostingClient({
                             <Target className="h-4 w-4" />
                           )}
                         </span>
-                        <span className="min-w-0 text-[13px] font-black leading-4">
+                        <span className="min-w-0 text-[13px] font-bold leading-4">
                           <span className="line-clamp-2">
                             {demandActionTitle}
                           </span>
@@ -7787,7 +7866,7 @@ export function CreatePostingClient({
                             <Sparkles className="h-4 w-4" />
                           )}
                         </span>
-                        <span className="min-w-0 text-[13px] font-black leading-4">
+                        <span className="min-w-0 text-[13px] font-bold leading-4">
                           <span className="line-clamp-2">
                             {supplyActionTitle}
                           </span>
@@ -7926,7 +8005,7 @@ export function CreatePostingClient({
                           : `${requiredDone}/${requiredFields.length} required`}
                     </span>
                     {supportsSimpleMode ? (
-                      <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-black text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+                      <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
                         {isSimpleModeActive
                           ? locale === 'id'
                             ? 'Mode cepat'
@@ -8197,14 +8276,14 @@ export function CreatePostingClient({
             </>
           )}
 
-          {/* Step 4: promotion setup */}
+          {/* Step 4: additional info / promotion */}
           {currentStep === 4 && (
             <>
               <div className="rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_60%,_transparent)]">
                 <p className="text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                   {locale === 'id'
-                    ? 'Promo, opsional'
-                    : 'Optional Listing Promotion'}
+                    ? 'Informasi tambahan, opsional'
+                    : 'Additional information, optional'}
                 </p>
                 <p className="mt-1 text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                   {locale === 'id'
@@ -8608,6 +8687,202 @@ export function CreatePostingClient({
             </>
           )}
 
+          {currentStep === 5 && (
+            <CreateFormSectionCard
+              eyebrow={locale === 'id' ? 'Preview' : 'Preview'}
+              title={
+                locale === 'id'
+                  ? 'Tinjau sebelum publish'
+                  : 'Review before publish'
+              }
+              description={
+                locale === 'id'
+                  ? 'Cek ringkasan listing, media, dan status siap tayang.'
+                  : 'Double-check the listing summary, media, and publish readiness.'
+              }
+              aside={
+                <span className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-[10px] font-bold text-[color:var(--app-accent)]">
+                  {locale === 'id' ? 'Step 5 dari 6' : 'Step 5 of 6'}
+                </span>
+              }
+            >
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Ringkasan utama' : 'Core summary'}
+                      </p>
+                      <h3 className="mt-1 text-[15px] font-bold text-[color:var(--app-text)]">
+                        {sideRailTitle}
+                      </h3>
+                    </div>
+                    <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                      {listingSideContextLabel}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Lokasi' : 'Location'}
+                      </p>
+                      <p className="mt-1 text-[12px] font-semibold text-[color:var(--app-text)]">
+                        {sideRailLocation}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Harga' : 'Price'}
+                      </p>
+                      <p className="mt-1 text-[12px] font-semibold text-[color:var(--app-text)]">
+                        {sideRailPriceLabel}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2 text-[12px] leading-6 text-[color:var(--app-text-soft)]">
+                    {cleanText(fieldValues.summary) ||
+                      (locale === 'id'
+                        ? 'Ringkasan belum diisi, tapi draft tetap bisa dilanjutkan.'
+                        : 'The summary is still empty, but the draft can continue.')}
+                  </p>
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                    {locale === 'id' ? 'Siap tayang' : 'Publish readiness'}
+                  </p>
+                  <div className="space-y-2">
+                    {publishReadiness.map(item => (
+                      <div
+                        key={item.key}
+                        className="flex items-start gap-2 rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2"
+                      >
+                        <CheckCircle2
+                          className={cn(
+                            'mt-0.5 h-4 w-4 shrink-0',
+                            item.done
+                              ? 'text-[color:var(--app-accent)]'
+                              : 'text-slate-300',
+                          )}
+                        />
+                        <span className="text-[11px] leading-5 text-[color:var(--app-text)]">
+                          {locale === 'id' ? item.labelId : item.labelEn}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CreateFormSectionCard>
+          )}
+
+          {currentStep === 6 && (
+            <CreateFormSectionCard
+              eyebrow={locale === 'id' ? 'Publish' : 'Publish'}
+              title={
+                locale === 'id'
+                  ? 'Final check sebelum tayang'
+                  : 'Final check before going live'
+              }
+              description={
+                locale === 'id'
+                  ? 'Kalau semua sudah aman, tombol publish di bawah akan mengirim data ke backend.'
+                  : 'If everything looks right, the button below will send the payload to the backend.'
+              }
+              aside={
+                <span className="inline-flex items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-[10px] font-bold text-[color:var(--app-accent)]">
+                  {locale === 'id' ? 'Step 6 dari 6' : 'Step 6 of 6'}
+                </span>
+              }
+            >
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Preview final' : 'Final preview'}
+                      </p>
+                      <h3 className="mt-1 text-[15px] font-bold text-[color:var(--app-text)]">
+                        {sideRailTitle}
+                      </h3>
+                    </div>
+                    <span className="inline-flex items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
+                      {contentStatus === 'active'
+                        ? locale === 'id'
+                          ? 'Sudah tayang'
+                          : 'Live'
+                        : locale === 'id'
+                          ? 'Draft'
+                          : 'Draft'}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Foto' : 'Photos'}
+                      </p>
+                      <p className="mt-1 text-[12px] font-semibold text-[color:var(--app-text)]">
+                        {images.length > 0
+                          ? locale === 'id'
+                            ? `${images.length} foto siap`
+                            : `${images.length} photos ready`
+                          : locale === 'id'
+                            ? 'Belum ada foto'
+                            : 'No photos yet'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Dokumen' : 'Documents'}
+                      </p>
+                      <p className="mt-1 text-[12px] font-semibold text-[color:var(--app-text)]">
+                        {documents.length > 0
+                          ? locale === 'id'
+                            ? `${documents.length} dokumen`
+                            : `${documents.length} documents`
+                          : locale === 'id'
+                            ? 'Opsional'
+                            : 'Optional'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                        {locale === 'id' ? 'Progress' : 'Progress'}
+                      </p>
+                      <p className="mt-1 text-[12px] font-semibold text-[color:var(--app-text)]">
+                        {publishReadyCount}/{publishReadiness.length}{' '}
+                        {locale === 'id' ? 'siap' : 'ready'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                    {locale === 'id' ? 'Yang akan dikirim' : 'What will be sent'}
+                  </p>
+                  <div className="space-y-2">
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2 text-[11px] leading-5 text-[color:var(--app-text)]">
+                      {locale === 'id'
+                        ? 'Judul, ringkasan, body, harga, lokasi, foto, dokumen, tag, dan metadata kategori akan ikut tersimpan.'
+                        : 'Title, summary, body, price, location, photos, documents, tags, and category metadata will be saved.'}
+                    </div>
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2 text-[11px] leading-5 text-[color:var(--app-text)]">
+                      {locale === 'id'
+                        ? 'Kalau masih ada blocker, publish akan dihentikan oleh validasi backend.'
+                        : 'If any blockers remain, backend validation will stop the publish.'}
+                    </div>
+                    <div className="rounded-xl border border-[color:var(--app-border)] bg-white px-3 py-2 text-[11px] leading-5 text-[color:var(--app-text)]">
+                      {locale === 'id'
+                        ? 'Gunakan tombol Publish di bawah untuk final submit.'
+                        : 'Use the Publish button below for the final submit.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CreateFormSectionCard>
+          )}
+
           {/* {showSharePackPanel ? (
             <div className="xl:hidden">
               <CreateSharePackPanel
@@ -8618,7 +8893,7 @@ export function CreatePostingClient({
             </div>
           ) : null} */}
 
-          <div className="sticky bottom-2 z-20 grid grid-cols-[0.82fr_1.18fr] gap-2 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_18px_34px_-24px_rgba(15,23,42,0.18)] backdrop-blur-xl sm:grid-cols-[0.9fr_auto_1.25fr] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/88">
+          <div className="sticky bottom-2 z-20 grid grid-cols-[0.82fr_1.18fr] gap-2 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_18px_34px_-24px_rgba(15,23,42,0.18)]  sm:grid-cols-[0.9fr_auto_1.25fr] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/88">
             <button
               type="button"
               onClick={() => {
@@ -8631,7 +8906,7 @@ export function CreatePostingClient({
                 }
                 router.push('/create');
               }}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)] shadow-[0_16px_24px_-22px_rgba(15,23,42,0.2)] backdrop-blur-sm transition hover:bg-[color:var(--app-surface-muted)] dark:border-slate-800/70 dark:bg-slate-950/68"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)] shadow-[0_16px_24px_-22px_rgba(15,23,42,0.2)]  transition hover:bg-[color:var(--app-surface-muted)] dark:border-slate-800/70 dark:bg-slate-950/68"
             >
               <ChevronLeft className="h-4 w-4" />
               {currentStep > 1
@@ -8699,7 +8974,7 @@ export function CreatePostingClient({
           <aside className="mt-3 hidden xl:block xl:mt-0">
             <div className="sticky top-3 space-y-3">
               <div className="rounded-[14px] border border-emerald-100 bg-emerald-50/70 p-4 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.18)] dark:border-emerald-900/70 dark:bg-emerald-950/20">
-                <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                <p className="text-[13px] font-bold text-[color:var(--app-text)]">
                   {locale === 'id' ? 'Tips' : 'Tips'}
                 </p>
                 <div className="mt-3 space-y-2">
@@ -8735,7 +9010,7 @@ export function CreatePostingClient({
 
               <div className="rounded-[14px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.18)] dark:border-slate-800/75 dark:bg-[color:var(--app-surface-strong)]">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-[13px] font-black text-[color:var(--app-text)]">
+                  <p className="text-[13px] font-bold text-[color:var(--app-text)]">
                     {locale === 'id' ? 'Ikhtisar' : 'Summary'}
                   </p>
                   <button
@@ -8753,7 +9028,7 @@ export function CreatePostingClient({
                     <ActiveTypeIcon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate text-[13px] font-black text-[color:var(--app-text)]">
+                    <p className="truncate text-[13px] font-bold text-[color:var(--app-text)]">
                       {sideRailTitle}
                     </p>
                     <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-accent)]">
@@ -8787,7 +9062,7 @@ export function CreatePostingClient({
 
               {topPublishBlockers.length > 0 ? (
                 <div className="rounded-[14px] border border-amber-200 bg-amber-50/80 p-4 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.18)] dark:border-amber-900 dark:bg-amber-950/20">
-                  <p className="text-[13px] font-black text-amber-800 dark:text-amber-200">
+                  <p className="text-[13px] font-bold text-amber-800 dark:text-amber-200">
                     {locale === 'id'
                       ? 'Prioritas sekarang'
                       : 'Priority right now'}

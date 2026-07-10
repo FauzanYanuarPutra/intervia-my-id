@@ -89,7 +89,7 @@ export default function LoginClient() {
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
-    router.replace(callbackUrl || `/${locale}/dashboard`);
+    router.replace(callbackUrl || `/${locale}/profile`);
     router.refresh();
   }, [authLoading, callbackUrl, isAuthenticated, locale, router]);
 
@@ -106,7 +106,7 @@ export default function LoginClient() {
         otpToken,
         otpType: 'email',
         otpTarget: normalizedEmail,
-        redirectTo: callbackUrl || `/${locale}/dashboard`,
+        redirectTo: callbackUrl || `/${locale}/profile`,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : undefined;
@@ -195,7 +195,7 @@ export default function LoginClient() {
   };
 
   const googleHref = `/api/auth/google?callbackUrl=${encodeURIComponent(
-    callbackUrl || `/${locale}/dashboard`,
+    callbackUrl || `/${locale}/profile`,
   )}`;
 
   const inputClass =
@@ -227,7 +227,7 @@ export default function LoginClient() {
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <a
           href={googleHref}
-          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-strong)]"
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-strong)]"
         >
           <svg width="24" height="24" viewBox="-0.5 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg">
 
@@ -260,7 +260,7 @@ export default function LoginClient() {
 
         <div className="flex items-center gap-3">
           <span className="h-px flex-1 bg-[color:var(--app-border)]" />
-          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
             {isId ? 'atau' : 'or'}
           </span>
           <span className="h-px flex-1 bg-[color:var(--app-border)]" />
@@ -278,7 +278,7 @@ export default function LoginClient() {
         </div>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             Username
           </span>
           <span className="relative block">
@@ -302,7 +302,7 @@ export default function LoginClient() {
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             Password
           </span>
           <span className="relative block">
@@ -331,7 +331,7 @@ export default function LoginClient() {
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             Email OTP
           </span>
           <span className="relative block">
@@ -370,7 +370,7 @@ export default function LoginClient() {
             type="button"
             onClick={sendEmailOtp}
             disabled={sendingOtp || !normalizedEmail.includes('@') || otpCooldownLeft > 0}
-            className="inline-flex min-h-[48px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
+            className="inline-flex min-h-[48px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
           >
             {sendingOtp
               ? 'SEND...'
@@ -386,7 +386,7 @@ export default function LoginClient() {
           type="button"
           onClick={verifyEmailOtp}
           disabled={verifyingOtp || otp.length !== 6 || !normalizedEmail.includes('@') || Boolean(otpToken)}
-          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-black text-[color:var(--app-accent-strong)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_70%,white_30%)] disabled:cursor-not-allowed disabled:border-[color:var(--app-border)] disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]"
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-bold text-[color:var(--app-accent-strong)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_70%,white_30%)] disabled:cursor-not-allowed disabled:border-[color:var(--app-border)] disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]"
         >
           {verifyingOtp ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -417,7 +417,7 @@ export default function LoginClient() {
         <button
           type="submit"
           disabled={!canSubmit || submitting}
-          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_-24px_rgba(0,128,64,0.75)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] disabled:shadow-none"
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_-24px_rgba(0,128,64,0.75)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] disabled:shadow-none"
         >
           {submitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />

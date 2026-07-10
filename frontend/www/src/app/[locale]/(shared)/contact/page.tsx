@@ -13,7 +13,7 @@ import {
 export const metadata: Metadata = {
   title: 'Hubungi Kami | Lajukan',
   description:
-    'Kontak cepat untuk supplier, transaksi, dan usaha.',
+    'Kontak resmi Lajukan untuk bantuan akun, posting, pencarian supplier, dan verifikasi usaha.',
   keywords: [
     'hubungi laju',
     'kontak',
@@ -40,18 +40,18 @@ export default async function ContactPage({ params }: PageProps) {
       href: 'mailto:support@lajukan.com?subject=Support%20Lajukan',
       title: isId ? 'Email support' : 'Email support',
       desc: isId
-        ? 'Supplier, transaksi, usaha.'
-        : 'For supplier, transaction, and business operation tickets.',
+        ? 'Untuk bantuan akun, posting, pencarian supplier, dan verifikasi usaha.'
+        : 'For account, posting, supplier search, and business verification help.',
       meta: 'support@lajukan.com',
       icon: Mail,
       external: true,
     },
     {
       href: businessPhoneHref,
-      title: isId ? 'Hotline' : 'Hotline',
+      title: isId ? 'Telepon resmi' : 'Official phone',
       desc: isId
-        ? 'Kontak bisnis resmi untuk bantuan akun, listing, pembayaran, dan verifikasi.'
-        : 'For urgent issues, quick verification, and sensitive cases.',
+        ? 'Kontak bisnis resmi untuk bantuan penting dan verifikasi.'
+        : 'Official business contact for important help and verification.',
       meta: businessPhone,
       icon: Phone,
       external: true,
@@ -60,8 +60,8 @@ export default async function ContactPage({ params }: PageProps) {
       href: businessWhatsappHref,
       title: 'WhatsApp',
       desc: isId
-        ? 'Jalur cepat untuk tanya status listing, order, pembayaran, atau kerja sama.'
-        : 'Fast path for listing, order, payment, or partnership questions.',
+        ? 'Jalur cepat untuk tanya status listing, pencarian supplier, atau kerja sama.'
+        : 'Fast path for listing, supplier search, or partnership questions.',
       meta: businessPhone,
       icon: MessageCircle,
       external: true,
@@ -70,7 +70,7 @@ export default async function ContactPage({ params }: PageProps) {
       href: '/chat',
       title: isId ? 'Live chat' : 'Live chat',
       desc: isId
-        ? 'Langsung chat.'
+        ? 'Buka chat untuk bantuan akun dan aktivitas di Lajukan.'
         : 'Talk directly with the Lajukan operations team.',
       meta: isId ? 'Buka chat' : 'Open chat',
       icon: MessageCircle,
@@ -85,12 +85,12 @@ export default async function ContactPage({ params }: PageProps) {
           {isId ? 'Pusat kontak' : 'Contact center'}
         </p>
         <h1 className="ui-page-title mt-2">
-          {isId ? 'Butuh bantuan?' : 'Need help? Pick the fastest path.'}
+          {isId ? 'Butuh bantuan?' : 'Need help?'}
         </h1>
         <p className="ui-page-copy mt-2">
           {isId
-            ? 'Pilih jalur. Tulis singkat.'
-            : 'Start from the closest context: suppliers, transactions, storefronts, or trust. Keep it short so the team can act quickly.'}
+            ? 'Hubungi tim Lajukan untuk bantuan akun, posting, pencarian supplier, atau verifikasi usaha.'
+            : 'Contact the Lajukan team for account, posting, supplier search, or business verification help.'}
         </p>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -101,7 +101,7 @@ export default async function ContactPage({ params }: PageProps) {
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                   <Icon className="h-4 w-4" />
                 </span>
-                <h2 className="mt-3 text-sm font-black text-[color:var(--app-text)]">{channel.title}</h2>
+                <h2 className="mt-3 text-sm font-bold text-[color:var(--app-text)]">{channel.title}</h2>
                 <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
                   {channel.desc}
                 </p>
@@ -126,27 +126,27 @@ export default async function ContactPage({ params }: PageProps) {
 
         <div className="mt-4 grid gap-3 rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-sm text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] lg:grid-cols-3">
           <div>
-            <p className="font-black text-[color:var(--app-text)]">
+            <p className="font-bold text-[color:var(--app-text)]">
               {isId ? 'Informasi bisnis' : 'Business information'}
             </p>
             <p className="mt-1 leading-6">
               {isId
-                ? 'Lajukan menyediakan discovery listing produk, jasa, supplier, lokasi usaha, komunitas, chat, dan halaman usaha.'
-                : 'Lajukan provides product, service, supplier, business-location discovery, communities, chat, and business profiles.'}
+                ? 'Lajukan membantu pengguna menemukan dan menawarkan mesin, bahan usaha, jasa, tempat usaha, serta profil usaha lokal.'
+                : 'Lajukan helps users find and offer equipment, business supplies, services, business places, and local business profiles.'}
             </p>
           </div>
           <div>
-            <p className="font-black text-[color:var(--app-text)]">
-              {isId ? 'Pembayaran' : 'Payments'}
+            <p className="font-bold text-[color:var(--app-text)]">
+              {isId ? 'Status pembayaran' : 'Payment status'}
             </p>
             <p className="mt-1 leading-6">
               {isId
-                ? 'Semua harga dan transaksi yang aktif memakai Rupiah (IDR). Pembayaran diproses dari halaman Lajukan.'
-                : 'All active prices and transactions use Indonesian Rupiah (IDR). Payments are processed from Lajukan pages.'}
+                ? 'Untuk fase beta, komunikasi utama dilakukan lewat chat langsung. Pembayaran aman di Lajukan sedang disiapkan dan akan ditandai jelas saat aktif.'
+                : 'During beta, communication mainly happens through direct chat. Secure Lajukan payments are being prepared and will be clearly marked when active.'}
             </p>
           </div>
           <div>
-            <p className="font-black text-[color:var(--app-text)]">
+            <p className="font-bold text-[color:var(--app-text)]">
               {isId ? 'Kebijakan' : 'Policies'}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">

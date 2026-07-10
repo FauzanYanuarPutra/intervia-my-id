@@ -13,11 +13,13 @@ import {
   enforceCreatorBudget,
   refundCreatorBudget,
 } from '@/lib/server/creatorBudget';
+import { listUmkmStoresForActor } from '@/lib/super-app/umkm-commerce';
 
 const MARKETPLACE_URL =
   process.env.INTERNAL_MARKETPLACE_URL ||
   process.env.MARKETPLACE_URL ||
   'http://localhost:8081';
+const MAX_LINKED_UMKM_STORES = 12;
 
 function setNestedString(
   target: Record<string, unknown>,
@@ -114,6 +116,13 @@ function normalizeContentMediaUrls(
       origin,
     );
   }
+  for (const key of ['image_urls', 'gallery_images']) {
+    if (Array.isArray(normalized[key])) {
+      normalized[key] = normalized[key].map(entry =>
+        normalizeMediaPayloadValue(entry, origin),
+      );
+    }
+  }
 
   if (
     !normalized.metadata ||
@@ -202,6 +211,152 @@ function normalizeContentMediaUrls(
   return normalized;
 }
 
+function readStringArray(value: unknown, limit: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const items: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const trimmed = entry.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    items.push(trimmed);
+    if (items.length >= limit) break;
+  }
+  return items;
+}
+
+function readRecordArray(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (entry): entry is Record<string, unknown> =>
+      Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry),
+  );
+}
+
+function readStockQty(value: unknown): number | null {
+  const number =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number(value.replace(/[^\d]/g, ''))
+        : Number.NaN;
+  if (!Number.isFinite(number) || number < 0) return null;
+  return Math.min(999_999, Math.round(number));
+}
+
+function readAvailability(value: unknown): string {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (
+    normalized === 'available' ||
+    normalized === 'limited' ||
+    normalized === 'out_of_stock' ||
+    normalized === 'preorder'
+  ) {
+    return normalized;
+  }
+  return 'available';
+}
+
+async function normalizeLinkedUmkmMetadata(
+  payload: Record<string, unknown>,
+  actorUserId: string,
+  actorEmail?: string,
+): Promise<Record<string, unknown>> {
+  const metadata =
+    payload.metadata && typeof payload.metadata === 'object' && !Array.isArray(payload.metadata)
+      ? { ...(payload.metadata as Record<string, unknown>) }
+      : null;
+  if (!metadata) return payload;
+
+  const requestedIds = readStringArray(
+    metadata.linked_umkm_store_ids,
+    MAX_LINKED_UMKM_STORES,
+  );
+  if (requestedIds.length === 0) {
+    return {
+      ...payload,
+      metadata: {
+        ...metadata,
+        linked_umkm_store_ids: undefined,
+        linked_umkm_stores: undefined,
+        primary_umkm_store_id: undefined,
+        umkm_store_inventory: undefined,
+        has_branch_specific_inventory: undefined,
+      },
+    };
+  }
+
+  const ownedStores = await listUmkmStoresForActor({
+    actorUserId,
+    actorEmail,
+    limit: 500,
+  });
+  const ownedById = new Map(ownedStores.map(store => [store.id, store]));
+  const allowedIds = requestedIds.filter(id => ownedById.has(id));
+  const rawInventory = readRecordArray(metadata.umkm_store_inventory);
+  const inventoryByStoreId = new Map(
+    rawInventory
+      .map(item => {
+        const id = typeof item.store_id === 'string' ? item.store_id.trim() : '';
+        return id ? ([id, item] as const) : null;
+      })
+      .filter((item): item is readonly [string, Record<string, unknown>] => Boolean(item)),
+  );
+
+  const linkedStores = allowedIds.map(id => {
+    const store = ownedById.get(id);
+    return {
+      id,
+      name: store?.name,
+      slug: store?.slug,
+      city: store?.city,
+      address: store?.address,
+      latitude: store?.lat,
+      longitude: store?.lng,
+      phone: store?.phone,
+      is_active: store?.is_active,
+      online_order_enabled: store?.online_order_enabled,
+      offline_order_enabled: store?.offline_order_enabled,
+    };
+  });
+  const inventory = allowedIds.map(id => {
+    const store = ownedById.get(id);
+    const source = inventoryByStoreId.get(id) || {};
+    return {
+      store_id: id,
+      store_name: store?.name,
+      city: store?.city,
+      address: store?.address,
+      latitude: store?.lat,
+      longitude: store?.lng,
+      availability_status: readAvailability(source.availability_status),
+      stock_qty:
+        readAvailability(source.availability_status) === 'out_of_stock'
+          ? 0
+          : readStockQty(source.stock_qty),
+    };
+  });
+
+  return {
+    ...payload,
+    metadata: {
+      ...metadata,
+      linked_umkm_store_ids: allowedIds,
+      primary_umkm_store_id: allowedIds[0],
+      linked_umkm_stores: linkedStores,
+      umkm_store_inventory: inventory,
+      inventory_policy:
+        allowedIds.length > 1
+          ? 'branch_specific'
+          : allowedIds.length === 1
+            ? 'single_store'
+            : 'global_listing',
+      has_branch_specific_inventory: allowedIds.length > 1,
+    },
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireAuth(req);
@@ -235,7 +390,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const forwardPayload = toUpsertListingPayload(validated.payload);
+    const forwardPayload = await normalizeLinkedUmkmMetadata(
+      toUpsertListingPayload(validated.payload),
+      auth.ctx.userId,
+      auth.ctx.email,
+    );
     const trustSafetyCandidates = collectTrustSafetyCandidates(forwardPayload);
     for (const candidate of trustSafetyCandidates) {
       const safety = evaluateTrustSafety(candidate.value, {

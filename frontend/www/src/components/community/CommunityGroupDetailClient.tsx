@@ -151,14 +151,14 @@ function MemberRow({
         className="h-11 w-11 rounded-full object-cover"
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+        <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
           {member.name}
         </p>
         <p className="mt-0.5 truncate text-xs text-[color:var(--app-text-soft)]">
           {member.title || (isId ? 'Anggota komunitas' : 'Community member')}
         </p>
       </div>
-      <span className="inline-flex shrink-0 items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)]">
+      <span className="inline-flex shrink-0 items-center rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)]">
         {groupRoleLabel(member.role, isId)}
       </span>
     </article>
@@ -432,7 +432,7 @@ export default function CommunityGroupDetailClient({
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-slate-50 text-[color:var(--app-text-soft)]">
             <Users className="h-7 w-7" />
           </div>
-          <h1 className="mt-4 text-xl font-black text-[color:var(--app-text)]">
+          <h1 className="mt-4 text-xl font-bold text-[color:var(--app-text)]">
             {isId ? 'Grup tidak ditemukan' : 'Group not found'}
           </h1>
           <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -461,7 +461,7 @@ export default function CommunityGroupDetailClient({
 
   return (
     <main className="lajukan-home-compact min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
-      <div className="sticky top-0 z-30 -mx-1 mb-3 border-b border-[color:var(--app-border)] bg-white/94 px-1 py-2 backdrop-blur-xl lg:hidden">
+      <div className="sticky top-0 z-30 -mx-1 mb-3 border-b border-[color:var(--app-border)] bg-white/94 px-1 py-2  lg:hidden">
         <div className="flex items-center gap-2">
           <Link
             href="/community"
@@ -471,7 +471,7 @@ export default function CommunityGroupDetailClient({
             <ChevronLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+            <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
               {group.name}
             </p>
             <p className="truncate text-[11px] text-[color:var(--app-text-soft)]">
@@ -482,7 +482,7 @@ export default function CommunityGroupDetailClient({
             type="button"
             onClick={joinOrLeave}
             disabled={busyJoin || pending || group.viewerRole === 'owner'}
-            className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-black text-white disabled:opacity-60"
+            className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white disabled:opacity-60"
           >
             {joined ? (isId ? 'Joined' : 'Joined') : isId ? 'Gabung' : 'Join'}
           </button>
@@ -499,7 +499,7 @@ export default function CommunityGroupDetailClient({
               <ChevronLeft className="h-4 w-4" />
               {isId ? 'Komunitas' : 'Community'}
             </Link>
-            <h1 className="mt-3 text-[1.25rem] font-black leading-tight tracking-[-0.04em] text-[color:var(--app-text)]">
+            <h1 className="mt-3 text-[1.25rem] font-bold leading-tight tracking-[-0.04em] text-[color:var(--app-text)]">
               {group.name}
             </h1>
             <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -507,7 +507,7 @@ export default function CommunityGroupDetailClient({
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-[18px] bg-slate-50 p-3">
-                <p className="text-lg font-black text-[color:var(--app-text)]">
+                <p className="text-lg font-bold text-[color:var(--app-text)]">
                   {compactNumber(group.memberCount)}
                 </p>
                 <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -515,7 +515,7 @@ export default function CommunityGroupDetailClient({
                 </p>
               </div>
               <div className="rounded-[18px] bg-slate-50 p-3">
-                <p className="text-lg font-black text-[color:var(--app-text)]">
+                <p className="text-lg font-bold text-[color:var(--app-text)]">
                   {compactNumber(group.postCount)}
                 </p>
                 <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -528,7 +528,7 @@ export default function CommunityGroupDetailClient({
               onClick={joinOrLeave}
               disabled={busyJoin || pending || group.viewerRole === 'owner'}
               className={cn(
-                'mt-4 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[15px] text-sm font-black disabled:opacity-60',
+                'mt-4 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-[15px] text-sm font-bold disabled:opacity-60',
                 joined
                   ? 'border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]'
                   : 'bg-[color:var(--app-accent)] text-white',
@@ -579,7 +579,7 @@ export default function CommunityGroupDetailClient({
               )}
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.10),rgba(15,23,42,0.50))]" />
               <div className="relative z-[1] flex min-h-[136px] flex-col justify-between sm:min-h-[158px]">
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
                   <Link
                     href="/community"
                     className="rounded-full bg-white/92 px-2.5 py-1 text-[color:var(--app-accent)]"
@@ -592,10 +592,10 @@ export default function CommunityGroupDetailClient({
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-black text-[color:var(--app-accent)]">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-accent)]">
                       {groupJoinLabel(group, isId)}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text)]">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text)]">
                       {group.privacy === 'public' ? (
                         <Earth className="h-3.5 w-3.5" />
                       ) : (
@@ -604,7 +604,7 @@ export default function CommunityGroupDetailClient({
                       {groupPrivacyLabel(group, isId)}
                     </span>
                   </div>
-                  <h2 className="mt-2 max-w-2xl text-[1.65rem] font-black leading-tight tracking-[-0.05em] text-white sm:text-[2.1rem]">
+                  <h2 className="mt-2 max-w-2xl text-[1.65rem] font-bold leading-tight tracking-[-0.05em] text-white sm:text-[2.1rem]">
                     {group.name}
                   </h2>
                 </div>
@@ -621,7 +621,7 @@ export default function CommunityGroupDetailClient({
                   onClick={() => setMembersModalGroup(group)}
                   className="rounded-[16px] bg-slate-50 p-2"
                 >
-                  <span className="block text-base font-black text-[color:var(--app-text)]">
+                  <span className="block text-base font-bold text-[color:var(--app-text)]">
                     {compactNumber(group.memberCount)}
                   </span>
                   <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -629,7 +629,7 @@ export default function CommunityGroupDetailClient({
                   </span>
                 </button>
                 <div className="rounded-[16px] bg-slate-50 p-2">
-                  <span className="block text-base font-black text-[color:var(--app-text)]">
+                  <span className="block text-base font-bold text-[color:var(--app-text)]">
                     {compactNumber(group.postCount)}
                   </span>
                   <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -637,7 +637,7 @@ export default function CommunityGroupDetailClient({
                   </span>
                 </div>
                 <div className="rounded-[16px] bg-slate-50 p-2">
-                  <span className="block truncate text-xs font-black text-[color:var(--app-text)]">
+                  <span className="block truncate text-xs font-bold text-[color:var(--app-text)]">
                     {groupPostLabel(group, isId)}
                   </span>
                   <span className="block text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -648,14 +648,14 @@ export default function CommunityGroupDetailClient({
             </div>
           </section>
 
-          <nav className="sticky top-[58px] z-20 flex gap-2 overflow-x-auto rounded-[18px] border border-[color:var(--app-border)] bg-white/94 p-1.5 backdrop-blur-xl lg:top-2">
+          <nav className="sticky top-[58px] z-20 flex gap-2 overflow-x-auto rounded-[18px] border border-[color:var(--app-border)] bg-white/94 p-1.5  lg:top-2">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'min-h-[38px] flex-1 rounded-[13px] px-3 text-sm font-black transition',
+                  'min-h-[38px] flex-1 rounded-[13px] px-3 text-sm font-bold transition',
                   activeTab === tab.id
                     ? 'bg-[color:var(--app-accent)] text-white'
                     : 'text-[color:var(--app-text-soft)] hover:bg-slate-50',
@@ -732,7 +732,7 @@ export default function CommunityGroupDetailClient({
             <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-black text-[color:var(--app-text)]">
+                  <h2 className="text-base font-bold text-[color:var(--app-text)]">
                     {isId ? 'Anggota grup' : 'Group members'}
                   </h2>
                   <p className="text-xs text-[color:var(--app-text-soft)]">
@@ -742,7 +742,7 @@ export default function CommunityGroupDetailClient({
                 <button
                   type="button"
                   onClick={() => setMembersModalGroup(group)}
-                  className="inline-flex min-h-[36px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)]"
+                  className="inline-flex min-h-[36px] items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
                 >
                   {isId ? 'Lihat detail' : 'View detail'}
                 </button>
@@ -758,17 +758,17 @@ export default function CommunityGroupDetailClient({
 
           {activeTab === 'rules' ? (
             <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-              <h2 className="text-base font-black text-[color:var(--app-text)]">
+              <h2 className="text-base font-bold text-[color:var(--app-text)]">
                 {isId ? 'Aturan grup' : 'Group rules'}
               </h2>
               <div className="mt-3 space-y-2">
                 {(group.rules.length
                   ? group.rules
                   : [
-                      isId
-                        ? 'Diskusi harus relevan dengan usaha.'
-                        : 'Discussions must be relevant to business.',
-                    ]
+                    isId
+                      ? 'Diskusi harus relevan dengan usaha.'
+                      : 'Discussions must be relevant to business.',
+                  ]
                 ).map(rule => (
                   <div
                     key={rule}
@@ -785,7 +785,7 @@ export default function CommunityGroupDetailClient({
 
         <aside className="hidden min-h-0 overflow-y-auto overscroll-contain pb-6 xl:block">
           <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-            <h2 className="text-sm font-black text-[color:var(--app-text)]">
+            <h2 className="text-sm font-bold text-[color:var(--app-text)]">
               {isId ? 'Admin & moderator' : 'Admins & moderators'}
             </h2>
             <div className="mt-3 space-y-2">
@@ -803,7 +803,7 @@ export default function CommunityGroupDetailClient({
             </div>
           </section>
           <section className="mt-3 rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-            <h2 className="text-sm font-black text-[color:var(--app-text)]">
+            <h2 className="text-sm font-bold text-[color:var(--app-text)]">
               {isId ? 'Ringkas' : 'Summary'}
             </h2>
             <div className="mt-3 space-y-2 text-xs text-[color:var(--app-text)]">

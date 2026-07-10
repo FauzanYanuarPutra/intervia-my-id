@@ -22,7 +22,7 @@ export function Modal({
 }: ModalProps) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--color-surface)_50%,_transparent)] p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--color-surface)_50%,_transparent)] p-0  sm:items-center sm:p-4">
       <div
         className={cn(
           "relative flex max-h-[min(88svh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--color-surface)_95%,_transparent)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl dark:border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--color-surface)_90%,_transparent)] sm:max-h-[80svh] sm:rounded-2xl sm:p-5",

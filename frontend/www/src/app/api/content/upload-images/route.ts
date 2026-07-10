@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
       folder: 'content',
       maxBytes: IMAGE_UPLOAD_RAW_MAX_BYTES,
       minioTarget: 'content',
-      minioTimeoutMs: 2200,
+      requireMinio: true,
+      minioTimeoutMs: 15000,
     });
 
     if (uploaded.length === 0) {

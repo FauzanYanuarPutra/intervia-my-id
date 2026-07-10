@@ -97,7 +97,7 @@ type ReelsClientProps = {
   initialUploadOpen?: boolean;
 };
 
-const iconMap: Record<LajukanReel['iconKey'], LucideIcon> = {
+const iconMap: Partial<Record<LajukanReel['iconKey'] | string, LucideIcon>> = {
   supplier: BriefcaseBusiness,
   marketing: Megaphone,
   finance: WalletCards,
@@ -2649,7 +2649,7 @@ function ReelsDesktopSidebar({
           <Store className="h-5 w-5" />
         </Link>
         <div className="min-w-0">
-          <p className="truncate text-base font-black">Lajukan</p>
+          <p className="truncate text-base font-bold">Lajukan</p>
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/42">
             Reels
           </p>
@@ -2671,7 +2671,7 @@ function ReelsDesktopSidebar({
       <nav className="mt-5 space-y-1.5">
         <Link
           href={`/${locale}/home`}
-          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-black text-white/72 transition hover:bg-white/8 hover:text-white"
+          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-white/72 transition hover:bg-white/8 hover:text-white"
         >
           <Home className="h-5 w-5" />
           Beranda
@@ -2702,7 +2702,7 @@ function ReelsDesktopSidebar({
                 <ItemIcon className="h-5 w-5" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-black">
+                <span className="block truncate text-sm font-bold">
                   {item.label}
                 </span>
                 <span
@@ -2720,7 +2720,7 @@ function ReelsDesktopSidebar({
 
         <Link
           href={`/${locale}/community`}
-          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-black text-white/72 transition hover:bg-white/8 hover:text-white"
+          className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-white/72 transition hover:bg-white/8 hover:text-white"
         >
           <MessageCircle className="h-5 w-5" />
           Komunitas
@@ -2728,7 +2728,7 @@ function ReelsDesktopSidebar({
       </nav>
 
       <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-        <div className="flex items-center gap-2 text-sm font-black">
+        <div className="flex items-center gap-2 text-sm font-bold">
           <Sparkles className="h-4 w-4 text-yellow-300" />
           Lagi relevan
         </div>
@@ -2750,7 +2750,7 @@ function ReelsDesktopSidebar({
         <button
           type="button"
           onClick={onOpenUpload}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-400 px-4 text-sm font-black text-slate-950 shadow-lg shadow-emerald-400/15 transition active:scale-[0.98]"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-400 px-4 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-400/15 transition active:scale-[0.98]"
           data-testid="reels-upload-button"
         >
           <Camera className="h-4.5 w-4.5" />
@@ -2763,7 +2763,7 @@ function ReelsDesktopSidebar({
               <User className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black">{displayName}</p>
+              <p className="truncate text-sm font-bold">{displayName}</p>
               <p className="truncate text-[11px] font-semibold text-white/40">
                 Mode creator usaha
               </p>
@@ -2826,7 +2826,7 @@ function ReelsDesktopInfoSidebar({
             <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white/10">
               <Clapperboard className="h-7 w-7 text-white/60" />
             </div>
-            <p className="mt-4 text-sm font-black">Reels siap diputar</p>
+            <p className="mt-4 text-sm font-bold">Reels siap diputar</p>
             <p className="mt-1 text-xs font-semibold leading-relaxed text-white/45">
               Detail, komentar, produk, dan aksi creator tampil di panel ini.
             </p>
@@ -2869,10 +2869,10 @@ function ReelsDesktopInfoSidebar({
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-yellow-300">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-yellow-300">
               Sekarang diputar
             </p>
-            <h2 className="mt-1 truncate text-lg font-black">{reel.title}</h2>
+            <h2 className="mt-1 truncate text-lg font-bold">{reel.title}</h2>
           </div>
           <button
             type="button"
@@ -2905,11 +2905,11 @@ function ReelsDesktopInfoSidebar({
           )}
           <StudioEffectOverlay effect={studioEffect} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/14 to-black/20" />
-          <div className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-black backdrop-blur">
+          <div className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-bold ">
             {reel.tag}
           </div>
           {liveLabel && (
-            <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1.5 text-[11px] font-black text-white shadow-lg shadow-rose-950/20">
+            <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-lg shadow-rose-950/20">
               <Radio className="h-3.5 w-3.5" />
               {liveLabel}
             </div>
@@ -2920,7 +2920,7 @@ function ReelsDesktopInfoSidebar({
             className="absolute inset-0 grid place-items-center"
             aria-label="Lihat detail reels"
           >
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/18 backdrop-blur">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/18 ">
               <Play className="h-5 w-5 fill-white" />
             </span>
           </button>
@@ -2938,7 +2938,7 @@ function ReelsDesktopInfoSidebar({
             <div className="min-w-0 flex-1">
               <Link
                 href={profileHref}
-                className="block truncate text-sm font-black text-white underline-offset-4 transition hover:underline"
+                className="block truncate text-sm font-bold text-white underline-offset-4 transition hover:underline"
               >
                 {reel.creator}
               </Link>
@@ -2950,7 +2950,7 @@ function ReelsDesktopInfoSidebar({
               type="button"
               onClick={onMessageCreator}
               disabled={chatBusy}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-black text-slate-950 transition active:scale-[0.98] disabled:opacity-60"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-bold text-slate-950 transition active:scale-[0.98] disabled:opacity-60"
             >
               {chatBusy ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2964,7 +2964,7 @@ function ReelsDesktopInfoSidebar({
               onClick={onFollow}
               disabled={actionState.loading === 'follow'}
               className={cn(
-                'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-black transition active:scale-[0.98] disabled:opacity-60',
+                'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition active:scale-[0.98] disabled:opacity-60',
                 actionState.followed
                   ? 'bg-emerald-400 text-slate-950'
                   : 'bg-white/10 text-white ring-1 ring-white/10',
@@ -2988,7 +2988,7 @@ function ReelsDesktopInfoSidebar({
           <button
             type="button"
             onClick={onOpenDetail}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-xs font-black text-white/80 transition hover:bg-white/14 hover:text-white"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white/80 transition hover:bg-white/14 hover:text-white"
           >
             Buka detail penuh
             <ChevronRight className="h-3.5 w-3.5" />
@@ -2997,13 +2997,13 @@ function ReelsDesktopInfoSidebar({
 
         <div className="mt-3 grid grid-cols-3 gap-2">
           <div className="rounded-[18px] bg-white/[0.06] p-3 text-center ring-1 ring-white/10">
-            <p className="text-sm font-black">
+            <p className="text-sm font-bold">
               {formatCompactMetric(metricCount(reel, 'likes'))}
             </p>
             <p className="mt-0.5 text-[10px] font-bold text-white/42">Like</p>
           </div>
           <div className="rounded-[18px] bg-white/[0.06] p-3 text-center ring-1 ring-white/10">
-            <p className="text-sm font-black">
+            <p className="text-sm font-bold">
               {formatCompactMetric(metricCount(reel, 'comments'))}
             </p>
             <p className="mt-0.5 text-[10px] font-bold text-white/42">
@@ -3011,7 +3011,7 @@ function ReelsDesktopInfoSidebar({
             </p>
           </div>
           <div className="rounded-[18px] bg-white/[0.06] p-3 text-center ring-1 ring-white/10">
-            <p className="text-sm font-black">
+            <p className="text-sm font-bold">
               {formatCompactMetric(metricCount(reel, 'shares'))}
             </p>
             <p className="mt-0.5 text-[10px] font-bold text-white/42">Share</p>
@@ -3025,10 +3025,10 @@ function ReelsDesktopInfoSidebar({
                 <ShoppingBag className="h-6 w-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-black uppercase tracking-wide text-slate-700">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
                   Produk terkait
                 </p>
-                <h3 className="mt-1 truncate text-sm font-black">
+                <h3 className="mt-1 truncate text-sm font-bold">
                   {reel.productName}
                 </h3>
                 <p className="truncate text-xs font-bold text-slate-700">
@@ -3041,14 +3041,14 @@ function ReelsDesktopInfoSidebar({
               <button
                 type="button"
                 onClick={onOpenProduct}
-                className="rounded-2xl bg-slate-950 px-3 py-2.5 text-xs font-black text-white"
+                className="rounded-2xl bg-slate-950 px-3 py-2.5 text-xs font-bold text-white"
               >
                 Detail
               </button>
               {productHref ? (
                 <Link
                   href={productHref}
-                  className="rounded-2xl bg-white px-3 py-2.5 text-center text-xs font-black text-slate-950"
+                  className="rounded-2xl bg-white px-3 py-2.5 text-center text-xs font-bold text-slate-950"
                 >
                   Lihat produk
                 </Link>
@@ -3056,7 +3056,7 @@ function ReelsDesktopInfoSidebar({
                 <button
                   type="button"
                   onClick={onOpenProduct}
-                  className="rounded-2xl bg-white px-3 py-2.5 text-xs font-black text-slate-950"
+                  className="rounded-2xl bg-white px-3 py-2.5 text-xs font-bold text-slate-950"
                 >
                   Lihat produk
                 </button>
@@ -3065,7 +3065,7 @@ function ReelsDesktopInfoSidebar({
           </div>
         ) : (
           <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
-            <div className="flex items-center gap-2 text-sm font-black">
+            <div className="flex items-center gap-2 text-sm font-bold">
               <Info className="h-4.5 w-4.5 text-yellow-300" />
               Info bisnis
             </div>
@@ -3085,7 +3085,7 @@ function ReelsDesktopInfoSidebar({
                 type="button"
                 onClick={action.onClick}
                 className={cn(
-                  'flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] px-3 text-xs font-black transition active:scale-[0.98]',
+                  'flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] px-3 text-xs font-bold transition active:scale-[0.98]',
                   action.featured
                     ? 'bg-yellow-400 text-slate-950 shadow-lg shadow-yellow-400/10'
                     : 'bg-white/[0.07] text-white/78 ring-1 ring-white/10 hover:bg-white/12 hover:text-white',
@@ -3101,7 +3101,7 @@ function ReelsDesktopInfoSidebar({
         <div className="mt-3 rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-black">Komentar cepat</p>
+              <p className="text-sm font-bold">Komentar cepat</p>
               <p className="text-[11px] font-semibold text-white/42">
                 {formatCompactMetric(metricCount(reel, 'comments'))} komentar
               </p>
@@ -3109,7 +3109,7 @@ function ReelsDesktopInfoSidebar({
             <button
               type="button"
               onClick={onOpenComments}
-              className="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-950"
+              className="rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-950"
             >
               Buka
             </button>
@@ -3127,7 +3127,7 @@ function ReelsDesktopInfoSidebar({
                   key={comment.id}
                   className="rounded-2xl bg-white/[0.06] px-3 py-2"
                 >
-                  <p className="truncate text-[11px] font-black text-white/80">
+                  <p className="truncate text-[11px] font-bold text-white/80">
                     {comment.authorName}
                   </p>
                   <p className="mt-1 line-clamp-2 text-xs font-semibold leading-relaxed text-white/50">
@@ -3151,7 +3151,7 @@ function ReelsDesktopInfoSidebar({
           <button
             type="button"
             onClick={onOpenUpload}
-            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] bg-white text-xs font-black text-slate-950"
+            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] bg-white text-xs font-bold text-slate-950"
           >
             <Camera className="h-4.5 w-4.5" />
             Buat
@@ -3159,7 +3159,7 @@ function ReelsDesktopInfoSidebar({
           <button
             type="button"
             onClick={onOpenSearch}
-            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] bg-white/[0.07] text-xs font-black text-white/78 ring-1 ring-white/10"
+            className="flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] bg-white/[0.07] text-xs font-bold text-white/78 ring-1 ring-white/10"
           >
             <Search className="h-4.5 w-4.5" />
             Cari
@@ -3194,7 +3194,7 @@ function ReelsTopBar({
           type="button"
           onClick={handleBack}
           aria-label={locale === 'id' ? 'Kembali' : 'Back'}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-black/45 font-black text-white backdrop-blur-xl transition active:scale-[0.96]"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-black/45 font-bold text-white  transition active:scale-[0.96]"
         >
           <ArrowLeft className="h-4.5 w-4.5" />
         </button>
@@ -3204,7 +3204,7 @@ function ReelsTopBar({
             <button
               type="button"
               onClick={onOpenSearch}
-              className="inline-flex h-10 min-w-0 max-w-full items-center gap-2 rounded-full border border-white/14 bg-black/52 px-3 text-left text-xs font-black text-white/92 shadow-[0_18px_38px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl transition active:scale-[0.98] sm:px-4 sm:text-sm"
+              className="inline-flex h-10 min-w-0 max-w-full items-center gap-2 rounded-full border border-white/14 bg-black/52 px-3 text-left text-xs font-bold text-white/92 shadow-[0_18px_38px_-26px_rgba(0,0,0,0.9)]  transition active:scale-[0.98] sm:px-4 sm:text-sm"
             >
               <Search className="h-4 w-4 shrink-0" />
               <span className="truncate">{searchQuery}</span>
@@ -3213,7 +3213,7 @@ function ReelsTopBar({
           ) : (
             <nav
               aria-label="Filter reels"
-              className="inline-flex h-10 max-w-full items-center justify-center gap-0.5 rounded-full border border-white/70 bg-white/92 p-1 text-[12px] font-black text-slate-700 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.72)] ring-1 ring-black/5 backdrop-blur-xl sm:text-sm"
+              className="inline-flex h-10 max-w-full items-center justify-center gap-0.5 rounded-full border border-white/70 bg-white/92 p-1 text-[12px] font-bold text-slate-700 shadow-[0_18px_40px_-24px_rgba(0,0,0,0.72)] ring-1 ring-black/5  sm:text-sm"
             >
               {REELS_FEED_TABS.map(tab => (
                 <button
@@ -3242,7 +3242,7 @@ function ReelsTopBar({
             type="button"
             onClick={onOpenSearch}
             aria-label="Cari reels"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur-xl transition active:scale-[0.96]"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/12 bg-black/45 text-white  transition active:scale-[0.96]"
           >
             <Search className="h-4.5 w-4.5" />
           </button>
@@ -3289,11 +3289,11 @@ function ReelsEmptyState({
 
   return (
     <div className="flex h-full snap-start items-center justify-center px-5 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+6rem)] text-center">
-      <div className="w-full max-w-[320px] rounded-[28px] border border-white/10 bg-white/[0.07] p-5 text-white shadow-[0_24px_58px_-36px_rgba(0,0,0,0.85)] backdrop-blur-xl">
+      <div className="w-full max-w-[320px] rounded-[28px] border border-white/10 bg-white/[0.07] p-5 text-white shadow-[0_24px_58px_-36px_rgba(0,0,0,0.85)] ">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-950/20">
           <Clapperboard className="h-7 w-7" />
         </div>
-        <h2 className="mt-4 text-lg font-black leading-tight">
+        <h2 className="mt-4 text-lg font-bold leading-tight">
           {isId ? 'Belum ada reels untuk ditampilkan' : 'No reels to show yet'}
         </h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-white/62">
@@ -3305,7 +3305,7 @@ function ReelsEmptyState({
           <button
             type="button"
             onClick={onUpload}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-rose-500 px-4 text-sm font-black text-white transition active:scale-[0.98]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-rose-500 px-4 text-sm font-bold text-white transition active:scale-[0.98]"
           >
             <Camera className="h-4.5 w-4.5" />
             {isId ? 'Buat Reels' : 'Create Reels'}
@@ -3313,7 +3313,7 @@ function ReelsEmptyState({
           <button
             type="button"
             onClick={onSearch}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/36 px-4 text-sm font-black text-white transition active:scale-[0.98]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/12 bg-black/36 px-4 text-sm font-bold text-white transition active:scale-[0.98]"
           >
             <Search className="h-4.5 w-4.5" />
             {isId ? 'Cari reels' : 'Search reels'}
@@ -3361,10 +3361,10 @@ function ReelsEndSlide({
               <Check className="h-6 w-6" />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">
                 {isId ? 'Feed selesai' : 'Feed complete'}
               </p>
-              <h2 className="mt-1 text-[26px] font-black leading-[1.05] tracking-[-0.03em] text-slate-950">
+              <h2 className="mt-1 text-[26px] font-bold leading-[1.05] tracking-[-0.03em] text-slate-950">
                 {isId ? 'Kamu sudah sampai akhir' : 'You are all caught up'}
               </h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
@@ -3377,7 +3377,7 @@ function ReelsEndSlide({
 
           <div className="mt-5 grid grid-cols-2 gap-2">
             <div className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.24)]">
-              <p className="text-2xl font-black text-slate-950">
+              <p className="text-2xl font-bold text-slate-950">
                 {totalCount.toLocaleString(locale)}
               </p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
@@ -3385,7 +3385,7 @@ function ReelsEndSlide({
               </p>
             </div>
             <div className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.24)]">
-              <p className="text-2xl font-black text-slate-950">
+              <p className="text-2xl font-bold text-slate-950">
                 {topicChips.length.toLocaleString(locale)}
               </p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
@@ -3398,7 +3398,7 @@ function ReelsEndSlide({
             <button
               type="button"
               onClick={onRestart}
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-sm font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.26)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.26)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
             >
               <RefreshCcw className="h-4.5 w-4.5" />
               {isId ? 'Ulangi feed dari awal' : 'Restart feed'}
@@ -3407,7 +3407,7 @@ function ReelsEndSlide({
               <button
                 type="button"
                 onClick={() => onSearch()}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-3 text-xs font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.22)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-3 text-xs font-bold text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.22)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
               >
                 <Search className="h-4 w-4" />
                 {isId ? 'Cari topik' : 'Search'}
@@ -3415,7 +3415,7 @@ function ReelsEndSlide({
               <button
                 type="button"
                 onClick={onUpload}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-emerald-200 bg-white px-3 text-xs font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.22)] transition hover:border-emerald-300 hover:text-emerald-700 active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[18px] border border-emerald-200 bg-white px-3 text-xs font-bold text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.22)] transition hover:border-emerald-300 hover:text-emerald-700 active:scale-[0.98]"
               >
                 <Camera className="h-4 w-4" />
                 {isId ? 'Buat reels' : 'Create'}
@@ -3424,7 +3424,7 @@ function ReelsEndSlide({
           </div>
 
           <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.24)]">
-            <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
               {isId ? 'Topik yang bisa dicari' : 'Topics to search'}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -3433,7 +3433,7 @@ function ReelsEndSlide({
                   key={topic}
                   type="button"
                   onClick={() => onSearch(topic)}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-black text-slate-700 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.24)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-95"
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-700 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.24)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-95"
                 >
                   #{topic}
                 </button>
@@ -3443,7 +3443,7 @@ function ReelsEndSlide({
 
           <Link
             href={`/${locale}/home`}
-            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-xs font-black text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.26)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
+            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-xs font-bold text-slate-900 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.26)] transition hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.98]"
           >
             <Home className="h-4 w-4" />
             {isId ? 'Kembali ke beranda' : 'Back to home'}
@@ -3554,7 +3554,7 @@ function ReelSlide({
   onOpenActions: () => void;
   onAction: (action: ReelUserAction, active?: boolean) => void;
 }) {
-  const Icon = iconMap[reel.iconKey];
+  const Icon = iconMap[reel.iconKey] ?? Clapperboard;
   const imageMedia = isImageMediaUrl(reel.videoSrc);
   const mediaStyle = getReelMediaStyle(reel.filterPreset);
   const studioEffect = getReelStudioEffect(reel);
@@ -3569,7 +3569,7 @@ function ReelSlide({
       >
         <div className="absolute inset-0 bg-[#050505]" />
         <div className="relative z-10 mt-auto min-w-0 flex-1 pr-[58px] opacity-0 sm:pr-[70px]">
-          <h1 className="line-clamp-2 text-[16px] font-black leading-tight">
+          <h1 className="line-clamp-2 text-[16px] font-bold leading-tight">
             {reel.title}
           </h1>
         </div>
@@ -3618,12 +3618,12 @@ function ReelSlide({
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/16 to-black/36" />
 
-      <div className="absolute left-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 flex max-w-[calc(100%-84px)] items-center gap-1.5 rounded-full bg-black/32 px-2 py-1 text-[10px] font-black backdrop-blur sm:left-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:max-w-[calc(100%-108px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
+      <div className="absolute left-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 flex max-w-[calc(100%-84px)] items-center gap-1.5 rounded-full bg-black/32 px-2 py-1 text-[10px] font-bold  sm:left-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:max-w-[calc(100%-108px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
         <Icon className="h-4 w-4" />
         <span className="truncate">{reel.tag}</span>
       </div>
       {liveLabel && (
-        <div className="absolute right-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-black text-white shadow-2xl shadow-rose-950/25 sm:right-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
+        <div className="absolute right-2.5 top-[calc(env(safe-area-inset-top)+50px)] z-20 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-bold text-white shadow-2xl shadow-rose-950/25 sm:right-4 sm:top-[calc(env(safe-area-inset-top)+62px)] sm:px-2.5 sm:py-1.5 sm:text-[11px]">
           <Radio className="h-3.5 w-3.5" />
           {liveLabel}
         </div>
@@ -3641,7 +3641,7 @@ function ReelSlide({
 
       {buffering && (
         <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
-          <div className="grid h-16 w-16 place-items-center rounded-full bg-black/35 backdrop-blur">
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-black/35 ">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         </div>
@@ -3649,7 +3649,7 @@ function ReelSlide({
 
       {paused && active && !buffering && (
         <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center">
-          <div className="grid h-20 w-20 place-items-center rounded-full bg-white/20 backdrop-blur">
+          <div className="grid h-20 w-20 place-items-center rounded-full bg-white/20 ">
             <Play className="h-9 w-9 fill-white" />
           </div>
         </div>
@@ -3662,7 +3662,7 @@ function ReelSlide({
             event.stopPropagation();
             onToggleSound();
           }}
-          className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+100px)] z-40 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-xs font-black text-slate-950 shadow-2xl backdrop-blur sm:top-[calc(env(safe-area-inset-top)+110px)] sm:gap-2 sm:px-4"
+          className="absolute left-1/2 top-[calc(env(safe-area-inset-top)+100px)] z-40 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-xs font-bold text-slate-950 shadow-2xl  sm:top-[calc(env(safe-area-inset-top)+110px)] sm:gap-2 sm:px-4"
         >
           <Volume2 className="h-4 w-4" />
           Ketuk untuk suara
@@ -3699,7 +3699,6 @@ function ReelSlide({
                 py-1.5
                 text-xs
                 font-semibold
-                backdrop-blur-sm
               "
             >
               <ShoppingBag className="h-3.5 w-3.5" />
@@ -3765,7 +3764,7 @@ function ProductCartDock({
         <ShoppingBag className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[11px] font-black sm:text-[12px]">
+        <span className="block truncate text-[11px] font-bold sm:text-[12px]">
           {reel.productName}
         </span>
         <span className="block truncate text-[9px] font-bold text-slate-600 sm:text-[10px]">
@@ -3892,8 +3891,6 @@ function ActionRail({
 
             !text-white
             shadow-[0_8px_20px_-8px_rgba(0,0,0,0.9)]
-            ring-2
-            ring-black
 
             transition
             active:scale-95
@@ -3926,23 +3923,22 @@ function ActionRail({
           >
             <span
               className={cn(
-                '!grid !h-10 !w-10 place-items-center rounded-full !bg-black/34 !text-white shadow-[0_14px_30px_-20px_rgba(0,0,0,0.9)] backdrop-blur-md ring-1 ring-white/18 transition sm:!h-11 sm:!w-11',
-                action.active && '!bg-rose-600 !text-white !ring-rose-200',
+                '!grid !h-11 !w-11 place-items-center rounded-full !bg-transparent !text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.88)] transition sm:!h-12 sm:!w-12',
+                action.active && '!text-rose-500',
               )}
             >
               {action.loading ? (
-                <Loader2 className="h-4.5 w-4.5 animate-spin sm:h-5 sm:w-5" />
+                <Loader2 className="h-6 w-6 animate-spin sm:h-6 sm:w-6" />
               ) : (
                 <ActionIcon
                   className={cn(
-                    '!h-4.5 !w-4.5 sm:!h-5 sm:!w-5',
-                    action.active && '!fill-current',
+                    '!h-6 !w-6 fill-current stroke-current stroke-[2.65] sm:!h-6 sm:!w-6',
                   )}
                 />
               )}
             </span>
             {action.label && (
-              <span className="max-w-full truncate text-center text-[9px] font-black leading-3 drop-shadow sm:text-[10px]">
+              <span className="max-w-full truncate text-center text-[9px] font-bold leading-3 drop-shadow sm:text-[10px]">
                 {action.label}
               </span>
             )}
@@ -4083,7 +4079,7 @@ function SearchOverlay({
 
   return (
     <section className="ui-layer-header fixed inset-0 flex min-h-0 flex-col bg-[#050505] text-white">
-      <header className="shrink-0 border-b border-white/10 bg-black/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur">
+      <header className="shrink-0 border-b border-white/10 bg-black/95 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+14px)] ">
         <div className="mx-auto flex w-full max-w-[1440px] items-center gap-3">
           <button
             type="button"
@@ -4116,7 +4112,7 @@ function SearchOverlay({
           <button
             type="button"
             onClick={onClose}
-            className="hidden rounded-full bg-white px-5 py-3 text-sm font-black text-slate-950 sm:inline-flex"
+            className="hidden rounded-full bg-white px-5 py-3 text-sm font-bold text-slate-950 sm:inline-flex"
           >
             Tutup
           </button>
@@ -4142,7 +4138,7 @@ function SearchOverlay({
                 type="button"
                 onClick={() => setQuery(chip === 'Semua' ? '' : chip)}
                 className={cn(
-                  'shrink-0 rounded-full px-3 py-2 text-xs font-black transition',
+                  'shrink-0 rounded-full px-3 py-2 text-xs font-bold transition',
                   active
                     ? 'bg-white text-slate-950'
                     : 'bg-white/10 text-white/75 hover:bg-white/15',
@@ -4170,10 +4166,10 @@ function SearchOverlay({
         <div className="mx-auto w-full max-w-[1440px]">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-wide text-white/45">
+              <p className="text-xs font-bold uppercase tracking-wide text-white/45">
                 {query ? 'Hasil pencarian' : 'Eksplor Reels'}
               </p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">
+              <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
                 {query ? `Cari: ${query}` : 'Cari video bisnis'}
               </h1>
             </div>
@@ -4201,7 +4197,7 @@ function SearchOverlay({
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10">
                 <Search className="h-8 w-8" />
               </div>
-              <p className="mt-5 text-xl font-black">Belum ada video</p>
+              <p className="mt-5 text-xl font-bold">Belum ada video</p>
               <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/55">
                 Coba kata lain seperti supplier, packaging, kopi, frozen food,
                 marketing, atau keuangan.
@@ -4211,7 +4207,7 @@ function SearchOverlay({
 
           <div className="py-8">
             {loadingMore && (
-              <div className="flex items-center justify-center gap-2 text-sm font-black text-white/70">
+              <div className="flex items-center justify-center gap-2 text-sm font-bold text-white/70">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Memuat video...
               </div>
@@ -4221,7 +4217,7 @@ function SearchOverlay({
               <button
                 type="button"
                 onClick={onLoadMore}
-                className="mx-auto flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-black text-slate-950"
+                className="mx-auto flex items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-bold text-slate-950"
               >
                 Muat video lainnya
               </button>
@@ -4237,7 +4233,7 @@ function SearchOverlay({
               <button
                 type="button"
                 onClick={onLoadMore}
-                className="mx-auto mt-3 flex rounded-full bg-white px-4 py-2 text-xs font-black text-slate-950"
+                className="mx-auto mt-3 flex rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-950"
               >
                 Coba lagi
               </button>
@@ -4256,7 +4252,7 @@ function SearchVideoCard({
   reel: LajukanReel;
   onClick: () => void;
 }) {
-  const Icon = iconMap[reel.iconKey];
+  const Icon = iconMap[reel.iconKey] ?? Clapperboard;
   const imageMedia = isImageMediaUrl(reel.videoSrc);
   const mediaStyle = getReelMediaStyle(reel.filterPreset);
   const liveLabel = getLiveLabel(reel);
@@ -4301,7 +4297,7 @@ function SearchVideoCard({
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/12 to-black/25" />
 
-      <div className="absolute left-2 top-2 flex max-w-[calc(100%-56px)] items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-black text-white backdrop-blur">
+      <div className="absolute left-2 top-2 flex max-w-[calc(100%-56px)] items-center gap-1 rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-white ">
         <Icon className="h-3 w-3 shrink-0" />
         <span className="truncate">{reel.tag}</span>
       </div>
@@ -4312,30 +4308,30 @@ function SearchVideoCard({
         </div>
       )}
       {liveLabel && (
-        <div className="absolute right-2 top-11 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-black text-white shadow-lg">
+        <div className="absolute right-2 top-11 inline-flex items-center gap-1 rounded-full bg-rose-500 px-2 py-1 text-[10px] font-bold text-white shadow-lg">
           <Radio className="h-3 w-3" />
           {liveLabel}
         </div>
       )}
 
       <div className="absolute inset-0 grid place-items-center opacity-90 transition group-hover:scale-110">
-        <div className="grid h-11 w-11 place-items-center rounded-full bg-white/18 backdrop-blur">
+        <div className="grid h-11 w-11 place-items-center rounded-full bg-white/18 ">
           <Play className="h-4 w-4 fill-white text-white" />
         </div>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 p-2.5">
-        <p className="line-clamp-2 text-xs font-black leading-tight text-white">
+        <p className="line-clamp-2 text-xs font-bold leading-tight text-white">
           {reel.title}
         </p>
 
         {reel.productName ? (
-          <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-yellow-400 px-2 py-1 text-[10px] font-black text-slate-950">
+          <div className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-yellow-400 px-2 py-1 text-[10px] font-bold text-slate-950">
             <ShoppingBag className="h-3 w-3 shrink-0" />
             <span className="truncate">{reel.productName}</span>
           </div>
         ) : (
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2 py-1 text-[10px] font-black text-white/80">
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2 py-1 text-[10px] font-bold text-white/80">
             <Info className="h-3 w-3" />
             Info bisnis
           </div>
@@ -4383,7 +4379,7 @@ function DetailOverlay({
 }) {
   if (!reel) return null;
 
-  const Icon = iconMap[reel.iconKey];
+  const Icon = iconMap[reel.iconKey] ?? Clapperboard;
   const imageMedia = isImageMediaUrl(reel.videoSrc);
   const mediaStyle = getReelMediaStyle(reel.filterPreset);
   const liveLabel = getLiveLabel(reel);
@@ -4391,7 +4387,7 @@ function DetailOverlay({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/68 p-0 text-white backdrop-blur-md lg:items-stretch lg:justify-end lg:bg-black/42 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/68 p-0 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 "
       role="dialog"
       aria-modal="true"
     >
@@ -4426,19 +4422,19 @@ function DetailOverlay({
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/20" />
 
-          <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/45 px-3 py-2 text-xs font-black backdrop-blur">
+          <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/45 px-3 py-2 text-xs font-bold ">
             <Icon className="h-4 w-4" />
             {reel.tag}
           </div>
           {liveLabel && (
-            <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-2 text-xs font-black text-white shadow-xl">
+            <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-2 text-xs font-bold text-white shadow-xl">
               <Radio className="h-3.5 w-3.5" />
               {liveLabel}
             </div>
           )}
 
           <div className="absolute inset-0 grid place-items-center">
-            <div className="grid h-16 w-16 place-items-center rounded-full bg-white/15 backdrop-blur">
+            <div className="grid h-16 w-16 place-items-center rounded-full bg-white/15 ">
               <Play className="h-7 w-7 fill-white" />
             </div>
           </div>
@@ -4447,10 +4443,10 @@ function DetailOverlay({
         <div className="min-h-0 flex-1 overflow-y-auto bg-[#0c0f14] p-5 text-white sm:p-6">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-wide text-emerald-300">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-300">
                 Detail Reels
               </p>
-              <h2 className="mt-1 text-2xl font-black leading-tight">
+              <h2 className="mt-1 text-2xl font-bold leading-tight">
                 {reel.title}
               </h2>
             </div>
@@ -4480,7 +4476,7 @@ function DetailOverlay({
             <div className="min-w-0 flex-1">
               <Link
                 href={profileHref}
-                className="block truncate text-sm font-black text-white underline-offset-4 transition hover:underline"
+                className="block truncate text-sm font-bold text-white underline-offset-4 transition hover:underline"
               >
                 {reel.creator}
               </Link>
@@ -4491,7 +4487,7 @@ function DetailOverlay({
 
             <Link
               href={profileHref}
-              className="hidden items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-black text-white transition active:scale-[0.98] min-[430px]:inline-flex"
+              className="hidden items-center gap-1.5 rounded-full bg-white/10 px-4 py-2 text-xs font-bold text-white transition active:scale-[0.98] min-[430px]:inline-flex"
             >
               <User className="h-3.5 w-3.5" />
               Profil
@@ -4501,7 +4497,7 @@ function DetailOverlay({
               type="button"
               onClick={() => onMessageCreator(reel)}
               disabled={chatBusyReelId === reel.id}
-              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-4 py-2 text-xs font-black text-white disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
             >
               {chatBusyReelId === reel.id ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -4516,7 +4512,7 @@ function DetailOverlay({
               onClick={() => onAction(reel, 'follow')}
               disabled={actionState.loading === 'follow'}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-black disabled:opacity-60',
+                'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold disabled:opacity-60',
                 actionState.followed
                   ? 'bg-emerald-500 text-white'
                   : 'bg-white/10 text-white ring-1 ring-white/10',
@@ -4548,10 +4544,10 @@ function DetailOverlay({
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="mb-1 inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-yellow-200">
+                <div className="mb-1 inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-yellow-200">
                   Produk terkait
                 </div>
-                <p className="truncate text-base font-black">
+                <p className="truncate text-base font-bold">
                   {reel.productName}
                 </p>
                 <p className="truncate text-sm font-bold text-white/64">
@@ -4563,7 +4559,7 @@ function DetailOverlay({
             </button>
           ) : (
             <div className="mt-5 rounded-[24px] border border-white/10 bg-white/6 p-4">
-              <div className="flex items-center gap-2 text-sm font-black text-white">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
                 <Info className="h-5 w-5 text-emerald-300" />
                 Konten informasi
               </div>
@@ -4593,7 +4589,7 @@ function DetailOverlay({
             <button
               type="button"
               onClick={() => onOpenComments(reel)}
-              className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-black text-white ring-1 ring-white/10"
+              className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-bold text-white ring-1 ring-white/10"
             >
               Komentar
             </button>
@@ -4601,14 +4597,14 @@ function DetailOverlay({
               type="button"
               onClick={() => onAction(reel, 'save')}
               disabled={actionState.loading === 'save'}
-              className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-black text-white ring-1 ring-white/10"
+              className="rounded-2xl bg-white/10 px-3 py-3 text-sm font-bold text-white ring-1 ring-white/10"
             >
               {actionState.saved ? 'Tersimpan' : 'Simpan'}
             </button>
             <button
               type="button"
               onClick={() => onOpenShare(reel)}
-              className="rounded-2xl bg-emerald-500 px-3 py-3 text-sm font-black text-white"
+              className="rounded-2xl bg-emerald-500 px-3 py-3 text-sm font-bold text-white"
             >
               Bagikan
             </button>
@@ -4622,7 +4618,7 @@ function DetailOverlay({
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-100 p-3 text-center">
-      <p className="text-sm font-black">{value}</p>
+      <p className="text-sm font-bold">{value}</p>
       <p className="mt-0.5 text-[11px] font-bold text-slate-500">{label}</p>
     </div>
   );
@@ -5013,7 +5009,7 @@ function ShareSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
       role="dialog"
       aria-modal="true"
     >
@@ -5032,7 +5028,7 @@ function ShareSheet({
           </div>
 
           <div className="min-w-0 flex-1 text-center">
-            <h2 className="text-xl font-black tracking-[-0.03em]">Send to</h2>
+            <h2 className="text-xl font-bold tracking-[-0.03em]">Send to</h2>
             <p className="truncate text-xs font-semibold text-white/60">
               {reel.title}
             </p>
@@ -5083,7 +5079,7 @@ function ShareSheet({
                 >
                   <span
                     className={cn(
-                      'mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br text-sm font-black text-white shadow-lg ring-1 ring-black/5',
+                      'mx-auto grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br text-sm font-bold text-white shadow-lg ring-1 ring-black/5',
                       recipientTone(recipient),
                     )}
                   >
@@ -5134,7 +5130,7 @@ function ShareSheet({
                 >
                   <span
                     className={cn(
-                      'mx-auto grid h-14 w-14 place-items-center rounded-full text-lg font-black shadow-lg',
+                      'mx-auto grid h-14 w-14 place-items-center rounded-full text-lg font-bold shadow-lg',
                       action.className,
                     )}
                   >
@@ -5187,7 +5183,7 @@ function ShareSheet({
           </div>
 
           {copied && (
-            <div className="mb-2 rounded-full bg-emerald-500 px-4 py-2 text-center text-xs font-black text-white">
+            <div className="mb-2 rounded-full bg-emerald-500 px-4 py-2 text-center text-xs font-bold text-white">
               Link reels disalin
             </div>
           )}
@@ -5287,7 +5283,7 @@ function MoreActionsSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white backdrop-blur-sm sm:items-end lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/58 text-white  sm:items-end lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
       role="dialog"
       aria-modal="true"
     >
@@ -5302,10 +5298,10 @@ function MoreActionsSheet({
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
               Aksi reels
             </p>
-            <h2 className="truncate text-base font-black">{reel.title}</h2>
+            <h2 className="truncate text-base font-bold">{reel.title}</h2>
           </div>
           <button
             type="button"
@@ -5327,17 +5323,17 @@ function MoreActionsSheet({
                 disabled={action.disabled}
                 onClick={action.onClick}
                 className={cn(
-                  'flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] px-2 text-xs font-black transition active:scale-[0.98] disabled:opacity-60',
+                  'flex min-h-[74px] flex-col items-center justify-center gap-2 rounded-[18px] px-2 text-xs font-bold transition active:scale-[0.98] disabled:opacity-60',
                   action.featured
-                    ? 'bg-white/10 text-white ring-1 ring-white/10'
+                    ? 'bg-emerald-600 text-white shadow-[0_10px_22px_-18px_rgba(16,185,129,0.65)]'
                     : action.active
-                      ? 'bg-emerald-500 text-white ring-1 ring-emerald-300/25'
-                      : 'bg-white/8 text-white ring-1 ring-white/10',
+                      ? 'bg-rose-600 text-white shadow-[0_10px_22px_-18px_rgba(225,29,72,0.65)]'
+                      : 'bg-zinc-800 text-white shadow-[0_10px_22px_-18px_rgba(0,0,0,0.68)]',
                 )}
               >
                 <ActionIcon
                   className={cn(
-                    'h-5 w-5',
+                    'h-5 w-5 fill-current stroke-current stroke-[2.5]',
                     action.icon === Loader2 && chatBusy && 'animate-spin',
                   )}
                 />
@@ -5410,7 +5406,7 @@ function CommentsSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
       role="dialog"
       aria-modal="true"
     >
@@ -5425,17 +5421,17 @@ function CommentsSheet({
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
               {formatCompactMetric(metricCount(reel, 'comments'))} komentar
             </p>
-            <h2 className="truncate text-base !text-black font-black">{reel.title}</h2>
+            <h2 className="truncate text-base !text-black font-bold">{reel.title}</h2>
           </div>
 
           <button
             type="button"
             onClick={() => onChatCreator(null)}
             disabled={chatBusy}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-black text-white disabled:opacity-60 !text-black"
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-60 !text-black"
           >
             {chatBusy ? (
               <Loader2 className="h-4 w-4 animate-spin !text-black" />
@@ -5481,7 +5477,7 @@ function CommentsSheet({
                       />
                       <div className="min-w-0 flex-1">
                         <div className="rounded-2xl !text-black bg-white/8 px-3 py-2 ring-1 ring-white/10">
-                          <p className="truncate text-xs font-black text-white">
+                          <p className="truncate text-xs font-bold text-white">
                             {comment.authorName}
                           </p>
                           <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-white/78">
@@ -5523,7 +5519,7 @@ function CommentsSheet({
                             />
                             <div className="min-w-0 flex-1">
                               <div className="rounded-2xl bg-white/6 px-3 py-2 ring-1 ring-white/10">
-                                <p className="truncate text-[11px] font-black text-white">
+                                <p className="truncate text-[11px] font-bold text-white">
                                   {reply.authorName}
                                 </p>
                                 <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-white/75">
@@ -5546,7 +5542,7 @@ function CommentsSheet({
             <div className="grid h-44 place-items-center text-center">
               <div>
                 <MessageCircle className="mx-auto h-9 w-9 text-white/28" />
-                <p className="mt-2 text-sm font-black text-white">
+                <p className="mt-2 text-sm font-bold text-white">
                   Belum ada komentar
                 </p>
                 <p className="mt-1 text-xs font-medium text-white/50">
@@ -5567,7 +5563,7 @@ function CommentsSheet({
               type="button"
               onClick={() => onLoadMore(reel.id)}
               disabled={bucket.loading}
-              className="mt-4 w-full rounded-full bg-white/10 px-4 py-2.5 text-xs font-black text-white disabled:opacity-60"
+              className="mt-4 w-full rounded-full bg-white/10 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60"
             >
               {bucket.loading ? 'Memuat...' : 'Lihat komentar lainnya'}
             </button>
@@ -5634,7 +5630,7 @@ function CommentsSheet({
               </button>
               <Link
                 href={loginHref}
-                className="rounded-full bg-emerald-500 px-4 py-3 text-sm font-black text-white"
+                className="rounded-full bg-emerald-500 px-4 py-3 text-sm font-bold text-white"
               >
                 Masuk
               </Link>
@@ -5666,7 +5662,7 @@ function ProductSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white backdrop-blur-sm lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 lg:backdrop-blur-[2px]"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-black/62 text-white  lg:items-stretch lg:justify-end lg:bg-black/42 lg:p-0 "
       role="dialog"
       aria-modal="true"
     >
@@ -5681,10 +5677,10 @@ function ProductSheet({
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-start justify-between gap-3 p-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-wide text-yellow-300">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-yellow-300">
               Produk terkait
             </p>
-            <h2 className="mt-1 text-xl font-black leading-tight">
+            <h2 className="mt-1 text-xl font-bold leading-tight">
               {reel.productName || 'Produk terkait'}
             </h2>
             <p className="mt-1 text-sm font-bold text-white/60">
@@ -5707,7 +5703,7 @@ function ProductSheet({
               <ShoppingBag className="h-7 w-7" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black text-white">{reel.creator}</p>
+              <p className="truncate text-sm font-bold text-white">{reel.creator}</p>
               <p className="mt-0.5 line-clamp-2 text-xs font-semibold leading-relaxed text-white/72">
                 {reel.caption}
               </p>
@@ -5717,7 +5713,7 @@ function ProductSheet({
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Link
               href={productHref}
-              className="rounded-2xl bg-white/10 px-4 py-3 text-center text-sm font-black text-white ring-1 ring-white/10"
+              className="rounded-2xl bg-white/10 px-4 py-3 text-center text-sm font-bold text-white ring-1 ring-white/10"
             >
               Lihat produk
             </Link>
@@ -5725,7 +5721,7 @@ function ProductSheet({
             {isAuthenticated ? (
               <Link
                 href={checkoutHref}
-                className="rounded-2xl bg-emerald-500 px-4 py-3 text-center text-sm font-black text-white"
+                className="rounded-2xl bg-emerald-500 px-4 py-3 text-center text-sm font-bold text-white"
               >
                 Mulai transaksi
               </Link>
@@ -5733,7 +5729,7 @@ function ProductSheet({
               <button
                 type="button"
                 onClick={onRequireLogin}
-                className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white"
+                className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white"
               >
                 Mulai transaksi
               </button>
@@ -6385,7 +6381,7 @@ function UploadReelSheet({
     REELS_STUDIO_MODES.find(mode => mode.id === studioMode) ||
     REELS_STUDIO_MODES[2];
   const ActiveStudioIcon = activeStudioMode.icon;
-  const fieldLabelClass = 'text-xs font-black text-slate-900 dark:text-white/84';
+  const fieldLabelClass = 'text-xs font-bold text-slate-900 dark:text-white/84';
   const inputClass =
     'mt-1 h-10 w-full rounded-[13px] border border-slate-200 bg-white px-3 text-[13px] font-semibold !text-slate-950 outline-none placeholder:text-slate-400 focus:border-emerald-300/50 focus:bg-white dark:border-white/10 dark:bg-white/[0.08] dark:!text-white dark:placeholder:text-white/38 dark:focus:bg-white/[0.11]';
   const textareaClass =
@@ -6580,7 +6576,7 @@ function UploadReelSheet({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 flex items-end bg-[color:color-mix(in_srgb,_var(--app-overlay)_86%,_transparent)] text-[color:var(--app-text)] backdrop-blur-md dark:bg-black/86 lg:items-center lg:justify-center lg:p-4"
+      className="ui-layer-modal fixed inset-0 flex items-end bg-[color:color-mix(in_srgb,_var(--app-overlay)_86%,_transparent)] text-[color:var(--app-text)]  dark:bg-black/86 lg:items-center lg:justify-center lg:p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -6614,10 +6610,10 @@ function UploadReelSheet({
           )}
         >
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:text-emerald-300">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:text-emerald-300">
               Reels
             </p>
-            <h2 className="text-base font-black">Kamera Reels</h2>
+            <h2 className="text-base font-bold">Kamera Reels</h2>
           </div>
 
           <div className="hidden items-center gap-1 rounded-full bg-[color:var(--app-surface-muted)] p-1 sm:flex dark:bg-white/10">
@@ -6626,7 +6622,7 @@ function UploadReelSheet({
                 <span
                   key={item}
                   className={cn(
-                    'rounded-full px-3 py-1.5 text-[11px] font-black',
+                    'rounded-full px-3 py-1.5 text-[11px] font-bold',
                     step === item
                       ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] shadow-sm dark:bg-white dark:text-slate-950'
                       : 'text-[color:var(--app-text-soft)] dark:text-white/58',
@@ -6720,7 +6716,7 @@ function UploadReelSheet({
                           </div>
                           {step !== 'media' && (
                             <>
-                              <p className="mt-4 text-sm font-black">
+                              <p className="mt-4 text-sm font-bold">
                                 Buka kamera Lajukan
                               </p>
                               <p className="mt-1 text-xs font-semibold leading-5 text-white/58">
@@ -6739,7 +6735,7 @@ function UploadReelSheet({
                       <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/12">
                         <Clapperboard className="h-8 w-8" />
                       </div>
-                      <p className="mt-4 text-sm font-black">
+                      <p className="mt-4 text-sm font-bold">
                         Pilih media dulu
                       </p>
                       <p className="mt-1 text-xs font-semibold text-white/55">
@@ -6752,22 +6748,22 @@ function UploadReelSheet({
 
                 {step !== 'media' && (form.hook || form.title) && (
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 text-white">
-                    <p className="text-[11px] font-black text-yellow-300">
+                    <p className="text-[11px] font-bold text-yellow-300">
                       {form.tag}
                     </p>
-                    <p className="mt-1 line-clamp-2 text-base font-black leading-tight">
+                    <p className="mt-1 line-clamp-2 text-base font-bold leading-tight">
                       {form.hook || form.title}
                     </p>
                   </div>
                 )}
                 {step !== 'media' && (
-                  <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 text-[11px] font-black text-white backdrop-blur">
+                  <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1.5 text-[11px] font-bold text-white ">
                     <SelectedCaptureIcon className="h-3.5 w-3.5" />
                     {selectedCaptureMode?.label ?? 'Kamera'}
                   </div>
                 )}
                 {step !== 'media' && form.captureMode === 'live' && (
-                  <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1.5 text-[11px] font-black text-white shadow-xl">
+                  <div className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-xl">
                     <Radio className="h-3.5 w-3.5" />
                     Live
                   </div>
@@ -6803,7 +6799,7 @@ function UploadReelSheet({
                           key={tool.label}
                           type="button"
                           onClick={tool.action}
-                          className="grid h-10 w-10 place-items-center rounded-full bg-black/38 text-white shadow-xl ring-1 ring-white/12 backdrop-blur transition active:scale-95"
+                          className="grid h-10 w-10 place-items-center rounded-full bg-black/38 text-white shadow-xl ring-1 ring-white/12  transition active:scale-95"
                           aria-label={tool.label}
                         >
                           <ToolIcon className="h-4.5 w-4.5" />
@@ -6814,8 +6810,8 @@ function UploadReelSheet({
                 )}
                 {step !== 'media' && (
                   <div className="absolute inset-x-2 bottom-3 z-20">
-                    <div className="mx-auto flex max-w-[240px] items-center justify-center rounded-full bg-black/42 px-3 py-2 text-white shadow-2xl ring-1 ring-white/12 backdrop-blur">
-                      <div className="flex items-center gap-2 text-[11px] font-black">
+                    <div className="mx-auto flex max-w-[240px] items-center justify-center rounded-full bg-black/42 px-3 py-2 text-white shadow-2xl ring-1 ring-white/12 ">
+                      <div className="flex items-center gap-2 text-[11px] font-bold">
                         <Camera className="h-4 w-4 text-emerald-200" />
                         <span>{selectedCaptureMode?.label ?? 'Kamera'}</span>
                         <span className="rounded-full bg-white/12 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/74">
@@ -6832,7 +6828,7 @@ function UploadReelSheet({
                     <button
                       type="button"
                       onClick={onClose}
-                      className="absolute left-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/34 text-white ring-1 ring-white/12 backdrop-blur"
+                      className="absolute left-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/34 text-white ring-1 ring-white/12 "
                       aria-label="Tutup"
                     >
                       <X className="h-5 w-5" />
@@ -6845,7 +6841,7 @@ function UploadReelSheet({
                           current === 'music' ? null : 'music',
                         )
                       }
-                      className="absolute left-1/2 top-4 z-30 inline-flex max-w-[210px] -translate-x-1/2 items-center gap-2 rounded-full bg-black/24 px-3 py-2 text-xs font-black text-white ring-1 ring-white/10 backdrop-blur"
+                      className="absolute left-1/2 top-4 z-30 inline-flex max-w-[210px] -translate-x-1/2 items-center gap-2 rounded-full bg-black/24 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10 "
                     >
                       <Music className="h-4 w-4" />
                       <span className="truncate">
@@ -6913,7 +6909,7 @@ function UploadReelSheet({
                             type="button"
                             onClick={tool.onClick}
                             className={cn(
-                              'grid h-10 w-10 place-items-center rounded-full text-white shadow-lg ring-1 ring-white/12 backdrop-blur transition active:scale-95',
+                              'grid h-10 w-10 place-items-center rounded-full text-white shadow-lg ring-1 ring-white/12  transition active:scale-95',
                               tool.active
                                 ? 'bg-white text-slate-950'
                                 : 'bg-black/32',
@@ -6930,7 +6926,7 @@ function UploadReelSheet({
                     {cameraError && (
                       <div
                         className={cn(
-                          'absolute inset-x-4 z-40 rounded-[16px] bg-amber-300/18 px-3 py-2 text-center text-xs font-bold text-amber-50 ring-1 ring-amber-200/20 backdrop-blur',
+                          'absolute inset-x-4 z-40 rounded-[16px] bg-amber-300/18 px-3 py-2 text-center text-xs font-bold text-amber-50 ring-1 ring-amber-200/20 ',
                           studioPanel ? 'bottom-[258px]' : 'bottom-[196px]',
                         )}
                       >
@@ -6940,9 +6936,9 @@ function UploadReelSheet({
 
                     <div className="absolute inset-x-0 bottom-[148px] z-30 flex justify-center px-3">
                       {studioPanel ? (
-                        <div className="w-full max-w-[340px] rounded-[24px] bg-black/58 p-2 shadow-2xl ring-1 ring-white/12 backdrop-blur-xl">
+                        <div className="w-full max-w-[340px] rounded-[24px] bg-black/58 p-2 shadow-2xl ring-1 ring-white/12 ">
                           <div className="mb-2 flex items-center justify-between gap-2 px-1 text-white">
-                            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-white/64">
+                            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/64">
                               {studioPanel === 'filters'
                                 ? 'Filter'
                                 : studioPanel === 'effects'
@@ -6983,7 +6979,7 @@ function UploadReelSheet({
                                       setField('filterPreset', filter.id)
                                     }
                                     className={cn(
-                                      'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
+                                      'flex min-w-[72px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
                                       active
                                         ? 'bg-white text-slate-950'
                                         : 'bg-white/9 text-white/72',
@@ -7012,7 +7008,7 @@ function UploadReelSheet({
                                         setStudioEffect(effect.id)
                                       }
                                       className={cn(
-                                        'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-black transition active:scale-95',
+                                        'flex min-w-[76px] shrink-0 flex-col items-center gap-1 rounded-[17px] px-2 py-2 text-[10px] font-bold transition active:scale-95',
                                         active
                                           ? 'bg-yellow-300 text-slate-950'
                                           : 'bg-white/9 text-white/72',
@@ -7039,7 +7035,7 @@ function UploadReelSheet({
                                         setField('musicTrack', track)
                                       }
                                       className={cn(
-                                        'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-black transition active:scale-95',
+                                        'min-h-[40px] shrink-0 rounded-full px-3 text-[11px] font-bold transition active:scale-95',
                                         form.musicTrack === track
                                           ? 'bg-yellow-300 text-slate-950'
                                           : 'bg-white/9 text-white/72',
@@ -7054,7 +7050,7 @@ function UploadReelSheet({
                                       type="button"
                                       onClick={() => setStudioSpeed(speed)}
                                       className={cn(
-                                        'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-black transition active:scale-95',
+                                        'grid h-11 w-14 shrink-0 place-items-center rounded-full text-[11px] font-bold transition active:scale-95',
                                         studioSpeed === speed
                                           ? 'bg-white text-slate-950'
                                           : 'bg-white/9 text-white/72',
@@ -7066,7 +7062,7 @@ function UploadReelSheet({
                           </div>
                         </div>
                       ) : recording ? (
-                        <div className="w-[210px] overflow-hidden rounded-full bg-black/52 px-3 py-2 text-[12px] font-black text-white shadow-xl ring-1 ring-white/12 backdrop-blur">
+                        <div className="w-[210px] overflow-hidden rounded-full bg-black/52 px-3 py-2 text-[12px] font-bold text-white shadow-xl ring-1 ring-white/12 ">
                           <div className="flex items-center justify-between gap-3">
                             <span className="inline-flex items-center gap-1.5">
                               <span className="h-2 w-2 rounded-full bg-rose-500" />
@@ -7084,7 +7080,7 @@ function UploadReelSheet({
                           </span>
                         </div>
                       ) : (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-black/42 p-1 text-[12px] font-black text-white/50 shadow-xl ring-1 ring-white/12 backdrop-blur">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-black/42 p-1 text-[12px] font-bold text-white/50 shadow-xl ring-1 ring-white/12 ">
                           {REELS_STUDIO_DURATIONS.map(duration => (
                             <button
                               key={duration}
@@ -7112,9 +7108,9 @@ function UploadReelSheet({
                             current === 'effects' ? null : 'effects',
                           )
                         }
-                        className="flex flex-col items-center gap-1 text-[11px] font-black"
+                        className="flex flex-col items-center gap-1 text-[11px] font-bold"
                       >
-                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 backdrop-blur">
+                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 ">
                           <Sparkles className="h-5 w-5 text-yellow-200" />
                         </span>
                         <span className="max-w-[64px] truncate">
@@ -7145,8 +7141,8 @@ function UploadReelSheet({
                         )}
                       </button>
 
-                      <label className="flex cursor-pointer flex-col items-center gap-1 text-[11px] font-black">
-                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 backdrop-blur">
+                      <label className="flex cursor-pointer flex-col items-center gap-1 text-[11px] font-bold">
+                        <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-white/18 ring-1 ring-white/18 ">
                           <Upload className="h-5 w-5 text-orange-200" />
                         </span>
                         Upload
@@ -7162,7 +7158,7 @@ function UploadReelSheet({
                     </div>
 
                     <div className="absolute inset-x-7 bottom-3 z-30 flex items-center justify-center">
-                      <span className="rounded-full bg-black/30 px-3 py-1.5 text-[11px] font-black text-white/72 ring-1 ring-white/10 backdrop-blur">
+                      <span className="rounded-full bg-black/30 px-3 py-1.5 text-[11px] font-bold text-white/72 ring-1 ring-white/10 ">
                         {locale === 'id'
                           ? 'Langsung rekam dari sini'
                           : 'Record straight from here'}
@@ -7184,10 +7180,10 @@ function UploadReelSheet({
                   <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
                           {activeStudioMode.label}
                         </p>
-                        <h3 className="truncate text-base font-black">
+                        <h3 className="truncate text-base font-bold">
                           {studioMode === 'gallery'
                             ? 'Pilih dari galeri'
                             : studioMode === 'photo'
@@ -7203,7 +7199,7 @@ function UploadReelSheet({
                     </div>
 
                     <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                      <label className="inline-flex h-12 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/10 px-3 text-xs font-black text-white ring-1 ring-white/10 transition active:scale-[0.98]">
+                      <label className="inline-flex h-12 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-white/10 px-3 text-xs font-bold text-white ring-1 ring-white/10 transition active:scale-[0.98]">
                         <Upload className="h-4 w-4" />
                         Galeri
                         <input
@@ -7265,7 +7261,7 @@ function UploadReelSheet({
                         disabled={
                           studioMode === 'gallery' || studioMode === 'live'
                         }
-                        className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-xs font-black text-slate-950 transition active:scale-[0.98] disabled:bg-white/10 disabled:text-white/38"
+                        className="inline-flex h-12 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-xs font-bold text-slate-950 transition active:scale-[0.98] disabled:bg-white/10 disabled:text-white/38"
                       >
                         <RefreshCcw className="h-4 w-4" />
                         {cameraReady ? 'Reset' : 'Kamera'}
@@ -7280,7 +7276,7 @@ function UploadReelSheet({
                   </div>
 
                   <div className="rounded-[20px] border border-white/10 bg-white/[0.05] p-3">
-                    <div className="flex items-center gap-2 text-xs font-black text-white/82">
+                    <div className="flex items-center gap-2 text-xs font-bold text-white/82">
                       <SlidersHorizontal className="h-4 w-4 text-emerald-300" />
                       Filter
                     </div>
@@ -7303,7 +7299,7 @@ function UploadReelSheet({
                             type="button"
                             onClick={() => setField('filterPreset', filter.id)}
                             className={cn(
-                              'inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-[11px] font-black ring-1 transition active:scale-95',
+                              'inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-[11px] font-bold ring-1 transition active:scale-95',
                               active
                                 ? 'bg-white text-slate-950 ring-white'
                                 : 'bg-white/8 text-white/70 ring-white/10',
@@ -7323,7 +7319,7 @@ function UploadReelSheet({
                   </div>
 
                   <div className="rounded-[20px] border border-white/10 bg-white/[0.05] p-3">
-                    <div className="flex items-center gap-2 text-xs font-black text-white/82">
+                    <div className="flex items-center gap-2 text-xs font-bold text-white/82">
                       <Music className="h-4 w-4 text-yellow-300" />
                       Musik
                     </div>
@@ -7344,7 +7340,7 @@ function UploadReelSheet({
                           type="button"
                           onClick={() => setField('musicTrack', track)}
                           className={cn(
-                            'h-9 shrink-0 rounded-full px-3 text-[11px] font-black ring-1 transition active:scale-95',
+                            'h-9 shrink-0 rounded-full px-3 text-[11px] font-bold ring-1 transition active:scale-95',
                             form.musicTrack === track
                               ? 'bg-yellow-300 text-slate-950 ring-yellow-200'
                               : 'bg-white/8 text-white/70 ring-white/10',
@@ -7379,7 +7375,7 @@ function UploadReelSheet({
                     <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-100 text-emerald-700">
                       <Upload className="h-6 w-6" />
                     </div>
-                    <p className="mt-3 text-sm font-black text-[color:var(--app-text)]">
+                    <p className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
                       {form.captureMode === 'camera'
                         ? 'Atau pilih dari galeri'
                         : form.captureMode === 'live'
@@ -7405,10 +7401,10 @@ function UploadReelSheet({
               {step === 'edit' && (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
                       Langkah 2
                     </p>
-                    <h3 className="text-lg font-black leading-tight">
+                    <h3 className="text-lg font-bold leading-tight">
                       Rapikan reels
                     </h3>
                     <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-white/52">
@@ -7420,10 +7416,10 @@ function UploadReelSheet({
                     <div className="rounded-[18px] border border-emerald-300/20 bg-emerald-500/10 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-[11px] font-black uppercase tracking-wide text-emerald-200">
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-200">
                             Media terpilih
                           </p>
-                          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
+                          <p className="truncate text-sm font-bold text-slate-950 dark:text-white">
                             {file.name}
                           </p>
                           <p className="text-xs font-semibold text-slate-500 dark:text-white/58">
@@ -7433,7 +7429,7 @@ function UploadReelSheet({
                         <button
                           type="button"
                           onClick={() => setStep('media')}
-                          className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-black text-slate-950"
+                          className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-950"
                         >
                           Ganti
                         </button>
@@ -7471,7 +7467,7 @@ function UploadReelSheet({
                         type="button"
                         onClick={() => setField('tag', chip)}
                         className={cn(
-                          'rounded-full px-3 py-2 text-xs font-black',
+                          'rounded-full px-3 py-2 text-xs font-bold',
                           form.tag === chip
                             ? 'bg-emerald-700 text-white'
                             : 'bg-slate-100 text-slate-700 dark:bg-white/[0.08] dark:text-white/64',
@@ -7488,10 +7484,10 @@ function UploadReelSheet({
               {step === 'post' && (
                 <div className="space-y-3">
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-wide text-emerald-300">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
                       Posting
                     </p>
-                    <h3 className="text-lg font-black leading-tight">
+                    <h3 className="text-lg font-bold leading-tight">
                       Teks singkat
                     </h3>
                     <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-white/52">
@@ -7503,7 +7499,7 @@ function UploadReelSheet({
                     <div className="rounded-[18px] border border-rose-100 bg-rose-50/80 p-3">
                       <div className="flex items-center gap-2 text-rose-700">
                         <Radio className="h-4 w-4" />
-                        <p className="text-xs font-black uppercase tracking-wide">
+                        <p className="text-xs font-bold uppercase tracking-wide">
                           Setup live
                         </p>
                       </div>
@@ -7572,7 +7568,7 @@ function UploadReelSheet({
               <button
                 type="button"
                 onClick={() => setStep(step === 'post' ? 'edit' : 'media')}
-                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 dark:border-white/14 dark:bg-transparent dark:text-white"
+                className="h-11 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 dark:border-white/14 dark:bg-transparent dark:text-white"
               >
                 Kembali
               </button>
@@ -7582,7 +7578,7 @@ function UploadReelSheet({
               <button
                 type="button"
                 onClick={goNext}
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white shadow-lg shadow-emerald-700/20"
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white shadow-lg shadow-emerald-700/20"
               >
                 Lanjut
                 <ChevronRight className="h-4 w-4" />
@@ -7591,7 +7587,7 @@ function UploadReelSheet({
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white shadow-lg shadow-emerald-700/20 disabled:opacity-60"
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white shadow-lg shadow-emerald-700/20 disabled:opacity-60"
               >
                 {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 {submitting
@@ -7622,7 +7618,7 @@ function AuthPromptSheet({
   if (!message) return null;
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex items-end bg-black/65 text-slate-950 backdrop-blur-sm sm:items-center sm:justify-center sm:p-5">
+    <div className="ui-layer-modal fixed inset-0 flex items-end bg-black/65 text-slate-950  sm:items-center sm:justify-center sm:p-5">
       <button
         type="button"
         aria-label="Tutup"
@@ -7632,10 +7628,10 @@ function AuthPromptSheet({
       <section className="relative w-full rounded-t-[28px] bg-white p-4 shadow-2xl sm:max-w-[420px] sm:rounded-[28px]">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
               Perlu akun
             </p>
-            <h2 className="mt-1 text-xl font-black">Masuk dulu</h2>
+            <h2 className="mt-1 text-xl font-bold">Masuk dulu</h2>
           </div>
           <button
             type="button"
@@ -7653,13 +7649,13 @@ function AuthPromptSheet({
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Link
             href={`/${locale}/register`}
-            className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-black text-slate-800"
+            className="rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-bold text-slate-800"
           >
             Daftar
           </Link>
           <Link
             href={loginHref}
-            className="rounded-2xl bg-emerald-700 px-4 py-3 text-center text-sm font-black text-white"
+            className="rounded-2xl bg-emerald-700 px-4 py-3 text-center text-sm font-bold text-white"
           >
             Masuk
           </Link>
@@ -7686,7 +7682,7 @@ function LoadingToast({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-6 z-40 flex justify-center px-4">
-      <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-black text-slate-950 shadow-xl">
+      <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-950 shadow-xl">
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />

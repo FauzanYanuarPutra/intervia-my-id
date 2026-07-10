@@ -252,7 +252,7 @@ function SettingsPanel({
             <Icon className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-[15px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <h2 className="text-[15px] font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {title}
             </h2>
             {description ? (
@@ -285,21 +285,19 @@ function PreferenceRow({
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 py-2.5 dark:border-[color:var(--app-border-strong)]">
       <span
-        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${
-          danger
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${danger
             ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
             : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-accent)]'
-        }`}
+          }`}
       >
         <Icon className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
         <span
-          className={`block truncate text-sm font-black ${
-            danger
+          className={`block truncate text-sm font-bold ${danger
               ? 'text-[color:var(--app-danger)]'
               : 'text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]'
-          }`}
+            }`}
         >
           {title}
         </span>
@@ -334,7 +332,7 @@ function QuickLinkCard({
         <Icon className="h-4.5 w-4.5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <span className="block truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {label}
         </span>
         <span className="mt-0.5 block truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -712,15 +710,15 @@ export default function SettingsPage() {
       },
       ...(!PROMO_ONLY_MODE
         ? [
-            {
-              href: '/payments',
-              icon: WalletCards,
-              label: isId ? 'Saldo & pembayaran' : 'Balance and payments',
-              description: isId
-                ? 'Wallet, invoice, payout'
-                : 'Wallet, invoices, payouts',
-            },
-          ]
+          {
+            href: '/payments',
+            icon: WalletCards,
+            label: isId ? 'Saldo & pembayaran' : 'Balance and payments',
+            description: isId
+              ? 'Wallet, invoice, payout'
+              : 'Wallet, invoices, payouts',
+          },
+        ]
         : []),
       {
         href: '/notifications',
@@ -1034,10 +1032,10 @@ export default function SettingsPage() {
                 />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                   {isId ? 'Pusat pengaturan' : 'Settings center'}
                 </p>
-                <h1 className="mt-0.5 truncate text-[1.45rem] font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                <h1 className="mt-0.5 truncate text-[1.45rem] font-bold leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
                   {text.title}
                 </h1>
                 <p className="mt-1 line-clamp-2 max-w-2xl text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
@@ -1076,7 +1074,7 @@ export default function SettingsPage() {
                   key={item.label}
                   className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2.5 py-2 text-center dark:border-[color:var(--app-border-strong)]"
                 >
-                  <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  <p className="truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                     {item.value}
                   </p>
                   <p className="mt-0.5 truncate text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1100,23 +1098,21 @@ export default function SettingsPage() {
                       key={item.key}
                       type="button"
                       onClick={() => setActiveCategory(item.key)}
-                      className={`flex min-w-[154px] items-center gap-2 rounded-[15px] border px-3 py-2 text-left transition lg:min-w-0 ${
-                        active
+                      className={`flex min-w-[154px] items-center gap-2 rounded-[15px] border px-3 py-2 text-left transition lg:min-w-0 ${active
                           ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-sm'
                           : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)]'
-                      }`}
+                        }`}
                     >
                       <span
-                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${
-                          active
+                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-[12px] ${active
                             ? 'bg-white text-[color:var(--app-accent)]'
                             : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]'
-                        }`}
+                          }`}
                       >
                         <Icon className="h-4 w-4" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-black">
+                        <span className="block truncate text-sm font-bold">
                           {item.label}
                         </span>
                         <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1130,7 +1126,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="mt-3 hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:var(--app-border-strong)] lg:block">
-              <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                 {isId ? 'Bantuan cepat' : 'Quick help'}
               </p>
               <p className="mt-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
@@ -1140,7 +1136,7 @@ export default function SettingsPage() {
               </p>
               <Link
                 href="/support"
-                className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)]"
+                className="mt-3 inline-flex min-h-9 w-full items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)]"
               >
                 {isId ? 'Buka bantuan' : 'Open help'}
               </Link>
@@ -1223,7 +1219,7 @@ export default function SettingsPage() {
                           <span className="grid h-9 w-9 place-items-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                             <Icon className="h-4 w-4" />
                           </span>
-                          <p className="mt-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          <p className="mt-2 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                             {item.label}
                           </p>
                           <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -1243,7 +1239,7 @@ export default function SettingsPage() {
                 title={text.savedAccounts}
                 description={text.savedAccountsDesc}
                 action={
-                  <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1 text-[10px] font-black text-[color:var(--app-text-soft)]">
+                  <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
                     {savedAccounts.length}/{MAX_SAVED_ACCOUNTS}
                   </span>
                 }
@@ -1279,7 +1275,7 @@ export default function SettingsPage() {
                               />
                             </span>
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              <p className="truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                 {account.displayName}
                               </p>
                               <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -1289,7 +1285,7 @@ export default function SettingsPage() {
                           </div>
                           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                             {isCurrent ? (
-                              <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)]">
+                              <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]">
                                 <UserRound className="h-3.5 w-3.5" />
                                 {text.currentAccount}
                               </span>
@@ -1371,27 +1367,27 @@ export default function SettingsPage() {
                       },
                       ...(!PROMO_ONLY_MODE
                         ? [
-                            {
-                              key: 'escrowRequired' as const,
-                              icon: ShieldCheck,
-                              title: isId
-                                ? 'Sarankan pembayaran aman'
-                                : 'Recommend protected payments',
-                              desc: isId
-                                ? 'Tampilkan opsi escrow saat transaksi jasa atau project.'
-                                : 'Show escrow options for services and projects.',
-                            },
-                            {
-                              key: 'autoInvoice' as const,
-                              icon: WalletCards,
-                              title: isId
-                                ? 'Buat invoice otomatis'
-                                : 'Auto-create invoices',
-                              desc: isId
-                                ? 'Invoice disiapkan setelah deal di chat.'
-                                : 'Invoices are prepared after a chat deal.',
-                            },
-                          ]
+                          {
+                            key: 'escrowRequired' as const,
+                            icon: ShieldCheck,
+                            title: isId
+                              ? 'Sarankan pembayaran aman'
+                              : 'Recommend protected payments',
+                            desc: isId
+                              ? 'Tampilkan opsi escrow saat transaksi jasa atau project.'
+                              : 'Show escrow options for services and projects.',
+                          },
+                          {
+                            key: 'autoInvoice' as const,
+                            icon: WalletCards,
+                            title: isId
+                              ? 'Buat invoice otomatis'
+                              : 'Auto-create invoices',
+                            desc: isId
+                              ? 'Invoice disiapkan setelah deal di chat.'
+                              : 'Invoices are prepared after a chat deal.',
+                          },
+                        ]
                         : []),
                     ].map(item => (
                       <PreferenceRow
@@ -1429,25 +1425,25 @@ export default function SettingsPage() {
                   {[
                     PROMO_ONLY_MODE
                       ? {
-                          key: 'orderAlerts' as const,
-                          icon: Store,
-                          title: isId
-                            ? 'Update katalog & profil'
-                            : 'Catalog and profile updates',
-                          desc: isId
-                            ? 'Perubahan listing, etalase, dan profil usaha.'
-                            : 'Listing, showcase, and business profile changes.',
-                        }
+                        key: 'orderAlerts' as const,
+                        icon: Store,
+                        title: isId
+                          ? 'Update katalog & profil'
+                          : 'Catalog and profile updates',
+                        desc: isId
+                          ? 'Perubahan listing, etalase, dan profil usaha.'
+                          : 'Listing, showcase, and business profile changes.',
+                      }
                       : {
-                          key: 'orderAlerts' as const,
-                          icon: WalletCards,
-                          title: isId
-                            ? 'Order dan pembayaran'
-                            : 'Orders and payments',
-                          desc: isId
-                            ? 'Top up, invoice, escrow, payout, refund.'
-                            : 'Top ups, invoices, escrow, payouts, refunds.',
-                        },
+                        key: 'orderAlerts' as const,
+                        icon: WalletCards,
+                        title: isId
+                          ? 'Order dan pembayaran'
+                          : 'Orders and payments',
+                        desc: isId
+                          ? 'Top up, invoice, escrow, payout, refund.'
+                          : 'Top ups, invoices, escrow, payouts, refunds.',
+                      },
                     {
                       key: 'chatAlerts' as const,
                       icon: MessageCircle,
@@ -1772,9 +1768,8 @@ export default function SettingsPage() {
                       aria-label={text.refreshSessions}
                     >
                       <RefreshCcw
-                        className={`h-4 w-4 ${
-                          sessionsState === 'loading' ? 'animate-spin' : ''
-                        }`}
+                        className={`h-4 w-4 ${sessionsState === 'loading' ? 'animate-spin' : ''
+                          }`}
                       />
                     </button>
                   }
@@ -1788,13 +1783,13 @@ export default function SettingsPage() {
                         >
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              <p className="truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                 {session.deviceName ||
                                   session.deviceType ||
                                   (isId ? 'Perangkat' : 'Device')}
                               </p>
                               {session.isCurrent ? (
-                                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
+                                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-accent)]">
                                   {text.currentDevice}
                                 </span>
                               ) : null}

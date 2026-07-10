@@ -230,6 +230,50 @@ describe('validateListingPayload', () => {
     ).toBe(true);
   });
 
+  it('accepts active demand product briefs without a primary image', () => {
+    const result = validateListingPayload(
+      {
+        content_type: 'product',
+        content_status: 'active',
+        title: 'Butuh cup plastik 12 oz',
+        summary: 'Cari supplier cup plastik area Bandung.',
+        body: 'Butuh cup plastik untuk outlet minuman, kirim rutin mingguan.',
+        metadata: {
+          listing_mode: 'simple',
+          listing_side: 'demand',
+          market_side: 'demand',
+          product_name: 'Cup plastik 12 oz',
+          location: 'Bandung',
+        },
+      },
+      { mode: 'create' },
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts active demand property briefs without a primary image', () => {
+    const result = validateListingPayload(
+      {
+        content_type: 'property',
+        content_status: 'active',
+        title: 'Cari kios 3x3 dekat kampus',
+        summary: 'Butuh tempat usaha untuk minuman area Bandung.',
+        body: 'Cari kios kecil, listrik aman, dan bisa sewa bulanan.',
+        metadata: {
+          listing_mode: 'simple',
+          listing_side: 'demand',
+          market_side: 'demand',
+          property_type: 'kios',
+          location: 'Bandung',
+        },
+      },
+      { mode: 'create' },
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
   it('accepts active business transfer listings with required handover details', () => {
     const result = validateListingPayload(
       {

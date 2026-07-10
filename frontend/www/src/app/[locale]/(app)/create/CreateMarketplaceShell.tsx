@@ -147,13 +147,13 @@ function CreateDesktopSidebar({
     ...(
       PROMO_ONLY_MODE
         ? [
-            {
-              href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
-              label: isId ? 'Profil Usaha' : 'Business profile',
-              caption: isId ? 'Alamat dan kontak' : 'Address and contact',
-              icon: Store,
-            },
-          ]
+          {
+            href: resolveMarketplaceCreatePath(locale, 'company', 'supply'),
+            label: isId ? 'Profil Usaha' : 'Business profile',
+            caption: isId ? 'Alamat dan kontak' : 'Address and contact',
+            icon: Store,
+          },
+        ]
         : [
           {
             href: buildCreateBasePath({
@@ -205,14 +205,14 @@ function CreateDesktopSidebar({
     const active =
       itemPath === supplyCreateHref
         ? currentPath === supplyCreateHref ||
-          currentPath.startsWith(`${supplyCreateHref}/`)
+        currentPath.startsWith(`${supplyCreateHref}/`)
         : itemPath === demandCreateHref
           ? currentPath === demandCreateHref ||
-            currentPath.startsWith(`${demandCreateHref}/`)
+          currentPath.startsWith(`${demandCreateHref}/`)
           : itemPath === '/create'
             ? currentPath === '/create'
             : currentPath === itemPath ||
-              currentPath.startsWith(`${itemPath}/`);
+            currentPath.startsWith(`${itemPath}/`);
     const Icon = item.icon;
 
     return (
@@ -257,21 +257,21 @@ function CreateDesktopSidebar({
       >
         <nav className="shrink-0 rounded-[22px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.14)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
           <div className="px-2 py-1.5">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
               {isId ? 'Menu utama' : 'Main menu'}
             </p>
           </div>
           <div className="space-y-1">{primaryItems.map(renderNavItem)}</div>
           <div className="my-2 h-px bg-[color:var(--app-border)]" />
           <div className="px-2 py-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
               {isId ? 'Kelola usaha' : 'Business tools'}
             </p>
           </div>
           <div className="space-y-1">{businessItems.map(renderNavItem)}</div>
           <div className="my-2 h-px bg-[color:var(--app-border)]" />
           <div className="px-2 py-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+            <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
               {isId ? 'Kelola konten' : 'Manage content'}
             </p>
           </div>
@@ -291,7 +291,7 @@ function CreateDesktopSidebar({
               <ShieldCheck className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-[0.92rem] font-black tracking-[-0.03em]">
+              <p className="text-[0.92rem] font-bold tracking-[-0.03em]">
                 {isId ? 'Bingung mulai?' : 'Not sure where to start?'}
               </p>
               <p className="mt-1.5 text-[11px] leading-5 text-emerald-800/78 dark:text-emerald-100/78">

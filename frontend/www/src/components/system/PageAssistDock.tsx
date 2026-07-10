@@ -126,26 +126,26 @@ export function PageAssistDock() {
         actions: [
           user
             ? {
-                href: '/create?mode=quick',
-                label: isId ? 'Posting kebutuhan' : 'Post a need',
-                icon: PlusSquare,
-                primary: true,
-              }
+              href: '/create?mode=quick',
+              label: isId ? 'Posting kebutuhan' : 'Post a need',
+              icon: PlusSquare,
+              primary: true,
+            }
             : {
-                href: '/register',
-                label: isId ? 'Daftar gratis' : 'Start free',
-                icon: ShieldCheck,
-                primary: true,
-              },
+              href: '/register',
+              label: isId ? 'Daftar gratis' : 'Start free',
+              icon: ShieldCheck,
+              primary: true,
+            },
           fallbackSupport,
           ...(user
             ? [
-                {
-                  href: '/dashboard',
-                  label: isId ? 'Lihat yang aktif' : 'See today tasks',
-                  icon: LayoutDashboard,
-                },
-              ]
+              {
+                href: '/dashboard',
+                label: isId ? 'Lihat yang aktif' : 'See today tasks',
+                icon: LayoutDashboard,
+              },
+            ]
             : []),
         ],
       };
@@ -216,25 +216,25 @@ export function PageAssistDock() {
       actions: [
         user
           ? {
-              href: '/create?mode=quick',
-              label: isId ? 'Posting cepat' : 'Post quickly',
-              icon: PlusSquare,
-              primary: true,
-            }
+            href: '/create?mode=quick',
+            label: isId ? 'Posting cepat' : 'Post quickly',
+            icon: PlusSquare,
+            primary: true,
+          }
           : {
-              href: '/register',
-              label: isId ? 'Daftar gratis' : 'Start free',
-              icon: ShieldCheck,
-              primary: true,
-            },
+            href: '/register',
+            label: isId ? 'Daftar gratis' : 'Start free',
+            icon: ShieldCheck,
+            primary: true,
+          },
         ...(user
           ? [
-              {
-                href: '/dashboard',
-                label: isId ? 'Yang aktif' : 'Today tasks',
-                icon: LayoutDashboard,
-              },
-            ]
+            {
+              href: '/dashboard',
+              label: isId ? 'Yang aktif' : 'Today tasks',
+              icon: LayoutDashboard,
+            },
+          ]
           : []),
         fallbackSearch,
         fallbackSupport,
@@ -284,15 +284,15 @@ export function PageAssistDock() {
   const panelActions =
     showAdminChatLauncher && user
       ? [
-          ...config.actions,
-          {
-            label: locale === 'id' ? 'Chat admin' : 'Chat admin',
-            icon: MessageCircle,
-            onClick: () => {
-              void openAdminChat();
-            },
+        ...config.actions,
+        {
+          label: locale === 'id' ? 'Chat admin' : 'Chat admin',
+          icon: MessageCircle,
+          onClick: () => {
+            void openAdminChat();
           },
-        ]
+        },
+      ]
       : config.actions;
   const primaryAction =
     panelActions.find(action => action.primary) ?? panelActions[0] ?? null;
@@ -390,10 +390,10 @@ export function PageAssistDock() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="inline-flex rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                  <p className="inline-flex rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                     {locale === 'id' ? 'Bantuan cepat' : 'Quick help'}
                   </p>
-                  <h2 className="mt-2 text-sm font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] sm:text-base">
+                  <h2 className="mt-2 text-sm font-bold leading-tight tracking-[-0.03em] text-[color:var(--app-text)] sm:text-base">
                     {config.title}
                   </h2>
                   <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">

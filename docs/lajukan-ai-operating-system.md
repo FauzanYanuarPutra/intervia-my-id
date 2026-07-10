@@ -34,6 +34,77 @@ Client Apps
 
 AI tidak boleh menjadi source of truth untuk uang, role, KYC, ownership, atau status transaksi. AI memberi rekomendasi dan automation command. Backend domain service tetap melakukan validasi, authorization, idempotency, dan audit log.
 
+### 2.1 Local Docker AI untuk Create Form
+
+Fitur create listing boleh memakai AI lokal supaya biaya API bisa nol saat development atau operasional kecil.
+
+Jalur provider untuk foto create form:
+
+1. `USE_OLLAMA=true` -> `Ollama` di Docker.
+2. `INTERNAL_AI_URL` -> AI service internal.
+3. `OPENAI_API_KEY` -> fallback eksternal jika disediakan.
+
+Fitur AI ringan yang aktif di create flow:
+
+- AI baca foto listing -> isi field yang jelas saja.
+- AI Paket Usaha Lite -> ide usaha, kebutuhan bahan/alat/kemasan/jasa, estimasi modal, risiko, dan link pencarian Lajukan.
+- AI Paket Usaha Lite tetap berjalan tanpa model besar karena punya fallback rule-based lokal.
+
+Contoh menyalakan mode lokal:
+
+```powershell
+.\up-super-fast.ps1
+```
+
+Mode ringan teks saja:
+
+```powershell
+.\up-super-fast.ps1 -AiTextOnly
+```
+
+Mode tanpa AI lokal:
+
+```powershell
+.\up-super-fast.ps1 -NoAi
+```
+
+Custom model:
+
+```powershell
+.\up-super-fast.ps1 -AiBusinessModel "llama3.2:3b" -AiVisionModel "llava:7b"
+```
+
+Untuk laptop RAM 24 GB, mulai dari `llama3.2:3b` untuk teks dan gunakan model vision hanya saat perlu membaca foto. Jangan menjalankan fine-tuning, Qdrant indexing besar, dan model vision besar bersamaan ketika sedang development frontend.
+
+Guardrail wajib:
+
+- AI service tidak dipanggil dari browser; frontend memanggil API server Lajukan.
+- Port Ollama dibind ke `127.0.0.1`, bukan dibuka ke LAN/internet.
+- Upload foto dibatasi tipe dan ukuran.
+- Hasil AI hanya boleh mengisi field yang dikirim form sebagai allowlist.
+- Field dengan confidence rendah dibuang.
+- User tetap harus konfirmasi apakah hasil AI benar atau perlu diperbaiki.
+- Feedback user disimpan sebagai data pembelajaran, bukan langsung fine-tune otomatis.
+- Model lokal tidak diberi akses langsung ke database produksi; data DB dipakai lewat query terkontrol, retrieval, ranking, atau batch training terjadwal.
+
+Learning loop aman:
+
+```
+foto + hasil AI + koreksi user
+  -> metadata.ai_image_assist
+  -> dataset evaluasi
+  -> prompt/ranking improvement
+  -> optional fine-tune batch setelah data cukup bersih
+```
+
+Tahap berikutnya saat data Lajukan sudah cukup:
+
+1. Index listing supplier/bahan/mesin/jasa ke Qdrant.
+2. Ambil kandidat supplier dari Meilisearch + Qdrant.
+3. Ambil detail resmi dari PostgreSQL/marketplace service.
+4. Biarkan Ollama hanya menyusun penjelasan dan estimasi.
+5. Jangan biarkan LLM mengarang nama supplier yang tidak ada di database.
+
 ## 3. Feature Dependency Map
 
 | Module | Bergantung pada | Memberi sinyal ke | Automation wajib |

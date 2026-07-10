@@ -81,35 +81,35 @@ const DAILY_ACTIVITY_OPTIONS: Array<{
   noteId: string;
   noteEn: string;
 }> = [
-  {
-    id: 'available_today',
-    labelId: 'Tersedia hari ini',
-    labelEn: 'Available today',
-    noteId: 'Siap dihubungi hari ini',
-    noteEn: 'Ready to contact today',
-  },
-  {
-    id: 'stock_updated',
-    labelId: 'Stok update',
-    labelEn: 'Stock updated',
-    noteId: 'Info stok baru diperbarui',
-    noteEn: 'Stock info was just refreshed',
-  },
-  {
-    id: 'busy_today',
-    labelId: 'Lagi rame',
-    labelEn: 'Busy today',
-    noteId: 'Masih aktif, respon mungkin bergantian',
-    noteEn: 'Still active, replies may take turns',
-  },
-  {
-    id: 'fully_booked',
-    labelId: 'Full dulu',
-    labelEn: 'Full for now',
-    noteId: 'Sementara tidak menerima permintaan baru',
-    noteEn: 'Temporarily not accepting new requests',
-  },
-];
+    {
+      id: 'available_today',
+      labelId: 'Tersedia hari ini',
+      labelEn: 'Available today',
+      noteId: 'Siap dihubungi hari ini',
+      noteEn: 'Ready to contact today',
+    },
+    {
+      id: 'stock_updated',
+      labelId: 'Stok update',
+      labelEn: 'Stock updated',
+      noteId: 'Info stok baru diperbarui',
+      noteEn: 'Stock info was just refreshed',
+    },
+    {
+      id: 'busy_today',
+      labelId: 'Lagi rame',
+      labelEn: 'Busy today',
+      noteId: 'Masih aktif, respon mungkin bergantian',
+      noteEn: 'Still active, replies may take turns',
+    },
+    {
+      id: 'fully_booked',
+      labelId: 'Full dulu',
+      labelEn: 'Full for now',
+      noteId: 'Sementara tidak menerima permintaan baru',
+      noteEn: 'Temporarily not accepting new requests',
+    },
+  ];
 
 function parseId(value: string): string {
   const clean = value.trim();
@@ -210,8 +210,8 @@ function buildDailyActivityMetadata(
   };
   const existingLog = Array.isArray(metadata.listing_activity_log)
     ? metadata.listing_activity_log.filter(
-        entry => entry && typeof entry === 'object' && !Array.isArray(entry),
-      )
+      entry => entry && typeof entry === 'object' && !Array.isArray(entry),
+    )
     : [];
 
   return {
@@ -727,10 +727,10 @@ export default function MyListingsPage() {
         current.map(entry =>
           entry.id === item.id
             ? mergeUpdatedListing(
-                optimisticItem,
-                payload,
-                optimisticItem.metadata || {},
-              )
+              optimisticItem,
+              payload,
+              optimisticItem.metadata || {},
+            )
             : entry,
         ),
       );
@@ -783,28 +783,28 @@ export default function MyListingsPage() {
   const primaryAction =
     collectionMode !== 'mine'
       ? {
-          label: locale === 'id' ? 'Cari inspirasi' : 'Search ideas',
-          href: '/search',
-          icon: Search,
-        }
+        label: locale === 'id' ? 'Cari inspirasi' : 'Search ideas',
+        href: '/search',
+        icon: Search,
+      }
       : {
-          label: createLabel,
-          href: createHref,
-          icon: Plus,
-        };
+        label: createLabel,
+        href: createHref,
+        icon: Plus,
+      };
   const PrimaryActionIcon = primaryAction.icon;
   const secondaryAction =
     collectionMode !== 'mine'
       ? {
-          label: locale === 'id' ? 'Postingan saya' : 'My posts',
-          href: '/my-listings',
-          icon: Megaphone,
-        }
+        label: locale === 'id' ? 'Postingan saya' : 'My posts',
+        href: '/my-listings',
+        icon: Megaphone,
+      }
       : {
-          label: locale === 'id' ? 'Cari inspirasi' : 'Find ideas',
-          href: '/search',
-          icon: Search,
-        };
+        label: locale === 'id' ? 'Cari inspirasi' : 'Find ideas',
+        href: '/search',
+        icon: Search,
+      };
   const SecondaryActionIcon = secondaryAction.icon;
   const totalShown =
     collectionMode === 'favorites'
@@ -837,11 +837,11 @@ export default function MyListingsPage() {
                   <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-white/86 text-emerald-700 shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-200 dark:ring-white/10">
                     <HeaderIcon className="h-4 w-4" />
                   </span>
-                  <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-100 dark:bg-white/8 dark:text-emerald-200 dark:ring-white/10">
+                  <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-100 dark:bg-white/8 dark:text-emerald-200 dark:ring-white/10">
                     {locale === 'id' ? 'Ruang promosi' : 'Promo space'}
                   </span>
                 </div>
-                <h1 className="mt-2 text-xl font-black leading-tight tracking-[-0.05em] text-slate-950 dark:text-white sm:text-2xl">
+                <h1 className="mt-2 text-xl font-bold leading-tight tracking-[-0.05em] text-slate-950 dark:text-white sm:text-2xl">
                   {pageTitle}
                 </h1>
                 <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-slate-600 dark:text-slate-300 sm:text-[13px]">
@@ -852,14 +852,14 @@ export default function MyListingsPage() {
               <div className="grid gap-2 sm:grid-cols-2 lg:w-[300px]">
                 <Link
                   href={primaryAction.href}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-xs font-black text-white shadow-[0_18px_34px_-24px_rgba(4,120,87,0.72)] transition hover:bg-emerald-800"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-xs font-bold text-white shadow-[0_18px_34px_-24px_rgba(4,120,87,0.72)] transition hover:bg-emerald-800"
                 >
                   <PrimaryActionIcon className="h-4 w-4" />
                   {primaryAction.label}
                 </Link>
                 <Link
                   href={secondaryAction.href}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/84 px-4 text-xs font-black text-slate-800 transition hover:bg-white dark:border-white/10 dark:bg-white/8 dark:text-white"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/84 px-4 text-xs font-bold text-slate-800 transition hover:bg-white dark:border-white/10 dark:bg-white/8 dark:text-white"
                 >
                   <SecondaryActionIcon className="h-4 w-4" />
                   {secondaryAction.label}
@@ -869,26 +869,26 @@ export default function MyListingsPage() {
 
             <div className="relative mt-3 grid gap-1.5 sm:grid-cols-3">
               <div className="rounded-[15px] bg-white/72 p-2.5 ring-1 ring-white/80 dark:bg-white/[0.06] dark:ring-white/10">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                   {locale === 'id' ? 'Mode' : 'Mode'}
                 </p>
-                <p className="mt-0.5 truncate text-sm font-black text-slate-950 dark:text-white">
+                <p className="mt-0.5 truncate text-sm font-bold text-slate-950 dark:text-white">
                   {heroStatusLabel}
                 </p>
               </div>
               <div className="rounded-[15px] bg-white/72 p-2.5 ring-1 ring-white/80 dark:bg-white/[0.06] dark:ring-white/10">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                   {locale === 'id' ? 'Tampil' : 'Shown'}
                 </p>
-                <p className="mt-0.5 text-sm font-black text-slate-950 dark:text-white">
+                <p className="mt-0.5 text-sm font-bold text-slate-950 dark:text-white">
                   {totalShown.toLocaleString(locale)}
                 </p>
               </div>
               <div className="rounded-[15px] bg-white/72 p-2.5 ring-1 ring-white/80 dark:bg-white/[0.06] dark:ring-white/10">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                   {locale === 'id' ? 'Fokus launch' : 'Launch focus'}
                 </p>
-                <p className="mt-0.5 truncate text-sm font-black text-slate-950 dark:text-white">
+                <p className="mt-0.5 truncate text-sm font-bold text-slate-950 dark:text-white">
                   {locale === 'id' ? 'Promosi + chat' : 'Promo + chat'}
                 </p>
               </div>
@@ -909,11 +909,10 @@ export default function MyListingsPage() {
                       key={tab.id}
                       href={tab.href}
                       aria-current={active ? 'page' : undefined}
-                      className={`inline-flex min-h-9 items-center justify-center rounded-[12px] px-2 text-center text-xs font-black transition sm:text-[13px] ${
-                        active
+                      className={`inline-flex min-h-9 items-center justify-center rounded-[12px] px-2 text-center text-xs font-bold transition sm:text-[13px] ${active
                           ? 'bg-emerald-700 text-white shadow-[0_12px_24px_-18px_rgba(4,120,87,0.45)] ring-1 ring-emerald-800/10 dark:bg-emerald-500 dark:text-slate-950'
                           : 'text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/70 dark:hover:text-white'
-                      }`}
+                        }`}
                     >
                       {tab.label}
                     </Link>
@@ -970,11 +969,10 @@ export default function MyListingsPage() {
                     type="button"
                     onClick={() => setActiveStatus(tab.id)}
                     aria-pressed={activeStatus === tab.id}
-                    className={`min-h-9 rounded-[12px] px-2 text-xs font-black transition sm:text-[13px] ${
-                      activeStatus === tab.id
+                    className={`min-h-9 rounded-[12px] px-2 text-xs font-bold transition sm:text-[13px] ${activeStatus === tab.id
                         ? 'bg-emerald-700 text-white shadow-[0_12px_24px_-18px_rgba(4,120,87,0.45)] ring-1 ring-emerald-800/10 dark:bg-emerald-500 dark:text-slate-950'
                         : 'text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-950/70 dark:hover:text-white'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -990,7 +988,7 @@ export default function MyListingsPage() {
           ) : null}
 
           {activityNotice ? (
-            <section className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
+            <section className="rounded-[22px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
               {activityNotice}
             </section>
           ) : null}
@@ -1023,14 +1021,14 @@ export default function MyListingsPage() {
                       <button
                         type="button"
                         onClick={() => setQuery('')}
-                        className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                        className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                       >
                         {locale === 'id' ? 'Reset cari' : 'Reset search'}
                       </button>
                     ) : (
                       <Link
                         href="/search"
-                        className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800"
+                        className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
                       >
                         {locale === 'id' ? 'Cari postingan' : 'Search posts'}
                       </Link>
@@ -1042,8 +1040,8 @@ export default function MyListingsPage() {
                   {filteredViewedReferences.map(item => {
                     const imageStyle = item.image
                       ? {
-                          backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
-                        }
+                        backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
+                      }
                       : undefined;
 
                     return (
@@ -1059,19 +1057,19 @@ export default function MyListingsPage() {
                             {!item.image ? (
                               <Eye className="h-5 w-5 text-emerald-500" />
                             ) : null}
-                            <span className="absolute left-1.5 top-1.5 max-w-[64px] truncate rounded-full bg-white/88 px-1.5 py-0.5 text-[9px] font-black text-slate-700 shadow-sm dark:bg-slate-950/78 dark:text-white">
+                            <span className="absolute left-1.5 top-1.5 max-w-[64px] truncate rounded-full bg-white/88 px-1.5 py-0.5 text-[9px] font-bold text-slate-700 shadow-sm dark:bg-slate-950/78 dark:text-white">
                               {item.typeLabel}
                             </span>
                           </div>
                           <div className="min-w-0">
-                            <h2 className="line-clamp-2 text-[13.5px] font-black leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
+                            <h2 className="line-clamp-2 text-[13.5px] font-bold leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
                               {item.title}
                             </h2>
                             <div className="mt-1.5 flex flex-wrap gap-1">
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
+                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
                                 {item.priceLabel}
                               </span>
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600 dark:bg-white/8 dark:text-slate-300">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/8 dark:text-slate-300">
                                 {formatDate(new Date(item.viewedAt).toISOString())}
                               </span>
                             </div>
@@ -1093,7 +1091,7 @@ export default function MyListingsPage() {
                           <button
                             type="button"
                             onClick={() => removeViewedReference(item.id)}
-                            className="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
+                            className="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
                             aria-label={
                               locale === 'id'
                                 ? 'Hapus dari riwayat'
@@ -1104,7 +1102,7 @@ export default function MyListingsPage() {
                           </button>
                           <Link
                             href={item.href}
-                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-black text-white transition hover:bg-emerald-800"
+                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-800"
                           >
                             <Eye className="h-4 w-4" />
                             {locale === 'id' ? 'Buka lagi' : 'Open again'}
@@ -1142,14 +1140,14 @@ export default function MyListingsPage() {
                       <button
                         type="button"
                         onClick={() => setQuery('')}
-                        className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                        className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                       >
                         {locale === 'id' ? 'Reset cari' : 'Reset search'}
                       </button>
                     ) : (
                       <Link
                         href="/search"
-                        className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800"
+                        className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
                       >
                         {locale === 'id' ? 'Cari inspirasi' : 'Search ideas'}
                       </Link>
@@ -1161,8 +1159,8 @@ export default function MyListingsPage() {
                   {filteredReferences.map(item => {
                     const imageStyle = item.image
                       ? {
-                          backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
-                        }
+                        backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
+                      }
                       : undefined;
 
                     return (
@@ -1178,20 +1176,20 @@ export default function MyListingsPage() {
                             {!item.image ? (
                               <Heart className="h-5 w-5 text-rose-400" />
                             ) : null}
-                            <span className="absolute left-1.5 top-1.5 max-w-[64px] truncate rounded-full bg-white/88 px-1.5 py-0.5 text-[9px] font-black text-slate-700 shadow-sm dark:bg-slate-950/78 dark:text-white">
+                            <span className="absolute left-1.5 top-1.5 max-w-[64px] truncate rounded-full bg-white/88 px-1.5 py-0.5 text-[9px] font-bold text-slate-700 shadow-sm dark:bg-slate-950/78 dark:text-white">
                               {item.typeLabel}
                             </span>
                           </div>
                           <div className="min-w-0">
-                            <h2 className="line-clamp-2 text-[13.5px] font-black leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
+                            <h2 className="line-clamp-2 text-[13.5px] font-bold leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
                               {item.title}
                             </h2>
                             <div className="mt-1.5 flex flex-wrap gap-1">
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
+                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
                                 {item.priceLabel}
                               </span>
                               {item.quantity > 1 ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600 dark:bg-white/8 dark:text-slate-300">
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-white/8 dark:text-slate-300">
                                   x{item.quantity}
                                 </span>
                               ) : null}
@@ -1214,7 +1212,7 @@ export default function MyListingsPage() {
                           <button
                             type="button"
                             onClick={() => removeReference(item.id)}
-                            className="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
+                            className="inline-flex min-h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-500 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300"
                             aria-label={
                               locale === 'id'
                                 ? 'Hapus dari simpanan'
@@ -1225,7 +1223,7 @@ export default function MyListingsPage() {
                           </button>
                           <Link
                             href={item.href}
-                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-black text-white transition hover:bg-emerald-800"
+                            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-800"
                           >
                             <Eye className="h-4 w-4" />
                             {item.actionLabel ||
@@ -1267,14 +1265,14 @@ export default function MyListingsPage() {
                     <button
                       type="button"
                       onClick={() => setQuery('')}
-                      className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                      className="inline-flex min-h-10 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                     >
                       {locale === 'id' ? 'Reset cari' : 'Reset search'}
                     </button>
                   ) : (
                     <Link
                       href={createHref}
-                      className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800"
+                      className="inline-flex min-h-10 items-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
                     >
                       {createLabel}
                     </Link>
@@ -1292,7 +1290,7 @@ export default function MyListingsPage() {
                   const normalizedStatus = rawStatus.toLowerCase();
                   const cardStatus: ListingStatus =
                     normalizedStatus === 'active' ||
-                    normalizedStatus === 'archived'
+                      normalizedStatus === 'archived'
                       ? normalizedStatus
                       : 'draft';
                   const itemStatus = listingStatusLabel(rawStatus, locale);
@@ -1335,26 +1333,26 @@ export default function MyListingsPage() {
                             <ImageIcon className="h-5 w-5" />
                           ) : null}
                           <span
-                            className={`absolute left-1.5 top-1.5 max-w-[68px] truncate rounded-full px-1.5 py-0.5 text-[9px] font-black ${statusToneClass(rawStatus)}`}
+                            className={`absolute left-1.5 top-1.5 max-w-[68px] truncate rounded-full px-1.5 py-0.5 text-[9px] font-bold ${statusToneClass(rawStatus)}`}
                           >
                             {itemStatus}
                           </span>
                         </div>
 
                         <div className="min-w-0">
-                          <h2 className="line-clamp-2 text-[13.5px] font-black leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
+                          <h2 className="line-clamp-2 text-[13.5px] font-bold leading-snug tracking-[-0.02em] text-slate-950 dark:text-white">
                             {item.title ||
                               (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
                           </h2>
                           <div className="mt-1.5 flex flex-wrap gap-1">
-                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700 dark:bg-white/8 dark:text-slate-300">
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-white/8 dark:text-slate-300">
                               {typeLabel}
                             </span>
-                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-white/10">
+                            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-white/10">
                               {formatDate(item.updated_at || item.created_at)}
                             </span>
                             {activityLabel ? (
-                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/12 dark:text-emerald-200 dark:ring-emerald-400/20">
+                              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/12 dark:text-emerald-200 dark:ring-emerald-400/20">
                                 {activityLabel}
                               </span>
                             ) : null}
@@ -1393,7 +1391,7 @@ export default function MyListingsPage() {
                         {cardStatus === 'active' ? (
                           <div className="mt-2 border-t border-slate-200/80 pt-2 dark:border-white/10">
                             <div className="mb-2 flex items-center justify-between gap-2">
-                              <p className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                              <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                                 {locale === 'id'
                                   ? 'Update cepat'
                                   : 'Quick update'}
@@ -1416,11 +1414,10 @@ export default function MyListingsPage() {
                                     onClick={() =>
                                       void updateDailyActivity(item, option.id)
                                     }
-                                    className={`min-h-8 rounded-full border px-1.5 text-[10px] font-black transition disabled:cursor-wait disabled:opacity-60 ${
-                                      activeActivity
+                                    className={`min-h-8 rounded-full border px-1.5 text-[10px] font-bold transition disabled:cursor-wait disabled:opacity-60 ${activeActivity
                                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/12 dark:text-emerald-200'
                                         : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-emerald-400/20 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200'
-                                    }`}
+                                      }`}
                                   >
                                     {activityBusy
                                       ? locale === 'id'
@@ -1444,7 +1441,7 @@ export default function MyListingsPage() {
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
-                            <p className="mt-1 text-[10px] font-black text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
                               {locale === 'id'
                                 ? `Kelengkapan ${progress}%`
                                 : `${progress}% complete`}
@@ -1453,11 +1450,11 @@ export default function MyListingsPage() {
                         ) : null}
                       </div>
 
-                    <div className={`mt-2 grid gap-1.5 ${actionGridClass}`}>
-                      {cardStatus === 'draft' ? (
-                        <Link
-                          href={`/create?draft=${id}`}
-                          className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-black text-white transition hover:bg-amber-700"
+                      <div className={`mt-2 grid gap-1.5 ${actionGridClass}`}>
+                        {cardStatus === 'draft' ? (
+                          <Link
+                            href={`/create?draft=${id}`}
+                            className="col-span-2 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-amber-600 px-3 text-xs font-bold text-white transition hover:bg-amber-700"
                           >
                             <PencilLine className="h-4 w-4" />
                             {locale === 'id'
@@ -1468,14 +1465,14 @@ export default function MyListingsPage() {
                           <>
                             <Link
                               href={`/create?draft=${id}`}
-                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
+                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-950 dark:text-white"
                             >
                               <PencilLine className="h-4 w-4" />
                               {locale === 'id' ? 'Edit' : 'Edit'}
                             </Link>
                             <Link
                               href={`/content/${id}`}
-                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-black text-white transition hover:bg-emerald-800"
+                              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-emerald-700 px-3 text-xs font-bold text-white transition hover:bg-emerald-800"
                             >
                               <Eye className="h-4 w-4" />
                               {locale === 'id' ? 'Lihat' : 'View'}
@@ -1490,7 +1487,7 @@ export default function MyListingsPage() {
                                   )
                                 }
                                 disabled={updatingStatusId === item.id}
-                                className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border-2 px-3 text-xs font-black transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
+                                className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border-2 px-3 text-xs font-bold transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
                               >
                                 <statusToggle.icon className="h-4 w-4" />
                                 {statusToggle.label}
@@ -1520,7 +1517,7 @@ export default function MyListingsPage() {
                 <HeaderIcon className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
-                <h1 className="truncate text-[17px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <h1 className="truncate text-[17px] font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {pageTitle}
                 </h1>
                 <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -1531,7 +1528,7 @@ export default function MyListingsPage() {
             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:flex sm:justify-end">
               <Link
                 href={primaryAction.href}
-                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] shadow-[0_14px_24px_-20px_rgba(15,23,42,0.35)]"
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] shadow-[0_14px_24px_-20px_rgba(15,23,42,0.35)]"
               >
                 <PrimaryActionIcon className="h-3.5 w-3.5" />
                 {primaryAction.label}
@@ -1540,7 +1537,7 @@ export default function MyListingsPage() {
                 href={
                   collectionMode !== 'mine' ? '/my-listings' : '/transactions'
                 }
-                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950"
               >
                 <SecondaryActionIcon className="h-3.5 w-3.5" />
                 {collectionMode !== 'mine'
@@ -1565,11 +1562,10 @@ export default function MyListingsPage() {
                   <Link
                     key={tab.id}
                     href={tab.href}
-                    className={`inline-flex min-h-9 items-center justify-center rounded-[12px] px-2 text-xs font-black transition sm:text-[13px] ${
-                      active
+                    className={`inline-flex min-h-9 items-center justify-center rounded-[12px] px-2 text-xs font-bold transition sm:text-[13px] ${active
                         ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
                         : 'text-[color:var(--app-text-soft)] hover:bg-white/70 hover:text-[color:var(--app-text)] dark:hover:bg-slate-900'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </Link>
@@ -1625,11 +1621,10 @@ export default function MyListingsPage() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveStatus(tab.id)}
-                  className={`min-h-9 rounded-[12px] px-2 text-xs font-black transition sm:text-[13px] ${
-                    activeStatus === tab.id
+                  className={`min-h-9 rounded-[12px] px-2 text-xs font-bold transition sm:text-[13px] ${activeStatus === tab.id
                       ? 'bg-white text-[color:var(--app-accent)] shadow-[0_10px_20px_-18px_rgba(15,23,42,0.35)] dark:bg-slate-900 dark:text-emerald-300'
                       : 'text-[color:var(--app-text-soft)] hover:bg-white/70 hover:text-[color:var(--app-text)] dark:hover:bg-slate-900'
-                  }`}
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -1669,14 +1664,14 @@ export default function MyListingsPage() {
                   <button
                     type="button"
                     onClick={() => setQuery('')}
-                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
+                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
                   >
                     {locale === 'id' ? 'Reset cari' : 'Reset search'}
                   </button>
                 ) : (
                   <Link
                     href="/search"
-                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                   >
                     {locale === 'id' ? 'Cari listing' : 'Search listings'}
                   </Link>
@@ -1710,14 +1705,14 @@ export default function MyListingsPage() {
                     <button
                       type="button"
                       onClick={() => setQuery('')}
-                      className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
+                      className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
                     >
                       {locale === 'id' ? 'Reset cari' : 'Reset search'}
                     </button>
                   ) : (
                     <Link
                       href="/search"
-                      className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                      className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                     >
                       {locale === 'id' ? 'Cari listing' : 'Search listings'}
                     </Link>
@@ -1729,8 +1724,8 @@ export default function MyListingsPage() {
                 {filteredReferences.map(item => {
                   const imageStyle = item.image
                     ? {
-                        backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
-                      }
+                      backgroundImage: `url("${item.image.replace(/"/g, '%22')}")`,
+                    }
                     : undefined;
 
                   return (
@@ -1748,7 +1743,7 @@ export default function MyListingsPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <h2 className="line-clamp-2 text-[15px] font-black leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              <h2 className="line-clamp-2 text-[15px] font-bold leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                 {item.title}
                               </h2>
                               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -1782,7 +1777,7 @@ export default function MyListingsPage() {
                         <button
                           type="button"
                           onClick={() => removeReference(item.id)}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] border-2 border-slate-300 bg-white px-3 text-sm font-black text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] dark:border-slate-700 dark:bg-slate-950"
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] border-2 border-slate-300 bg-white px-3 text-sm font-bold text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] dark:border-slate-700 dark:bg-slate-950"
                           aria-label={
                             locale === 'id'
                               ? 'Hapus favorit'
@@ -1793,7 +1788,7 @@ export default function MyListingsPage() {
                         </button>
                         <Link
                           href={item.href}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                          className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                         >
                           {item.actionLabel ||
                             (locale === 'id' ? 'Buka' : 'Open')}
@@ -1832,14 +1827,14 @@ export default function MyListingsPage() {
                   <button
                     type="button"
                     onClick={() => setQuery('')}
-                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
+                    className="inline-flex min-h-9 items-center rounded-xl border border-[color:var(--app-border-strong)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-slate-950"
                   >
                     {locale === 'id' ? 'Reset cari' : 'Reset search'}
                   </button>
                 ) : (
                   <Link
                     href={createHref}
-                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                    className="inline-flex min-h-9 items-center rounded-xl bg-[color:var(--app-accent-strong)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                   >
                     {createLabel}
                   </Link>
@@ -1858,15 +1853,15 @@ export default function MyListingsPage() {
                 const normalizedStatus = rawStatus.toLowerCase();
                 const cardStatus: ListingStatus =
                   normalizedStatus === 'active' ||
-                  normalizedStatus === 'archived'
+                    normalizedStatus === 'archived'
                     ? normalizedStatus
                     : 'draft';
                 const progress = readProgress(item);
                 const imageUrl = resolveListingImage(item);
                 const imageStyle = imageUrl
                   ? {
-                      backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")`,
-                    }
+                    backgroundImage: `url("${imageUrl.replace(/"/g, '%22')}")`,
+                  }
                   : undefined;
                 const statusToggle = listingStatusToggle(cardStatus, locale);
                 const actionGridClass = statusToggle
@@ -1890,7 +1885,7 @@ export default function MyListingsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <h2 className="line-clamp-2 text-[15px] font-black leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            <h2 className="line-clamp-2 text-[15px] font-bold leading-snug text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                               {item.title ||
                                 (locale === 'id' ? 'Tanpa judul' : 'Untitled')}
                             </h2>
@@ -1937,7 +1932,7 @@ export default function MyListingsPage() {
                       {activeStatus === 'draft' ? (
                         <Link
                           href={`/create?draft=${id}`}
-                          className="col-span-2 inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-warning)] px-3 text-sm font-black text-[color:var(--app-text-inverse)]"
+                          className="col-span-2 inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-warning)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)]"
                         >
                           {locale === 'id' ? 'Lanjut isi' : 'Continue Draft'}
                         </Link>
@@ -1945,13 +1940,13 @@ export default function MyListingsPage() {
                         <>
                           <Link
                             href={`/create?draft=${id}`}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] border-2 border-slate-300 bg-white px-3 text-sm font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-slate-700 dark:bg-slate-950"
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] border-2 border-slate-300 bg-white px-3 text-sm font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-slate-700 dark:bg-slate-950"
                           >
                             {locale === 'id' ? 'Edit' : 'Edit'}
                           </Link>
                           <Link
                             href={`/content/${id}`}
-                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                            className="inline-flex min-h-[44px] items-center justify-center rounded-[14px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                           >
                             {locale === 'id' ? 'Lihat' : 'View'}
                           </Link>
@@ -1965,7 +1960,7 @@ export default function MyListingsPage() {
                                 )
                               }
                               disabled={updatingStatusId === item.id}
-                              className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border-2 px-3 text-sm font-black transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
+                              className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border-2 px-3 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 ${statusToggle.className}`}
                             >
                               <statusToggle.icon className="h-4 w-4" />
                               {statusToggle.label}

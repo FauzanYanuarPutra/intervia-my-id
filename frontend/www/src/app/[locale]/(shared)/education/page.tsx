@@ -206,11 +206,11 @@ export default async function EducationPage({ params }: PageProps) {
 
         <div className="mx-auto grid min-h-[560px] w-full max-w-7xl items-center gap-8 px-4 pb-12 pt-24 sm:px-6 lg:grid-cols-[1fr_440px] lg:px-8">
           <div className="max-w-3xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-semibold text-emerald-50 backdrop-blur">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-semibold text-emerald-50 ">
               <GraduationCap className="h-4 w-4" />
               Education hub
             </div>
-            <h1 className="max-w-3xl text-4xl font-black leading-[1.03] tracking-normal sm:text-5xl lg:text-6xl">
+            <h1 className="max-w-3xl text-4xl font-bold leading-[1.03] tracking-normal sm:text-5xl lg:text-6xl">
               {heroTitle}
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-100 sm:text-lg">
@@ -220,7 +220,7 @@ export default async function EducationPage({ params }: PageProps) {
               {EDUCATION_HERO.chips.map(chip => (
                 <span
                   key={pickText(locale, chip)}
-                  className="rounded-full border border-white/18 bg-white/10 px-3 py-1 text-xs font-black text-slate-100 backdrop-blur"
+                  className="rounded-full border border-white/18 bg-white/10 px-3 py-1 text-xs font-bold text-slate-100 "
                 >
                   {pickText(locale, chip)}
                 </span>
@@ -230,14 +230,14 @@ export default async function EducationPage({ params }: PageProps) {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 href="/learn"
-                className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-5 text-sm font-black text-slate-950 shadow-[0_22px_44px_-30px_rgba(255,255,255,0.9)] transition hover:-translate-y-0.5"
+                className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-slate-950 shadow-[0_22px_44px_-30px_rgba(255,255,255,0.9)] transition hover:-translate-y-0.5"
               >
                 <BookOpen className="h-4 w-4" />
                 Jelajahi materi user
               </Link>
               <Link
                 href="/learn#creator-studio"
-                className="inline-flex h-12 items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 text-sm font-black text-white backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/16"
+                className="inline-flex h-12 items-center gap-2 rounded-full border border-white/25 bg-white/10 px-5 text-sm font-bold text-white  transition hover:-translate-y-0.5 hover:bg-white/16"
               >
                 <Sparkles className="h-4 w-4" />
                 Buat course
@@ -245,7 +245,7 @@ export default async function EducationPage({ params }: PageProps) {
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 p-4 shadow-[0_32px_80px_-42px_rgba(0,0,0,0.85)] backdrop-blur-xl">
+          <div className="rounded-[32px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 p-4 shadow-[0_32px_80px_-42px_rgba(0,0,0,0.85)] ">
             <div className="overflow-hidden rounded-[24px] bg-white text-slate-950">
               <div className="relative aspect-video bg-slate-900">
                 <LajukanImage
@@ -261,7 +261,7 @@ export default async function EducationPage({ params }: PageProps) {
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-100">
                       Creator playlist
                     </p>
-                    <p className="mt-1 text-lg font-black">
+                    <p className="mt-1 text-lg font-bold">
                       Video, bacaan, dan kelas praktik
                     </p>
                   </div>
@@ -272,19 +272,19 @@ export default async function EducationPage({ params }: PageProps) {
               </div>
               <div className="grid grid-cols-3 divide-x divide-slate-100 text-center">
                 <div className="p-4">
-                  <p className="text-2xl font-black">{courses.length || 9}+</p>
+                  <p className="text-2xl font-bold">{courses.length || 9}+</p>
                   <p className="mt-1 text-xs font-bold text-slate-500">
                     Materi
                   </p>
                 </div>
                 <div className="p-4">
-                  <p className="text-2xl font-black">
+                  <p className="text-2xl font-bold">
                     {videoCount || LEARN_TRACKS.length}
                   </p>
                   <p className="mt-1 text-xs font-bold text-slate-500">Video</p>
                 </div>
                 <div className="p-4">
-                  <p className="text-2xl font-black">
+                  <p className="text-2xl font-bold">
                     {readingCount || LEARN_PATHS.length}
                   </p>
                   <p className="mt-1 text-xs font-bold text-slate-500">
@@ -336,7 +336,7 @@ export default async function EducationPage({ params }: PageProps) {
                   <StatIcon kind={stat.icon} />
                 </span>
                 <div>
-                  <p className="text-lg font-black text-slate-950">
+                  <p className="text-lg font-bold text-slate-950">
                     {stat.value}
                   </p>
                   <p className="text-xs font-bold text-slate-500">
@@ -352,10 +352,10 @@ export default async function EducationPage({ params }: PageProps) {
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-700">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-700">
               Materi dari creator
             </p>
-            <h2 className="mt-2 text-3xl font-black tracking-normal text-slate-950">
+            <h2 className="mt-2 text-3xl font-bold tracking-normal text-slate-950">
               Belajar seperti YouTube, lanjut sedalam Udemy.
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
@@ -365,7 +365,7 @@ export default async function EducationPage({ params }: PageProps) {
           </div>
           <Link
             href="/learn"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200"
           >
             Buka Learn
             <ArrowRight className="h-4 w-4" />
@@ -391,12 +391,12 @@ export default async function EducationPage({ params }: PageProps) {
                   />
                   <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-gradient-to-t from-slate-950/82 to-transparent p-4 text-white">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black ring-1 ${meta.tone} bg-white`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${meta.tone} bg-white`}
                     >
                       <FormatKindIcon format={course.primary_format} />
                       {meta.label}
                     </span>
-                    <span className="rounded-full bg-white/14 px-2.5 py-1 text-xs font-black backdrop-blur">
+                    <span className="rounded-full bg-white/14 px-2.5 py-1 text-xs font-bold ">
                       {course.level ?? 'Semua level'}
                     </span>
                   </div>
@@ -409,7 +409,7 @@ export default async function EducationPage({ params }: PageProps) {
                     <span aria-hidden="true">•</span>
                     <span>{formatPrice(course)}</span>
                   </div>
-                  <h3 className="mt-3 line-clamp-2 text-lg font-black leading-snug text-slate-950">
+                  <h3 className="mt-3 line-clamp-2 text-lg font-bold leading-snug text-slate-950">
                     {course.title}
                   </h3>
                   <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
@@ -439,10 +439,10 @@ export default async function EducationPage({ params }: PageProps) {
       <section className="bg-white">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.82fr_1.18fr] lg:px-8">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-sky-700">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-sky-700">
               Jalur belajar
             </p>
-            <h2 className="mt-2 text-3xl font-black tracking-normal text-slate-950">
+            <h2 className="mt-2 text-3xl font-bold tracking-normal text-slate-950">
               Pilih urutan belajar sesuai kebutuhan bisnis.
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -456,7 +456,7 @@ export default async function EducationPage({ params }: PageProps) {
                   <ShieldCheck className="h-5 w-5" />
                 </span>
                 <div>
-                  <h3 className="font-black text-slate-950">
+                  <h3 className="font-bold text-slate-950">
                     Cocok untuk creator dan learner
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -477,16 +477,16 @@ export default async function EducationPage({ params }: PageProps) {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-slate-950 shadow-sm">
-                    <span className="text-sm font-black">
+                    <span className="text-sm font-bold">
                       {(index + 1).toString().padStart(2, '0')}
                     </span>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-600 ring-1 ring-slate-200">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
                     <Clock3 className="h-3.5 w-3.5" />
                     Bertahap
                   </span>
                 </div>
-                <h3 className="mt-5 text-lg font-black text-slate-950">
+                <h3 className="mt-5 text-lg font-bold text-slate-950">
                   {pickText(locale, path.title)}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -512,10 +512,10 @@ export default async function EducationPage({ params }: PageProps) {
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-[30px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_24px_70px_-52px_rgba(15,23,42,0.9)] sm:p-8">
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-emerald-200">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-200">
               Format belajar
             </p>
-            <h2 className="mt-2 text-3xl font-black tracking-normal">
+            <h2 className="mt-2 text-3xl font-bold tracking-normal">
               Dari baca cepat sampai kelas lengkap.
             </h2>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -535,7 +535,7 @@ export default async function EducationPage({ params }: PageProps) {
                       )}
                     </span>
                     <div>
-                      <h3 className="font-black">
+                      <h3 className="font-bold">
                         {pickText(locale, track.title)}
                       </h3>
                       <p className="mt-1 text-sm leading-6 text-slate-300">
@@ -555,7 +555,7 @@ export default async function EducationPage({ params }: PageProps) {
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
               <Sparkles className="h-6 w-6" />
             </div>
-            <h2 className="mt-5 text-3xl font-black tracking-normal text-slate-950">
+            <h2 className="mt-5 text-3xl font-bold tracking-normal text-slate-950">
               Punya ilmu operasional? Jadikan materi.
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -577,7 +577,7 @@ export default async function EducationPage({ params }: PageProps) {
             </div>
             <Link
               href="/learn#creator-studio"
-              className="mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white shadow-[0_18px_44px_-30px_rgba(4,120,87,0.9)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
+              className="mt-7 inline-flex h-12 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white shadow-[0_18px_44px_-30px_rgba(4,120,87,0.9)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
             >
               Buka Creator Studio
               <ArrowRight className="h-4 w-4" />
@@ -589,10 +589,10 @@ export default async function EducationPage({ params }: PageProps) {
       <section className="border-y border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-amber-700">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-700">
               Panduan aman
             </p>
-            <h2 className="mt-2 text-3xl font-black tracking-normal text-slate-950">
+            <h2 className="mt-2 text-3xl font-bold tracking-normal text-slate-950">
               Belajar sambil tetap siap transaksi.
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -611,7 +611,7 @@ export default async function EducationPage({ params }: PageProps) {
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-white text-slate-950 shadow-sm">
                     <TopicIcon index={index} />
                   </span>
-                  <h3 className="mt-5 text-lg font-black text-slate-950">
+                  <h3 className="mt-5 text-lg font-bold text-slate-950">
                     {pickText(locale, topic.title)}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -668,13 +668,13 @@ export default async function EducationPage({ params }: PageProps) {
                 <span className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-white">
                   <ResourceIcon kind={item.icon} />
                 </span>
-                <h3 className="mt-5 text-lg font-black text-slate-950">
+                <h3 className="mt-5 text-lg font-bold text-slate-950">
                   {item.title}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   {item.body}
                 </p>
-                <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-black text-emerald-700">
+                <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
                   Buka
                   <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
                 </span>

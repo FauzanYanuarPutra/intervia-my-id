@@ -9,15 +9,15 @@ const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'develo
 const MESSAGES = {
   en: {
     title: 'Something went wrong',
-    description: 'Please try again. If the problem persists, contact support.',
+    description: 'Try again. If it keeps happening, contact support.',
     tryAgain: 'Try again',
     goHome: 'Go home',
   },
   id: {
-    title: 'Terjadi kesalahan',
-    description: 'Silakan coba lagi. Jika masalah berlanjut, hubungi dukungan.',
+    title: 'Ada kendala',
+    description: 'Coba lagi. Kalau masih terjadi, hubungi bantuan.',
     tryAgain: 'Coba lagi',
-    goHome: 'Ke beranda',
+    goHome: 'Buka beranda',
   },
 };
 

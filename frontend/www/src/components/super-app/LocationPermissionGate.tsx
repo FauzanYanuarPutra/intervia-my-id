@@ -244,11 +244,11 @@ export function LocationPermissionGate({
   ];
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_56%,_transparent)] p-3 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_56%,_transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))]  sm:items-center sm:p-4">
       <section
         role="dialog"
         aria-modal="true"
-        className="ui-sheet max-h-[80svh] w-full max-w-[680px] overflow-y-auto p-4 sm:p-5"
+        className="ui-sheet max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-[680px] overflow-y-auto p-4 sm:p-5"
       >
         <div className="ui-bottom-sheet-handle sm:hidden" />
 

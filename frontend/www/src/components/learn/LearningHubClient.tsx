@@ -160,7 +160,7 @@ function CourseCard({
           className="object-cover transition duration-500 group-hover:scale-[1.03]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-        <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/94 px-2.5 py-1 text-[11px] font-black text-slate-950">
+        <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/94 px-2.5 py-1 text-[11px] font-bold text-slate-950">
           <FormatIconGlyph format={course.primary_format} />
           {formatLabel(course.primary_format, isId)}
         </span>
@@ -170,7 +170,7 @@ function CourseCard({
       </div>
       <div className="space-y-3 p-4">
         <div>
-          <h2 className="line-clamp-2 text-base font-black leading-5 text-[color:var(--app-text)]">
+          <h2 className="line-clamp-2 text-base font-bold leading-5 text-[color:var(--app-text)]">
             {course.title}
           </h2>
           <p className="mt-2 line-clamp-2 text-sm leading-5 text-[color:var(--app-text-soft)]">
@@ -201,7 +201,7 @@ function CourseCard({
             <Users className="h-3.5 w-3.5" />
             {course.enrollment_count || course.view_count || 0}
           </span>
-          <span className="font-black text-[color:var(--app-accent)]">
+          <span className="font-bold text-[color:var(--app-accent)]">
             {formatMoney(course, isId)}
           </span>
         </div>
@@ -214,7 +214,7 @@ function EmptyLearningState({ isId }: { isId: boolean }) {
   return (
     <div className="rounded-[24px] border border-dashed border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-6 text-center">
       <BookOpen className="mx-auto h-10 w-10 text-[color:var(--app-accent)]" />
-      <h2 className="mt-3 text-lg font-black text-[color:var(--app-text)]">
+      <h2 className="mt-3 text-lg font-bold text-[color:var(--app-text)]">
         {isId ? 'Belum ada materi dari database' : 'No database content yet'}
       </h2>
       <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -280,11 +280,11 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
           <div className="overflow-hidden rounded-[26px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
             <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
               <div className="p-5 sm:p-6">
-                <p className="inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-[11px] font-black uppercase text-[color:var(--app-accent)]">
+                <p className="inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-[11px] font-bold uppercase text-[color:var(--app-accent)]">
                   <GraduationCap className="h-3.5 w-3.5" />
                   Lajukan Learn
                 </p>
-                <h1 className="mt-4 max-w-3xl text-2xl font-black leading-tight text-[color:var(--app-text)] sm:text-3xl lg:text-4xl">
+                <h1 className="mt-4 max-w-3xl text-2xl font-bold leading-tight text-[color:var(--app-text)] sm:text-3xl lg:text-4xl">
                   {isId
                     ? 'Belajar usaha dari video, bacaan, dan kelas buatan creator.'
                     : 'Learn business from creator-made videos, readings, and courses.'}
@@ -319,7 +319,7 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
                       className="rounded-[16px] bg-[color:var(--app-surface-muted)] p-3"
                     >
                       <item.icon className="h-4 w-4 text-[color:var(--app-accent)]" />
-                      <p className="mt-2 text-lg font-black text-[color:var(--app-text)]">
+                      <p className="mt-2 text-lg font-bold text-[color:var(--app-text)]">
                         {item.value}
                       </p>
                       <p className="text-xs font-bold text-[color:var(--app-text-soft)]">
@@ -356,16 +356,16 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-black/15 to-transparent" />
                     <div className="absolute inset-x-4 bottom-4">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/94 px-3 py-1 text-[11px] font-black text-slate-950">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/94 px-3 py-1 text-[11px] font-bold text-slate-950">
                         <PlayCircle className="h-3.5 w-3.5" />
                         {formatLabel(featured.primary_format, isId)}
                       </span>
-                      <h2 className="mt-3 line-clamp-2 text-xl font-black leading-6 text-white">
+                      <h2 className="mt-3 line-clamp-2 text-xl font-bold leading-6 text-white">
                         {featured.title}
                       </h2>
                       <Link
                         href={`/learn/${featured.slug}`}
-                        className="mt-4 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-black text-slate-950"
+                        className="mt-4 inline-flex h-10 items-center rounded-full bg-white px-4 text-sm font-bold text-slate-950"
                       >
                         {isId ? 'Mulai belajar' : 'Start learning'}
                       </Link>
@@ -373,7 +373,7 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
                   </>
                 ) : (
                   <div className="flex h-full min-h-[280px] items-center justify-center bg-[linear-gradient(135deg,#f8fafc_0%,#dbeafe_50%,#dcfce7_100%)] p-6 text-center">
-                    <p className="text-sm font-black text-slate-800">
+                    <p className="text-sm font-bold text-slate-800">
                       {isId
                         ? 'Materi creator akan tampil di sini.'
                         : 'Creator content will appear here.'}
@@ -411,8 +411,8 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
                     onClick={() => setFormat(item.key)}
                     className={
                       active
-                        ? 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-black text-[color:var(--app-text-inverse)]'
-                        : 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-sm font-black text-[color:var(--app-text)]'
+                        ? 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)]'
+                        : 'inline-flex h-11 shrink-0 items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 text-sm font-bold text-[color:var(--app-text)]'
                     }
                   >
                     {item.label}
@@ -443,11 +443,11 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
         <section className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="inline-flex items-center gap-2 text-xs font-black uppercase text-[color:var(--app-accent)]">
+              <p className="inline-flex items-center gap-2 text-xs font-bold uppercase text-[color:var(--app-accent)]">
                 <Sparkles className="h-4 w-4" />
                 {isId ? 'Untukmu' : 'For you'}
               </p>
-              <h2 className="mt-1 text-xl font-black text-[color:var(--app-text)]">
+              <h2 className="mt-1 text-xl font-bold text-[color:var(--app-text)]">
                 {isId
                   ? 'Materi terbaru dari creator'
                   : 'Latest creator learning'}
@@ -481,7 +481,7 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
           <section className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-black text-[color:var(--app-text)]">
+                <h2 className="text-base font-bold text-[color:var(--app-text)]">
                   {isId ? 'Belajar lewat video' : 'Learn by video'}
                 </h2>
                 <PlayCircle className="h-5 w-5 text-[color:var(--app-accent)]" />
@@ -500,7 +500,7 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
             </div>
             <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-black text-[color:var(--app-text)]">
+                <h2 className="text-base font-bold text-[color:var(--app-text)]">
                   {isId ? 'Belajar lewat bacaan' : 'Learn by reading'}
                 </h2>
                 <BookOpen className="h-5 w-5 text-[color:var(--app-accent)]" />
@@ -516,7 +516,7 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
                       <BookOpen className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="line-clamp-1 text-sm font-black text-[color:var(--app-text)]">
+                      <span className="line-clamp-1 text-sm font-bold text-[color:var(--app-text)]">
                         {course.title}
                       </span>
                       <span className="mt-1 flex items-center gap-2 text-xs font-bold text-[color:var(--app-text-soft)]">
@@ -533,7 +533,7 @@ export function LearningHubClient({ locale, initialCourses }: Props) {
 
         <section className="grid gap-4 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-            <h2 className="flex items-center gap-2 text-base font-black text-[color:var(--app-text)]">
+            <h2 className="flex items-center gap-2 text-base font-bold text-[color:var(--app-text)]">
               <CheckCircle2 className="h-5 w-5 text-[color:var(--app-accent)]" />
               {isId ? 'Cara pilih materi' : 'How to choose'}
             </h2>

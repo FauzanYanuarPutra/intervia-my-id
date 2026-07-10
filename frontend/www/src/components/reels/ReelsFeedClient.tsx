@@ -129,7 +129,7 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
           <Clapperboard className="h-3.5 w-3.5" />
           {isId ? 'Reels usaha' : 'Business reels'}
         </p>
-        <h1 className="mt-3 text-3xl font-black tracking-tight text-[color:var(--app-text)]">
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
           {storeHint
             ? isId
               ? `Reels untuk ${storeHint}`
@@ -241,7 +241,7 @@ export default function ReelsFeedClient({ isId }: { isId: boolean }) {
                   />
                 )}
                 {liveLabel ? (
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1.5 text-[11px] font-black text-white shadow-lg">
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-lg">
                     <Radio className="h-3.5 w-3.5" />
                     {liveLabel}
                   </span>

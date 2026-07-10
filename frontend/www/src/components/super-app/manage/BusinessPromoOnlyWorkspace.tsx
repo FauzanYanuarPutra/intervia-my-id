@@ -63,11 +63,11 @@ export function BusinessPromoOnlyWorkspace({
         <div className="relative overflow-hidden rounded-[26px] border border-white/80 bg-white/88 p-5 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.24)] dark:border-white/10 dark:bg-slate-950/72 sm:p-6">
           <div className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-emerald-200/70 blur-3xl dark:bg-emerald-400/15" />
           <div className="relative">
-            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
               <PauseCircle className="h-4 w-4" />
               {isId ? 'Mode launching awal' : 'Early launch mode'}
             </span>
-            <h1 className="mt-4 line-clamp-2 max-w-3xl text-2xl font-black leading-tight tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+            <h1 className="mt-4 line-clamp-2 max-w-3xl text-2xl font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-4xl">
               {title}
             </h1>
             <p className="mt-3 line-clamp-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
@@ -84,14 +84,14 @@ export function BusinessPromoOnlyWorkspace({
             <div className="mt-5 grid gap-2 sm:flex sm:flex-wrap">
               <Link
                 href={primaryAction.href}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-black text-white shadow-[0_14px_28px_-20px_rgba(21,128,61,0.9)] transition hover:bg-emerald-800"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 text-sm font-bold text-white shadow-[0_14px_28px_-20px_rgba(21,128,61,0.9)] transition hover:bg-emerald-800"
               >
                 <span>{primaryAction.label}</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
                 href={secondaryAction.href}
-                className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/12"
+                className="inline-flex min-h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/12"
               >
                 {secondaryAction.label}
               </Link>
@@ -100,7 +100,7 @@ export function BusinessPromoOnlyWorkspace({
         </div>
 
         <aside className="rounded-[26px] border border-white/80 bg-white/86 p-4 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-950/72">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
             {isId ? 'Prioritas sekarang' : 'Current priority'}
           </p>
           <div className="mt-3 space-y-3">
@@ -121,7 +121,7 @@ export function BusinessPromoOnlyWorkspace({
                       <Icon className="h-5 w-5" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-black text-slate-950 dark:text-white">
+                      <span className="block text-sm font-bold text-slate-950 dark:text-white">
                         {item.title}
                       </span>
                       <span className="mt-1 block line-clamp-2 text-xs leading-5 text-slate-600 dark:text-slate-300">

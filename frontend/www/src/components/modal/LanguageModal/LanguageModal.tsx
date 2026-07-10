@@ -22,7 +22,7 @@ const localeDetails: Record<
   en: {
     name: 'English',
     code: 'us',
-    hint: 'Useful if you prefer English navigation.',
+    hint: 'Pakai kalau kamu nyaman dengan navigasi bahasa Inggris.',
   },
 };
 
@@ -32,6 +32,7 @@ export function LanguageModal() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isId = currentLocale === 'id';
 
   const switchLocale = (target: LocaleChoice) => {
     confirmLocale(target);
@@ -47,7 +48,7 @@ export function LanguageModal() {
       {isOpen && (
         <>
           <motion.div
-            className="fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-overlay)_40%,_transparent)] backdrop-blur-sm"
+            className="fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-overlay)_40%,_transparent)] "
             style={{ zIndex: Z_INDEX.bgBlur + Z_INDEX.modal - 1 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -68,8 +69,8 @@ export function LanguageModal() {
               <div className="mb-4 flex items-center justify-between pl-2">
                 <div className="flex items-center gap-2">
                   <Globe size={14} className="text-[color:var(--app-accent)]" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                    {isMandatory ? 'Choose Language' : 'Language'}
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                    {isId ? 'Bahasa' : 'Language'}
                   </span>
                 </div>
                 {!isMandatory ? (
@@ -86,8 +87,12 @@ export function LanguageModal() {
 
               <p className="mb-4 rounded-2xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_30%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] dark:text-[color:var(--app-accent)]">
                 {isMandatory
-                  ? 'Pilih bahasa dulu sebelum masuk. Pilihan ini disimpan 1 minggu.'
-                  : 'Ubah bahasa kapan saja dari sini.'}
+                  ? isId
+                    ? 'Pilih bahasa yang paling nyaman. Halaman /id otomatis memakai Bahasa Indonesia.'
+                    : 'Choose your preferred language. /en pages use English automatically.'
+                  : isId
+                    ? 'Ubah bahasa kapan saja dari sini.'
+                    : 'Change language anytime from here.'}
               </p>
 
               <div className="flex flex-col gap-2">
@@ -100,11 +105,10 @@ export function LanguageModal() {
                       key={loc}
                       type="button"
                       onClick={() => switchLocale(loc)}
-                      className={`flex w-full items-center justify-between rounded-2xl border p-3 text-left transition-all ${
-                        active
+                      className={`flex w-full items-center justify-between rounded-2xl border p-3 text-left transition-all ${active
                           ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-lg shadow-[var(--app-shadow)]'
                           : 'border-transparent bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)] dark:hover:bg-[color:var(--app-surface-strong)]'
-                      }`}
+                        }`}
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="h-8 w-10 shrink-0 overflow-hidden rounded-lg border border-[color:color-mix(in_srgb,_var(--app-border-strong)_5%,_transparent)] bg-white/60 dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)]">
@@ -115,15 +119,14 @@ export function LanguageModal() {
                           />
                         </div>
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-black tracking-tight">
+                          <div className="truncate text-sm font-bold tracking-tight">
                             {details.name}
                           </div>
                           <div
-                            className={`mt-0.5 truncate text-[11px] font-medium ${
-                              active
+                            className={`mt-0.5 truncate text-[11px] font-medium ${active
                                 ? 'text-white/82'
                                 : 'text-[color:var(--app-text-soft)]'
-                            }`}
+                              }`}
                           >
                             {details.hint}
                           </div>
@@ -140,7 +143,7 @@ export function LanguageModal() {
                 })}
               </div>
 
-              <p className="mt-4 text-center text-[9px] font-black uppercase tracking-[0.35em] text-[color:var(--app-text)] opacity-30">
+              <p className="mt-4 text-center text-[9px] font-bold uppercase tracking-[0.35em] text-[color:var(--app-text)] opacity-30">
                 Lajukan
               </p>
             </motion.div>

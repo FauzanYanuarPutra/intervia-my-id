@@ -293,7 +293,7 @@ export default function OnboardingPage() {
             {isId ? 'Lewati' : 'Skip'}
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-[color:var(--app-accent)]">
+            <span className="text-xs font-bold text-[color:var(--app-accent)]">
               {Math.round(completionPercent)}%
             </span>
             <div className="h-2 w-24 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
@@ -306,10 +306,10 @@ export default function OnboardingPage() {
         </header>
 
         <div className="mb-4 rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent)_16%,var(--app-border))] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_20px_54px_-42px_rgba(15,23,42,0.38)]">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
             {isId ? 'Mulai cepat' : 'Quick setup'}
           </p>
-          <h1 className="mt-2 text-[1.65rem] font-black leading-[1.04] tracking-[-0.045em] text-[color:var(--app-text)] sm:text-[2rem]">
+          <h1 className="mt-2 text-[1.65rem] font-bold leading-[1.04] tracking-[-0.045em] text-[color:var(--app-text)] sm:text-[2rem]">
             {isId
               ? 'Bikin Lajukan langsung ngerti kebutuhanmu.'
               : 'Help Lajukan understand your needs.'}
@@ -335,11 +335,11 @@ export default function OnboardingPage() {
         >
           <section className={sectionClass}>
             <div className="flex items-start gap-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent)] text-sm font-black text-[color:var(--app-text-inverse)]">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent)] text-sm font-bold text-[color:var(--app-text-inverse)]">
                 1
               </span>
               <label className="grid min-w-0 flex-1 gap-2">
-                <span className="text-base font-black tracking-[-0.02em]">
+                <span className="text-base font-bold tracking-[-0.02em]">
                   {isId ? 'Nama kamu' : 'Your name'}
                 </span>
                 <input
@@ -360,11 +360,11 @@ export default function OnboardingPage() {
 
           <section className={sectionClass}>
             <div className="flex items-center gap-3">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent)] text-sm font-black text-[color:var(--app-text-inverse)]">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[color:var(--app-accent)] text-sm font-bold text-[color:var(--app-text-inverse)]">
                 2
               </span>
               <div className="min-w-0">
-                <h2 className="text-base font-black tracking-[-0.02em]">
+                <h2 className="text-base font-bold tracking-[-0.02em]">
                   {isId ? 'Tujuan utama' : 'Main purpose'}
                 </h2>
                 <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -387,23 +387,21 @@ export default function OnboardingPage() {
                       setRoles(current => toggleValue(current, option.value));
                       setError('');
                     }}
-                    className={`flex min-h-[78px] items-start gap-2.5 rounded-[17px] border p-3 text-left transition active:scale-[0.99] ${
-                      selected
+                    className={`flex min-h-[78px] items-start gap-2.5 rounded-[17px] border p-3 text-left transition active:scale-[0.99] ${selected
                         ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
                         : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] hover:border-[color:var(--app-accent-border)]'
-                    }`}
+                      }`}
                   >
                     <span
-                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-[13px] ${
-                        selected
+                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-[13px] ${selected
                           ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                           : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)]'
-                      }`}
+                        }`}
                     >
                       <Icon className="h-4.5 w-4.5" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-black leading-5">
+                      <span className="block text-sm font-bold leading-5">
                         {copy(option.label, isId)}
                       </span>
                       <span className="mt-1 block text-xs font-medium leading-4 text-[color:var(--app-text-soft)]">
@@ -423,7 +421,7 @@ export default function OnboardingPage() {
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <span className="min-w-0">
-                <span className="block text-sm font-black">
+                <span className="block text-sm font-bold">
                   {isId ? 'Profil usaha opsional' : 'Optional business profile'}
                 </span>
                 <span className="mt-1 block truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -436,9 +434,8 @@ export default function OnboardingPage() {
               </span>
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[color:var(--app-surface-muted)]">
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform ${
-                    showOptional ? 'rotate-180' : ''
-                  }`}
+                  className={`h-4 w-4 transition-transform ${showOptional ? 'rotate-180' : ''
+                    }`}
                 />
               </span>
             </button>
@@ -446,7 +443,7 @@ export default function OnboardingPage() {
             {showOptional ? (
               <div className="mt-4 space-y-4 border-t border-[color:var(--app-border)] pt-4">
                 <div>
-                  <p className="text-sm font-black">
+                  <p className="text-sm font-bold">
                     {isId ? 'Bidang usaha' : 'Sector'}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -464,11 +461,10 @@ export default function OnboardingPage() {
                               toggleValue(current, option.value),
                             )
                           }
-                          className={`inline-flex min-h-[38px] items-center gap-1.5 rounded-full border px-3 text-xs font-black transition ${
-                            selected
+                          className={`inline-flex min-h-[38px] items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition ${selected
                               ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                               : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
-                          }`}
+                            }`}
                         >
                           <Icon className="h-3.5 w-3.5" />
                           {copy(option.label, isId)}
@@ -480,7 +476,7 @@ export default function OnboardingPage() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-2">
-                    <span className="text-sm font-black">
+                    <span className="text-sm font-bold">
                       {isId ? 'Nama usaha' : 'Company name'}
                     </span>
                     <input
@@ -497,7 +493,7 @@ export default function OnboardingPage() {
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="text-sm font-black">
+                    <span className="text-sm font-bold">
                       {isId ? 'Bio singkat' : 'Short bio'}
                     </span>
                     <textarea
@@ -523,44 +519,44 @@ export default function OnboardingPage() {
             </div>
           ) : null}
 
-          <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[120] mx-auto max-w-[680px] rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent)_20%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] p-2 shadow-[0_22px_64px_-34px_rgba(15,23,42,0.48)] backdrop-blur-xl sm:inset-x-6 sm:p-2.5">
+          <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[120] mx-auto max-w-[680px] rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent)_20%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] p-2 shadow-[0_22px_64px_-34px_rgba(15,23,42,0.48)]  sm:inset-x-6 sm:p-2.5">
             <div className="mb-2 flex items-center justify-between gap-3 px-1.5">
               <div className="min-w-0">
-                <p className="truncate text-xs font-black text-[color:var(--app-text)]">
+                <p className="truncate text-xs font-bold text-[color:var(--app-text)]">
                   {isId ? 'Siap mulai?' : 'Ready to start?'}
                 </p>
                 <p className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
                   {primaryActionHint}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-black text-[color:var(--app-accent-strong)]">
+              <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-accent-strong)]">
                 {Math.round(completionPercent)}%
               </span>
             </div>
             <div className="flex gap-2">
-            <Link
-              href="/dashboard"
-              className="inline-flex min-h-[50px] w-[34%] items-center justify-center rounded-[17px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-strong)]"
-            >
-              {isId ? 'Lewati' : 'Skip'}
-            </Link>
-            <button
-              type="submit"
-              disabled={loading}
-              className="ui-button-primary inline-flex min-h-[50px] flex-1 items-center justify-center gap-2 rounded-[17px] px-4 text-sm font-black shadow-[0_18px_36px_-24px_rgba(22,163,74,0.86)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                  {isId ? 'Menyimpan' : 'Saving'}
-                </>
-              ) : (
-                <>
-                  {primaryActionLabel}
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
+              <Link
+                href="/dashboard"
+                className="inline-flex min-h-[50px] w-[34%] items-center justify-center rounded-[17px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-strong)]"
+              >
+                {isId ? 'Lewati' : 'Skip'}
+              </Link>
+              <button
+                type="submit"
+                disabled={loading}
+                className="ui-button-primary inline-flex min-h-[50px] flex-1 items-center justify-center gap-2 rounded-[17px] px-4 text-sm font-bold shadow-[0_18px_36px_-24px_rgba(22,163,74,0.86)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    {isId ? 'Menyimpan' : 'Saving'}
+                  </>
+                ) : (
+                  <>
+                    {primaryActionLabel}
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </form>

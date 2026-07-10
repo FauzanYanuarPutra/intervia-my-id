@@ -9,10 +9,10 @@ export default function PerformanceDashboardPage() {
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.48)]">
-        <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
+        <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
           Performance
         </p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
           Local performance cockpit
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
@@ -24,7 +24,7 @@ export default function PerformanceDashboardPage() {
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+          <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-500">
             Quick checks
           </h2>
           <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
@@ -34,7 +34,7 @@ export default function PerformanceDashboardPage() {
           </ul>
         </div>
         <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-          <h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
+          <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-500">
             Security baseline
           </h2>
           <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">

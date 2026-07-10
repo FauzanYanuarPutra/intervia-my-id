@@ -208,7 +208,7 @@ export function IdentityVerificationPanel({
       if (!res.ok) {
         throw new Error(
           (typeof data.error === 'string' && data.error) ||
-            'Verifikasi identitas gagal',
+          'Verifikasi identitas gagal',
         );
       }
 
@@ -219,7 +219,7 @@ export function IdentityVerificationPanel({
       );
       setMessage(
         (typeof data.message === 'string' && data.message) ||
-          'Verifikasi identitas berhasil diproses',
+        'Verifikasi identitas berhasil diproses',
       );
       if (onRefresh) {
         await onRefresh();
@@ -237,22 +237,22 @@ export function IdentityVerificationPanel({
 
   const handleFileSelect =
     (setter: (file: File | null) => void) =>
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0] || null;
-      event.target.value = '';
-      if (!file) {
-        setter(null);
-        return;
-      }
-      const error = validateKycImage(file);
-      if (error) {
-        setter(null);
-        setMessage(error);
-        return;
-      }
-      setMessage(null);
-      setter(file);
-    };
+      (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] || null;
+        event.target.value = '';
+        if (!file) {
+          setter(null);
+          return;
+        }
+        const error = validateKycImage(file);
+        if (error) {
+          setter(null);
+          setMessage(error);
+          return;
+        }
+        setMessage(null);
+        setter(file);
+      };
 
   return (
     <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-sm sm:p-4 sm:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.34)] dark:border-[color:var(--app-border-strong)]">
@@ -267,10 +267,10 @@ export function IdentityVerificationPanel({
               )}
             </span>
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
                 Trust
               </p>
-              <h2 className="truncate text-base font-black text-[color:var(--app-text)] dark:text-white sm:text-lg">
+              <h2 className="truncate text-base font-bold text-[color:var(--app-text)] dark:text-white sm:text-lg">
                 {isApproved
                   ? 'Akun sudah terpercaya'
                   : 'Biar akun lebih dipercaya'}
@@ -282,10 +282,10 @@ export function IdentityVerificationPanel({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-black text-[color:var(--app-accent)] shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-100 dark:ring-white/10">
+          <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-bold text-[color:var(--app-accent)] shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-100 dark:ring-white/10">
             KYC {kycLabel(activeRecord?.kyc_status)}
           </span>
-          <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-black text-[color:var(--app-text)] shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-white dark:ring-white/10">
+          <span className="inline-flex min-h-8 items-center rounded-full bg-white px-3 text-xs font-bold text-[color:var(--app-text)] shadow-sm ring-1 ring-emerald-100 dark:bg-white/10 dark:text-white dark:ring-white/10">
             {completedSteps}/3 siap
           </span>
         </div>
@@ -304,7 +304,7 @@ export function IdentityVerificationPanel({
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                     <Icon className="h-4.5 w-4.5" />
                   </span>
-                  <p className="mt-2 text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                  <p className="mt-2 text-sm font-bold text-[color:var(--app-text)] dark:text-white">
                     {item.title}
                   </p>
                   <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-[color:var(--app-text-soft)] dark:text-white/62">
@@ -318,14 +318,14 @@ export function IdentityVerificationPanel({
           <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05] sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-white">
                   3 langkah saja
                 </p>
                 <p className="mt-1 text-xs font-medium text-[color:var(--app-text-soft)]">
                   Nomor HP, KTP, dan selfie. Detail teknis disimpan di belakang.
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-xs font-black text-[color:var(--app-accent)]">
+              <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[color:var(--app-accent)]">
                 {completedSteps}/3
               </span>
             </div>
@@ -338,11 +338,10 @@ export function IdentityVerificationPanel({
                     className="flex min-w-0 items-center gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 dark:border-[color:var(--app-border-strong)] dark:bg-black/10"
                   >
                     <span
-                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ${
-                        item.ok
+                      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] ${item.ok
                           ? 'bg-[color:var(--app-accent)] text-white'
                           : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]'
-                      }`}
+                        }`}
                     >
                       {item.ok ? (
                         <CheckCircle2 className="h-4.5 w-4.5" />
@@ -351,7 +350,7 @@ export function IdentityVerificationPanel({
                       )}
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                      <span className="block truncate text-sm font-bold text-[color:var(--app-text)] dark:text-white">
                         {item.label}
                       </span>
                       <span className="line-clamp-1 text-xs font-medium text-[color:var(--app-text-soft)]">
@@ -365,7 +364,7 @@ export function IdentityVerificationPanel({
           </div>
 
           <div className="rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/40 p-3 dark:bg-emerald-400/5 sm:p-4">
-            <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+            <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-white">
               Upload dokumen
             </p>
             <p className="mt-1 text-xs font-medium leading-5 text-[color:var(--app-text-soft)]">
@@ -385,7 +384,7 @@ export function IdentityVerificationPanel({
                   <FileText className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                  <span className="block text-sm font-bold text-[color:var(--app-text)] dark:text-white">
                     KTP
                   </span>
                   <span className="block truncate text-xs font-medium text-[color:var(--app-text-soft)]">
@@ -409,7 +408,7 @@ export function IdentityVerificationPanel({
                   <Camera className="h-5 w-5" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                  <span className="block text-sm font-bold text-[color:var(--app-text)] dark:text-white">
                     Selfie
                   </span>
                   <span className="block truncate text-xs font-medium text-[color:var(--app-text-soft)]">
@@ -427,7 +426,7 @@ export function IdentityVerificationPanel({
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                className="ui-button-primary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -452,7 +451,7 @@ export function IdentityVerificationPanel({
 
         <aside className="space-y-3">
           <div className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05]">
-            <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+            <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-white">
               Setelah aktif
             </p>
             <div className="mt-3 space-y-2">
@@ -469,7 +468,7 @@ export function IdentityVerificationPanel({
           </div>
 
           <details className="group rounded-[20px] border border-[color:var(--app-border)] bg-white p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05]">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-[color:var(--app-text)] dark:text-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-[color:var(--app-text)] dark:text-white">
               Detail teknis
               <ChevronDown className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)] transition group-open:rotate-180" />
             </summary>
@@ -487,7 +486,7 @@ export function IdentityVerificationPanel({
                   <p className="text-[11px] font-bold text-[color:var(--app-text-soft)]">
                     {label}
                   </p>
-                  <p className="mt-1 truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                  <p className="mt-1 truncate text-sm font-bold text-[color:var(--app-text)] dark:text-white">
                     {value}
                   </p>
                 </div>
@@ -511,7 +510,7 @@ export function IdentityVerificationPanel({
           </details>
 
           <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/[0.05]">
-            <p className="text-sm font-black text-[color:var(--app-text)] dark:text-white">
+            <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-white">
               Fitur yang kebuka
             </p>
             {activeRecord?.use_cases && activeRecord.use_cases.length > 0 ? (

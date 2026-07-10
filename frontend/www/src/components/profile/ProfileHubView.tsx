@@ -7,7 +7,10 @@ import { usePathname } from 'next/navigation';
 import { Modal } from '@/components/common/Modal';
 import { IdentityVerificationPanel } from '@/components/profile/IdentityVerificationPanel';
 import { LocalizedLink } from '@/components/ui-kit';
-import { useNotificationInbox, type InboxNotification } from '@/context/NotificationInboxContext';
+import {
+  useNotificationInbox,
+  type InboxNotification,
+} from '@/context/NotificationInboxContext';
 import { readIdentityVerification } from '@/lib/identityVerification';
 import { resolveLocaleFromPathname } from '@/lib/locale';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
@@ -32,6 +35,7 @@ import {
   Camera,
   CheckCircle2,
   ChevronRight,
+  Circle,
   Clapperboard,
   ClipboardList,
   ExternalLink,
@@ -51,6 +55,7 @@ import {
   Upload,
   User2,
   UserMinus,
+  UserPen,
   UserPlus,
   Users,
   type LucideIcon,
@@ -64,6 +69,7 @@ type ProfessionalEntry = {
 };
 
 type ProfessionalData = {
+  bio: string;
   headline: string;
   summary: string;
   skills: string[];
@@ -257,11 +263,11 @@ const STAT_TONE_CLASSES = [
   'border-rose-200/75 bg-[linear-gradient(135deg,#ffffff_0%,#fff7fb_62%,#ffe4e6_100%)] dark:border-rose-900/70 dark:bg-[linear-gradient(135deg,#16090f_0%,#25101a_100%)]',
 ];
 const PRIMARY_ACTION_CLASS =
-  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-strong)] px-3.5 text-xs font-black text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(4,120,87,0.65)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65 sm:min-h-[44px] sm:px-4';
+  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(4,120,87,0.65)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-65 sm:min-h-[44px] sm:px-4';
 const SECONDARY_ACTION_CLASS =
-  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] sm:min-h-[44px] sm:px-4';
+  'inline-flex min-h-[42px] max-w-full items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)] sm:min-h-[44px] sm:px-4';
 const TONAL_ACTION_CLASS =
-  'inline-flex min-h-[40px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)] transition hover:brightness-105 sm:min-h-[42px] sm:px-3.5';
+  'inline-flex min-h-[40px] max-w-full items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)] transition hover:brightness-105 sm:min-h-[42px] sm:px-3.5';
 const INPUT_CLASS =
   'w-full rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-2.5 text-sm text-[color:var(--app-text)] outline-none transition focus:border-[color:var(--app-accent-border)] focus:ring-2 focus:ring-[color:var(--app-accent-soft)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]';
 const REELS_PROFILE_STORAGE_KEY = 'lajukan.reels.preference.v1';
@@ -293,11 +299,11 @@ function readNotificationText(value: unknown): string {
   return '';
 }
 
-function readNotificationData(notification: InboxNotification): Record<string, unknown> {
+function readNotificationData(
+  notification: InboxNotification,
+): Record<string, unknown> {
   const data = notification.data;
-  return data && typeof data === 'object' && !Array.isArray(data)
-    ? data
-    : {};
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
 }
 
 function readNotificationDataText(
@@ -314,14 +320,22 @@ function readNotificationDataText(
 
 function buildNotificationTargetHref(notification: InboxNotification): string {
   const directHref =
-    readNotificationDataText(notification, ['href', 'url', 'action_url', 'actionHref']) || '';
+    readNotificationDataText(notification, [
+      'href',
+      'url',
+      'action_url',
+      'actionHref',
+    ]) || '';
   if (directHref.startsWith('/')) return directHref;
 
   const entityType = readNotificationDataText(notification, [
     'entity_type',
     'entityType',
   ]).toLowerCase();
-  const entityId = readNotificationDataText(notification, ['entity_id', 'entityId']);
+  const entityId = readNotificationDataText(notification, [
+    'entity_id',
+    'entityId',
+  ]);
   if (entityType === 'profile' && entityId) return `/profile/${entityId}`;
   if ((entityType === 'reel' || entityType === 'reels') && entityId) {
     return `/reels?reel=${encodeURIComponent(entityId)}`;
@@ -335,7 +349,9 @@ function buildNotificationTargetHref(notification: InboxNotification): string {
   return '/notifications';
 }
 
-function normalizeNotificationActorKey(notification: InboxNotification): string {
+function normalizeNotificationActorKey(
+  notification: InboxNotification,
+): string {
   return [
     readNotificationDataText(notification, ['actor_user_id']),
     readNotificationDataText(notification, ['actor_username']),
@@ -363,7 +379,7 @@ function SectionBlock({
     <section className={cn(CARD_CLASS, SECTION_TONE_CLASS[tone], 'p-3 sm:p-4')}>
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+          <h2 className="text-[15px] font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
             {title}
           </h2>
           {subtitle ? (
@@ -587,7 +603,7 @@ function SocialUserRow({
       </LocalizedLink>
 
       <LocalizedLink href={item.href} className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <p className="truncate text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {item.name}
         </p>
         {item.handle ? (
@@ -604,7 +620,7 @@ function SocialUserRow({
         type="button"
         onClick={() => onToggle(item.id)}
         className={cn(
-          'inline-flex min-h-[36px] shrink-0 items-center justify-center gap-1 rounded-full px-3 text-[11px] font-black transition sm:text-xs',
+          'inline-flex min-h-[36px] shrink-0 items-center justify-center gap-1 rounded-full px-3 text-[11px] font-bold transition sm:text-xs',
           following
             ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-rose-200 hover:text-rose-600'
             : 'bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] hover:brightness-105',
@@ -640,7 +656,7 @@ function StatStrip({ items }: { items: StatItem[] }) {
                 <Icon className="h-[18px] w-[18px]" />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-xl font-black leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <span className="block truncate text-xl font-bold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {item.value}
                 </span>
                 <span className="mt-0.5 block truncate text-[11px] font-bold text-[color:var(--app-text-soft)] sm:text-xs">
@@ -649,7 +665,7 @@ function StatStrip({ items }: { items: StatItem[] }) {
               </span>
             </div>
             {item.hint ? (
-              <p className="mt-2 truncate rounded-full bg-white/70 px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] dark:bg-white/10">
+              <p className="mt-2 truncate rounded-full bg-white/70 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)] dark:bg-white/10">
                 {item.hint}
               </p>
             ) : null}
@@ -671,7 +687,7 @@ function EmptyState({
 }) {
   return (
     <div className="rounded-[12px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
-      <p className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <p className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
         {title}
       </p>
       <p className="mx-auto mt-1 max-w-md text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
@@ -698,7 +714,7 @@ function ProfileTabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'inline-flex min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-black transition sm:min-h-[36px] sm:px-3.5',
+        'inline-flex min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-bold transition sm:min-h-[36px] sm:px-3.5',
         active
           ? 'bg-[color:var(--app-accent-strong)] text-[color:var(--app-text-inverse)] shadow-[0_14px_24px_-20px_rgba(4,120,87,0.7)]'
           : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] ring-1 ring-[color:var(--app-border)] hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)] dark:ring-[color:var(--app-border-strong)]',
@@ -731,7 +747,7 @@ function EntryList({
         >
           <div className="flex items-start justify-between gap-2.5">
             <div className="min-w-0">
-              <p className="break-words text-[13px] font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              <p className="break-words text-[13px] font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                 {item.title}
               </p>
               {item.subtitle || item.meta ? (
@@ -798,7 +814,7 @@ function ActivityActionCard({
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <p className="line-clamp-1 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <p className="line-clamp-1 text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {title}
           </p>
           <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
@@ -810,7 +826,7 @@ function ActivityActionCard({
         <span className="min-w-0 truncate rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-muted)]">
           {metric}
         </span>
-        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-black text-[color:var(--app-accent)]">
+        <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-[color:var(--app-accent)]">
           {actionLabel}
           <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
         </span>
@@ -840,7 +856,7 @@ function ActivityMetricCard({
           {hint}
         </span>
       </div>
-      <p className="mt-2 truncate text-lg font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <p className="mt-2 truncate text-lg font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
         {value}
       </p>
       <p className="mt-1 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -873,7 +889,7 @@ function ActivityTimelineRow({
         <Icon className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <span className="block truncate text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {title}
         </span>
         <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -963,14 +979,14 @@ function ProfileGameProgress({
 
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-black text-emerald-800 ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-100 dark:ring-white/10">
+            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-100 dark:bg-white/10 dark:text-emerald-100 dark:ring-white/10">
               {rank}
             </span>
-            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text-soft)] ring-1 ring-emerald-100 dark:bg-white/10 dark:ring-white/10">
+            <span className="rounded-full bg-white/82 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-emerald-100 dark:bg-white/10 dark:ring-white/10">
               Level {level}
             </span>
           </div>
-          <h3 className="mt-2 text-base font-black leading-5 sm:text-[17px]">
+          <h3 className="mt-2 text-base font-bold leading-5 sm:text-[17px]">
             {isId ? 'Profil makin siap dipakai' : 'Profile is getting ready'}
           </h3>
           <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
@@ -983,10 +999,10 @@ function ProfileGameProgress({
 
       <div className="mt-3 rounded-[16px] border border-emerald-100 bg-white/78 p-3 dark:border-white/10 dark:bg-white/[0.06]">
         <div className="flex items-center justify-between gap-3">
-          <span className="min-w-0 truncate text-xs font-black text-[color:var(--app-text)] dark:text-white">
+          <span className="min-w-0 truncate text-xs font-bold text-[color:var(--app-text)] dark:text-white">
             {isId ? `Misi: ${quest}` : `Mission: ${quest}`}
           </span>
-          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/15">
+          <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/10 dark:text-emerald-200 dark:ring-emerald-400/15">
             {xp}/{xpGoal} XP
           </span>
         </div>
@@ -1023,7 +1039,7 @@ function ProfileGameProgress({
               className="min-w-0 rounded-[15px] border border-emerald-100 bg-white/72 px-2.5 py-2 dark:border-white/10 dark:bg-white/[0.06]"
             >
               <Icon className="h-4 w-4 text-emerald-700 dark:text-emerald-200" />
-              <p className="mt-1 truncate text-sm font-black leading-4 text-[color:var(--app-text)] dark:text-white">
+              <p className="mt-1 truncate text-sm font-bold leading-4 text-[color:var(--app-text)] dark:text-white">
                 {item.value}
               </p>
               <p className="truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
@@ -1194,7 +1210,9 @@ export function ProfileHubView(props: ProfileHubViewProps) {
         readNotificationDataText(item, ['actor_username']) ||
         'Someone';
       const actorHandle = readNotificationDataText(item, ['actor_username']);
-      const actorAvatarUrl = readNotificationDataText(item, ['actor_avatar_url']);
+      const actorAvatarUrl = readNotificationDataText(item, [
+        'actor_avatar_url',
+      ]);
 
       result.push({
         id: item.id,
@@ -1331,6 +1349,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           dealDesc: PROMO_ONLY_MODE
             ? 'Lanjut chat, simpan sinyal kebutuhan, dan rapikan listing dari pertanyaan user.'
             : 'Lanjut chat, negosiasi, transaksi, wallet, dan riwayat.',
+          aiAction: 'AI Pribadi',
+          aiDesc: 'Atur asisten, tab chat, tombol cepat, memory, dan share.',
           storeAction: 'Toko UMKM',
           storeDesc: PROMO_ONLY_MODE
             ? 'Kelola storefront, katalog, profil, dan chat usaha.'
@@ -1407,6 +1427,8 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           dealDesc: PROMO_ONLY_MODE
             ? 'Continue chats, save demand signals, and improve listings from user questions.'
             : 'Continue chats, negotiations, transactions, wallet, and history.',
+          aiAction: 'Personal AI',
+          aiDesc: 'Manage assistant, chat tabs, quick buttons, memory, and sharing.',
           storeAction: 'UMKM store',
           storeDesc: PROMO_ONLY_MODE
             ? 'Manage storefront, catalog, profile, and business chats.'
@@ -1474,7 +1496,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
   ).trim();
   const locationValue = String(locationInput || detail?.location || '').trim();
   const headlineValue =
-    professionalData.headline?.trim() ||
+    professionalData.bio?.trim() ||
     (isId
       ? 'Profil siap dilihat. Tinggal dibuat makin jelas.'
       : 'Profile ready to view.');
@@ -1653,6 +1675,15 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             : 'Active inbox'
           : `${txPreview.length.toLocaleString(locale)} ${isId ? 'terbaru' : 'latest'}`,
         actionLabel: copy.open,
+      },
+      {
+        key: 'personal-ai',
+        title: copy.aiAction,
+        description: copy.aiDesc,
+        href: '/profile/ai',
+        icon: Sparkles,
+        metric: isId ? 'AI + tabs' : 'AI + tabs',
+        actionLabel: copy.manage,
       },
       {
         key: 'umkm',
@@ -1859,58 +1890,142 @@ export function ProfileHubView(props: ProfileHubViewProps) {
     : 'Your promo profile';
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f6f3ec] pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-slate-950 dark:bg-slate-950 dark:text-white sm:pb-10">
-      <div className="page-shell page-shell-inset py-3 sm:py-5">
-        <div className="mx-auto grid w-full max-w-[1040px] gap-3 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#fffdf7_0%,#f2fff7_56%,#fff7e7_100%)] p-4 shadow-[0_20px_52px_-44px_rgba(15,23,42,0.32)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#0f172a_0%,#06281d_60%,#1c1917_100%)] sm:p-5 lg:col-span-2">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
-                  {isId ? 'Profil sederhana' : 'Simple profile'}
-                </p>
-                <h1 className="mt-1 text-2xl font-black tracking-[-0.055em] text-slate-950 dark:text-white sm:text-3xl">
-                  {simpleProfileTitle}
-                </h1>
-                <p className="mt-2 line-clamp-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
-                  {simpleProfileIntro}
-                </p>
-              </div>
-              <LocalizedLink
-                href="/create"
-                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800"
-              >
-                <Upload className="h-4 w-4" />
-                {isId ? 'Buat postingan' : 'Create post'}
-              </LocalizedLink>
-            </div>
-          </section>
-
+    <div className="min-h-screen overflow-x-hidden bg-white pb-[calc(5.5rem+env(safe-area-inset-bottom))] text-slate-950 dark:bg-slate-950 dark:text-white sm:pb-10">
+      <div className="!p-0 !px-0 !py-0 !m-0 lg:py-5">
+        <div className="w-full max-w-[1360px] gap-3 mx-auto">
           <main className="min-w-0 space-y-3">
-            <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_22px_54px_-42px_rgba(15,23,42,0.28)] dark:border-white/10 dark:bg-slate-900">
-              <div className="relative h-32 bg-emerald-100 sm:h-44">
+            <section
+              className="
+    rounded-none
+    lg:rounded-[28px]
+    !border-0
+    outline-none
+    ring-0
+    shadow-none
+    "
+              style={{ borderRadius: '0px !important' }}
+            >
+              <div
+                className="
+                !border-none
+                !outline-none !ring-0 focus:border-none focus:ring-0 focus:outline-none
+    relative
+    overflow-hidden
+    lg:rounded-t-[28px]
+    h-36
+    sm:h-44
+    md:h-52
+    lg:h-60
+    xl:h-64
+    bg-emerald-100
+  "
+              >
                 {effectiveCoverUrl ? (
                   <Image
                     src={effectiveCoverUrl}
-                    alt="Sampul profil"
+                    alt={isId ? 'Sampul profil' : 'Profile cover'}
                     fill
                     sizes="100vw"
-                    className="object-cover"
+                    className="!border-none
+                !outline-none !ring-0 focus:border-none focus:ring-0 focus:outline-none object-cover"
+                    priority
                     unoptimized
                   />
                 ) : (
-                  <div className="h-full w-full bg-[linear-gradient(135deg,#d9f99d_0%,#99f6e4_48%,#fed7aa_100%)] dark:bg-[linear-gradient(135deg,#064e3b_0%,#0f172a_58%,#78350f_100%)]" />
+                  <div className="h-full w-full bg-[linear-gradient(135deg,#d9f99d_0%,#99f6e4_45%,#fed7aa_100%)] dark:bg-[linear-gradient(135deg,#064e3b_0%,#0f172a_55%,#78350f_100%)]" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/28" />
+
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
+
+                {/* ===========================
+      Desktop Button
+  =========================== */}
                 <label
                   htmlFor="simple-profile-cover-upload"
-                  className="absolute right-3 top-3 inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full bg-white/92 px-3 text-xs font-black text-slate-800 shadow-sm backdrop-blur transition hover:bg-white dark:bg-slate-950/82 dark:text-white"
+                  className="
+      absolute
+      left-4
+      top-4
+      hidden
+      lg:inline-flex
+      cursor-pointer
+      items-center
+      gap-2
+      rounded-full
+      border
+      border-white/30
+      bg-white/95
+      px-4
+      py-2
+      text-sm
+      font-bold
+      text-slate-800
+      shadow-lg
+      
+      transition-all
+      duration-200
+      hover:scale-[1.02]
+      hover:bg-white
+      dark:border-white/10
+      dark:bg-slate-900/90
+      dark:text-white
+    "
                 >
                   {coverUploading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Camera className="h-3.5 w-3.5" />
+                    <Camera className="h-4 w-4" />
                   )}
-                  {isId ? 'Ganti sampul' : 'Change cover'}
+
+                  {isId ? 'Ganti Sampul' : 'Change Cover'}
+
+                  <input
+                    id="simple-profile-cover-upload"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={onCoverFileChange}
+                  />
+                </label>
+
+                {/* ===========================
+      Mobile Button
+  =========================== */}
+                <label
+                  htmlFor="simple-profile-cover-upload"
+                  className="
+      absolute
+      bottom-3
+      right-3
+      inline-flex
+      lg:hidden
+      cursor-pointer
+      items-center
+      gap-1.5
+      rounded-full
+      bg-white
+      px-3
+      py-2
+      text-xs
+      font-semibold
+      text-slate-800
+      shadow-xl
+      transition-all
+      duration-200
+      active:scale-95
+      dark:bg-slate-900
+      dark:text-white
+    "
+                >
+                  {coverUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="h-4 w-4" />
+                  )}
+
+                  {isId ? 'Ganti Sampul' : 'Change Cover'}
+
                   <input
                     id="simple-profile-cover-upload"
                     type="file"
@@ -1921,116 +2036,247 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 </label>
               </div>
 
-              <div className="px-4 pb-4 sm:px-5 sm:pb-5">
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="-mt-10 relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] border-4 border-white bg-slate-100 shadow-[0_18px_36px_-26px_rgba(15,23,42,0.6)] dark:border-slate-900 dark:bg-slate-800 sm:-mt-12 sm:h-24 sm:w-24 lg:h-28 lg:w-28">
-                      <Image
-                        src={profileAvatarSrc(effectiveAvatarUrl)}
-                        alt={displayName}
-                        fill
-                        sizes="(min-width: 1024px) 112px, (min-width: 640px) 96px, 80px"
-                        className="object-cover"
-                        unoptimized
-                      />
-                      <label
-                        htmlFor="simple-profile-avatar-upload"
-                        className="absolute inset-x-1.5 bottom-1.5 inline-flex min-h-7 cursor-pointer items-center justify-center rounded-full bg-slate-950/72 px-2 text-[10px] font-black text-white backdrop-blur transition hover:bg-slate-950/86 sm:inset-x-2 sm:bottom-2 sm:px-2.5"
+              <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 lg:pt-2">
+                <div className="lg:col-span-1 px-4 pb-4 sm:px-5 sm:pb-5">
+                  <div>
+                    <div className="flex flex-col lg:flex-row items-start gap-4 sm:gap-5">
+                      <div
+                        className="
+    relative
+    -mt-[50px]
+    h-24
+    w-24
+    shrink-0
+    rounded-full
+    border-[5px]
+    border-white
+    bg-slate-100
+    shadow-[0_20px_45px_-18px_rgba(15,23,42,0.35)]
+    dark:border-slate-900
+    dark:bg-slate-800
+
+    sm:-mt-[78px]
+    sm:h-32
+    sm:w-32
+
+    lg:-mt-[90px]
+    lg:h-[150px]
+    lg:w-[150px]
+transition  "
                       >
-                        {avatarUploading ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : isId ? (
-                          'Foto'
-                        ) : (
-                          'Photo'
-                        )}
-                        <input
-                          id="simple-profile-avatar-upload"
-                          type="file"
-                          accept="image/*"
-                          className="sr-only"
-                          onChange={onAvatarFileChange}
+                        <Image
+                          src={profileAvatarSrc(effectiveAvatarUrl)}
+                          alt={displayName}
+                          fill
+                          sizes="(min-width:1024px) 150px, (min-width:640px) 128px, 96px"
+                          className="object-cover rounded-full"
+                          unoptimized
                         />
-                      </label>
-                    </div>
-                    <div className="min-w-0 pb-0 sm:pb-1">
-                      <h1 className="truncate text-2xl font-black tracking-[-0.05em] text-slate-950 dark:text-white sm:text-3xl">
-                        {displayName}
-                      </h1>
-                      {publicHandle ? (
-                        <p className="mt-0.5 truncate text-xs font-black text-emerald-700 dark:text-emerald-300">
-                          @{publicHandle}
+                        <label
+                          htmlFor="simple-profile-avatar-upload"
+                          className="absolute -bottom-1 -right-1 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-white text-slate-700 shadow-lg transition-all duration-200 hover:scale-105 hover:bg-emerald-50 hover:text-emerald-600 dark:border-slate-900 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-300"
+                        >
+                          {avatarUploading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Camera className="h-4 w-4" />
+                          )}
+
+                          <input
+                            id="simple-profile-avatar-upload"
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={onAvatarFileChange}
+                          />
+                        </label>
+                      </div>
+                      <div className="min-w-0 pb-0 sm:pb-1 w-full mt-2 lg:mt-0">
+                        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] items-center justify-between">
+                          <h1 className="truncate  text-[22px] font-bold tracking-[-0.05em] text-slate-950 dark:text-white sm:text-3xl">
+                            {displayName}
+                          </h1>
+                        </div>
+                        {publicHandle ? (
+                          <p className="mt-0.5 truncate text-[14px] font-normal text-emerald-700 dark:text-emerald-300">
+                            @{publicHandle}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 line-clamp-2 text-[14px] font-normal leading-5 text-slate-600 dark:text-slate-300">
+                          {headlineValue}
                         </p>
-                      ) : null}
-                      <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-slate-600 dark:text-slate-300">
-                        {headlineValue}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 ml-auto flex w-fit flex-col gap-2">
+                  <LocalizedLink
+                    href={publicProfilePath}
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    {isId ? 'Lihat Profil Publik' : 'View Public'}
+                  </LocalizedLink>
+
+                  <LocalizedLink
+                    href="/profile/edit"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
+                  >
+                    <UserPen className="h-3.5 w-3.5" />
+                    {isId ? 'Edit Profil' : 'Edit Profile'}
+                  </LocalizedLink>
+                </div>
+                <section className="col-span-3 lg:col-span-1 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 w-[calc(100%-1rem)] lg:w-[calc(100%-2.5rem)] mx-auto">
+                  {/* Header */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-[24px] text-lg font-bold text-slate-900 dark:text-white">
+                        {isId ? 'Profil siap' : 'Profile Ready'}
+                      </h3>
+
+                      <p className="mt-1 text-[14px] text-slate-500">
+                        <span className="text-[16px] font-bold text-slate-900 dark:text-white">
+                          {setupPercent}%
+                        </span>{' '}
+                        {isId ? 'terisi' : 'completed'}
                       </p>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {phoneValue ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-700 dark:bg-orange-400/12 dark:text-orange-200">
-                            <Phone className="h-3 w-3" />
-                            {phoneValue}
-                          </span>
-                        ) : null}
-                        {locationValue ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
-                            <MapPin className="h-3 w-3" />
-                            {locationValue}
-                          </span>
-                        ) : null}
-                        {trustReady ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700 dark:bg-sky-400/12 dark:text-sky-200">
-                            <BadgeCheck className="h-3 w-3" />
-                            {isId ? 'Terverifikasi' : 'Verified'}
-                          </span>
-                        ) : null}
+                    </div>
+
+                    {/* Circle Progress */}
+                    <div className="relative h-10 w-10">
+                      <svg
+                        viewBox="0 0 40 40"
+                        className="-rotate-90 h-full w-full"
+                      >
+                        <circle
+                          cx="20"
+                          cy="20"
+                          r="16"
+                          strokeWidth="4"
+                          fill="none"
+                          className="stroke-slate-200 dark:stroke-slate-700"
+                        />
+
+                        <circle
+                          cx="20"
+                          cy="20"
+                          r="16"
+                          strokeWidth="4"
+                          fill="none"
+                          strokeLinecap="round"
+                          className="stroke-emerald-600"
+                          strokeDasharray={2 * Math.PI * 16}
+                          strokeDashoffset={
+                            2 * Math.PI * 16 -
+                            (setupPercent / 100) * (2 * Math.PI * 16)
+                          }
+                        />
+                      </svg>
+
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[10px] font-bold">
+                          {setupPercent}%
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:justify-end md:pt-0">
-                    {avatarBuilder ? (
-                      <button
-                        type="button"
-                        onClick={() => setQuickEditOpen(true)}
-                        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 text-xs font-black text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100"
+                  {/* Desktop */}
+                  <div className="mt-5 hidden lg:grid gap-3">
+                    {importantSetup.map(item => (
+                      <div
+                        key={item.label}
+                        className="flex items-center justify-between"
                       >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        {isId ? 'Avatar 2D' : '2D avatar'}
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={copyPublicProfileUrl}
-                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
-                    >
-                      <Link2 className="h-3.5 w-3.5" />
-                      {copyMessage || copy.copyLink}
-                    </button>
-                    <LocalizedLink
-                      href={publicProfilePath}
-                      className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full !bg-slate-950 px-3 text-xs font-black !text-white transition !hover:bg-slate-800 !dark:bg-white !dark:text-slate-950"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      {isId ? 'Lihat publik' : 'Public'}
-                    </LocalizedLink>
-                  </div>
-                </div>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`flex h-5 w-5 items-center justify-center rounded-full ${item.done
+                                ? 'bg-emerald-100 text-emerald-600'
+                                : 'bg-slate-100 text-slate-400'
+                              }`}
+                          >
+                            {item.done ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              <div className="h-2 w-2 rounded-full bg-current" />
+                            )}
+                          </div>
 
-                <div className="mt-4 rounded-[22px] bg-[#f7f4ed] p-3 dark:bg-white/[0.04]">
-                  <p className="line-clamp-3 text-sm font-semibold leading-6 text-slate-700 dark:text-slate-300">
-                    {summaryValue}
-                  </p>
-                </div>
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {item.label}
+                          </span>
+                        </div>
+
+                        {!item.done && (
+                          <span className="text-xs font-semibold text-slate-400">
+                            {isId ? 'Belum' : 'Missing'}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* CTA */}
+                    <div className="mt-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-600 shadow">
+                          <Sparkles className="h-5 w-5" />
+                        </div>
+
+                        <div>
+                          <p className="font-bold text-emerald-800 dark:text-emerald-300">
+                            {isId
+                              ? 'Lengkapi profilmu'
+                              : 'Complete your profile'}
+                          </p>
+
+                          <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-200">
+                            {isId
+                              ? 'Profil lengkap meningkatkan kepercayaan pelanggan.'
+                              : 'A complete profile builds customer trust.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mobile */}
+                  <div className="mt-5 lg:hidden">
+                    <div className="grid grid-cols-5 gap-3">
+                      {importantSetup.map(item => (
+                        <div
+                          key={item.label}
+                          className="flex flex-col items-center gap-2 text-center"
+                        >
+                          <div
+                            className={`flex h-10 w-10 items-center justify-center rounded-full ${item.done
+                                ? 'bg-emerald-100 text-emerald-600'
+                                : 'bg-slate-100 text-slate-400'
+                              }`}
+                          >
+                            {item.done ? (
+                              <CheckCircle2 className="h-5 w-5" />
+                            ) : (
+                              <Circle className="h-5 w-5" />
+                            )}
+                          </div>
+
+                          <span className="text-[11px] font-medium leading-tight">
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
               </div>
             </section>
 
-            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
+            {/* <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
               <div className="flex flex-col gap-1">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
                   {isId ? 'Edit profil' : 'Edit profile'}
                 </p>
-                <h2 className="text-lg font-black tracking-[-0.03em]">
+                <h2 className="text-lg font-bold tracking-[-0.03em]">
                   {isId
                     ? 'Cukup isi yang orang perlu tahu.'
                     : 'Only fill what people need to know.'}
@@ -2048,7 +2294,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1.5">
-                  <span className="text-sm font-black">
+                  <span className="text-sm font-bold">
                     {isId ? 'Nama tampil' : 'Display name'}
                   </span>
                   <input
@@ -2062,7 +2308,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="text-sm font-black">
+                  <span className="text-sm font-bold">
                     {isId ? 'Nomor HP' : 'Phone number'}
                   </span>
                   <input
@@ -2074,7 +2320,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="text-sm font-black">
+                  <span className="text-sm font-bold">
                     {isId ? 'Lokasi' : 'Location'}
                   </span>
                   <input
@@ -2086,7 +2332,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   />
                 </label>
                 <label className="space-y-1.5">
-                  <span className="text-sm font-black">
+                  <span className="text-sm font-bold">
                     {isId ? 'Link profil' : 'Profile link'}
                   </span>
                   <input
@@ -2098,7 +2344,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   />
                 </label>
                 <label className="space-y-1.5 sm:col-span-2">
-                  <span className="text-sm font-black">
+                  <span className="text-sm font-bold">
                     {isId ? 'Cerita singkat' : 'Short intro'}
                   </span>
                   <textarea
@@ -2120,7 +2366,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   type="button"
                   onClick={onSaveProfile}
                   disabled={saving || avatarUploading || coverUploading}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {saving ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -2135,15 +2381,15 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   </p>
                 ) : null}
               </div>
-            </section>
+            </section> */}
 
-            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
+            {/* <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900 sm:p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
                     {isId ? 'Postingan' : 'Posts'}
                   </p>
-                  <h2 className="text-lg font-black tracking-[-0.03em]">
+                  <h2 className="text-lg font-bold tracking-[-0.03em]">
                     {isId
                       ? 'Yang sedang kamu tampilkan.'
                       : 'What you are showing.'}
@@ -2151,7 +2397,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 </div>
                 <LocalizedLink
                   href="/create"
-                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full !bg-slate-950 px-3 text-xs font-black !text-white !dark:bg-white !dark:text-slate-950"
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-full !bg-slate-950 px-3 text-xs font-bold !text-white !dark:bg-white !dark:text-slate-950"
                 >
                   <Upload className="h-3.5 w-3.5" />
                   {isId ? 'Posting' : 'Post'}
@@ -2160,7 +2406,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
               {previewListings.length === 0 ? (
                 <div className="mt-4 rounded-[20px] border border-dashed border-slate-200 bg-[#f7f4ed] p-4 text-center dark:border-white/10 dark:bg-white/[0.04]">
-                  <p className="text-sm font-black">
+                  <p className="text-sm font-bold">
                     {isId
                       ? 'Belum ada postingan aktif.'
                       : 'No active posts yet.'}
@@ -2180,7 +2426,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       className="flex min-w-0 items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-[#f7f4ed] px-3 py-3 transition hover:border-emerald-200 dark:border-white/10 dark:bg-white/[0.04]"
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-black">
+                        <span className="block truncate text-sm font-bold">
                           {item.title ||
                             (isId ? 'Postingan tanpa judul' : 'Untitled post')}
                         </span>
@@ -2194,68 +2440,32 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   ))}
                 </div>
               )}
-            </section>
+            </section> */}
           </main>
 
-          <aside className="space-y-3 lg:sticky lg:top-[calc(88px+env(safe-area-inset-top))] lg:self-start">
+          {/* <aside className="space-y-3 lg:sticky lg:top-[calc(88px+env(safe-area-inset-top))] lg:self-start">
             <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black">
-                    {isId ? 'Profil siap' : 'Profile ready'}
-                  </p>
-                  <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    {setupPercent}% {isId ? 'terisi' : 'complete'}
-                  </p>
-                </div>
-                <span className="grid h-11 w-11 place-items-center rounded-[18px] bg-emerald-50 text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
-                  <Sparkles className="h-5 w-5" />
-                </span>
-              </div>
-              <div className="mt-3">
-                <ProgressBar value={setupPercent} />
-              </div>
-              <div className="mt-3 grid gap-2">
-                {importantSetup.map(item => (
-                  <div
-                    key={item.label}
-                    className="flex items-center justify-between gap-3 rounded-[15px] bg-[#f7f4ed] px-3 py-2 dark:bg-white/[0.04]"
-                  >
-                    <span className="text-sm font-semibold">{item.label}</span>
-                    {item.done ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    ) : (
-                      <span className="text-xs font-bold text-slate-400">
-                        {isId ? 'Belum' : 'Missing'}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
-              <p className="text-sm font-black">
+              <p className="text-sm font-bold">
                 {isId ? 'Butuh apa sekarang?' : 'What do you need now?'}
               </p>
               <div className="mt-3 grid gap-2">
                 <LocalizedLink
                   href="/chat"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-black text-white transition hover:bg-emerald-800"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white transition hover:bg-emerald-800"
                 >
                   <MessageCircle className="h-4 w-4" />
                   {isId ? 'Buka chat' : 'Open chat'}
                 </LocalizedLink>
                 <LocalizedLink
                   href="/my-listings"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
                 >
                   <Store className="h-4 w-4" />
                   {isId ? 'Kelola postingan' : 'Manage posts'}
                 </LocalizedLink>
                 <LocalizedLink
                   href="/usaha"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
                 >
                   <Briefcase className="h-4 w-4" />
                   {isId ? 'Kelola Usaha' : 'Manage business'}
@@ -2263,7 +2473,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 {dialPhone ? (
                   <a
                     href={`tel:${dialPhone}`}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
                   >
                     <Phone className="h-4 w-4" />
                     {isId ? 'Telepon' : 'Call'}
@@ -2273,7 +2483,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             </section>
 
             <section className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-slate-900">
-              <p className="text-sm font-black">
+              <p className="text-sm font-bold">
                 {isId ? 'Kontak' : 'Contact'}
               </p>
               <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
@@ -2297,7 +2507,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 {profileError}
               </section>
             ) : null}
-          </aside>
+          </aside> */}
         </div>
       </div>
     </div>
@@ -2324,7 +2534,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02)_0%,rgba(15,23,42,0.18)_48%,rgba(15,23,42,0.58)_100%)]" />
               <label
                 htmlFor="profile-cover-upload"
-                className="absolute right-2 top-2 inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur dark:bg-slate-950/90 dark:text-slate-100 sm:right-3 sm:top-3 sm:min-h-[34px] sm:px-3"
+                className="absolute right-2 top-2 inline-flex min-h-[32px] cursor-pointer items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-xs font-semibold text-slate-700 shadow-sm  dark:bg-slate-950/90 dark:text-slate-100 sm:right-3 sm:top-3 sm:min-h-[34px] sm:px-3"
                 title={isId ? 'Ganti sampul' : 'Change cover'}
               >
                 {coverUploading ? (
@@ -2381,7 +2591,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
                   <div className="min-w-0 flex-1 pt-0 sm:pt-1 lg:pt-3">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <h1 className="min-w-0 max-w-full break-words text-2xl font-black leading-tight text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                      <h1 className="min-w-0 max-w-full break-words text-2xl font-bold leading-tight text-[color:var(--app-text)] [overflow-wrap:anywhere] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
                         {displayName}
                       </h1>
                       <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[color:var(--app-accent)] sm:text-xs">
@@ -2420,7 +2630,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                           'min-w-0 px-3 py-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
                         )}
                       >
-                        <span className="block truncate text-sm font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                        <span className="block truncate text-sm font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                           {followerCount.toLocaleString(locale)}
                         </span>
                         <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
@@ -2435,7 +2645,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                           'min-w-0 px-3 py-2 text-left transition hover:border-[color:var(--app-accent-border)] hover:bg-[color:var(--app-surface-strong)]',
                         )}
                       >
-                        <span className="block truncate text-sm font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                        <span className="block truncate text-sm font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                           {followingCount.toLocaleString(locale)}
                         </span>
                         <span className="mt-0.5 block truncate text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
@@ -2542,7 +2752,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   >
                     <div className="grid gap-2 sm:grid-cols-2">
                       <div className={cn(MUTED_ROW_CLASS, 'p-2.5')}>
-                        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
                           {isId ? 'Ringkasan' : 'Summary'}
                         </p>
                         <p className="mt-1 text-[13px] font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
@@ -2550,7 +2760,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                         </p>
                       </div>
                       <div className={cn(MUTED_ROW_CLASS, 'p-2.5')}>
-                        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
                           {isId ? 'Kontak' : 'Contact'}
                         </p>
                         <div className="mt-1.5 space-y-1.5 text-[13px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -2611,7 +2821,11 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   </SectionBlock>
 
                   <SectionBlock
-                    title={isId ? 'Siapa yang lihat profilmu' : 'Who viewed your profile'}
+                    title={
+                      isId
+                        ? 'Siapa yang lihat profilmu'
+                        : 'Who viewed your profile'
+                    }
                     tone="social"
                     subtitle={
                       isId
@@ -2628,7 +2842,10 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                             : 'When people open your profile, their names and links will appear here.'
                         }
                         action={
-                          <LocalizedLink href="/profile" className={TONAL_ACTION_CLASS}>
+                          <LocalizedLink
+                            href="/profile"
+                            className={TONAL_ACTION_CLASS}
+                          >
                             <Users className="h-4 w-4" />
                             {isId ? 'Buka profil' : 'Open profile'}
                           </LocalizedLink>
@@ -2653,13 +2870,13 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                                   unoptimized
                                 />
                               ) : (
-                                <span className="grid h-full w-full place-items-center text-sm font-black text-[color:var(--app-accent)]">
+                                <span className="grid h-full w-full place-items-center text-sm font-bold text-[color:var(--app-accent)]">
                                   {item.actorName.slice(0, 1).toUpperCase()}
                                 </span>
                               )}
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                              <span className="block truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                 {item.actorName}
                               </span>
                               <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -3019,7 +3236,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                           >
                             <div className="flex items-start justify-between gap-2.5">
                               <div className="min-w-0">
-                                <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                <p className="truncate text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                   {item.title ||
                                     (isId
                                       ? 'Listing tanpa judul'
@@ -3082,7 +3299,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                             >
                               <div className="flex items-center justify-between gap-2.5">
                                 <div className="min-w-0">
-                                  <p className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                  <p className="truncate text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                                     {formatMoneyFromCents(
                                       item.amount_cents,
                                       item.currency || 'IDR',
@@ -3133,7 +3350,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       </div>
 
                       <div>
-                        <p className="mb-1.5 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        <p className="mb-1.5 text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {copy.skills}
                         </p>
                         {professionalData.skills.length === 0 ? (
@@ -3156,7 +3373,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
                       <div className="grid gap-2.5 lg:grid-cols-2">
                         <div>
-                          <p className="mb-1.5 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          <p className="mb-1.5 text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                             {copy.experience}
                           </p>
                           <EntryList
@@ -3169,7 +3386,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                           />
                         </div>
                         <div>
-                          <p className="mb-1.5 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          <p className="mb-1.5 text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                             {copy.education}
                           </p>
                           <EntryList
@@ -3199,7 +3416,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                   >
                     <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                       <label className="block min-w-0 space-y-1.5">
-                        <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {copy.uploadCv}
                         </span>
                         <input
@@ -3300,7 +3517,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               >
                 <div className="flex items-start justify-between gap-2.5">
                   <div>
-                    <p className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <p className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {copy.completeProfile}
                     </p>
                     <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -3343,7 +3560,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
               >
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <p className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {copy.social}
                     </p>
                     <p className="mt-0.5 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
@@ -3361,7 +3578,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     onClick={() => setSocialModal('followers')}
                     className={cn(MUTED_ROW_CLASS, 'px-2.5 py-1.5 text-left')}
                   >
-                    <span className="block text-base font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <span className="block text-base font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {followerCount.toLocaleString(locale)}
                     </span>
                     <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -3373,7 +3590,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                     onClick={() => setSocialModal('following')}
                     className={cn(MUTED_ROW_CLASS, 'px-2.5 py-1.5 text-left')}
                   >
-                    <span className="block text-base font-black leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <span className="block text-base font-bold leading-none text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {followingCount.toLocaleString(locale)}
                     </span>
                     <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -3397,7 +3614,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                       <span className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                         <Users className="h-4 w-4" />
                       </span>
-                      <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      <p className="mt-2 text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                         {copy.emptyConnections}
                       </p>
                       <p className="mt-0.5 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
@@ -3465,7 +3682,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
                 type="button"
                 onClick={() => setSocialModal(item.key)}
                 className={cn(
-                  'min-h-[42px] rounded-[13px] px-2 text-center text-xs font-black transition',
+                  'min-h-[42px] rounded-[13px] px-2 text-center text-xs font-bold transition',
                   socialModal === item.key
                     ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] shadow-sm'
                     : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]',
@@ -3561,7 +3778,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           {avatarBuilder ? avatarBuilder : null}
 
           <label className="block space-y-1.5">
-            <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+            <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId ? 'Nama tampil' : 'Display name'}
             </span>
             <input
@@ -3575,7 +3792,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+            <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId ? 'URL profil publik' : 'Public profile URL'}
             </span>
             <input
@@ -3591,7 +3808,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1.5">
-              <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                 {isId ? 'Nomor telepon' : 'Phone'}
               </span>
               <input
@@ -3603,7 +3820,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
             </label>
 
             <label className="block space-y-1.5">
-              <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+              <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                 {isId ? 'Lokasi' : 'Location'}
               </span>
               <input
@@ -3616,7 +3833,7 @@ export function ProfileHubView(props: ProfileHubViewProps) {
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+            <span className="text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId ? 'Ringkasan singkat' : 'Short summary'}
             </span>
             <textarea

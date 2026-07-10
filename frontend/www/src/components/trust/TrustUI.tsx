@@ -49,7 +49,7 @@ export function SummaryCard({
           {meta}
         </p>
       ) : null}
-      <h2 className="mt-2 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+      <h2 className="mt-2 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
         {title}
       </h2>
       <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">

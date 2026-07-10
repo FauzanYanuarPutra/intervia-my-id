@@ -101,7 +101,7 @@ const LajukanLogo = ({
         <span
           className={cn(
             compact ? 'text-lg' : 'text-xl sm:text-[1.35rem]',
-            'font-black leading-none tracking-[-0.035em] text-[color:var(--app-text)] transition-colors group-hover:text-[color:var(--app-accent)]',
+            'font-bold leading-none tracking-[-0.035em] text-[color:var(--app-text)] transition-colors group-hover:text-[color:var(--app-accent)]',
             textClassName,
           )}
         >

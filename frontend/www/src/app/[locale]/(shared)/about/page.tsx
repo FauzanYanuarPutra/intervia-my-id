@@ -38,8 +38,8 @@ export default async function AboutPage({ params }: PageProps) {
     {
       title: isId ? 'Transaksi aman & transparan' : 'Safe & verifiable transactions',
       desc: isId
-        ? 'Chat, escrow, bukti kerja, dan verifikasi di satu tempat.'
-        : 'Chat, escrow, proof-of-work, and verification built into every transaction.',
+        ? 'Chat langsung, bukti kerja, dan sinyal verifikasi dibuat jelas. Pembayaran aman sedang disiapkan bertahap.'
+        : 'Direct chat, proof-of-work, and verification signals stay clear. Secure payments are being prepared gradually.',
       icon: ShieldCheck,
     },
     {
@@ -69,8 +69,8 @@ export default async function AboutPage({ params }: PageProps) {
     {
       title: isId ? 'Transaksi aman' : 'Secure transaction',
       desc: isId
-        ? 'Escrow & verifikasi melindungi kedua pihak.'
-        : 'Escrow and verification protect both sides.',
+        ? 'Cek profil, chat, bukti, dan status verifikasi sebelum lanjut.'
+        : 'Check profile, chat, proof, and verification status before moving forward.',
       icon: ShieldCheck,
     },
     {
@@ -92,7 +92,7 @@ export default async function AboutPage({ params }: PageProps) {
           {isId ? 'Tentang Lajukan' : 'About Lajukan'}
         </p>
 
-        <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
+        <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-5xl">
           {isId
             ? 'Satu tempat untuk jalankan bisnis.'
             : 'One place to run your business end-to-end.'}
@@ -100,8 +100,8 @@ export default async function AboutPage({ params }: PageProps) {
 
         <p className="mt-4 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)] sm:text-base">
           {isId
-            ? 'Lajukan membantu UMKM menemukan supplier, menjalankan operasional, dan melakukan transaksi aman tanpa ribet.'
-            : 'Lajukan connects sourcing, operations, and secure transactions into a single business flow for SMEs and freelancers.'}
+            ? 'Lajukan membantu UMKM menemukan supplier, jasa, tempat usaha, dan peluang operasional dengan lebih rapi.'
+            : 'Lajukan helps SMEs find suppliers, services, business places, and operational opportunities in a clearer flow.'}
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
@@ -129,8 +129,8 @@ export default async function AboutPage({ params }: PageProps) {
         </h2>
         <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
           {isId
-            ? 'UMKM sering terpisah: cari supplier di satu tempat, jasa di tempat lain, transaksi tidak aman, dan operasional tidak terhubung.'
-            : 'SMEs are fragmented: sourcing, services, and transactions are scattered across different platforms with no trust layer.'}
+            ? 'UMKM sering terpisah: cari supplier di satu tempat, jasa di tempat lain, kontak tidak jelas, dan informasi usaha sulit dicek.'
+            : 'SMEs are fragmented: sourcing, services, unclear contacts, and business information are scattered across different places.'}
         </p>
       </section>
 
@@ -180,7 +180,7 @@ export default async function AboutPage({ params }: PageProps) {
 
         <div className="mt-4 grid gap-2 text-sm text-[color:var(--app-text-soft)]">
           <p>• {isId ? 'Verifikasi pengguna & bisnis' : 'User and business verification'}</p>
-          <p>• {isId ? 'Escrow untuk transaksi aman' : 'Escrow for safe transactions'}</p>
+          <p>• {isId ? 'Pembayaran aman sedang disiapkan bertahap' : 'Secure payments are being prepared gradually'}</p>
           <p>• {isId ? 'Chat & bukti kerja terintegrasi' : 'Built-in chat & proof of work'}</p>
           <p>• {isId ? 'Audit transaksi transparan' : 'Transparent transaction history'}</p>
         </div>
@@ -196,8 +196,8 @@ export default async function AboutPage({ params }: PageProps) {
 
         <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
           {isId
-            ? 'Cari supplier, jalankan operasional, dan transaksi dengan aman dalam satu platform.'
-            : 'Source, operate, and transact securely in one connected system.'}
+            ? 'Cari supplier, jasa, tempat usaha, dan peluang dengan alur yang lebih sederhana.'
+            : 'Find suppliers, services, business places, and opportunities in a simpler flow.'}
         </p>
 
         <div className="mt-6">

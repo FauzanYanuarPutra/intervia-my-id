@@ -32,10 +32,10 @@ export default function ProjectsDashboard() {
     <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
             Projects Hub
           </p>
-          <h1 className="text-3xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h1 className="text-3xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             Track milestones and escrow status in one view.
           </h1>
           <p className="mt-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -45,11 +45,11 @@ export default function ProjectsDashboard() {
         <div className="flex flex-wrap gap-2">
           <Link
             href="/chat"
-            className="rounded-full border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+            className="rounded-full border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
           >
             Open Rooms
           </Link>
-          <button className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]">
+          <button className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]">
             New Project
           </button>
         </div>
@@ -64,7 +64,7 @@ export default function ProjectsDashboard() {
             <p className="text-xs font-bold text-[color:var(--app-accent)] uppercase tracking-widest">
               {project.status}
             </p>
-            <h2 className="mt-2 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <h2 className="mt-2 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {project.name}
             </h2>
             <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">

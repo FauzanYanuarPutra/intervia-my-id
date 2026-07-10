@@ -114,7 +114,7 @@ export function FeedRail({ isId, items, loading, error }: FeedRailProps) {
               </p>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-black text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">{card.priceLabel}</p>
+              <p className="text-xs font-bold text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">{card.priceLabel}</p>
               <p className="truncate text-[11px] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">{card.location}</p>
             </div>
           </Link>

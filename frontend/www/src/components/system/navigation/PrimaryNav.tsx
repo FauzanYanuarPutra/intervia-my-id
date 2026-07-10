@@ -78,7 +78,7 @@ export function buildPrimaryNavItems(
     home: locale === 'id' ? 'Beranda' : 'Home',
     search: locale === 'id' ? 'Cari' : 'Search',
     create: locale === 'id' ? 'Buat' : 'Create',
-    umkm: locale === 'id' ? 'Proyek' : 'Projects',
+    umkm: locale === 'id' ? 'Usaha Sekitar' : 'Nearby',
     account: locale === 'id' ? 'Akun' : 'Account',
   };
 
@@ -97,11 +97,8 @@ export function buildPrimaryNavItems(
       icon: LayoutGrid,
       matchers: [
         '/kategori',
-        UMKM_DISCOVERY_PATH,
-        `${LEGACY_UMKM_DISCOVERY_PATH}$`,
         '/search',
         '/microgigs',
-        '/toko',
       ],
     },
     {
@@ -117,9 +114,9 @@ export function buildPrimaryNavItems(
     items.push({
       key: 'umkm',
       label: text.umkm,
-      href: isAuthenticated ? '/my-projects' : '/login',
+      href: UMKM_DISCOVERY_PATH,
       icon: ClipboardList,
-      matchers: ['/my-projects'],
+      matchers: [UMKM_DISCOVERY_PATH, `${LEGACY_UMKM_DISCOVERY_PATH}$`, '/toko'],
     });
   }
 

@@ -42,28 +42,28 @@ const SIMPLE_CREATE_STEPS: Array<{
   descId: string;
   descEn: string;
 }> = [
-  {
-    id: 'basic',
-    titleId: 'Dasar',
-    titleEn: 'Basic',
-    descId: 'Nama dan jenis usaha.',
-    descEn: 'Business name and type.',
-  },
-  {
-    id: 'location',
-    titleId: 'Lokasi',
-    titleEn: 'Location',
-    descId: 'Kota, alamat, dan titik.',
-    descEn: 'City, address, and pin.',
-  },
-  {
-    id: 'review',
-    titleId: 'Simpan',
-    titleEn: 'Save',
-    descId: 'Cek singkat lalu buat.',
-    descEn: 'Quick check, then create.',
-  },
-];
+    {
+      id: 'basic',
+      titleId: 'Dasar',
+      titleEn: 'Basic',
+      descId: 'Nama dan jenis usaha.',
+      descEn: 'Business name and type.',
+    },
+    {
+      id: 'location',
+      titleId: 'Lokasi',
+      titleEn: 'Location',
+      descId: 'Kota, alamat, dan titik.',
+      descEn: 'City, address, and pin.',
+    },
+    {
+      id: 'review',
+      titleId: 'Simpan',
+      titleEn: 'Save',
+      descId: 'Cek singkat lalu buat.',
+      descEn: 'Quick check, then create.',
+    },
+  ];
 
 const DEFAULT_POINT: LatLng = { lat: -6.2, lng: 106.816666 };
 
@@ -293,10 +293,10 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
     <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.18)] sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
             {isId ? 'Buka usaha' : 'Open business'}
           </p>
-          <h2 className="mt-1 text-[1.2rem] font-black ui-text sm:text-[1.45rem]">
+          <h2 className="mt-1 text-[1.2rem] font-bold ui-text sm:text-[1.45rem]">
             {isId ? 'Isi yang penting saja' : 'Fill only the essentials'}
           </h2>
           <p className="mt-1 text-sm leading-6 ui-text-soft">
@@ -317,7 +317,7 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
                 type="button"
                 onClick={() => goStep(item.id)}
                 className={cn(
-                  'inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-left text-[11px] font-black transition',
+                  'inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-left text-[11px] font-bold transition',
                   active
                     ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white shadow-[0_10px_24px_-18px_rgba(15,23,42,0.3)]'
                     : done
@@ -358,10 +358,10 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
               <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.18)]">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
                       {isId ? 'Foto usaha' : 'Business photo'}
                     </p>
-                    <h3 className="mt-1 text-[1rem] font-black ui-text">
+                    <h3 className="mt-1 text-[1rem] font-bold ui-text">
                       {isId ? 'Wajib dipakai di maps dan daftar' : 'Required for maps and lists'}
                     </h3>
                   </div>
@@ -454,14 +454,14 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
             </div>
 
             <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.18)]">
-              <p className="text-sm font-black ui-text">
+              <p className="text-sm font-bold ui-text">
                 {isId ? 'Ringkasannya' : 'Quick preview'}
               </p>
               <div className="mt-4 rounded-[20px] bg-[linear-gradient(135deg,#f8fffb_0%,#f7f8f4_100%)] p-4 ring-1 ring-[color:var(--app-border)]">
                 <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)]">
                   <Store className="h-8 w-8" />
                 </div>
-                <p className="mt-4 text-center text-lg font-black ui-text">
+                <p className="mt-4 text-center text-lg font-bold ui-text">
                   {name || (isId ? 'Nama usaha' : 'Business name')}
                 </p>
                 <p className="mt-1 text-center text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -512,7 +512,7 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
             <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.18)]">
               <div className="flex items-center gap-2 px-1 pb-3">
                 <MapPin className="h-4 w-4 text-[color:var(--app-accent)]" />
-                <p className="text-sm font-black ui-text">
+                <p className="text-sm font-bold ui-text">
                   {isId ? 'Titik lokasi' : 'Location pin'}
                 </p>
               </div>
@@ -545,7 +545,7 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
                   key={card.label}
                   className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-4"
                 >
-                  <p className="text-[11px] font-black uppercase tracking-[0.14em] ui-accent-text">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] ui-accent-text">
                     {card.label}
                   </p>
                   <p className="mt-2 text-sm font-semibold leading-6 ui-text">
@@ -556,7 +556,7 @@ export function SimpleUsahaCreateFlow({ isId }: SimpleUsahaCreateFlowProps) {
             </div>
 
             <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(247,250,247,0.94))] p-4">
-              <p className="text-sm font-black ui-text">
+              <p className="text-sm font-bold ui-text">
                 {isId ? 'Siap simpan' : 'Ready to save'}
               </p>
               <p className="mt-2 text-sm leading-6 ui-text-soft">

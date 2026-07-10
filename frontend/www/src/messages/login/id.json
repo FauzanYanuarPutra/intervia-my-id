@@ -1,21 +1,21 @@
 {
   "login": {
     "title": "Masuk | Lajukan",
-    "description": "Masuk ke akun Lajukan untuk akses proyek freelancer."
+    "description": "Masuk untuk lanjut mencari, membuat postingan, dan membuka chat."
   },
-  "title": "Masuk ke Akun Anda",
-  "subtitle": "Selamat datang kembali! Silakan masukkan detail akun Anda.",
+  "title": "Masuk ke akunmu",
+  "subtitle": "Lanjutkan aktivitasmu di Lajukan.",
   "email_label": "Email",
   "email_placeholder": "nama@contoh.com",
   "password_label": "Kata Sandi",
   "password_placeholder": "minimal 8 karakter",
   "login_button": "Masuk",
-  "logging_in": "Sedang Memproses...",
+  "logging_in": "Lagi masuk...",
   "no_account": "Belum punya akun?",
-  "register_link": "Daftar Sekarang",
-  "forgot_password": "Lupa Kata Sandi?",
-  "error_invalid": "Email atau kata sandi tidak valid. Silakan coba lagi.",
-  "error_failed": "Proses login gagal. Terjadi kesalahan jaringan.",
-  "banner_title": "Akses Cepat & Aman",
-  "banner_subtitle": "Kelola semua data dan proyek Anda dengan keamanan terjamin."
+  "register_link": "Daftar sekarang",
+  "forgot_password": "Lupa kata sandi?",
+  "error_invalid": "Email atau kata sandi belum cocok. Coba lagi.",
+  "error_failed": "Belum bisa masuk. Cek koneksi lalu coba lagi.",
+  "banner_title": "Akses akun lebih mudah",
+  "banner_subtitle": "Kelola postingan, chat, dan kebutuhan usahamu dari satu akun."
 }

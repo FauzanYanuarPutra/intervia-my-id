@@ -46,7 +46,7 @@ function StepNumber({
   return (
     <span
       className={cn(
-        'grid h-8 w-8 place-items-center rounded-full text-xs font-black transition',
+        'grid h-8 w-8 place-items-center rounded-full text-xs font-bold transition',
         active || done
           ? 'bg-emerald-700 text-white ring-emerald-700'
           : 'bg-slate-100 text-slate-500 ring-slate-200 dark:bg-white/8 dark:text-slate-300 dark:ring-white/10',
@@ -68,7 +68,7 @@ export function BusinessSetupRail({
 }) {
   return (
     <aside className="hidden rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-950 xl:block">
-      <p className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
         {isId ? 'Buat Profil Usaha' : 'Create Business Profile'}
       </p>
       <div className="mt-5 space-y-1">
@@ -98,7 +98,7 @@ export function BusinessSetupRail({
             <span className="min-w-0 pb-2">
               <span
                 className={cn(
-                  'block text-[13px] font-black leading-5',
+                  'block text-[13px] font-bold leading-5',
                   step.active
                     ? 'text-emerald-700 dark:text-emerald-300'
                     : 'text-slate-900 dark:text-white',
@@ -133,7 +133,7 @@ export function BusinessSetupHorizontalSteps({
           onClick={() => onStepSelect(step.id)}
           disabled={!step.unlocked}
           className={cn(
-            'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-55 sm:px-3',
+            'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-55 sm:px-3',
             step.active
               ? 'border-emerald-200 bg-emerald-700 text-white shadow-[0_12px_24px_-20px_rgba(21,128,61,0.75)] dark:border-emerald-400/30'
               : step.done
@@ -143,7 +143,7 @@ export function BusinessSetupHorizontalSteps({
         >
           <span
             className={cn(
-              'grid h-5 w-5 place-items-center rounded-full text-[10px] font-black transition',
+              'grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold transition',
               step.active || step.done
                 ? 'bg-white/18 text-current ring-1 ring-white/35'
                 : 'bg-white text-slate-500 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-white/10',
@@ -167,18 +167,18 @@ export function BusinessPreviewCard({
 }) {
   return (
     <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-950">
-      <p className="text-sm font-black text-slate-950 dark:text-white">
+      <p className="text-sm font-bold text-slate-950 dark:text-white">
         {isId ? 'Preview Usaha' : 'Business Preview'}
       </p>
       <div className="mt-4 rounded-[22px] bg-[linear-gradient(135deg,#f8fffb_0%,#f7f8f4_100%)] p-4 ring-1 ring-slate-100 dark:bg-white/[0.04] dark:ring-white/10">
         <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-400/12 dark:text-emerald-200 dark:ring-emerald-400/20">
           <Store className="h-9 w-9" />
         </div>
-        <h3 className="mt-4 line-clamp-2 text-center text-lg font-black text-slate-950 dark:text-white">
+        <h3 className="mt-4 line-clamp-2 text-center text-lg font-bold text-slate-950 dark:text-white">
           {preview.title || preview.fallbackTitle}
         </h3>
         <div className="mt-2 flex justify-center">
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-400/12 dark:text-emerald-200">
             {preview.categoryLabel}
           </span>
         </div>
@@ -199,7 +199,7 @@ export function BusinessTipsCard({
 }) {
   return (
     <div className="rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-950">
-      <p className="text-sm font-black text-slate-950 dark:text-white">
+      <p className="text-sm font-bold text-slate-950 dark:text-white">
         {isId ? 'Tips Mengisi' : 'Filling Tips'}
       </p>
       <div className="mt-3 space-y-3">
@@ -237,7 +237,7 @@ export function BusinessSetupIntroLayout({
                 <Store className="h-4.5 w-4.5" />
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-[1.05rem] font-black tracking-[-0.04em] text-slate-950 dark:text-white sm:text-xl">
+                <h2 className="truncate text-[1.05rem] font-bold tracking-[-0.04em] text-slate-950 dark:text-white sm:text-xl">
                   {title}
                 </h2>
                 <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-slate-500 dark:text-slate-400 sm:text-[13px]">
@@ -257,7 +257,7 @@ export function BusinessSetupIntroLayout({
 
         <div className="mt-2 flex min-w-0 items-center justify-between gap-2 rounded-[14px] border border-emerald-100 bg-emerald-50/60 px-3 py-2 dark:border-emerald-400/14 dark:bg-emerald-400/10">
           <div className="min-w-0">
-            <p className="truncate text-xs font-black text-emerald-800 dark:text-emerald-100 sm:text-[13px]">
+            <p className="truncate text-xs font-bold text-emerald-800 dark:text-emerald-100 sm:text-[13px]">
               {currentStepTitle}
             </p>
             <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-emerald-700/78 dark:text-emerald-100/70">

@@ -53,6 +53,8 @@ export enum RoutePath {
 }
 
 export interface MetaType {
+  title?: string;
+  description?: string;
   topbar?: {
     isVisibleOnWeb: boolean;
     isVisibleOnMobile: boolean;
@@ -75,6 +77,7 @@ export interface MetaType {
 }
 
 export interface RouteConfig {
+
   path: string;
   name: string;
   meta: MetaType;
@@ -260,11 +263,14 @@ export const routes: RouteConfig[] = [
     path: RoutePath.CREATE,
     name: 'Create Posting',
     meta: {
+      title: 'Buat Postingan',
+      description: 'Pilih jenis postingan yang ingin dibuat.',
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },
       footer: { isVisibleOnWeb: true, isVisibleOnMobile: false },
     },
+
     access: AUTH_ACCESS,
     children: [
       {
@@ -293,6 +299,7 @@ export const routes: RouteConfig[] = [
     path: RoutePath.PROFILE,
     name: 'Profile',
     meta: {
+      title: "Profil",
       topbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       navbar: { isVisibleOnWeb: true, isVisibleOnMobile: true },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: true },

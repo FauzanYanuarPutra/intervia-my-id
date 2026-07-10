@@ -211,7 +211,7 @@ export default function MarketplaceClient() {
       inStockOnly: searchParams.get('in_stock') === '1',
       sortBy:
         (searchParams.get('sort') as Filters['sortBy']) === 'price_low' ||
-        (searchParams.get('sort') as Filters['sortBy']) === 'price_high'
+          (searchParams.get('sort') as Filters['sortBy']) === 'price_high'
           ? (searchParams.get('sort') as Filters['sortBy'])
           : 'latest',
     }),
@@ -300,7 +300,7 @@ export default function MarketplaceClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-              `Failed to load marketplace content (${response.status})`,
+            `Failed to load marketplace content (${response.status})`,
           );
         }
 
@@ -356,13 +356,13 @@ export default function MarketplaceClient() {
 
     setFilters(prev =>
       prev.search === next.search &&
-      prev.category === next.category &&
-      prev.location === next.location &&
-      prev.minPrice === next.minPrice &&
-      prev.maxPrice === next.maxPrice &&
-      prev.condition === next.condition &&
-      prev.inStockOnly === next.inStockOnly &&
-      prev.sortBy === next.sortBy
+        prev.category === next.category &&
+        prev.location === next.location &&
+        prev.minPrice === next.minPrice &&
+        prev.maxPrice === next.maxPrice &&
+        prev.condition === next.condition &&
+        prev.inStockOnly === next.inStockOnly &&
+        prev.sortBy === next.sortBy
         ? prev
         : next,
     );
@@ -446,7 +446,7 @@ export default function MarketplaceClient() {
 
   return (
     <div className="lajukan-market-page lajukan-market-marketplace min-h-screen bg-[color:var(--app-surface-muted)] pb-6 dark:bg-[color:var(--app-surface-strong)] lg:pb-0">
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)]  lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
         <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
           <div className="flex flex-col gap-2 md:flex-row">
             <div className="flex flex-grow items-center gap-2">
@@ -591,7 +591,7 @@ export default function MarketplaceClient() {
           </div>
 
           <div className="flex min-h-[32px] flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-[color:var(--app-text-soft)]">
+            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-[color:var(--app-text-soft)]">
               <Filter className="h-3 w-3" /> Filters:
             </span>
             {!hasActiveFilters ? (
@@ -659,7 +659,7 @@ export default function MarketplaceClient() {
             <p className="font-semibold text-[color:var(--app-text)]">
               Loaded Items
             </p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length}
             </p>
           </div>
@@ -667,7 +667,7 @@ export default function MarketplaceClient() {
             <p className="font-semibold text-[color:var(--app-text)]">
               Avg Price
             </p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {avgPrice}
             </p>
           </div>
@@ -675,7 +675,7 @@ export default function MarketplaceClient() {
             <p className="font-semibold text-[color:var(--app-text)]">
               In-stock Ratio
             </p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length > 0
                 ? `${Math.round((items.filter(item => item.inStock).length / items.length) * 100)}%`
                 : '-'}
@@ -746,11 +746,10 @@ export default function MarketplaceClient() {
                           {item.condition}
                         </span>
                         <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            item.inStock
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.inStock
                               ? 'border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] dark:border-[color:var(--app-accent-border)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_30%,_transparent)] dark:text-[color:var(--app-accent)]'
                               : 'border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)] dark:border-[color:var(--app-danger-border)] dark:bg-[color:color-mix(in_srgb,_var(--app-danger)_30%,_transparent)] dark:text-[color:var(--app-danger)]'
-                          }`}
+                            }`}
                         >
                           {item.inStock ? 'In stock' : 'Out of stock'}
                         </span>

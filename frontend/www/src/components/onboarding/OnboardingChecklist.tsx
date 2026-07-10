@@ -64,14 +64,14 @@ export default function OnboardingChecklist({
     <section className="rounded-[32px] border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] p-6 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
             Onboarding
           </p>
-          <h3 className="text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h3 className="text-xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {title}
           </h3>
         </div>
-        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_10%,_transparent)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
           Fast Track
         </span>
       </div>
@@ -85,11 +85,10 @@ export default function OnboardingChecklist({
               className="flex items-start gap-3 rounded-2xl border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_5%,_transparent)] bg-[color:var(--app-surface-muted)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] p-4"
             >
               <div
-                className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl text-xs font-black ${
-                  step.done
+                className={`mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold ${step.done
                     ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                     : 'bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-overlay)_30%,_transparent)] text-[color:var(--app-text)]'
-                }`}
+                  }`}
               >
                 {step.done ? 'OK' : 'GO'}
               </div>
@@ -104,7 +103,7 @@ export default function OnboardingChecklist({
               {href && (
                 <Link
                   href={href}
-                  className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)] hover:text-[color:var(--app-accent)]"
+                  className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)] hover:text-[color:var(--app-accent)]"
                 >
                   Open
                 </Link>

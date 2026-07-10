@@ -81,7 +81,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             role="status"
             aria-live="polite"
             className={cn(
-              'pointer-events-auto rounded-2xl border p-3 shadow-lg backdrop-blur',
+              'pointer-events-auto rounded-2xl border p-3 shadow-lg ',
               variantClasses(toast.variant),
             )}
           >

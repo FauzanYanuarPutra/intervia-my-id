@@ -482,21 +482,21 @@ function resolveTransactionProgress(
   const labels =
     locale === 'id'
       ? [
-          'Order dibuat',
-          'Seller terima',
-          'Dana aman',
-          'Diproses',
-          'Hasil dikirim',
-          'Selesai',
-        ]
+        'Order dibuat',
+        'Seller terima',
+        'Dana aman',
+        'Diproses',
+        'Hasil dikirim',
+        'Selesai',
+      ]
       : [
-          'Order created',
-          'Seller accepts',
-          'Funds secured',
-          'In progress',
-          'Delivered',
-          'Done',
-        ];
+        'Order created',
+        'Seller accepts',
+        'Funds secured',
+        'In progress',
+        'Delivered',
+        'Done',
+      ];
 
   const statusIndex: Record<string, number> = {
     pending: paymentReady ? 1 : 0,
@@ -516,9 +516,9 @@ function resolveTransactionProgress(
         : status === 'pending' && paymentReady
           ? 33
           : Math.max(
-              16,
-              Math.round(((currentIndex + 1) / labels.length) * 100),
-            );
+            16,
+            Math.round(((currentIndex + 1) / labels.length) * 100),
+          );
 
   return {
     percent,
@@ -685,9 +685,9 @@ function readTopupOriginalTransactionAmount(
   const clientMeta = asObject(payload.client_metadata);
   return Number(
     clientMeta.original_amount_cents ||
-      clientMeta.transaction_amount_cents ||
-      payload.original_amount_cents ||
-      0,
+    clientMeta.transaction_amount_cents ||
+    payload.original_amount_cents ||
+    0,
   );
 }
 
@@ -1161,7 +1161,7 @@ function PaymentMethodPill({ option }: { option: PaymentOption }) {
         />
       </span>
       <span className="min-w-0 text-left">
-        <span className="block truncate text-sm font-black text-[color:var(--app-text)]">
+        <span className="block truncate text-sm font-bold text-[color:var(--app-text)]">
           {option.title}
         </span>
         <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1299,9 +1299,9 @@ export default function TransactionsPage() {
       if (!res.ok) {
         throw new Error(
           asString('error' in payload ? payload.error : '') ||
-            (locale === 'id'
-              ? 'Riwayat transaksi belum bisa dimuat.'
-              : 'Unable to load transactions.'),
+          (locale === 'id'
+            ? 'Riwayat transaksi belum bisa dimuat.'
+            : 'Unable to load transactions.'),
         );
       }
 
@@ -1385,9 +1385,9 @@ export default function TransactionsPage() {
       if (!res.ok) {
         throw new Error(
           payload.error ||
-            (locale === 'id'
-              ? 'Gagal memuat saldo koin.'
-              : 'Failed to load coin balance.'),
+          (locale === 'id'
+            ? 'Gagal memuat saldo koin.'
+            : 'Failed to load coin balance.'),
         );
       }
 
@@ -1579,29 +1579,29 @@ export default function TransactionsPage() {
   );
   const maxRewardCoinDiscountCents = paymentTxn
     ? Math.max(
-        0,
-        Math.min(
-          Math.floor(
-            (Number(paymentTxn.amount_cents || 0) * rewardCoinMaxDiscountBps) /
-              10_000,
-          ),
-          Math.max(
-            0,
-            Number(paymentTxn.amount_cents || 0) -
-              rewardCoinMinCashPaymentCents,
-          ),
+      0,
+      Math.min(
+        Math.floor(
+          (Number(paymentTxn.amount_cents || 0) * rewardCoinMaxDiscountBps) /
+          10_000,
         ),
-      )
+        Math.max(
+          0,
+          Number(paymentTxn.amount_cents || 0) -
+          rewardCoinMinCashPaymentCents,
+        ),
+      ),
+    )
     : 0;
   const rewardCoinsApplied =
     useCoinsForPayment && canUseRewardCoinsForTxn
       ? Math.max(
-          0,
-          Math.min(
-            rewardCoinBalance,
-            Math.floor(maxRewardCoinDiscountCents / rewardCoinValueCents),
-          ),
-        )
+        0,
+        Math.min(
+          rewardCoinBalance,
+          Math.floor(maxRewardCoinDiscountCents / rewardCoinValueCents),
+        ),
+      )
       : 0;
   const rewardCoinDiscountCents = rewardCoinsApplied * rewardCoinValueCents;
   const paymentDueAfterCoinsCents = Math.max(
@@ -1726,7 +1726,7 @@ export default function TransactionsPage() {
           option.provider === latestTopupProvider &&
           asString(option.method || '').toLowerCase() === latestTopupMethod,
       ) ||
-        providerOptions.find(option => option.provider === latestTopupProvider),
+      providerOptions.find(option => option.provider === latestTopupProvider),
     );
 
     return nextOptions;
@@ -1902,8 +1902,8 @@ export default function TransactionsPage() {
       listFilter === 'all'
         ? orderedTransactions
         : orderedTransactions.filter(
-            txn => resolveTransactionListFilter(txn, user?.id) === listFilter,
-          ),
+          txn => resolveTransactionListFilter(txn, user?.id) === listFilter,
+        ),
     [listFilter, orderedTransactions, user?.id],
   );
 
@@ -2014,7 +2014,7 @@ export default function TransactionsPage() {
         const updated = await res.json();
         setTransactions(prev => prev.map(t => (t.id === id ? updated : t)));
         notifyTransactionChat(updated, 'accepted', message || undefined).catch(
-          () => {},
+          () => { },
         );
       } else {
         const errorData = (await res.json().catch(() => ({}))) as {
@@ -2048,7 +2048,7 @@ export default function TransactionsPage() {
         const updated = await res.json();
         setTransactions(prev => prev.map(t => (t.id === id ? updated : t)));
         notifyTransactionChat(updated, 'in_progress', undefined).catch(
-          () => {},
+          () => { },
         );
       } else {
         notify({ title: 'Failed to start transaction', variant: 'error' });
@@ -2120,9 +2120,9 @@ export default function TransactionsPage() {
               ? 'Batas habis. Kalau masih keberatan, masuk review support.'
               : 'The delivery limit has been reached. If the buyer still disagrees, the order will move to support review.'
             : errorPayload.error ||
-                (locale === 'id'
-                  ? 'Gagal mengirim hasil kerja.'
-                  : 'Failed to submit the delivery package.'),
+            (locale === 'id'
+              ? 'Gagal mengirim hasil kerja.'
+              : 'Failed to submit the delivery package.'),
         );
       }
 
@@ -2134,7 +2134,7 @@ export default function TransactionsPage() {
         updated,
         'delivered',
         deliveryNote.trim() || deliveryTitle.trim() || undefined,
-      ).catch(() => {});
+      ).catch(() => { });
       setActionNotice(
         locale === 'id'
           ? 'Hasil kerja dikirim. Buyer bisa terima atau minta revisi.'
@@ -2220,9 +2220,9 @@ export default function TransactionsPage() {
       if (!res.ok) {
         throw new Error(
           (payload as { error?: string }).error ||
-            (locale === 'id'
-              ? 'Gagal memproses review hasil kerja.'
-              : 'Failed to process the delivery review.'),
+          (locale === 'id'
+            ? 'Gagal memproses review hasil kerja.'
+            : 'Failed to process the delivery review.'),
         );
       }
 
@@ -2234,7 +2234,7 @@ export default function TransactionsPage() {
         updated,
         updated.status,
         deliveryReviewNote.trim() || undefined,
-      ).catch(() => {});
+      ).catch(() => { });
       setActionNotice(
         deliveryReviewDecision === 'accept'
           ? locale === 'id'
@@ -2312,9 +2312,9 @@ export default function TransactionsPage() {
       if (!res.ok) {
         throw new Error(
           (payload as { error?: string }).error ||
-            (locale === 'id'
-              ? 'Gagal membatalkan transaksi.'
-              : 'Failed to cancel transaction.'),
+          (locale === 'id'
+            ? 'Gagal membatalkan transaksi.'
+            : 'Failed to cancel transaction.'),
         );
       }
 
@@ -2326,7 +2326,7 @@ export default function TransactionsPage() {
         updated,
         'cancelled',
         cancelMessage.trim() || undefined,
-      ).catch(() => {});
+      ).catch(() => { });
       setActionNotice(
         locale === 'id'
           ? 'Pembatalan terkirim dan tercatat.'
@@ -2383,14 +2383,14 @@ export default function TransactionsPage() {
 
     const safetyChecklist =
       counterOfferTxn.safety_checklist &&
-      Object.keys(counterOfferTxn.safety_checklist).length > 0
+        Object.keys(counterOfferTxn.safety_checklist).length > 0
         ? counterOfferTxn.safety_checklist
         : {
-            identity_confirmed: true,
-            platform_payment_confirmed: true,
-            item_detail_confirmed: true,
-            anti_scam_acknowledged: true,
-          };
+          identity_confirmed: true,
+          platform_payment_confirmed: true,
+          item_detail_confirmed: true,
+          anti_scam_acknowledged: true,
+        };
 
     setCounterOfferSubmitting(true);
     setCounterOfferError(null);
@@ -2430,9 +2430,9 @@ export default function TransactionsPage() {
         }
         throw new Error(
           errorPayload.error ||
-            (locale === 'id'
-              ? 'Gagal mengirim counter offer.'
-              : 'Failed to create a counter offer.'),
+          (locale === 'id'
+            ? 'Gagal mengirim counter offer.'
+            : 'Failed to create a counter offer.'),
         );
       }
 
@@ -2447,7 +2447,7 @@ export default function TransactionsPage() {
         counterOfferMessage.trim()
           ? `Counter offer: ${counterOfferMessage.trim()}`
           : 'Counter offer',
-      ).catch(() => {});
+      ).catch(() => { });
       setActionNotice(
         locale === 'id'
           ? 'Counter offer terkirim. Balas dari chat atau halaman ini.'
@@ -2514,17 +2514,17 @@ export default function TransactionsPage() {
       const evidenceHash = await sha256Hex(evidenceSource);
       const evidenceAttachment = disputeEvidenceUrl.trim()
         ? {
-            evidence_type: 'external_reference',
-            file_url: disputeEvidenceUrl.trim(),
-            file_hash_sha256: evidenceHash,
-            description: disputeEvidenceContext.trim() || disputeMessage.trim(),
-          }
+          evidence_type: 'external_reference',
+          file_url: disputeEvidenceUrl.trim(),
+          file_hash_sha256: evidenceHash,
+          description: disputeEvidenceContext.trim() || disputeMessage.trim(),
+        }
         : {
-            evidence_type: 'self_report',
-            external_ref: `transactions:self-report:${disputeTxn.id}:${Date.now()}`,
-            file_hash_sha256: evidenceHash,
-            description: disputeEvidenceContext.trim() || disputeMessage.trim(),
-          };
+          evidence_type: 'self_report',
+          external_ref: `transactions:self-report:${disputeTxn.id}:${Date.now()}`,
+          file_hash_sha256: evidenceHash,
+          description: disputeEvidenceContext.trim() || disputeMessage.trim(),
+        };
 
       const res = await authFetch(
         `/api/transactions/${disputeTxn.id}/dispute`,
@@ -2549,9 +2549,9 @@ export default function TransactionsPage() {
       if (!res.ok) {
         throw new Error(
           (payload as { error?: string }).error ||
-            (locale === 'id'
-              ? 'Gagal mengirim dispute.'
-              : 'Failed to submit dispute.'),
+          (locale === 'id'
+            ? 'Gagal mengirim dispute.'
+            : 'Failed to submit dispute.'),
         );
       }
 
@@ -2560,7 +2560,7 @@ export default function TransactionsPage() {
         prev.map(txn => (txn.id === disputeTxn.id ? updated : txn)),
       );
       notifyTransactionChat(updated, 'disputed', disputeMessage.trim()).catch(
-        () => {},
+        () => { },
       );
       setActionNotice(
         locale === 'id'
@@ -2607,9 +2607,9 @@ export default function TransactionsPage() {
     : '-';
   const walletHeldSummary = paymentTxn
     ? formatPrice(
-        Number(paymentWalletAccount?.held_balance_cents || 0),
-        paymentCurrency,
-      )
+      Number(paymentWalletAccount?.held_balance_cents || 0),
+      paymentCurrency,
+    )
     : '-';
   const walletShortfallSummary =
     paymentTxn && walletShortfallCents > 0
@@ -2918,9 +2918,9 @@ export default function TransactionsPage() {
           }
           throw new Error(
             payload.error ||
-              (locale === 'id'
-                ? 'Gagal membayar transaksi dengan saldo wallet.'
-                : 'Failed to fund the transaction from wallet balance.'),
+            (locale === 'id'
+              ? 'Gagal membayar transaksi dengan saldo wallet.'
+              : 'Failed to fund the transaction from wallet balance.'),
           );
         }
 
@@ -3257,11 +3257,10 @@ export default function TransactionsPage() {
                   key={option.value}
                   type="button"
                   onClick={() => setListFilter(option.value)}
-                  className={`inline-flex min-h-[38px] items-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${
-                    active
+                  className={`inline-flex min-h-[38px] items-center gap-2 rounded-full border px-3 text-sm font-semibold transition ${active
                       ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                       : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]'
-                  }`}
+                    }`}
                 >
                   <span>{option.label}</span>
                   <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-bold dark:bg-white/10">
@@ -3344,11 +3343,10 @@ export default function TransactionsPage() {
                       setDetailTxn(txn);
                     }
                   }}
-                  className={`ui-feed-row relative cursor-pointer overflow-hidden rounded-none border border-x-0 bg-[color:var(--app-surface-strong)] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_28%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-2xl sm:border-x sm:p-4 ${
-                    isFocused
+                  className={`ui-feed-row relative cursor-pointer overflow-hidden rounded-none border border-x-0 bg-[color:var(--app-surface-strong)] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[color:color-mix(in_srgb,_var(--app-accent)_28%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-2xl sm:border-x sm:p-4 ${isFocused
                       ? 'border-[color:var(--app-accent-border)] ring-2 ring-[color:color-mix(in_srgb,_var(--app-accent)_25%,_transparent)]'
                       : 'border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)]'
-                  }`}
+                    }`}
                 >
                   <span
                     className={`absolute left-0 top-0 h-full w-1.5 opacity-80 ${statusM.accentClass}`}
@@ -3383,12 +3381,12 @@ export default function TransactionsPage() {
                           ) : null}
                         </div>
 
-                        <h2 className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                        <h2 className="mt-2 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                           {snapshotTitle}
                         </h2>
 
                         <div className="mt-2 flex min-w-0 items-center gap-2">
-                          <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[11px] font-black text-[color:var(--app-accent)]">
+                          <span className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-[11px] font-bold text-[color:var(--app-accent)]">
                             <Image
                               src={profileAvatarSrc(
                                 counterparty.avatar,
@@ -3416,7 +3414,7 @@ export default function TransactionsPage() {
 
                     <div className="flex items-center justify-between gap-3 sm:block sm:min-w-[160px] sm:text-right">
                       <div>
-                        <p className="text-base font-black text-[color:var(--app-accent)]">
+                        <p className="text-base font-bold text-[color:var(--app-accent)]">
                           {formatPrice(txn.amount_cents, txn.currency)}
                         </p>
                       </div>
@@ -3464,7 +3462,7 @@ export default function TransactionsPage() {
                       <p className="line-clamp-1 min-w-0 text-xs font-semibold text-[color:var(--app-text)]">
                         {headline}
                       </p>
-                      <span className="shrink-0 text-xs font-black text-[color:var(--app-accent)]">
+                      <span className="shrink-0 text-xs font-bold text-[color:var(--app-accent)]">
                         {progress.percent}%
                       </span>
                     </div>
@@ -3613,17 +3611,17 @@ export default function TransactionsPage() {
                           size="xs"
                         />
                       </div>
-                      <h3 className="mt-3 text-base font-black leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      <h3 className="mt-3 text-base font-bold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                         {snapshotTitle}
                       </h3>
-                      <p className="mt-1 text-lg font-black text-[color:var(--app-accent)]">
+                      <p className="mt-1 text-lg font-bold text-[color:var(--app-accent)]">
                         {formatPrice(
                           detailTxn.amount_cents,
                           detailTxn.currency,
                         )}
                       </p>
                       <div className="mt-3 flex items-center gap-2">
-                        <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-xs font-black text-[color:var(--app-accent)]">
+                        <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--app-accent-soft)] text-xs font-bold text-[color:var(--app-accent)]">
                           <Image
                             src={profileAvatarSrc(
                               counterparty.avatar,
@@ -3652,14 +3650,14 @@ export default function TransactionsPage() {
                   <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-[color:var(--app-text)]">
+                        <p className="text-sm font-bold text-[color:var(--app-text)]">
                           {progress.label}
                         </p>
                         <p className="mt-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
                           {guidance}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-xs font-black text-[color:var(--app-accent)]">
+                      <span className="shrink-0 rounded-full bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-xs font-bold text-[color:var(--app-accent)]">
                         {progress.percent}%
                       </span>
                     </div>
@@ -3672,7 +3670,7 @@ export default function TransactionsPage() {
                   </div>
 
                   <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
-                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-[color:var(--app-text)]">
                       {locale === 'id'
                         ? 'Detail transaksi'
                         : 'Transaction detail'}
@@ -3728,13 +3726,12 @@ export default function TransactionsPage() {
                               className="flex items-center gap-2 text-xs font-semibold text-[color:var(--app-text)]"
                             >
                               <span
-                                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
-                                  step.state === 'done'
+                                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${step.state === 'done'
                                     ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                                     : step.state === 'current'
                                       ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                                       : 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text-soft)]'
-                                }`}
+                                  }`}
                               >
                                 {index + 1}
                               </span>
@@ -3748,7 +3745,7 @@ export default function TransactionsPage() {
 
                   {detailTxn.offer_message || detailTxn.response_message ? (
                     <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
-                      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-[color:var(--app-text)]">
                         {locale === 'id'
                           ? 'Catatan negosiasi'
                           : 'Negotiation notes'}
@@ -3769,7 +3766,7 @@ export default function TransactionsPage() {
                   ) : null}
 
                   <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
-                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-[color:var(--app-text)]">
                       {locale === 'id' ? 'Keamanan & bantuan' : 'Safety & help'}
                     </summary>
                     <p className="border-t border-[color:var(--app-border)] p-3 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
@@ -3929,11 +3926,10 @@ export default function TransactionsPage() {
               type="button"
               onClick={() => void submitDeliveryReview()}
               disabled={deliveryReviewSubmitting}
-              className={`inline-flex flex-1 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] disabled:opacity-60 ${
-                deliveryReviewDecision === 'accept'
+              className={`inline-flex flex-1 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-[color:var(--app-text-inverse)] disabled:opacity-60 ${deliveryReviewDecision === 'accept'
                   ? 'bg-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-strong)]'
                   : 'bg-[color:var(--app-info)] hover:bg-[color:var(--app-info)]'
-              }`}
+                }`}
             >
               {deliveryReviewSubmitting
                 ? locale === 'id'
@@ -3997,11 +3993,10 @@ export default function TransactionsPage() {
                     <button
                       type="button"
                       onClick={() => setDeliveryReviewDecision('accept')}
-                      className={`rounded-2xl border px-3 py-3 text-left text-xs ${
-                        deliveryReviewDecision === 'accept'
+                      className={`rounded-2xl border px-3 py-3 text-left text-xs ${deliveryReviewDecision === 'accept'
                           ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                           : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]'
-                      }`}
+                        }`}
                     >
                       <p className="font-semibold">
                         {locale === 'id'
@@ -4019,11 +4014,10 @@ export default function TransactionsPage() {
                       onClick={() =>
                         setDeliveryReviewDecision('request_revision')
                       }
-                      className={`rounded-2xl border px-3 py-3 text-left text-xs ${
-                        deliveryReviewDecision === 'request_revision'
+                      className={`rounded-2xl border px-3 py-3 text-left text-xs ${deliveryReviewDecision === 'request_revision'
                           ? 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]'
                           : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]'
-                      }`}
+                        }`}
                     >
                       <p className="font-semibold">
                         {locale === 'id' ? 'Minta revisi' : 'Request revision'}
@@ -4456,10 +4450,10 @@ export default function TransactionsPage() {
             <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.34)] dark:border-[color:var(--app-border-strong)]">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
                     {locale === 'id' ? 'Total bayar' : 'Total payment'}
                   </p>
-                  <p className="mt-1 text-2xl font-black leading-tight text-[color:var(--app-text)]">
+                  <p className="mt-1 text-2xl font-bold leading-tight text-[color:var(--app-text)]">
                     {formatPrice(paymentTxn.amount_cents, paymentTxn.currency)}
                   </p>
                   <p className="mt-1 truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -4497,7 +4491,7 @@ export default function TransactionsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-black text-[color:var(--app-text)]">
+                      <p className="text-sm font-bold text-[color:var(--app-text)]">
                         {locale === 'id'
                           ? 'Pakai Koin Lajukan'
                           : 'Use Lajukan Coins'}
@@ -4518,11 +4512,10 @@ export default function TransactionsPage() {
                       disabled={
                         !canUseRewardCoinsForTxn || loadingRewardBalance
                       }
-                      className={`inline-flex h-9 min-w-[76px] items-center justify-center rounded-full px-3 text-xs font-black transition ${
-                        useCoinsForPayment && rewardCoinsApplied > 0
+                      className={`inline-flex h-9 min-w-[76px] items-center justify-center rounded-full px-3 text-xs font-bold transition ${useCoinsForPayment && rewardCoinsApplied > 0
                           ? 'bg-[color:var(--app-accent)] text-white'
                           : 'border border-amber-200 bg-white text-amber-700'
-                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
                     >
                       {useCoinsForPayment && rewardCoinsApplied > 0
                         ? locale === 'id'
@@ -4536,30 +4529,30 @@ export default function TransactionsPage() {
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <div className="rounded-2xl border border-amber-100 bg-white/82 px-3 py-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
                         {locale === 'id' ? 'Potongan' : 'Discount'}
                       </p>
-                      <p className="mt-1 text-sm font-black text-[color:var(--app-text)]">
+                      <p className="mt-1 text-sm font-bold text-[color:var(--app-text)]">
                         {rewardCoinDiscountCents > 0
                           ? rewardCoinDiscountSummary
                           : '-'}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-amber-100 bg-white/82 px-3 py-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
                         {locale === 'id' ? 'Koin' : 'Coins'}
                       </p>
-                      <p className="mt-1 text-sm font-black text-[color:var(--app-text)]">
+                      <p className="mt-1 text-sm font-bold text-[color:var(--app-text)]">
                         {rewardCoinsApplied > 0
                           ? `${rewardCoinsApplied}`
                           : rewardCoinBalance}
                       </p>
                     </div>
                     <div className="rounded-2xl border border-amber-100 bg-white/82 px-3 py-2">
-                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
                         {locale === 'id' ? 'Sisa bayar' : 'Due'}
                       </p>
-                      <p className="mt-1 text-sm font-black text-[color:var(--app-text)]">
+                      <p className="mt-1 text-sm font-bold text-[color:var(--app-text)]">
                         {paymentDueAfterCoinsSummary}
                       </p>
                     </div>
@@ -4575,7 +4568,7 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <p className="text-sm font-black text-[color:var(--app-text)]">
+              <p className="text-sm font-bold text-[color:var(--app-text)]">
                 {locale === 'id' ? 'Pilih metode' : 'Choose method'}
               </p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -4584,11 +4577,10 @@ export default function TransactionsPage() {
                     key={option.id}
                     type="button"
                     onClick={() => setSelectedPaymentOptionId(option.id)}
-                    className={`ui-pressable flex min-h-[64px] items-center justify-between gap-2 rounded-[20px] border px-3 py-2 text-left transition ${
-                      selectedPaymentOptionId === option.id
+                    className={`ui-pressable flex min-h-[64px] items-center justify-between gap-2 rounded-[20px] border px-3 py-2 text-left transition ${selectedPaymentOptionId === option.id
                         ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[0_16px_34px_-28px_rgba(15,23,42,0.28)]'
                         : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)]'
-                    }`}
+                      }`}
                   >
                     <PaymentMethodPill option={option} />
                     {selectedPaymentOptionId === option.id ? (
@@ -4604,7 +4596,7 @@ export default function TransactionsPage() {
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-[color:var(--app-text)]">
+                    <p className="text-sm font-bold text-[color:var(--app-text)]">
                       {selectedPaymentOption.title}
                     </p>
                     <p className="mt-0.5 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
@@ -4641,25 +4633,24 @@ export default function TransactionsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
-                        <p className="text-sm font-black text-[color:var(--app-text)]">
+                        <p className="text-sm font-bold text-[color:var(--app-text)]">
                           {locale === 'id' ? 'Saldo Wallet' : 'Wallet Balance'}
                         </p>
                         <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
                           {locale === 'id' ? 'Tersedia' : 'Available'}
                         </p>
                       </div>
-                      <p className="text-base font-black text-[color:var(--app-text)]">
+                      <p className="text-base font-bold text-[color:var(--app-text)]">
                         {loadingWalletBalances ? '...' : walletBalanceSummary}
                       </p>
                     </div>
                     <p
-                      className={`mt-2 text-xs font-semibold leading-5 ${
-                        loadingWalletBalances
+                      className={`mt-2 text-xs font-semibold leading-5 ${loadingWalletBalances
                           ? 'text-[color:var(--app-text-soft)]'
                           : canPayWithWalletBalance
                             ? 'text-[color:var(--app-accent)]'
                             : 'text-[color:var(--app-warning)]'
-                      }`}
+                        }`}
                     >
                       {loadingWalletBalances
                         ? locale === 'id'
@@ -4731,14 +4722,14 @@ export default function TransactionsPage() {
                       <CheckCircle2 className="h-5 w-5" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-black text-[color:var(--app-text)]">
+                      <p className="text-sm font-bold text-[color:var(--app-text)]">
                         {latestPaymentInstruction?.qrUrl
                           ? locale === 'id'
                             ? 'QRIS siap discan'
                             : 'QRIS is ready'
                           : latestPaymentInstruction?.vaNumbers?.[0]?.number ||
-                              latestPaymentInstruction?.permataVa ||
-                              latestPaymentInstruction?.billKey
+                            latestPaymentInstruction?.permataVa ||
+                            latestPaymentInstruction?.billKey
                             ? locale === 'id'
                               ? 'Nomor bayar siap'
                               : 'Payment number is ready'
@@ -4761,7 +4752,7 @@ export default function TransactionsPage() {
                             href={latestCheckoutUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]"
                           >
                             {locale === 'id'
                               ? 'Buka instruksi'
@@ -4774,7 +4765,7 @@ export default function TransactionsPage() {
                             href={latestPaymentInstruction.qrUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
                           >
                             {locale === 'id' ? 'Buka QR' : 'Open QR'}
                             <ExternalLink className="h-3.5 w-3.5" />
@@ -4788,7 +4779,7 @@ export default function TransactionsPage() {
                                 latestPaymentInstruction.vaNumbers[0].number,
                               )
                             }
-                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
                           >
                             <Copy className="h-3.5 w-3.5" />
                             {locale === 'id' ? 'Salin VA' : 'Copy VA'}
@@ -4802,7 +4793,7 @@ export default function TransactionsPage() {
                                 latestPaymentInstruction.permataVa,
                               )
                             }
-                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
                           >
                             <Copy className="h-3.5 w-3.5" />
                             {locale === 'id' ? 'Salin VA' : 'Copy VA'}
@@ -4816,7 +4807,7 @@ export default function TransactionsPage() {
                                 `${latestPaymentInstruction.billerCode || ''} ${latestPaymentInstruction.billKey}`.trim(),
                               )
                             }
-                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-black text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
+                            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface-strong)] px-3 text-xs font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]"
                           >
                             <Copy className="h-3.5 w-3.5" />
                             {locale === 'id' ? 'Salin kode' : 'Copy code'}
@@ -4827,7 +4818,7 @@ export default function TransactionsPage() {
                   </div>
                 </div>
                 <details className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)]">
-                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-[color:var(--app-text)]">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-sm font-bold text-[color:var(--app-text)]">
                     {locale === 'id' ? 'Detail pembayaran' : 'Payment detail'}
                     <span className="ml-2 text-xs font-semibold text-[color:var(--app-text-soft)]">
                       {locale === 'id' ? 'opsional' : 'optional'}
@@ -4842,10 +4833,10 @@ export default function TransactionsPage() {
                         <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_15%,_transparent)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--app-info)] dark:text-[color:var(--app-info)]">
                           {humanize(
                             latestPaymentInstruction?.paymentType ||
-                              latestTopup.payment_method ||
-                              selectedPaymentOption?.method ||
-                              selectedPaymentOption?.provider ||
-                              '-',
+                            latestTopup.payment_method ||
+                            selectedPaymentOption?.method ||
+                            selectedPaymentOption?.provider ||
+                            '-',
                           )}
                         </span>
                         {latestPaymentInstruction?.mode ? (
@@ -4879,8 +4870,8 @@ export default function TransactionsPage() {
                           <p className="mt-1 text-xs font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                             {humanize(
                               latestPaymentInstruction?.transactionStatus ||
-                                latestTopup.status ||
-                                '-',
+                              latestTopup.status ||
+                              '-',
                             )}
                           </p>
                         </div>
@@ -4987,10 +4978,10 @@ export default function TransactionsPage() {
                       ) : null}
 
                       {latestPaymentInstruction &&
-                      (latestPaymentInstruction.vaNumbers.length > 0 ||
-                        latestPaymentInstruction.permataVa ||
-                        latestPaymentInstruction.billKey ||
-                        latestPaymentInstruction.billerCode) ? (
+                        (latestPaymentInstruction.vaNumbers.length > 0 ||
+                          latestPaymentInstruction.permataVa ||
+                          latestPaymentInstruction.billKey ||
+                          latestPaymentInstruction.billerCode) ? (
                         <div className="rounded-xl border border-[color:var(--app-border)] p-3 dark:border-[color:var(--app-border-strong)]">
                           <p className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--app-text)]">
                             Virtual Account / Bill
@@ -5125,7 +5116,7 @@ export default function TransactionsPage() {
                 type="button"
                 onClick={() => void handleCreateTransactionPayment()}
                 disabled={paymentActionDisabled}
-                className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:opacity-60"
+                className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:opacity-60"
               >
                 {submittingPayment ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -5138,14 +5129,14 @@ export default function TransactionsPage() {
               </button>
 
               {latestTopup &&
-              asString(latestTopup.status).toLowerCase() === 'pending' &&
-              asString(latestTopup.payment_provider).toLowerCase() ===
+                asString(latestTopup.status).toLowerCase() === 'pending' &&
+                asString(latestTopup.payment_provider).toLowerCase() ===
                 'midtrans' ? (
                 <button
                   type="button"
                   onClick={() => void syncLatestTopupStatus(false)}
                   disabled={syncingTopupStatus || submittingPayment}
-                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60 dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] disabled:opacity-60 dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
                 >
                   {syncingTopupStatus ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -5167,7 +5158,7 @@ export default function TransactionsPage() {
                   href={latestCheckoutUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex min-h-[46px] items-center justify-center gap-1 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                  className="inline-flex min-h-[46px] items-center justify-center gap-1 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
                 >
                   {locale === 'id' ? 'Buka pembayaran' : 'Open payment'}
                   <ExternalLink className="h-3.5 w-3.5" />
@@ -5180,7 +5171,7 @@ export default function TransactionsPage() {
                   void loadTransactions();
                   void loadWalletBalances();
                 }}
-                className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-border)] px-4 text-sm font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
               >
                 <RefreshCcw className="h-4 w-4" />
                 {locale === 'id' ? 'Refresh' : 'Refresh'}

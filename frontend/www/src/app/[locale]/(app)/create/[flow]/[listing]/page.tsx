@@ -1,40 +1,15 @@
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
-import CreatePostingClient from '../../CreatePostingClient';
-import { buildUsahaPath } from '@/lib/umkmSurface';
+import { notFound } from 'next/navigation';
+import SimpleCreateFlow from '../../SimpleCreateFlow';
+import { normalizeCreateFlowSegment } from '../../createPageUtils';
 import {
-  buildCreateBasePath,
-  normalizeCreateFlowSegment,
-  normalizeCreateTypeSegment,
-} from '../../createPageUtils';
+  buildCreateBusinessCategoryHref,
+  normalizeCreateBusinessCategorySegment,
+} from '../../createBusinessData';
 
 type PageProps = {
   params: Promise<{ locale: string; flow: string; listing: string }>;
 };
-
-const DEMAND_CREATE_TYPE_IDS = new Set([
-  'product',
-  'service',
-  'job',
-  'property',
-  'tool_rental',
-]);
-const SUPPLY_CREATE_TYPE_IDS = new Set([
-  'product',
-  'service',
-  'property',
-  'tool_rental',
-  'business_transfer',
-]);
-
-function isTypeAllowedForIntent(
-  intent: 'demand' | 'supply',
-  typeId: string,
-): boolean {
-  return intent === 'demand'
-    ? DEMAND_CREATE_TYPE_IDS.has(typeId)
-    : SUPPLY_CREATE_TYPE_IDS.has(typeId);
-}
 
 const TYPE_LABELS: Record<
   string,
@@ -87,18 +62,11 @@ const TYPE_LABELS: Record<
 export default async function CreateFlowListingPage({ params }: PageProps) {
   const { flow, listing } = await params;
   const intent = normalizeCreateFlowSegment(flow);
-  const typeId = normalizeCreateTypeSegment(listing);
-  if (intent === 'supply' && typeId === 'company') {
-    redirect(buildUsahaPath('onboarding'));
-  }
-  if (!intent || !typeId || !isTypeAllowedForIntent(intent, typeId)) notFound();
+  const category = normalizeCreateBusinessCategorySegment(listing);
+  if (!intent || !category) notFound();
 
   return (
-    <CreatePostingClient
-      entryMode={intent}
-      forcedListingSide={intent}
-      forcedTypeId={typeId}
-    />
+    <SimpleCreateFlow entryMode={intent} categoryId={category.id} />
   );
 }
 
@@ -107,23 +75,20 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const { locale, flow, listing } = await params;
   const intent = normalizeCreateFlowSegment(flow);
-  const typeId = normalizeCreateTypeSegment(listing);
-  if (intent === 'supply' && typeId === 'company') {
-    return {
-      alternates: {
-        canonical: buildUsahaPath('onboarding'),
-      },
-      robots: { index: false, follow: true },
-    };
-  }
-  if (!intent || !typeId || !isTypeAllowedForIntent(intent, typeId)) notFound();
+  const category = normalizeCreateBusinessCategorySegment(listing);
+  if (!intent || !category) notFound();
   const isId = locale === 'id';
   const sideId = intent === 'demand' ? 'demand' : 'supply';
-  const labels = TYPE_LABELS[typeId];
-  const canonical = `https://www.lajukan.com/${locale}${buildCreateBasePath({
+  const labels = TYPE_LABELS[category.contentType] || {
+    id: category.titleId.toLowerCase(),
+    en: category.titleEn.toLowerCase(),
+    needId: category.titleId.toLowerCase(),
+    needEn: category.titleEn.toLowerCase(),
+  };
+  const canonical = `https://www.lajukan.com/${locale}${buildCreateBusinessCategoryHref({
     locale,
-    sideId,
-    typeId,
+    side: sideId,
+    category,
   })}`;
 
   const title =

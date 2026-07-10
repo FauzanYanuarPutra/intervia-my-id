@@ -114,10 +114,10 @@ export function ActivityHub() {
       <section className="ui-panel ui-hero-panel rounded-[32px] p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
               {t('eyebrow')}
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-[color:var(--app-text)]">
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
               {t('title')}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -154,7 +154,7 @@ export function ActivityHub() {
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,_var(--app-accent),_var(--app-accent-strong))] text-[color:var(--app-accent)]">
                 <Icon className="h-5 w-5" />
               </span>
-              <p className="mt-4 text-3xl font-black tracking-tight text-[color:var(--app-text)]">{formatCount(item.value)}</p>
+              <p className="mt-4 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">{formatCount(item.value)}</p>
               <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{item.label}</p>
             </article>
           );
@@ -167,10 +167,10 @@ export function ActivityHub() {
         <article className="ui-panel rounded-3xl p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {t('nextEyebrow')}
               </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
                 {t('nextTitle')}
               </h2>
             </div>
@@ -210,10 +210,10 @@ export function ActivityHub() {
         </article>
 
         <article className="ui-panel rounded-3xl p-5">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
             {t('healthEyebrow')}
           </p>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
             {t('healthTitle')}
           </h2>
           <div className="mt-4 space-y-3">

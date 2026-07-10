@@ -134,7 +134,7 @@ function resolveUserLabel(entry: DiscoverUser): string {
 }
 
 const CHAT_LAYOUT_LABEL_CLASS =
-  'mb-1.5 block text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]';
+  'mb-1.5 block text-[12px] font-bold tracking-[0.005em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]';
 const CHAT_LAYOUT_INPUT_CLASS =
   'w-full min-h-[40px] rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_LAYOUT_SEARCH_INPUT_CLASS =
@@ -217,7 +217,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
               (typeof payload.username === 'string' && payload.username.trim()
                 ? `@${payload.username.trim()}`
                 : typeof payload.full_name === 'string' &&
-                    payload.full_name.trim()
+                  payload.full_name.trim()
                   ? payload.full_name.trim()
                   : null) || null;
             return label ? { id, label } : null;
@@ -292,8 +292,8 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
         roomId.startsWith('support:') || normalizedName.includes('support')
           ? 'support'
           : roomId.startsWith('dm:') ||
-              roomId.startsWith('draft:') ||
-              normalizedName.includes('direct message')
+            roomId.startsWith('draft:') ||
+            normalizedName.includes('direct message')
             ? 'direct'
             : 'group';
 
@@ -493,9 +493,9 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
         if (!res.ok || !roomId) {
           throw new Error(
             payload.error ||
-              (isId
-                ? 'Grup belum bisa dibuat.'
-                : 'Group chat is not available yet.'),
+            (isId
+              ? 'Grup belum bisa dibuat.'
+              : 'Group chat is not available yet.'),
           );
         }
         setShowNewChat(false);
@@ -571,7 +571,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
       if (!res.ok || !roomId) {
         throw new Error(
           payload.error ||
-            (isId ? 'Gagal membuat chat' : 'Failed to create chat'),
+          (isId ? 'Gagal membuat chat' : 'Failed to create chat'),
         );
       }
       setShowNewChat(false);
@@ -631,9 +631,9 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
 
   if (!user) {
     return (
-      <div className="min-h-[100svh] bg-gradient-to-br from-[color:var(--app-accent-soft)] via-[color:var(--app-surface-strong)] to-[color:var(--app-info-soft)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)]">
-        <div className="flex min-h-[100svh] items-center justify-center px-0 sm:px-4">
-          <div className="w-full max-w-sm rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-6 text-center shadow-sm backdrop-blur dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] sm:rounded-3xl sm:border-x">
+      <div className="min-h-[var(--app-viewport-height)] bg-gradient-to-br from-[color:var(--app-accent-soft)] via-[color:var(--app-surface-strong)] to-[color:var(--app-info-soft)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)]">
+        <div className="flex min-h-[var(--app-viewport-height)] items-center justify-center px-0 sm:px-4">
+          <div className="w-full max-w-sm rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-6 text-center shadow-sm  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] sm:rounded-3xl sm:border-x">
             <MessageCircle className="mx-auto mb-4 h-14 w-14 text-[color:var(--app-accent)]" />
             <p className="mb-4 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
               {isId
@@ -653,13 +653,12 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#d9dbd5] dark:bg-[#0b141a]">
+    <div className="h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] overflow-hidden bg-[#d9dbd5] dark:bg-[#0b141a]">
       <div className="mx-auto flex h-full max-h-full min-h-0 w-full min-w-0 max-w-[1600px] overflow-hidden lg:px-4 lg:py-4">
         <div className="flex h-full w-full min-w-0 overflow-hidden bg-[#f7f5f3] shadow-none dark:bg-[#111b21] lg:rounded-[18px] lg:border lg:border-black/5 lg:shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)] dark:lg:border-white/10">
           <section
-            className={`h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden border-r border-black/5 bg-white dark:border-white/6 dark:bg-[#111b21] lg:w-[390px] lg:shrink-0 ${
-              activeRoomId ? 'hidden lg:flex' : 'flex'
-            }`}
+            className={`h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden border-r border-black/5 bg-white dark:border-white/6 dark:bg-[#111b21] lg:w-[390px] lg:shrink-0 ${activeRoomId ? 'hidden lg:flex' : 'flex'
+              }`}
           >
             <div className="sticky top-0 z-20 shrink-0 border-b border-black/5 bg-[#f0f2f5] px-3 py-3 dark:border-white/6 dark:bg-[#202c33] sm:px-4">
               <div className="flex items-center justify-between gap-3">
@@ -738,11 +737,10 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                           type="button"
                           aria-pressed={active}
                           onClick={() => setActiveFilter(option.value)}
-                          className={`inline-flex min-h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-1.5 text-[11px] font-black transition active:scale-[0.98] ${
-                            active
+                          className={`inline-flex min-h-8 min-w-0 items-center justify-center gap-1 rounded-full border px-1.5 text-[11px] font-bold transition active:scale-[0.98] ${active
                               ? option.activeClass
                               : 'border-black/5 bg-white/80 text-[#111b21] hover:border-[#25d366]/35 hover:bg-white dark:border-white/8 dark:bg-[#182229] dark:text-[#e9edef] dark:hover:border-emerald-300/25 dark:hover:bg-[#202c33]'
-                          }`}
+                            }`}
                         >
                           <span className="shrink-0 tabular-nums">
                             {option.count}
@@ -824,22 +822,21 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                         onClick={() =>
                           safeGoToRoom(room.id || room.room_id || '')
                         }
-                        className={`group flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left transition sm:px-4 ${
-                          isActive
+                        className={`group flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left transition sm:px-4 ${isActive
                             ? 'bg-[#f0f2f5] dark:bg-[#202c33]'
                             : 'hover:bg-[#f5f6f6] dark:hover:bg-[#182229]'
-                        }`}
+                          }`}
                       >
                         <div className="relative h-11 w-11 shrink-0">
                           <img
                             src={profileAvatarSrc(
                               (room.avatar || room.room_avatar) as
-                                | string
-                                | undefined,
+                              | string
+                              | undefined,
                               readProfileAvatarStyle(room),
                               (room.name || room.room_name) as
-                                | string
-                                | undefined,
+                              | string
+                              | undefined,
                             )}
                             alt=""
                             className="h-full w-full rounded-full object-cover"
@@ -850,11 +847,10 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                           <div className="flex items-baseline justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-1.5">
                               <h3
-                                className={`truncate text-[15px] ${
-                                  (room.unread_count || 0) > 0
+                                className={`truncate text-[15px] ${(room.unread_count || 0) > 0
                                     ? 'font-semibold text-[#111b21] dark:text-[#e9edef]'
                                     : 'font-medium text-[#111b21] dark:text-[#e9edef]'
-                                }`}
+                                  }`}
                               >
                                 {room.name || 'Conversation'}
                               </h3>
@@ -866,11 +862,10 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                             </div>
 
                             <span
-                              className={`shrink-0 text-[11px] ${
-                                (room.unread_count || 0) > 0
+                              className={`shrink-0 text-[11px] ${(room.unread_count || 0) > 0
                                   ? 'font-medium text-[#25d366]'
                                   : 'text-[#667781] dark:text-[#8696a0]'
-                              }`}
+                                }`}
                             >
                               {room.time || ''}
                             </span>
@@ -878,11 +873,10 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
 
                           <div className="mt-1 flex items-center gap-2">
                             <p
-                              className={`min-w-0 flex-1 truncate text-[13px] ${
-                                (room.unread_count || 0) > 0
+                              className={`min-w-0 flex-1 truncate text-[13px] ${(room.unread_count || 0) > 0
                                   ? 'font-medium text-[#111b21] dark:text-[#dfe7ea]'
                                   : 'text-[#667781] dark:text-[#8696a0]'
-                              }`}
+                                }`}
                             >
                               {room.lastPreview}
                             </p>
@@ -957,22 +951,20 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
                   <button
                     type="button"
                     onClick={() => setNewChatMode('direct')}
-                    className={`flex-1 rounded-full px-3 py-1.5 transition ${
-                      newChatMode === 'direct'
+                    className={`flex-1 rounded-full px-3 py-1.5 transition ${newChatMode === 'direct'
                         ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
                         : 'text-[color:var(--app-text-soft)]'
-                    }`}
+                      }`}
                   >
                     {isId ? 'Langsung' : 'Direct'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setNewChatMode('group')}
-                    className={`flex-1 rounded-full px-3 py-1.5 transition ${
-                      newChatMode === 'group'
+                    className={`flex-1 rounded-full px-3 py-1.5 transition ${newChatMode === 'group'
                         ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
                         : 'text-[color:var(--app-text-soft)]'
-                    }`}
+                      }`}
                   >
                     {isId ? 'Grup' : 'Group'}
                   </button>

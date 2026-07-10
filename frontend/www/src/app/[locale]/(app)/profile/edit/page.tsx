@@ -1072,7 +1072,7 @@ export default function EditProfilePage() {
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || 'Gagal menyimpan profile');
-      setMessage('Profile advanced berhasil disimpan.');
+      setMessage('Profil berhasil disimpan.');
       setBaseMetadata(metadataPayload);
       await refreshUser();
     } catch (err) {
@@ -1343,7 +1343,7 @@ export default function EditProfilePage() {
             className={sectionCardClass('talent')}
           >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Talent / Freelancer
+              Keahlian & Freelancer
             </h2>
             <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
               Bagian ini memengaruhi jobs, talent discovery, dan cara buyer
@@ -1352,38 +1352,38 @@ export default function EditProfilePage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 className={inputClass}
-                placeholder="Headline / Professional title"
+                placeholder="Judul keahlian / profesi"
                 value={headline}
                 onChange={e => setHeadline(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Hourly rate (IDR)"
+                placeholder="Tarif per jam (IDR)"
                 value={hourlyRate}
                 onChange={e => setHourlyRate(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Skills (comma separated)"
+                placeholder="Keahlian, pisahkan dengan koma"
                 value={skills}
                 onChange={e => setSkills(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Languages"
+                placeholder="Bahasa"
                 value={languages}
                 onChange={e => setLanguages(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Experience years"
+                placeholder="Lama pengalaman, contoh: 3"
                 value={experienceYears}
                 onChange={e => setExperienceYears(e.target.value)}
               />
             </div>
             <textarea
               className={`${textareaClass} mt-3 min-h-[80px]`}
-              placeholder="Portfolio URLs (comma/new line separated)"
+              placeholder="Link portofolio, pisahkan koma atau baris baru"
               value={portfolioUrls}
               onChange={e => setPortfolioUrls(e.target.value)}
             />
@@ -1393,7 +1393,7 @@ export default function EditProfilePage() {
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Education
+                  Pendidikan
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
                   Tampilkan sekolah, gelar, atau jurusan penting tanpa memenuhi
@@ -1466,7 +1466,7 @@ export default function EditProfilePage() {
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Certificates
+                  Sertifikat
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
                   Cocok untuk sertifikasi, lisensi, atau pelatihan yang bikin
@@ -1546,7 +1546,7 @@ export default function EditProfilePage() {
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Experience
+                  Pengalaman
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
                   Isi pengalaman atau proyek penting.
@@ -1625,7 +1625,7 @@ export default function EditProfilePage() {
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Links & Portfolio
+                  Link & Portofolio
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
                   Tambah LinkedIn, website, GitHub, atau portfolio.
@@ -1685,7 +1685,7 @@ export default function EditProfilePage() {
             className={sectionCardClass('seller')}
           >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Provider / Seller
+              Penyedia Jasa / Penjual
             </h2>
             <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
               Dipakai saat Anda tampil sebagai seller/provider, termasuk
@@ -1694,19 +1694,19 @@ export default function EditProfilePage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <input
                 className={inputClass}
-                placeholder="Provider headline"
+                placeholder="Judul usaha / layanan"
                 value={providerHeadline}
                 onChange={e => setProviderHeadline(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Work mode (onsite/remote/hybrid)"
+                placeholder="Cara kerja, contoh: datang ke lokasi / online"
                 value={workMode}
                 onChange={e => setWorkMode(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Provider skills"
+                placeholder="Keahlian layanan"
                 value={providerSkills}
                 onChange={e => setProviderSkills(e.target.value)}
               />
@@ -1718,13 +1718,13 @@ export default function EditProfilePage() {
               />
               <input
                 className={inputClass}
-                placeholder="Price min"
+                placeholder="Harga mulai"
                 value={priceMin}
                 onChange={e => setPriceMin(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Price max"
+                placeholder="Harga maksimal"
                 value={priceMax}
                 onChange={e => setPriceMax(e.target.value)}
               />
@@ -1742,7 +1742,7 @@ export default function EditProfilePage() {
             className={sectionCardClass('buyer')}
           >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Buyer Preferences
+              Kebutuhan Pembeli
             </h2>
             <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
               Bantu matching kebutuhan, budget, dan vendor.
@@ -1756,7 +1756,7 @@ export default function EditProfilePage() {
               />
               <input
                 className={inputClass}
-                placeholder="Preferred location"
+                placeholder="Lokasi yang dicari"
                 value={preferredLocation}
                 onChange={e => setPreferredLocation(e.target.value)}
               />
@@ -1774,13 +1774,13 @@ export default function EditProfilePage() {
               />
               <input
                 className={inputClass}
-                placeholder="Preferred sector"
+                placeholder="Sektor yang diminati"
                 value={preferredSector}
                 onChange={e => setPreferredSector(e.target.value)}
               />
               <input
                 className={inputClass}
-                placeholder="Preferred sub-sector"
+                placeholder="Sub sektor yang diminati"
                 value={preferredSubSector}
                 onChange={e => setPreferredSubSector(e.target.value)}
               />
@@ -1792,7 +1792,7 @@ export default function EditProfilePage() {
             className={sectionCardClass('media')}
           >
             <h2 className="mb-3 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              Media Upload
+              Media Profil
             </h2>
             <p className="mb-3 text-sm text-[color:var(--app-text-soft)]">
               Avatar, cover, gallery, dan dokumen akan dipakai di profile
@@ -1842,7 +1842,7 @@ export default function EditProfilePage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                  Cover Image
+                  Foto Sampul
                 </label>
                 {coverImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element

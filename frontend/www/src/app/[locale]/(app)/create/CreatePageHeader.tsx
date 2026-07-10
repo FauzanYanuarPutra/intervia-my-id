@@ -137,10 +137,10 @@ export function CreatePageHeader({
             </span>
           ) : null}
           <div className="min-w-0">
-            <p className="truncate text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+            <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
               {typePicked ? compactSummary : formEyebrow}
             </p>
-            <h1 className="truncate text-[1.02rem] font-black leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.2rem]">
+            <h1 className="truncate text-[1.02rem] font-bold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.2rem]">
               {formTitle}
             </h1>
           </div>
@@ -148,20 +148,20 @@ export function CreatePageHeader({
 
         <div className="flex shrink-0 items-center gap-1.5">
           {isMinimal ? (
-            <span className="inline-flex min-h-[26px] items-center rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)]">
+            <span className="inline-flex min-h-[26px] items-center rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)]">
               {currentStep}/{totalSteps}
             </span>
           ) : null}
           <span
-            className={`inline-flex min-h-[26px] items-center rounded-full border px-2 text-[10px] font-black ${statusToneClass}`}
+            className={`inline-flex min-h-[26px] items-center rounded-full border px-2 text-[10px] font-bold ${statusToneClass}`}
           >
             {statusLabel}
           </span>
           {!isMinimal ? (
             <span
-              className={`inline-flex min-h-[26px] items-center gap-1 rounded-full border px-2 text-[10px] font-black ${publishBlockersCount > 0
-                  ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
-                  : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+              className={`inline-flex min-h-[26px] items-center gap-1 rounded-full border px-2 text-[10px] font-bold ${publishBlockersCount > 0
+                ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]'
+                : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                 }`}
             >
               {publishBlockersCount > 0 ? (
@@ -188,12 +188,12 @@ export function CreatePageHeader({
         </div>
       ) : (
         <div className="mt-2 flex min-w-0 items-center gap-2 rounded-[12px] bg-[color:var(--app-surface-muted)] px-2 py-1.5 dark:bg-slate-950/45">
-          <span className="inline-flex h-7 min-w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-2 text-[10px] font-black text-white">
+          <span className="inline-flex h-7 min-w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-2 text-[10px] font-bold text-white">
             {currentStep}/{totalSteps}
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-[11px] font-black text-[color:var(--app-text)]">
+              <p className="min-w-0 truncate text-[11px] font-bold text-[color:var(--app-text)]">
                 {activeStepLabel}
               </p>
               <span className="shrink-0 text-[10px] font-bold text-[color:var(--app-text-soft)]">
@@ -237,11 +237,11 @@ export function CreatePageHeader({
                 onClick={() => {
                   if (clickable) onStepSelect(step);
                 }}
-                className={`min-h-[28px] shrink-0 rounded-full border px-2.5 text-center text-[10px] font-black transition ${active
-                    ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
-                    : done
-                      ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] dark:bg-slate-950/70'
-                      : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] dark:bg-slate-950/55'
+                className={`min-h-[28px] shrink-0 rounded-full border px-2.5 text-center text-[10px] font-bold transition ${active
+                  ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
+                  : done
+                    ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] dark:bg-slate-950/70'
+                    : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] dark:bg-slate-950/55'
                   } ${clickable ? 'hover:border-[color:var(--app-accent)]' : 'cursor-default'}`}
               >
                 <span className="inline-flex items-center justify-center gap-1">
@@ -257,43 +257,43 @@ export function CreatePageHeader({
       ) : null}
 
       {!isMinimal ? (
-      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {showModeSwitch ? (
-            <div className="flex flex-col gap-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
-                {isId ? 'Mode isi' : 'Input mode'}
-              </span>
-              <div className="inline-flex rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-0.5 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
-                <button
-                  type="button"
-                  onClick={() => onListingModeChange('simple')}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${listingMode === 'simple'
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {showModeSwitch ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                  {isId ? 'Mode isi' : 'Input mode'}
+                </span>
+                <div className="inline-flex rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-0.5 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55">
+                  <button
+                    type="button"
+                    onClick={() => onListingModeChange('simple')}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${listingMode === 'simple'
                       ? 'bg-[color:var(--app-accent)] text-white'
                       : 'text-[color:var(--app-text)]'
-                    }`}
-                >
-                  {isId ? 'Cepat' : 'Quick'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onListingModeChange('detail')}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-black transition ${listingMode === 'detail'
+                      }`}
+                  >
+                    {isId ? 'Cepat' : 'Quick'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onListingModeChange('detail')}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${listingMode === 'detail'
                       ? 'bg-[color:var(--app-accent)] text-white'
                       : 'text-[color:var(--app-text)]'
-                    }`}
-                >
-                  {isId ? 'Lengkap' : 'Full'}
-                </button>
+                      }`}
+                  >
+                    {isId ? 'Lengkap' : 'Full'}
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
             {canChangeTypeBeforeDraft ? (
               <button
                 type="button"
                 onClick={onChangeType}
-                className="inline-flex min-h-[28px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 text-[10px] font-black text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
+                className="inline-flex min-h-[28px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 text-[10px] font-bold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/55"
               >
                 {isId ? 'Tipe' : 'Category'}
               </button>
@@ -301,7 +301,7 @@ export function CreatePageHeader({
           </div>
 
           <details className="group relative">
-            <summary className="inline-flex min-h-[28px] cursor-pointer list-none items-center rounded-full bg-[color:var(--app-surface-muted)] px-2.5 text-[10px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)] [&::-webkit-details-marker]:hidden">
+            <summary className="inline-flex min-h-[28px] cursor-pointer list-none items-center rounded-full bg-[color:var(--app-surface-muted)] px-2.5 text-[10px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-slate-950/55 dark:ring-[color:var(--app-border-strong)] [&::-webkit-details-marker]:hidden">
               {isId ? 'Status' : 'Status'}
             </summary>
             <div className="absolute right-0 z-30 mt-2 w-[min(88vw,280px)] rounded-[16px] border border-[color:var(--app-border)] bg-white p-3 text-[11px] font-semibold text-[color:var(--app-text-soft)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">

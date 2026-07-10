@@ -2680,9 +2680,9 @@ export function UmkmStorefrontClient({
             : 'Add to bill';
   const PlaceTypeIcon = placeHeader ? getPlaceIcon(placeHeader.kind) : null;
   const utilityActionClass =
-    'ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/28 bg-slate-950/46 px-3 py-1.5 text-[10px] font-black text-[color:var(--app-text)] dark:text-white shadow-[0_14px_24px_-22px_rgba(15,23,42,0.45)] backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:text-[color:var(--app-text)] sm:text-[11px]';
+    'ui-pressable inline-flex min-h-[36px] min-w-0 items-center justify-center gap-1.5 rounded-full border border-white/28 bg-slate-950/46 px-3 py-1.5 text-[10px] font-bold text-[color:var(--app-text)] dark:text-white shadow-[0_14px_24px_-22px_rgba(15,23,42,0.45)]  transition hover:-translate-y-0.5 hover:bg-white hover:text-[color:var(--app-text)] sm:text-[11px]';
   const detailActionClass =
-    'ui-pressable inline-flex min-h-[42px] min-w-0 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-[11px] font-black text-[color:var(--app-text)] shadow-[0_12px_22px_-21px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950 sm:text-[12px]';
+    'ui-pressable inline-flex min-h-[42px] min-w-0 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-3 text-[11px] font-bold text-[color:var(--app-text)] shadow-[0_12px_22px_-21px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950 sm:text-[12px]';
   const heroShellClass =
     'relative min-w-0 overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white shadow-[0_28px_70px_-48px_rgba(15,23,42,0.38)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] sm:rounded-[28px]';
   const heroContentCardClass =
@@ -2742,44 +2742,44 @@ export function UmkmStorefrontClient({
 
     const metadataMedia: StoreGalleryItem[] = readStoreGalleryMedia(store).map(
       (item, index): StoreGalleryItem => ({
-      id: `place-${index}`,
-      src: item.src,
-      title:
-        item.mediaType === 'video'
-          ? isId
-            ? 'Video usaha'
-            : 'Business video'
-          : index === 0
+        id: `place-${index}`,
+        src: item.src,
+        title:
+          item.mediaType === 'video'
             ? isId
-              ? 'Tampak usaha'
-              : 'Business cover'
-            : isId
-              ? 'Foto usaha'
-              : 'Business photo',
-      caption:
-        index === 0
-          ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
-          : store.address || store.city,
-      mediaType: item.mediaType,
+              ? 'Video usaha'
+              : 'Business video'
+            : index === 0
+              ? isId
+                ? 'Tampak usaha'
+                : 'Business cover'
+              : isId
+                ? 'Foto usaha'
+                : 'Business photo',
+        caption:
+          index === 0
+            ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
+            : store.address || store.city,
+        mediaType: item.mediaType,
       }),
     );
     const placeImages: StoreGalleryItem[] = (placeHeader?.gallery || []).map(
       (src, index): StoreGalleryItem => ({
-      id: `generated-place-${index}`,
-      src,
-      title:
-        index === 0
-          ? isId
-            ? 'Foto utama usaha'
-            : 'Business hero photo'
-          : isId
-            ? 'Suasana dan produk'
-            : 'Atmosphere and product',
-      caption:
-        index === 0
-          ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
-          : store.address || store.city,
-      mediaType: 'image' as const,
+        id: `generated-place-${index}`,
+        src,
+        title:
+          index === 0
+            ? isId
+              ? 'Foto utama usaha'
+              : 'Business hero photo'
+            : isId
+              ? 'Suasana dan produk'
+              : 'Atmosphere and product',
+        caption:
+          index === 0
+            ? `${placeHeader?.categoryLabel || store.name} / ${store.city}`
+            : store.address || store.city,
+        mediaType: 'image' as const,
       }),
     );
     const productItems = products
@@ -2825,8 +2825,8 @@ export function UmkmStorefrontClient({
     heroCoverItem?.mediaType === 'video'
       ? store?.name || (isId ? 'Foto usaha' : 'Business photo')
       : heroCoverItem?.title ||
-    store?.name ||
-    (isId ? 'Foto usaha' : 'Business photo');
+      store?.name ||
+      (isId ? 'Foto usaha' : 'Business photo');
   const storeKeywords = store
     ? readTextArray(asRecord(store.metadata).keywords).slice(0, 3)
     : [];
@@ -3001,7 +3001,7 @@ export function UmkmStorefrontClient({
   const infoCardClass =
     'min-w-0 rounded-[16px] border border-emerald-100/90 bg-emerald-50/54 px-3 py-2.5 dark:border-emerald-400/14 dark:bg-emerald-400/10';
   const subtleActionClass =
-    'ui-pressable inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-emerald-100 bg-white px-3 text-xs font-black text-[color:var(--app-text)] shadow-[0_12px_22px_-21px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]';
+    'ui-pressable inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-emerald-100 bg-white px-3 text-xs font-bold text-[color:var(--app-text)] shadow-[0_12px_22px_-21px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]';
   const categoryShellClass =
     'min-w-0 rounded-[20px] border border-emerald-100/90 bg-white p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.12)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)] sm:rounded-[22px] sm:p-3.5';
   const menuItemCardClass =
@@ -3073,8 +3073,8 @@ export function UmkmStorefrontClient({
 
         const likedMediaKeys = Array.isArray(payload.liked_media_keys)
           ? payload.liked_media_keys
-              .map(value => (typeof value === 'string' ? value.trim() : ''))
-              .filter(Boolean)
+            .map(value => (typeof value === 'string' ? value.trim() : ''))
+            .filter(Boolean)
           : [];
 
         setGalleryLikes(
@@ -3144,8 +3144,8 @@ export function UmkmStorefrontClient({
 
         const serverLikedMediaKeys = Array.isArray(payload.liked_media_keys)
           ? payload.liked_media_keys
-              .map(value => (typeof value === 'string' ? value.trim() : ''))
-              .filter(Boolean)
+            .map(value => (typeof value === 'string' ? value.trim() : ''))
+            .filter(Boolean)
           : null;
 
         if (serverLikedMediaKeys) {
@@ -3209,7 +3209,7 @@ export function UmkmStorefrontClient({
   );
 
   return (
-    <main className="app-cohesive-theme min-h-screen overflow-x-hidden pb-24 pt-1 sm:pb-10 sm:pt-2">
+    <main className="app-cohesive-theme min-h-screen min-h-[100dvh] overflow-x-hidden pb-24 pt-1 sm:pb-10 sm:pt-2">
       <div className="mx-auto flex w-full min-w-0 max-w-[var(--app-max-width)] flex-col gap-2.5 px-3 sm:gap-3 sm:px-4">
         <section>
           <div className={heroShellClass}>
@@ -3275,7 +3275,7 @@ export function UmkmStorefrontClient({
                         <MapPin className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                         {store.city}
                       </span>
-                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] backdrop-blur dark:border-white/20 dark:bg-white/18 dark:text-white">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)]  dark:border-white/20 dark:bg-white/18 dark:text-white">
                         <Clock3 className="h-3.5 w-3.5" />
                         {placeHeader?.statusLabel ||
                           publicProfile?.openHours ||
@@ -3289,11 +3289,11 @@ export function UmkmStorefrontClient({
                       ) : null}
                     </div>
 
-                    <div className="mt-4 inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)] dark:text-white/86 backdrop-blur">
+                    <div className="mt-4 inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)] dark:text-white/86 ">
                       {isId ? 'Toko Lajukan' : 'Lajukan Store'}
                     </div>
 
-                    <h1 className="mt-3 max-w-3xl text-[2.15rem] font-black leading-[1.02] text-white sm:text-[3rem] lg:text-[3.45rem]">
+                    <h1 className="mt-3 max-w-3xl text-[2.15rem] font-bold leading-[1.02] text-white sm:text-[3rem] lg:text-[3.45rem]">
                       {store.name}
                     </h1>
                     <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)] dark:text-white/82 sm:text-base">
@@ -3308,7 +3308,7 @@ export function UmkmStorefrontClient({
                         {heroBadges.map(item => (
                           <span
                             key={item}
-                            className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-white/20 dark:bg-white/12 dark:text-white backdrop-blur"
+                            className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-white/20 dark:bg-white/12 dark:text-white "
                           >
                             {item}
                           </span>
@@ -3330,7 +3330,7 @@ export function UmkmStorefrontClient({
                               <Icon className="h-3.5 w-3.5" />
                               {item.label}
                             </p>
-                            <p className="mt-1 truncate text-sm font-black">
+                            <p className="mt-1 truncate text-sm font-bold">
                               {item.value}
                             </p>
                           </div>
@@ -3347,7 +3347,7 @@ export function UmkmStorefrontClient({
                         <MapPin className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                         {store.city}
                       </span>
-                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)] backdrop-blur dark:border-white/20 dark:bg-white/18 dark:text-white">
+                      <span className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-[color:var(--app-text)]  dark:border-white/20 dark:bg-white/18 dark:text-white">
                         <Clock3 className="h-3.5 w-3.5" />
                         {placeHeader?.statusLabel ||
                           publicProfile?.openHours ||
@@ -3361,11 +3361,11 @@ export function UmkmStorefrontClient({
                       ) : null}
                     </div>
 
-                    <div className="mt-3 inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)] dark:text-white/86 backdrop-blur">
+                    <div className="mt-3 inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] dark:border-white/18 dark:bg-white/12 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)] dark:text-white/86 ">
                       {isId ? 'Toko Lajukan' : 'Lajukan Store'}
                     </div>
 
-                    <h1 className="mt-3 text-[1.75rem] font-black leading-[1.05] text-[color:var(--app-text)] dark:text-white sm:text-[2.15rem]">
+                    <h1 className="mt-3 text-[1.75rem] font-bold leading-[1.05] text-[color:var(--app-text)] dark:text-white sm:text-[2.15rem]">
                       {store.name}
                     </h1>
                     <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)] dark:text-white/82">
@@ -3380,7 +3380,7 @@ export function UmkmStorefrontClient({
                         {heroBadges.map(item => (
                           <span
                             key={`mobile-${item}`}
-                            className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-white/20 dark:bg-white/12 dark:text-white backdrop-blur"
+                            className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-3 text-[11px] font-semibold text-[color:var(--app-text)] dark:border-white/20 dark:bg-white/12 dark:text-white "
                           >
                             {item}
                           </span>
@@ -3394,13 +3394,13 @@ export function UmkmStorefrontClient({
                         return (
                           <div
                             key={`mobile-${item.id}`}
-                            className="min-w-0 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] dark:border-white/18 dark:bg-white/10 px-3 py-2.5 backdrop-blur"
+                            className="min-w-0 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface)] dark:border-white/18 dark:bg-white/10 px-3 py-2.5 "
                           >
                             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)] dark:text-white/72">
                               <Icon className="h-3.5 w-3.5" />
                               {item.label}
                             </p>
-                            <p className="mt-1 truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+                            <p className="mt-1 truncate text-sm font-bold text-[color:var(--app-text)] dark:text-white">
                               {item.value}
                             </p>
                           </div>
@@ -3412,7 +3412,7 @@ export function UmkmStorefrontClient({
                   <div className={heroContentCardClass}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-[11px] font-black text-[color:var(--app-accent)]">
+                        <p className="text-[11px] font-bold text-[color:var(--app-accent)]">
                           {isId ? 'Siap dipesan' : 'Ready to order'}
                         </p>
                         <p className="mt-1 text-sm font-semibold leading-5 text-[color:var(--app-text)]">
@@ -3430,7 +3430,7 @@ export function UmkmStorefrontClient({
                     </div>
 
                     <div className="mt-4 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
                         {isId ? 'Ringkasan usaha' : 'Business snapshot'}
                       </p>
                       <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text)]">
@@ -3456,7 +3456,7 @@ export function UmkmStorefrontClient({
                           <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                             {item.label}
                           </p>
-                          <p className="mt-1 truncate text-[13px] font-black text-[color:var(--app-text)]">
+                          <p className="mt-1 truncate text-[13px] font-bold text-[color:var(--app-text)]">
                             {item.value}
                           </p>
                         </div>
@@ -3465,7 +3465,7 @@ export function UmkmStorefrontClient({
                         <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                           {isId ? 'Mode' : 'Mode'}
                         </p>
-                        <p className="mt-1 truncate text-[13px] font-black text-[color:var(--app-text)]">
+                        <p className="mt-1 truncate text-[13px] font-bold text-[color:var(--app-text)]">
                           {heroModeLabel}
                         </p>
                       </div>
@@ -3474,13 +3474,13 @@ export function UmkmStorefrontClient({
                     {heroFeaturedProducts.length ? (
                       <div className="mt-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
                             {isId ? 'Menu unggulan' : 'Featured menu'}
                           </p>
                           <button
                             type="button"
                             onClick={() => handleTabChange('menu')}
-                            className="text-[10px] font-black text-[color:var(--app-accent)]"
+                            className="text-[10px] font-bold text-[color:var(--app-accent)]"
                           >
                             {isId ? 'Lihat semua' : 'See all'}
                           </button>
@@ -3496,7 +3496,7 @@ export function UmkmStorefrontClient({
                                 className="relative h-12 w-12 shrink-0 overflow-hidden rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
                               />
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-[12px] font-black text-[color:var(--app-text)]">
+                                <p className="truncate text-[12px] font-bold text-[color:var(--app-text)]">
                                   {product.name}
                                 </p>
                                 <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -3514,7 +3514,7 @@ export function UmkmStorefrontClient({
                         <button
                           type="button"
                           onClick={() => startOrderFlow()}
-                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black"
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-bold"
                         >
                           <ShoppingBag className="h-4 w-4" />
                           {cartItemCount > 0
@@ -3527,7 +3527,7 @@ export function UmkmStorefrontClient({
                           href={placeHeader.whatsappHref}
                           target="_blank"
                           rel="noreferrer"
-                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black"
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-bold"
                         >
                           <MessageCircle className="h-4 w-4" />
                           {contactPrimaryLabel}
@@ -3535,7 +3535,7 @@ export function UmkmStorefrontClient({
                       ) : placeHeader?.telHref ? (
                         <a
                           href={placeHeader.telHref}
-                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black"
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-bold"
                         >
                           <Phone className="h-4 w-4" />
                           {isId ? 'Telepon usaha' : 'Call business'}
@@ -3545,7 +3545,7 @@ export function UmkmStorefrontClient({
                           type="button"
                           onClick={() => void startChat()}
                           disabled={chatLoading}
-                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-black disabled:opacity-60"
+                          className="ui-button-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[16px] px-4 text-sm font-bold disabled:opacity-60"
                         >
                           {chatLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -3614,7 +3614,7 @@ export function UmkmStorefrontClient({
                       />
                       <LocalizedAnchor
                         href={fullMapHref}
-                        className="absolute right-3 top-3 z-[1100] inline-flex min-h-[34px] items-center gap-1 rounded-full border border-white/70 bg-slate-950/78 px-3 text-[11px] font-semibold text-white shadow-[0_16px_30px_-24px_rgba(15,23,42,0.45)] backdrop-blur-sm"
+                        className="absolute right-3 top-3 z-[1100] inline-flex min-h-[34px] items-center gap-1 rounded-full border border-white/70 bg-slate-950/78 px-3 text-[11px] font-semibold text-white shadow-[0_16px_30px_-24px_rgba(15,23,42,0.45)] "
                       >
                         {isId ? 'Peta penuh' : 'Full map'}
                         <ArrowRight className="h-3.5 w-3.5" />
@@ -3644,7 +3644,7 @@ export function UmkmStorefrontClient({
           </div>
         </section>
 
-        <nav className="sticky top-2 z-20 rounded-[18px] border border-emerald-100/90 bg-white/95 p-1 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.18)] backdrop-blur dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]/94 sm:top-4 sm:rounded-[20px]">
+        <nav className="sticky top-2 z-20 rounded-[18px] border border-emerald-100/90 bg-white/95 p-1 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.18)]  dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)]/94 sm:top-4 sm:rounded-[20px]">
           <div
             className="flex flex-nowrap items-center gap-1.5 overflow-x-auto"
             data-auto-scrollbar
@@ -3675,10 +3675,10 @@ export function UmkmStorefrontClient({
           <section ref={tabContentRef} className={tabPanelClass}>
             <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 max-w-3xl">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
                   {tabHighlights.eyebrow}
                 </p>
-                <h2 className="mt-2 text-[1.15rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.4rem]">
+                <h2 className="mt-2 text-[1.15rem] font-bold leading-tight text-[color:var(--app-text)] sm:text-[1.4rem]">
                   {tabHighlights.title}
                 </h2>
                 <p className="mt-2 text-[12px] leading-6 text-[color:var(--app-text-soft)] sm:text-[13px]">
@@ -3738,10 +3738,10 @@ export function UmkmStorefrontClient({
               <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:w-[300px] xl:w-[320px]">
                 {activeTab === 'menu' ? (
                   <div className={infoCardClass}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                       {isId ? 'Ringkas banget' : 'Summary'}
                     </p>
-                    <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+                    <p className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
                       {cartItemCount > 0
                         ? `${cartItemCount} ${isId ? 'item' : 'items'}`
                         : `${products.length} ${isId ? 'menu' : 'items'}`}
@@ -3784,10 +3784,10 @@ export function UmkmStorefrontClient({
                 ) : activeTab === 'reviews' ? (
                   <>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Rating rata-rata' : 'Average rating'}
                       </p>
-                      <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+                      <p className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
                         {ratingValueLabel}
                       </p>
                       <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -3795,7 +3795,7 @@ export function UmkmStorefrontClient({
                       </p>
                     </div>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Sinyal pembeli' : 'Customer signal'}
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -3809,10 +3809,10 @@ export function UmkmStorefrontClient({
                 ) : activeTab === 'gallery' ? (
                   <>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Foto aktif' : 'Gallery count'}
                       </p>
-                      <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+                      <p className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
                         {storeGallery.length}
                       </p>
                       <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -3822,7 +3822,7 @@ export function UmkmStorefrontClient({
                       </p>
                     </div>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Paling berguna buat' : 'Best used for'}
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -3835,10 +3835,10 @@ export function UmkmStorefrontClient({
                 ) : activeTab === 'reels' ? (
                   <>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Reels aktif' : 'Live reels'}
                       </p>
-                      <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+                      <p className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
                         {storeReels.length}
                       </p>
                       <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -3848,7 +3848,7 @@ export function UmkmStorefrontClient({
                       </p>
                     </div>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Tujuan utamanya' : 'Primary use'}
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -3861,10 +3861,10 @@ export function UmkmStorefrontClient({
                 ) : activeTab === 'forum' ? (
                   <>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Topik siap pakai' : 'Ready topics'}
                       </p>
-                      <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+                      <p className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
                         {storeForumTopics.length}
                       </p>
                       <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -3874,7 +3874,7 @@ export function UmkmStorefrontClient({
                       </p>
                     </div>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Nilai utamanya' : 'Primary value'}
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -3887,10 +3887,10 @@ export function UmkmStorefrontClient({
                 ) : activeTab === 'reservation' ? (
                   <>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Meja tersedia' : 'Available tables'}
                       </p>
-                      <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+                      <p className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
                         {store?.available_table_count ??
                           tables.filter(table => table.status === 'available')
                             .length}
@@ -3901,7 +3901,7 @@ export function UmkmStorefrontClient({
                       </p>
                     </div>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Slot awal' : 'Starting slot'}
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -3912,7 +3912,7 @@ export function UmkmStorefrontClient({
                 ) : (
                   <>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Akses cepat' : 'Quick access'}
                       </p>
                       <button
@@ -3924,7 +3924,7 @@ export function UmkmStorefrontClient({
                       </button>
                     </div>
                     <div className={infoCardClass}>
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Kategori' : 'Category'}
                       </p>
                       <p className="mt-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -4176,7 +4176,7 @@ export function UmkmStorefrontClient({
                                 loading="lazy"
                               />
                             )}
-                            <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/62 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+                            <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/62 px-2.5 py-1 text-[10px] font-semibold text-white ">
                               {item.mediaType === 'video' ? (
                                 <Video className="h-3.5 w-3.5" />
                               ) : (
@@ -4205,7 +4205,7 @@ export function UmkmStorefrontClient({
                           onClick={() => void toggleGalleryLike(item)}
                           disabled={saving}
                           className={cn(
-                            'absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold backdrop-blur transition disabled:cursor-wait disabled:opacity-75',
+                            'absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold  transition disabled:cursor-wait disabled:opacity-75',
                             liked
                               ? 'bg-rose-500 text-white shadow-[0_10px_18px_-14px_rgba(244,63,94,0.55)]'
                               : 'bg-white/90 text-[color:var(--app-text)]',
@@ -4218,12 +4218,12 @@ export function UmkmStorefrontClient({
                               ? 'Menyimpan'
                               : 'Saving'
                             : liked
-                            ? isId
-                              ? 'Disukai'
-                              : 'Liked'
-                            : isId
-                              ? 'Suka'
-                              : 'Like'}
+                              ? isId
+                                ? 'Disukai'
+                                : 'Liked'
+                              : isId
+                                ? 'Suka'
+                                : 'Like'}
                         </button>
                       </article>
                     );
@@ -4565,7 +4565,7 @@ export function UmkmStorefrontClient({
                         <ShoppingBag className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-black">
+                        <h3 className="text-sm font-bold">
                           {isId
                             ? 'Katalog toko sedang disiapkan'
                             : 'The catalog is being prepared'}
@@ -4581,7 +4581,7 @@ export function UmkmStorefrontClient({
                               href={placeHeader.whatsappHref}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text)] dark:text-white"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text)] dark:text-white"
                             >
                               <MessageCircle className="h-4 w-4" />
                               {isId ? 'Tanya menu' : 'Ask for menu'}
@@ -4589,7 +4589,7 @@ export function UmkmStorefrontClient({
                           ) : placeHeader?.telHref ? (
                             <a
                               href={placeHeader.telHref}
-                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text)] dark:text-white"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text)] dark:text-white"
                             >
                               <Phone className="h-4 w-4" />
                               {isId ? 'Telepon usaha' : 'Call business'}
@@ -4599,7 +4599,7 @@ export function UmkmStorefrontClient({
                               type="button"
                               onClick={() => void startChat()}
                               disabled={chatLoading}
-                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text)] dark:text-white disabled:opacity-60"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text)] dark:text-white disabled:opacity-60"
                             >
                               {chatLoading ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -4614,7 +4614,7 @@ export function UmkmStorefrontClient({
                               href={placeHeader.googleMapsDirectionsUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] dark:bg-slate-950"
+                              className="inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] dark:bg-slate-950"
                             >
                               <Navigation className="h-4 w-4" />
                               {isId ? 'Lihat rute' : 'Directions'}
@@ -4650,7 +4650,7 @@ export function UmkmStorefrontClient({
                             >
                               <div className="flex min-w-0 gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <p className="line-clamp-2 text-[13px] font-black leading-tight text-[color:var(--app-text)]">
+                                  <p className="line-clamp-2 text-[13px] font-bold leading-tight text-[color:var(--app-text)]">
                                     {product.name}
                                   </p>
                                   <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -4659,7 +4659,7 @@ export function UmkmStorefrontClient({
                                         ? 'Siap dipesan.'
                                         : 'Ready to order.')}
                                   </p>
-                                  <p className="mt-2 text-[13px] font-black text-[color:var(--app-text)]">
+                                  <p className="mt-2 text-[13px] font-bold text-[color:var(--app-text)]">
                                     {formatIdr(product.price_cents)}
                                   </p>
                                   <p className="mt-1 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -4687,7 +4687,7 @@ export function UmkmStorefrontClient({
                                       >
                                         <Minus className="h-4 w-4" />
                                       </button>
-                                      <span className="min-w-[24px] text-center text-sm font-black text-[color:var(--app-text)]">
+                                      <span className="min-w-[24px] text-center text-sm font-bold text-[color:var(--app-text)]">
                                         {quantity}
                                       </span>
                                       <button
@@ -4709,7 +4709,7 @@ export function UmkmStorefrontClient({
                                       onClick={() =>
                                         changeQuantity(product.id, 1)
                                       }
-                                      className="ui-pressable absolute bottom-1 right-1 inline-flex h-8 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-accent)] bg-white px-2.5 text-[10px] font-black text-[color:var(--app-accent)] shadow-[0_12px_18px_-12px_rgba(15,23,42,0.25)]"
+                                      className="ui-pressable absolute bottom-1 right-1 inline-flex h-8 min-w-[68px] items-center justify-center gap-1.5 rounded-full border border-[color:var(--app-accent)] bg-white px-2.5 text-[10px] font-bold text-[color:var(--app-accent)] shadow-[0_12px_18px_-12px_rgba(15,23,42,0.25)]"
                                     >
                                       <Plus className="h-3.5 w-3.5" />
                                       {isId ? 'Tambah' : 'Add'}
@@ -5067,12 +5067,12 @@ export function UmkmStorefrontClient({
                       ? 'Menyimpan'
                       : 'Saving'
                     : galleryLikes[activeGalleryLikeKey]
-                    ? isId
-                      ? 'Disukai'
-                      : 'Liked'
-                    : isId
-                      ? 'Suka media ini'
-                      : 'Like this media'}
+                      ? isId
+                        ? 'Disukai'
+                        : 'Liked'
+                      : isId
+                        ? 'Suka media ini'
+                        : 'Like this media'}
                 </button>
               </div>
               {activeGalleryIndex !== null ? (
@@ -5152,7 +5152,7 @@ export function UmkmStorefrontClient({
                 <span className="font-semibold">
                   {isId ? 'Ringkasan pesanan' : 'Order summary'}
                 </span>
-                <span className="font-black">{cartItemCount}</span>
+                <span className="font-bold">{cartItemCount}</span>
               </div>
               <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-[color:var(--app-text)]">
                 <span className="rounded-full border border-[color:var(--app-accent-border)] px-3 py-1.5">
@@ -5204,7 +5204,7 @@ export function UmkmStorefrontClient({
                         >
                           <Minus className="h-4 w-4" />
                         </button>
-                        <span className="min-w-[24px] text-center text-sm font-black">
+                        <span className="min-w-[24px] text-center text-sm font-bold">
                           {item.quantity}
                         </span>
                         <button
@@ -5249,7 +5249,7 @@ export function UmkmStorefrontClient({
                 </div>
                 <div className="flex items-center justify-between border-t pt-3 text-base">
                   <span className="font-bold">{isId ? 'Total' : 'Total'}</span>
-                  <span className="font-black">{formatIdr(totalCents)}</span>
+                  <span className="font-bold">{formatIdr(totalCents)}</span>
                 </div>
               </div>
             </div>
@@ -5686,7 +5686,7 @@ export function UmkmStorefrontClient({
                         void startOrderPayment(orderResult.order.id)
                       }
                       disabled={orderPaymentLoading}
-                      className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-xs font-black text-[color:var(--app-text)] dark:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-xs font-bold text-[color:var(--app-text)] dark:text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {orderPaymentLoading
                         ? isId
@@ -5751,10 +5751,10 @@ export function UmkmStorefrontClient({
 
       {!loading && store && orderTabEnabled && cartItemCount > 0 ? (
         <div className="sticky bottom-4 z-20">
-          <div className="mx-auto max-w-3xl rounded-[28px] border border-[color:var(--app-accent-border)] bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+          <div className="mx-auto max-w-3xl rounded-[28px] border border-[color:var(--app-accent-border)] bg-white/95 px-4 py-3 shadow-lg ">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                   {isId ? 'Ringkas & cepat' : 'Fast lane'}
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm font-semibold text-[color:var(--app-text)]">
@@ -5783,7 +5783,7 @@ export function UmkmStorefrontClient({
               <button
                 type="button"
                 onClick={() => openOrderPanel()}
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text)] dark:text-white"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text)] dark:text-white"
               >
                 <ShoppingBag className="h-4 w-4" />
                 {isId ? 'Pesan sekarang' : 'Order now'}

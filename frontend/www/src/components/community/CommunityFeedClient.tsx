@@ -5,6 +5,7 @@ import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -14,6 +15,7 @@ import {
 } from 'react';
 import {
   BarChart3,
+  ChevronLeft,
   ChevronRight,
   Crown,
   Earth,
@@ -35,6 +37,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import useEmblaCarousel from 'embla-carousel-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/system/feedback/ToastProvider';
@@ -153,7 +156,7 @@ type PollVoteResponse = {
 };
 
 const COMMUNITY_MODAL_SHELL_CLASS =
-  'ui-layer-modal fixed inset-0 z-[10000] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-sm sm:items-center sm:p-4';
+  'ui-layer-modal fixed inset-0 z-[10000] flex items-end justify-center bg-slate-950/45 p-0  sm:items-center sm:p-4';
 
 const COMMUNITY_MODAL_SURFACE_CLASS =
   'flex h-full w-full flex-col overflow-hidden shadow-[0_30px_80px_-40px_rgba(15,23,42,0.42)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-[24px]';
@@ -166,23 +169,23 @@ const TABS: Array<{
   captionEn: string;
   icon: typeof Users;
 }> = [
-  {
-    id: 'for-you',
-    labelId: 'Diskusi',
-    labelEn: 'Discussions',
-    captionId: 'Pertanyaan, jawaban, dan update usaha',
-    captionEn: 'Business questions, answers, and updates',
-    icon: MessageCircle,
-  },
-  {
-    id: 'community',
-    labelId: 'Grup',
-    labelEn: 'Groups',
-    captionId: 'Ruang diskusi per topik',
-    captionEn: 'Topic-based discussion rooms',
-    icon: Users,
-  },
-];
+    {
+      id: 'for-you',
+      labelId: 'Diskusi',
+      labelEn: 'Discussions',
+      captionId: 'Pertanyaan, jawaban, dan update usaha',
+      captionEn: 'Business questions, answers, and updates',
+      icon: MessageCircle,
+    },
+    {
+      id: 'community',
+      labelId: 'Grup',
+      labelEn: 'Groups',
+      captionId: 'Ruang diskusi per topik',
+      captionEn: 'Topic-based discussion rooms',
+      icon: Users,
+    },
+  ];
 
 const SEARCH_TABS: Array<{
   id: CommunitySearchKind;
@@ -190,11 +193,11 @@ const SEARCH_TABS: Array<{
   labelEn: string;
   icon: typeof Search;
 }> = [
-  { id: 'all', labelId: 'Semua', labelEn: 'All', icon: Search },
-  { id: 'posts', labelId: 'Postingan', labelEn: 'Posts', icon: MessageCircle },
-  { id: 'people', labelId: 'Orang', labelEn: 'People', icon: UserCog },
-  { id: 'groups', labelId: 'Grup', labelEn: 'Groups', icon: Users },
-];
+    { id: 'all', labelId: 'Semua', labelEn: 'All', icon: Search },
+    { id: 'posts', labelId: 'Postingan', labelEn: 'Posts', icon: MessageCircle },
+    { id: 'people', labelId: 'Orang', labelEn: 'People', icon: UserCog },
+    { id: 'groups', labelId: 'Grup', labelEn: 'Groups', icon: Users },
+  ];
 
 function resolveCommunityMediaSrc(value?: string | null): string {
   const clean = normalizeContentMediaUrl(String(value || '').trim());
@@ -542,10 +545,10 @@ function createdThreadToFeedItem(
     tags: thread.tags || [],
     media: mediaSrc
       ? {
-          type: isVideoMedia(mediaSrc) ? 'video' : 'image',
-          src: mediaSrc,
-          alt: thread.title,
-        }
+        type: isVideoMedia(mediaSrc) ? 'video' : 'image',
+        src: mediaSrc,
+        alt: thread.title,
+      }
       : null,
     mediaItems,
     imageUrls: mediaItems.map(item => item.src),
@@ -607,7 +610,7 @@ function CommunityImageFrame({
           <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-[color:var(--app-accent)] shadow-[0_16px_32px_-28px_rgba(15,23,42,0.2)]">
             <ImageIcon className="h-5 w-5" />
           </span>
-          <p className="mt-3 line-clamp-2 text-sm font-black text-[color:var(--app-text)]">
+          <p className="mt-3 line-clamp-2 text-sm font-bold text-[color:var(--app-text)]">
             {alt}
           </p>
         </div>
@@ -661,7 +664,7 @@ function CommunityVideoFrame({
           <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-[color:var(--app-accent)] shadow-sm ring-1 ring-emerald-100">
             <PlayCircle className="h-5 w-5" />
           </span>
-          <p className="mt-2 line-clamp-2 text-xs font-black text-[color:var(--app-text)]">
+          <p className="mt-2 line-clamp-2 text-xs font-bold text-[color:var(--app-text)]">
             {isId
               ? 'Preview video belum tersedia'
               : 'Video preview unavailable'}
@@ -707,7 +710,7 @@ function CommunityVideoFrame({
           preload="metadata"
           onError={() => setFailed(true)}
         />
-        <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/62 px-2.5 py-1 text-[11px] font-black text-white backdrop-blur-md">
+        <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/62 px-2.5 py-1 text-[11px] font-bold text-white ">
           <PlayCircle className="h-3.5 w-3.5" />
           {isThumb ? 'Video' : isId ? 'Putar video' : 'Play video'}
         </span>
@@ -766,7 +769,7 @@ function CommunityMediaTile({
             preload="metadata"
             className="h-full w-full bg-slate-950 object-cover"
           />
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/62 px-2 py-1 text-[10px] font-black text-white backdrop-blur-md">
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/62 px-2 py-1 text-[10px] font-bold text-white ">
             <PlayCircle className="h-3.5 w-3.5" />
             Video
           </span>
@@ -785,12 +788,12 @@ function CommunityMediaTile({
       )}
 
       <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/24 via-transparent to-transparent opacity-80" />
-      <span className="pointer-events-none absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/44 text-white opacity-0 backdrop-blur transition group-hover/media:opacity-100">
+      <span className="pointer-events-none absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/44 text-white opacity-0  transition group-hover/media:opacity-100">
         <Expand className="h-4 w-4" />
       </span>
 
       {extraCount && extraCount > 0 ? (
-        <span className="absolute inset-0 grid place-items-center bg-black/54 text-xl font-black text-white backdrop-blur-[1px] sm:text-2xl">
+        <span className="absolute inset-0 grid place-items-center bg-black/54 text-xl font-bold text-white  sm:text-2xl">
           +{extraCount}
         </span>
       ) : null}
@@ -829,16 +832,16 @@ function CommunityMediaGalleryPreview({
   const frameClass =
     items.length === 1
       ? cn(
-          'relative w-full',
-          isDetail
-            ? 'aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9]'
-            : 'aspect-[4/3] sm:aspect-[16/9]',
-        )
+        'relative w-full',
+        isDetail
+          ? 'aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9]'
+          : 'aspect-[4/3] sm:aspect-[16/9]',
+      )
       : cn(
-          'grid w-full gap-1 bg-slate-200 p-1 dark:bg-slate-900',
-          'aspect-[4/3] sm:aspect-[16/9]',
-          items.length === 2 ? 'grid-cols-2' : 'grid-cols-2 grid-rows-2',
-        );
+        'grid w-full gap-1 bg-slate-200 p-1 dark:bg-slate-900',
+        'aspect-[4/3] sm:aspect-[16/9]',
+        items.length === 2 ? 'grid-cols-2' : 'grid-cols-2 grid-rows-2',
+      );
 
   return (
     <>
@@ -868,14 +871,14 @@ function CommunityMediaGalleryPreview({
         </div>
 
         {items.length > 1 ? (
-          <span className="absolute left-3 top-3 rounded-full bg-black/62 px-2.5 py-1 text-[11px] font-black text-white shadow-sm backdrop-blur-md">
+          <span className="absolute left-3 top-3 rounded-full bg-black/62 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm ">
             {items.length} {isId ? 'media' : 'media'}
           </span>
         ) : null}
       </div>
 
       {lightboxIndex != null ? (
-        <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/95 p-3 backdrop-blur-md">
+        <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/95 p-3 ">
           <button
             type="button"
             onClick={() => setLightboxIndex(null)}
@@ -1056,18 +1059,18 @@ function CommunityPoll({
     <section className="mt-3 rounded-[22px] border border-emerald-100 bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_58%,#eff6ff_100%)] p-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.22)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
             <BarChart3 className="h-3.5 w-3.5" />
             {isId ? 'Polling' : 'Poll'}
           </p>
-          <h3 className="mt-2 line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)]">
+          <h3 className="mt-2 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]">
             {poll.question}
           </h3>
           <p className="mt-1 text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
             {pollHint}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)]">
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)]">
           {totalVotes > 0
             ? `${compactNumber(totalVotes)} ${isId ? 'suara' : 'votes'}`
             : isId
@@ -1118,7 +1121,7 @@ function CommunityPoll({
               />
               <span className="relative flex items-center justify-between gap-3">
                 <span className="min-w-0">
-                  <span className="line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)]">
+                  <span className="line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)]">
                     {option}
                   </span>
                   <span className="mt-0.5 block text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1131,7 +1134,7 @@ function CommunityPoll({
                 </span>
                 <span
                   className={cn(
-                    'inline-flex h-9 min-w-12 shrink-0 items-center justify-center rounded-full px-2 text-xs font-black',
+                    'inline-flex h-9 min-w-12 shrink-0 items-center justify-center rounded-full px-2 text-xs font-bold',
                     selected
                       ? 'bg-[color:var(--app-accent)] text-white'
                       : 'bg-slate-50 text-[color:var(--app-text-soft)]',
@@ -1168,7 +1171,7 @@ function CommunityPoll({
           <button
             type="button"
             onClick={() => router.push(loginHref)}
-            className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-[color:var(--app-accent)] ring-1 ring-emerald-100"
+            className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-[color:var(--app-accent)] ring-1 ring-emerald-100"
           >
             {isId ? 'Masuk untuk vote' : 'Sign in to vote'}
           </button>
@@ -1315,16 +1318,16 @@ export function CommunityComposer({
     const selectedTags = [
       mode === 'poll'
         ? overview?.trendingTags?.find(tag =>
-            /poll|survey|event|support/i.test(`${tag.slug} ${tag.name}`),
-          )?.slug || 'polling'
+          /poll|survey|event|support/i.test(`${tag.slug} ${tag.name}`),
+        )?.slug || 'polling'
         : mode === 'feeling'
           ? overview?.trendingTags?.find(tag =>
-              /growth|support|community/i.test(`${tag.slug} ${tag.name}`),
-            )?.slug || 'perasaan'
+            /growth|support|community/i.test(`${tag.slug} ${tag.name}`),
+          )?.slug || 'perasaan'
           : mode === 'photo'
             ? overview?.trendingTags?.find(tag =>
-                /market|produk|supply/i.test(`${tag.slug} ${tag.name}`),
-              )?.slug
+              /market|produk|supply/i.test(`${tag.slug} ${tag.name}`),
+            )?.slug
             : overview?.trendingTags?.[0]?.slug,
     ].filter((item): item is string => Boolean(item));
 
@@ -1508,7 +1511,7 @@ export function CommunityComposer({
             data-testid="community-compose-surface"
           >
             <header className="flex min-h-[54px] items-center justify-between border-b border-[color:var(--app-border)] px-4">
-              <h2 className="text-sm font-black text-[color:var(--app-text)]">
+              <h2 className="text-sm font-bold text-[color:var(--app-text)]">
                 {isId ? 'Buat posting' : 'Create community post'}
               </h2>
               <button
@@ -1552,7 +1555,7 @@ export function CommunityComposer({
                     <Upload className="h-5 w-5" />
                   )}
                 </span>
-                <span className="mt-3 block text-sm font-black text-[color:var(--app-text)]">
+                <span className="mt-3 block text-sm font-bold text-[color:var(--app-text)]">
                   {isId
                     ? 'Tarik foto/video ke sini atau pilih file'
                     : 'Drop photos/videos here or choose files'}
@@ -1595,7 +1598,7 @@ export function CommunityComposer({
                                 current.filter(item => item !== url),
                               );
                             }}
-                            className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/62 text-white backdrop-blur"
+                            className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/62 text-white "
                             aria-label={isId ? 'Hapus media' : 'Remove media'}
                           >
                             <X className="h-3.5 w-3.5" />
@@ -2312,7 +2315,7 @@ export function CommunityDetailModal({
       >
         <header className="flex min-h-[58px] items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4">
           <div className="min-w-0">
-            <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+            <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
               {thread?.category?.name ||
                 (isId ? 'Detail komunitas' : 'Community detail')}
             </p>
@@ -2363,7 +2366,7 @@ export function CommunityDetailModal({
                     </p>
                   </div>
                 </div>
-                <h1 className="mt-3 text-[1.2rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+                <h1 className="mt-3 text-[1.2rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
                   {thread.title}
                 </h1>
                 {rootPostBody ? (
@@ -2406,7 +2409,7 @@ export function CommunityDetailModal({
                     className={cn(
                       'inline-flex min-h-[38px] items-center justify-center gap-2 rounded-[12px] hover:bg-slate-50',
                       thread.viewerVote === 1 &&
-                        'text-[color:var(--app-accent)]',
+                      'text-[color:var(--app-accent)]',
                     )}
                   >
                     <ThumbsUp className="h-4 w-4" />
@@ -2436,7 +2439,7 @@ export function CommunityDetailModal({
               </article>
 
               <section className="space-y-3">
-                <h2 className="text-sm font-black text-[color:var(--app-text)]">
+                <h2 className="text-sm font-bold text-[color:var(--app-text)]">
                   {isId ? 'Komentar' : 'Comments'}
                 </h2>
                 {comments.length === 0 ? (
@@ -2609,7 +2612,7 @@ function GroupCreateModal({
         data-testid="community-group-create-surface"
       >
         <header className="flex min-h-[58px] items-center justify-between border-b border-[color:var(--app-border)] px-4">
-          <h2 className="text-sm font-black text-[color:var(--app-text)]">
+          <h2 className="text-sm font-bold text-[color:var(--app-text)]">
             {isId ? 'Buat Grup Komunitas' : 'Create Community Group'}
           </h2>
           <button
@@ -2781,7 +2784,7 @@ function MemberRoleBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black',
+        'inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold',
         role === 'owner'
           ? 'bg-amber-50 text-amber-700'
           : role === 'moderator'
@@ -2834,7 +2837,7 @@ function GroupLeadershipPreview({
   return (
     <div className="rounded-[18px] bg-slate-50 p-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-black text-[color:var(--app-text)]">
+        <p className="text-xs font-bold text-[color:var(--app-text)]">
           {isId ? 'Admin & moderator' : 'Admins & moderators'}
         </p>
         <button
@@ -2960,12 +2963,12 @@ export function GroupMembersModal({
     value: CommunityGroupMember['role'];
     label: string;
   }> = [
-    ...(canPromoteAdmin
-      ? [{ value: 'owner' as const, label: isId ? 'Admin' : 'Admin' }]
-      : []),
-    { value: 'moderator', label: isId ? 'Moderator' : 'Moderator' },
-    { value: 'member', label: isId ? 'Member' : 'Member' },
-  ];
+      ...(canPromoteAdmin
+        ? [{ value: 'owner' as const, label: isId ? 'Admin' : 'Admin' }]
+        : []),
+      { value: 'moderator', label: isId ? 'Moderator' : 'Moderator' },
+      { value: 'member', label: isId ? 'Member' : 'Member' },
+    ];
 
   const updateRole = async (
     member: CommunityGroupMember,
@@ -3027,7 +3030,7 @@ export function GroupMembersModal({
       >
         <header className="flex min-h-[62px] items-center justify-between gap-3 border-b border-[color:var(--app-border)] px-4">
           <div className="min-w-0">
-            <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+            <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
               {group.name}
             </p>
             <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -3190,14 +3193,14 @@ function GroupDetailPanel({
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(15,23,42,0.45))]" />
         <div className="relative z-[1] flex min-h-[104px] flex-col justify-end">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-black text-[color:var(--app-accent)]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-accent)]">
               {group.viewerMembershipStatus === 'active'
                 ? isId
                   ? 'Kamu anggota'
                   : 'Joined'
                 : groupJoinLabel(group, isId)}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text)]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text)]">
               {group.privacy === 'public' ? (
                 <Earth className="h-3.5 w-3.5" />
               ) : (
@@ -3206,7 +3209,7 @@ function GroupDetailPanel({
               {groupPrivacyLabel(group, isId)}
             </span>
           </div>
-          <h2 className="mt-2 max-w-[720px] text-[1.35rem] font-black leading-tight tracking-[-0.04em] text-white sm:text-[1.6rem]">
+          <h2 className="mt-2 max-w-[720px] text-[1.35rem] font-bold leading-tight tracking-[-0.04em] text-white sm:text-[1.6rem]">
             {group.name}
           </h2>
         </div>
@@ -3224,7 +3227,7 @@ function GroupDetailPanel({
           />
           {group.rules.length ? (
             <div className="rounded-[18px] bg-slate-50 p-3">
-              <p className="text-xs font-black text-[color:var(--app-text)]">
+              <p className="text-xs font-bold text-[color:var(--app-text)]">
                 {isId ? 'Aturan grup' : 'Group rules'}
               </p>
               <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[color:var(--app-text-soft)]">
@@ -3246,7 +3249,7 @@ function GroupDetailPanel({
             className="flex min-h-[58px] w-full items-center justify-between gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-white px-3 text-left shadow-[0_14px_24px_-26px_rgba(15,23,42,0.2)]"
           >
             <span>
-              <span className="block text-[1.15rem] font-black text-[color:var(--app-text)]">
+              <span className="block text-[1.15rem] font-bold text-[color:var(--app-text)]">
                 {compactNumber(group.memberCount)}
               </span>
               <span className="block text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -3256,7 +3259,7 @@ function GroupDetailPanel({
             <Users className="h-5 w-5 text-[color:var(--app-accent)]" />
           </button>
           <div className="rounded-[18px] bg-slate-50 p-3">
-            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
               {isId ? 'Permission' : 'Permissions'}
             </p>
             <div className="mt-2 space-y-2 text-xs text-[color:var(--app-text)]">
@@ -3356,10 +3359,15 @@ function GroupCard({
     <article
       className={cn(
         'group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-white text-left shadow-[0_18px_34px_-32px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_22px_40px_-34px_rgba(15,23,42,0.28)]',
-        compact && 'min-w-0',
+        compact && 'min-w-0 rounded-[20px]',
       )}
     >
-      <div className="relative h-24 overflow-hidden bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_52%,#fff7ed_100%)]">
+      <div
+        className={cn(
+          'relative overflow-hidden bg-[linear-gradient(135deg,#ecfdf5_0%,#eff6ff_52%,#fff7ed_100%)]',
+          compact ? 'h-[72px]' : 'h-24',
+        )}
+      >
         {group.coverUrl ? (
           <Image
             src={group.coverUrl}
@@ -3371,7 +3379,7 @@ function GroupCard({
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(16,185,129,0.28),transparent_32%),radial-gradient(circle_at_84%_12%,rgba(59,130,246,0.22),transparent_26%)]" />
         )}
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(15,23,42,0.22))]" />
-        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black text-[color:var(--app-accent)] shadow-sm">
+        <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)] shadow-sm">
           {group.privacy === 'public' ? (
             <Earth className="h-3 w-3" />
           ) : (
@@ -3381,10 +3389,18 @@ function GroupCard({
         </div>
       </div>
 
-      <div className="relative flex flex-1 flex-col px-3 pb-3 pt-0">
+      <div
+        className={cn(
+          'relative flex flex-1 flex-col px-3 pb-3 pt-0',
+          compact && 'px-2.5 pb-2.5',
+        )}
+      >
         <Link
           href={communityGroupHref(group)}
-          className="-mt-9 grid h-16 w-16 place-items-center rounded-[22px] border-[3px] border-white bg-[color:var(--app-accent-soft)] text-xl font-black text-[color:var(--app-accent)] shadow-[0_18px_28px_-24px_rgba(15,23,42,0.4)] transition group-hover:scale-[1.03]"
+          className={cn(
+            '-mt-9 grid place-items-center rounded-[22px] border-[3px] border-white bg-[color:var(--app-accent-soft)] font-bold text-[color:var(--app-accent)] shadow-[0_18px_28px_-24px_rgba(15,23,42,0.4)] transition group-hover:scale-[1.03]',
+            compact ? 'h-12 w-12 text-base' : 'h-16 w-16 text-xl',
+          )}
           aria-label={group.name}
         >
           {initial}
@@ -3393,30 +3409,67 @@ function GroupCard({
         <div className="mt-2 min-w-0">
           <Link
             href={communityGroupHref(group)}
-            className="line-clamp-2 text-[0.98rem] font-black leading-5 tracking-[-0.02em] text-[color:var(--app-text)]"
+            className={cn(
+              'font-bold tracking-[-0.02em] text-[color:var(--app-text)]',
+              compact
+                ? 'line-clamp-1 text-sm leading-5'
+                : 'line-clamp-2 text-[0.98rem] leading-5',
+            )}
           >
             {group.name}
           </Link>
-          <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
+          <p
+            className={cn(
+              'mt-1 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]',
+              compact ? 'line-clamp-1' : 'line-clamp-2',
+            )}
+          >
             {group.description}
           </p>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div
+          className={cn(
+            'mt-3 gap-2',
+            compact ? 'flex items-center' : 'grid grid-cols-2',
+          )}
+        >
           <button
             type="button"
             onClick={() => onOpenMembers(group)}
-            className="rounded-[16px] bg-slate-50 px-2 py-2 text-left transition hover:bg-emerald-50"
+            className={cn(
+              'bg-slate-50 text-left transition hover:bg-emerald-50',
+              compact
+                ? 'inline-flex min-h-[30px] flex-1 items-center gap-1 rounded-full px-2 py-0 text-[10px]'
+                : 'rounded-[16px] px-2 py-2',
+            )}
           >
-            <span className="block text-sm font-black text-[color:var(--app-text)]">
+            <span
+              className={cn(
+                'font-bold text-[color:var(--app-text)]',
+                compact ? 'text-xs' : 'block text-sm',
+              )}
+            >
               {compactNumber(group.memberCount)}
             </span>
             <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
               {isId ? 'member' : 'members'}
             </span>
           </button>
-          <div className="rounded-[16px] bg-slate-50 px-2 py-2 text-left">
-            <span className="block text-sm font-black text-[color:var(--app-text)]">
+          <div
+            className={cn(
+              'bg-slate-50 text-left',
+              compact
+                ? 'inline-flex min-h-[30px] flex-1 items-center gap-1 rounded-full px-2 py-0 text-[10px]'
+                : 'rounded-[16px] px-2 py-2',
+            )}
+          >
+            <span
+              className={cn(
+                'font-bold text-[color:var(--app-text)]',
+                compact ? 'text-xs' : 'block text-sm',
+              )}
+            >
               {compactNumber(group.postCount)}
             </span>
             <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
@@ -3438,13 +3491,13 @@ function GroupCard({
           </div>
         ) : null}
 
-        <div className="mt-auto pt-3">
+        <div className="mt-auto pt-2.5">
           <button
             type="button"
             onClick={joinOrLeave}
             disabled={busy || pending}
             className={cn(
-              'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[15px] px-2 text-center text-xs font-black leading-4 transition disabled:opacity-60',
+              'inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[15px] px-2 text-center text-xs font-bold leading-4 transition disabled:opacity-60',
               joined
                 ? 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)]'
                 : 'bg-[color:var(--app-accent)] text-white shadow-[0_14px_24px_-18px_rgba(4,120,87,0.7)] hover:bg-[color:var(--app-accent-strong)]',
@@ -3488,6 +3541,13 @@ function GroupStrip({
   onCreateGroup: () => void;
   onOpenMembers: (group: CommunityGroup) => void;
 }) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'trimSnaps',
+    dragFree: true,
+  });
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
   const groups = [
     ...(overview?.joinedGroups || []),
     ...(overview?.recommendedGroups || []),
@@ -3499,43 +3559,90 @@ function GroupStrip({
     )
     .slice(0, 8);
 
+  const updateScrollButtons = useCallback(() => {
+    if (!emblaApi) return;
+    setCanScrollPrev(emblaApi.canScrollPrev());
+    setCanScrollNext(emblaApi.canScrollNext());
+  }, [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const frame = window.requestAnimationFrame(updateScrollButtons);
+    emblaApi.on('select', updateScrollButtons);
+    emblaApi.on('reInit', updateScrollButtons);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      emblaApi.off('select', updateScrollButtons);
+      emblaApi.off('reInit', updateScrollButtons);
+    };
+  }, [emblaApi, updateScrollButtons]);
+
+  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+
   return (
-    <section className="rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_100%)] p-3.5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <section className="overflow-hidden rounded-[20px] border border-[color:color-mix(in_srgb,var(--app-border)_82%,transparent)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fffb_100%)] p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.18)] sm:p-3.5">
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
             {isId ? 'Ruang diskusi' : 'Discussion rooms'}
           </p>
-          <h2 className="mt-0.5 text-base font-black tracking-[-0.025em] text-[color:var(--app-text)] sm:text-lg">
+          <h2 className="mt-0.5 text-base font-bold tracking-[-0.025em] text-[color:var(--app-text)]">
             {isId ? 'Grup untuk kamu' : 'Groups for you'}
           </h2>
-          <p className="mt-0.5 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+          <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
             {isId
               ? 'Pilih ruang yang paling nyambung dengan usaha kamu.'
               : 'Pick a room that matches your work.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onCreateGroup}
-          className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent)] hover:text-white"
-        >
-          <Plus className="h-4 w-4" />
-          {isId ? 'Buat' : 'Create'}
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={scrollPrev}
+            disabled={!canScrollPrev}
+            className="hidden h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 sm:inline-flex"
+            aria-label={isId ? 'Grup sebelumnya' : 'Previous groups'}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={scrollNext}
+            disabled={!canScrollNext}
+            className="hidden h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:opacity-35 sm:inline-flex"
+            aria-label={isId ? 'Grup berikutnya' : 'Next groups'}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onCreateGroup}
+            className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)] transition hover:bg-[color:var(--app-accent)] hover:text-white"
+          >
+            <Plus className="h-4 w-4" />
+            {isId ? 'Buat' : 'Create'}
+          </button>
+        </div>
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-        {groups.map(group => (
-          <GroupCard
-            key={group.id}
-            group={group}
-            isId={isId}
-            compact
-            onChanged={onChanged}
-            onOpenMembers={onOpenMembers}
-          />
-        ))}
+      <div className="-mx-3 mt-3 overflow-hidden px-3" ref={emblaRef}>
+        <div className="-ml-3 flex touch-pan-y">
+          {groups.map(group => (
+            <div
+              key={group.id}
+              className="min-w-0 flex-[0_0_82%] pl-3 sm:flex-[0_0_46%] xl:flex-[0_0_31%] 2xl:flex-[0_0_24%]"
+            >
+              <GroupCard
+                group={group}
+                isId={isId}
+                compact
+                onChanged={onChanged}
+                onOpenMembers={onOpenMembers}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -3577,7 +3684,7 @@ function SearchFilterButton({
       </span>
       <span>{isId ? tab.labelId : tab.labelEn}</span>
       {count ? (
-        <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-[color:var(--app-text-soft)]">
+        <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
           {compactNumber(count)}
         </span>
       ) : null}
@@ -3594,7 +3701,7 @@ function SearchSection({
 }) {
   return (
     <section className="space-y-3">
-      <h2 className="px-1 text-base font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+      <h2 className="px-1 text-base font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
         {title}
       </h2>
       <div className="space-y-2.5">{children}</div>
@@ -3680,25 +3787,25 @@ function SearchGroupResult({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="grid h-full w-full place-items-center text-2xl font-black text-[color:var(--app-accent)]">
+            <div className="grid h-full w-full place-items-center text-2xl font-bold text-[color:var(--app-accent)]">
               {initial}
             </div>
           )}
         </div>
         <div className="min-w-0 flex-1 py-3 pr-3">
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
+            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-accent)]">
               {groupPrivacyLabel(group, isId)}
             </span>
             {joined ? (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-[color:var(--app-text-soft)]">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)]">
                 {isId ? 'Sudah join' : 'Joined'}
               </span>
             ) : null}
           </div>
           <Link
             href={communityGroupHref(group)}
-            className="line-clamp-1 text-sm font-black text-[color:var(--app-text)]"
+            className="line-clamp-1 text-sm font-bold text-[color:var(--app-text)]"
           >
             {group.name}
           </Link>
@@ -3780,7 +3887,7 @@ function SearchPersonResult({
       <div className="min-w-0 flex-1">
         <Link
           href={`/profile/${encodeURIComponent(person.id)}`}
-          className="block truncate text-sm font-black text-[color:var(--app-text)]"
+          className="block truncate text-sm font-bold text-[color:var(--app-text)]"
         >
           {person.name}
         </Link>
@@ -3788,7 +3895,7 @@ function SearchPersonResult({
           {person.title}
         </p>
       </div>
-      <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-black text-[color:var(--app-text-soft)]">
+      <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
         {compactNumber(person.reputation)} pts
       </span>
     </article>
@@ -3836,12 +3943,12 @@ function LegacySearchVideoResult({
             <PlayCircle className="h-7 w-7" />
           </div>
         )}
-        <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-black text-white">
+        <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-bold text-white">
           Video
         </span>
       </div>
       <div className="min-w-0 flex-1 py-1">
-        <h3 className="line-clamp-2 text-sm font-black text-[color:var(--app-text)]">
+        <h3 className="line-clamp-2 text-sm font-bold text-[color:var(--app-text)]">
           {item.title}
         </h3>
         <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
@@ -3870,7 +3977,7 @@ function SearchMarketplaceResult({
           <BarChart3 className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+          <h2 className="text-base font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
             Marketplace
           </h2>
           <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
@@ -3883,13 +3990,13 @@ function SearchMarketplaceResult({
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <Link
           href={`/search?q=${encodeURIComponent(query)}`}
-          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] bg-amber-500 px-3 text-xs font-black text-white"
+          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] bg-amber-500 px-3 text-xs font-bold text-white"
         >
           {isId ? 'Cari di marketplace' : 'Search marketplace'}
         </Link>
         <Link
           href="/umkm"
-          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] border border-amber-200 bg-white px-3 text-xs font-black text-amber-700"
+          className="inline-flex min-h-[38px] flex-1 items-center justify-center rounded-[13px] border border-amber-200 bg-white px-3 text-xs font-bold text-amber-700"
         >
           UMKM
         </Link>
@@ -3926,10 +4033,10 @@ function CommunitySearchPanel({
   );
   const resultSummary = results?.counts
     ? [
-        `${compactNumber(results.counts.posts)} ${isId ? 'postingan' : 'posts'}`,
-        `${compactNumber(results.counts.groups)} ${isId ? 'grup' : 'groups'}`,
-        `${compactNumber(results.counts.people)} ${isId ? 'orang' : 'people'}`,
-      ].join(' - ')
+      `${compactNumber(results.counts.posts)} ${isId ? 'postingan' : 'posts'}`,
+      `${compactNumber(results.counts.groups)} ${isId ? 'grup' : 'groups'}`,
+      `${compactNumber(results.counts.people)} ${isId ? 'orang' : 'people'}`,
+    ].join(' - ')
     : isId
       ? 'Mencari diskusi, grup, dan orang.'
       : 'Searching discussions, groups, and people.';
@@ -3939,10 +4046,10 @@ function CommunitySearchPanel({
       <section className="rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_56%,#eff6ff_100%)] p-3.5 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.2)] sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[color:var(--app-accent)]">
               {isId ? 'Pencarian komunitas' : 'Community search'}
             </p>
-            <h2 className="mt-1 text-base font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+            <h2 className="mt-1 text-base font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
               {isId ? 'Hasil pencarian' : 'Search results'}
             </h2>
             <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
@@ -4047,7 +4154,7 @@ function LeftRail({
         data-auto-scrollbar
       >
         <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-          <h1 className="text-[1.1rem] font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+          <h1 className="text-[1.1rem] font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
             {searchMode
               ? isId
                 ? 'Hasil pencarian'
@@ -4059,49 +4166,49 @@ function LeftRail({
           <div className="mt-3 space-y-1">
             {searchMode
               ? SEARCH_TABS.map(tab => (
-                  <SearchFilterButton
-                    key={tab.id}
-                    tab={tab}
-                    isId={isId}
-                    active={searchKind === tab.id}
-                    count={searchCountFor(searchCounts, tab.id)}
-                    onClick={() => onSearchKindChange(tab.id)}
-                  />
-                ))
+                <SearchFilterButton
+                  key={tab.id}
+                  tab={tab}
+                  isId={isId}
+                  active={searchKind === tab.id}
+                  count={searchCountFor(searchCounts, tab.id)}
+                  onClick={() => onSearchKindChange(tab.id)}
+                />
+              ))
               : TABS.map(tab => {
-                  const Icon = tab.icon;
-                  const active = activeTab === tab.id;
+                const Icon = tab.icon;
+                const active = activeTab === tab.id;
 
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => onTabChange(tab.id)}
-                      className={cn(
-                        'flex min-h-[52px] w-full items-center gap-2.5 rounded-[14px] px-3 text-left',
-                        active
-                          ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                          : 'text-[color:var(--app-text-soft)] hover:bg-slate-50',
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-black">
-                          {isId ? tab.labelId : tab.labelEn}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[11px] font-semibold opacity-75">
-                          {isId ? tab.captionId : tab.captionEn}
-                        </span>
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => onTabChange(tab.id)}
+                    className={cn(
+                      'flex min-h-[52px] w-full items-center gap-2.5 rounded-[14px] px-3 text-left',
+                      active
+                        ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                        : 'text-[color:var(--app-text-soft)] hover:bg-slate-50',
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold">
+                        {isId ? tab.labelId : tab.labelEn}
                       </span>
-                    </button>
-                  );
-                })}
+                      <span className="mt-0.5 block truncate text-[11px] font-semibold opacity-75">
+                        {isId ? tab.captionId : tab.captionEn}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
           </div>
         </section>
 
         <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-black text-[color:var(--app-text)]">
+            <p className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Grup aktif' : 'Active groups'}
             </p>
             <button
@@ -4160,7 +4267,7 @@ function RightRail({
         <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[color:var(--app-accent)]" />
-            <h2 className="text-sm font-black text-[color:var(--app-text)]">
+            <h2 className="text-sm font-bold text-[color:var(--app-text)]">
               {isId ? 'Sedang ramai' : 'Trending'}
             </h2>
           </div>
@@ -4186,7 +4293,7 @@ function RightRail({
         </section>
 
         <section className="shrink-0 rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-          <h2 className="text-sm font-black text-[color:var(--app-text)]">
+          <h2 className="text-sm font-bold text-[color:var(--app-text)]">
             {isId ? 'Rekomendasi grup' : 'Recommended groups'}
           </h2>
           <div className="mt-3 space-y-2">
@@ -4252,6 +4359,7 @@ export default function CommunityFeedClient({
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
   const [membersModalGroup, setMembersModalGroup] =
@@ -4345,7 +4453,10 @@ export default function CommunityFeedClient({
   useEffect(() => {
     let alive = true;
     queueMicrotask(() => {
-      if (alive) setLoading(true);
+      if (alive) {
+        setLoading(true);
+        setLoadMoreError(null);
+      }
     });
 
     fetch(feedUrl, { cache: 'no-store', credentials: 'include' })
@@ -4405,34 +4516,45 @@ export default function CommunityFeedClient({
   const loadMore = async () => {
     if (!hasMore || nextCursor == null || loadingMore) return;
     setLoadingMore(true);
-    const params = new URLSearchParams();
-    params.set('tab', activeTab);
-    params.set('limit', '10');
-    params.set('cursor', String(nextCursor));
-    if (submittedQuery.trim()) params.set('q', submittedQuery.trim());
-    const category = searchParams.get('category');
-    const tag = searchParams.get('tag');
-    if (category) params.set('category', category);
-    if (tag) params.set('tag', tag);
-    const response = await fetch(`/api/community/feed?${params.toString()}`, {
-      cache: 'no-store',
-      credentials: 'include',
-    });
-    const payload = (await response
-      .json()
-      .catch(() => ({}))) as Partial<CommunityFeedResponse>;
-    setItems(current => {
-      const existing = new Set(current.map(item => item.id));
-      return [
-        ...current,
-        ...communityDiscussionItems(payload.items).filter(
-          item => !existing.has(item.id),
-        ),
-      ];
-    });
-    setNextCursor(payload.nextCursor ?? null);
-    setHasMore(Boolean(payload.hasMore));
-    setLoadingMore(false);
+    setLoadMoreError(null);
+    try {
+      const params = new URLSearchParams();
+      params.set('tab', activeTab);
+      params.set('limit', '10');
+      params.set('cursor', String(nextCursor));
+      if (submittedQuery.trim()) params.set('q', submittedQuery.trim());
+      const category = searchParams.get('category');
+      const tag = searchParams.get('tag');
+      if (category) params.set('category', category);
+      if (tag) params.set('tag', tag);
+      const response = await fetch(`/api/community/feed?${params.toString()}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      });
+      const payload = (await response
+        .json()
+        .catch(() => ({}))) as Partial<CommunityFeedResponse>;
+      if (!response.ok) throw new Error('Failed to load community page');
+      setItems(current => {
+        const existing = new Set(current.map(item => item.id));
+        return [
+          ...current,
+          ...communityDiscussionItems(payload.items).filter(
+            item => !existing.has(item.id),
+          ),
+        ];
+      });
+      setNextCursor(payload.nextCursor ?? null);
+      setHasMore(Boolean(payload.hasMore));
+    } catch {
+      setLoadMoreError(
+        isId
+          ? 'Gagal memuat diskusi berikutnya. Coba lagi.'
+          : 'Failed to load more discussions. Try again.',
+      );
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -4494,13 +4616,13 @@ export default function CommunityFeedClient({
     setOverview(current =>
       current
         ? {
-            ...current,
-            stats: {
-              ...current.stats,
-              totalThreads: current.stats.totalThreads + 1,
-              totalPosts: current.stats.totalPosts + 1,
-            },
-          }
+          ...current,
+          stats: {
+            ...current.stats,
+            totalThreads: current.stats.totalThreads + 1,
+            totalPosts: current.stats.totalPosts + 1,
+          },
+        }
         : current,
     );
   };
@@ -4517,7 +4639,7 @@ export default function CommunityFeedClient({
   };
 
   return (
-    <main className="lajukan-home-compact min-h-screen bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <main className="lajukan-home-compact min-h-screen min-h-[100dvh] bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell mx-auto flex h-full flex-col lg:overflow-hidden">
         <div className="lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1700px] flex-1 gap-4 lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_320px] 2xl:grid-cols-[280px_minmax(0,1fr)_340px]">
           <LeftRail
@@ -4536,54 +4658,64 @@ export default function CommunityFeedClient({
             className="min-w-0 space-y-3 pt-2 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1"
             data-auto-scrollbar
           >
-            <section className="overflow-hidden rounded-[28px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_48%,#eff6ff_100%)] p-3.5 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.25)] sm:p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <p className="inline-flex rounded-full bg-white/82 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
+            <section className="overflow-hidden rounded-[20px] border border-emerald-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdf4_58%,#eff6ff_100%)] p-3 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.25)] sm:p-3.5">
+              <div className="flex flex-col gap-2.5">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="inline-flex min-h-[28px] items-center rounded-full bg-white/86 px-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
                     {isId ? 'Forum Lajukan' : 'Lajukan Forum'}
-                  </p>
-                  <h1 className="mt-2 text-[1.28rem] font-black tracking-[-0.045em] text-[color:var(--app-text)] sm:text-[1.55rem]">
+                  </span>
+                  <h1 className="min-w-0 flex-1 truncate text-[1.12rem] font-bold tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.32rem]">
                     {isId ? 'Komunitas Usaha' : 'Business Community'}
                   </h1>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   {!isSearchMode ? (
-                    <p className="mt-1 max-w-xl text-sm font-semibold leading-6 text-[color:var(--app-text-soft)]">
+                    <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
                       {isId ? activeFeedTab.captionId : activeFeedTab.captionEn}
                     </p>
-                  ) : null}
-                </div>
-                <div className="grid grid-cols-3 gap-2 sm:min-w-[260px]">
-                  {[
-                    {
-                      label: isId ? 'Diskusi' : 'Threads',
-                      value: overview?.stats.totalThreads,
-                    },
-                    {
-                      label: isId ? 'Jawaban' : 'Replies',
-                      value: overview?.stats.totalPosts,
-                    },
-                    {
-                      label: isId ? 'Member' : 'Members',
-                      value: overview?.stats.totalUsers,
-                    },
-                  ].map(item => (
-                    <div
-                      key={item.label}
-                      className="rounded-[16px] bg-white/88 px-2.5 py-2 text-center ring-1 ring-emerald-100"
-                    >
-                      <span className="block text-sm font-black text-[color:var(--app-text)]">
-                        {compactNumber(item.value)}
-                      </span>
-                      <span className="block truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
+                  ) : (
+                    <p className="min-w-0 flex-1 text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
+                      {isId
+                        ? 'Cari diskusi, orang, dan grup usaha.'
+                        : 'Search discussions, people, and groups.'}
+                    </p>
+                  )}
+
+                  <div className="flex shrink-0 gap-1.5 overflow-x-auto pb-0.5 sm:overflow-visible">
+                    {[
+                      {
+                        label: isId ? 'Diskusi' : 'Threads',
+                        value: overview?.stats.totalThreads,
+                      },
+                      {
+                        label: isId ? 'Jawaban' : 'Replies',
+                        value: overview?.stats.totalPosts,
+                      },
+                      {
+                        label: isId ? 'Member' : 'Members',
+                        value: overview?.stats.totalUsers,
+                      },
+                    ].map(item => (
+                      <div
+                        key={item.label}
+                        className="inline-flex min-h-[30px] shrink-0 items-center gap-1.5 rounded-full bg-white/88 px-2.5 text-left ring-1 ring-emerald-100"
+                      >
+                        <span className="text-xs font-bold text-[color:var(--app-text)]">
+                          {compactNumber(item.value)}
+                        </span>
+                        <span className="truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
+                          {item.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               <form
                 onSubmit={handleSearch}
-                className="mt-3 flex min-h-[46px] items-center gap-2 rounded-full bg-white/90 px-3 ring-1 ring-emerald-100"
+                className="mt-2.5 flex min-h-[42px] items-center gap-2 rounded-full bg-white/92 px-3 ring-1 ring-emerald-100"
               >
                 <Search className="h-4 w-4 text-[color:var(--app-text-soft)]" />
                 <input
@@ -4598,7 +4730,7 @@ export default function CommunityFeedClient({
                 />
                 <button
                   type="submit"
-                  className="rounded-full bg-[color:var(--app-accent)] px-3 py-1.5 text-[11px] font-bold text-white"
+                  className="min-h-[32px] rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white"
                 >
                   {isId ? 'Cari' : 'Search'}
                 </button>
@@ -4635,20 +4767,15 @@ export default function CommunityFeedClient({
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
                         className={cn(
-                          'relative flex min-h-[46px] min-w-[118px] shrink-0 flex-col justify-center rounded-[15px] border px-3 text-left transition',
+                          'relative inline-flex min-h-[38px] min-w-[104px] shrink-0 items-center gap-2 rounded-full border px-3 text-left transition',
                           active
                             ? 'border-[color:var(--app-accent)] bg-white text-[color:var(--app-accent)] shadow-[0_14px_26px_-24px_rgba(4,120,87,0.6)]'
                             : 'border-white/70 bg-white/72 text-[color:var(--app-text-soft)] hover:bg-white',
                         )}
                       >
-                        <span className="flex min-w-0 items-center gap-1.5 text-xs font-black">
-                          <Icon className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">
-                            {isId ? tab.labelId : tab.labelEn}
-                          </span>
-                        </span>
-                        <span className="mt-0.5 line-clamp-1 text-[10px] font-semibold leading-3 opacity-75">
-                          {isId ? tab.captionId : tab.captionEn}
+                        <Icon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate text-xs font-bold">
+                          {isId ? tab.labelId : tab.labelEn}
                         </span>
                       </button>
                     );
@@ -4698,7 +4825,7 @@ export default function CommunityFeedClient({
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[color:var(--app-accent)] shadow-[0_16px_30px_-24px_rgba(15,23,42,0.3)] ring-1 ring-emerald-100">
                       <MessageCircle className="h-5 w-5" />
                     </div>
-                    <p className="mt-3 text-base font-black text-[color:var(--app-text)]">
+                    <p className="mt-3 text-base font-bold text-[color:var(--app-text)]">
                       {emptyFeedTitle}
                     </p>
                     <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -4707,7 +4834,7 @@ export default function CommunityFeedClient({
                     <button
                       type="button"
                       onClick={() => router.push('/community?compose=post')}
-                      className="mt-4 inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-black text-white shadow-[0_18px_30px_-22px_rgba(16,185,129,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(16,185,129,0.95)]"
+                      className="mt-4 inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent-strong)] px-4 text-sm font-bold text-white shadow-[0_18px_30px_-22px_rgba(16,185,129,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_34px_-24px_rgba(16,185,129,0.95)]"
                     >
                       <Plus className="h-4 w-4" />
                       {isId ? 'Mulai diskusi' : 'Start a discussion'}
@@ -4726,6 +4853,11 @@ export default function CommunityFeedClient({
                   ))}
                 </div>
 
+                {loadMoreError ? (
+                  <p className="text-center text-xs font-semibold text-amber-700">
+                    {loadMoreError}
+                  </p>
+                ) : null}
                 {hasMore ? (
                   <div className="flex justify-center py-2">
                     <button

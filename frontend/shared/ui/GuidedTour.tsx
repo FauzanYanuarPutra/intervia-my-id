@@ -194,7 +194,7 @@ export function GuidedTour({
 
       <div
         ref={panelRef}
-        className="absolute max-w-sm rounded-2xl border border-[color:color-mix(in_srgb,_var(--color-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--color-surface)_95%,_transparent)] p-4 text-[color:var(--color-text)] shadow-2xl backdrop-blur dark:border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--color-surface)_95%,_transparent)] dark:text-[color:var(--color-text-soft)]"
+        className="absolute max-w-sm rounded-2xl border border-[color:color-mix(in_srgb,_var(--color-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--color-surface)_95%,_transparent)] p-4 text-[color:var(--color-text)] shadow-2xl  dark:border-[color:color-mix(in_srgb,_var(--color-border)_80%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--color-surface)_95%,_transparent)] dark:text-[color:var(--color-text-soft)]"
         style={panelStyle || { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
       >
         <div className="flex items-start justify-between gap-3">

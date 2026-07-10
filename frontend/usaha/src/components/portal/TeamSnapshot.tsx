@@ -35,7 +35,7 @@ export function TeamSnapshot({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="portal-kicker">Tim usaha</p>
-            <h3 className="mt-1 text-lg font-black tracking-[-0.04em] text-portal-ink">
+            <h3 className="mt-1 text-lg font-bold tracking-[-0.04em] text-portal-ink">
               {business.teamMembers.length} anggota aktif
             </h3>
           </div>
@@ -88,7 +88,7 @@ export function TeamSnapshot({
             </span>
             <div>
               <p className="portal-kicker">Undangan</p>
-              <h3 className="mt-1 text-lg font-black tracking-[-0.04em] text-portal-ink">
+              <h3 className="mt-1 text-lg font-bold tracking-[-0.04em] text-portal-ink">
                 {pendingInvites.length} menunggu konfirmasi
               </h3>
             </div>

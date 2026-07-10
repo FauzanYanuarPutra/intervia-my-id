@@ -106,7 +106,6 @@ body {
   background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
   box-shadow: 0 24px 60px color-mix(in srgb, var(--color-text) 12%, transparent);
-  backdrop-filter: blur(16px);
 }
 
 @keyframes rise {

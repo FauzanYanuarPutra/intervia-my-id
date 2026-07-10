@@ -192,13 +192,13 @@ export default async function TermsPage({ params }: PageProps) {
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 <Icon className="h-5 w-5" />
               </span>
-              <h2 className="mt-4 text-base font-black text-[color:var(--app-text)]">
+              <h2 className="mt-4 text-base font-bold text-[color:var(--app-text)]">
                 {item.title}
               </h2>
               <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
                 {item.body}
               </p>
-              <span className="mt-4 inline-flex text-xs font-black text-[color:var(--app-accent)]">
+              <span className="mt-4 inline-flex text-xs font-bold text-[color:var(--app-accent)]">
                 {item.cta}
               </span>
             </Link>

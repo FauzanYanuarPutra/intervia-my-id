@@ -1,10 +1,10 @@
 {
   "login": {
     "title": "Login | Lajukan",
-    "description": "Sign in to your Lajukan account to access freelance projects."
+    "description": "Sign in to search, create posts, and open chats."
   },
-  "title": "Log in to Your Account",
-  "subtitle": "Welcome back! Please enter your account details.",
+  "title": "Log in to your account",
+  "subtitle": "Continue your activity on Lajukan.",
   "email_label": "Email",
   "email_placeholder": "name@example.com",
   "password_label": "Password",
@@ -12,10 +12,10 @@
   "login_button": "Login",
   "logging_in": "Logging in...",
   "no_account": "Don't have an account?",
-  "register_link": "Register Now",
-  "forgot_password": "Forgot Password?",
-  "error_invalid": "Invalid email or password. Please try again.",
-  "error_failed": "Login process failed. A network error occurred.",
-  "banner_title": "Fast & Secure Access",
-  "banner_subtitle": "Manage all your data and projects with guaranteed security."
+  "register_link": "Register now",
+  "forgot_password": "Forgot password?",
+  "error_invalid": "Email or password does not match. Try again.",
+  "error_failed": "Could not log in. Check your connection and try again.",
+  "banner_title": "Easy account access",
+  "banner_subtitle": "Manage posts, chats, and business needs from one account."
 }

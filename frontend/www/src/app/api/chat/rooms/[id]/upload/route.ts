@@ -74,7 +74,8 @@ export async function POST(
       folder: `chat/${id}`,
       maxBytes: MEDIA_UPLOAD_RAW_MAX_BYTES,
       minioTarget: id,
-      minioTimeoutMs: 2600,
+      requireMinio: true,
+      minioTimeoutMs: 20000,
     });
     const stored = uploaded[0];
     if (!stored) {

@@ -51,8 +51,8 @@ export default async function PrivacyPage({ params }: PageProps) {
           <p className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
             {isId
-              ? 'Transaksi dilindungi escrow & verifikasi'
-              : 'Transactions are protected with escrow & verification'}
+              ? 'Verifikasi dan keamanan transaksi dikembangkan bertahap'
+              : 'Verification and transaction safety are being rolled out gradually'}
           </p>
 
           <p className="flex items-center gap-2">

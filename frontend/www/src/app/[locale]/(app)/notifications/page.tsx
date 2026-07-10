@@ -223,10 +223,10 @@ export default function NotificationsPage() {
               </span>
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                 Inbox
               </p>
-              <h1 className="mt-0.5 truncate text-[1.25rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] sm:text-[1.65rem]">
+              <h1 className="mt-0.5 truncate text-[1.25rem] font-bold leading-tight tracking-[-0.03em] text-[color:var(--app-text)] sm:text-[1.65rem]">
                 {isId ? 'Notifikasi' : 'Notifications'}
               </h1>
               <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-xs">
@@ -239,7 +239,7 @@ export default function NotificationsPage() {
             <button
               type="button"
               onClick={() => void refetch()}
-              className="ui-pressable inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-[15px] border border-[color:var(--app-border)] bg-white/88 px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-white/8"
+              className="ui-pressable inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-[15px] border border-[color:var(--app-border)] bg-white/88 px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:bg-white/8"
               aria-label={isId ? 'Refresh notifikasi' : 'Refresh notifications'}
             >
               <RefreshCcw className="h-3.5 w-3.5" />
@@ -256,7 +256,7 @@ export default function NotificationsPage() {
                   setSubmitting(false);
                 }
               }}
-              className="ui-pressable inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-[15px] bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="ui-pressable inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-[15px] bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label={
                 isId ? 'Tandai semua dibaca' : 'Mark all notifications read'
               }
@@ -362,7 +362,7 @@ export default function NotificationsPage() {
                         <span className="min-w-0">
                           <span
                             className={cn(
-                              'block text-[14px] font-black leading-5 tracking-[-0.01em] sm:text-[15px]',
+                              'block text-[14px] font-bold leading-5 tracking-[-0.01em] sm:text-[15px]',
                               visual.titleClassName,
                             )}
                           >
@@ -387,7 +387,7 @@ export default function NotificationsPage() {
                       <span className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5">
                         <span
                           className={cn(
-                            'rounded-full border px-2.5 py-1 text-[10px] font-black',
+                            'rounded-full border px-2.5 py-1 text-[10px] font-bold',
                             visual.badgeClassName,
                           )}
                         >
@@ -401,7 +401,7 @@ export default function NotificationsPage() {
                         </span>
                         <span
                           className={cn(
-                            'rounded-full px-2.5 py-1 text-[10px] font-black',
+                            'rounded-full px-2.5 py-1 text-[10px] font-bold',
                             item.is_read
                               ? 'bg-white/75 text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-white/8'
                               : 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]',

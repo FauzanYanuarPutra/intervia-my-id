@@ -43,11 +43,11 @@ export function PortalShell({
         <header className="portal-panel flex flex-col gap-4 px-5 py-5 sm:px-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-portal-line/80 bg-white/80 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-portal-forest">
+              <div className="inline-flex items-center gap-2 rounded-full border border-portal-line/80 bg-white/80 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-portal-forest">
                 <Store className="h-3.5 w-3.5" />
                 Usaha Portal
               </div>
-              <h1 className="mt-3 text-[1.9rem] font-black tracking-[-0.06em] sm:text-[2.6rem]">
+              <h1 className="mt-3 text-[1.9rem] font-bold tracking-[-0.06em] sm:text-[2.6rem]">
                 {activeBusiness ? activeBusiness.name : 'Kelola usaha tanpa dashboard yang berantakan'}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-portal-soft">
@@ -126,7 +126,7 @@ export function PortalShell({
                     </span>
                     <div>
                       <p className="portal-kicker">Usaha aktif</p>
-                      <h2 className="mt-1 text-lg font-black tracking-[-0.04em] text-portal-ink">
+                      <h2 className="mt-1 text-lg font-bold tracking-[-0.04em] text-portal-ink">
                         {activeBusiness.name}
                       </h2>
                       <p className="mt-1 text-sm leading-6 text-portal-soft">

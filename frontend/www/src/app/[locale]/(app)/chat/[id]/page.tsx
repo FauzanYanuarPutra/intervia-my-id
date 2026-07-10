@@ -113,7 +113,7 @@ type DraftAttachment = {
 
 const MAX_COMPOSER_ATTACHMENTS = 10;
 const CHAT_FIELD_LABEL_CLASS =
-  'block text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)]';
+  'block text-[12px] font-bold tracking-[0.005em] text-[color:var(--app-text)]';
 const CHAT_CONTROL_CLASS =
   'mt-1.5 min-h-[40px] w-full rounded-[12px] border border-slate-300 bg-white px-3 text-[13px] font-semibold text-[color:var(--app-text)] shadow-none outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--app-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--app-accent)_14%,transparent)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-emerald-400';
 const CHAT_TEXTAREA_CLASS =
@@ -2089,6 +2089,8 @@ export default function ChatRoomPage() {
   } | null>(null);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [activeCallIsCaller, setActiveCallIsCaller] = useState(false);
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const messagesViewportRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -2146,6 +2148,36 @@ export default function ChatRoomPage() {
   useEffect(() => {
     activeCallIdRef.current = activeCallId;
   }, [activeCallId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const updateKeyboardState = () => {
+      const activeElement = document.activeElement;
+      const typingTarget =
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLSelectElement;
+      const viewportInset =
+        window.innerHeight - viewport.height - viewport.offsetTop;
+      setKeyboardOpen(typingTarget && viewportInset > 80);
+    };
+
+    updateKeyboardState();
+    viewport.addEventListener('resize', updateKeyboardState);
+    viewport.addEventListener('scroll', updateKeyboardState);
+    window.addEventListener('focusin', updateKeyboardState);
+    window.addEventListener('focusout', updateKeyboardState);
+
+    return () => {
+      viewport.removeEventListener('resize', updateKeyboardState);
+      viewport.removeEventListener('scroll', updateKeyboardState);
+      window.removeEventListener('focusin', updateKeyboardState);
+      window.removeEventListener('focusout', updateKeyboardState);
+    };
+  }, []);
 
   useEffect(() => {
     incomingCallRefState.current = incomingCall;
@@ -4853,7 +4885,7 @@ export default function ChatRoomPage() {
   if (roomAllowed === null) {
     return (
       <div className="flex h-full max-h-full min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]">
-        <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
+        <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
           <div className="flex min-w-0 items-center gap-3 px-2.5 py-2 sm:px-4 sm:py-2.5">
             <div className="h-10 w-10 shrink-0 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942]" />
             <div className="min-w-0 flex-1">
@@ -4864,7 +4896,7 @@ export default function ChatRoomPage() {
         </header>
 
         <div className="grid min-h-0 flex-1 place-items-center px-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/88 px-4 py-2 text-[#54656f] shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#111b21]/88 dark:text-[#aebac1]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/88 px-4 py-2 text-[#54656f] shadow-sm  dark:border-white/10 dark:bg-[#111b21]/88 dark:text-[#aebac1]">
             <Loader2 className="h-5 w-5 animate-spin text-[#00a884]" />
             <span className="text-sm font-semibold">
               {chatLocale === 'id' ? 'Membuka chat...' : 'Opening chat...'}
@@ -4905,7 +4937,7 @@ export default function ChatRoomPage() {
         backgroundColor: 'transparent',
       }}
     >
-      <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)] backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95">
+      <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
         <div className="min-w-0 px-2.5 py-2 sm:px-4 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
@@ -5056,7 +5088,7 @@ export default function ChatRoomPage() {
       {!PROMO_ONLY_MODE && roomSummaryTransaction ? (
         <div className="border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
           <div className="mx-auto w-full max-w-[920px]">
-            <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)] backdrop-blur dark:border-white/8 dark:bg-[#202c33]/90">
+            <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)]  dark:border-white/8 dark:bg-[#202c33]/90">
               <button
                 type="button"
                 onClick={() => setRoomSummaryExpanded(prev => !prev)}
@@ -5067,12 +5099,12 @@ export default function ChatRoomPage() {
                   <ReceiptText className="h-4.5 w-4.5" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[10px] font-black uppercase tracking-[0.14em] text-[#128c7e] dark:text-[#25d366]">
+                  <span className="block truncate text-[10px] font-bold uppercase tracking-[0.14em] text-[#128c7e] dark:text-[#25d366]">
                     {chatLocale === 'id'
                       ? 'Transaksi aktif'
                       : 'Active transaction'}
                   </span>
-                  <span className="mt-0.5 block truncate text-sm font-black text-[#111b21] dark:text-[#e9edef]">
+                  <span className="mt-0.5 block truncate text-sm font-bold text-[#111b21] dark:text-[#e9edef]">
                     {roomSummaryTxnTitle}
                   </span>
                   <span className="mt-0.5 block truncate text-xs font-semibold text-[#667781] dark:text-[#8696a0]">
@@ -5080,7 +5112,7 @@ export default function ChatRoomPage() {
                   </span>
                 </span>
                 <span className="hidden shrink-0 text-right sm:block">
-                  <span className="block text-sm font-black text-[#128c7e] dark:text-[#25d366]">
+                  <span className="block text-sm font-bold text-[#128c7e] dark:text-[#25d366]">
                     {formatMoney(
                       roomSummaryTransaction.amount_cents,
                       roomSummaryTransaction.currency,
@@ -5100,7 +5132,7 @@ export default function ChatRoomPage() {
               </button>
 
               <div className="mt-2 flex items-center gap-2 sm:hidden">
-                <span className="shrink-0 text-xs font-black text-[#128c7e] dark:text-[#25d366]">
+                <span className="shrink-0 text-xs font-bold text-[#128c7e] dark:text-[#25d366]">
                   {formatMoney(
                     roomSummaryTransaction.amount_cents,
                     roomSummaryTransaction.currency,
@@ -5269,7 +5301,7 @@ export default function ChatRoomPage() {
                   </button>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="rounded-[26px] border border-white/60 bg-white/70 p-10 text-center shadow-[0_18px_36px_-28px_rgba(17,27,33,0.35)] backdrop-blur dark:border-white/10 dark:bg-[#202c33]/80">
+                <div className="rounded-[26px] border border-white/60 bg-white/70 p-10 text-center shadow-[0_18px_36px_-28px_rgba(17,27,33,0.35)]  dark:border-white/10 dark:bg-[#202c33]/80">
                   <MessageSquareText className="mx-auto mb-3 h-8 w-8 text-[#25d366]" />
                   <p className="font-medium text-[#54656f] dark:text-[#dfe7ea]">
                     {chatLocale === 'id' ? 'Belum ada chat' : 'No messages yet'}
@@ -5290,7 +5322,7 @@ export default function ChatRoomPage() {
                           key={item.id}
                           className="sticky top-2 z-10 flex justify-center py-1"
                         >
-                          <span className="rounded-full border border-black/5 bg-white/95 px-3 py-1 text-[10px] font-medium text-[#54656f] shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#202c33]/95 dark:text-[#d1d7db]">
+                          <span className="rounded-full border border-black/5 bg-white/95 px-3 py-1 text-[10px] font-medium text-[#54656f] shadow-sm  dark:border-white/10 dark:bg-[#202c33]/95 dark:text-[#d1d7db]">
                             {item.label}
                           </span>
                         </div>
@@ -5654,7 +5686,7 @@ export default function ChatRoomPage() {
                                           : 'New offer'),
                                       )}
                                     </p>
-                                    <p className="mt-1 text-base font-black text-[color:var(--app-accent)]">
+                                    <p className="mt-1 text-base font-bold text-[color:var(--app-accent)]">
                                       {formatMoney(
                                         transactionCardMeta?.amount_cents,
                                         transactionCardMeta?.currency,
@@ -5932,7 +5964,7 @@ export default function ChatRoomPage() {
                                         : ''}
                                     </p>
                                     <div className="mt-1 flex items-end gap-1.5">
-                                      <p className="text-base font-black text-[color:var(--app-accent)]">
+                                      <p className="text-base font-bold text-[color:var(--app-accent)]">
                                         {inferPricingMode(meta || {}) ===
                                           'request'
                                           ? 'Price on request'
@@ -6170,14 +6202,14 @@ export default function ChatRoomPage() {
                                       )}
                                       <div className="min-w-0 flex-1">
                                         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700 dark:bg-emerald-300/12 dark:text-emerald-200">
+                                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-700 dark:bg-emerald-300/12 dark:text-emerald-200">
                                             {structuredSideContext}
                                           </span>
                                           <span className="rounded-full bg-[#f2f5f4] px-2 py-0.5 text-[10px] font-bold text-[#667781] dark:bg-white/[0.08] dark:text-[#c8d2d1]">
                                             {transactionCardWalletLabel}
                                           </span>
                                         </div>
-                                        <p className="mt-1 line-clamp-2 text-sm font-black leading-5 text-[#111b21] dark:text-[#e9edef]">
+                                        <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[#111b21] dark:text-[#e9edef]">
                                           {transactionCardTitle}
                                         </p>
                                         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[10px] font-semibold text-[#667781] dark:text-[#aebac1]">
@@ -6206,7 +6238,7 @@ export default function ChatRoomPage() {
                                               ? 'Nominal'
                                               : 'Amount'}
                                           </p>
-                                          <p className="mt-0.5 text-base font-black leading-5 text-emerald-700 dark:text-emerald-200">
+                                          <p className="mt-0.5 text-base font-bold leading-5 text-emerald-700 dark:text-emerald-200">
                                             {formatMoney(
                                               transactionCardMeta?.amount_cents,
                                               transactionCardMeta?.currency,
@@ -6214,7 +6246,7 @@ export default function ChatRoomPage() {
                                           </p>
                                         </div>
                                         <span
-                                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black ${statusTone(transactionCardStatus)}`}
+                                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusTone(transactionCardStatus)}`}
                                         >
                                           {humanizeStatus(
                                             transactionCardStatus,
@@ -6228,7 +6260,7 @@ export default function ChatRoomPage() {
                                               ? 'Menunggu pembaruan transaksi'
                                               : 'Waiting for transaction update')}
                                         </p>
-                                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-black text-emerald-800 dark:bg-emerald-300/14 dark:text-emerald-100">
+                                        <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 dark:bg-emerald-300/14 dark:text-emerald-100">
                                           {transactionCardProgress}%
                                         </span>
                                       </div>
@@ -6289,7 +6321,7 @@ export default function ChatRoomPage() {
                                                 transactionCardMeta?.currency,
                                             })
                                           }
-                                          className="inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-full bg-emerald-600 px-3 text-xs font-black text-white shadow-[0_12px_24px_-18px_rgba(4,120,87,0.85)] hover:bg-emerald-700 dark:bg-emerald-400 dark:text-[#052e1a] dark:hover:bg-emerald-300"
+                                          className="inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-full bg-emerald-600 px-3 text-xs font-bold text-white shadow-[0_12px_24px_-18px_rgba(4,120,87,0.85)] hover:bg-emerald-700 dark:bg-emerald-400 dark:text-[#052e1a] dark:hover:bg-emerald-300"
                                         >
                                           <Wallet className="h-3.5 w-3.5" />
                                           {chatLocale === 'id'
@@ -6313,7 +6345,7 @@ export default function ChatRoomPage() {
                                               setSelectedTransaction(found);
                                           })();
                                         }}
-                                        className="inline-flex min-h-[34px] flex-1 items-center justify-center rounded-full border border-[#d4e1dc] bg-white px-3 text-xs font-black text-[#0f3f2e] hover:bg-emerald-50 dark:border-white/10 dark:bg-white/[0.08] dark:text-[#e9edef] dark:hover:bg-white/[0.12]"
+                                        className="inline-flex min-h-[34px] flex-1 items-center justify-center rounded-full border border-[#d4e1dc] bg-white px-3 text-xs font-bold text-[#0f3f2e] hover:bg-emerald-50 dark:border-white/10 dark:bg-white/[0.08] dark:text-[#e9edef] dark:hover:bg-white/[0.12]"
                                       >
                                         {chatLocale === 'id' ? 'Buka' : 'Open'}
                                       </button>
@@ -6468,7 +6500,13 @@ export default function ChatRoomPage() {
       {/* Composer */}
       <div
         ref={composerRef}
-        className="shrink-0 border-t border-black/5 bg-[#f0f2f5]/95 px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur dark:border-white/6 dark:bg-[#202c33]/95"
+        className="shrink-0 border-t border-black/5 bg-[#f0f2f5]/95 px-2 pb-[var(--chat-composer-bottom-pad)] pt-2  dark:border-white/6 dark:bg-[#202c33]/95"
+        style={{
+          ['--chat-composer-bottom-pad' as string]:
+            keyboardOpen || composerFocused
+              ? '6px'
+              : 'calc(8px + env(safe-area-inset-bottom))',
+        }}
       >
         <div className="mx-auto w-full max-w-[920px] space-y-2">
           <input
@@ -6484,7 +6522,7 @@ export default function ChatRoomPage() {
             <div className="overflow-hidden rounded-[22px] border border-black/5 bg-white/90 p-2 shadow-sm dark:border-white/8 dark:bg-[#111b21]/90">
               <div className="mb-2 flex items-center justify-between gap-2 px-1">
                 <div className="min-w-0">
-                  <p className="truncate text-[12px] font-black text-[#111b21] dark:text-[#e9edef]">
+                  <p className="truncate text-[12px] font-bold text-[#111b21] dark:text-[#e9edef]">
                     Preview sebelum kirim
                   </p>
                   <p className="truncate text-[11px] font-semibold text-[#667781] dark:text-[#8696a0]">
@@ -6500,7 +6538,7 @@ export default function ChatRoomPage() {
                 <button
                   type="button"
                   onClick={() => clearDraftAttachments()}
-                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-black/5 bg-[#f0f2f5] px-3 text-[11px] font-black text-[#54656f] transition hover:bg-[#e9edef] dark:border-white/8 dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
+                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-black/5 bg-[#f0f2f5] px-3 text-[11px] font-bold text-[#54656f] transition hover:bg-[#e9edef] dark:border-white/8 dark:bg-[#202c33] dark:text-[#aebac1] dark:hover:bg-[#2a3942]"
                 >
                   Hapus semua
                 </button>
@@ -6548,7 +6586,7 @@ export default function ChatRoomPage() {
                         <Paperclip className="h-7 w-7" />
                       </span>
                       <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-black">
+                        <p className="line-clamp-2 text-sm font-bold">
                           {activeDraftAttachment.name}
                         </p>
                         <p className="mt-1 text-xs font-semibold text-white/58">
@@ -6594,7 +6632,7 @@ export default function ChatRoomPage() {
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/76 via-black/36 to-transparent px-3 pb-3 pt-8">
                   <div className="flex min-w-0 items-center justify-between gap-3 text-white">
                     <div className="min-w-0">
-                      <p className="truncate text-[12px] font-black">
+                      <p className="truncate text-[12px] font-bold">
                         {activeDraftAttachment.name}
                       </p>
                       <p className="mt-0.5 truncate text-[11px] font-semibold text-white/64">
@@ -6602,7 +6640,7 @@ export default function ChatRoomPage() {
                       </p>
                     </div>
                     {activeDraftAttachment.status === 'uploading' ? (
-                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-black text-white">
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-bold text-white">
                         <Loader2
                           className="h-3.5 w-3.5 animate-spin"
                           aria-label="Uploading"
@@ -6615,12 +6653,12 @@ export default function ChatRoomPage() {
                         onClick={() =>
                           retryAttachmentUpload(activeDraftAttachment.id)
                         }
-                        className="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-[#128c7e]"
+                        className="inline-flex shrink-0 items-center rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[#128c7e]"
                       >
                         Retry
                       </button>
                     ) : (
-                      <span className="inline-flex shrink-0 items-center rounded-full bg-[#25d366] px-2.5 py-1 text-[11px] font-black text-[#0b141a]">
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-[#25d366] px-2.5 py-1 text-[11px] font-bold text-[#0b141a]">
                         Siap
                       </span>
                     )}
@@ -6671,7 +6709,7 @@ export default function ChatRoomPage() {
                           </span>
                         )}
                         {attachment.status === 'error' && (
-                          <span className="absolute inset-x-1 bottom-1 rounded-full bg-white px-1 py-0.5 text-[9px] font-black text-[#d14343]">
+                          <span className="absolute inset-x-1 bottom-1 rounded-full bg-white px-1 py-0.5 text-[9px] font-bold text-[#d14343]">
                             Retry
                           </span>
                         )}
@@ -6769,6 +6807,7 @@ export default function ChatRoomPage() {
                     value={newMessage}
                     onChange={e => handleTypingChange(e.target.value)}
                     onFocus={() => {
+                      setComposerFocused(true);
                       requestAnimationFrame(() =>
                         scrollMessagesToBottom('smooth'),
                       );
@@ -6776,6 +6815,9 @@ export default function ChatRoomPage() {
                         () => scrollMessagesToBottom('smooth'),
                         260,
                       );
+                    }}
+                    onBlur={() => {
+                      window.setTimeout(() => setComposerFocused(false), 80);
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter' && !e.shiftKey) {
@@ -6795,7 +6837,7 @@ export default function ChatRoomPage() {
                   {showEmojiPicker && (
                     <div
                       ref={emojiPickerRef}
-                      className="absolute bottom-full left-1/2 z-40 mb-3 w-[min(300px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-zinc-100 bg-white/95 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/95 sm:left-0 sm:w-[300px] sm:translate-x-0"
+                      className="absolute bottom-full left-1/2 z-40 mb-3 w-[min(300px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-zinc-100 bg-white/95 p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.08)]  dark:border-zinc-800 dark:bg-zinc-900/95 sm:left-0 sm:w-[300px] sm:translate-x-0"
                     >
                       <div className="grid grid-cols-5 gap-1 sm:grid-cols-6 sm:gap-1.5">
                         {QUICK_EMOJIS.map(emoji => (
@@ -6891,11 +6933,11 @@ export default function ChatRoomPage() {
 
       {showAiQuickPanel && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3 sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] sm:items-center sm:p-3"
           onClick={() => setShowAiQuickPanel(false)}
         >
           <div
-            className="ui-feed-section max-h-[80svh] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
+            className="ui-feed-section max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
             onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -6958,7 +7000,7 @@ export default function ChatRoomPage() {
                     <Sparkles className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-black">
+                    <p className="text-xs font-bold">
                       {chatLocale === 'id'
                         ? 'Bikin bantuan lebih rapi'
                         : 'Make support clearer'}
@@ -6982,7 +7024,7 @@ export default function ChatRoomPage() {
                           : 'Summarize the issue in 3 parts: problem, needed data, and next step.',
                       );
                     }}
-                    className="rounded-full bg-[#008f72] px-3 py-1.5 text-[11px] font-black text-white shadow-sm transition hover:bg-[#00745d]"
+                    className="rounded-full bg-[#008f72] px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-[#00745d]"
                   >
                     {chatLocale === 'id' ? 'Ringkas masalah' : 'Summarize'}
                   </button>
@@ -6997,7 +7039,7 @@ export default function ChatRoomPage() {
                           : 'Ask for up to 3 key details an admin needs to investigate.',
                       );
                     }}
-                    className="rounded-full border border-[#9bd9bd] bg-white/80 px-3 py-1.5 text-[11px] font-black text-[#0f5138] transition hover:bg-white dark:border-[#2b6b50] dark:bg-white/10 dark:text-[#d8fbe7] dark:hover:bg-white/15"
+                    className="rounded-full border border-[#9bd9bd] bg-white/80 px-3 py-1.5 text-[11px] font-bold text-[#0f5138] transition hover:bg-white dark:border-[#2b6b50] dark:bg-white/10 dark:text-[#d8fbe7] dark:hover:bg-white/15"
                   >
                     {chatLocale === 'id' ? 'Minta data' : 'Ask details'}
                   </button>
@@ -7012,7 +7054,7 @@ export default function ChatRoomPage() {
                           : 'Prepare an admin escalation: issue summary, user impact, and evidence to attach.',
                       );
                     }}
-                    className="rounded-full border border-[#9bd9bd] bg-white/80 px-3 py-1.5 text-[11px] font-black text-[#0f5138] transition hover:bg-white dark:border-[#2b6b50] dark:bg-white/10 dark:text-[#d8fbe7] dark:hover:bg-white/15"
+                    className="rounded-full border border-[#9bd9bd] bg-white/80 px-3 py-1.5 text-[11px] font-bold text-[#0f5138] transition hover:bg-white dark:border-[#2b6b50] dark:bg-white/10 dark:text-[#d8fbe7] dark:hover:bg-white/15"
                   >
                     {chatLocale === 'id' ? 'Eskalasi admin' : 'Escalate'}
                   </button>
@@ -7383,7 +7425,7 @@ export default function ChatRoomPage() {
           onClick={() => setShowChatSettings(false)}
         >
           <div
-            className="ui-feed-section flex h-[100svh] max-h-[100svh] w-full max-w-md flex-col overflow-hidden border-l border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
+            className="ui-feed-section flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full max-w-md flex-col overflow-hidden border-l border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
             onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
@@ -7409,10 +7451,10 @@ export default function ChatRoomPage() {
               <div className="ui-feed-tile rounded-[24px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                       AI Pribadi
                     </p>
-                    <h4 className="mt-1 text-base font-black text-[color:var(--app-text)]">
+                    <h4 className="mt-1 text-base font-bold text-[color:var(--app-text)]">
                       Balas seperti kamu
                     </h4>
                     <p className="mt-1 max-w-[28rem] text-xs font-medium leading-5 text-[color:var(--app-text-soft)]">
@@ -7426,7 +7468,7 @@ export default function ChatRoomPage() {
                       setShowChatSettings(false);
                       openAiWorkspace('reply');
                     }}
-                    className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)]"
+                    className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)]"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     Buka AI
@@ -7444,7 +7486,7 @@ export default function ChatRoomPage() {
                       }`}
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-black">
+                      <span className="text-sm font-bold">
                         Belajar gaya saya
                       </span>
                       {aiUseContext ? (
@@ -7465,7 +7507,7 @@ export default function ChatRoomPage() {
                       }`}
                   >
                     <span className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-black">
+                      <span className="text-sm font-bold">
                         {aiAutoSend ? 'Auto kirim' : 'Review dulu'}
                       </span>
                       {aiAutoSend ? <CheckCircle2 className="h-4 w-4" /> : null}
@@ -7479,7 +7521,7 @@ export default function ChatRoomPage() {
                 </div>
 
                 <div className="mt-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
                     Gaya balasan
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -7488,7 +7530,7 @@ export default function ChatRoomPage() {
                         key={tone.id}
                         type="button"
                         onClick={() => setAiToneId(tone.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiToneId === tone.id
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-bold transition ${aiToneId === tone.id
                           ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                           : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
                           }`}
@@ -7501,7 +7543,7 @@ export default function ChatRoomPage() {
                         key={length.id}
                         type="button"
                         onClick={() => setAiLengthId(length.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiLengthId === length.id
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-bold transition ${aiLengthId === length.id
                           ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                           : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
                           }`}
@@ -7513,7 +7555,7 @@ export default function ChatRoomPage() {
                 </div>
 
                 <div className="mt-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
                     Tujuan balasan
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
@@ -7522,7 +7564,7 @@ export default function ChatRoomPage() {
                         key={template.id}
                         type="button"
                         onClick={() => setAiTemplateId(template.id)}
-                        className={`min-h-[34px] rounded-full px-3 text-xs font-black transition ${aiTemplateId === template.id
+                        className={`min-h-[34px] rounded-full px-3 text-xs font-bold transition ${aiTemplateId === template.id
                           ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                           : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-border)]'
                           }`}
@@ -7550,7 +7592,7 @@ export default function ChatRoomPage() {
                       key={example.id}
                       type="button"
                       onClick={() => setAiInstruction(example.prompt)}
-                      className="rounded-full border border-[color:var(--app-border-strong)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
+                      className="rounded-full border border-[color:var(--app-border-strong)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-muted)]"
                     >
                       {example.label}
                     </button>
@@ -7561,7 +7603,7 @@ export default function ChatRoomPage() {
                   <div className="flex items-start gap-2">
                     <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
                     <div className="min-w-0">
-                      <p className="text-xs font-black text-[color:var(--app-text)]">
+                      <p className="text-xs font-bold text-[color:var(--app-text)]">
                         Izin konteks dibuat ketat
                       </p>
                       <p className="mt-1 text-[11px] font-medium leading-4 text-[color:var(--app-text-soft)]">
@@ -7574,7 +7616,7 @@ export default function ChatRoomPage() {
                 </div>
 
                 <details className="mt-3 rounded-[18px] border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-muted)] p-3">
-                  <summary className="cursor-pointer text-xs font-black text-[color:var(--app-text)]">
+                  <summary className="cursor-pointer text-xs font-bold text-[color:var(--app-text)]">
                     Pengaturan lanjutan
                   </summary>
                   <label className={`mt-3 ${CHAT_FIELD_LABEL_CLASS}`}>
@@ -7595,8 +7637,8 @@ export default function ChatRoomPage() {
       )}
 
       {showListingActionModal && listingActionDraft && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3 sm:items-center">
-          <div className="ui-feed-section max-h-[80svh] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] sm:items-center sm:p-3">
+          <div className="ui-feed-section max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
@@ -7829,7 +7871,7 @@ export default function ChatRoomPage() {
           onClick={() => setShowTransactionsDrawer(false)}
         >
           <div
-            className="ui-feed-section flex h-[100svh] max-h-[100svh] w-full max-w-md flex-col overflow-hidden border-l border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
+            className="ui-feed-section flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full max-w-md flex-col overflow-hidden border-l border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl"
             onClick={event => event.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between gap-2">
@@ -7959,7 +8001,7 @@ export default function ChatRoomPage() {
                                 )}
                               </span>
                             </div>
-                            <p className="mt-1 text-sm font-black text-[color:var(--app-accent)]">
+                            <p className="mt-1 text-sm font-bold text-[color:var(--app-accent)]">
                               {formatMoney(txn.amount_cents, txn.currency)}
                             </p>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[color:var(--app-text-soft)]">
@@ -8036,8 +8078,8 @@ export default function ChatRoomPage() {
       )}
 
       {selectedTransaction && (
-        <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] p-3 sm:items-center">
-          <div className="ui-feed-section max-h-[80svh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl sm:p-5">
+        <div className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_60%,_transparent)] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] sm:items-center sm:p-3">
+          <div className="ui-feed-section max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl sm:p-5">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs uppercase tracking-wide text-[color:var(--app-text-soft)]">
@@ -8133,7 +8175,7 @@ export default function ChatRoomPage() {
                   <Clock className="mt-0.5 h-4 w-4 shrink-0" />
                 )}
                 <div className="min-w-0">
-                  <p className="text-sm font-black">
+                  <p className="text-sm font-bold">
                     {selectedTxnOutcome.title}
                   </p>
                   <p className="mt-1 text-xs font-medium leading-5 opacity-90">

@@ -40,10 +40,10 @@ export default function CmsDashboard() {
     <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
             CMS Control
           </p>
-          <h1 className="text-3xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h1 className="text-3xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             Manage sectors, content, and knowledge base.
           </h1>
           <p className="mt-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -53,11 +53,11 @@ export default function CmsDashboard() {
         <div className="flex flex-wrap gap-2">
           <Link
             href="/search"
-            className="rounded-full border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+            className="rounded-full border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
           >
             Preview Search
           </Link>
-          <button className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]">
+          <button className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]">
             New Article
           </button>
         </div>
@@ -65,7 +65,7 @@ export default function CmsDashboard() {
 
       <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
         <div className="rounded-2xl border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] p-6 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
             Content Queue
           </p>
           <div className="mt-4 space-y-3">
@@ -87,7 +87,7 @@ export default function CmsDashboard() {
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               Sector Manager
             </p>
             <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -103,7 +103,7 @@ export default function CmsDashboard() {
           </div>
 
           <div className="rounded-2xl border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               Banner Management
             </p>
             <div className="mt-3 space-y-2">

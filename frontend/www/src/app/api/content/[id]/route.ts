@@ -140,6 +140,13 @@ function normalizeContentMediaUrls(
       origin,
     );
   }
+  for (const key of ['image_urls', 'gallery_images']) {
+    if (Array.isArray(normalized[key])) {
+      normalized[key] = normalized[key].map(entry =>
+        normalizeMediaPayloadValue(entry, origin),
+      );
+    }
+  }
 
   if (
     !normalized.metadata ||
@@ -383,15 +390,6 @@ export async function PUT(
 
   const requestedPayload = parsedBody.data as Record<string, unknown>;
 
-  // ==========================================
-  // FIX: FORCE STATUS TO ACTIVE (KECUALI DRAFT)
-  // ==========================================
-  const incomingStatus = normalizeStatus(requestedPayload.content_status);
-  if (incomingStatus !== 'draft') {
-    requestedPayload.content_status = 'active';
-  }
-  // ==========================================
-
   const validatedPatch = validateListingPayload(requestedPayload, {
     mode: 'update',
   });
@@ -427,28 +425,21 @@ export async function PUT(
     normalizeStatus(currentState.content_status) ||
     normalizeStatus(currentState.status) ||
     'draft';
-  
-  // Menggunakan status yang sudah kita normalisasi & paksa di atas
   const requestedStatus = normalizeStatus(requestedPayload.content_status);
 
-  // ==========================================
-  // FIX: BYPASS TRANSITION CHECK JIKA MAU KE ACTIVE
-  // ==========================================
-  // if (
-  //   requestedStatus &&
-  //   requestedStatus !== 'active' && // Jika dia mau ke active, bypass pengecekan kaku ini
-  //   !canTransitionContentStatus(currentStatus, requestedStatus)
-  // ) {
-  //   return NextResponse.json(
-  //     {
-  //       error: 'Invalid content status transition',
-  //       current_status: currentStatus,
-  //       next_status: requestedStatus,
-  //     },
-  //     { status: 409 },
-  //   );
-  // }
-  // ==========================================
+  if (
+    requestedStatus &&
+    !canTransitionContentStatus(currentStatus, requestedStatus)
+  ) {
+    return NextResponse.json(
+      {
+        error: 'Invalid content status transition',
+        current_status: currentStatus,
+        next_status: requestedStatus,
+      },
+      { status: 409 },
+    );
+  }
 
   const requiresStrictValidation =
     requestedStatus === 'active' && currentStatus !== 'active';
@@ -474,9 +465,9 @@ export async function PUT(
   }
 
   const forwardPayload = toUpsertListingPayload(validatedPatch.payload);
-  
-  // Pastikan payload yang diteruskan juga mengunci status baru yang diinginkan
-  forwardPayload.content_status = requestedStatus;
+  if (requestedStatus) {
+    forwardPayload.content_status = requestedStatus;
+  }
 
   const trustSafetyCandidates = collectTrustSafetyCandidates(forwardPayload);
   for (const candidate of trustSafetyCandidates) {
@@ -529,6 +520,39 @@ export async function PUT(
       cost: 10,
     });
   }
+  return NextResponse.json(data ?? { error: 'Invalid response' }, {
+    status: backendRes.status,
+  });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!marketplaceBase) {
+    return NextResponse.json(
+      { error: 'Marketplace service URL not configured' },
+      { status: 500 },
+    );
+  }
+
+  const auth = await requireAuth(req);
+  if (!auth.ok) return auth.res;
+
+  const resolvedParams = await params;
+  const resolvedContentId = extractContentId(resolvedParams.id);
+  const backendRes = await fetch(
+    `${marketplaceBase}/v1/content/${resolvedContentId || resolvedParams.id}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${auth.ctx.token}`,
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+
+  const data = await readUpstreamPayload(backendRes);
   return NextResponse.json(data ?? { error: 'Invalid response' }, {
     status: backendRes.status,
   });

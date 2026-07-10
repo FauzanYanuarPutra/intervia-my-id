@@ -171,7 +171,7 @@ export function HorizontalRail({
             'overscroll-x-contain no-scrollbar scroll-smooth',
             '[scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch]',
             '[scroll-snap-type:x_mandatory]',
-            minimal ? 'gap-2 p-0' : 'gap-3 py-2',
+            minimal ? 'gap-2' : 'gap-3 py-2',
             hasOverflow ? 'cursor-grab active:cursor-grabbing' : '',
             className,
           ].join(' ')}
@@ -184,13 +184,20 @@ export function HorizontalRail({
                 minimal
                   ? 'basis-auto'
                   : [
-                      'w-[82vw] min-w-[82vw] max-w-[82vw]',
-                      'xs:w-[74vw] xs:min-w-[74vw] xs:max-w-[74vw]',
-                      'sm:w-[320px] sm:min-w-[320px] sm:max-w-[320px]',
-                      'md:w-[340px] md:min-w-[340px] md:max-w-[340px]',
-                      'lg:w-[360px] lg:min-w-[360px] lg:max-w-[360px]',
-                      'xl:w-[380px] xl:min-w-[380px] xl:max-w-[380px]',
-                    ].join(' '),
+                    // Mobile
+                    'w-[46vw] min-w-[46vw] max-w-[46vw]',
+
+                    // HP besar
+                    'xs:w-[42vw] xs:min-w-[42vw] xs:max-w-[42vw]',
+
+                    // Tablet
+                    'sm:w-[180px] sm:min-w-[180px] sm:max-w-[180px]',
+
+                    // Desktop
+                    'md:w-[190px] md:min-w-[190px] md:max-w-[190px]',
+                    'lg:w-[210px] lg:min-w-[210px] lg:max-w-[210px]',
+                    'xl:w-[220px] xl:min-w-[220px] xl:max-w-[220px]',
+                  ].join(' ')
               ].join(' ')}
             >
               <div className="h-full w-full min-w-0">{child}</div>

@@ -15,7 +15,7 @@ export function ComingSoon({ title, descriptionId, descriptionEn }: ComingSoonPr
       <div className="w-16 h-16 bg-[color:var(--app-accent-soft)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_30%,_transparent)] rounded-2xl flex items-center justify-center mb-5">
         <Construction className="w-8 h-8 text-[color:var(--app-accent)]" />
       </div>
-      <h1 className="text-2xl font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] mb-2">{title}</h1>
+      <h1 className="text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] mb-2">{title}</h1>
       <p className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] max-w-md mb-1">{descriptionId}</p>
       <p className="text-xs text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)] max-w-md italic mb-6">{descriptionEn}</p>
       <LocalizedLink

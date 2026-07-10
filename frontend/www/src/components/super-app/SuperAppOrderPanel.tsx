@@ -416,9 +416,9 @@ function estimateStraightDistanceKm(origin: LatLng, destination: LatLng): number
   const a =
     Math.sin(latDelta / 2) * Math.sin(latDelta / 2) +
     Math.cos((origin.lat * Math.PI) / 180) *
-      Math.cos((destination.lat * Math.PI) / 180) *
-      Math.sin(lngDelta / 2) *
-      Math.sin(lngDelta / 2);
+    Math.cos((destination.lat * Math.PI) / 180) *
+    Math.sin(lngDelta / 2) *
+    Math.sin(lngDelta / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return earthRadiusKm * c;
 }
@@ -454,42 +454,42 @@ function buildDynamicTripOptions(input: {
   const pricingModel =
     input.service === 'car'
       ? {
-          driverBaseCents: 1_900_000,
-          driverPerKmCents: 430_000,
-          driverPerMinuteCents: 62_000,
-          platformBaseCents: 320_000,
-          platformPerKmCents: 96_000,
-          platformPerMinuteCents: 14_000,
-          reserveCents: 180_000,
-          longTripThresholdKm: 24,
-          longTripDriverPerKmCents: 85_000,
-          longTripPlatformPerKmCents: 22_000,
-        }
+        driverBaseCents: 1_900_000,
+        driverPerKmCents: 430_000,
+        driverPerMinuteCents: 62_000,
+        platformBaseCents: 320_000,
+        platformPerKmCents: 96_000,
+        platformPerMinuteCents: 14_000,
+        reserveCents: 180_000,
+        longTripThresholdKm: 24,
+        longTripDriverPerKmCents: 85_000,
+        longTripPlatformPerKmCents: 22_000,
+      }
       : input.service === 'send'
         ? {
-            driverBaseCents: 1_450_000,
-            driverPerKmCents: 360_000,
-            driverPerMinuteCents: 55_000,
-            platformBaseCents: 320_000,
-            platformPerKmCents: 88_000,
-            platformPerMinuteCents: 12_000,
-            reserveCents: 420_000,
-            longTripThresholdKm: 18,
-            longTripDriverPerKmCents: 72_000,
-            longTripPlatformPerKmCents: 20_000,
-          }
+          driverBaseCents: 1_450_000,
+          driverPerKmCents: 360_000,
+          driverPerMinuteCents: 55_000,
+          platformBaseCents: 320_000,
+          platformPerKmCents: 88_000,
+          platformPerMinuteCents: 12_000,
+          reserveCents: 420_000,
+          longTripThresholdKm: 18,
+          longTripDriverPerKmCents: 72_000,
+          longTripPlatformPerKmCents: 20_000,
+        }
         : {
-            driverBaseCents: 950_000,
-            driverPerKmCents: 320_000,
-            driverPerMinuteCents: 44_000,
-            platformBaseCents: 240_000,
-            platformPerKmCents: 78_000,
-            platformPerMinuteCents: 10_000,
-            reserveCents: 120_000,
-            longTripThresholdKm: 18,
-            longTripDriverPerKmCents: 60_000,
-            longTripPlatformPerKmCents: 18_000,
-          };
+          driverBaseCents: 950_000,
+          driverPerKmCents: 320_000,
+          driverPerMinuteCents: 44_000,
+          platformBaseCents: 240_000,
+          platformPerKmCents: 78_000,
+          platformPerMinuteCents: 10_000,
+          reserveCents: 120_000,
+          longTripThresholdKm: 18,
+          longTripDriverPerKmCents: 60_000,
+          longTripPlatformPerKmCents: 18_000,
+        };
 
   const longTripKm = Math.max(0, safeDistanceKm - pricingModel.longTripThresholdKm);
   const trafficReserveCents =
@@ -511,147 +511,147 @@ function buildDynamicTripOptions(input: {
   const variants: TripVariant[] =
     input.service === 'car'
       ? [
+        {
+          id: 'car-standard',
+          title: input.isId ? 'Car Standard' : 'Car Standard',
+          note: input.isId ? 'Pas untuk perjalanan harian' : 'Best for daily trips',
+          badge: input.isId ? 'Paling sering' : 'Most used',
+          capacityLabel: input.isId ? '1-4 orang' : '1-4 seats',
+          detail: input.isId
+            ? 'Kabin nyaman untuk meeting, komuter, dan perjalanan kota.'
+            : 'Comfortable cabin for meetings, commuting, and city trips.',
+          footnote: input.isId ? 'AC + bagasi standar' : 'AC + standard luggage',
+          icon: 'car',
+          multiplier: 1,
+          extraCents: 0,
+          pickupOffsetMin: 0,
+        },
+        {
+          id: 'car-xl',
+          title: 'XL',
+          note: input.isId ? 'Lebih lega untuk keluarga atau tim kecil' : 'More room for family or a small team',
+          badge: input.isId ? 'Kabin lega' : 'More room',
+          capacityLabel: input.isId ? '1-6 orang' : '1-6 seats',
+          detail: input.isId
+            ? 'Cocok untuk koper, meeting luar kota, dan perjalanan group.'
+            : 'Good for luggage, out-of-town meetings, and group travel.',
+          footnote: input.isId ? 'Bagasi lebih besar' : 'Bigger luggage space',
+          icon: 'car',
+          multiplier: 1.14,
+          extraCents: 520_000,
+          pickupOffsetMin: 2,
+        },
+        {
+          id: 'car-premium',
+          title: input.isId ? 'Premium' : 'Premium',
+          note: input.isId ? 'Pickup cepat dan pengalaman lebih halus' : 'Faster pickup and a smoother ride',
+          badge: input.isId ? 'Premium' : 'Premium',
+          capacityLabel: input.isId ? '1-4 orang' : '1-4 seats',
+          detail: input.isId
+            ? 'Diprioritaskan untuk jam sibuk dengan kendaraan kualitas lebih tinggi.'
+            : 'Prioritized during peak hours with a higher-quality vehicle.',
+          footnote: input.isId ? 'Driver prioritas' : 'Priority driver',
+          icon: 'car',
+          multiplier: 1.22,
+          extraCents: 720_000,
+          pickupOffsetMin: -2,
+        },
+      ]
+      : input.service === 'send'
+        ? [
           {
-            id: 'car-standard',
-            title: input.isId ? 'Car Standard' : 'Car Standard',
-            note: input.isId ? 'Pas untuk perjalanan harian' : 'Best for daily trips',
-            badge: input.isId ? 'Paling sering' : 'Most used',
-            capacityLabel: input.isId ? '1-4 orang' : '1-4 seats',
+            id: 'send-courier',
+            title: input.isId ? 'Courier' : 'Courier',
+            note: input.isId ? 'Pickup cepat untuk paket harian' : 'Fast pickup for daily parcels',
+            badge: input.isId ? 'Instan' : 'Instant',
+            capacityLabel: input.isId ? 'Dokumen & paket ringan' : 'Docs and light parcels',
             detail: input.isId
-              ? 'Kabin nyaman untuk meeting, komuter, dan perjalanan kota.'
-              : 'Comfortable cabin for meetings, commuting, and city trips.',
-            footnote: input.isId ? 'AC + bagasi standar' : 'AC + standard luggage',
-            icon: 'car',
+              ? 'Cocok untuk dokumen, pakaian, dan paket kecil sampai menengah.'
+              : 'Best for documents, clothes, and small-to-medium parcels.',
+            footnote: input.isId ? 'Tracking kurir aktif' : 'Active courier tracking',
+            icon: 'package',
             multiplier: 1,
             extraCents: 0,
             pickupOffsetMin: 0,
           },
           {
-            id: 'car-xl',
-            title: 'XL',
-            note: input.isId ? 'Lebih lega untuk keluarga atau tim kecil' : 'More room for family or a small team',
-            badge: input.isId ? 'Kabin lega' : 'More room',
-            capacityLabel: input.isId ? '1-6 orang' : '1-6 seats',
+            id: 'send-same-day',
+            title: input.isId ? 'Same Day' : 'Same Day',
+            note: input.isId ? 'Lebih hemat untuk pengiriman fleksibel' : 'Lower cost for flexible delivery windows',
+            badge: input.isId ? 'Lebih hemat' : 'Lower fare',
+            capacityLabel: input.isId ? 'Paket sampai 5 kg' : 'Parcels up to 5 kg',
             detail: input.isId
-              ? 'Cocok untuk koper, meeting luar kota, dan perjalanan group.'
-              : 'Good for luggage, out-of-town meetings, and group travel.',
-            footnote: input.isId ? 'Bagasi lebih besar' : 'Bigger luggage space',
-            icon: 'car',
-            multiplier: 1.14,
-            extraCents: 520_000,
+              ? 'Lebih cocok kalau paket tidak butuh pickup super cepat.'
+              : 'A better fit when the parcel does not need the fastest pickup.',
+            footnote: input.isId ? 'Window pengiriman lebih panjang' : 'Longer delivery window',
+            icon: 'package',
+            multiplier: 0.84,
+            extraCents: 0,
+            pickupOffsetMin: 34,
+          },
+          {
+            id: 'send-fragile',
+            title: input.isId ? 'Fragile' : 'Fragile',
+            note: input.isId ? 'Handling ekstra hati-hati' : 'Extra-care handling',
+            badge: input.isId ? 'Extra care' : 'Extra care',
+            capacityLabel: input.isId ? 'Barang rapuh / penting' : 'Fragile or important items',
+            detail: input.isId
+              ? 'Tambahan proteksi handling dan alur serah terima yang lebih rapi.'
+              : 'Adds more careful handling and a cleaner handoff flow.',
+            footnote: input.isId ? 'Butuh foto bukti' : 'Proof photo required',
+            icon: 'package',
+            multiplier: 1.22,
+            extraCents: 600_000,
+            pickupOffsetMin: 5,
+          },
+        ]
+        : [
+          {
+            id: 'ride-bike',
+            title: input.isId ? 'Ride / Bike' : 'Ride / Bike',
+            note: input.isId ? 'Paling efisien untuk gerak cepat' : 'Most efficient for fast city movement',
+            badge: input.isId ? 'Paling hemat' : 'Best value',
+            capacityLabel: input.isId ? '1 penumpang' : '1 rider',
+            detail: input.isId
+              ? 'Pilihan utama untuk perjalanan sendiri dengan ETA paling kompetitif.'
+              : 'The main choice for solo trips with the most competitive ETA.',
+            footnote: input.isId ? 'Helm & pickup cepat' : 'Fast pickup',
+            icon: 'bike',
+            multiplier: 0.97,
+            extraCents: 0,
             pickupOffsetMin: 2,
           },
           {
-            id: 'car-premium',
-            title: input.isId ? 'Premium' : 'Premium',
-            note: input.isId ? 'Pickup cepat dan pengalaman lebih halus' : 'Faster pickup and a smoother ride',
-            badge: input.isId ? 'Premium' : 'Premium',
-            capacityLabel: input.isId ? '1-4 orang' : '1-4 seats',
+            id: 'ride-priority',
+            title: input.isId ? 'Priority' : 'Priority',
+            note: input.isId ? 'Lebih cepat dapat driver saat jam sibuk' : 'Faster driver matching during peak hours',
+            badge: input.isId ? 'Cepat' : 'Fast',
+            capacityLabel: input.isId ? '1 penumpang' : '1 rider',
             detail: input.isId
-              ? 'Diprioritaskan untuk jam sibuk dengan kendaraan kualitas lebih tinggi.'
-              : 'Prioritized during peak hours with a higher-quality vehicle.',
-            footnote: input.isId ? 'Driver prioritas' : 'Priority driver',
-            icon: 'car',
-            multiplier: 1.22,
-            extraCents: 720_000,
-            pickupOffsetMin: -2,
+              ? 'Diprioritaskan untuk order yang butuh pickup lebih gesit.'
+              : 'Prioritized for trips that need a faster pickup response.',
+            footnote: input.isId ? 'Driver cepat dipanggil' : 'Faster matching queue',
+            icon: 'bike',
+            multiplier: 1.08,
+            extraCents: 300_000,
+            pickupOffsetMin: -1,
           },
-        ]
-      : input.service === 'send'
-        ? [
-            {
-              id: 'send-courier',
-              title: input.isId ? 'Courier' : 'Courier',
-              note: input.isId ? 'Pickup cepat untuk paket harian' : 'Fast pickup for daily parcels',
-              badge: input.isId ? 'Instan' : 'Instant',
-              capacityLabel: input.isId ? 'Dokumen & paket ringan' : 'Docs and light parcels',
-              detail: input.isId
-                ? 'Cocok untuk dokumen, pakaian, dan paket kecil sampai menengah.'
-                : 'Best for documents, clothes, and small-to-medium parcels.',
-              footnote: input.isId ? 'Tracking kurir aktif' : 'Active courier tracking',
-              icon: 'package',
-              multiplier: 1,
-              extraCents: 0,
-              pickupOffsetMin: 0,
-            },
-            {
-              id: 'send-same-day',
-              title: input.isId ? 'Same Day' : 'Same Day',
-              note: input.isId ? 'Lebih hemat untuk pengiriman fleksibel' : 'Lower cost for flexible delivery windows',
-              badge: input.isId ? 'Lebih hemat' : 'Lower fare',
-              capacityLabel: input.isId ? 'Paket sampai 5 kg' : 'Parcels up to 5 kg',
-              detail: input.isId
-                ? 'Lebih cocok kalau paket tidak butuh pickup super cepat.'
-                : 'A better fit when the parcel does not need the fastest pickup.',
-              footnote: input.isId ? 'Window pengiriman lebih panjang' : 'Longer delivery window',
-              icon: 'package',
-              multiplier: 0.84,
-              extraCents: 0,
-              pickupOffsetMin: 34,
-            },
-            {
-              id: 'send-fragile',
-              title: input.isId ? 'Fragile' : 'Fragile',
-              note: input.isId ? 'Handling ekstra hati-hati' : 'Extra-care handling',
-              badge: input.isId ? 'Extra care' : 'Extra care',
-              capacityLabel: input.isId ? 'Barang rapuh / penting' : 'Fragile or important items',
-              detail: input.isId
-                ? 'Tambahan proteksi handling dan alur serah terima yang lebih rapi.'
-                : 'Adds more careful handling and a cleaner handoff flow.',
-              footnote: input.isId ? 'Butuh foto bukti' : 'Proof photo required',
-              icon: 'package',
-              multiplier: 1.22,
-              extraCents: 600_000,
-              pickupOffsetMin: 5,
-            },
-          ]
-        : [
-            {
-              id: 'ride-bike',
-              title: input.isId ? 'Ride / Bike' : 'Ride / Bike',
-              note: input.isId ? 'Paling efisien untuk gerak cepat' : 'Most efficient for fast city movement',
-              badge: input.isId ? 'Paling hemat' : 'Best value',
-              capacityLabel: input.isId ? '1 penumpang' : '1 rider',
-              detail: input.isId
-                ? 'Pilihan utama untuk perjalanan sendiri dengan ETA paling kompetitif.'
-                : 'The main choice for solo trips with the most competitive ETA.',
-              footnote: input.isId ? 'Helm & pickup cepat' : 'Fast pickup',
-              icon: 'bike',
-              multiplier: 0.97,
-              extraCents: 0,
-              pickupOffsetMin: 2,
-            },
-            {
-              id: 'ride-priority',
-              title: input.isId ? 'Priority' : 'Priority',
-              note: input.isId ? 'Lebih cepat dapat driver saat jam sibuk' : 'Faster driver matching during peak hours',
-              badge: input.isId ? 'Cepat' : 'Fast',
-              capacityLabel: input.isId ? '1 penumpang' : '1 rider',
-              detail: input.isId
-                ? 'Diprioritaskan untuk order yang butuh pickup lebih gesit.'
-                : 'Prioritized for trips that need a faster pickup response.',
-              footnote: input.isId ? 'Driver cepat dipanggil' : 'Faster matching queue',
-              icon: 'bike',
-              multiplier: 1.08,
-              extraCents: 300_000,
-              pickupOffsetMin: -1,
-            },
-            {
-              id: 'ride-comfort',
-              title: input.isId ? 'Comfort' : 'Comfort',
-              note: input.isId ? 'Rider lebih stabil untuk perjalanan lebih jauh' : 'A steadier option for longer trips',
-              badge: input.isId ? 'Nyaman' : 'Comfort',
-              capacityLabel: input.isId ? '1 penumpang + tas' : '1 rider + bag',
-              detail: input.isId
-                ? 'Lebih cocok untuk perjalanan menengah dengan bawaan ringan.'
-                : 'Better for medium-length trips with a light bag.',
-              footnote: input.isId ? 'Lebih tenang di jalan' : 'Smoother ride feel',
-              icon: 'bike',
-              multiplier: 1.16,
-              extraCents: 500_000,
-              pickupOffsetMin: 0,
-            },
-          ];
+          {
+            id: 'ride-comfort',
+            title: input.isId ? 'Comfort' : 'Comfort',
+            note: input.isId ? 'Rider lebih stabil untuk perjalanan lebih jauh' : 'A steadier option for longer trips',
+            badge: input.isId ? 'Nyaman' : 'Comfort',
+            capacityLabel: input.isId ? '1 penumpang + tas' : '1 rider + bag',
+            detail: input.isId
+              ? 'Lebih cocok untuk perjalanan menengah dengan bawaan ringan.'
+              : 'Better for medium-length trips with a light bag.',
+            footnote: input.isId ? 'Lebih tenang di jalan' : 'Smoother ride feel',
+            icon: 'bike',
+            multiplier: 1.16,
+            extraCents: 500_000,
+            pickupOffsetMin: 0,
+          },
+        ];
 
   return variants.map((variant) => {
     const driverCutCents = roundUpIdrCents(
@@ -876,20 +876,20 @@ export function SuperAppOrderPanel({
   const canProceedWithoutLogin =
     isFoodService
       ? Boolean(selectedFoodMerchant) &&
-        selectedFoodItems.length > 0 &&
-        catalogStep === 'checkout' &&
-        dropoffAddress.trim().length >= 3
+      selectedFoodItems.length > 0 &&
+      catalogStep === 'checkout' &&
+      dropoffAddress.trim().length >= 3
       : isMartService
         ? Boolean(selectedMartStore) &&
-          selectedMartItems.length > 0 &&
-          catalogStep === 'checkout' &&
-          dropoffAddress.trim().length >= 3
+        selectedMartItems.length > 0 &&
+        catalogStep === 'checkout' &&
+        dropoffAddress.trim().length >= 3
         : hasPickupInput &&
-          Boolean(resolvedPickupCoords) &&
-          (!requiresDropoff ||
-            (hasDropoffInput &&
-              Boolean(resolvedDropoffCoords) &&
-              routePreview.provider !== 'none'));
+        Boolean(resolvedPickupCoords) &&
+        (!requiresDropoff ||
+          (hasDropoffInput &&
+            Boolean(resolvedDropoffCoords) &&
+            routePreview.provider !== 'none'));
   const canSubmit = Boolean(user) && canProceedWithoutLogin;
   const loginRequiredToBook = !user && canProceedWithoutLogin;
   const termsConsentRequiredNow = Boolean(user) && canProceedWithoutLogin && requiresTermsAcceptance;
@@ -1423,46 +1423,46 @@ export function SuperAppOrderPanel({
     try {
       const payload = isFoodService
         ? {
+          service,
+          merchant_id: selectedFoodMerchant?.id,
+          food_items: selectedFoodItems.map((item) => ({
+            item_id: item.item_id,
+            quantity: item.quantity,
+          })),
+          pickup_address: selectedFoodMerchant?.address,
+          pickup_lat: selectedFoodMerchant?.lat,
+          pickup_lng: selectedFoodMerchant?.lng,
+          dropoff_address: dropoffAddress,
+          customer_lat: location?.lat,
+          customer_lng: location?.lng,
+          notes: notes || undefined,
+          amount_estimate_cents: estimatedFoodTotalCents,
+          payment_method: paymentMethod,
+          terms_acceptance: termsConsentRequiredNow
+            ? {
+              accepted: acceptedLegalTerms,
+              terms_version: termsVersion,
+              liability_ack: acceptedLegalTerms,
+              risk_ack: acceptedLegalTerms,
+            }
+            : undefined,
+          client_meta: {
+            order_flow: 'food_menu_first',
+            location_source: location ? 'browser_geolocation' : 'manual_input',
+            captured_at: new Date().toISOString(),
+          },
+        }
+        : isMartService
+          ? {
             service,
-            merchant_id: selectedFoodMerchant?.id,
-            food_items: selectedFoodItems.map((item) => ({
+            mart_store_id: selectedMartStore?.id,
+            mart_items: selectedMartItems.map((item) => ({
               item_id: item.item_id,
               quantity: item.quantity,
             })),
-            pickup_address: selectedFoodMerchant?.address,
-            pickup_lat: selectedFoodMerchant?.lat,
-            pickup_lng: selectedFoodMerchant?.lng,
-            dropoff_address: dropoffAddress,
-            customer_lat: location?.lat,
-            customer_lng: location?.lng,
-            notes: notes || undefined,
-            amount_estimate_cents: estimatedFoodTotalCents,
-            payment_method: paymentMethod,
-            terms_acceptance: termsConsentRequiredNow
-              ? {
-                  accepted: acceptedLegalTerms,
-                  terms_version: termsVersion,
-                  liability_ack: acceptedLegalTerms,
-                  risk_ack: acceptedLegalTerms,
-                }
-              : undefined,
-            client_meta: {
-              order_flow: 'food_menu_first',
-              location_source: location ? 'browser_geolocation' : 'manual_input',
-              captured_at: new Date().toISOString(),
-            },
-          }
-        : isMartService
-          ? {
-              service,
-              mart_store_id: selectedMartStore?.id,
-              mart_items: selectedMartItems.map((item) => ({
-                item_id: item.item_id,
-                quantity: item.quantity,
-              })),
-              pickup_address: selectedMartStore?.address,
-              pickup_lat: selectedMartStore?.lat,
-              pickup_lng: selectedMartStore?.lng,
+            pickup_address: selectedMartStore?.address,
+            pickup_lat: selectedMartStore?.lat,
+            pickup_lng: selectedMartStore?.lng,
             dropoff_address: dropoffAddress,
             customer_lat: location?.lat,
             customer_lng: location?.lng,
@@ -1471,19 +1471,19 @@ export function SuperAppOrderPanel({
             payment_method: paymentMethod,
             terms_acceptance: termsConsentRequiredNow
               ? {
-                  accepted: acceptedLegalTerms,
-                  terms_version: termsVersion,
-                  liability_ack: acceptedLegalTerms,
-                  risk_ack: acceptedLegalTerms,
-                }
+                accepted: acceptedLegalTerms,
+                terms_version: termsVersion,
+                liability_ack: acceptedLegalTerms,
+                risk_ack: acceptedLegalTerms,
+              }
               : undefined,
             client_meta: {
               order_flow: 'mart_cart_checkout',
               location_source: location ? 'browser_geolocation' : 'manual_input',
-                captured_at: new Date().toISOString(),
-              },
-            }
-        : {
+              captured_at: new Date().toISOString(),
+            },
+          }
+          : {
             service,
             pickup_address: pickupAddress,
             dropoff_address: dropoffAddress || undefined,
@@ -1498,11 +1498,11 @@ export function SuperAppOrderPanel({
             amount_estimate_cents: finalTripPriceCents || activeTripOption?.priceCents,
             terms_acceptance: termsConsentRequiredNow
               ? {
-                  accepted: acceptedLegalTerms,
-                  terms_version: termsVersion,
-                  liability_ack: acceptedLegalTerms,
-                  risk_ack: acceptedLegalTerms,
-                }
+                accepted: acceptedLegalTerms,
+                terms_version: termsVersion,
+                liability_ack: acceptedLegalTerms,
+                risk_ack: acceptedLegalTerms,
+              }
               : undefined,
             client_meta: {
               location_source: 'browser_geolocation',
@@ -1765,9 +1765,9 @@ export function SuperAppOrderPanel({
         setOrder((previous) =>
           previous
             ? {
-                ...previous,
-                status: data.data?.status || previous.status,
-              }
+              ...previous,
+              status: data.data?.status || previous.status,
+            }
             : previous,
         );
         if (event === 'rating_submitted') {
@@ -1900,11 +1900,11 @@ export function SuperAppOrderPanel({
     () =>
       mapOrigin && mapDestination
         ? [
-            mapOrigin.lat.toFixed(5),
-            mapOrigin.lng.toFixed(5),
-            mapDestination.lat.toFixed(5),
-            mapDestination.lng.toFixed(5),
-          ].join('|')
+          mapOrigin.lat.toFixed(5),
+          mapOrigin.lng.toFixed(5),
+          mapDestination.lat.toFixed(5),
+          mapDestination.lng.toFixed(5),
+        ].join('|')
         : 'none',
     [mapDestination, mapOrigin],
   );
@@ -1924,19 +1924,19 @@ export function SuperAppOrderPanel({
     null;
   const availablePromos = isMapService
     ? [
-        {
-          id: 'hemat12' as const,
-          title: isId ? 'HEMAT12' : 'SAVE12',
-          description: isId ? 'Potongan Rp 12.000 untuk perjalanan pagi.' : 'Rp 12,000 off for a morning trip.',
-          discountCents: 1_200_000,
-        },
-        {
-          id: 'wallet5' as const,
-          title: isId ? 'Saldo 5%' : 'Wallet 5%',
-          description: isId ? 'Diskon 5% bila bayar pakai saldo.' : '5% off when you pay with wallet.',
-          discountCents: 500_000,
-        },
-      ]
+      {
+        id: 'hemat12' as const,
+        title: isId ? 'HEMAT12' : 'SAVE12',
+        description: isId ? 'Potongan Rp 12.000 untuk perjalanan pagi.' : 'Rp 12,000 off for a morning trip.',
+        discountCents: 1_200_000,
+      },
+      {
+        id: 'wallet5' as const,
+        title: isId ? 'Saldo 5%' : 'Wallet 5%',
+        description: isId ? 'Diskon 5% bila bayar pakai saldo.' : '5% off when you pay with wallet.',
+        discountCents: 500_000,
+      },
+    ]
     : [];
   const appliedPromo =
     selectedPromoId === 'none'
@@ -1984,11 +1984,11 @@ export function SuperAppOrderPanel({
       ? isId
         ? `Maksimal ${distanceLimitLabel}`
         : `Max ${distanceLimitLabel}`
-    : routePricingReady
-      ? mapCtaLabel
-      : isId
-        ? 'Menghitung tarif...'
-        : 'Calculating fare...';
+      : routePricingReady
+        ? mapCtaLabel
+        : isId
+          ? 'Menghitung tarif...'
+          : 'Calculating fare...';
 
   useEffect(() => {
     if (!tripOptions.length) {
@@ -2028,9 +2028,9 @@ export function SuperAppOrderPanel({
         ? isId
           ? 'Menghitung rute'
           : 'Calculating route'
-      : isId
-        ? 'Pilih tujuan'
-        : 'Choose destination';
+        : isId
+          ? 'Pilih tujuan'
+          : 'Choose destination';
   const routeDurationLabel =
     routeMinutes > 0 ? formatRouteDurationLabel(routeMinutes, isId) : '--';
   const trackerLiveMarkers = useMemo(() => {
@@ -2045,17 +2045,17 @@ export function SuperAppOrderPanel({
       pulse: boolean;
       animationMs: number;
     }> = [
-      {
-        id: 'driver-live-panel',
-        point: tracking.partner_live || tracking.partner,
-        label: isId ? 'Driver (LIVE)' : 'Driver (LIVE)',
-        kind: 'driver',
-        color: 'var(--app-success)',
-        radius: 10,
-        pulse: true,
-        animationMs: 900,
-      },
-    ];
+        {
+          id: 'driver-live-panel',
+          point: tracking.partner_live || tracking.partner,
+          label: isId ? 'Driver (LIVE)' : 'Driver (LIVE)',
+          kind: 'driver',
+          color: 'var(--app-success)',
+          radius: 10,
+          pulse: true,
+          animationMs: 900,
+        },
+      ];
     if (location) {
       markers.push({
         id: 'customer-live-panel',
@@ -2171,7 +2171,7 @@ export function SuperAppOrderPanel({
     ] as const;
     if (!hasActiveOrder && layoutMode === 'immersive') {
       return (
-        <section className="relative h-[100svh] min-h-[100svh] max-h-[100svh] w-full overflow-hidden bg-[color:var(--app-surface)]">
+        <section className="relative h-[var(--app-viewport-height)] min-h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full overflow-hidden bg-[color:var(--app-surface)]">
           <LocationPermissionGate
             isId={isId}
             enabled={needsGeo}
@@ -2202,7 +2202,7 @@ export function SuperAppOrderPanel({
               <div className="flex items-center gap-2">
                 <Link
                   href="/super-app"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-[color:var(--app-text)] shadow-lg backdrop-blur"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-[color:var(--app-text)] shadow-lg "
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Link>
@@ -2214,11 +2214,10 @@ export function SuperAppOrderPanel({
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`inline-flex min-h-[38px] shrink-0 items-center rounded-full px-4 text-xs font-semibold backdrop-blur transition ${
-                          active
+                        className={`inline-flex min-h-[38px] shrink-0 items-center rounded-full px-4 text-xs font-semibold  transition ${active
                             ? 'bg-[color:var(--app-text)] text-[color:var(--app-text-inverse)]'
                             : 'bg-white/90 text-[color:var(--app-text)]'
-                        }`}
+                          }`}
                       >
                         {item.label}
                       </Link>
@@ -2230,14 +2229,14 @@ export function SuperAppOrderPanel({
                   type="button"
                   onClick={refreshLocation}
                   disabled={locationLoading}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-[color:var(--app-text)] shadow-lg backdrop-blur disabled:opacity-60"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-[color:var(--app-text)] shadow-lg  disabled:opacity-60"
                 >
                   {locationLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
                 </button>
               </div>
 
               <div className="mt-3 space-y-2">
-                <div className="rounded-[22px] border border-white/60 bg-white/92 px-4 py-3 shadow-lg backdrop-blur">
+                <div className="rounded-[22px] border border-white/60 bg-white/92 px-4 py-3 shadow-lg ">
                   <div className="relative">
                     <div className="flex items-center gap-2 text-xs text-[color:var(--app-text)]">
                       <MapPin className="h-4 w-4 text-[color:var(--app-accent)]" />
@@ -2313,7 +2312,7 @@ export function SuperAppOrderPanel({
                   </div>
                 </div>
 
-                <div className="rounded-[22px] border border-white/60 bg-white/92 px-4 py-3 shadow-lg backdrop-blur">
+                <div className="rounded-[22px] border border-white/60 bg-white/92 px-4 py-3 shadow-lg ">
                   <div className="relative">
                     <div className="flex items-center gap-2 text-xs text-[color:var(--app-text)]">
                       <Navigation className="h-4 w-4 text-[color:var(--app-info)]" />
@@ -2380,9 +2379,9 @@ export function SuperAppOrderPanel({
 
           <div className="absolute inset-x-0 bottom-0 z-20">
             <div className="mx-auto max-w-[980px]">
-              <div className="rounded-t-[30px] border border-b-0 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] shadow-2xl backdrop-blur-xl">
+              <div className="rounded-t-[30px] border border-b-0 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] shadow-2xl ">
                 <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-[color:var(--app-border)]" />
-                <div className="max-h-[56svh] overflow-y-auto px-4 pb-5 pt-3 sm:px-5">
+                <div className="max-h-[56dvh] overflow-y-auto px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 sm:px-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap gap-2">
@@ -2568,11 +2567,10 @@ export function SuperAppOrderPanel({
                             key={item.id}
                             type="button"
                             onClick={() => setPaymentMethod(item.id)}
-                            className={`rounded-[18px] border px-3 py-3 text-sm font-semibold transition ${
-                              paymentMethod === item.id
+                            className={`rounded-[18px] border px-3 py-3 text-sm font-semibold transition ${paymentMethod === item.id
                                 ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                                 : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
-                            }`}
+                              }`}
                           >
                             <span className="inline-flex items-center gap-2">
                               <Wallet className="h-4 w-4" />
@@ -2591,11 +2589,10 @@ export function SuperAppOrderPanel({
                         <button
                           type="button"
                           onClick={() => setSelectedPromoId('none')}
-                          className={`rounded-full border px-3 py-2 text-[11px] font-semibold transition ${
-                            selectedPromoId === 'none'
+                          className={`rounded-full border px-3 py-2 text-[11px] font-semibold transition ${selectedPromoId === 'none'
                               ? 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
                               : 'border-[color:var(--app-border)] bg-transparent text-[color:var(--app-text-soft)]'
-                          }`}
+                            }`}
                         >
                           {isId ? 'Tanpa promo' : 'No promo'}
                         </button>
@@ -2604,11 +2601,10 @@ export function SuperAppOrderPanel({
                             key={item.id}
                             type="button"
                             onClick={() => setSelectedPromoId(item.id)}
-                            className={`rounded-full border px-3 py-2 text-[11px] font-semibold transition ${
-                              selectedPromoId === item.id
+                            className={`rounded-full border px-3 py-2 text-[11px] font-semibold transition ${selectedPromoId === item.id
                                 ? 'border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)] text-[color:var(--app-success)]'
                                 : 'border-[color:var(--app-border)] bg-transparent text-[color:var(--app-text-soft)]'
-                            }`}
+                              }`}
                           >
                             {item.title}
                           </button>
@@ -2721,7 +2717,7 @@ export function SuperAppOrderPanel({
           )}
 
           <div className="absolute left-3 right-3 top-3 z-20 space-y-2">
-            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)] px-3 py-2 shadow-sm backdrop-blur dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)]">
+            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)] px-3 py-2 shadow-sm  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)]">
               <div className="relative">
                 <div className="flex items-center gap-2 text-xs text-[color:var(--app-text)]">
                   <MapPin className="h-4 w-4 text-[color:var(--app-accent)]" />
@@ -2796,7 +2792,7 @@ export function SuperAppOrderPanel({
                 ) : null}
               </div>
             </div>
-            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)] px-3 py-2 shadow-sm backdrop-blur dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)]">
+            <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)] px-3 py-2 shadow-sm  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)]">
               <div className="relative">
                 <div className="flex items-center gap-2 text-xs text-[color:var(--app-text)]">
                   <Navigation className="h-4 w-4 text-[color:var(--app-info)]" />
@@ -2943,9 +2939,9 @@ export function SuperAppOrderPanel({
                         ? isId
                           ? 'Estimasi siap'
                           : 'Estimate ready'
-                    : isId
-                      ? 'Belum aktif'
-                      : 'Not active'
+                        : isId
+                          ? 'Belum aktif'
+                          : 'Not active'
               }
               tone={
                 hasLiveTracking
@@ -3012,9 +3008,9 @@ export function SuperAppOrderPanel({
                     ? isId
                       ? 'Jarak, durasi, dan estimasi biaya sekarang mengikuti route dari map.'
                       : 'Distance, duration, and estimated fare now follow the map route.'
-                : isId
-                  ? 'Tambahkan lokasi jemput dan tujuan, lalu pesan untuk mulai cari driver.'
-                  : 'Add pickup and destination, then book to start driver matching.'}
+                    : isId
+                      ? 'Tambahkan lokasi jemput dan tujuan, lalu pesan untuk mulai cari driver.'
+                      : 'Add pickup and destination, then book to start driver matching.'}
             </div>
           )}
 
@@ -3113,9 +3109,9 @@ export function SuperAppOrderPanel({
                       ? 'Layanan dibatasi biar ETA tetap realistis.'
                       : 'This service is limited so ETA, driver supply, and booking experience stay realistic.'
                     : activeTripOption?.note ||
-                      (isId
-                        ? 'Biaya dan ETA baru aktif setelah pickup dan tujuan tervalidasi dari map.'
-                        : 'Fare and ETA only activate after pickup and destination are validated by the map.')}
+                    (isId
+                      ? 'Biaya dan ETA baru aktif setelah pickup dan tujuan tervalidasi dari map.'
+                      : 'Fare and ETA only activate after pickup and destination are validated by the map.')}
                 </div>
               </div>
             </div>
@@ -3156,11 +3152,10 @@ export function SuperAppOrderPanel({
                       key={option.id}
                       type="button"
                       onClick={() => setSelectedTripOption(option.id)}
-                      className={`rounded-[22px] border px-3 py-3 text-left transition ${
-                        active
+                      className={`rounded-[22px] border px-3 py-3 text-left transition ${active
                           ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
                           : 'ui-panel-muted border-[color:var(--app-border)]/80 hover:border-[color:var(--app-accent-border)]'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -3258,7 +3253,7 @@ export function SuperAppOrderPanel({
         onGranted={() => setLocationGateGranted(true)}
         onContinueWithoutLocation={() => setLocationGateGranted(true)}
       />
-      <h2 className="text-sm font-black uppercase tracking-[0.16em] text-[color:var(--app-text)]">
+      <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--app-text)]">
         {isCatalogService && !user
           ? isId
             ? isMartService
@@ -3392,11 +3387,10 @@ export function SuperAppOrderPanel({
                         if (isMartService) setMartStoreId(merchant.id);
                         if (catalogStep !== 'browse') setCatalogStep('browse');
                       }}
-                      className={`rounded-xl border p-3 text-left transition ${
-                        isSelected
+                      className={`rounded-xl border p-3 text-left transition ${isSelected
                           ? 'border-[color:var(--app-warning)] bg-[color:var(--app-surface-strong)] shadow-sm'
                           : 'border-[color:var(--app-warning-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_85%,_transparent)] hover:bg-[color:var(--app-surface-strong)]'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--app-surface-muted)] text-[11px] font-bold text-[color:var(--app-text-soft)]">
@@ -3921,11 +3915,10 @@ export function SuperAppOrderPanel({
 
       {showOperationalDiagnostics && dispatchData ? (
         <div
-          className={`mt-3 rounded-xl border p-3 text-xs ${
-            dispatchStatus?.status === 'expired'
+          className={`mt-3 rounded-xl border p-3 text-xs ${dispatchStatus?.status === 'expired'
               ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] dark:border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-warning)_20%,_transparent)] dark:text-[color:var(--app-warning)]'
               : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)] dark:text-[color:var(--app-accent)]'
-          }`}
+            }`}
         >
           <p className="font-bold">
             {isId ? 'Broadcast driver dikirim' : 'Driver broadcast sent'}: {dispatchData.notified_count}
@@ -3940,11 +3933,10 @@ export function SuperAppOrderPanel({
           ) : null}
           {dispatchData.candidates.length > 0 ? (
             <div
-              className={`mt-2 rounded-lg border bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-2 dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_40%,_transparent)] ${
-                dispatchStatus?.status === 'expired'
+              className={`mt-2 rounded-lg border bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_80%,_transparent)] p-2 dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_40%,_transparent)] ${dispatchStatus?.status === 'expired'
                   ? 'border-[color:var(--app-warning-border)] dark:border-[color:var(--app-warning-border)]'
                   : 'border-[color:var(--app-accent-border)] dark:border-[color:var(--app-accent-border)]'
-              }`}
+                }`}
             >
               <p className="font-semibold">{isId ? 'Driver terdekat online:' : 'Nearest online drivers:'}</p>
               <ul className="mt-1 space-y-1">
@@ -4085,13 +4077,12 @@ export function SuperAppOrderPanel({
 
       {showOperationalDiagnostics && aiGuard ? (
         <div
-          className={`mt-3 rounded-xl border p-3 text-xs ${
-            aiGuard.severity === 'high'
+          className={`mt-3 rounded-xl border p-3 text-xs ${aiGuard.severity === 'high'
               ? 'border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)] dark:border-[color:color-mix(in_srgb,_var(--app-danger-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-danger)_20%,_transparent)] dark:text-[color:var(--app-danger)]'
               : aiGuard.severity === 'medium'
                 ? 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)] dark:border-[color:color-mix(in_srgb,_var(--app-warning-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-warning)_20%,_transparent)] dark:text-[color:var(--app-warning)]'
                 : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] dark:border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)] dark:text-[color:var(--app-accent)]'
-          }`}
+            }`}
         >
           <p className="inline-flex items-center gap-1 font-bold">
             <Sparkles className="h-3.5 w-3.5" />

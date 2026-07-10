@@ -40,7 +40,7 @@ export function GlobalPreferenceDock() {
         <div
           className={cn(
             'pointer-events-auto mr-2 w-[min(82vw,238px)] origin-right rounded-[22px] border border-[color:var(--app-border)]',
-            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2.5 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl',
+            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2.5 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] ',
             'transition duration-200',
             isOpen
               ? 'translate-x-0 scale-100 opacity-100'
@@ -49,7 +49,7 @@ export function GlobalPreferenceDock() {
         >
           <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
                 Preferences
               </p>
             </div>
@@ -70,7 +70,7 @@ export function GlobalPreferenceDock() {
               onClick={toggleTheme}
               disabled={!isReady}
               className={cn(
-                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-black uppercase tracking-[0.08em] transition',
+                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-bold uppercase tracking-[0.08em] transition',
                 'border-[color:var(--app-border)] text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] disabled:opacity-50',
               )}
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -85,7 +85,7 @@ export function GlobalPreferenceDock() {
               type="button"
               onClick={openLanguage}
               className={cn(
-                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-black uppercase tracking-[0.08em] transition',
+                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-bold uppercase tracking-[0.08em] transition',
                 'border-[color:var(--app-border)] text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
               )}
               aria-label="Change language"
@@ -107,7 +107,7 @@ export function GlobalPreferenceDock() {
           onClick={() => setIsOpen(value => !value)}
           className={cn(
             'pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-l-[18px] border border-r-0 border-[color:var(--app-border)]',
-            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] text-[color:var(--app-text)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl',
+            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] text-[color:var(--app-text)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] ',
             'transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
           )}
           aria-expanded={isOpen}
@@ -122,7 +122,7 @@ export function GlobalPreferenceDock() {
         <div
           className={cn(
             'mb-2 w-[min(84vw,250px)] origin-bottom-right rounded-[20px] border border-[color:var(--app-border)]',
-            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl',
+            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] ',
             'transition duration-200',
             isOpen
               ? 'translate-y-0 scale-100 opacity-100'
@@ -135,7 +135,7 @@ export function GlobalPreferenceDock() {
               onClick={toggleTheme}
               disabled={!isReady}
               className={cn(
-                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-black uppercase tracking-[0.08em] transition',
+                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-bold uppercase tracking-[0.08em] transition',
                 'border-[color:var(--app-border)] text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] disabled:opacity-50',
               )}
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -150,7 +150,7 @@ export function GlobalPreferenceDock() {
               type="button"
               onClick={openLanguage}
               className={cn(
-                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-black uppercase tracking-[0.08em] transition',
+                'inline-flex h-10 w-full items-center justify-between rounded-full border px-3 text-xs font-bold uppercase tracking-[0.08em] transition',
                 'border-[color:var(--app-border)] text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
               )}
               aria-label="Change language"
@@ -172,7 +172,7 @@ export function GlobalPreferenceDock() {
           onClick={() => setIsOpen(value => !value)}
           className={cn(
             'pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--app-border)]',
-            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] text-[color:var(--app-text)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] backdrop-blur-xl',
+            'bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] text-[color:var(--app-text)] shadow-[0_18px_42px_-28px_rgba(15,23,42,0.28)] ',
             'transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]',
           )}
           aria-expanded={isOpen}

@@ -256,7 +256,7 @@ export function MediaPreviewCarousel({
               >
                 {renderMedia(item, index)}
                 {item.type === 'video' ? (
-                  <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm">
+                  <span className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white  shadow-sm">
                     <PlayCircle className="h-3.5 w-3.5 text-white/90" />
                     Video
                   </span>
@@ -272,7 +272,7 @@ export function MediaPreviewCarousel({
 
         {/* Counter Badge */}
         {visibleMediaItems.length > 1 && showCounter ? (
-          <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-md shadow-sm select-none">
+          <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white  shadow-sm select-none">
             {active + 1} / {visibleMediaItems.length}
           </span>
         ) : null}
@@ -286,7 +286,7 @@ export function MediaPreviewCarousel({
               event.stopPropagation();
               setLightboxOpen(true);
             }}
-            className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white dark:hover:bg-slate-900"
+            className="absolute bottom-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md  transition-all duration-200 hover:scale-105 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white dark:hover:bg-slate-900"
             aria-label="Perbesar media"
           >
             <Expand className="h-4 w-4" />
@@ -305,7 +305,7 @@ export function MediaPreviewCarousel({
                 scrollToIndex(active - 1);
               }}
               className={cn(
-                "absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md backdrop-blur-sm transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white md:opacity-0 md:group-hover:opacity-100",
+                "absolute left-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md  transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white md:opacity-0 md:group-hover:opacity-100",
                 active === 0 && "cursor-not-allowed opacity-40 md:group-hover:opacity-40"
               )}
               aria-label="Media sebelumnya"
@@ -321,7 +321,7 @@ export function MediaPreviewCarousel({
                 scrollToIndex(active + 1);
               }}
               className={cn(
-                "absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md backdrop-blur-sm transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white md:opacity-0 md:group-hover:opacity-100",
+                "absolute right-3 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-md  transition-all duration-200 hover:bg-white active:scale-95 dark:bg-slate-900/90 dark:text-white md:opacity-0 md:group-hover:opacity-100",
                 active === visibleMediaItems.length - 1 && "cursor-not-allowed opacity-40 md:group-hover:opacity-40"
               )}
               aria-label="Media berikutnya"
@@ -349,11 +349,11 @@ export function MediaPreviewCarousel({
 
       {/* Fullscreen Lightbox Modal */}
       {lightboxOpen ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4  animate-in fade-in duration-200">
           <button
             type="button"
             onClick={() => setLightboxOpen(false)}
-            className="absolute right-4 top-4 z-[110] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 hover:scale-105 active:scale-95"
+            className="absolute right-4 top-4 z-[110] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white  transition-all duration-200 hover:bg-white/20 hover:scale-105 active:scale-95"
             aria-label="Tutup preview"
           >
             <X className="h-6 w-6" />

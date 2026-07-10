@@ -175,19 +175,40 @@ function getCategoryLabel(
   return locale === 'id' ? label.id : label.en;
 }
 
+function getSideVisual(side: DiscoveryCardSide): {
+  badgeClass: string;
+  chipClass: string;
+} {
+  if (side === 'demand') {
+    return {
+      badgeClass:
+        'bg-emerald-600 text-white shadow-[0_10px_24px_-16px_rgba(5,150,105,0.75)]',
+      chipClass:
+        'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-400/20',
+    };
+  }
+
+  return {
+    badgeClass:
+      'bg-rose-600 text-white shadow-[0_10px_24px_-16px_rgba(225,29,72,0.75)]',
+    chipClass:
+      'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-400/20',
+  };
+}
+
 export const DISCOVERY_COMPACT_CARD_BASELINE_CLASS =
-  'min-h-[244px] sm:min-h-[252px]';
+  'h-[300px] min-h-[300px] max-h-[300px] sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
 
 const RAIL_COMPACT_CARD_FRAME_CLASS =
-  'h-full min-h-[244px] self-stretch sm:min-h-[252px]';
+  'h-[300px] min-h-[300px] max-h-[300px] self-stretch sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
 const GRID_COMPACT_CARD_FRAME_CLASS = cn(
-  'h-full self-stretch',
+  'self-stretch',
   DISCOVERY_COMPACT_CARD_BASELINE_CLASS,
 );
 const RAIL_COMFORTABLE_CARD_FRAME_CLASS =
-  'h-full min-h-[288px] self-stretch sm:min-h-[300px]';
+  'h-[340px] min-h-[340px] max-h-[340px] self-stretch sm:h-[360px] sm:min-h-[360px] sm:max-h-[360px]';
 const GRID_COMFORTABLE_CARD_FRAME_CLASS =
-  'h-full min-h-[292px] self-stretch sm:min-h-[304px]';
+  'h-[340px] min-h-[340px] max-h-[340px] self-stretch sm:h-[360px] sm:min-h-[360px] sm:max-h-[360px]';
 
 function getFrameClass(
   compact: boolean,
@@ -244,7 +265,13 @@ function getInitials(value: string): string {
   return parts.map(part => part[0]?.toUpperCase() || '').join('') || 'MK';
 }
 
-function uniqueMediaCandidates(item: any): string[] {
+type MediaCandidateSource = Pick<MarketplaceDiscoveryCardItem, 'images'> & {
+  image_urls?: unknown;
+  metadata?: { images?: unknown } | null;
+  cover_image?: unknown;
+};
+
+function uniqueMediaCandidates(item: MediaCandidateSource): string[] {
   const raw =
     item.images ||
     item.image_urls ||
@@ -255,11 +282,11 @@ function uniqueMediaCandidates(item: any): string[] {
   const seen = new Set<string>();
 
   return entries
-    .map((e: string) => (e || '').trim())
+    .map(entry => String(entry || '').trim())
     .filter(Boolean)
-    .map((e: string) => normalizeContentMediaUrl(e))
+    .map(entry => normalizeContentMediaUrl(entry))
     .filter(Boolean)
-    .filter((entry: string) => {
+    .filter(entry => {
       const key = entry.toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
@@ -500,8 +527,16 @@ function CategoryPreview({
 
   const locationLabel = String(item.location || '').trim();
   const updatedLabel = String(item.updatedLabel || '').trim();
-  const summaryLabel = String(item.sideContextLabel || item.summary || '').trim();
+  const summaryLabel = String(
+    item.sideContextLabel || item.summary || '',
+  ).trim();
   const supplierBadges = (item.supplierBadges || []).filter(Boolean);
+  const sideVisual = getSideVisual(item.side);
+  const sideLabel = String(item.sideLabel || '').trim();
+  const detailBadges = [
+    String(item.sideContextLabel || '').trim(),
+    ...supplierBadges,
+  ].filter(Boolean);
 
   const valueLabel = showPrice
     ? item.priceLabel
@@ -521,16 +556,22 @@ function CategoryPreview({
         ? BadgeCheck
         : null;
 
+  const dense = compact || minimal;
   const heroHeightClass = minimal
-    ? 'h-[110px]'
+    ? 'h-[104px] sm:h-[112px]'
     : compact
-      ? 'h-[130px]'
+      ? 'h-[108px] sm:h-[116px]'
       : simple
-        ? 'h-[150px]'
-        : 'h-[170px]';
+        ? 'h-[160px]'
+        : 'h-[176px]';
 
   return (
-    <div className="flex flex-col gap-2.5 w-full h-full">
+    <div
+      className={cn(
+        'flex h-full w-full flex-col',
+        dense ? 'gap-1.5' : 'gap-2.5',
+      )}
+    >
       {/* HERO IMAGE */}
       <div className="relative w-full overflow-hidden rounded-[18px]">
         <div className={cn('relative w-full', heroHeightClass)}>
@@ -543,17 +584,31 @@ function CategoryPreview({
         </div>
 
         {/* CATEGORY BADGE */}
-        <div className="absolute top-0 left-0 right-0 flex justify-between p-2.5">
-          <span className={cn(
-            'text-[9px] font-semibold uppercase px-2.5 py-1 rounded-full',
-            TYPE_ACCENTS[item.typeKey].softBg,
-            TYPE_ACCENTS[item.typeKey].softText,
-          )}>
-            {categoryLabel}
-          </span>
+        <div className="absolute top-0 left-0 right-0 flex items-start justify-between gap-2 p-2.5">
+          <div className="flex min-w-0 flex-wrap gap-1.5">
+            <span
+              className={cn(
+                'rounded-full px-2.5 py-1 text-[9px] font-semibold uppercase',
+                TYPE_ACCENTS[item.typeKey].softBg,
+                TYPE_ACCENTS[item.typeKey].softText,
+              )}
+            >
+              {categoryLabel}
+            </span>
+            {sideLabel ? (
+              <span
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.08em]',
+                  sideVisual.badgeClass,
+                )}
+              >
+                {sideLabel}
+              </span>
+            ) : null}
+          </div>
 
           {item.verified && (
-            <span className="bg-white/90 rounded-full p-1">
+            <span className="shrink-0 rounded-full bg-white/90 p-1">
               <BadgeCheck className="h-4 w-4" />
             </span>
           )}
@@ -570,25 +625,44 @@ function CategoryPreview({
       </div>
 
       {/* TITLE */}
-      <h3 className="font-semibold text-slate-900 dark:text-white text-[15px] line-clamp-2">
+      <h3
+        className={cn(
+          'line-clamp-2 font-semibold text-slate-900 dark:text-white',
+          dense
+            ? 'h-[36px] text-[13px] leading-[18px]'
+            : 'h-[40px] text-[15px] leading-5',
+        )}
+      >
         {item.title}
       </h3>
 
-      {supplierBadges.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {supplierBadges.slice(0, 3).map(badge => (
+      {detailBadges.length > 0 && !dense ? (
+        <div className="flex h-[24px] max-h-[24px] flex-wrap gap-1.5 overflow-hidden">
+          {detailBadges.slice(0, 3).map((badge, index) => (
             <span
               key={badge}
-              className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              className={cn(
+                'inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold',
+                index === 0
+                  ? sideVisual.chipClass
+                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+              )}
             >
               {badge}
             </span>
           ))}
         </div>
+      ) : !dense ? (
+        <div className="h-[24px] max-h-[24px]" />
       ) : null}
 
       {/* META */}
-      <div className="flex flex-wrap gap-1.5">
+      <div
+        className={cn(
+          'flex flex-wrap gap-1.5 overflow-hidden',
+          dense ? 'h-[22px] max-h-[22px]' : 'h-[24px] max-h-[24px]',
+        )}
+      >
         {locationLabel && (
           <span className="flex items-center gap-1 text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full">
             <MapPin className="h-3 w-3" />
@@ -606,10 +680,20 @@ function CategoryPreview({
 
       {/* VALUE */}
       <div className="mt-auto">
-        <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-900 px-3 py-2 rounded-[14px]">
-          <span className="flex items-center gap-1 text-sm font-semibold">
+        <div
+          className={cn(
+            'flex items-center justify-between rounded-[14px] bg-slate-50 px-3 dark:bg-slate-900',
+            dense ? 'py-1.5' : 'py-2',
+          )}
+        >
+          <span
+            className={cn(
+              'flex min-w-0 items-center gap-1 font-semibold',
+              dense ? 'text-xs' : 'text-sm',
+            )}
+          >
             {ValueIcon && <ValueIcon className="h-4 w-4" />}
-            {valueLabel}
+            <span className="truncate">{valueLabel}</span>
           </span>
         </div>
       </div>

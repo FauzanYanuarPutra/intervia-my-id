@@ -101,7 +101,7 @@ export function RatingStars({
           )}
         />
       </span>
-      <span className="shrink-0 text-[10px] font-black text-[color:var(--app-text-soft)]">
+      <span className="shrink-0 text-[10px] font-bold text-[color:var(--app-text-soft)]">
         {countText}
       </span>
     </span>
@@ -165,7 +165,7 @@ export function PlaceThumb({
         loading="lazy"
       />
       {overlayLabel ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/54 text-lg font-black text-white backdrop-blur-[2px]">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/54 text-lg font-bold text-white ">
           {overlayLabel}
         </div>
       ) : null}
@@ -224,19 +224,19 @@ export function MapQuickControls({
   compact?: boolean;
 }) {
   const pillButtonClassName = cn(
-    'pointer-events-auto inline-flex shrink-0 items-center justify-center border font-semibold shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)] backdrop-blur-md transition',
+    'pointer-events-auto inline-flex shrink-0 items-center justify-center border font-semibold shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)]  transition',
     compact
       ? 'h-10 w-10 rounded-full px-0 text-[0px]'
       : 'h-8 gap-1.5 rounded-[14px] px-2.5 text-[10px] sm:h-8 sm:px-3',
   );
   const iconButtonClassName = cn(
-    'pointer-events-auto inline-flex shrink-0 items-center justify-center border shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)] backdrop-blur-md transition',
+    'pointer-events-auto inline-flex shrink-0 items-center justify-center border shadow-[0_10px_22px_-18px_rgba(15,23,42,0.38)]  transition',
     compact
       ? 'h-10 w-10 rounded-full'
       : 'h-8 w-8 rounded-[14px] sm:h-8 sm:w-8',
   );
   const statusChipClassName =
-    'pointer-events-none inline-flex min-h-[28px] items-center rounded-[14px] border px-2.5 py-1 text-[10px] font-semibold shadow-[0_12px_24px_-18px_rgba(15,23,42,0.3)] backdrop-blur-md';
+    'pointer-events-none inline-flex min-h-[28px] items-center rounded-[14px] border px-2.5 py-1 text-[10px] font-semibold shadow-[0_12px_24px_-18px_rgba(15,23,42,0.3)] ';
   const runAction = (action: () => void | Promise<void>, label: string) => {
     try {
       const result = action();
@@ -281,7 +281,7 @@ export function MapQuickControls({
       ) : null}
       <div
         className={cn(
-          'inline-flex bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))] shadow-[0_16px_30px_-22px_rgba(15,23,42,0.3)] backdrop-blur-md',
+          'inline-flex bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(248,250,252,0.82))] shadow-[0_16px_30px_-22px_rgba(15,23,42,0.3)] ',
           compact
             ? 'flex-col gap-1 rounded-[24px] p-1'
             : 'items-center gap-1 rounded-[18px] p-1.5',
@@ -497,7 +497,7 @@ export function SelectedPlaceCard<T extends UmkmMapStore>({
         </div>
 
         <div>
-          <h3 className="text-[1rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.08rem]">
+          <h3 className="text-[1rem] font-bold leading-tight text-[color:var(--app-text)] sm:text-[1.08rem]">
             {item.store.name}
           </h3>
           <p className="hidden text-[13px] text-[color:var(--app-text-soft)]">
@@ -590,7 +590,7 @@ export function PlaceListButton<T extends UmkmMapStore>({
             />
           </div>
 
-          <h4 className="mt-1.5 line-clamp-1 text-[0.94rem] font-black text-[color:var(--app-text)] sm:mt-2 sm:text-[0.98rem]">
+          <h4 className="mt-1.5 line-clamp-1 text-[0.94rem] font-bold text-[color:var(--app-text)] sm:mt-2 sm:text-[0.98rem]">
             {item.store.name}
           </h4>
           <p className="hidden text-[12px] text-[color:var(--app-text-soft)]">

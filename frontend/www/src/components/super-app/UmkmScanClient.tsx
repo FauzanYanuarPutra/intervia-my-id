@@ -243,7 +243,7 @@ export function UmkmScanClient({ locale, isId }: UmkmScanClientProps) {
       setVideoReady(true);
     };
     video.addEventListener('canplay', onCanPlay);
-    video.play().catch(() => {});
+    video.play().catch(() => { });
     return () => {
       video.removeEventListener('canplay', onCanPlay);
     };
@@ -331,7 +331,7 @@ export function UmkmScanClient({ locale, isId }: UmkmScanClientProps) {
           ? isId
             ? 'Kamera belum didukung'
             : 'Camera not supported'
-      : cameraState === 'error'
+          : cameraState === 'error'
             ? isId
               ? 'Kamera belum siap'
               : 'Camera unavailable'
@@ -347,10 +347,10 @@ export function UmkmScanClient({ locale, isId }: UmkmScanClientProps) {
             <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
               {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <ScanLine className="h-6 w-6" />}
             </div>
-            <p className="mt-3 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               Lajukan UMKM
             </p>
-            <h1 className="mt-1.5 text-[1.45rem] font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.7rem]">
+            <h1 className="mt-1.5 text-[1.45rem] font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.7rem]">
               {loading
                 ? isId
                   ? 'Lagi cek QR...'
@@ -364,8 +364,8 @@ export function UmkmScanClient({ locale, isId }: UmkmScanClientProps) {
                       ? 'QR belum kebaca'
                       : 'Scan failed'
                     : isId
-                    ? 'QR ketemu'
-                    : 'Scan resolved'}
+                      ? 'QR ketemu'
+                      : 'Scan resolved'}
             </h1>
             <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
               {showError

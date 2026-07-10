@@ -317,7 +317,7 @@ export default async function RootLayout({
         />
       </head>
 
-      <body className="app-cohesive-theme m-0 min-h-screen w-full overflow-x-hidden bg-[color:var(--app-surface-muted)] p-0 font-sans text-[color:var(--app-text)] antialiased dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
+      <body className="app-cohesive-theme m-0 min-h-screen min-h-[100dvh] w-full overflow-x-hidden bg-[color:var(--app-surface-muted)] p-0 font-sans text-[color:var(--app-text)] antialiased dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]">
         <ScrollToTop />
         <AutoHideScrollbars />
         <Providers>{children}</Providers>

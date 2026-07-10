@@ -468,9 +468,9 @@ export default function CrmDashboard() {
   ).length;
   const winRate = leads.length
     ? Math.round(
-        (leads.filter(lead => lead.stage === 'won').length / leads.length) *
-          100,
-      )
+      (leads.filter(lead => lead.stage === 'won').length / leads.length) *
+      100,
+    )
     : 0;
 
   const supportStats = useMemo(() => {
@@ -534,10 +534,10 @@ export default function CrmDashboard() {
     <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
             CRM Command Center
           </p>
-          <h1 className="text-3xl font-black tracking-tight text-[color:var(--app-text)]">
+          <h1 className="text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
             Leads, support, assignment.
           </h1>
           <p className="mt-2 text-sm text-[color:var(--app-text)]">
@@ -547,21 +547,21 @@ export default function CrmDashboard() {
         <div className="flex flex-wrap gap-2">
           <Link
             href="/support"
-            className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text)]"
+            className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text)]"
           >
             Open Support Hub
           </Link>
           {crmUrl ? (
             <a
               href={crmUrl}
-              className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]"
+              className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]"
             >
               Open CRM App
             </a>
           ) : (
             <button
               type="button"
-              className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]"
+              className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)]"
             >
               Create Lead
             </button>
@@ -608,10 +608,10 @@ export default function CrmDashboard() {
             key={metric.label}
             className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm"
           >
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
               {metric.label}
             </p>
-            <p className="mt-2 text-2xl font-black text-[color:var(--app-text)]">
+            <p className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">
               {metric.value}
             </p>
             <p className="mt-1 text-xs text-[color:var(--app-text)]">
@@ -624,7 +624,7 @@ export default function CrmDashboard() {
       <section className="mt-8 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               Support Queue
             </p>
             <p className="mt-1 text-xs text-[color:var(--app-text)]">
@@ -647,11 +647,10 @@ export default function CrmDashboard() {
                 key={item.key}
                 type="button"
                 onClick={() => setSupportFilter(item.key)}
-                className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                  supportFilter === item.key
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold ${supportFilter === item.key
                     ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)]'
                     : 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]'
-                }`}
+                  }`}
               >
                 {item.label}
               </button>
@@ -722,7 +721,7 @@ export default function CrmDashboard() {
                     ) : assignedToMe ? (
                       <>
                         {ticket.status !== 'resolved' &&
-                        ticket.status !== 'closed' ? (
+                          ticket.status !== 'closed' ? (
                           <button
                             type="button"
                             disabled={loadingAction}
@@ -765,7 +764,7 @@ export default function CrmDashboard() {
       <section className="mt-8 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               Listing Moderation
             </p>
             <p className="mt-1 text-xs text-[color:var(--app-text)]">
@@ -837,7 +836,7 @@ export default function CrmDashboard() {
                   </div>
                   <div className="mt-3 grid gap-2 lg:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                         Reports
                       </p>
                       <div className="mt-2 space-y-2">
@@ -870,7 +869,7 @@ export default function CrmDashboard() {
                       </div>
                     </div>
                     <div className="rounded-lg border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                         Actions
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -948,9 +947,9 @@ export default function CrmDashboard() {
                       <div className="mt-3 text-[11px] text-[color:var(--app-text-soft)]">
                         {Object.entries(item.reporter_summary).length > 0
                           ? Object.entries(item.reporter_summary)
-                              .slice(0, 4)
-                              .map(([name, count]) => `${name} (${count})`)
-                              .join(' • ')
+                            .slice(0, 4)
+                            .map(([name, count]) => `${name} (${count})`)
+                            .join(' • ')
                           : 'No reporter summary yet.'}
                       </div>
                     </div>
@@ -971,7 +970,7 @@ export default function CrmDashboard() {
                 key={stage}
                 className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm"
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
                   {STAGE_LABELS[stage]} ({items.length})
                 </p>
                 <div className="mt-4 space-y-3">
@@ -991,7 +990,7 @@ export default function CrmDashboard() {
                         <p className="text-[10px] uppercase tracking-widest text-[color:var(--app-text-soft)]">
                           {item.sector}
                         </p>
-                        <p className="mt-2 text-[10px] font-black text-[color:var(--app-accent)]">
+                        <p className="mt-2 text-[10px] font-bold text-[color:var(--app-accent)]">
                           {formatCurrency(
                             item.value_cents,
                             item.currency || 'IDR',
@@ -1008,7 +1007,7 @@ export default function CrmDashboard() {
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               Activity Feed
             </p>
             {loading ? (
@@ -1037,7 +1036,7 @@ export default function CrmDashboard() {
           </div>
 
           <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
               SLA Hint
             </p>
             <p className="mt-2 text-sm font-bold text-[color:var(--app-text)]">

@@ -28,7 +28,7 @@ export function Button({
   return (
     <button
       className={[
-        'inline-flex min-h-11 items-center justify-center rounded-2xl px-4 text-sm font-black transition disabled:pointer-events-none disabled:opacity-55',
+        'inline-flex min-h-11 items-center justify-center rounded-2xl px-4 text-sm font-bold transition disabled:pointer-events-none disabled:opacity-55',
         variantClass[variant],
         className,
       ]

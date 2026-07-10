@@ -422,10 +422,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : {}),
         ...(options?.otpToken
           ? {
-              otp_token: options.otpToken,
-              otp_type: options.otpType || 'email',
-              otp_target: options.otpTarget,
-            }
+            otp_token: options.otpToken,
+            otp_type: options.otpType || 'email',
+            otp_target: options.otpTarget,
+          }
           : {}),
       }),
       credentials: 'include',
@@ -445,7 +445,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(data.access_token);
     await fetchMe(data.access_token);
     if (!options?.silent) {
-      const target = options?.redirectTo || `/${getLocale()}/dashboard`;
+      const target = options?.redirectTo || `/${getLocale()}/home`;
       router.replace(target);
       router.refresh();
     }
@@ -482,7 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccessToken(data.access_token);
     await fetchMe(data.access_token);
     if (!options?.silent) {
-      const target = options?.redirectTo || `/${getLocale()}/dashboard`;
+      const target = options?.redirectTo || `/${getLocale()}/home`;
       router.replace(target);
       router.refresh();
     }

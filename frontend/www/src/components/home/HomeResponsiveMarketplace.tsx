@@ -1,12 +1,15 @@
 'use client';
 
-import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import {
+  LajukanImage as Image,
+  LajukanImage,
+} from '@/components/common/LajukanImage';
 import {
   MediaPreviewCarousel,
   type MediaPreviewItem,
 } from '@/components/common/MediaPreviewCarousel';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -40,8 +43,24 @@ import {
   Zap,
   ArrowRight,
   type LucideIcon,
+  Search,
+  SlidersHorizontal,
+  Video,
+  Play,
 } from 'lucide-react';
+import {
+  MagnifyingGlassIcon,
+  CubeIcon,
+  BuildingStorefrontIcon,
+  BriefcaseIcon,
+  MapPinIcon,
+  UserGroupIcon,
+  ChatBubbleLeftRightIcon,
+  PlayCircleIcon,
+  GlobeAltIcon,
+} from '@heroicons/react/24/solid';
 import { HomeUmkmMapPreview } from '@/components/home/HomeUmkmMapPreview';
+import { useViewerLocation } from '@/components/super-app/useViewerLocation';
 import { Footer } from '@/components/layout/Footer';
 import { DailyLoginRewardCard } from '@/components/rewards/DailyLoginRewardCard';
 import { SearchInput } from '@/components/ui/SearchInput';
@@ -53,6 +72,7 @@ import {
   formatLajukanCountLabel,
   type LajukanSummary,
 } from '@/lib/lajukan-marketplace';
+import { formatDistanceKm } from '@/lib/geo/distance';
 import {
   createLajukanAvatarDataUrl,
   type LajukanAvatarStyle,
@@ -74,14 +94,23 @@ import type {
 import { CommunityComposer } from '@/components/community/CommunityFeedClient';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { UMKM_DISCOVERY_PATH } from '@/lib/umkmSurface';
+import {
+  HOME_BUSINESS_DISCOVERY_CATEGORY_IDS,
+  getBusinessDiscoveryCategoryById,
+  type BusinessDiscoveryCategoryId,
+} from '@/lib/businessDiscoveryCategories';
 import { cn } from '@/lib/utils';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
+import useEmblaCarousel from 'embla-carousel-react';
 
 type HomeContentSimpleProps = {
   locale: string;
 };
 
 const HOME_COMMUNITY_PAGE_SIZE = 6;
+const HOME_COMMUNITY_REQUEST_TIMEOUT_MS = 12000;
+const MARKETPLACE_CARD_FIXED_HEIGHT_CLASS =
+  'h-[300px] min-h-[300px] max-h-[300px] sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
 
 type Tone =
   | 'emerald'
@@ -104,14 +133,46 @@ type SidebarItem = {
   locked?: boolean;
 };
 
-type QuickCategory = {
+export interface QuickCategory {
   id: string;
   label: string;
   description: string;
   href: string;
-  icon: LucideIcon;
+  image: string;
   tone: Tone;
+  badge?: string;
+
+  // UI Configuration
+  flip?: boolean;
+  scale?: number;
+  rotate?: number;
+  offsetX?: number;
+  offsetY?: number;
+  imageSize?: number;
+}
+
+type QuickCategoryUiConfig = Pick<
+  QuickCategory,
+  | 'image'
+  | 'tone'
+  | 'flip'
+  | 'scale'
+  | 'rotate'
+  | 'offsetX'
+  | 'offsetY'
+  | 'imageSize'
+>;
+
+type TrendingSearchItem = {
+  label: string;
+  href: string;
+  score?: number;
+  count?: number;
+  source?: string;
 };
+
+let trendingSearchCache: TrendingSearchItem[] | null = null;
+let trendingSearchRequest: Promise<TrendingSearchItem[]> | null = null;
 
 type RecommendationItem = {
   id: string;
@@ -133,6 +194,8 @@ type RecommendationItem = {
   detailActionLabel?: string;
   secondaryActionLabel?: string;
   secondaryEventName?: string;
+  distanceKm?: number | null;
+  distanceLabel?: string | null;
 };
 
 type CommunityTab = 'for-you' | 'following' | 'community';
@@ -229,7 +292,7 @@ type HomeWalletBalancesResponse = {
 };
 
 const HERO_TAGS = ['Bahan Lokal', 'Siap Ekspor', 'Kemasan', 'Mesin UMKM'];
-const HOME_HERO_IMAGE = '/images/hero/lajukan-id-3.png';
+const HOME_HERO_IMAGE = '/images/hero/logo-grow.webp';
 
 type HomeAvatarProp =
   | 'crate'
@@ -258,6 +321,11 @@ type HomeHeroAvatar = HomeAvatarScene & {
   sizeClassName: string;
 };
 
+type ReelsPanelProps = {
+  isId: boolean;
+  items: ReelItem[];
+};
+
 function buildCommunityPostHref(post: CommunityPost): string {
   if (post.href) return post.href;
   const params = new URLSearchParams();
@@ -273,85 +341,100 @@ function buildCommunityTabHref(tab: CommunityTab): string {
   return `/community?${params.toString()}`;
 }
 
+type ToneClassNames = {
+  text: string;
+  icon: string;
+  soft: string;
+  surface: string;
+  card: string;
+  glow: string;
+};
+
 function toneClassNames(tone: Tone) {
-  if (tone === 'blue' || tone === 'teal') {
-    return {
-      icon: 'bg-teal-100 text-teal-700',
-      soft: 'bg-teal-50 text-teal-700',
-      surface: 'border-teal-100 bg-teal-50/70',
-      card: 'border-teal-100 bg-[linear-gradient(180deg,#ffffff,#f0fdfa)]',
-      glow: 'bg-teal-400/16',
-      text: 'text-teal-700',
-    };
-  }
-  if (tone === 'violet') {
-    return {
-      icon: 'bg-lime-100 text-lime-800',
-      soft: 'bg-lime-50 text-lime-800',
-      surface: 'border-lime-100 bg-lime-50/70',
-      card: 'border-lime-100 bg-[linear-gradient(180deg,#ffffff,#f7fee7)]',
-      glow: 'bg-lime-400/16',
-      text: 'text-lime-700',
-    };
-  }
-  if (tone === 'amber') {
-    return {
-      icon: 'bg-amber-100 text-amber-600',
-      soft: 'bg-amber-50 text-amber-700',
-      surface: 'border-amber-100 bg-amber-50/70',
-      card: 'border-amber-100 bg-[linear-gradient(180deg,#ffffff,#fff8e7)]',
-      glow: 'bg-amber-400/18',
-      text: 'text-amber-700',
-    };
-  }
-  if (tone === 'rose') {
-    return {
-      icon: 'bg-rose-100 text-rose-600',
-      soft: 'bg-rose-50 text-rose-700',
-      surface: 'border-rose-100 bg-rose-50/70',
-      card: 'border-rose-100 bg-[linear-gradient(180deg,#ffffff,#fff1f5)]',
-      glow: 'bg-rose-400/16',
-      text: 'text-rose-700',
-    };
-  }
-  if (tone === 'cyan') {
-    return {
-      icon: 'bg-emerald-100 text-emerald-700',
-      soft: 'bg-emerald-50 text-emerald-700',
-      surface: 'border-emerald-100 bg-emerald-50/70',
-      card: 'border-emerald-100',
-      glow: 'bg-emerald-400/16',
-      text: 'text-emerald-700',
-    };
-  }
-  if (tone === 'lime') {
-    return {
-      icon: 'bg-lime-100 text-lime-700',
-      soft: 'bg-lime-50 text-lime-700',
-      surface: 'border-lime-100 bg-lime-50/70',
-      card: 'border-lime-100',
-      glow: 'bg-lime-400/16',
-      text: 'text-lime-700',
-    };
-  }
-  if (tone === 'orange') {
-    return {
-      icon: 'bg-orange-100 text-orange-700',
-      soft: 'bg-orange-50 text-orange-700',
-      surface: 'border-orange-100 bg-orange-50/70',
-      card: 'border-orange-100',
-      glow: 'bg-orange-400/16',
-      text: 'text-orange-700',
-    };
-  }
-  return {
-    icon: 'bg-emerald-100 text-emerald-700',
-    soft: 'bg-emerald-50 text-emerald-700',
-    surface: 'border-emerald-100 bg-emerald-50/70',
-    card: 'border-emerald-100',
-    glow: 'bg-emerald-400/16',
-    text: 'text-emerald-700',
+  const map: Record<Tone, ToneClassNames> = {
+    emerald: {
+      text: 'text-emerald-600',
+      icon: 'bg-emerald-200 text-emerald-600',
+      soft: 'bg-emerald-200 text-emerald-600',
+      surface: 'bg-emerald-50/60 border-emerald-100',
+      card: 'bg-gradient-to-b from-white to-emerald-50/40 border-emerald-100',
+      glow: 'bg-emerald-400/10',
+    },
+
+    blue: {
+      text: 'text-blue-600',
+      icon: 'bg-blue-200 text-blue-600',
+      soft: 'bg-blue-200 text-blue-600',
+      surface: 'bg-blue-50/60 border-blue-100',
+      card: 'bg-gradient-to-b from-white to-blue-50/40 border-blue-100',
+      glow: 'bg-blue-400/10',
+    },
+
+    teal: {
+      text: 'text-teal-600',
+      icon: 'bg-teal-200 text-teal-600',
+      soft: 'bg-teal-200 text-teal-600',
+      surface: 'bg-teal-50/60 border-teal-100',
+      card: 'bg-gradient-to-b from-white to-teal-50/40 border-teal-100',
+      glow: 'bg-teal-400/10',
+    },
+
+    violet: {
+      text: 'text-violet-600',
+      icon: 'bg-violet-200 text-violet-600',
+      soft: 'bg-violet-200 text-violet-600',
+      surface: 'bg-violet-50/60 border-violet-100',
+      card: 'bg-gradient-to-b from-white to-violet-50/40 border-violet-100',
+      glow: 'bg-violet-400/10',
+    },
+
+    amber: {
+      text: 'text-amber-600',
+      icon: 'bg-amber-200 text-amber-600',
+      soft: 'bg-amber-200 text-amber-600',
+      surface: 'bg-amber-50/60 border-amber-100',
+      card: 'bg-gradient-to-b from-white to-amber-50/40 border-amber-100',
+      glow: 'bg-amber-400/10',
+    },
+
+    rose: {
+      text: 'text-rose-600',
+      icon: 'bg-rose-200 text-rose-600',
+      soft: 'bg-rose-200 text-rose-600',
+      surface: 'bg-rose-50/60 border-rose-100',
+      card: 'bg-gradient-to-b from-white to-rose-50/40 border-rose-100',
+      glow: 'bg-rose-400/10',
+    },
+
+    cyan: {
+      text: 'text-cyan-600',
+      icon: 'bg-cyan-200 text-cyan-600',
+      soft: 'bg-cyan-200 text-cyan-600',
+      surface: 'bg-cyan-50/60 border-cyan-100',
+      card: 'bg-gradient-to-b from-white to-cyan-50/40 border-cyan-100',
+      glow: 'bg-cyan-400/10',
+    },
+
+    lime: {
+      text: 'text-lime-600',
+      icon: 'bg-lime-200 text-lime-600',
+      soft: 'bg-lime-200 text-lime-600',
+      surface: 'bg-lime-50/60 border-lime-100',
+      card: 'bg-gradient-to-b from-white to-lime-50/40 border-lime-100',
+      glow: 'bg-lime-400/10',
+    },
+
+    orange: {
+      text: 'text-orange-600',
+      icon: 'bg-orange-200 text-orange-600',
+      soft: 'bg-orange-200 text-orange-600',
+      surface: 'bg-orange-50/60 border-orange-100',
+      card: 'bg-gradient-to-b from-white to-orange-50/40 border-orange-100',
+      glow: 'bg-orange-400/10',
+    },
   };
+
+  return map[tone] ?? map.emerald;
 }
 
 const HOME_AVATAR_SCENES: Record<string, HomeAvatarScene> = {
@@ -642,6 +725,24 @@ function metadataText(item: ContentItem, ...keys: string[]): string {
   return '';
 }
 
+function readContentDistanceKm(
+  item: ContentItem,
+  allowViewerDistance: boolean,
+): number | null {
+  if (!allowViewerDistance) return null;
+  const metadata = item.metadata || {};
+  const viewerDistance = readNumber(metadata.viewer_distance_km);
+  if (viewerDistance !== null && viewerDistance >= 0) return viewerDistance;
+  const direct = readNumber(
+    (item as ContentItem & { distance_km?: unknown }).distance_km,
+  );
+  return direct !== null && direct >= 0 ? direct : null;
+}
+
+function formatRecommendationDistance(distanceKm: number | null): string | null {
+  return formatDistanceKm(distanceKm);
+}
+
 function labelForContentType(isId: boolean, type?: string | null): string {
   const normalized = (type || '').toLowerCase();
   if (normalized === 'product') return isId ? 'Produk' : 'Product';
@@ -669,6 +770,7 @@ function createHrefForContentType(type?: string | null): string {
 function mapContentToRecommendation(
   item: ContentItem,
   isId: boolean,
+  allowViewerDistance = false,
 ): RecommendationItem | null {
   if (!item.id || !item.title) return null;
   const images = resolveImageGallery(item);
@@ -691,6 +793,7 @@ function mapContentToRecommendation(
   const unit =
     resolveContentPriceUnitLabel(item, isId ? 'id' : 'en') ||
     metadataText(item, 'unit', 'rate_type', 'min_order_qty', 'lease_term');
+  const distanceKm = readContentDistanceKm(item, allowViewerDistance);
 
   return {
     id: item.id,
@@ -714,6 +817,8 @@ function mapContentToRecommendation(
     badgeTone: item.promo_label ? 'rose' : undefined,
     typeLabel: labelForContentType(isId, type),
     createHref: createHrefForContentType(type),
+    distanceKm,
+    distanceLabel: formatRecommendationDistance(distanceKm),
   };
 }
 
@@ -1004,105 +1109,122 @@ function buildGameSnapshot(
   };
 }
 
-function getQuickCategories(isId: boolean): QuickCategory[] {
+const QUICK_CATEGORY_UI: Record<
+  BusinessDiscoveryCategoryId,
+  QuickCategoryUiConfig
+> = {
+  equipment: {
+    image: '/images/hero/menu/mesin-01.png',
+    tone: 'emerald',
+    flip: true,
+    scale: 1,
+    rotate: -5,
+    offsetX: -20,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  supplies: {
+    image: '/images/hero/menu/bahan-01.png',
+    tone: 'orange',
+    flip: true,
+    scale: 1,
+    rotate: -5,
+    offsetX: -20,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  service: {
+    image: '/images/hero/menu/jasa-01.png',
+    tone: 'violet',
+    flip: true,
+    scale: 1,
+    rotate: -5,
+    offsetX: -20,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  property: {
+    image: '/images/hero/menu/lok-01.png',
+    tone: 'rose',
+    flip: false,
+    scale: 1,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  nearby: {
+    image: '/images/hero/menu/map-01.png',
+    tone: 'blue',
+    flip: true,
+    scale: 0.88,
+    rotate: -5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+  opportunity: {
+    image: '/images/hero/menu/peluang-01.png',
+    tone: 'cyan',
+    flip: false,
+    scale: 1,
+    rotate: 5,
+    offsetX: -24,
+    offsetY: -16,
+    imageSize: 70,
+  },
+};
+
+export function getQuickCategories(isId: boolean): QuickCategory[] {
+  const businessCategories = HOME_BUSINESS_DISCOVERY_CATEGORY_IDS.map(
+    (id): QuickCategory | null => {
+      const category = getBusinessDiscoveryCategoryById(id);
+      if (!category) return null;
+      return {
+        id: category.id,
+        label: isId ? category.labelId : category.labelEn,
+        description: isId ? category.hintId : category.hintEn,
+        href:
+          category.id === 'nearby' ? UMKM_DISCOVERY_PATH : category.searchHref,
+        badge: isId ? category.badgeId : category.badgeEn,
+        ...QUICK_CATEGORY_UI[category.id],
+      };
+    },
+  ).filter((item): item is QuickCategory => Boolean(item));
+
   return [
-    {
-      id: 'supplier',
-      label: isId ? 'Supplier' : 'Suppliers',
-      description: isId ? 'Supplier siap respon' : 'Trusted suppliers',
-      href: '/search?type=product&q=supplier',
-      icon: ShoppingBag,
-      tone: 'emerald',
-    },
-    {
-      id: 'product',
-      label: isId ? 'Produk' : 'Products',
-      description: isId ? 'Stok siap jual' : 'Best products',
-      href: '/search?q=produk%20reseller',
-      icon: Package,
-      tone: 'orange',
-    },
-    {
-      id: 'service',
-      label: isId ? 'Jasa' : 'Services',
-      description: isId ? 'Jasa operasional' : 'Business services',
-      href: '/search?type=service&q=jasa%20usaha',
-      icon: BriefcaseBusiness,
-      tone: 'violet',
-    },
-    {
-      id: 'location',
-      label: isId ? 'Lokasi' : 'Places',
-      description: isId ? 'Lokasi jualan' : 'Strategic places',
-      href: '/search?type=property&q=lokasi%20usaha',
-      icon: MapPin,
-      tone: 'rose',
-    },
-    {
-      id: 'talent',
-      label: 'Talent',
-      description: isId ? 'Talent siap bantu' : 'Qualified talent',
-      href: '/search?type=freelancer&q=talent',
-      icon: UserRound,
-      tone: 'cyan',
-    },
+    ...businessCategories,
     {
       id: 'community',
       label: isId ? 'Komunitas' : 'Community',
-      description: isId
-        ? 'Diskusi dan belajar bareng'
-        : 'Discuss and learn together',
+      description: '...',
       href: '/community',
-      icon: MessageCircle,
+      image: '/images/hero/menu/komun-01.png',
       tone: 'amber',
-    },
-    {
-      id: 'reels',
-      label: 'Reels',
-      description: isId ? 'Video usaha' : 'Business videos',
-      href: '/reels',
-      icon: Clapperboard,
-      tone: 'lime',
-    },
-    {
-      id: 'map',
-      label: isId ? 'Peta Usaha' : 'Business Map',
-      description: isId ? 'Usaha sekitar' : 'Nearby businesses',
-      href: UMKM_DISCOVERY_PATH,
-      icon: Globe2,
-      tone: 'blue',
-    },
-  ];
-}
+      badge: isId ? 'Aktif' : 'Active',
 
-function getHeroMetrics(
-  isId: boolean,
-  summary: LajukanSummary | null,
-): HeroMetric[] {
-  return [
-    {
-      id: 'verified',
-      label: isId ? 'Supplier siap' : 'Verified suppliers',
-      value: formatCompactCount(summary?.stores?.verified, '0'),
-      note: isId ? 'Partner siap diajak kerja' : 'Partners ready to work',
-      icon: ShieldCheck,
-      tone: 'emerald',
+      flip: false,
+      scale: 1.2,
+      rotate: 5,
+      offsetX: -24,
+      offsetY: -16,
+      imageSize: 70,
     },
     {
-      id: 'demand',
-      label: isId ? 'Permintaan aktif' : 'Active requests',
-      value: formatCompactCount(summary?.requests?.active, '0'),
-      note: isId ? 'Diambil dari data platform' : 'From platform data',
-      icon: TrendingUp,
-      tone: 'amber',
-    },
-    {
-      id: 'community',
-      label: isId ? 'Komunitas Aktif' : 'Active community',
-      value: formatCompactCount(summary?.requests?.active, '0'),
-      note: isId ? 'Diskusi dan peluang baru' : 'Discussions and new leads',
-      icon: UserRound,
-      tone: 'blue',
+      id: 'video',
+      label: isId ? 'Video' : 'Videos',
+      description: '...',
+      href: '/reels',
+      image: '/images/hero/menu/reel-01.png',
+      tone: 'lime',
+      badge: isId ? 'Viral' : 'Trending',
+
+      flip: false,
+      scale: 1.2,
+      rotate: 5,
+      offsetX: -24,
+      offsetY: -16,
+      imageSize: 70,
     },
   ];
 }
@@ -1206,102 +1328,6 @@ function renderHomeAvatarProp(prop: HomeAvatarProp) {
   );
 }
 
-function HomeCategoryAvatar({
-  item,
-  isId,
-  mobile = false,
-}: {
-  item: QuickCategory;
-  isId: boolean;
-  mobile?: boolean;
-}) {
-  const scene = getHomeAvatarScene(item.id);
-  const tone = toneClassNames(scene.tone);
-
-  return (
-    <span
-      className={cn(
-        'relative isolate inline-flex items-end justify-center overflow-hidden rounded-[18px] border bg-white/88 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.28)]',
-        mobile ? 'h-14 w-14' : 'h-[4.5rem] w-[4.5rem]',
-        tone.surface,
-      )}
-    >
-      <span
-        className={cn(
-          'absolute -right-3 -top-3 h-10 w-10 rounded-full blur-xl',
-          tone.glow,
-        )}
-      />
-      <span className="absolute inset-x-2 bottom-1 h-4 rounded-full bg-white/60" />
-      <span
-        className={cn(
-          'relative z-10',
-          mobile ? 'h-[3.8rem] w-[3.8rem]' : 'h-[4.7rem] w-[4.7rem]',
-        )}
-      >
-        <HomeAvatarSprite
-          scene={scene}
-          isId={isId}
-          decorative
-          sizes={mobile ? '56px' : '72px'}
-        />
-      </span>
-      <span className="absolute bottom-0 right-0 z-20 h-8 w-9 motion-safe:animate-pulse">
-        {renderHomeAvatarProp(scene.prop)}
-      </span>
-    </span>
-  );
-}
-
-function HomeHeroCollaborationScene({
-  isId,
-  compact = false,
-}: {
-  isId: boolean;
-  compact?: boolean;
-}) {
-  return (
-    <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_48%_20%,#ecfeff_0%,#d1fae5_36%,#86efac_72%,#22c55e_120%)]">
-      <span className="absolute inset-x-6 bottom-0 h-[38%] rounded-t-[999px] bg-[linear-gradient(180deg,#bbf7d0,#86efac)] opacity-90" />
-      <span className="absolute left-[12%] top-[45%] h-1 w-[74%] -rotate-6 rounded-full bg-white/60 shadow-[0_0_18px_rgba(255,255,255,0.6)]" />
-      <span className="absolute left-[19%] top-[39%] h-3 w-3 rounded-full bg-white/80" />
-      <span className="absolute right-[20%] top-[31%] h-3 w-3 rounded-full bg-emerald-100/90" />
-      <span className="absolute left-4 top-4 rounded-full bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 shadow-sm">
-        {isId ? 'Tim UMKM hidup' : 'Live SME team'}
-      </span>
-      <span className="absolute bottom-8 left-[23%] h-8 w-12 rounded-[10px] border border-amber-700/15 bg-amber-300/90 shadow-sm motion-safe:animate-bounce" />
-      <span className="absolute bottom-12 right-[19%] h-10 w-14 rounded-[12px] border border-orange-700/15 bg-orange-300/90 shadow-sm" />
-      {HOME_HERO_AVATARS.map((avatar, index) => (
-        <span
-          key={avatar.id}
-          className={cn(
-            'absolute z-10',
-            compact ? avatar.mobileClassName : avatar.desktopClassName,
-            avatar.sizeClassName,
-            compact && index === 3 ? 'hidden min-[430px]:block' : '',
-          )}
-        >
-          <HomeAvatarSprite
-            scene={avatar}
-            isId={isId}
-            sizes={compact ? '144px' : '160px'}
-          />
-          <span className="absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/88 px-2 py-0.5 text-[9px] font-black text-emerald-700 shadow-sm backdrop-blur">
-            {homeSceneCaption(avatar, isId)}
-          </span>
-        </span>
-      ))}
-      <span className="absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-1 rounded-full bg-white/86 px-3 py-1.5 text-[10px] font-black text-emerald-800 shadow-sm backdrop-blur sm:inline-flex">
-        <span>{isId ? 'Supplier' : 'Supplier'}</span>
-        <ChevronRight className="h-3 w-3" />
-        <span>Chat</span>
-        <ChevronRight className="h-3 w-3" />
-        <span>{isId ? 'Kirim' : 'Deliver'}</span>
-      </span>
-    </div>
-  );
-}
-
 type CommunityTabItem = {
   id: CommunityTab;
   label: string;
@@ -1369,7 +1395,7 @@ function SectionHeading({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <h2 className="text-[1.02rem] font-black tracking-[-0.035em] text-[color:var(--app-text)] sm:text-[1.12rem]">
+      <h2 className="text-[1.02rem] font-bold tracking-[-0.035em] text-[color:var(--app-text)] sm:text-[1.12rem]">
         {title}
       </h2>
       {actionLabel && actionHref ? (
@@ -1400,6 +1426,58 @@ function DesktopSidebar({
   inviteHref: string;
 }) {
   const currentPath = normalizePathname(pathname);
+  const primaryItems = items.primary.slice(0, 5);
+  const secondaryItems = items.secondary.slice(0, 2);
+
+  const isItemActive = (item: SidebarItem) => {
+    const itemPath = item.href.split('?')[0];
+    return itemPath === '/home'
+      ? currentPath === '/home' || currentPath === '/'
+      : currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
+  };
+
+  const renderSidebarItem = (item: SidebarItem, compact = false) => {
+    const Icon = item.icon;
+    const active = isItemActive(item);
+
+    return (
+      <Link
+        key={item.id}
+        href={item.href}
+        title={item.caption}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'flex items-center gap-2.5 rounded-[14px] px-2.5 transition',
+          compact ? 'min-h-[40px] py-1.5' : 'min-h-[44px] py-2',
+          active
+            ? 'bg-emerald-50 text-emerald-700'
+            : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]',
+        )}
+      >
+        <span
+          className={cn(
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]',
+            active
+              ? 'bg-white text-emerald-600'
+              : 'bg-slate-50 text-[color:var(--app-text-soft)]',
+          )}
+        >
+          <Icon className="h-4.5 w-4.5" />
+        </span>
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="truncate text-xs font-semibold">{item.label}</span>
+          {item.locked ? (
+            <LockKeyhole className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          ) : null}
+          {item.badge ? (
+            <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+              {item.badge}
+            </span>
+          ) : null}
+        </span>
+      </Link>
+    );
+  };
 
   return (
     <aside className="hidden lg:block lg:h-full lg:min-h-0 lg:overflow-hidden">
@@ -1407,114 +1485,27 @@ function DesktopSidebar({
         className="flex h-full max-h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pb-6 pr-1"
         data-auto-scrollbar
       >
-        <nav className="shrink-0 rounded-[24px] p-3 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)]">
-          <div className="space-y-1">
-            {items.primary.map(item => {
-              const Icon = item.icon;
-              const itemPath = item.href.split('?')[0];
-              const active =
-                itemPath === '/home'
-                  ? currentPath === '/home' || currentPath === '/'
-                  : currentPath === itemPath ||
-                  currentPath.startsWith(`${itemPath}/`);
-
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'flex min-h-[46px] items-start gap-2.5 rounded-[14px] px-2.5 py-2 transition',
-                    active
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]',
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px]',
-                      active
-                        ? 'bg-white text-emerald-600'
-                        : 'bg-slate-50 text-[color:var(--app-text-soft)]',
-                    )}
-                  >
-                    <Icon className="h-4.5 w-4.5" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-2 text-xs font-semibold">
-                      {item.label}
-                      {item.locked ? (
-                        <LockKeyhole className="h-3.5 w-3.5 text-slate-400" />
-                      ) : null}
-                      {item.badge ? (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">
-                          {item.badge}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                      {item.caption}
-                    </span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-          <div className="my-2 h-px bg-[color:var(--app-border)]" />
-          <div className="space-y-1">
-            {items.secondary.map(item => {
-              const Icon = item.icon;
-              const itemPath = item.href.split('?')[0];
-              const active =
-                currentPath === itemPath ||
-                currentPath.startsWith(`${itemPath}/`);
-
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  aria-current={active ? 'page' : undefined}
-                  className={cn(
-                    'flex min-h-[44px] items-start gap-2.5 rounded-[14px] px-2.5 py-2 transition',
-                    active
-                      ? 'bg-slate-50 text-[color:var(--app-text)]'
-                      : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)] hover:text-[color:var(--app-text)]',
-                  )}
-                >
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-slate-50 text-[color:var(--app-text-soft)]">
-                    <Icon className="h-4.5 w-4.5" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-2 text-xs font-semibold">
-                      {item.label}
-                      {item.locked ? (
-                        <LockKeyhole className="h-3.5 w-3.5 text-slate-400" />
-                      ) : null}
-                      {item.badge ? (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">
-                          {item.badge}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="mt-0.5 block text-[10px] leading-4 text-[color:var(--app-text-soft)]">
-                      {item.caption}
-                    </span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+        <nav className="shrink-0 rounded-[22px] p-2.5 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)]">
+          <div className="space-y-1">{primaryItems.map(item => renderSidebarItem(item))}</div>
+          {secondaryItems.length > 0 ? (
+            <>
+              <div className="my-2 h-px bg-[color:var(--app-border)]" />
+              <div className="space-y-1">
+                {secondaryItems.map(item => renderSidebarItem(item, true))}
+              </div>
+            </>
+          ) : null}
         </nav>
-        <div className="shrink-0 overflow-hidden rounded-[24px] border border-emerald-100 bg-[linear-gradient(180deg,#f4fff8_0%,#ffffff_62%,#eefbf4_100%)] p-3.5 shadow-[0_18px_36px_-32px_rgba(22,163,74,0.22)] m-3">
-          <h3 className="text-[0.92rem] font-black tracking-[-0.03em] text-[color:var(--app-text)]">
+        <div className="m-2 shrink-0 overflow-hidden rounded-[20px] border border-emerald-100 bg-emerald-50/70 p-3 shadow-[0_18px_36px_-32px_rgba(22,163,74,0.22)]">
+          <h3 className="line-clamp-1 text-[0.85rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">
             {inviteTitle}
           </h3>
-          <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
             {inviteDescription}
           </p>
           <Link
             href={inviteHref}
-            className="mt-3 inline-flex min-h-[38px] w-full items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-xs font-semibold text-[color:var(--app-text-inverse)]"
+            className="mt-2 inline-flex min-h-[36px] w-full items-center justify-center rounded-[13px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-xs font-semibold text-[color:var(--app-text-inverse)]"
           >
             {inviteButton}
           </Link>
@@ -1531,392 +1522,102 @@ function HeroVisualStage({
   isId: boolean;
   className?: string;
 }) {
+  const { user, isAuthenticated } = useAuth();
+
+  const displayName =
+    user?.username || user?.fullName || user?.full_name || 'Sobat Bisnis';
+
   return (
-    <div
-      className={cn(
-        "min-w-0 rounded-[24px]",
-        className,
-      )}
-    >
-      <div className="relative aspect-[1734/907] overflow-hidden rounded-[20px]">
-        <Image
-          src={HOME_HERO_IMAGE}
-          alt="Lajukan hero"
-          fill
-          quality={95}
-          sizes="100vw"
-          className="object-cover object-center scale-[1.08]"
-        />
-
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-transparent" />
-
-        {/* Content */}
-        <div className="absolute inset-0 flex items-center">
-          <div
-            className="
-              w-[58%]
-              pl-[clamp(1rem,3vw,3.5rem)]
-              pr-[clamp(0.5rem,1vw,1rem)]
-            "
-          >
-            <h2
-              className="
-                text-white
-                font-black
-                leading-[0.92]
-                tracking-[-0.04em]
-                drop-shadow-[0_8px_32px_rgba(0,0,0,0.45)]
-
-                text-[clamp(1.6rem,3.6vw,5.6rem)]
-              "
-            >
-              {isId ? (
-                <>
-                  Semua kebutuhan bisnis
-                  <br />
-                  semakin mudah di{" "}
-                  <span className="text-emerald-100">
-                    Lajukan
+    <section className={`mx-auto w-full max-w-7xl px-3 py-4 ${className || ''}`}>
+      <div
+        className={`
+          relative overflow-hidden rounded-3xl bg-emerald-50/70
+          px-4 py-5 sm:px-6 sm:py-7
+          ${isAuthenticated ? 'min-h-[125px]' : 'min-h-[155px]'}
+        `}
+      >
+        <div className="relative z-10 grid grid-cols-3 items-center gap-3">
+          {/* LEFT */}
+          <div className="col-span-2 flex flex-col justify-center">
+            {isAuthenticated ? (
+              <>
+                <h1 className="text-[clamp(1.25rem,3vw,2.25rem)] font-black leading-[0.95] tracking-[-0.05em] text-zinc-950">
+                  Halo,{' '}
+                  <span className="text-emerald-600">
+                    {displayName} 👋
                   </span>
-                  .
-                </>
-              ) : (
-                <>
-                  All business needs
+                </h1>
+
+                <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-600 sm:text-sm sm:leading-6">
+                  Cari supplier, bahan usaha, jasa, tempat jualan, dan peluang
+                  baru untuk usahamu.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-[clamp(1.4rem,3.5vw,2.75rem)] font-black leading-[0.95] tracking-[-0.06em] text-zinc-950">
+                  Cari Kebutuhan
                   <br />
-                  made easier with{" "}
-                  <span className="text-emerald-100">
-                    Lajukan
+                  <span className="text-emerald-600">
+                    Usaha Lokal 🚀
                   </span>
-                  .
-                </>
-              )}
-            </h2>
+                </h1>
 
-            <Link
-              href="/register"
-              className="
-                mt-[clamp(1rem,2vw,2rem)]
-                inline-flex
-                items-center
-                gap-[clamp(0.5rem,1vw,1rem)]
+                <p className="mt-2 max-w-xl text-xs font-semibold leading-5 text-zinc-600 sm:text-sm sm:leading-6">
+                  Temukan supplier, bahan, mesin, jasa, tempat usaha, dan
+                  peluang bisnis untuk UMKM Indonesia.
+                </p>
+              </>
+            )}
+          </div>
 
-                rounded-full
-                bg-yellow-500
-
-                px-[clamp(1.25rem,2vw,2.5rem)]
-                py-[clamp(0.75rem,1vw,1rem)]
-
-                text-[clamp(0.95rem,1.35vw,1.7rem)]
-                font-bold
-                text-black
-
-                shadow-xl
-                transition-all
-                duration-200
-
-                hover:bg-yellow-400
-                hover:scale-105
-              "
-            >
-              {isId ? "Gabung Gratis" : "Join Free"}
-
-              <ArrowRight
+          {/* RIGHT IMAGE */}
+          {!isAuthenticated && (
+            <div className="relative col-span-1 h-[110px] sm:h-[140px] md:h-[170px]">
+              <Image
+                src={HOME_HERO_IMAGE}
+                alt="Lajukan Hero"
+                width={500}
+                height={500}
+                priority
                 className="
-                  h-[clamp(1rem,1.3vw,1.7rem)]
-                  w-[clamp(1rem,1.3vw,1.7rem)]
+                  pointer-events-none absolute right-[-20px] top-1/2
+                  w-[150px] -translate-y-1/2 object-contain
+                  sm:w-[210px] md:w-[260px]
                 "
               />
-            </Link>
-          </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
 
-// function MobileHeroVisualBanner({
-//   isId,
-//   metrics,
-//   className,
-// }: {
-//   isId: boolean;
-//   metrics: HeroMetric[];
-//   className?: string;
-// }) {
-//   return (
-//     <section
-//       className={cn(
-//         'relative aspect-[3/2] w-full overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_76%,white_16%)] bg-emerald-100 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.22)]',
-//         className,
-//       )}
-//     >
-//       <Image
-//         src={HOME_HERO_IMAGE}
-//         alt={isId ? 'Visual Lajukan' : 'Lajukan visual'}
-//         fill
-//         loading="lazy"
-//         fetchPriority="low"
-//         quality={1000}
-//         sizes="100vw"
-//         className="object-cover object-center"
-//       />
-//     </section>
-//   );
-// }
+      {/* SEARCH */}
+      <div className="-mt-5 px-2">
+        <div className="relative z-20 flex h-12 items-center gap-2 rounded-2xl border border-zinc-100 bg-white px-3 shadow-lg shadow-zinc-900/5">
+          <Search className="h-4 w-4 shrink-0 text-emerald-600" />
 
-function DesktopHeroSection({
-  isId,
-  isAuthenticated,
-  summary,
-  primaryCtaHref,
-  query,
-  onQueryChange,
-  onSubmit,
-  placeholder,
-  buttonLabel,
-}: {
-  isId: boolean;
-  isAuthenticated: boolean;
-  summary: LajukanSummary | null;
-  primaryCtaHref: string;
-  query: string;
-  onQueryChange: (value: string) => void;
-  onSubmit: (query: string) => void;
-  placeholder: string;
-  buttonLabel: string;
-}) {
-  const metrics = getHeroMetrics(isId, summary);
-
-  if (!isAuthenticated) {
-    return (
-      <div>
-        <HeroVisualStage
-          isId={isId}
-          className="mb-3"
-        />
-
-      </div >
-    );
-  }
-
-  return (
-    <div>
-      {/* <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_8%)] bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_48%,#eefbf2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)] xl:p-5">
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_268px] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_292px]">
-          <div className="relative z-10 min-w-0">
-            <p className="mb-2 inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] ring-1 ring-emerald-100">
-              {isAuthenticated
-                ? isId
-                  ? 'Workspace bisnismu'
-                  : 'Your business workspace'
-                : isId
-                  ? 'Sourcing dan operasional'
-                  : 'Sourcing and operations'}
-            </p>
-            <h1 className="max-w-[22ch] text-[1.78rem] font-semibold leading-[1.04] tracking-[-0.045em] text-[color:var(--app-text)] xl:text-[2rem]">
-              {isAuthenticated
-                ? isId
-                  ? 'Lanjut di '
-                  : 'Continue your business flow on '
-                : isId
-                  ? 'Cari kebutuhan usaha di '
-                  : 'Everything your business needs is on '}
-              <span className="text-[color:var(--app-accent)]">Lajukan</span>
-            </h1>
-            <p className="mt-3 max-w-[37rem] text-[13px] leading-6 text-[color:var(--app-text-soft)]">
-              {isAuthenticated
-                ? isId
-                  ? 'Chat, transaksi, dan kebutuhan aktif.'
-                  : 'Track offers, create new needs, and continue supplier chats from one compact page.'
-                : isId
-                  ? 'Cari. Pilih. Chat. Deal aman.'
-                  : 'Find suppliers, products, services, places, talent, and business opportunities in one flow.'}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-3 grid min-w-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-center">
-          <SearchInput
-            value={query}
-            onValueChange={onQueryChange}
-            onSearch={onSubmit}
-            placeholder={placeholder}
-            buttonLabel={buttonLabel}
-            layout="row"
-            variant="hero"
-            ariaLabel={isId ? 'Cari kebutuhan usaha' : 'Search business needs'}
-            inputAriaLabel={isId ? 'Kata kunci pencarian' : 'Search keyword'}
-            testId="home-hero-search-form"
-            inputTestId="home-hero-search-input"
+          <input
+            placeholder={
+              isAuthenticated
+                ? 'Cari kebutuhan usaha hari ini...'
+                : 'Cari supplier, bahan usaha, jasa, atau peluang...'
+            }
+            className="
+              min-w-0 flex-1 bg-transparent text-sm font-semibold text-zinc-700
+              placeholder:text-zinc-400 focus:outline-none
+            "
           />
-          <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-            <Link
-              href={primaryCtaHref}
-              className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-xs font-semibold text-[color:var(--app-text-inverse)]"
-            >
-              {isAuthenticated
-                ? isId
-                  ? 'Buat Permintaan'
-                  : 'Create Request'
-                : isId
-                  ? 'Daftar Sekarang'
-                  : 'Register Now'}
-            </Link>
-            <Link
-              href={isAuthenticated ? '/dashboard' : UMKM_DISCOVERY_PATH}
-              className="inline-flex min-h-[40px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-xs font-semibold text-[color:var(--app-text)]"
-            >
-              {isAuthenticated
-                ? isId
-                  ? 'Dashboard'
-                  : 'Open Dashboard'
-                : isId
-                  ? 'Jelajah'
-                  : 'Explore Platform'}
-            </Link>
-          </div>
+
+          <button
+            type="button"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-zinc-500 hover:bg-zinc-100"
+            aria-label="Filter pencarian"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
         </div>
-
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-semibold text-[color:var(--app-text-soft)]">
-            {isId ? 'Populer:' : 'Popular:'}
-          </span>
-          {HERO_TAGS.map(tag => (
-            <Link
-              key={tag}
-              href={`/search?q=${encodeURIComponent(tag)}`}
-              className="inline-flex min-h-0 items-center rounded-full border border-[color:var(--app-border)] bg-white px-2.5 py-1 text-[10px] font-medium text-[color:var(--app-text-soft)]"
-            >
-              {tag}
-            </Link>
-          ))}
-        </div>
-      </section> */}
-      {/* <MobileHeroVisualBanner
-        isId={isId}
-        metrics={metrics}
-        className="mt-3 xl:hidden"
-      /> */}
-      <HeroVisualStage
-        isId={isId}
-        metrics={metrics}
-        className="mt-3"
-      />
-    </div>
-  );
-}
-
-function MobileHeroSection({
-  isId,
-  isAuthenticated,
-  summary,
-}: {
-  isId: boolean;
-  isAuthenticated: boolean;
-  summary: LajukanSummary | null;
-}) {
-  const metrics = getHeroMetrics(isId, summary);
-
-  if (!isAuthenticated) {
-    return (
-      <div>
-        {/* <MobileHeroVisualBanner
-          isId={isId}
-          metrics={metrics}
-          className="mb-2.5"
-        /> */}
-        {/* <section className="overflow-hidden rounded-[26px] border border-emerald-200/70 bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_46%,#ecfff2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)]">
-          <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-            {isId ? 'Sebelum login' : 'Before login'}
-          </p>
-          <h1 className="max-w-[18ch] text-[1.36rem] font-semibold leading-[1.05] tracking-[-0.04em] text-[color:var(--app-text)]">
-            {isId
-              ? 'Masuk dulu, biar peluang terbaik tidak lewat begitu saja'
-              : 'Log in first so the best opportunities do not pass by'}
-            <span className="text-[color:var(--app-accent)]"> Lajukan</span>
-          </h1>
-          <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
-            {isId
-              ? 'Lihat listing, komunitas, dan reels bisnis yang relevan. Login supaya favorit, chat, dan riwayat pencarian ikut tersimpan.'
-              : 'Browse suppliers, services, communities, and business reels. Log in so favorites, chats, and search history stay with you.'}
-          </p>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
-              <Heart className="h-3.5 w-3.5 text-rose-500" />
-              {isId ? 'Simpan favorit' : 'Save favorites'}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              {isId ? 'Lebih rapi' : 'Stay organized'}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text)] ring-1 ring-emerald-100">
-              <Zap className="h-3.5 w-3.5 text-amber-500" />
-              {isId ? 'Lanjut cepat' : 'Continue fast'}
-            </span>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link
-              href="/login"
-              className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] border border-emerald-200 bg-white px-3 text-[12px] font-black text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/[0.08] dark:text-emerald-100 dark:hover:bg-white/[0.12]"
-            >
-              {isId ? 'Masuk' : 'Login'}
-            </Link>
-            <Link
-              href="/register"
-              className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-black text-white shadow-[0_12px_22px_-17px_rgba(4,120,87,0.82)] transition hover:bg-[color:var(--app-accent-strong)]"
-            >
-              {isId ? 'Daftar Sekarang' : 'Register Now'}
-            </Link>
-          </div>
-        </section> */}
       </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* <MobileHeroVisualBanner
-        isId={isId}
-        metrics={metrics}
-        className="mb-2.5"
-      /> */}
-      {/* <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_8%)] bg-[linear-gradient(145deg,#ffffff_0%,#f8fcff_48%,#eefbf2_100%)] p-4 shadow-[0_20px_42px_-36px_rgba(15,23,42,0.18)]">
-        <div className="min-w-0">
-          <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
-            {isAuthenticated
-              ? isId
-                ? 'Workspace bisnismu'
-                : 'Your workspace'
-              : isId
-                ? 'Mulai'
-                : 'Start here'}
-          </p>
-          <h1 className="max-w-[18ch] text-[1.36rem] font-semibold leading-[1.05] tracking-[-0.04em] text-[color:var(--app-text)]">
-            {isAuthenticated
-              ? isId
-                ? 'Lanjutkan bisnis di '
-                : 'Continue on '
-              : isId
-                ? 'Semua kebutuhan usaha di '
-                : 'Business essentials on '}
-            <span className="text-[color:var(--app-accent)]">Lajukan</span>
-          </h1>
-          <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
-            {isAuthenticated
-              ? isId
-                ? 'Chat, transaksi, peluang.'
-                : 'Track chats, transactions, and new opportunities without wasted space.'
-              : isId
-                ? 'Cari supplier, lokasi, jasa, talent.'
-                : 'Find suppliers, places, services, and talent for your business.'}
-          </p>
-        </div>
-      </section> */}
-    </div>
+    </section>
   );
 }
 
@@ -1955,7 +1656,7 @@ function GameProgressCard({
             <LockKeyhole className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-white">
+            <p className="text-sm font-bold leading-5 text-[color:var(--app-text)] dark:text-white">
               {isId ? 'Masuk untuk mulai level' : 'Login to start your level'}
             </p>
             <p className="mt-1 text-[12px] font-semibold leading-5 text-[color:var(--app-text-soft)] dark:text-white/64">
@@ -1966,13 +1667,13 @@ function GameProgressCard({
             <div className="mt-2 grid grid-cols-2 gap-2">
               <Link
                 href="/login"
-                className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] border border-emerald-200 bg-white px-3 text-[12px] font-black text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/[0.08] dark:text-emerald-100 dark:hover:bg-white/[0.12]"
+                className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] border border-emerald-200 bg-white px-3 text-[12px] font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/[0.08] dark:text-emerald-100 dark:hover:bg-white/[0.12]"
               >
                 {isId ? 'Masuk' : 'Login'}
               </Link>
               <Link
                 href="/register"
-                className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-black text-white shadow-[0_12px_22px_-17px_rgba(4,120,87,0.82)] transition hover:bg-[color:var(--app-accent-strong)]"
+                className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-bold text-white shadow-[0_12px_22px_-17px_rgba(4,120,87,0.82)] transition hover:bg-[color:var(--app-accent-strong)]"
               >
                 {isId ? 'Daftar Sekarang' : 'Register Now'}
               </Link>
@@ -2005,7 +1706,7 @@ function GameProgressCard({
         <div className="flex min-w-0 items-center gap-3">
           {/* Badge Level dengan Efek 3D Clean */}
           <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20">
-            <span className="text-base font-black tracking-tight">
+            <span className="text-base font-bold tracking-tight">
               {snapshot.level}
             </span>
             <div className="absolute -bottom-1 -right-1 rounded-md bg-amber-400 p-0.5 shadow-sm">
@@ -2116,7 +1817,7 @@ function GameProgressCard({
                 </p>
               </div>
             </div>
-            <span className="shrink-0 text-xs font-black text-emerald-600 dark:text-emerald-400 bg-white dark:bg-zinc-900 px-2 py-1 rounded-md border border-emerald-100/50 dark:border-zinc-800">
+            <span className="shrink-0 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-zinc-900 px-2 py-1 rounded-md border border-emerald-100/50 dark:border-zinc-800">
               +{activeQuest.xp} XP
             </span>
           </Link>
@@ -2126,302 +1827,425 @@ function GameProgressCard({
   );
 }
 
-function QuickCategoriesSection({
-  isId,
-  mobile = false,
-}: {
-  isId: boolean;
-  mobile?: boolean;
-}) {
-  const categories = getQuickCategories(isId);
+const FALLBACK_TRENDING_SEARCHES: TrendingSearchItem[] = [
+  'Supplier kemasan',
+  'Bahan baku usaha',
+  'Mesin usaha',
+  'Jasa branding',
+  'Lokasi usaha',
+  'Peluang usaha',
+].map(label => ({
+  label,
+  href: `/search?q=${encodeURIComponent(label)}`,
+  source: 'fallback',
+}));
 
-  if (mobile) {
-    return (
-      <section className="overflow-hidden rounded-[22px] border border-[color:var(--app-border)] p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.12)]">
-        {/* <div className="flex items-center gap-2.5 px-0.5 pb-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-emerald-100 bg-emerald-50 text-emerald-600">
-            <Sparkles className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[1.08rem] font-black tracking-[-0.035em] text-[color:var(--app-text)]">
-              {isId ? 'Jelajahi kategori' : 'Explore categories'}
-            </p>
-            <p className="mt-0.5 text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
-              {isId
-                ? 'Cari kebutuhan usaha tanpa ribet.'
-                : 'Find business needs fast.'}
-            </p>
-          </div>
-        </div> */}
-        <div className="grid grid-cols-4 gap-1">
-          {categories.map(item => {
-            const tone = toneClassNames(item.tone);
-            const Icon = item.icon;
+function normalizeTrendingItem(value: unknown): TrendingSearchItem | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<TrendingSearchItem>;
+  const label = typeof item.label === 'string' ? item.label.trim() : '';
+  const href = typeof item.href === 'string' ? item.href.trim() : '';
+  if (!label || !href) return null;
+  return {
+    label: label.slice(0, 80),
+    href,
+    score: typeof item.score === 'number' ? item.score : undefined,
+    count: typeof item.count === 'number' ? item.count : undefined,
+    source: typeof item.source === 'string' ? item.source : undefined,
+  };
+}
 
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                aria-label={`${item.label}: ${item.description}`}
-                className={cn(
-                  'group relative flex min-h-[106px] flex-col items-center justify-center overflow-hidden rounded-[18px] px-1.5 py-2 text-center transition active:scale-[0.98]',
-                )}
-              >
-                <span
-                  className="absolute -right-5 -top-5 hidden h-20 w-20 rounded-full blur-xl transition group-hover:scale-125"
-                />
-                <span
-                  className={cn(
-                    'relative inline-flex h-12 w-12 items-center justify-center rounded-[15px] bg-white/88 shadow-[0_14px_24px_-20px_rgba(15,23,42,0.36)] ring-1 ring-white/70',
-                    tone.surface,
-                    tone.text,
-                  )}
-                >
-                  <Icon className="h-6 w-6" />
-                </span>
-                <span className="relative mt-2 line-clamp-2 max-w-full text-[11.5px] font-black leading-[1.1] text-[color:var(--app-text)]">
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-    );
-  }
+async function loadTrendingSearches() {
+  if (trendingSearchCache) return trendingSearchCache;
+  if (trendingSearchRequest) return trendingSearchRequest;
+
+  trendingSearchRequest = fetch('/api/home/trending-searches', {
+    cache: 'no-store',
+  })
+    .then(async response => {
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { items?: unknown[] };
+      };
+      const items = (payload.data?.items || [])
+        .map(normalizeTrendingItem)
+        .filter((item): item is TrendingSearchItem => Boolean(item))
+        .slice(0, 10);
+      trendingSearchCache = items.length > 0 ? items : FALLBACK_TRENDING_SEARCHES;
+      return trendingSearchCache;
+    })
+    .catch(() => {
+      trendingSearchCache = FALLBACK_TRENDING_SEARCHES;
+      return trendingSearchCache;
+    })
+    .finally(() => {
+      trendingSearchRequest = null;
+    });
+
+  return trendingSearchRequest;
+}
+
+export function TrendingSearchSection({ isId }: { isId: boolean }) {
+  const [items, setItems] = useState<TrendingSearchItem[]>(
+    trendingSearchCache || FALLBACK_TRENDING_SEARCHES,
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    void loadTrendingSearches().then(nextItems => {
+      if (active) setItems(nextItems);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Inisialisasi Embla untuk Chip Slider yang fleksibel
+  const [emblaRef] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true, // Membuat efek geser bebas seperti native swipe
+  });
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white p-3.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
-      <div>
-        <div className="flex items-center gap-3 rounded-[20px] bg-[linear-gradient(135deg,#ffffff,#f8fbff_60%,#effdf5)] p-3.5">
-          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] border border-emerald-100 bg-emerald-50 text-emerald-600">
-            <Sparkles className="h-5 w-5" />
+    <div className="my-5 w-full">
+      {/* HEADER */}
+      {/* Diubah ke px-4 agar sejajar dengan standar layout halaman */}
+      <div className="flex items-center justify-between px-1 sm:px-3 md:px-6">
+        <div className="flex items-center gap-2">
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-500 text-white animate-pulse shadow-sm">
+            <Flame className="h-3 w-3 fill-current" />
           </span>
-          <div className="min-w-0">
-            <p className="text-[1.12rem] font-black tracking-[-0.035em] text-[color:var(--app-text)]">
-              {isId ? 'Jelajahi kategori' : 'Explore categories'}
-            </p>
-            <p className="mt-1 text-[13px] font-semibold leading-5 text-[color:var(--app-text-soft)]">
-              {isId ? 'Cari cepat. Lanjut chat.' : 'Find what you need faster.'}
-            </p>
+          <h2 className="text-xs font-semibold text-[color:var(--app-text)] tracking-tight">
+            Banyak dicari
+          </h2>
+        </div>
+
+        <Link
+          href="/search"
+          className="group flex items-center gap-0.5 text-xs font-semibold text-[color:var(--app-accent)] transition-opacity hover:opacity-80"
+          onClick={() => {
+            void trackLajukanEvent('home.trending_search.see_all_clicked', {
+              properties: {
+                source: 'home_trending_searches',
+              },
+            });
+          }}
+        >
+          {isId ? 'Lihat semua' : 'See all'}
+          <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+
+      {/* CAROUSEL CHIPS CONTAINER */}
+      <div className="w-full">
+        {/* Pembungkus utama Embla viewport */}
+        <div className="overflow-hidden contain-paint" ref={emblaRef}>
+          {/* embla__container */}
+          {/* 1. Tambah transform-gpu & will-change-transform */}
+          {/* 2. Tambah padding kiri-kanan agar chip meluncur seamless ke ujung layar */}
+          <div className="flex touch-pan-y transform-gpu will-change-transform py-0.5 pl-4 pr-4 sm:pl-6 sm:pr-6">
+            {items.map(item => (
+              /* embla__slide */
+              <Link
+                key={`${item.label}-${item.href}`}
+                href={item.href}
+                className="
+                  flex flex-shrink-0 items-center gap-1.5
+                  rounded-full select-none
+                  border border-zinc-200 bg-zinc-50/60
+                  px-3.5 py-1.5
+                  text-[11px] font-medium text-zinc-700
+                  
+                  /* 3. OPTIMASI: Gunakan transition-colors saja (jangan transition-all) */
+                  transition-colors duration-150
+                  hover:bg-[color:var(--app-surface-muted)]
+                  hover:border-zinc-300
+                  
+                  /* 4. Ganti gap jadi margin-right agar kalkulasi Embla konstan */
+                  mr-2 last:mr-0
+                "
+                /* 5. Mencegah micro-stuttering & flicker di iOS Safari */
+                style={{ backfaceVisibility: 'hidden' }}
+                onClick={() => {
+                  void trackLajukanEvent('home.trending_search.clicked', {
+                    properties: {
+                      query: item.label,
+                      source: item.source || 'home_trending_searches',
+                      score: item.score,
+                      count: item.count,
+                    },
+                  });
+                }}
+              >
+                <Search size={12} className="text-zinc-400 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            ))}
           </div>
         </div>
-        <div className="mt-2.5 grid grid-cols-4 gap-1">
-          {categories.map(item => {
-            const tone = toneClassNames(item.tone);
-            const Icon = item.icon;
+      </div>
+    </div>
+  );
+}
 
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                aria-label={`${item.label}: ${item.description}`}
-                className={cn(
-                  'group relative min-h-[142px] overflow-hidden rounded-[18px] p-2.5 transition hover:-translate-y-0.5 ',
-                )}
+function QuickCategoriesSection({ isId }: { isId: boolean }) {
+  const categories = getQuickCategories(isId);
+
+  return (
+    <section className="rounded-2xl border border-zinc-100 bg-gradient-to-b from-white to-zinc-50 p-3 shadow-sm">
+      <div className="grid grid-cols-4 gap-2">
+        {categories.map(item => {
+          const toneStyle = toneClassNames(item.tone);
+
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-label={item.label}
+              className="group flex flex-col items-center rounded-2xl p-2 transition-transform hover:-translate-y-0.5"
+            >
+              <div
+                className={`
+                  relative
+                  flex
+                  h-14
+                  w-14
+                  items-center
+                  justify-center
+                  rounded-xl
+                  border
+                  shadow-sm
+                  ${toneStyle.surface}
+                `}
               >
-                <span
-                  className={cn(
-                    'absolute -right-7 -top-7 h-16 w-16 rounded-full blur-2xl transition group-hover:scale-125',
-                    tone.glow,
-                  )}
-                />
-                <div className="relative flex h-full flex-col items-center text-center">
-                  <span
-                    className={cn(
-                      'inline-flex h-14 w-14 items-center justify-center rounded-[17px] border bg-white/88 shadow-[0_16px_30px_-24px_rgba(15,23,42,0.28)]',
-                      tone.surface,
-                      tone.text,
-                    )}
-                  >
-                    <Icon className="h-6 w-6" />
-                  </span>
-                  <p className="mt-2.5 w-full truncate text-[0.92rem] font-black leading-5 tracking-[-0.025em] text-[color:var(--app-text)]">
-                    {item.label}
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-[12px] font-medium leading-4 text-[color:var(--app-text-soft)]">
-                    {item.description}
-                  </p>
+                {/* Badge Container */}
+                {item.badge && (
+                  <div className="absolute left-0 top-0 z-20">
+                    <div className="whitespace-nowrap bg-black px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.05em] text-white">
+                      {item.badge}
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="absolute aspect-square flex items-center justify-center"
+                  style={{
+                    width: item.imageSize ?? 70,
+                    right: item.offsetX ?? -18,
+                    bottom: item.offsetY ?? -14,
+                    transform: `
+                      scaleX(${item.flip ? -1 : 1})
+                      scale(${item.scale ?? 1})
+                      rotate(${item.rotate ?? 0}deg)
+                    `,
+                  }}
+                >
+                  <img
+                    src={item.image}
+                    alt={item.label}
+                    className="
+                      h-full
+                      w-full
+                      object-contain
+                      transition-transform
+                      duration-300
+                      group-hover:scale-105
+                      select-none
+                      pointer-events-none
+                    "
+                  />
                 </div>
-              </Link>
-            );
-          })}
-        </div>
+              </div>
+
+              <span className="mt-2 text-center text-[11px] font-semibold leading-tight text-zinc-700">
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
 }
+
+export function RecommendationsSection({
+  isId,
+  items,
+}: {
+  isId: boolean;
+  items: RecommendationItem[];
+}) {
+  const [emblaRef] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true,
+  });
+
+  return (
+    <section
+      className="space-y-4 py-4"
+      data-testid="home-recommendations-section"
+    >
+      {/* HEADER SECTION */}
+      <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
+        <div className="space-y-0.5">
+          <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
+            {/* Menggunakan icon Sparkles dengan animasi spin lambat agar senada */}
+            <Sparkles
+              className="h-4 w-4 text-emerald-600 animate-spin-slow"
+              style={{ animationDuration: '10s' }}
+            />
+            {isId ? 'Rekomendasi Usaha' : 'Recommended'}
+          </h2>
+          <p className="text-[11px] font-medium text-zinc-400">
+            {isId
+              ? 'Pilihan supplier, jasa, dan alat terbaik.'
+              : 'Best handpicked options for your business.'}
+          </p>
+        </div>
+
+        <Link
+          href={UMKM_DISCOVERY_PATH}
+          className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors shrink-0"
+        >
+          <span>{isId ? 'Lihat semua' : 'See all'}</span>
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="mx-4 sm:mx-6 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/50 px-4 py-8 text-center text-sm font-medium text-zinc-500">
+          {isId
+            ? 'Belum ada rekomendasi aktif saat ini.'
+            : 'No active recommendations yet.'}
+        </div>
+      ) : (
+        /* FIX HEIGHT DISINI: Gunakan 'overflow-visible' agar kartu tidak terpotong */
+        <div className="w-full relative overflow-visible">
+          <div className="overflow-hidden" ref={emblaRef}>
+            {/* Lebar item disesuaikan menjadi 260px sesuai blueprint gambar */}
+            <div className="flex touch-pan-y transform-gpu px-1 sm:px-3 md:px-6 gap-1 md:gap-2 py-1">
+              {' '}
+              {/* Tambah py-1 agar bayangan hover tidak kepotong */}
+              {items.map(item => (
+                <div
+                  key={item.id}
+                  className="w-[170px] sm:w-[200px] lg:w-[220px] shrink-0 select-none"
+                  style={{ backfaceVisibility: 'hidden' }}
+                >
+                  <RecommendationCard item={item} isId={isId} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const CATEGORY_STYLES: Record<string, string> = {
+  supplier: 'bg-amber-50 text-amber-800 border-amber-200',
+  jasa: 'bg-blue-50 text-blue-800 border-blue-200',
+  lokasi: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+  talent: 'bg-pink-50 text-pink-800 border-pink-200',
+  loker: 'bg-cyan-50 text-cyan-800 border-cyan-200',
+  sewa: 'bg-violet-50 text-violet-800 border-violet-200',
+  'oper usaha': 'bg-orange-50 text-orange-800 border-orange-200',
+  usaha: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  default: 'bg-zinc-50 text-zinc-700 border-zinc-200',
+};
 
 function RecommendationCard({
   item,
   isId,
-  mobile = false,
 }: {
   item: RecommendationItem;
   isId: boolean;
-  mobile?: boolean;
 }) {
-  const badgeTone = toneClassNames(item.badgeTone || 'emerald');
-  const entityType = item.entityType || 'listing';
+  // 1. Logic Badge Dinamis
+  const badgeStyle = useMemo(() => {
+    const label = item.typeLabel.toLowerCase();
+    const categoryKey = Object.keys(CATEGORY_STYLES).find(key =>
+      label.includes(key),
+    );
+    return categoryKey ? CATEGORY_STYLES[categoryKey] : CATEGORY_STYLES.default;
+  }, [item.typeLabel]);
 
   return (
     <article
       className={cn(
-        'flex h-full shrink-0 snap-start flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-white shadow-[0_16px_30px_-28px_rgba(15,23,42,0.14)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.2)]',
-        mobile
-          ? 'w-[150px] min-w-[150px]'
-          : 'w-[170px] min-w-[170px]'
+        'group relative flex w-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm transition-all duration-200 hover:border-zinc-300 hover:shadow-md',
+        MARKETPLACE_CARD_FIXED_HEIGHT_CLASS,
       )}
       data-testid="home-recommendation-card"
     >
-      {/* IMAGE */}
-      <div className="relative aspect-square overflow-hidden">
-        <Link
-          href={item.href}
-          className="block h-full"
-        >
-          {item.images.length > 0 ? (
-            <MediaPreviewCarousel
-              items={item.images}
+      {/* IMAGE CONTAINER */}
+      <div className="relative h-[132px] w-full shrink-0 overflow-hidden rounded-xl bg-zinc-100 sm:h-[144px]">
+        <Link href={item.href} className="block h-full w-full">
+          {item.images?.[0] ? (
+            <img
+              src={item.images[0]}
               alt={item.title}
-              aspectClassName="h-full w-full"
-              className="h-full w-full"
-              controls={false}
-              lightbox={false}
-              showDots={item.images.length > 1}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
             />
           ) : (
-            <div className="flex h-full items-center justify-center bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]">
-              <Package className="h-8 w-8" />
+            <div className="flex h-full items-center justify-center text-zinc-400">
+              <Package className="h-6 w-6" />
             </div>
           )}
         </Link>
-
-        {/* BADGE */}
         {item.badge && (
-          <span className={cn('absolute left-2 top-2 rounded-full px-2 py-1 text-[9px] font-bold', badgeTone.soft)}>
+          <span className="absolute right-2 top-2 rounded-md bg-amber-100/90 border border-amber-200/50 px-1.5 py-0.5 text-[10px] font-bold text-amber-900 ">
             {item.badge}
           </span>
         )}
-
-        <span className="flex justify-center items-center absolute bottom-2 left-2 rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase text-[color:var(--app-accent)]">
-          {item.typeLabel}
-        </span>
       </div>
 
-      {/* CONTENT */}
-      <Link href={item.href} className="flex flex-1 flex-col">
-        <div className="flex flex-1 flex-col p-2.5">
+      {/* CONTENT AREA */}
+      <div className="flex flex-1 flex-col pt-3 min-w-0">
+        <div className="mb-2 flex h-[22px] max-h-[22px] items-center justify-between gap-2 overflow-hidden">
+          <span
+            className={cn(
+              'inline-flex min-w-0 items-center truncate rounded-md border px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide',
+              badgeStyle,
+            )}
+          >
+            {item.typeLabel}
+          </span>
 
-          {/* TITLE (FIXED HEIGHT 2 LINES STABLE) */}
-          <h3 className="line-clamp-2 h-[2.2rem] lg:h-[2.35rem] text-[13px] font-bold leading-snug text-[color:var(--app-text)]">
+          {item.distanceLabel ? (
+            <div className="flex min-w-0 shrink-0 items-center gap-1 text-[10px] font-bold text-sky-700">
+              <MapPinIcon className="h-3 w-3 shrink-0 text-sky-500" />
+
+              <span className="max-w-[80px] truncate">
+                {item.distanceLabel}
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        <Link href={item.href} className="block min-w-0">
+          <h3 className="line-clamp-2 h-[36px] text-sm font-bold leading-tight text-zinc-900">
             {item.title}
           </h3>
+        </Link>
 
-          {/* VENDOR (FIXED SLOT) */}
-          <div className="mt-1 h-[14px]">
-            {item.vendor && (
-              <p className="truncate text-[10px] text-[color:var(--app-text-soft)]">
-                {item.vendor}
-              </p>
-            )}
-          </div>
+        <hr className="mt-auto mb-2 border-zinc-100" />
 
-          {/* PRICE BLOCK (FIXED HEIGHT SLOT) */}
-          <div className="mt-auto pt-2">
-            <div className="flex items-end justify-between gap-2">
-
-              <div className="min-w-0">
-                <p className="truncate text-[14px] font-black text-[color:var(--app-accent)]">
-                  {item.price}
-                </p>
-
-                <p className="truncate text-[10px] text-[color:var(--app-text-soft)]">
-                  {item.unit || ' '}
-                </p>
-              </div>
-
-              <p className="max-w-[80px] truncate text-right text-[10px] text-[color:var(--app-text-soft)]">
-                {item.location}
-              </p>
-
-            </div>
-          </div>
+        <div className="flex items-baseline gap-1 min-w-0">
+          <span className="text-sm font-bold text-zinc-950 truncate">
+            {item.price}
+          </span>
+          <span className="text-[10px] font-medium text-zinc-400 truncate">
+            / {item.unit || 'item'}
+          </span>
         </div>
-      </Link>
-
-      {/* CTA (OUTSIDE FLOW → NO HEIGHT IMPACT) */}
-      {/* <div className="grid grid-cols-[1fr_auto] gap-2 px-2.5 pb-2.5">
-        <Link
-          href={item.href}
-          className="rounded-[10px] bg-[color:var(--app-surface-muted)] px-3 py-2 text-[10px] font-semibold text-[color:var(--app-text)] hover:text-[color:var(--app-accent)]"
-        >
-          {item.detailActionLabel || 'Detail'}
-        </Link>
-
-        <Link
-          href={item.createHref}
-          className="rounded-[10px] bg-[color:var(--app-accent)] px-3 py-2 text-[10px] font-semibold text-[color:var(--app-text-inverse)]"
-        >
-          {item.secondaryActionLabel || 'Create similar'}
-        </Link>
-      </div> */}
-    </article>
-  );
-}
-
-function RecommendationsSection({
-  isId,
-  items,
-  mobile = false,
-}: {
-  isId: boolean;
-  items: RecommendationItem[];
-  mobile?: boolean;
-}) {
-  return (
-    <section className="space-y-3" data-testid="home-recommendations-section">
-      <div>
-        <SectionHeading
-          title={isId ? 'Rekomendasi untuk Usaha' : 'Recommended for Business'}
-          actionLabel={isId ? 'Lihat semua' : 'See all'}
-          actionHref={UMKM_DISCOVERY_PATH}
-        />
-        <p className="mt-1 text-xs font-semibold leading-4 text-[color:var(--app-text-soft)]">
-          {isId
-            ? 'Geser untuk lihat supplier, jasa, lokasi, dan peluang usaha.'
-            : 'Swipe through suppliers, services, locations, and business opportunities.'}
-        </p>
       </div>
-      {items.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-white px-4 py-5 text-sm font-semibold text-[color:var(--app-text-soft)]">
-          {isId
-            ? 'Belum ada listing aktif dari database.'
-            : 'No active database listings yet.'}
-        </div>
-      ) : null}
-      {mobile ? (
-        <div
-          className="flex max-w-full snap-x snap-mandatory gap-1 overflow-x-auto pb-2 pr-1"
-          data-auto-scrollbar
-          data-testid="home-recommendations-rail"
-        >
-          {items.map(item => (
-            <RecommendationCard key={item.id} item={item} isId={isId} mobile />
-          ))}
-        </div>
-      ) : (
-        <div
-          className="flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-1"
-          data-auto-scrollbar
-          data-testid="home-recommendations-rail"
-        >
-          {items.map(item => (
-            <RecommendationCard key={item.id} item={item} isId={isId} />
-          ))}
-        </div>
-      )}
-    </section>
+    </article>
   );
 }
 
@@ -2435,6 +2259,7 @@ function CommunityPanel({
   posts,
   loading = false,
   hasMore = false,
+  loadError = null,
   onLoadMore,
   onCreated,
 }: {
@@ -2447,11 +2272,11 @@ function CommunityPanel({
   posts: CommunityPost[];
   loading?: boolean;
   hasMore?: boolean;
+  loadError?: string | null;
   onLoadMore?: () => void;
   onCreated?: (item?: CommunityFeedItem) => void;
 }) {
   const router = useRouter();
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [postOptionsOpen, setPostOptionsOpen] = useState(false);
   const [postOptionsCopied, setPostOptionsCopied] = useState(false);
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(
@@ -2522,66 +2347,125 @@ function CommunityPanel({
     setPostOptionsOpen(false);
   };
 
-  useEffect(() => {
-    if (!hasMore || loading || !onLoadMore) return;
-    const node = sentinelRef.current;
-    if (!node || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries.some(entry => entry.isIntersecting)) {
-          onLoadMore();
-        }
-      },
-      { rootMargin: '220px 0px' },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [hasMore, loading, onLoadMore, posts.length]);
+  const [emblaTabsRef] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true, // Membuat geseran terasa ringan dan natural di HP
+  });
 
   return (
-    <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-1.5 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)] sm:p-2">
-      <SectionHeading
-        title={isId ? 'Dari Komunitas' : 'From the Community'}
-        actionLabel={activeTabMeta.actionLabel}
-        actionHref={activeTabHref}
-      />
-      <div className="mt-3 grid grid-cols-3 gap-2" data-auto-scrollbar>
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const tone = toneClassNames(tab.tone);
-          const active = activeTab === tab.id;
+    <section className="rounded-[24px] p-1.5  sm:p-2">
+      <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
+        <div className="space-y-0.5">
+          <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
+            {/* Menggunakan Users Icon dari Lucide untuk Komunitas */}
+            <Users
+              className="h-4 w-4 text-emerald-600 animate-spin-slow"
+              style={{ animationDuration: '10s' }}
+            />
+            {isId ? 'Dari Komunitas' : 'From Community'}
+          </h2>
+          <p className="text-[11px] font-medium text-zinc-400">
+            {isId
+              ? 'Diskusi hangat dan obrolan para pelaku usaha.'
+              : 'Trending discussions from business owners.'}
+          </p>
+        </div>
 
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setPostOptionsOpen(false);
-                setPostOptionsCopied(false);
-                onTabChange(tab.id);
-              }}
-              className={cn(
-                'flex min-h-[58px] min-w-0 flex-col justify-center rounded-[16px] border px-3 text-left transition',
-                active
-                  ? cn(tone.surface, tone.text, 'border-current shadow-sm')
-                  : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:border-[color:var(--app-accent-border)] hover:bg-slate-50',
-              )}
-            >
-              <span className="flex min-w-0 items-center gap-1.5 text-xs font-black">
-                <Icon
+        <Link
+          href={activeTabHref}
+          className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors shrink-0"
+        >
+          <span>{activeTabMeta.actionLabel}</span>
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+      <div
+        className="mt-3 w-full overflow-hidden contain-paint select-none"
+        ref={emblaTabsRef}
+      >
+        {/* 
+      Container Embla (flex-row): 
+      Ditambahkan hardware acceleration via Tailwind agar geseran super lancar di HP spek rendah sekalipun.
+    */}
+        <div className="relative">
+          <div className="mb-2 px-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
+              Pilih kategori
+            </p>
+          </div>
+
+          <div
+            role="tablist"
+            aria-label="Kategori pencarian"
+            className="
+      flex gap-2 overflow-x-auto scroll-smooth px-1 pb-2
+      [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+      touch-pan-x
+    "
+          >
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              const tone = toneClassNames(tab.tone);
+              const active = activeTab === tab.id;
+
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    setPostOptionsOpen(false);
+                    setPostOptionsCopied(false);
+                    onTabChange(tab.id);
+                  }}
                   className={cn(
-                    'h-3.5 w-3.5 shrink-0',
-                    active ? tone.text : 'text-[color:var(--app-text-soft)]',
+                    `
+              group flex min-h-11 shrink-0 items-center gap-2 rounded-full
+              border px-4 text-sm font-extrabold transition-all duration-200
+              active:scale-95
+            `,
+                    active
+                      ? cn(
+                        tone.surface,
+                        tone.text,
+                        'border-current shadow-sm',
+                      )
+                      : `
+                  border-zinc-200 bg-white text-zinc-600
+                  hover:border-zinc-300 hover:bg-zinc-50
+                `,
                   )}
-                />
-                <span className="truncate">{tab.label}</span>
-              </span>
-              <span className="mt-0.5 line-clamp-1 text-[10px] font-semibold leading-3 opacity-80">
-                {tab.caption}
-              </span>
-            </button>
-          );
-        })}
+                >
+                  <span
+                    className={cn(
+                      `
+                flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+                transition
+              `,
+                      active
+                        ? 'bg-white/70'
+                        : 'bg-zinc-100 text-zinc-500 group-hover:bg-zinc-200',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+
+                  <span className="whitespace-nowrap">
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {tabs.find(tab => tab.id === activeTab)?.caption && (
+            <p className="mt-1 px-2 text-xs font-semibold text-zinc-500">
+              {tabs.find(tab => tab.id === activeTab)?.caption}
+            </p>
+          )}
+        </div>
       </div>
       <div className="mt-3">
         <CommunityComposer
@@ -2678,11 +2562,11 @@ function CommunityPanel({
                 ) : null}
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* <div className="mt-3 flex flex-wrap gap-2">
               <Link
                 href={activeTabHref}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-black',
+                  'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold',
                   activeTone.soft,
                 )}
               >
@@ -2696,7 +2580,7 @@ function CommunityPanel({
                 <Users className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{post.community}</span>
               </Link>
-            </div>
+            </div> */}
             <h3 className="mt-3 text-[0.98rem] font-bold leading-5 text-[color:var(--app-text)]">
               {post.title}
             </h3>
@@ -2718,7 +2602,7 @@ function CommunityPanel({
           {postMediaItems.length > 0 ? (
             <Link
               href={communityPostHref}
-              className="relative block overflow-hidden rounded-3xl aspect-[4/5] bg-slate-100"
+              className="relative block aspect-[16/9] overflow-hidden rounded-3xl bg-slate-100"
             >
               {postIsVideo && postMediaItems.length === 1 ? (
                 <video
@@ -2823,7 +2707,7 @@ function CommunityPanel({
                     <span className="shrink-0">-</span>
                     <span className="shrink-0">{item.time}</span>
                   </span>
-                  <span className="mt-0.5 line-clamp-1 block text-sm font-black text-[color:var(--app-text)]">
+                  <span className="mt-0.5 line-clamp-1 block text-sm font-bold text-[color:var(--app-text)]">
                     {item.title}
                   </span>
                   <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-[color:var(--app-text-soft)]">
@@ -2849,7 +2733,7 @@ function CommunityPanel({
                         <PlayCircle className="h-7 w-7 drop-shadow" />
                       </span>
                     ) : itemMediaItems.length > 1 ? (
-                      <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-full bg-black/58 px-1.5 py-0.5 text-[10px] font-black text-white">
+                      <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-full bg-black/58 px-1.5 py-0.5 text-[10px] font-bold text-white">
                         +{itemMediaItems.length - 1}
                       </span>
                     ) : null}
@@ -2862,8 +2746,13 @@ function CommunityPanel({
           })}
         </div>
       ) : null}
-      {hasMore || loading ? (
-        <div ref={sentinelRef} className="mt-3 flex justify-center">
+      {loadError ? (
+        <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-700 ring-1 ring-amber-100">
+          {loadError}
+        </p>
+      ) : null}
+      {hasMore || loading || loadError ? (
+        <div className="mt-3 flex justify-center">
           <button
             type="button"
             onClick={onLoadMore}
@@ -2872,9 +2761,13 @@ function CommunityPanel({
           >
             {loading
               ? activeTabMeta.loadingLabel
-              : isId
-                ? 'Muat lagi'
-                : 'Load more'}
+              : loadError
+                ? isId
+                  ? 'Coba muat lagi'
+                  : 'Try loading again'
+                : isId
+                  ? 'Muat lagi'
+                  : 'Load more'}
           </button>
         </div>
       ) : null}
@@ -2891,143 +2784,137 @@ function CommunityPanel({
   );
 }
 
-function ReelsPanel({
-  isId,
-  items,
-  mobile = false,
-}: {
-  isId: boolean;
-  items: ReelItem[];
-  mobile?: boolean;
-}) {
+export function ReelsPanel({ isId, items }: ReelsPanelProps) {
+  // Inisialisasi Embla Carousel untuk navigasi swipe super mulus
+  const [emblaRef] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true,
+  });
+
   return (
-    <section className="space-y-3" data-testid="home-reels-section">
-      <SectionHeading
-        title={isId ? 'Reels Inspirasi' : 'Inspiration Reels'}
-        actionLabel={isId ? 'Lihat semua' : 'See all'}
-        actionHref="/reels"
-      />
+    <section className="space-y-3 py-2" data-testid="home-reels-section">
+      {/* HEADER */}
+      {/* Jika SectionHeading milik Anda punya padding internal, sesuaikan penempatannya */}
+      <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
+        <div className="space-y-0.5">
+          <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
+            {/* Menggunakan PlayIcon dari Lucide untuk Reels */}
+            <Play
+              className="h-4 w-4 text-emerald-600animate-spin-slow"
+              style={{ animationDuration: '10s' }}
+            />
+            {isId ? 'Reels Inspirasi' : 'Inspiration Reels'}
+          </h2>
+          <p className="text-[11px] font-medium text-zinc-400">
+            {isId
+              ? 'Video singkat ide dan tips bisnis.'
+              : 'Short business ideas and tips videos.'}
+          </p>
+        </div>
+
+        <Link
+          href="/reels"
+          className="group flex items-center gap-0.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+        >
+          <span>{isId ? 'Lihat semua' : 'See all'}</span>
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+
+      {/* EMPTY STATE */}
       {items.length === 0 ? (
-        <div className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-white px-4 py-5 text-sm font-semibold text-[color:var(--app-text-soft)]">
+        <div className="mx-4 sm:mx-6 rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-white px-4 py-5 text-sm font-semibold text-[color:var(--app-text-soft)]">
           {isId ? 'Belum ada reels dari database.' : 'No database reels yet.'}
         </div>
-      ) : null}
-      {mobile ? (
-        <div
-          className="flex max-w-full snap-x snap-mandatory gap-1 overflow-x-auto pb-2 pr-1"
-          data-auto-scrollbar
-          data-testid="home-reels-rail"
-        >
-          {items.map(item => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="group relative aspect-[9/16] w-[174px] shrink-0 snap-start overflow-hidden rounded-[20px]"
-              data-testid="home-reel-card"
-              data-lajukan-event="home.card_clicked"
-              data-lajukan-surface="home_reels"
-              data-lajukan-entity-type="reel"
-              data-lajukan-entity-id={item.id}
-              data-lajukan-label={item.title}
-            >
-              {item.mediaUrl && item.mediaType !== 'image' ? (
-                <video
-                  src={item.mediaUrl}
-                  muted
-                  playsInline
-                  preload="metadata"
-                  className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                />
-              ) : item.mediaUrl ? (
-                <Image
-                  src={item.mediaUrl}
-                  alt={item.title}
-                  fill
-                  className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                />
-              ) : (
-                <span className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,#14532d,#020617)] text-white">
-                  <PlayCircle className="h-10 w-10" />
-                </span>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-              <span
-                className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-emerald-700"
-                title={item.category}
-              >
-                {item.category}
-              </span>
-              <div className="absolute inset-x-4 bottom-4">
-                <p className="line-clamp-3 text-sm font-semibold leading-5 text-white">
-                  {item.title}
-                </p>
-                <div className="mt-2 flex items-center justify-between text-xs text-white/80">
-                  <span>{item.views}</span>
-                  <PlayCircle className="h-5 w-5 text-white" />
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
       ) : (
-        <div
-          className="flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto pb-2 pr-1"
-          data-auto-scrollbar
-          data-testid="home-reels-rail"
-        >
-          {items.map(item => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className="group relative aspect-[9/16] w-[140px] min-w-[140px] max-w-[140px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-slate-950 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.22)] xl:w-[150px] xl:min-w-[150px] xl:max-w-[150px]"
-              data-testid="home-reel-card"
-              data-lajukan-event="home.card_clicked"
-              data-lajukan-surface="home_reels"
-              data-lajukan-entity-type="reel"
-              data-lajukan-entity-id={item.id}
-              data-lajukan-label={item.title}
-            >
-              {item.mediaUrl && item.mediaType !== 'image' ? (
-                <video
-                  src={item.mediaUrl}
-                  muted
-                  playsInline
-                  preload="metadata"
-                  className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-                />
-              ) : item.mediaUrl ? (
-                <Image
-                  src={item.mediaUrl}
-                  alt={item.title}
-                  fill
-                  className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                />
-              ) : (
-                <span className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,#14532d,#020617)] text-white">
-                  <PlayCircle className="h-10 w-10" />
-                </span>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-transparent" />
-              <span
-                className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-bold text-emerald-700"
-                title={item.category}
-              >
-                {item.category}
-              </span>
-              <div className="absolute inset-x-4 bottom-4">
-                <p className="text-sm font-semibold leading-5 text-white">
-                  {item.title}
-                </p>
-                <div className="mt-2 flex items-center justify-between text-xs text-white/80">
-                  <span>{item.views}</span>
-                  <PlayCircle className="h-5 w-5 text-white" />
+        /* CAROUSEL CONTAINER */
+        <div className="w-full">
+          <div
+            className="overflow-hidden px-1 sm:px-3 md:px-6 contain-paint"
+            ref={emblaRef}
+          >
+            {/* embla__container - Menggunakan touch-pan-y agar gesture scroll atas-bawah layar HP aman */}
+            <div className="flex gap-3 touch-pan-y py-1">
+              {items.map(item => (
+                /* embla__slide - Ukuran dikunci proporsional (140px di mobile, otomatis melar ke 156px di desktop) */
+                <div
+                  key={item.id}
+                  className="w-[140px] sm:w-[156px] shrink-0 select-none"
+                >
+                  <ReelCard item={item} />
                 </div>
-              </div>
-            </Link>
-          ))}
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </section>
+  );
+}
+
+function ReelCard({ item }: { item: ReelItem }) {
+  return (
+    <Link
+      href={item.href}
+      className="group relative block aspect-[9/16] w-full overflow-hidden rounded-[20px] border border-zinc-800 bg-zinc-950 shadow-[0_12px_24px_-16px_rgba(15,23,42,0.3)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_28px_-12px_rgba(15,23,42,0.4)]"
+      data-testid="home-reel-card"
+      data-lajukan-event="home.card_clicked"
+      data-lajukan-surface="home_reels"
+      data-lajukan-entity-type="reel"
+      data-lajukan-entity-id={item.id}
+      data-lajukan-label={item.title}
+    >
+      {/* BACKGROUND MEDIA */}
+      {item.mediaUrl && item.mediaType !== 'image' ? (
+        <video
+          src={item.mediaUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : item.mediaUrl ? (
+        <Image
+          src={item.mediaUrl}
+          alt={item.title}
+          fill
+          sizes="(max-width: 640px) 140px, 156px"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <span className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_top,#14532d,#020617)] text-white/40">
+          <Video className="h-8 w-8" />
+        </span>
+      )}
+
+      {/* GRADIENT OVERLAY (Gelap di bawah agar teks putih kontras & terbaca) */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/10 transition-opacity group-hover:via-black/40" />
+
+      {/* BADGE KATEGORI (Kiri Atas) */}
+      <span
+        className="absolute left-2.5 top-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-full bg-white/90  px-2 py-0.5 text-[9px] font-bold text-emerald-800 shadow-sm"
+        title={item.category}
+      >
+        {item.category}
+      </span>
+
+      {/* DESKRIPSI & INFO VIEWS (Bagian Bawah) */}
+      <div className="absolute inset-x-3 bottom-3 flex flex-col justify-end">
+        {/* Judul dengan batasan baris */}
+        <p className="line-clamp-2 text-[11px] sm:text-xs font-bold leading-snug text-white tracking-tight drop-shadow-sm">
+          {item.title}
+        </p>
+
+        {/* Baris data views & icon play */}
+        <div className="mt-2 flex items-center justify-between text-[10px] font-medium text-zinc-300/90">
+          <span className="rounded bg-black/45 px-1 text-white">
+            {item.views} views
+          </span>
+          <PlayCircle className="h-4 w-4 text-white transition-transform group-hover:scale-110" />
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -3103,10 +2990,10 @@ function RightRail({
         <section className="lajukan-home-pulse-card flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fffb_100%)] p-3 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)] dark:bg-[color:var(--app-surface)]">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
                 {isId ? 'Hari ini' : 'Today'}
               </p>
-              <h2 className="mt-1 line-clamp-2 text-[1rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+              <h2 className="mt-1 line-clamp-2 text-[1rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
                 {isId
                   ? 'Lihat peluang, lalu lanjut chat.'
                   : 'Find opportunities, then continue in chat.'}
@@ -3133,7 +3020,7 @@ function RightRail({
                   >
                     <Icon className="h-3.5 w-3.5" />
                   </span>
-                  <p className="mt-1 text-[15px] font-black leading-none tracking-[-0.04em] text-[color:var(--app-text)]">
+                  <p className="mt-1 text-[15px] font-bold leading-none tracking-[-0.04em] text-[color:var(--app-text)]">
                     {item.value}
                   </p>
                   <p className="mt-1 truncate text-[10px] font-semibold leading-tight text-[color:var(--app-text-soft)]">
@@ -3150,7 +3037,7 @@ function RightRail({
 
           <Link
             href={primaryCtaHref}
-            className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[12px] font-black text-[color:var(--app-text-inverse)] shadow-[0_16px_30px_-24px_color-mix(in_srgb,var(--app-accent)_50%,transparent)] transition hover:brightness-105"
+            className="mt-2 inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[12px] font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_30px_-24px_color-mix(in_srgb,var(--app-accent)_50%,transparent)] transition hover:brightness-105"
           >
             <Package className="h-4 w-4" />
             {pulseCtaLabel}
@@ -3189,6 +3076,11 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, user, loading: authLoading, authFetch } = useAuth();
+  const viewerLocationState = useViewerLocation({
+    isId,
+    autoRequest: false,
+  });
+  const { viewerLocation } = viewerLocationState;
   const { totalUnread } = useChatInbox();
   const [query, setQuery] = useState('');
   const [summary, setSummary] = useState<LajukanSummary | null>(null);
@@ -3200,8 +3092,10 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   const [communityOverview, setCommunityOverview] =
     useState<CommunityFeedOverview | null>(null);
   const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityError, setCommunityError] = useState<string | null>(null);
   const [communityHasMore, setCommunityHasMore] = useState(false);
   const [communityOffset, setCommunityOffset] = useState(0);
+  const communityRequestSeqRef = useRef(0);
   const [reels, setReels] = useState<ReelItem[]>([]);
   const [walletAmountLabel, setWalletAmountLabel] = useState(() =>
     formatCurrencyFromCents(0, 'IDR'),
@@ -3320,27 +3214,40 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
 
     const loadHomeContent = async () => {
       try {
-        const response = await fetch(
-          '/api/content?limit=16&status=active&include_owner=1&database_only=1',
-          {
-            cache: 'no-store',
-            credentials: 'include',
-          },
-        );
+        const params = new URLSearchParams({
+          limit: '16',
+          status: 'active',
+          include_owner: '1',
+          database_only: '1',
+        });
+        if (viewerLocation) {
+          params.set('viewer_lat', String(viewerLocation.lat));
+          params.set('viewer_lng', String(viewerLocation.lng));
+          params.set('nearby', '1');
+        }
+        const response = await fetch(`/api/content?${params.toString()}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        });
         const payload = await response.json().catch(() => null);
         if (!response.ok) {
           if (active) setRecommendations([]);
           return;
         }
         const listingItems = extractContentItems(payload)
-          .map(item => mapContentToRecommendation(item, isId))
+          .map(item =>
+            mapContentToRecommendation(item, isId, Boolean(viewerLocation)),
+          )
           .filter((item): item is RecommendationItem => Boolean(item));
         if (!active) return;
         setRecommendations(
-          listingItems.filter(
-            (item, index, allItems) =>
-              allItems.findIndex(candidate => candidate.id === item.id) === index,
-          ).slice(0, 12),
+          listingItems
+            .filter(
+              (item, index, allItems) =>
+                allItems.findIndex(candidate => candidate.id === item.id) ===
+                index,
+            )
+            .slice(0, 12),
         );
       } catch {
         if (active) setRecommendations([]);
@@ -3352,11 +3259,19 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
     return () => {
       active = false;
     };
-  }, [isId]);
+  }, [isId, viewerLocation]);
 
   const loadCommunityPostsPage = useCallback(
     async (offset = 0) => {
+      const requestSeq = communityRequestSeqRef.current + 1;
+      communityRequestSeqRef.current = requestSeq;
       setCommunityLoading(true);
+      setCommunityError(null);
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(
+        () => controller.abort(),
+        HOME_COMMUNITY_REQUEST_TIMEOUT_MS,
+      );
       try {
         const params = new URLSearchParams({
           tab: activeTab,
@@ -3368,32 +3283,70 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           {
             cache: 'no-store',
             credentials: 'include',
+            signal: controller.signal,
           },
         );
         const payload = (await response
           .json()
           .catch(() => null)) as CommunityFeedResponse | null;
-        if (!response.ok) return;
+        if (communityRequestSeqRef.current !== requestSeq) return;
+        if (!response.ok) {
+          throw new Error(
+            isId
+              ? 'Diskusi komunitas belum bisa dimuat. Coba lagi sebentar.'
+              : 'Community discussions could not be loaded. Please try again.',
+          );
+        }
         const discussionItems = (payload?.items || []).filter(
           item => item.kind !== 'reel',
         );
         const mapped = discussionItems.map(item =>
           mapCommunityItemToPost(item, isId, activeTab),
         );
+        const rawNextCursor =
+          typeof payload?.nextCursor === 'number' &&
+            Number.isFinite(payload.nextCursor)
+            ? payload.nextCursor
+            : null;
+        const responseItemCount = payload?.items?.length || 0;
+        const fallbackNextCursor = offset + Math.max(responseItemCount, mapped.length);
+        const nextCursor =
+          rawNextCursor !== null && rawNextCursor > offset
+            ? rawNextCursor
+            : fallbackNextCursor;
+        const cursorAdvanced = nextCursor > offset;
         setCommunityOverview(payload?.overview || null);
         setCommunityPosts(prev => {
           if (offset === 0) return mapped;
           const seen = new Set(prev.map(item => item.id));
           return [...prev, ...mapped.filter(item => !seen.has(item.id))];
         });
-        setCommunityOffset(payload?.nextCursor ?? offset + mapped.length);
-        setCommunityHasMore(Boolean(payload?.hasMore));
-      } catch {
+        setCommunityOffset(nextCursor);
+        setCommunityHasMore(
+          Boolean(payload?.hasMore) && cursorAdvanced && responseItemCount > 0,
+        );
+        setCommunityError(null);
+      } catch (error) {
+        if (communityRequestSeqRef.current !== requestSeq) return;
         if (offset === 0) setCommunityPosts([]);
         if (offset === 0) setCommunityOverview(null);
-        setCommunityHasMore(false);
+        if (offset === 0) setCommunityHasMore(false);
+        const aborted =
+          error instanceof DOMException && error.name === 'AbortError';
+        setCommunityError(
+          aborted
+            ? isId
+              ? 'Koneksi komunitas terlalu lama. Coba muat lagi.'
+              : 'Community loading took too long. Try again.'
+            : isId
+              ? 'Diskusi komunitas gagal dimuat. Coba muat lagi.'
+              : 'Community discussions failed to load. Try again.',
+        );
       } finally {
-        setCommunityLoading(false);
+        window.clearTimeout(timeoutId);
+        if (communityRequestSeqRef.current === requestSeq) {
+          setCommunityLoading(false);
+        }
       }
     },
     [activeTab, isId],
@@ -3402,18 +3355,26 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   useEffect(() => {
     setCommunityPosts([]);
     setCommunityOverview(null);
+    setCommunityError(null);
     setCommunityOffset(0);
     setCommunityHasMore(false);
     void loadCommunityPostsPage(0);
   }, [loadCommunityPostsPage]);
 
   const loadMoreCommunityPosts = useCallback(() => {
-    if (communityLoading || !communityHasMore) return;
+    if (communityLoading) return;
+    if (communityError) {
+      void loadCommunityPostsPage(communityPosts.length > 0 ? communityOffset : 0);
+      return;
+    }
+    if (!communityHasMore) return;
     void loadCommunityPostsPage(communityOffset);
   }, [
+    communityError,
     communityHasMore,
     communityLoading,
     communityOffset,
+    communityPosts.length,
     loadCommunityPostsPage,
   ]);
 
@@ -3648,7 +3609,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           caption: isId ? 'Siap bantu' : 'Qualified talent',
           href: '/search?type=freelancer&q=talent',
           icon: UserRound,
-        }
+        },
         // {
         //   id: 'opportunity',
         //   label: isId ? 'Peluang' : 'Business Opportunities',
@@ -3702,10 +3663,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
   return (
     <MarketplacePageFrame>
       <main className="mx-auto w-full max-w-[720px] space-y-3.5 sm:space-y-4 lg:hidden">
-        <HeroVisualStage
-          isId={isId}
-          className="mb-3"
-        />
+        <HeroVisualStage isId={isId} className="mb-3" />
         <GameProgressCard
           isId={isId}
           isAuthenticated={isAuthenticated}
@@ -3716,11 +3674,21 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           compact
         />
         <DailyLoginRewardCard locale={locale} compact />
-        <QuickCategoriesSection isId={isId} mobile />
+        <QuickCategoriesSection isId={isId} />
+        <TrendingSearchSection isId={isId} />
 
-        <HomeUmkmMapPreview locale={locale} />
-        <RecommendationsSection isId={isId} items={recommendations} mobile />
-        <ReelsPanel isId={isId} items={reels} mobile />
+        <HomeUmkmMapPreview
+          locale={locale}
+          viewerLocation={viewerLocationState.viewerLocation}
+          locating={viewerLocationState.locating}
+          locationError={viewerLocationState.locationError}
+          locationEnabled={viewerLocationState.locationEnabled}
+          locationPromptDismissed={viewerLocationState.locationPromptDismissed}
+          requestViewerLocation={viewerLocationState.requestViewerLocation}
+          dismissLocationPrompt={viewerLocationState.dismissLocationPrompt}
+        />
+        <RecommendationsSection isId={isId} items={recommendations} />
+        <ReelsPanel isId={isId} items={reels} />
         <CommunityPanel
           isId={isId}
           isAuthenticated={isAuthenticated}
@@ -3731,6 +3699,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
           posts={communityPosts}
           loading={communityLoading}
           hasMore={communityHasMore}
+          loadError={communityError}
           onLoadMore={loadMoreCommunityPosts}
           onCreated={handleCommunityComposerCreated}
         />
@@ -3763,10 +3732,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 placeholder={text.searchPlaceholder}
                 buttonLabel={text.searchButton}
               /> */}
-              <HeroVisualStage
-                isId={isId}
-                className="mb-3"
-              />
+              <HeroVisualStage isId={isId} className="mb-3" />
               <div className="xl:hidden">
                 <GameProgressCard
                   isId={isId}
@@ -3781,7 +3747,22 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                 </div>
               </div>
               <QuickCategoriesSection isId={isId} />
-              <HomeUmkmMapPreview locale={locale} />
+              <TrendingSearchSection isId={isId} />
+
+              <HomeUmkmMapPreview
+                locale={locale}
+                viewerLocation={viewerLocationState.viewerLocation}
+                locating={viewerLocationState.locating}
+                locationError={viewerLocationState.locationError}
+                locationEnabled={viewerLocationState.locationEnabled}
+                locationPromptDismissed={
+                  viewerLocationState.locationPromptDismissed
+                }
+                requestViewerLocation={viewerLocationState.requestViewerLocation}
+                dismissLocationPrompt={
+                  viewerLocationState.dismissLocationPrompt
+                }
+              />
               <RecommendationsSection isId={isId} items={recommendations} />
               <div className="grid gap-4">
                 <ReelsPanel isId={isId} items={reels} />
@@ -3795,6 +3776,7 @@ export function HomeResponsiveMarketplace({ locale }: HomeContentSimpleProps) {
                   posts={communityPosts}
                   loading={communityLoading}
                   hasMore={communityHasMore}
+                  loadError={communityError}
                   onLoadMore={loadMoreCommunityPosts}
                   onCreated={handleCommunityComposerCreated}
                 />

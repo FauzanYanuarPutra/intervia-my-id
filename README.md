@@ -12,6 +12,10 @@ Lajukan is a compact marketplace and super-app for jobs, services, property, ren
 1. Copy env: duplicate `.env.example` to `.env` or `.env.development`.
 2. Docker on WSL/Linux: `bash ./up-super-fast.sh`
 3. Docker on Windows PowerShell: `.\up-super-fast.ps1`
+   Local AI/Ollama is included by default in dev mode.
+   Without local AI: `.\up-super-fast.ps1 -NoAi`
+   Lightweight text-only AI: `.\up-super-fast.ps1 -AiTextOnly`
+   Skip AI model check/download: `.\up-super-fast.ps1 -SkipAiModels`
 4. Untuk workflow dev yang lebih hemat storage di Windows:
    `.\dev-stack.ps1 up` untuk jalan biasa,
    `.\dev-stack.ps1 fresh` untuk hapus container project + build cache tak terpakai lalu jalan lagi,

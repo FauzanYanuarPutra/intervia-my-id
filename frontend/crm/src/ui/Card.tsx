@@ -14,7 +14,7 @@ export function Card({ title, children, className = '', ...rest }: Props) {
     <div className={`${baseClass} ${className}`.trim()} {...rest}>
       {title ? (
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-base font-black tracking-[-0.02em] text-slate-950">
+          <h2 className="text-base font-bold tracking-[-0.02em] text-slate-950">
             {title}
           </h2>
         </div>

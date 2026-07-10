@@ -259,16 +259,16 @@ export function MediaPermissionGate({
   }
 
   return (
-    <div className="ui-layer-modal fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4 backdrop-blur-sm">
+    <div className="ui-layer-modal fixed inset-0 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] p-4 ">
       <section
         role="dialog"
         aria-modal="true"
         className="max-h-[80svh] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-2xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
       >
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
           {isId ? 'Izin perangkat' : 'Device permission'}
         </p>
-        <h2 className="mt-2 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <h2 className="mt-2 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {title || defaultTitle(need, isId)}
         </h2>
         <p className="mt-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">

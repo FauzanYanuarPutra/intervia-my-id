@@ -152,51 +152,51 @@ const NAV_ITEMS: Array<{
   hint: string;
   icon: IconName;
 }> = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    hint: "Ringkasan bisnis",
-    icon: "dashboard",
-  },
-  {
-    id: "pipeline",
-    label: "CRM Pipeline",
-    hint: "Follow-up deal",
-    icon: "pipeline",
-  },
-  { id: "users", label: "Users", hint: "Buyer, seller, talent", icon: "users" },
-  {
-    id: "listings",
-    label: "Moderasi Listing",
-    hint: "Report dan listing nakal",
-    icon: "listings",
-  },
-  {
-    id: "transactions",
-    label: "Transactions",
-    hint: "Escrow dan order",
-    icon: "transactions",
-  },
-  { id: "chat", label: "Chat CRM", hint: "Inbox prospek", icon: "chat" },
-  {
-    id: "analytics",
-    label: "Analytics",
-    hint: "GMV dan konversi",
-    icon: "analytics",
-  },
-  {
-    id: "disputes",
-    label: "Disputes",
-    hint: "Kasus dan risiko",
-    icon: "disputes",
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    hint: "Role dan moderasi",
-    icon: "settings",
-  },
-];
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      hint: "Ringkasan bisnis",
+      icon: "dashboard",
+    },
+    {
+      id: "pipeline",
+      label: "CRM Pipeline",
+      hint: "Follow-up deal",
+      icon: "pipeline",
+    },
+    { id: "users", label: "Users", hint: "Buyer, seller, talent", icon: "users" },
+    {
+      id: "listings",
+      label: "Moderasi Listing",
+      hint: "Report dan listing nakal",
+      icon: "listings",
+    },
+    {
+      id: "transactions",
+      label: "Transactions",
+      hint: "Escrow dan order",
+      icon: "transactions",
+    },
+    { id: "chat", label: "Chat CRM", hint: "Inbox prospek", icon: "chat" },
+    {
+      id: "analytics",
+      label: "Analytics",
+      hint: "GMV dan konversi",
+      icon: "analytics",
+    },
+    {
+      id: "disputes",
+      label: "Disputes",
+      hint: "Kasus dan risiko",
+      icon: "disputes",
+    },
+    {
+      id: "settings",
+      label: "Settings",
+      hint: "Role dan moderasi",
+      icon: "settings",
+    },
+  ];
 
 const CRM_DEMO_DATA_ENABLED =
   process.env.NEXT_PUBLIC_CRM_ENABLE_DEMO_DATA === "true";
@@ -1166,8 +1166,8 @@ function buildInsights(data: DashboardData): CrmInsight[] {
       title: "User sering chat tapi belum transaksi",
       body: hotLead
         ? `${hotLead.requester_name || hotLead.name} sudah masuk ${normalizeStage(
-            hotLead.stage,
-          )}. Agent perlu follow-up hari ini.`
+          hotLead.stage,
+        )}. Agent perlu follow-up hari ini.`
         : "Belum ada prospek panas. Pantau chat baru dari supplier dan jasa.",
       tone: "amber",
     },
@@ -1340,7 +1340,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
     return (
       <div className="flex h-52 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center">
         <div>
-          <p className="text-sm font-black text-slate-900">Belum ada data GMV</p>
+          <p className="text-sm font-bold text-slate-900">Belum ada data GMV</p>
           <p className="mt-1 text-xs font-semibold text-slate-500">Grafik akan muncul setelah ada order real.</p>
         </div>
       </div>
@@ -1453,7 +1453,7 @@ function KpiCard({ item }: { item: CrmKpi }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold text-slate-500">{item.label}</p>
-          <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">{item.value}</p>
+          <p className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">{item.value}</p>
         </div>
         <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold shadow-sm">{item.trend}</span>
       </div>
@@ -1595,10 +1595,10 @@ export default function CrmCommandCenter() {
           listings: current.listings.map(item =>
             item.id === listing.id
               ? {
-                  ...item,
-                  rawStatus: nextStatus,
-                  status: listingStatus(nextStatus),
-                }
+                ...item,
+                rawStatus: nextStatus,
+                status: listingStatus(nextStatus),
+              }
               : item,
           ),
         }));
@@ -1656,15 +1656,15 @@ export default function CrmCommandCenter() {
           listings: current.listings.map(item =>
             item.id === listing.id
               ? {
-                  ...item,
-                  rawStatus: nextStatus,
-                  status: listingStatus(nextStatus),
-                  metadata: {
-                    ...item.metadata,
-                    moderation,
-                  },
-                  moderationStatus: moderation.status,
-                }
+                ...item,
+                rawStatus: nextStatus,
+                status: listingStatus(nextStatus),
+                metadata: {
+                  ...item.metadata,
+                  moderation,
+                },
+                moderationStatus: moderation.status,
+              }
               : item,
           ),
         }));
@@ -1935,17 +1935,17 @@ export default function CrmCommandCenter() {
                 />
               ) : null}
               {activePage === "pipeline" ? <PipelinePage leads={filteredData.leads} /> : null}
-            {activePage === "users" ? (
-              <UsersPage users={filteredData.users} onTrustAction={handleUserTrustAction} />
-            ) : null}
-            {activePage === "listings" ? (
-              <ListingsPage
-                listings={filteredData.listings}
-                wwwUrl={wwwUrl}
-                onStatusChange={handleListingStatus}
-                onModerationAction={handleListingModeration}
-              />
-            ) : null}
+              {activePage === "users" ? (
+                <UsersPage users={filteredData.users} onTrustAction={handleUserTrustAction} />
+              ) : null}
+              {activePage === "listings" ? (
+                <ListingsPage
+                  listings={filteredData.listings}
+                  wwwUrl={wwwUrl}
+                  onStatusChange={handleListingStatus}
+                  onModerationAction={handleListingModeration}
+                />
+              ) : null}
               {activePage === "transactions" ? <TransactionsPage transactions={transactions} /> : null}
               {activePage === "chat" ? <ChatPage chats={filteredData.chats} /> : null}
               {activePage === "analytics" ? (
@@ -1989,23 +1989,21 @@ function Sidebar({
         type="button"
         aria-label="Tutup menu"
         onClick={onCloseMobile}
-        className={`fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-sm transition lg:hidden ${
-          mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        className={`fixed inset-0 z-40 bg-slate-950/30  transition lg:hidden ${mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] border-r border-slate-200 bg-white transition-all duration-300 lg:static lg:inset-auto lg:z-auto lg:h-full lg:shrink-0 ${
-          collapsed ? "w-[88px]" : "w-[280px]"
-        } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex h-[100dvh] border-r border-slate-200 bg-white transition-all duration-300 lg:static lg:inset-auto lg:z-auto lg:h-full lg:shrink-0 ${collapsed ? "w-[88px]" : "w-[280px]"
+          } ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         <div className="flex h-full min-h-0 w-full flex-col p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#6cd698] text-lg font-black text-white shadow-[0_16px_26px_-18px_rgba(22,163,74,0.8)]">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#6cd698] text-lg font-bold text-white shadow-[0_16px_26px_-18px_rgba(22,163,74,0.8)]">
               L
             </span>
             {!collapsed ? (
               <div className="min-w-0">
-                <p className="text-base font-black tracking-[-0.04em] text-slate-950">Lajukan CRM</p>
+                <p className="text-base font-bold tracking-[-0.04em] text-slate-950">Lajukan CRM</p>
                 <p className="text-xs font-semibold text-slate-500">Admin marketplace</p>
               </div>
             ) : null}
@@ -2028,11 +2026,10 @@ function Sidebar({
                   key={item.id}
                   type="button"
                   onClick={() => onSelect(item.id)}
-                  className={`flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left transition ${
-                    active
-                      ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-                  } ${collapsed ? "justify-center" : ""}`}
+                  className={`flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left transition ${active
+                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+                    } ${collapsed ? "justify-center" : ""}`}
                   title={item.label}
                 >
                   <Icon name={item.icon} className="h-5 w-5 shrink-0" />
@@ -2050,7 +2047,7 @@ function Sidebar({
           <div className="mt-4 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
             {!collapsed ? (
               <>
-                <p className="text-xs font-black text-slate-900">Mode CRM v1</p>
+                <p className="text-xs font-bold text-slate-900">Mode CRM v1</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
                   Fokus transaksi, chat, listing, dan moderasi.
                 </p>
@@ -2092,8 +2089,8 @@ function TopBar({
 }) {
   const page = NAV_ITEMS.find(item => item.id === activePage) || NAV_ITEMS[0];
   return (
-    <header className="z-30 shrink-0 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-[1540px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+    <header className="z-30 shrink-0 border-b border-slate-200 bg-white/90 ">
+      <div className="mx-auto flex h-16 max-w-[1540px] items-center gap-3 px-1 sm:px-3 md:px-6 lg:px-8">
         <button
           type="button"
           onClick={onOpenMobile}
@@ -2103,7 +2100,7 @@ function TopBar({
           <Icon name="menu" className="h-5 w-5" />
         </button>
         <div className="hidden min-w-[150px] sm:block">
-          <p className="text-sm font-black text-slate-950">{page.label}</p>
+          <p className="text-sm font-bold text-slate-950">{page.label}</p>
           <p className="text-xs font-semibold text-slate-500">{page.hint}</p>
         </div>
         <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-slate-500 focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100">
@@ -2130,7 +2127,7 @@ function TopBar({
         >
           <Icon name="bell" className="h-5 w-5" />
           {notificationCount ? (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
               {notificationCount}
             </span>
           ) : null}
@@ -2141,7 +2138,7 @@ function TopBar({
             onClick={onToggleProfile}
             className="flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 text-left"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-xs font-black text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-900 text-xs font-bold text-white">
               {userLabel.slice(0, 1).toUpperCase()}
             </span>
             <span className="hidden max-w-[130px] truncate text-sm font-bold text-slate-800 md:block">
@@ -2151,7 +2148,7 @@ function TopBar({
           {profileOpen ? (
             <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
               <div className="rounded-xl bg-slate-50 p-3">
-                <p className="text-sm font-black text-slate-900">{userLabel}</p>
+                <p className="text-sm font-bold text-slate-900">{userLabel}</p>
                 <p className="text-xs text-slate-500">Admin internal</p>
               </div>
               <button
@@ -2191,7 +2188,7 @@ function DashboardHome({
       <section className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div>
           <Badge tone="success">CRM + CMS Marketplace</Badge>
-          <h1 className="mt-3 text-2xl font-black tracking-[-0.05em] text-slate-950 sm:text-3xl">
+          <h1 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-slate-950 sm:text-3xl">
             Pantau transaksi, chat, dan listing dalam satu tempat.
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
@@ -2203,14 +2200,14 @@ function DashboardHome({
           <button
             type="button"
             onClick={() => onOpenPage("listings")}
-            className="rounded-2xl bg-[#6cd698] px-4 py-3 text-sm font-black text-white shadow-[0_16px_28px_-20px_rgba(22,163,74,0.8)]"
+            className="rounded-2xl bg-[#6cd698] px-4 py-3 text-sm font-bold text-white shadow-[0_16px_28px_-20px_rgba(22,163,74,0.8)]"
           >
             Cek Listing
           </button>
           <button
             type="button"
             onClick={() => onOpenPage("chat")}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700"
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700"
           >
             Buka Chat
           </button>
@@ -2227,7 +2224,7 @@ function DashboardHome({
         <ShellCard className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-black text-slate-950">GMV per hari</p>
+              <p className="text-sm font-bold text-slate-950">GMV per hari</p>
               <p className="text-xs font-semibold text-slate-500">Grafik bersih seperti Stripe, fokus tren.</p>
             </div>
             <Badge tone="blue">7 hari</Badge>
@@ -2236,7 +2233,7 @@ function DashboardHome({
         </ShellCard>
 
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Kategori paling aktif</p>
+          <p className="text-sm font-bold text-slate-950">Kategori paling aktif</p>
           <p className="mt-1 text-xs font-semibold text-slate-500">Listing dan permintaan paling ramai.</p>
           <div className="mt-5">
             <BarChart data={chartData.categories} />
@@ -2246,7 +2243,7 @@ function DashboardHome({
 
       <section className="grid gap-5 xl:grid-cols-[1fr_1fr_0.8fr]">
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Funnel transaksi</p>
+          <p className="text-sm font-bold text-slate-950">Funnel transaksi</p>
           <p className="mt-1 text-xs font-semibold text-slate-500">Dari dilihat sampai deal sukses.</p>
           <div className="mt-4">
             <FunnelChart data={chartData.funnel} />
@@ -2256,7 +2253,7 @@ function DashboardHome({
         <ShellCard className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-sm font-black text-slate-950">CRM Pipeline Snapshot</p>
+              <p className="text-sm font-bold text-slate-950">CRM Pipeline Snapshot</p>
               <p className="text-xs font-semibold text-slate-500">Kanban mini untuk prospek panas.</p>
             </div>
             <Badge tone="warning">{data.leads.length} lead</Badge>
@@ -2265,7 +2262,7 @@ function DashboardHome({
         </ShellCard>
 
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Aktivitas realtime</p>
+          <p className="text-sm font-bold text-slate-950">Aktivitas realtime</p>
           <div className="mt-4 space-y-3">
             {data.activities.slice(0, 6).map(activity => (
               <ActivityItem key={activity.id} activity={activity} />
@@ -2292,13 +2289,13 @@ function MiniPipeline({ leads }: { leads: CrmLead[] }) {
         return (
           <div key={column.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-black text-slate-800">{column.label}</p>
+              <p className="text-xs font-bold text-slate-800">{column.label}</p>
               <span className="text-xs font-bold text-slate-400">{items.length}</span>
             </div>
             <div className="mt-2 space-y-2">
               {items.map(lead => (
                 <div key={lead.id} className="rounded-xl bg-white p-3 shadow-sm">
-                  <p className="line-clamp-1 text-xs font-black text-slate-900">{lead.requester_name || lead.name}</p>
+                  <p className="line-clamp-1 text-xs font-bold text-slate-900">{lead.requester_name || lead.name}</p>
                   <p className="mt-1 line-clamp-1 text-[11px] text-slate-500">
                     {asString(lead.metadata?.listing_title) || lead.sector || "Listing"}
                   </p>
@@ -2359,7 +2356,7 @@ function PipelinePage({ leads }: { leads: CrmLead[] }) {
             <ShellCard key={column.id} className="min-h-[420px] p-3">
               <div className="mb-3 rounded-2xl bg-slate-50 p-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-black text-slate-900">{column.label}</p>
+                  <p className="text-sm font-bold text-slate-900">{column.label}</p>
                   <Badge tone={column.id === "completed" ? "success" : "neutral"}>{items.length}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-slate-500">{column.help}</p>
@@ -2368,7 +2365,7 @@ function PipelinePage({ leads }: { leads: CrmLead[] }) {
                 {items.map(lead => (
                   <div key={lead.id} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-2 text-sm font-black text-slate-950">{lead.requester_name || lead.name}</p>
+                      <p className="line-clamp-2 text-sm font-bold text-slate-950">{lead.requester_name || lead.name}</p>
                       {column.id === "negotiation" || column.id === "locked" ? (
                         <Badge tone="warning">Hot Lead 🔥</Badge>
                       ) : null}
@@ -2377,7 +2374,7 @@ function PipelinePage({ leads }: { leads: CrmLead[] }) {
                       {asString(lead.metadata?.listing_title) || lead.sector || "Listing yang dilihat"}
                     </p>
                     <div className="mt-3 flex items-center justify-between text-xs">
-                      <span className="font-black text-emerald-700">
+                      <span className="font-bold text-emerald-700">
                         {formatCurrency(lead.value_cents || 0, lead.currency || "IDR")}
                       </span>
                       <span className="text-slate-400">{formatDate(lead.updated_at)}</span>
@@ -2432,7 +2429,7 @@ function UsersPage({
       <ShellCard className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-[1180px] w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+            <thead className="bg-slate-50 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
               <tr>
                 <th className="px-4 py-3">Nama user</th>
                 <th className="px-4 py-3">Role</th>
@@ -2449,11 +2446,11 @@ function UsersPage({
                 <tr key={user.id} className="hover:bg-slate-50/70">
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-xs font-black text-white">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-xs font-bold text-white">
                         {user.name.slice(0, 1)}
                       </span>
                       <div>
-                        <p className="font-black text-slate-950">{user.name}</p>
+                        <p className="font-bold text-slate-950">{user.name}</p>
                         <p className="text-xs text-slate-500">{user.handle} - {user.city}</p>
                       </div>
                     </div>
@@ -2476,28 +2473,28 @@ function UsersPage({
                       <button
                         type="button"
                         onClick={() => onTrustAction(user, "approve")}
-                        className="rounded-xl bg-emerald-600 px-2.5 py-2 text-[11px] font-black text-white"
+                        className="rounded-xl bg-emerald-600 px-2.5 py-2 text-[11px] font-bold text-white"
                       >
                         Approve KYC
                       </button>
                       <button
                         type="button"
                         onClick={() => onTrustAction(user, "reject")}
-                        className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] font-black text-rose-700"
+                        className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-2 text-[11px] font-bold text-rose-700"
                       >
                         Reject
                       </button>
                       <button
                         type="button"
                         onClick={() => onTrustAction(user, "warn")}
-                        className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] font-black text-amber-700"
+                        className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] font-bold text-amber-700"
                       >
                         Alert
                       </button>
                       <button
                         type="button"
                         onClick={() => onTrustAction(user, user.manualHold ? "release" : "hold")}
-                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-black text-slate-700"
+                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-bold text-slate-700"
                       >
                         {user.manualHold ? "Lepas hold" : "Hold akun"}
                       </button>
@@ -2566,14 +2563,14 @@ function ListingsPage({
               }
             >
               {!listing.image ? (
-                <div className="flex h-full items-center justify-center text-xs font-black text-slate-400">
+                <div className="flex h-full items-center justify-center text-xs font-bold text-slate-400">
                   Preview listing
                 </div>
               ) : null}
             </div>
             <div className="p-4">
               <div className="flex items-start justify-between gap-2">
-                <p className="line-clamp-2 text-sm font-black text-slate-950">{listing.title}</p>
+                <p className="line-clamp-2 text-sm font-bold text-slate-950">{listing.title}</p>
                 <Badge tone={toneForStatus(listing.rawStatus)}>{statusLabel(listing.rawStatus)}</Badge>
               </div>
               <div className="mt-2 flex flex-wrap gap-1.5">
@@ -2587,21 +2584,21 @@ function ListingsPage({
               <p className="mt-2 text-xs font-semibold text-slate-500">
                 {listing.category} - {listing.location}
               </p>
-              <p className="mt-3 text-lg font-black text-emerald-700">
+              <p className="mt-3 text-lg font-bold text-emerald-700">
                 {listing.priceCents ? formatCurrency(listing.priceCents, listing.currency) : "Harga tanya admin"}
               </p>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedListing(listing)}
-                  className="rounded-xl bg-[#6cd698] px-3 py-2 text-xs font-black text-white"
+                  className="rounded-xl bg-[#6cd698] px-3 py-2 text-xs font-bold text-white"
                 >
                   Detail report
                 </button>
                 <button
                   type="button"
                   onClick={() => onModerationAction(listing, "review")}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700"
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
                 >
                   Tinjau
                 </button>
@@ -2610,14 +2607,14 @@ function ListingsPage({
                 <button
                   type="button"
                   onClick={() => onModerationAction(listing, "hide")}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-600"
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600"
                 >
                   Sembunyikan
                 </button>
                 <button
                   type="button"
                   onClick={() => onModerationAction(listing, "ban")}
-                  className="rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 text-xs font-black text-white"
+                  className="rounded-xl border border-slate-200 bg-slate-950 px-3 py-2 text-xs font-bold text-white"
                 >
                   Ban listing
                 </button>
@@ -2636,7 +2633,7 @@ function ListingsPage({
               <Badge tone={selectedListing.reportCount >= 3 ? "danger" : selectedListing.reportCount ? "warning" : "neutral"}>
                 {selectedListing.reportCount ? `${selectedListing.reportCount} laporan masuk` : "Tidak ada laporan"}
               </Badge>
-              <h2 className="mt-3 text-xl font-black tracking-[-0.04em] text-slate-950">
+              <h2 className="mt-3 text-xl font-bold tracking-[-0.04em] text-slate-950">
                 {selectedListing.title}
               </h2>
               <p className="mt-1 text-sm font-semibold text-slate-500">
@@ -2646,14 +2643,14 @@ function ListingsPage({
             <button
               type="button"
               onClick={() => setSelectedListing(null)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600"
             >
               Tutup detail
             </button>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.85fr]">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-black text-slate-950">Siapa yang report?</p>
+              <p className="text-sm font-bold text-slate-950">Siapa yang report?</p>
               <div className="mt-3 grid gap-2">
                 {selectedListing.reporters.length ? (
                   selectedListing.reporters.map(reporter => (
@@ -2665,7 +2662,7 @@ function ListingsPage({
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-black text-slate-950">Alasan laporan</p>
+              <p className="text-sm font-bold text-slate-950">Alasan laporan</p>
               <div className="mt-3 space-y-2">
                 {selectedListing.reportReasons.length ? (
                   selectedListing.reportReasons.map(reason => (
@@ -2685,28 +2682,28 @@ function ListingsPage({
             <button
               type="button"
               onClick={() => onStatusChange(selectedListing, "active")}
-              className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white"
+              className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white"
             >
               Pulihkan aktif
             </button>
             <button
               type="button"
               onClick={() => onModerationAction(selectedListing, "review")}
-              className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700"
+              className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700"
             >
               Tandai perlu tinjau
             </button>
             <button
               type="button"
               onClick={() => onModerationAction(selectedListing, "hide")}
-              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
             >
               Sembunyikan listing
             </button>
             <button
               type="button"
               onClick={() => onModerationAction(selectedListing, "ban")}
-              className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white"
+              className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-bold text-white"
             >
               Ban / arsipkan
             </button>
@@ -2716,7 +2713,7 @@ function ListingsPage({
       <ShellCard className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-[1120px] w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+            <thead className="bg-slate-50 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
               <tr>
                 <th className="px-4 py-3">Listing</th>
                 <th className="px-4 py-3">Kategori</th>
@@ -2730,7 +2727,7 @@ function ListingsPage({
             <tbody className="divide-y divide-slate-100">
               {filtered.map(listing => (
                 <tr key={`row-${listing.id}`} className="hover:bg-slate-50/70">
-                  <td className="px-4 py-4 font-black text-slate-950">{listing.title}</td>
+                  <td className="px-4 py-4 font-bold text-slate-950">{listing.title}</td>
                   <td className="px-4 py-4 text-slate-600">{listing.category}</td>
                   <td className="px-4 py-4 font-bold text-slate-800">{listing.priceCents ? formatCurrency(listing.priceCents, listing.currency) : "-"}</td>
                   <td className="px-4 py-4 text-slate-600">{listing.location}</td>
@@ -2744,7 +2741,7 @@ function ListingsPage({
                     <button
                       type="button"
                       onClick={() => setSelectedListing(listing)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600"
                     >
                       Review
                     </button>
@@ -2772,25 +2769,25 @@ function TransactionsPage({ transactions }: { transactions: CrmTransactionRow[] 
           <ShellCard key={tx.id} className="p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm font-black text-slate-950">Transaksi {compactId(tx.id)}</p>
+                <p className="text-sm font-bold text-slate-950">Transaksi {compactId(tx.id)}</p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">
                   Buyer {tx.buyer} - Seller {tx.seller}
                 </p>
               </div>
               <Badge tone={toneForStatus(tx.status)}>{statusLabel(tx.status)}</Badge>
             </div>
-            <p className="mt-4 text-2xl font-black tracking-[-0.04em] text-slate-950">
+            <p className="mt-4 text-2xl font-bold tracking-[-0.04em] text-slate-950">
               {formatCurrency(tx.amountCents)}
             </p>
             <OrderTimeline status={tx.status} />
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white">
+              <button type="button" className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white">
                 Lihat detail
               </button>
               <button
                 type="button"
                 disabled={tx.status !== "disputed"}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-500 disabled:text-slate-300"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500 disabled:text-slate-300"
                 title={tx.status === "disputed" ? "Resolve dispute" : "Hanya untuk dispute"}
               >
                 Resolve dispute
@@ -2810,9 +2807,8 @@ function OrderTimeline({ status }: { status: string }) {
     <div className="mt-5 grid gap-2 sm:grid-cols-5">
       {steps.map((step, index) => (
         <div key={step} className="flex items-center gap-2 sm:block">
-          <span className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-black ${
-            index <= statusIndex ? "bg-[#6cd698] text-white" : "bg-slate-100 text-slate-400"
-          }`}>
+          <span className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold ${index <= statusIndex ? "bg-[#6cd698] text-white" : "bg-slate-100 text-slate-400"
+            }`}>
             {index + 1}
           </span>
           <p className="mt-0 text-xs font-semibold text-slate-600 sm:mt-2">{step}</p>
@@ -2836,7 +2832,7 @@ function ChatPage({ chats }: { chats: CrmChatRow[] }) {
       <div className="grid min-h-[680px] gap-4 xl:grid-cols-[320px_minmax(0,1fr)_330px]">
         <ShellCard className="overflow-hidden">
           <div className="border-b border-slate-200 p-4">
-            <p className="font-black text-slate-950">Daftar chat</p>
+            <p className="font-bold text-slate-950">Daftar chat</p>
             <p className="text-xs text-slate-500">{chats.length} percakapan aktif</p>
           </div>
           <div className="max-h-[620px] overflow-y-auto p-2">
@@ -2845,16 +2841,15 @@ function ChatPage({ chats }: { chats: CrmChatRow[] }) {
                 key={chat.id}
                 type="button"
                 onClick={() => setSelectedId(chat.id)}
-                className={`mb-1 flex w-full gap-3 rounded-2xl p-3 text-left transition ${
-                  selected?.id === chat.id ? "bg-emerald-50 ring-1 ring-emerald-100" : "hover:bg-slate-50"
-                }`}
+                className={`mb-1 flex w-full gap-3 rounded-2xl p-3 text-left transition ${selected?.id === chat.id ? "bg-emerald-50 ring-1 ring-emerald-100" : "hover:bg-slate-50"
+                  }`}
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-black text-white">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
                   {chat.name.slice(0, 1)}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-black text-slate-950">{chat.name}</span>
+                    <span className="truncate text-sm font-bold text-slate-950">{chat.name}</span>
                     {chat.unread ? <span className="h-2 w-2 rounded-full bg-[#6cd698]" /> : null}
                   </span>
                   <span className="line-clamp-1 text-xs text-slate-500">{chat.lastMessage}</span>
@@ -2867,7 +2862,7 @@ function ChatPage({ chats }: { chats: CrmChatRow[] }) {
         <ShellCard className="flex min-h-[620px] flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-200 p-4">
             <div>
-              <p className="font-black text-slate-950">{selected?.name || "Pilih chat"}</p>
+              <p className="font-bold text-slate-950">{selected?.name || "Pilih chat"}</p>
               <p className="text-xs text-slate-500">End-to-end CRM view - bukan chat teknis</p>
             </div>
             {selected ? <Badge tone={selected.stage === "Hot" ? "warning" : "blue"}>{selected.stage === "Hot" ? "Hot Lead 🔥" : selected.stage}</Badge> : null}
@@ -2896,7 +2891,7 @@ function ChatPage({ chats }: { chats: CrmChatRow[] }) {
                 placeholder="Tulis balasan cepat..."
                 className="min-h-11 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold outline-none focus:border-emerald-300 focus:bg-white"
               />
-              <button type="button" className="rounded-2xl bg-[#6cd698] px-4 text-sm font-black text-white">
+              <button type="button" className="rounded-2xl bg-[#6cd698] px-4 text-sm font-bold text-white">
                 Kirim
               </button>
             </div>
@@ -2906,9 +2901,9 @@ function ChatPage({ chats }: { chats: CrmChatRow[] }) {
         <ShellCard className="p-5">
           {selected ? (
             <div>
-              <p className="text-sm font-black text-slate-950">Info user</p>
+              <p className="text-sm font-bold text-slate-950">Info user</p>
               <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                <p className="font-black text-slate-950">{selected.name}</p>
+                <p className="font-bold text-slate-950">{selected.name}</p>
                 <p className="mt-1 text-xs text-slate-500">{selected.source} - {formatDate(selected.updatedAt)}</p>
               </div>
               <div className="mt-4 space-y-3">
@@ -2917,7 +2912,7 @@ function ChatPage({ chats }: { chats: CrmChatRow[] }) {
                 <InfoRow label="Tahap konversi" value={selected.stage === "Hot" ? "Dalam Negosiasi" : "Perlu Follow-up"} />
               </div>
               <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-sm font-black text-emerald-800">Tag otomatis</p>
+                <p className="text-sm font-bold text-emerald-800">Tag otomatis</p>
                 <p className="mt-1 text-xs leading-5 text-emerald-700">
                   User ini cocok dimasukkan ke tahap follow-up karena sudah bertanya soal listing.
                 </p>
@@ -2936,9 +2931,8 @@ function ChatBubble({ side, body }: { side: "left" | "right"; body: string }) {
   return (
     <div className={`flex ${side === "right" ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
-          side === "right" ? "bg-[#d9ffd7] text-slate-900" : "bg-white text-slate-700"
-        }`}
+        className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${side === "right" ? "bg-[#d9ffd7] text-slate-900" : "bg-white text-slate-700"
+          }`}
       >
         {body}
         <span className="ml-2 text-[11px] text-slate-400">09:41</span>
@@ -2976,13 +2970,13 @@ function AnalyticsPage({
       />
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Revenue chart (GMV)</p>
+          <p className="text-sm font-bold text-slate-950">Revenue chart (GMV)</p>
           <div className="mt-4">
             <LineChart data={chartData.daily} />
           </div>
         </ShellCard>
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Conversion rate funnel</p>
+          <p className="text-sm font-bold text-slate-950">Conversion rate funnel</p>
           <div className="mt-4">
             <FunnelChart data={chartData.funnel} />
           </div>
@@ -2990,7 +2984,7 @@ function AnalyticsPage({
       </div>
       <div className="grid gap-5 xl:grid-cols-3">
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Top sellers</p>
+          <p className="text-sm font-bold text-slate-950">Top sellers</p>
           <div className="mt-4 space-y-3">
             {topSellers.map(user => (
               <InfoRow key={user.id} label={user.name} value={formatCurrency(user.gmvCents)} />
@@ -2998,13 +2992,13 @@ function AnalyticsPage({
           </div>
         </ShellCard>
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Top categories</p>
+          <p className="text-sm font-bold text-slate-950">Top categories</p>
           <div className="mt-4">
             <BarChart data={chartData.categories} />
           </div>
         </ShellCard>
         <ShellCard className="p-5">
-          <p className="text-sm font-black text-slate-950">Heatmap lokasi transaksi</p>
+          <p className="text-sm font-bold text-slate-950">Heatmap lokasi transaksi</p>
           <LocationHeatmap users={users} listings={listings} transactions={transactions} />
         </ShellCard>
       </div>
@@ -3014,7 +3008,7 @@ function AnalyticsPage({
             <Badge tone={insight.tone === "green" ? "success" : insight.tone === "amber" ? "warning" : "blue"}>
               AI Insight
             </Badge>
-            <p className="mt-3 text-base font-black text-slate-950">{insight.title}</p>
+            <p className="mt-3 text-base font-bold text-slate-950">{insight.title}</p>
             <p className="mt-2 text-sm leading-6 text-slate-500">{insight.body}</p>
           </ShellCard>
         ))}
@@ -3049,7 +3043,7 @@ function LocationHeatmap({
           className="rounded-2xl border border-emerald-100 p-3"
           style={{ backgroundColor: `rgba(108, 214, 152, ${0.15 + (value / max) * 0.35})` }}
         >
-          <p className="text-xs font-black text-slate-900">{city}</p>
+          <p className="text-xs font-bold text-slate-900">{city}</p>
           <p className="mt-1 text-[11px] font-semibold text-slate-600">{value} sinyal</p>
         </div>
       ))}
@@ -3116,19 +3110,19 @@ function IssueColumn({
 
   return (
     <ShellCard className="p-5">
-      <p className="text-sm font-black text-slate-950">{title}</p>
+      <p className="text-sm font-bold text-slate-950">{title}</p>
       <div className="mt-4 space-y-3">
         {items.map(item => (
           <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-black text-slate-950">{item.title}</p>
+              <p className="text-sm font-bold text-slate-950">{item.title}</p>
               <Badge tone={item.badge.includes("Tinggi") || item.badge === "Urgent" ? "danger" : "warning"}>{item.badge}</Badge>
             </div>
             <p className="mt-2 text-xs leading-5 text-slate-500">{item.body}</p>
             <button
               type="button"
               onClick={() => setSelectedIssue(item)}
-              className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+              className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
             >
               Lihat detail
             </button>
@@ -3140,13 +3134,13 @@ function IssueColumn({
         <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Detail kasus</p>
-              <p className="mt-1 text-sm font-black text-slate-950">{selectedIssue.title}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Detail kasus</p>
+              <p className="mt-1 text-sm font-bold text-slate-950">{selectedIssue.title}</p>
             </div>
             <button
               type="button"
               onClick={() => setSelectedIssue(null)}
-              className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-500"
+              className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-500"
             >
               Tutup
             </button>
@@ -3159,7 +3153,7 @@ function IssueColumn({
           <button
             type="button"
             disabled
-            className="mt-4 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-slate-400"
+            className="mt-4 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-slate-400"
             title="Perlu endpoint resolve/review dari backend"
           >
             Action resolve belum tersambung
@@ -3188,12 +3182,12 @@ function SettingsPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {blocks.map(([title, body]) => (
           <ShellCard key={title} className="p-5">
-            <p className="text-base font-black text-slate-950">{title}</p>
+            <p className="text-base font-bold text-slate-950">{title}</p>
             <p className="mt-2 text-sm leading-6 text-slate-500">{body}</p>
             <button
               type="button"
               disabled
-              className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-400"
+              className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-400"
             >
               Endpoint belum tersedia
             </button>
@@ -3208,7 +3202,7 @@ function PageHeader({ label, title, body }: { label: string; title: string; body
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <Badge tone="success">{label}</Badge>
-      <h1 className="mt-3 text-2xl font-black tracking-[-0.05em] text-slate-950 sm:text-3xl">{title}</h1>
+      <h1 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-slate-950 sm:text-3xl">{title}</h1>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{body}</p>
     </section>
   );
@@ -3233,7 +3227,7 @@ function FilterBar({
             <select
               value={filter.value}
               onChange={event => filter.onChange(event.target.value)}
-              className="bg-transparent text-sm font-black text-slate-900 outline-none"
+              className="bg-transparent text-sm font-bold text-slate-900 outline-none"
             >
               {filter.options.map(option => (
                 <option key={option} value={option}>
@@ -3252,7 +3246,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-3">
       <p className="text-xs font-semibold text-slate-500">{label}</p>
-      <p className="max-w-[60%] text-right text-xs font-black text-slate-900">{value}</p>
+      <p className="max-w-[60%] text-right text-xs font-bold text-slate-900">{value}</p>
     </div>
   );
 }

@@ -71,8 +71,8 @@ export function createHomeCopy(isId: boolean) {
     ctaCreate: isId ? 'Pasang peluang' : 'Post an opportunity',
 
     trustLine: isId
-      ? 'Cek verifikasi mitra, kapasitas produksi, sertifikasi, escrow pembayaran, dan riwayat transaksi sebelum lanjut.'
-      : 'Check partner verification, production capacity, certification, payment escrow, and transaction history before moving forward.',
+      ? 'Cek verifikasi mitra, kapasitas produksi, sertifikasi, bukti kerja, dan riwayat sebelum lanjut.'
+      : 'Check partner verification, production capacity, certification, proof of work, and history before moving forward.',
 
     shortcutsTitle: isId ? 'Aksi lokal' : 'Local-first shortcuts',
     launcherEyebrow: isId ? 'Mulai sekarang' : 'Start now',

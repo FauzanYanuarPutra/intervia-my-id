@@ -669,9 +669,9 @@ export function CategoryLandingClient({
   const desktopAction =
     desktopCategory === 'all'
       ? {
-          href: requestHref,
-          label: isId ? 'Buat Permintaan Sekarang' : 'Create Request Now',
-        }
+        href: requestHref,
+        label: isId ? 'Buat Permintaan Sekarang' : 'Create Request Now',
+      }
       : getPrimaryAction(desktopCategory, requestHref, isId);
   const mobileAction = getPrimaryAction(mobileCategory, requestHref, isId);
 
@@ -705,7 +705,7 @@ export function CategoryLandingClient({
       <div className="mx-auto w-full max-w-[1500px] px-2 sm:px-4 lg:px-6">
         <div className="lg:hidden">
           <section
-            className="ui-layer-local-topbar fixed inset-x-0 top-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)] backdrop-blur-xl sm:px-3"
+            className="ui-layer-local-topbar fixed inset-x-0 top-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)]  sm:px-3"
             style={{ paddingTop: 'max(env(safe-area-inset-top), 0.3rem)' }}
           >
             <div className="mx-auto flex max-w-[720px] items-center gap-2">
@@ -733,7 +733,7 @@ export function CategoryLandingClient({
               >
                 <Bell className="h-4.5 w-4.5" />
                 {unreadCount > 0 ? (
-                  <span className="absolute right-0.5 top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 py-0.5 text-[9px] font-black text-white">
+                  <span className="absolute right-0.5 top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 py-0.5 text-[9px] font-bold text-white">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 ) : null}
@@ -784,7 +784,7 @@ export function CategoryLandingClient({
               )}
             >
               <div className="max-w-[68%] space-y-2">
-                <h2 className="text-[1.45rem] font-black leading-[1.04] tracking-[-0.04em] text-slate-950">
+                <h2 className="text-[1.45rem] font-bold leading-[1.04] tracking-[-0.04em] text-slate-950">
                   {pick(isId, mobileCategoryConfig.heroTitle)}
                 </h2>
                 <p className="line-clamp-2 text-xs leading-5 text-slate-600">
@@ -914,7 +914,7 @@ export function CategoryLandingClient({
                 <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                   <Headphones className="h-5 w-5" />
                 </span>
-                <h2 className="mt-4 text-lg font-black tracking-[-0.04em] text-slate-950">
+                <h2 className="mt-4 text-lg font-bold tracking-[-0.04em] text-slate-950">
                   {isId ? 'Butuh bantuan?' : 'Need help?'}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -945,7 +945,7 @@ export function CategoryLandingClient({
               <div className="flex flex-col gap-5 rounded-[36px] border border-slate-200 bg-white p-6 shadow-[0_24px_44px_-34px_rgba(15,23,42,0.2)] xl:p-7">
                 <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                   <div className="max-w-3xl">
-                    <h1 className="text-[3.2rem] font-black leading-[0.92] tracking-[-0.08em] text-slate-950">
+                    <h1 className="text-[3.2rem] font-bold leading-[0.92] tracking-[-0.08em] text-slate-950">
                       {isId ? 'Kategori' : 'Categories'}
                     </h1>
                     <p className="mt-3 text-base leading-7 text-slate-600">
@@ -1002,7 +1002,7 @@ export function CategoryLandingClient({
                 )}
               >
                 <div>
-                  <h2 className="text-[2.2rem] font-black leading-[1] tracking-[-0.06em] text-slate-950">
+                  <h2 className="text-[2.2rem] font-bold leading-[1] tracking-[-0.06em] text-slate-950">
                     {desktopBannerTitle}
                   </h2>
                   <p className="mt-3 max-w-xl text-base leading-7 text-slate-600">
@@ -1036,13 +1036,13 @@ export function CategoryLandingClient({
                     return (
                       <div
                         key={item.id}
-                        className="flex items-start gap-4 rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 backdrop-blur-sm"
+                        className="flex items-start gap-4 rounded-[24px] border border-white/70 bg-white/80 px-4 py-4 "
                       >
                         <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
                           <Icon className="h-5 w-5" />
                         </span>
                         <div>
-                          <p className="text-sm font-black text-slate-950">
+                          <p className="text-sm font-bold text-slate-950">
                             {pick(isId, item.title)}
                           </p>
                           <p className="mt-1 text-sm text-slate-600">
@@ -1147,7 +1147,7 @@ function SectionHeader({
     <div className="flex items-center justify-between gap-3">
       <h2
         className={cn(
-          'font-black tracking-[-0.04em] text-slate-950',
+          'font-bold tracking-[-0.04em] text-slate-950',
           mobile ? 'text-[1.2rem]' : 'text-[2rem]',
         )}
       >
@@ -1185,7 +1185,7 @@ function CategoryEmptyShowcase({
       <span className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-[15px] bg-emerald-50 text-emerald-600">
         <Search className="h-5 w-5" />
       </span>
-      <p className="mt-3 text-sm font-black text-slate-950">
+      <p className="mt-3 text-sm font-bold text-slate-950">
         {isId ? 'Belum ada listing aktif' : 'No active listings yet'}
       </p>
       <p className="mx-auto mt-1 max-w-md text-xs font-semibold leading-5 text-slate-500">
@@ -1195,7 +1195,7 @@ function CategoryEmptyShowcase({
       </p>
       <Link
         href={canonicalizeDiscoveryHref(href)}
-        className="mt-4 inline-flex min-h-10 items-center justify-center rounded-[14px] bg-emerald-600 px-4 text-xs font-black text-white"
+        className="mt-4 inline-flex min-h-10 items-center justify-center rounded-[14px] bg-emerald-600 px-4 text-xs font-bold text-white"
       >
         {isId ? 'Cari data real' : 'Search real data'}
       </Link>
@@ -1271,7 +1271,7 @@ function DesktopCategoryCard({
       >
         <Icon className="h-5 w-5" />
       </span>
-      <h3 className="mt-4 text-[1.35rem] font-black tracking-[-0.04em] text-slate-950">
+      <h3 className="mt-4 text-[1.35rem] font-bold tracking-[-0.04em] text-slate-950">
         {pick(isId, category.label)}
       </h3>
       <p className="mt-2 max-w-[15rem] text-sm leading-6 text-slate-600">
@@ -1328,7 +1328,7 @@ function DesktopShowcaseCard({
         </span>
       </div>
       <div className="space-y-3 p-4">
-        <h3 className="text-[1.15rem] font-black leading-[1.2] tracking-[-0.04em] text-slate-950">
+        <h3 className="text-[1.15rem] font-bold leading-[1.2] tracking-[-0.04em] text-slate-950">
           {item.title}
         </h3>
         <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -1347,7 +1347,7 @@ function DesktopShowcaseCard({
         </p>
         <p className="text-sm text-slate-500">
           {isId ? 'Mulai dari ' : 'Starting at '}
-          <span className="text-[1.1rem] font-black tracking-[-0.03em] text-emerald-600">
+          <span className="text-[1.1rem] font-bold tracking-[-0.03em] text-emerald-600">
             {item.price}
           </span>
           <span className="text-slate-500">{item.unit}</span>
@@ -1391,7 +1391,7 @@ function MobileShowcaseCard({
         </span>
       </div>
       <div className="space-y-1.5 p-2.5">
-        <h3 className="line-clamp-2 text-sm font-black leading-[1.2] tracking-[-0.03em] text-slate-950">
+        <h3 className="line-clamp-2 text-sm font-bold leading-[1.2] tracking-[-0.03em] text-slate-950">
           {item.title}
         </h3>
         <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -1407,7 +1407,7 @@ function MobileShowcaseCard({
         </div>
         <p className="truncate text-[11px] text-slate-500">
           {isId ? 'Mulai dari ' : 'Starting at '}
-          <span className="text-sm font-black tracking-[-0.02em] text-emerald-600">
+          <span className="text-sm font-bold tracking-[-0.02em] text-emerald-600">
             {item.price}
           </span>
           <span>{item.unit}</span>
@@ -1443,7 +1443,7 @@ function MobileRecommendationRow({
       </div>
       <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-black tracking-[-0.03em] text-slate-950">
+          <h3 className="truncate text-sm font-bold tracking-[-0.03em] text-slate-950">
             {item.title}
           </h3>
           <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -1462,7 +1462,7 @@ function MobileRecommendationRow({
           </p>
           <p className="mt-1.5 text-[11px] text-slate-500">
             {isId ? 'Mulai dari ' : 'Starting at '}
-            <span className="text-sm font-black tracking-[-0.02em] text-emerald-600">
+            <span className="text-sm font-bold tracking-[-0.02em] text-emerald-600">
               {item.price}
             </span>
             <span>{item.unit}</span>

@@ -33,7 +33,7 @@ export function FlowNextSteps({
   return (
     <section className={`rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 shadow-sm ${className}`}>
       <p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${darkSurface ? 'text-[color:var(--app-accent)]' : 'text-[color:var(--app-accent)]'}`}>{eyebrow}</p>
-      <h2 className={`mt-2 text-lg font-black tracking-tight ${darkSurface ? 'text-[color:var(--app-accent)]' : 'text-[color:var(--app-accent)]'}`}>{title}</h2>
+      <h2 className={`mt-2 text-lg font-bold tracking-tight ${darkSurface ? 'text-[color:var(--app-accent)]' : 'text-[color:var(--app-accent)]'}`}>{title}</h2>
       <p className={`mt-2 max-w-3xl text-sm ${darkSurface ? 'text-[color:var(--app-accent)]' : 'text-[color:var(--app-accent)]'}`}>{description}</p>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -43,11 +43,10 @@ export function FlowNextSteps({
             <Link
               key={`${card.href}-${card.title}`}
               href={card.href}
-              className={`group rounded-2xl border p-3 transition ${
-                darkSurface
+              className={`group rounded-2xl border p-3 transition ${darkSurface
                   ? 'border-[color:var(--app-border-strong)] bg-[color:var(--app-surface)] text-[color:var(--app-accent)] hover:bg-[color:var(--app-surface-muted)]'
                   : 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">

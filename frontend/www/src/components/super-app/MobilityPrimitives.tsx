@@ -299,7 +299,7 @@ export function DriverIdentityCard({
       )}
     >
       <div className="flex items-center gap-3">
-        <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] text-base font-black">
+        <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] text-base font-bold">
           {name.slice(0, 2).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">

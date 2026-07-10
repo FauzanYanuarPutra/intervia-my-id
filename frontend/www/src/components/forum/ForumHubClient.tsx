@@ -211,7 +211,7 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
         </p>
         <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <h1 className="text-3xl font-black tracking-tight text-[color:var(--app-text)]">
+            <h1 className="text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
               {storeHint
                 ? isId
                   ? `Komunitas bisnis untuk ${storeHint}`
@@ -227,9 +227,9 @@ export default function ForumHubClient({ isId }: { isId: boolean }) {
             </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-black text-[color:var(--app-text)]">{overview?.stats.totalThreads || 0}</span>{isId ? 'topik' : 'topics'}</div>
-            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-black text-[color:var(--app-text)]">{overview?.stats.totalPosts || 0}</span>{isId ? 'balasan' : 'posts'}</div>
-            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-black text-[color:var(--app-text)]">{overview?.stats.totalUsers || 0}</span>{isId ? 'kontributor' : 'contributors'}</div>
+            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-bold text-[color:var(--app-text)]">{overview?.stats.totalThreads || 0}</span>{isId ? 'topik' : 'topics'}</div>
+            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-bold text-[color:var(--app-text)]">{overview?.stats.totalPosts || 0}</span>{isId ? 'balasan' : 'posts'}</div>
+            <div className="ui-panel-muted rounded-2xl border border-[color:var(--app-border)] px-4 py-3 text-sm"><span className="block font-bold text-[color:var(--app-text)]">{overview?.stats.totalUsers || 0}</span>{isId ? 'kontributor' : 'contributors'}</div>
           </div>
         </div>
         {overview?.trendingTags?.length ? (

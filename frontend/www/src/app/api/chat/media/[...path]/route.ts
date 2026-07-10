@@ -11,7 +11,10 @@ import { requireAuth } from '@/lib/serverAuth';
 const endpoint = process.env.MINIO_ENDPOINT;
 const accessKey = process.env.MINIO_ACCESS_KEY ?? process.env.MINIO_USER;
 const secretKey = process.env.MINIO_SECRET_KEY ?? process.env.MINIO_PASS;
+const configuredBucket = process.env.MINIO_BUCKET ?? 'laju-chat';
 const CHAT_URL = process.env.INTERNAL_CHAT_URL || 'http://localhost:4000';
+const SAFE_BUCKET = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+const SAFE_KEY_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,180}$/;
 
 function getClient(): S3Client | null {
   if (!endpoint || !accessKey || !secretKey) return null;
@@ -29,6 +32,53 @@ function decodeSafe(segment: string): string {
   } catch {
     return segment;
   }
+}
+
+function contentTypeForPath(filePath: string, fallback?: string): string {
+  if (fallback && fallback !== 'application/octet-stream') return fallback;
+  const cleanPath = filePath.split(/[?#]/, 1)[0]?.toLowerCase() ?? '';
+  if (cleanPath.endsWith('.jpg') || cleanPath.endsWith('.jpeg')) return 'image/jpeg';
+  if (cleanPath.endsWith('.png')) return 'image/png';
+  if (cleanPath.endsWith('.webp')) return 'image/webp';
+  if (cleanPath.endsWith('.gif')) return 'image/gif';
+  if (cleanPath.endsWith('.avif')) return 'image/avif';
+  if (cleanPath.endsWith('.svg')) return 'image/svg+xml';
+  if (cleanPath.endsWith('.mp4')) return 'video/mp4';
+  if (cleanPath.endsWith('.webm')) return 'video/webm';
+  if (cleanPath.endsWith('.mov')) return 'video/quicktime';
+  if (cleanPath.endsWith('.mp3')) return 'audio/mpeg';
+  if (cleanPath.endsWith('.ogg')) return 'audio/ogg';
+  if (cleanPath.endsWith('.wav')) return 'audio/wav';
+  return fallback ?? 'application/octet-stream';
+}
+
+function isSafeObjectKey(key: string): boolean {
+  const segments = key.split('/').filter(Boolean);
+  return (
+    segments.length >= 3 &&
+    segments.every(
+      segment =>
+        segment !== '.' &&
+        segment !== '..' &&
+        !segment.includes('\\') &&
+        SAFE_KEY_SEGMENT.test(segment),
+    )
+  );
+}
+
+function isMissingObjectError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const value = error as {
+    name?: string;
+    Code?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  return (
+    value.name === 'NoSuchKey' ||
+    value.name === 'NotFound' ||
+    value.Code === 'NoSuchKey' ||
+    value.$metadata?.httpStatusCode === 404
+  );
 }
 
 function extractRoomId(pathSegments: string[]): string | null {
@@ -97,23 +147,12 @@ export async function GET(
 
     try {
       const file = await readFile(absolute);
-      const ext = path.extname(absolute).toLowerCase();
-      const contentType =
-        ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' :
-        ext === '.png' ? 'image/png' :
-        ext === '.webp' ? 'image/webp' :
-        ext === '.gif' ? 'image/gif' :
-        ext === '.mp4' ? 'video/mp4' :
-        ext === '.webm' ? 'video/webm' :
-        ext === '.mov' ? 'video/quicktime' :
-        ext === '.mp3' ? 'audio/mpeg' :
-        ext === '.ogg' ? 'audio/ogg' :
-        ext === '.wav' ? 'audio/wav' :
-        'application/octet-stream';
+      const contentType = contentTypeForPath(absolute);
 
       return new NextResponse(file, {
         headers: {
           'Content-Type': contentType,
+          'Content-Disposition': 'inline',
           'Cache-Control': 'public, max-age=31536000, immutable',
         },
       });
@@ -128,6 +167,13 @@ export async function GET(
   }
 
   const key = pathSegments.slice(1).map(decodeSafe).join('/');
+  if (
+    bucket !== configuredBucket ||
+    !SAFE_BUCKET.test(bucket) ||
+    !isSafeObjectKey(key)
+  ) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   try {
     const res = await client.send(
@@ -139,16 +185,24 @@ export async function GET(
     }
 
     const bytes = await res.Body.transformToByteArray();
-    const contentType = res.ContentType ?? 'application/octet-stream';
+    const contentType = contentTypeForPath(key, res.ContentType);
     const buffer = Buffer.from(bytes);
 
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
+        'Content-Disposition': 'inline',
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });
-  } catch {
+  } catch (error) {
+    if (!isMissingObjectError(error)) {
+      console.error('[CHAT_MEDIA_GET_ERROR]', error);
+      return NextResponse.json(
+        { error: 'Storage unavailable' },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 }

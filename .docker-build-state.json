@@ -1,37 +1,45 @@
 {
-    "updated_at":  "2026-06-20T12:35:41.0913393+07:00",
+    "updated_at":  "2026-07-11T03:43:54.4792174+07:00",
     "services":  {
                      "chat_service":  {
-                                          "built_at":  "2026-06-18T17:37:04.9566696+07:00",
-                                          "input_ticks":  639173206127477302
+                                          "input_paths":  "docker-compose.yml|services/chat_service",
+                                          "input_ticks":  639193124678878617,
+                                          "built_at":  "2026-07-11T03:43:54.4787032+07:00"
                                       },
                      "identity_service":  {
-                                              "built_at":  "2026-06-18T17:37:05.0182834+07:00",
-                                              "input_ticks":  639173206127477302
+                                              "input_paths":  "docker-compose.yml|services/identity_service",
+                                              "input_ticks":  639192897650676412,
+                                              "built_at":  "2026-07-10T21:35:12.0187987+07:00"
                                           },
                      "www":  {
-                                 "built_at":  "2026-06-20T12:28:48.0458551+07:00",
-                                 "input_ticks":  639174729241615264
+                                 "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/shared|frontend/www",
+                                 "input_ticks":  639193110513384257,
+                                 "built_at":  "2026-07-11T03:33:47.4074797+07:00"
                              },
                      "marketplace_service":  {
-                                                 "built_at":  "2026-06-18T17:37:05.0198655+07:00",
-                                                 "input_ticks":  639173206127477302
+                                                 "input_paths":  "docker-compose.yml|services/marketplace_service",
+                                                 "input_ticks":  639193067827283096,
+                                                 "built_at":  "2026-07-11T02:39:10.4150711+07:00"
                                              },
                      "usaha":  {
-                                   "built_at":  "2026-06-18T17:37:05.0208658+07:00",
-                                   "input_ticks":  639173206127477302
+                                   "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/shared|frontend/usaha",
+                                   "input_ticks":  639193091094661577,
+                                   "built_at":  "2026-07-11T03:33:47.4074797+07:00"
                                },
                      "community_service":  {
-                                               "built_at":  "2026-06-18T17:37:05.0218627+07:00",
-                                               "input_ticks":  639173206127477302
+                                               "input_paths":  "docker-compose.yml|services/community_service",
+                                               "input_ticks":  639192897650676412,
+                                               "built_at":  "2026-07-10T21:35:12.0187987+07:00"
                                            },
                      "crm":  {
-                                 "built_at":  "2026-06-18T17:37:05.0218627+07:00",
-                                 "input_ticks":  639173206127477302
+                                 "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/crm|frontend/shared",
+                                 "input_ticks":  639193091094661577,
+                                 "built_at":  "2026-07-11T03:33:47.4074797+07:00"
                              },
                      "cms":  {
-                                 "built_at":  "2026-06-18T17:37:05.0198655+07:00",
-                                 "input_ticks":  639173206127477302
+                                 "input_paths":  "docker-compose.yml|frontend/.dockerignore|frontend/cms|frontend/shared",
+                                 "input_ticks":  639193092742773600,
+                                 "built_at":  "2026-07-11T03:33:47.4074797+07:00"
                              }
                  }
 }

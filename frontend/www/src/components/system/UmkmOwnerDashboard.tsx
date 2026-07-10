@@ -225,9 +225,9 @@ export function UmkmOwnerDashboard() {
   const summary = payload?.summary;
   const showGrowthJourney = Boolean(
     summary &&
-      (summary.total_listings < 2 ||
-        summary.completed_sales_transactions < 3 ||
-        summary.gross_sales_cents <= 0),
+    (summary.total_listings < 2 ||
+      summary.completed_sales_transactions < 3 ||
+      summary.gross_sales_cents <= 0),
   );
 
   const filteredListings = useMemo(() => {
@@ -360,10 +360,10 @@ export function UmkmOwnerDashboard() {
       <section className="ui-panel ui-hero-panel rounded-[32px] p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.22em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
               {isId ? 'Kelola usaha' : 'Business control'}
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-[color:var(--app-text)]">
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">
               {isId ? 'Kontrol listing, order, dan analytics dalam satu panel' : 'One panel for listings, orders, and analytics'}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -470,7 +470,7 @@ export function UmkmOwnerDashboard() {
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,_var(--app-accent),_var(--app-accent-strong))] text-[color:var(--app-accent)]">
                 <Icon className="h-5 w-5" />
               </span>
-              <p className="mt-4 text-3xl font-black tracking-tight text-[color:var(--app-text)]">{item.value}</p>
+              <p className="mt-4 text-3xl font-bold tracking-tight text-[color:var(--app-text)]">{item.value}</p>
               <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">{item.label}</p>
               <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">{item.note}</p>
             </article>
@@ -482,10 +482,10 @@ export function UmkmOwnerDashboard() {
         <article className="ui-panel rounded-3xl p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {isId ? 'Analytics Sektor' : 'Sector analytics'}
               </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
                 {isId ? 'Sektor usaha paling kuat' : 'Strongest business sectors'}
               </h2>
             </div>
@@ -527,10 +527,10 @@ export function UmkmOwnerDashboard() {
         </article>
 
         <article className="ui-panel rounded-3xl p-5">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
             {isId ? 'Status Order' : 'Order status'}
           </p>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
             {isId ? 'Distribusi status transaksi' : 'Transaction status mix'}
           </h2>
 
@@ -590,10 +590,10 @@ export function UmkmOwnerDashboard() {
       <section className="ui-panel rounded-3xl p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
               {isId ? 'Analytics per Listing' : 'Per-listing analytics'}
             </p>
-            <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+            <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
               {isId ? 'Usaha, jasa, produk, dan project kamu' : 'Your businesses, services, products, and projects'}
             </h2>
           </div>
@@ -609,11 +609,10 @@ export function UmkmOwnerDashboard() {
                 key={value}
                 type="button"
                 onClick={() => setFilter(value)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  filter === value
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${filter === value
                     ? 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]'
                     : 'bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]'
-                }`}
+                  }`}
               >
                 {label}
               </button>
@@ -719,10 +718,10 @@ export function UmkmOwnerDashboard() {
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <article className="ui-panel rounded-3xl p-5">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
             {isId ? 'Rekomendasi Aksi' : 'Action recommendations'}
           </p>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
             {isId ? 'Prioritas hari ini' : 'Today priorities'}
           </h2>
 
@@ -733,7 +732,7 @@ export function UmkmOwnerDashboard() {
                 href={item.href}
                 className={`block rounded-2xl border p-4 transition hover:shadow-sm ${levelClass(item.level)}`}
               >
-                <p className="text-xs font-black uppercase tracking-wide">{item.level}</p>
+                <p className="text-xs font-bold uppercase tracking-wide">{item.level}</p>
                 <p className="mt-1 text-sm font-semibold">{item.title}</p>
                 <p className="mt-1 text-xs">{item.description}</p>
               </Link>
@@ -742,10 +741,10 @@ export function UmkmOwnerDashboard() {
         </article>
 
         <article className="ui-panel rounded-3xl p-5">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
             {isId ? 'Aktivitas Terbaru' : 'Recent activities'}
           </p>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
             {isId ? 'Gerakan terbaru usaha kamu' : 'Latest movement across your businesses'}
           </h2>
 

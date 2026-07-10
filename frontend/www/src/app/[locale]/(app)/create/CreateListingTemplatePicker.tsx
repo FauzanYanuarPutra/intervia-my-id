@@ -31,7 +31,7 @@ export function CreateListingTemplatePicker({
             <Sparkles className="h-3.5 w-3.5" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <span className="block truncate text-[12px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {isId ? 'Contoh cepat' : 'Quick examples'}
             </span>
             <span className="block truncate text-[10px] font-medium text-[color:var(--app-text-soft)]">
@@ -39,7 +39,7 @@ export function CreateListingTemplatePicker({
             </span>
           </span>
         </span>
-        <span className="inline-flex shrink-0 items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[10px] font-black text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+        <span className="inline-flex shrink-0 items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
           {templates.length} {isId ? 'opsi' : 'options'}
         </span>
       </summary>
@@ -54,7 +54,7 @@ export function CreateListingTemplatePicker({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <span className="inline-flex rounded-full border border-current/10 bg-slate-100/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                <span className="inline-flex rounded-full border border-current/10 bg-slate-100/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                   {template.badge}
                 </span>
                 <p className="mt-1 text-[12px] font-semibold leading-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
@@ -64,7 +64,7 @@ export function CreateListingTemplatePicker({
                   {template.summary}
                 </p>
               </div>
-              <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-black text-slate-700 transition group-hover/template:scale-105 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+              <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-bold text-slate-700 transition group-hover/template:scale-105 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
                 <Wand2 className="h-3 w-3" />
                 {isId ? 'Pakai' : 'Use'}
               </span>

@@ -297,10 +297,10 @@ export function HomeWalletQuickPanel({
                 <Wallet className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
                   Wallet
                 </p>
-                <p className="mt-0.5 truncate text-[15px] font-black text-[color:var(--app-text)] sm:text-[16px]">
+                <p className="mt-0.5 truncate text-[15px] font-bold text-[color:var(--app-text)] sm:text-[16px]">
                   {isId ? 'Masuk dulu' : 'Sign in first'}
                 </p>
                 <p className="text-[11px] text-[color:var(--app-text-soft)]">
@@ -356,7 +356,7 @@ export function HomeWalletQuickPanel({
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
                   Wallet
                 </p>
                 <span
@@ -371,7 +371,7 @@ export function HomeWalletQuickPanel({
                 </span>
               </div>
 
-              <p className="mt-0.5 truncate text-[17px] font-black tracking-tight text-[color:var(--app-text)] sm:text-[19px]">
+              <p className="mt-0.5 truncate text-[17px] font-bold tracking-tight text-[color:var(--app-text)] sm:text-[19px]">
                 {balanceLabel}
               </p>
 

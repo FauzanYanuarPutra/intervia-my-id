@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
       folder: 'content',
       maxBytes: DOCUMENT_UPLOAD_MAX_BYTES,
       minioTarget: 'content',
-      minioTimeoutMs: 2600,
+      requireMinio: true,
+      minioTimeoutMs: 20000,
     });
 
     if (uploaded.length === 0) {

@@ -23,13 +23,13 @@ export default async function UmkmPage({ params, searchParams }: PageProps) {
       initialQuery={resolvedSearchParams.q || ''}
       initialCity={resolvedSearchParams.city || ''}
       initialCategory={resolvedSearchParams.category || ''}
-        initialStoreSlug={
-          resolvedSearchParams.store ||
-          resolvedSearchParams.storeId ||
-          resolvedSearchParams.business ||
-          ''
-        }
-        initialStoreId={resolvedSearchParams.storeId || ''}
-      />
-    );
+      initialStoreSlug={
+        resolvedSearchParams.store ||
+        resolvedSearchParams.storeId ||
+        resolvedSearchParams.business ||
+        ''
+      }
+      initialStoreId={resolvedSearchParams.storeId || ''}
+    />
+  );
 }

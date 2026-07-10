@@ -17,7 +17,7 @@ export function SectionCard({
     <section className="portal-panel p-5 sm:p-6">
       <p className="portal-kicker">{eyebrow}</p>
       <div className="mt-2 max-w-3xl">
-        <h1 className="text-[1.8rem] font-black tracking-[-0.06em] text-portal-ink sm:text-[2.25rem]">
+        <h1 className="text-[1.8rem] font-bold tracking-[-0.06em] text-portal-ink sm:text-[2.25rem]">
           {title}
         </h1>
         <p className="mt-3 text-sm leading-7 text-portal-soft">{description}</p>

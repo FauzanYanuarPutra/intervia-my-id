@@ -30,7 +30,7 @@ export function FieldLabel({
     <label
       htmlFor={htmlFor}
       className={cn(
-        'flex items-center gap-1 text-[12px] font-black tracking-[0.005em] text-[color:var(--app-text)]',
+        'flex items-center gap-1 text-[12px] font-bold tracking-[0.005em] text-[color:var(--app-text)]',
         className,
       )}
     >
@@ -250,12 +250,12 @@ export function StatCard({
         tone || 'ui-text',
       )}
     >
-      <p className="text-[9px] font-black uppercase tracking-[0.16em] ui-text-soft">
+      <p className="text-[9px] font-bold uppercase tracking-[0.16em] ui-text-soft">
         {label}
       </p>
       <p
         className={cn(
-          'font-black ui-text',
+          'font-bold ui-text',
           compact ? 'mt-1.5 text-[1.2rem] sm:text-[1.4rem]' : 'mt-3 text-2xl',
         )}
       >
@@ -396,7 +396,7 @@ export function ActionTile({
           </InlineBadge>
         </div>
       ) : null}
-      <p className="mt-1.5 text-[13px] font-black leading-tight text-[color:var(--app-text)]">
+      <p className="mt-1.5 text-[13px] font-bold leading-tight text-[color:var(--app-text)]">
         {title}
       </p>
       <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
@@ -451,9 +451,9 @@ export function RoleBlueprintCard({
       className={cn(
         'rounded-[20px] bg-white p-3.5 text-[color:var(--app-text)] shadow-[0_14px_24px_-20px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 dark:bg-slate-950 dark:ring-slate-800/80',
         tone === 'accent' &&
-          'border-[color:var(--app-accent)]/30 bg-[color:var(--app-accent-soft)]/75',
+        'border-[color:var(--app-accent)]/30 bg-[color:var(--app-accent-soft)]/75',
         tone === 'warning' &&
-          'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)]',
+        'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)]',
         tone === 'default' && '',
       )}
     >
@@ -473,7 +473,7 @@ export function RoleBlueprintCard({
           {scope}
         </InlineBadge>
       </div>
-      <h4 className="mt-3 text-[14px] font-black">{title}</h4>
+      <h4 className="mt-3 text-[14px] font-bold">{title}</h4>
       <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
         {desc}
       </p>
@@ -552,7 +552,7 @@ export function StoreSwitcherCard({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-[14px] font-black text-[color:var(--app-text)]">
+            <p className="truncate text-[14px] font-bold text-[color:var(--app-text)]">
               {name}
             </p>
             {healthLabel ? (
@@ -595,14 +595,14 @@ export function StoreSwitcherCard({
       <div className="mt-3 rounded-[20px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,244,235,0.9))] px-3.5 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
               {status}
             </p>
             <p className="mt-1.5 text-[11px] leading-5 ui-text-soft">
               {summary}
             </p>
           </div>
-          <p className="shrink-0 text-[1.45rem] font-black text-[color:var(--app-text)]">
+          <p className="shrink-0 text-[1.45rem] font-bold text-[color:var(--app-text)]">
             {safeReadiness}%
           </p>
         </div>
@@ -629,19 +629,19 @@ export function StoreSwitcherCard({
               className={cn(
                 'rounded-[18px] border px-3 py-2.5',
                 metric.tone === 'accent' &&
-                  'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/70',
+                'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]/70',
                 metric.tone === 'success' &&
-                  'border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)]',
+                'border-[color:var(--app-success-border)] bg-[color:var(--app-success-soft)]',
                 metric.tone === 'warning' &&
-                  'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)]',
+                'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)]',
                 (!metric.tone || metric.tone === 'default') &&
-                  'border-slate-200/80 bg-[color:var(--app-surface-muted)]',
+                'border-slate-200/80 bg-[color:var(--app-surface-muted)]',
               )}
             >
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] ui-text-soft">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] ui-text-soft">
                 {metric.label}
               </p>
-              <p className="mt-1 text-[12px] font-black text-[color:var(--app-text)]">
+              <p className="mt-1 text-[12px] font-bold text-[color:var(--app-text)]">
                 {metric.value}
               </p>
             </div>
@@ -652,7 +652,7 @@ export function StoreSwitcherCard({
       {nextActionLabel || nextActionDesc ? (
         <div className="mt-3 rounded-[18px] border border-slate-200/80 bg-white/88 px-3.5 py-3 dark:border-slate-800/80 dark:bg-slate-950/88">
           {nextActionLabel ? (
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
               {nextActionLabel}
             </p>
           ) : null}
@@ -740,17 +740,17 @@ export function SectionJumpTile({
         'ui-pressable ui-pressable-card group w-full text-left transition duration-200',
         compact ? 'rounded-[18px] px-2.5 py-2.5' : 'rounded-[24px] px-4 py-4',
         selected &&
-          'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_36%,white)] shadow-[0_18px_38px_-28px_rgba(15,23,42,0.18)] ring-1 ring-[color:var(--app-accent-border)]',
+        'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_36%,white)] shadow-[0_18px_38px_-28px_rgba(15,23,42,0.18)] ring-1 ring-[color:var(--app-accent-border)]',
         !selected &&
-          tone === 'accent' &&
-          'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_28%,white)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-[color:var(--app-accent-border)]',
+        tone === 'accent' &&
+        'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_28%,white)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-[color:var(--app-accent-border)]',
         tone === 'warning' &&
-          'bg-[color:var(--app-warning-soft)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-[color:var(--app-warning-border)]',
+        'bg-[color:var(--app-warning-soft)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-[color:var(--app-warning-border)]',
         tone === 'success' &&
-          'bg-[color:var(--app-success-soft)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-[color:var(--app-success-border)]',
+        'bg-[color:var(--app-success-soft)] shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] ring-1 ring-[color:var(--app-success-border)]',
         !selected &&
-          tone === 'default' &&
-          'bg-white shadow-[0_14px_28px_-24px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 hover:-translate-y-0.5 hover:shadow-[0_20px_32px_-24px_rgba(15,23,42,0.18)] dark:bg-slate-950 dark:ring-slate-800/80',
+        tone === 'default' &&
+        'bg-white shadow-[0_14px_28px_-24px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 hover:-translate-y-0.5 hover:shadow-[0_20px_32px_-24px_rgba(15,23,42,0.18)] dark:bg-slate-950 dark:ring-slate-800/80',
         disabled ? 'cursor-not-allowed opacity-60' : '',
       )}
     >
@@ -809,7 +809,7 @@ export function SectionJumpTile({
       </div>
       <p
         className={cn(
-          'font-black text-[color:var(--app-text)]',
+          'font-bold text-[color:var(--app-text)]',
           compact ? 'mt-2 text-[12px] sm:text-[13px]' : 'mt-4 text-sm',
         )}
       >

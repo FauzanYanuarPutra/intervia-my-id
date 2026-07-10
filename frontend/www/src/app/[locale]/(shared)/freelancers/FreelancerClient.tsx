@@ -132,8 +132,8 @@ function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
       : 0);
   const level = roleToLabel(
     asString(meta.level) ||
-      asString(meta.profile_level) ||
-      asString(meta.primary_role),
+    asString(meta.profile_level) ||
+    asString(meta.primary_role),
   );
 
   return {
@@ -185,8 +185,8 @@ function mapContentToFreelancer(item: ContentItem): FreelancerCardItem {
       avatar: {
         src: profileAvatarSrc(
           item.cover_image ||
-            asString(meta.avatar) ||
-            asString(meta.avatar_url),
+          asString(meta.avatar) ||
+          asString(meta.avatar_url),
           readProfileAvatarStyle(item.owner_profile || item),
           asString(meta.name) || item.title || 'Avatar',
         ),
@@ -226,7 +226,7 @@ function mapDiscoverUserToFreelancer(user: DiscoverUser): FreelancerCardItem {
       : pseudoStatFromId(id, 42, 49) / 10; // 4.2 - 4.9
   const projects =
     typeof user.completed_jobs === 'number' &&
-    Number.isFinite(user.completed_jobs)
+      Number.isFinite(user.completed_jobs)
       ? user.completed_jobs
       : pseudoStatFromId(id, 2, 18);
   const followers = pseudoStatFromId(id, 10, 180);
@@ -346,8 +346,8 @@ export default function FreelancerClient() {
       premiumOnly: searchParams.get('premium') === '1',
       sortBy:
         (searchParams.get('sort') as Filters['sortBy']) === 'rating' ||
-        (searchParams.get('sort') as Filters['sortBy']) === 'rate_low' ||
-        (searchParams.get('sort') as Filters['sortBy']) === 'rate_high'
+          (searchParams.get('sort') as Filters['sortBy']) === 'rate_low' ||
+          (searchParams.get('sort') as Filters['sortBy']) === 'rate_high'
           ? (searchParams.get('sort') as Filters['sortBy'])
           : 'latest',
     }),
@@ -435,7 +435,7 @@ export default function FreelancerClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-              `Failed to load freelancers (${response.status})`,
+            `Failed to load freelancers (${response.status})`,
           );
         }
 
@@ -536,14 +536,14 @@ export default function FreelancerClient() {
 
     setFilters(prev =>
       prev.search === next.search &&
-      prev.location === next.location &&
-      prev.rating === next.rating &&
-      prev.minRate === next.minRate &&
-      prev.maxRate === next.maxRate &&
-      prev.workMode === next.workMode &&
-      prev.verifiedOnly === next.verifiedOnly &&
-      prev.premiumOnly === next.premiumOnly &&
-      prev.sortBy === next.sortBy
+        prev.location === next.location &&
+        prev.rating === next.rating &&
+        prev.minRate === next.minRate &&
+        prev.maxRate === next.maxRate &&
+        prev.workMode === next.workMode &&
+        prev.verifiedOnly === next.verifiedOnly &&
+        prev.premiumOnly === next.premiumOnly &&
+        prev.sortBy === next.sortBy
         ? prev
         : next,
     );
@@ -617,7 +617,7 @@ export default function FreelancerClient() {
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)]  lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
         <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
           <div className="flex flex-col gap-2 md:flex-row">
             <div className="flex flex-grow items-center gap-2">
@@ -778,7 +778,7 @@ export default function FreelancerClient() {
           </div>
 
           <div className="flex min-h-[32px] flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-[color:var(--app-text-soft)]">
+            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-[color:var(--app-text-soft)]">
               <Filter className="h-3 w-3" /> Filters:
             </span>
 
@@ -852,7 +852,7 @@ export default function FreelancerClient() {
             <p className="font-semibold text-[color:var(--app-text)]">
               Loaded Talents
             </p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length}
             </p>
           </div>
@@ -860,12 +860,12 @@ export default function FreelancerClient() {
             <p className="font-semibold text-[color:var(--app-text)]">
               Avg Rating
             </p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length > 0
                 ? (
-                    items.reduce((sum, item) => sum + item.user.rating, 0) /
-                    items.length
-                  ).toFixed(1)
+                  items.reduce((sum, item) => sum + item.user.rating, 0) /
+                  items.length
+                ).toFixed(1)
                 : '-'}
             </p>
           </div>
@@ -873,7 +873,7 @@ export default function FreelancerClient() {
             <p className="font-semibold text-[color:var(--app-text)]">
               Verified Ratio
             </p>
-            <p className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <p className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {items.length > 0
                 ? `${Math.round((items.filter(item => item.user.verified).length / items.length) * 100)}%`
                 : '-'}

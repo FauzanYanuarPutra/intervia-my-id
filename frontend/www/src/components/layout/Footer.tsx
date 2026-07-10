@@ -1,18 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import { usePathname } from 'next/navigation';
-import {
-  MapPinned,
-  MessageCircle,
-  Phone,
-  ReceiptText,
-  ShieldCheck,
-  Store,
-  Wallet,
-} from 'lucide-react';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
-import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
 import {
   UMKM_DISCOVERY_PATH,
   UMKM_OWNER_PATH,
@@ -28,286 +17,135 @@ type FooterLink = {
   label: string;
 };
 
-function FooterGroup({ title, links }: { title: string; links: FooterLink[] }) {
+function FooterLinks({ title, links }: { title: string; links: FooterLink[] }) {
   return (
-    <div>
-      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+    <nav aria-label={title} className="min-w-0">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
         {title}
       </p>
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap gap-2">
         {links.map(item => (
           <Link
-            key={item.href}
+            key={`${item.href}-${item.label}`}
             href={item.href}
-            className="inline-flex min-h-[34px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-[11px] font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+            className="inline-flex min-h-[34px] items-center rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-[12px] font-semibold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
           >
             {item.label}
           </Link>
         ))}
       </div>
-    </div>
+    </nav>
   );
 }
 
 export function Footer() {
   const pathname = usePathname();
   const locale = detectLocale(pathname || '');
+  const isId = locale === 'id';
   const year = new Date().getFullYear();
   const surfaceCopy = getUmkmSurfaceCopy(locale);
-  const businessPhoneDisplay = '0821 1714 8623';
-  const businessPhoneHref = 'tel:+6282117148623';
-  const businessWhatsappHref = 'https://wa.me/6282117148623';
 
-  const text = useMemo(
-    () => ({
-      brand: 'Lajukan',
-      brandBadge: locale === 'id' ? 'Lajukan UMKM' : 'Lajukan',
-      tagline:
-        locale === 'id'
-          ? 'Cari supplier, jasa, dan peluang usaha tanpa ribet.'
-          : 'Find suppliers, services, and business opportunities without extra friction.',
-      summary:
-        locale === 'id'
-          ? 'Buka, pilih aksi, lanjut jalan.'
-          : 'Open once and move straight into search, posting, or daily business work.',
-      ctaSearch: locale === 'id' ? 'Buka pencarian' : 'Open search',
-      ctaCreate: locale === 'id' ? 'Posting cepat' : 'Post fast',
-      ecosystem: locale === 'id' ? 'Cari & belanja' : 'Core ecosystem',
-      growth: locale === 'id' ? 'Jual & tumbuh' : 'Growth paths',
-      trust: locale === 'id' ? 'Bantuan & aman' : 'Trust and support',
-      copyright:
-        locale === 'id' ? 'Hak cipta dilindungi.' : 'All rights reserved.',
-      businessContact:
-        locale === 'id' ? 'Kontak bisnis resmi' : 'Official business contact',
-      rupiahPayment:
-        locale === 'id'
-          ? 'Harga dan transaksi memakai Rupiah (IDR).'
-          : 'Prices and transactions use Indonesian Rupiah (IDR).',
-      checkoutNote:
-        locale === 'id'
-          ? 'Pembayaran diproses dari halaman Lajukan, bukan instruksi transfer luar platform.'
-          : 'Payments are processed from Lajukan pages, not through off-platform transfer instructions.',
-    }),
-    [locale],
-  );
-
-  const ecosystemLinks: FooterLink[] = [
+  const mainLinks: FooterLink[] = [
     {
-      href: '/search?type=product&side=supply',
-      label: locale === 'id' ? 'Supplier' : 'Suppliers',
-    },
-    {
-      href: '/search?type=service&side=supply',
-      label: locale === 'id' ? 'Jasa' : 'Services',
-    },
-    {
-      href: '/search?type=freelancer&side=supply',
-      label: locale === 'id' ? 'Talent' : 'Talent',
+      href: '/search',
+      label: isId ? 'Cari kebutuhan' : 'Search',
     },
     {
       href: '/create',
-      label: locale === 'id' ? 'Posting kebutuhan' : 'Post a need',
+      label: isId ? 'Buat posting' : 'Create post',
     },
     {
       href: UMKM_DISCOVERY_PATH,
       label: surfaceCopy.discovery,
     },
-  ];
-
-  const growthLinks: FooterLink[] = [
-    {
-      href: '/create',
-      label: locale === 'id' ? 'Posting kebutuhan' : 'Post a need',
-    },
     {
       href: '/community',
-      label: locale === 'id' ? 'Komunitas' : 'Community',
+      label: isId ? 'Komunitas' : 'Community',
     },
-    {
-      href: '/learn',
-      label: 'Learn',
-    },
-    {
-      href: '/blog',
-      label: locale === 'id' ? 'Blog UMKM' : 'SME blog',
-    },
-    {
-      href: '/education',
-      label: 'Education',
-    },
-    ...(!PROMO_ONLY_MODE
-      ? [
-          {
-            href: '/payments',
-            label: locale === 'id' ? 'Pembayaran' : 'Payments',
-          },
-        ]
-      : []),
     {
       href: UMKM_OWNER_PATH,
       label: surfaceCopy.owner,
     },
+  ];
+
+  const helpLinks: FooterLink[] = [
     {
       href: '/support',
-      label: locale === 'id' ? 'Bantuan cepat' : 'Fast support',
+      label: isId ? 'Bantuan' : 'Support',
     },
-  ];
-
-  const legalLinks: FooterLink[] = [
-    { href: '/support', label: locale === 'id' ? 'Bantuan' : 'Support' },
-    { href: '/contact', label: locale === 'id' ? 'Kontak' : 'Contact' },
     {
-      href: '/trust',
-      label: locale === 'id' ? 'Trust center' : 'Trust center',
+      href: '/contact',
+      label: isId ? 'Kontak' : 'Contact',
     },
-    { href: '/privacy', label: locale === 'id' ? 'Privasi' : 'Privacy' },
-    { href: '/terms', label: locale === 'id' ? 'Ketentuan' : 'Terms' },
+    {
+      href: '/privacy',
+      label: isId ? 'Privasi' : 'Privacy',
+    },
+    {
+      href: '/terms',
+      label: isId ? 'Ketentuan' : 'Terms',
+    },
     {
       href: '/refund-policy',
-      label: locale === 'id' ? 'Refund & retur' : 'Refunds & returns',
-    },
-    {
-      href: '/cookie-policy',
-      label: locale === 'id' ? 'Cookie' : 'Cookies',
-    },
-  ];
-
-  const trustSignals = [
-    {
-      icon: ShieldCheck,
-      label: locale === 'id' ? 'Verifikasi mitra' : 'Partner verification',
-    },
-    ...(!PROMO_ONLY_MODE
-      ? [
-          {
-            icon: Wallet,
-            label:
-              locale === 'id' ? 'Pembayaran & escrow' : 'Payments and escrow',
-          },
-        ]
-      : [
-          {
-            icon: MessageCircle,
-            label:
-              locale === 'id' ? 'Chat antar pengguna' : 'User-to-user chat',
-          },
-        ]),
-    {
-      icon: ReceiptText,
-      label: locale === 'id' ? 'Rupiah (IDR)' : 'Rupiah (IDR)',
-    },
-    {
-      icon: MapPinned,
-      label: locale === 'id' ? 'Peta usaha aktif' : 'Active business maps',
-    },
-    {
-      icon: Store,
-      label:
-        locale === 'id' ? 'Etalase usaha aktif' : 'Active business showcases',
+      label: isId ? 'Refund & retur' : 'Refunds',
     },
   ];
 
   return (
-    <footer className="mt-10 border-t border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_74%,_transparent)] text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_72%,_transparent)] dark:text-[color:var(--app-text-soft)]">
-      <div className="page-shell page-shell-inset py-6 sm:py-8">
-        <div className="mx-auto flex max-w-[1120px] flex-col gap-4">
-          <section className="overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,_var(--app-border)_84%,_transparent)] bg-[linear-gradient(140deg,rgba(255,255,255,0.98),rgba(239,246,255,0.86)_48%,rgba(255,247,237,0.88))] p-4 shadow-[0_24px_54px_-40px_rgba(15,23,42,0.24)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(145deg,rgba(8,17,34,0.98),rgba(14,28,56,0.92)_54%,rgba(49,46,129,0.2))] sm:p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                  {text.brandBadge}
-                </p>
-                <p className="mt-1.5 text-[1.15rem] font-black leading-tight tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.45rem]">
-                  {text.tagline}
-                </p>
-                <p className="mt-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
-                  {text.summary}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                <Link
-                  href="/search"
-                  className="ui-button-secondary inline-flex items-center rounded-full px-3.5 text-sm font-semibold"
-                >
-                  {text.ctaSearch}
-                </Link>
-                <Link
-                  href="/create"
-                  className="ui-button-primary inline-flex items-center rounded-full px-3.5 text-sm font-semibold"
-                >
-                  {text.ctaCreate}
-                </Link>
-              </div>
+    <footer className="mt-8 border-t border-[color:color-mix(in_srgb,_var(--app-border)_82%,_transparent)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_74%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+      <div className="page-shell page-shell-inset py-5 sm:py-6 px-2">
+        <div className="mx-auto grid max-w-[1120px] gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] lg:items-start">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+              {isId ? 'Lajukan UMKM' : 'Lajukan'}
+            </p>
+            <h2 className="mt-1 text-[1.1rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)]">
+              {isId
+                ? 'Cari, posting, dan kelola usaha tanpa ribet.'
+                : 'Search, post, and manage business without friction.'}
+            </h2>
+            <p className="mt-2 max-w-xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
+              {isId
+                ? 'Saat beta, pengguna terhubung lewat listing dan chat langsung. Pembayaran aman sedang disiapkan bertahap.'
+                : 'During beta, users connect through listings and direct chat. Secure payments are being prepared gradually.'}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                href="https://wa.me/6282117148623"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-[36px] items-center rounded-full bg-[color:var(--app-accent)] px-3.5 text-[12px] font-bold text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_70%,transparent)]"
+              >
+                WhatsApp Lajukan
+              </a>
+              <Link
+                href="/support"
+                className="inline-flex min-h-[36px] items-center rounded-full border border-[color:var(--app-border)] bg-white px-3.5 text-[12px] font-bold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-white/5"
+              >
+                {isId ? 'Pusat bantuan' : 'Help center'}
+              </Link>
             </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {trustSignals.map(signal => (
-                <span
-                  key={signal.label}
-                  className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 text-[10px] font-semibold text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
-                >
-                  <signal.icon className="h-3 w-3 text-[color:var(--app-accent)]" />
-                  {signal.label}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-4 grid gap-2 rounded-[20px] border border-[color:var(--app-border)] bg-white/72 p-3 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/36 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-              <div>
-                <p className="font-black text-[color:var(--app-text)]">
-                  {text.businessContact}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <a
-                    href={businessPhoneHref}
-                    className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-2.5 font-semibold text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)]"
-                  >
-                    <Phone className="h-3 w-3" />
-                    {businessPhoneDisplay}
-                  </a>
-                  <a
-                    href={businessWhatsappHref}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2.5 font-semibold text-[color:var(--app-accent)]"
-                  >
-                    <MessageCircle className="h-3 w-3" />
-                    WhatsApp
-                  </a>
-                </div>
-              </div>
-              <div className="leading-5">
-                <p>{text.rupiahPayment}</p>
-                <p>{text.checkoutNote}</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-3 lg:grid-cols-3">
-            <div className="ui-panel rounded-[22px] p-3.5 sm:p-4">
-              <FooterGroup title={text.ecosystem} links={ecosystemLinks} />
-            </div>
-
-            <div className="ui-panel rounded-[22px] p-3.5 sm:p-4">
-              <FooterGroup title={text.growth} links={growthLinks} />
-            </div>
-
-            <div className="ui-panel rounded-[22px] p-3.5 sm:p-4">
-              <FooterGroup title={text.trust} links={legalLinks} />
-            </div>
-          </section>
-
-          <div className="flex flex-col gap-1.5 border-t border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] pt-3.5 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              &copy; {year} {text.brand}. {text.copyright}
-            </span>
-            <span>
-              {locale === 'id'
-                ? 'Dirancang untuk pengguna Indonesia yang maunya cepat paham dan cepat jalan.'
-                : 'Designed for business users who need clarity fast.'}
-            </span>
           </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FooterLinks
+              title={isId ? 'Menu utama' : 'Main menu'}
+              links={mainLinks}
+            />
+            <FooterLinks
+              title={isId ? 'Bantuan & legal' : 'Help and legal'}
+              links={helpLinks}
+            />
+          </div>
+        </div>
+
+        <div className="mx-auto mt-5 flex max-w-[1120px] flex-col gap-1.5 border-t border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] pt-3 text-[11px] text-[color:var(--app-text-soft)] dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_72%,_transparent)] sm:flex-row sm:items-center sm:justify-between">
+          <span>&copy; {year} Lajukan.</span>
+          <span>
+            {isId
+              ? 'Dibuat agar pengguna Indonesia cepat paham dan cepat jalan.'
+              : 'Built for clear and fast business workflows.'}
+          </span>
         </div>
       </div>
     </footer>

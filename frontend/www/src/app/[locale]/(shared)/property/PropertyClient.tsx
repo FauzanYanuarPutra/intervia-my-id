@@ -306,8 +306,8 @@ export default function PropertyClient() {
     };
     setAppliedFilters(prev =>
       prev.search === next.search &&
-      prev.location === next.location &&
-      prev.type === next.type
+        prev.location === next.location &&
+        prev.type === next.type
         ? prev
         : next,
     );
@@ -366,7 +366,7 @@ export default function PropertyClient() {
 
   return (
     <div className="min-h-screen bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)]">
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)] backdrop-blur-xl lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)]  lg:top-[calc(3.5rem+env(safe-area-inset-top))] dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)]">
         <div className="mx-auto max-w-[1500px] space-y-2 px-2 py-2 sm:px-3">
           <div className="flex flex-col gap-2 md:flex-row">
             <div className="flex flex-grow items-center gap-2">
@@ -417,7 +417,7 @@ export default function PropertyClient() {
           </div>
 
           <div className="flex min-h-[30px] flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-[color:var(--app-text-soft)]">
+            <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-[color:var(--app-text-soft)]">
               <Filter className="w-3 h-3" /> Filter:
             </span>
             {!(

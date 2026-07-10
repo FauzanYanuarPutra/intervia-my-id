@@ -38,7 +38,7 @@ export default async function NewBusinessPage({ searchParams }: PageProps) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="portal-kicker">Buat usaha</p>
-                <h1 className="mt-1 text-[1.55rem] font-black tracking-[-0.05em] text-portal-ink sm:text-[2rem]">
+                <h1 className="mt-1 text-[1.55rem] font-bold tracking-[-0.05em] text-portal-ink sm:text-[2rem]">
                   Usaha baru, siap dikelola.
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-portal-soft">
@@ -83,7 +83,7 @@ export default async function NewBusinessPage({ searchParams }: PageProps) {
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-black text-portal-ink">{item.title}</span>
+                      <span className="block truncate text-sm font-bold text-portal-ink">{item.title}</span>
                       <span className="block truncate text-xs text-portal-soft">{item.copy}</span>
                     </span>
                   </div>
@@ -108,7 +108,7 @@ export default async function NewBusinessPage({ searchParams }: PageProps) {
                     <Clock3 className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-black text-portal-ink">Target: 2 menit</p>
+                    <p className="text-sm font-bold text-portal-ink">Target: 2 menit</p>
                     <p className="mt-1 text-xs leading-5 text-portal-soft">
                       Cukup data yang bikin usaha bisa dicari dan dihubungi.
                     </p>
@@ -117,7 +117,7 @@ export default async function NewBusinessPage({ searchParams }: PageProps) {
               </div>
 
               <div className="rounded-[20px] border border-portal-line/70 bg-white/80 p-4">
-                <p className="text-sm font-black text-portal-ink">Setelah simpan</p>
+                <p className="text-sm font-bold text-portal-ink">Setelah simpan</p>
                 <div className="mt-3 grid gap-2">
                   {['Masuk dashboard', 'Lengkapi foto/logo', 'Tambah produk atau jasa'].map(item => (
                     <div key={item} className="flex items-center gap-2 text-sm text-portal-soft">
@@ -130,7 +130,7 @@ export default async function NewBusinessPage({ searchParams }: PageProps) {
 
               {!account ? (
                 <div className="rounded-[20px] border border-portal-line/70 bg-white/80 p-4">
-                  <p className="text-sm font-black text-portal-ink">Sudah punya akun?</p>
+                  <p className="text-sm font-bold text-portal-ink">Sudah punya akun?</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Link href="/login" className="portal-button-secondary min-h-10 px-3 text-xs">
                       Masuk

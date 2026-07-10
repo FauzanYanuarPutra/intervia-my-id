@@ -195,7 +195,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
     return (
       <section className={cn(
         rewardCardShellClass,
-        "relative overflow-hidden rounded-2xl border border-zinc-200/60 bg-white/80 shadow-sm backdrop-blur-md dark:border-zinc-800/50 dark:bg-zinc-900/60 transition-all duration-300 hover:shadow-md",
+        "relative overflow-hidden rounded-2xl border border-zinc-200/60 bg-white/80 shadow-sm  dark:border-zinc-800/50 dark:bg-zinc-900/60 transition-all duration-300 hover:shadow-md",
         compact ? 'p-3.5' : 'p-4 sm:p-5'
       )}>
         {/* Ambient Glow - Dibikin lebih smooth */}
@@ -317,7 +317,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
             )}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="line-clamp-2 text-sm font-black leading-5 tracking-[-0.02em] text-[color:var(--app-text)]">
+            <p className="line-clamp-2 text-sm font-bold leading-5 tracking-[-0.02em] text-[color:var(--app-text)]">
               {effectiveStatus === 'loading'
                 ? isId
                   ? 'Mengecek reward...'
@@ -359,7 +359,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
               compact ? 'rounded-[14px] px-1.5 py-1.5' : '',
             )}
           >
-            <p className="inline-flex items-center justify-center gap-1 text-sm font-black text-[color:var(--app-text)]">
+            <p className="inline-flex items-center justify-center gap-1 text-sm font-bold text-[color:var(--app-text)]">
               <Flame className="h-3.5 w-3.5 text-orange-500" />
               {streak}/7
             </p>
@@ -373,7 +373,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
               compact ? 'rounded-[14px] px-1.5 py-1.5' : '',
             )}
           >
-            <p className="inline-flex items-center justify-center gap-1 text-sm font-black text-[color:var(--app-text)]">
+            <p className="inline-flex items-center justify-center gap-1 text-sm font-bold text-[color:var(--app-text)]">
               <Coins className="h-3.5 w-3.5 text-amber-600" />
               {coins}
             </p>
@@ -387,7 +387,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
               compact ? 'rounded-[14px] px-1.5 py-1.5' : '',
             )}
           >
-            <p className="inline-flex items-center justify-center gap-1 text-sm font-black text-[color:var(--app-text)]">
+            <p className="inline-flex items-center justify-center gap-1 text-sm font-bold text-[color:var(--app-text)]">
               {voucherCount > 0 ? (
                 <TicketPercent className="h-3.5 w-3.5 text-orange-600" />
               ) : (
@@ -433,7 +433,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
             >
               <p
                 className={cn(
-                  'text-[10px] font-black uppercase leading-3',
+                  'text-[10px] font-bold uppercase leading-3',
                   compact ? 'text-[9px]' : '',
                 )}
               >
@@ -449,7 +449,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
                   <Coins className="h-4 w-4 text-amber-500" />
                 )}
               </div>
-              <p className="mt-1 truncate text-[9px] font-black leading-3">
+              <p className="mt-1 truncate text-[9px] font-bold leading-3">
                 {day.voucher ? 'voucher' : `+${day.coin_amount}`}
               </p>
             </div>
@@ -472,7 +472,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
             compact ? 'rounded-[14px] px-2.5' : '',
           )}
         >
-          <p className="flex min-w-0 items-start gap-1.5 text-xs font-black leading-4 text-[color:var(--app-text)]">
+          <p className="flex min-w-0 items-start gap-1.5 text-xs font-bold leading-4 text-[color:var(--app-text)]">
             <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
             {claimedToday
               ? isId
@@ -495,7 +495,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
             onClick={() => void handleClaim()}
             disabled={!canClaimToday || effectiveStatus === 'claiming'}
             className={cn(
-              'inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[14px] px-3 text-xs font-black transition',
+              'inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[14px] px-3 text-xs font-bold transition',
               compact ? '' : 'sm:flex-none',
               canClaimToday
                 ? 'bg-amber-500 text-white shadow-[0_12px_22px_-17px_rgba(217,119,6,0.76)] hover:bg-amber-600'
@@ -523,7 +523,7 @@ export function DailyLoginRewardCard({ locale, compact = false }: Props) {
           <Link
             href={`/${locale}/transactions`}
             className={cn(
-              'inline-flex h-10 flex-1 items-center justify-center rounded-[14px] border border-sky-200 bg-sky-50 px-3 text-xs font-black text-sky-700 transition hover:bg-sky-100',
+              'inline-flex h-10 flex-1 items-center justify-center rounded-[14px] border border-sky-200 bg-sky-50 px-3 text-xs font-bold text-sky-700 transition hover:bg-sky-100',
               compact ? '' : 'sm:flex-none',
             )}
           >

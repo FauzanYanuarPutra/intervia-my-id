@@ -28,7 +28,7 @@ function SetupStepPill({
   return (
     <span
       className={cn(
-        'inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[11px] font-black',
+        'inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border px-3 text-[11px] font-bold',
         step.active
           ? 'border-[color:var(--app-accent)] bg-[color:var(--app-accent)] text-white'
           : step.done

@@ -163,7 +163,7 @@ export function ImageCropModal({
 
       setFrameSize(prev =>
         Math.abs(prev.width - next.width) > 1 ||
-        Math.abs(prev.height - next.height) > 1
+          Math.abs(prev.height - next.height) > 1
           ? next
           : prev,
       );
@@ -330,7 +330,7 @@ export function ImageCropModal({
       const nextMid = midpoint(points[0]!, points[1]!);
       const nextScale = clamp(
         gesture.startScale *
-          (distance(points[0]!, points[1]!) / gesture.startDistance),
+        (distance(points[0]!, points[1]!) / gesture.startDistance),
         minScale,
         maxScale,
       );
@@ -425,13 +425,13 @@ export function ImageCropModal({
       const cropH = Math.min(naturalSize.height, frameSize.height / scale);
       const cropX = clamp(
         ((naturalSize.width * scale - frameSize.width) / 2 - position.x) /
-          scale,
+        scale,
         0,
         Math.max(0, naturalSize.width - cropW),
       );
       const cropY = clamp(
         ((naturalSize.height * scale - frameSize.height) / 2 - position.y) /
-          scale,
+        scale,
         0,
         Math.max(0, naturalSize.height - cropH),
       );
@@ -482,7 +482,7 @@ export function ImageCropModal({
 
   return (
     <div
-      className="ui-layer-modal fixed inset-0 z-[1400] flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_68%,_transparent)] p-2 backdrop-blur-md sm:items-center sm:p-4"
+      className="ui-layer-modal fixed inset-0 z-[1400] flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_68%,_transparent)] p-2  sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -492,10 +492,10 @@ export function ImageCropModal({
           <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-[color:var(--app-surface-muted)] sm:hidden" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
                 {shape === 'round' ? 'Foto profil' : 'Cover image'}
               </p>
-              <h3 className="mt-1 truncate text-lg font-black text-[color:var(--app-text)] sm:text-xl">
+              <h3 className="mt-1 truncate text-lg font-bold text-[color:var(--app-text)] sm:text-xl">
                 {title}
               </h3>
               <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-[color:var(--app-text-soft)] sm:text-sm">
@@ -605,10 +605,10 @@ export function ImageCropModal({
             <aside className="space-y-3 rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 sm:p-4">
               <div className="rounded-[20px] bg-[color:var(--app-surface-strong)] p-3 shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="text-xs font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
                     Zoom
                   </span>
-                  <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-xs font-black text-[color:var(--app-accent)]">
+                  <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[color:var(--app-accent)]">
                     {zoomPercent}%
                   </span>
                 </div>
@@ -642,7 +642,7 @@ export function ImageCropModal({
               </div>
 
               <div className="rounded-[20px] bg-[color:var(--app-surface-strong)] p-3 text-xs font-semibold leading-6 text-[color:var(--app-text)] shadow-sm">
-                <p className="font-black text-[color:var(--app-text)]">
+                <p className="font-bold text-[color:var(--app-text)]">
                   Tips crop cepat
                 </p>
                 <p className="mt-2 text-[color:var(--app-text-soft)]">
@@ -655,7 +655,7 @@ export function ImageCropModal({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="rounded-full border border-[color:var(--app-border-strong)] px-4 py-2 text-xs font-black text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-strong)]"
+                  className="rounded-full border border-[color:var(--app-border-strong)] px-4 py-2 text-xs font-bold text-[color:var(--app-text-soft)] transition hover:bg-[color:var(--app-surface-strong)]"
                 >
                   Batal
                 </button>
@@ -663,7 +663,7 @@ export function ImageCropModal({
                   type="button"
                   onClick={handleConfirm}
                   disabled={loading || !imageReady}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-black text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-60"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-xs font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-60"
                 >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

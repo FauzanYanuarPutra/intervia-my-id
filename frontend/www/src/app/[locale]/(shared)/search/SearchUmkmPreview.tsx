@@ -53,6 +53,8 @@ type SearchUmkmPreviewProps = {
 function formatDistance(distanceKm: number | null): string | null {
   if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm))
     return null;
+  if (distanceKm < 1) return `${Math.max(1, Math.round(distanceKm * 1000))} m`;
+  if (distanceKm < 10) return `${distanceKm.toFixed(1)} km`;
   return `${distanceKm.toFixed(1)} km`;
 }
 
@@ -121,10 +123,10 @@ export function SearchUmkmPreview({
     cartQuantities?.[`umkm:${store.id}`] || 0;
 
   return (
-    <section className="overflow-hidden rounded-[24px] border border-emerald-100/90 bg-[linear-gradient(180deg,#ffffff_0%,#f4fff8_100%)] p-3 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.12)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)] sm:p-4">
-      <div className="flex items-center justify-between gap-2">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-[24px] border border-emerald-100/90 bg-[linear-gradient(180deg,#ffffff_0%,#f4fff8_100%)] p-3 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.12)] dark:border-emerald-400/14 dark:bg-[color:var(--app-surface-strong)] sm:p-4">
+      <div className="flex min-w-0 items-center justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-sm font-black text-[color:var(--app-text)] sm:text-base">
+          <h2 className="text-sm font-bold text-[color:var(--app-text)] sm:text-base">
             Lajukan Maps
           </h2>
           <p className="mt-0.5 line-clamp-1 text-[11px] ui-text-soft">
@@ -153,7 +155,7 @@ export function SearchUmkmPreview({
           {error}
         </div>
       ) : leadStore ? (
-        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.18fr)_minmax(250px,0.82fr)]">
+        <div className="mt-3 grid min-w-0 max-w-full gap-3 lg:grid-cols-[minmax(0,1.18fr)_minmax(250px,0.82fr)]">
           <div className="relative min-h-[260px] overflow-hidden rounded-[22px] border border-emerald-100 bg-emerald-50/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] sm:min-h-[320px] lg:min-h-[380px]">
             {mapStores.length > 0 ? (
               <UmkmStoreMap
@@ -178,7 +180,7 @@ export function SearchUmkmPreview({
               </div>
             )}
 
-            <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-black text-emerald-700 shadow-sm backdrop-blur">
+            <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-white/92 px-3 py-1.5 text-[11px] font-bold text-emerald-700 shadow-sm ">
               {stores.length}{' '}
               {isId ? 'usaha di hasil ini' : 'businesses in this result'}
             </div>
@@ -218,7 +220,7 @@ export function SearchUmkmPreview({
                         <MapPin className="h-4 w-4" />
                       </button>
                       <div className="min-w-0 flex-1">
-                        <h3 className="line-clamp-2 text-sm font-black leading-[1.15] text-[color:var(--app-text)]">
+                        <h3 className="line-clamp-2 text-sm font-bold leading-[1.15] text-[color:var(--app-text)]">
                           {store.name}
                         </h3>
                         <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] font-semibold ui-text-soft">

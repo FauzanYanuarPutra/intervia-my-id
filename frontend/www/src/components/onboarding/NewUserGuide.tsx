@@ -42,10 +42,10 @@ export default function NewUserGuide() {
     <section className="rounded-[32px] border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] p-6 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[color:var(--app-accent)]">
             Start Here
           </p>
-          <h2 className="text-xl md:text-2xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h2 className="text-xl md:text-2xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             New to the ecosystem? Follow a simple 3-step path.
           </h2>
           <p className="mt-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -55,13 +55,13 @@ export default function NewUserGuide() {
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link
             href={primaryHref}
-            className="inline-flex items-center justify-center rounded-2xl bg-[color:var(--app-accent)] px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)] shadow-lg shadow-[var(--app-shadow)] transition hover:bg-[color:var(--app-accent-strong)]"
+            className="inline-flex items-center justify-center rounded-2xl bg-[color:var(--app-accent)] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-inverse)] shadow-lg shadow-[var(--app-shadow)] transition hover:bg-[color:var(--app-accent-strong)]"
           >
             {user ? 'Open Dashboard' : 'Create Account'}
           </Link>
           <Link
             href={secondaryHref}
-            className="inline-flex items-center justify-center rounded-2xl border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] transition hover:border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)]"
+            className="inline-flex items-center justify-center rounded-2xl border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] bg-[color:var(--app-surface-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] px-5 py-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] transition hover:border-[color:color-mix(in_srgb,_var(--app-accent-border)_40%,_transparent)]"
           >
             {user ? 'Complete Profile' : 'Sign In'}
           </Link>
@@ -74,7 +74,7 @@ export default function NewUserGuide() {
             key={step.title}
             className="rounded-2xl border border-[color:var(--app-border)] dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_5%,_transparent)] bg-[color:var(--app-surface-muted)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_5%,_transparent)] p-4"
           >
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
               Step {idx + 1}
             </p>
             <p className="mt-2 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">

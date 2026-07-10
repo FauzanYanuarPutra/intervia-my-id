@@ -61,7 +61,7 @@ export default function PhoneNumberField({
           className={cn(
             'ui-field-shell flex min-h-[42px] min-w-0 items-center gap-2 rounded-[12px] border border-[color:var(--app-border)] bg-white px-2 py-1 transition-[border-color,background-color,box-shadow] focus-within:border-[color:var(--app-accent-border)] focus-within:bg-[color:var(--app-surface)] focus-within:ring-2 focus-within:ring-[color:color-mix(in_srgb,_var(--app-accent)_12%,_transparent)] dark:bg-[color:var(--app-surface-strong)]',
             disabled &&
-              'cursor-not-allowed bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+            'cursor-not-allowed bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
           )}
         >
           <span className="relative shrink-0">
@@ -84,7 +84,7 @@ export default function PhoneNumberField({
                 </option>
               ))}
             </select>
-            <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[10px] bg-[color:var(--app-surface-muted)] px-2 text-[12px] font-black text-[color:var(--app-text)]">
+            <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-[10px] bg-[color:var(--app-surface-muted)] px-2 text-[12px] font-bold text-[color:var(--app-text)]">
               <span className="text-base leading-none">{selectedFlag}</span>
               <span>{selectedCountry.dialCode}</span>
               <ChevronDown className="h-3.5 w-3.5 text-[color:var(--app-text-soft)]" />

@@ -136,7 +136,9 @@ export default async function LocaleLayout({
     cookieStore.get('NEXT_LOCALE')?.value ?? cookieStore.get('locale')?.value;
   const languageConfirmCookie =
     cookieStore.get(LANGUAGE_CONFIRM_COOKIE)?.value ?? null;
+  const routeLocaleAlreadyChoosesLanguage = locale === 'id' || locale === 'en';
   const initialLanguageSelectionRequired =
+    !routeLocaleAlreadyChoosesLanguage &&
     !hasConfirmedLanguageSelection(localeCookie, languageConfirmCookie);
   const messages = await getCommonMessages(locale);
   const startupState = readStackStartupState();

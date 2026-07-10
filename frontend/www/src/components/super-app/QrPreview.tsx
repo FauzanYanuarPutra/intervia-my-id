@@ -42,7 +42,7 @@ export function QrPreview({ value, label, size = 180 }: QrPreviewProps) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-3 shadow-sm border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
         {label}
       </p>
       <div className="mt-3 flex min-h-[180px] items-center justify-center rounded-2xl  text-[color:var(--app-accent)]">

@@ -16,161 +16,6 @@ export type MobileRouteChromeConfig = {
   eyebrow?: string;
 };
 
-// function titleForRoute(
-//   pathname: string,
-//   locale: LocaleCode,
-// ): Pick<MobileRouteChromeConfig, 'title' | 'eyebrow'> {
-//   const isId = locale === 'id';
-
-//   if (pathname.startsWith('/about')) {
-//     return { title: isId ? 'Tentang' : 'About', eyebrow: 'Lajukan' };
-//   }
-//   if (pathname.startsWith('/contact')) {
-//     return {
-//       title: isId ? 'Kontak' : 'Contact',
-//       eyebrow: isId ? 'Bantuan' : 'Support',
-//     };
-//   }
-//   if (pathname.startsWith('/support')) {
-//     return {
-//       title: isId ? 'Bantuan' : 'Support',
-//       eyebrow: isId ? 'Pusat bantuan' : 'Help center',
-//     };
-//   }
-//   if (pathname.startsWith('/kategori')) {
-//     return {
-//       title: isId ? 'Kategori' : 'Categories',
-//       eyebrow: isId ? 'Jelajah' : 'Explore',
-//     };
-//   }
-//   if (pathname.startsWith('/community')) {
-//     return {
-//       title: isId ? 'Komunitas' : 'Community',
-//       eyebrow: isId ? 'Diskusi' : 'Forum',
-//     };
-//   }
-//   if (pathname.startsWith('/trust')) {
-//     return {
-//       title: 'Trust Center',
-//       eyebrow: isId ? 'Aman & aturan' : 'Safety',
-//     };
-//   }
-//   if (pathname.startsWith('/privacy')) {
-//     return { title: isId ? 'Privasi' : 'Privacy', eyebrow: 'Data' };
-//   }
-//   if (pathname.startsWith('/terms')) {
-//     return {
-//       title: isId ? 'Syarat' : 'Terms',
-//       eyebrow: isId ? 'Aturan pakai' : 'Legal',
-//     };
-//   }
-//   if (pathname.startsWith('/cookie-policy')) {
-//     return {
-//       title: isId ? 'Cookie' : 'Cookies',
-//       eyebrow: isId ? 'Preferensi' : 'Preferences',
-//     };
-//   }
-//   if (pathname.startsWith('/education')) {
-//     return {
-//       title: isId ? 'Edukasi' : 'Education',
-//       eyebrow: isId ? 'Panduan' : 'Guide',
-//     };
-//   }
-//   if (pathname.startsWith('/learn')) {
-//     return {
-//       title: isId ? 'Belajar' : 'Learn',
-//       eyebrow: isId ? 'Operasional' : 'Operations',
-//     };
-//   }
-//   if (pathname.startsWith('/lainnya')) {
-//     return { title: isId ? 'Lainnya' : 'More', eyebrow: 'Menu' };
-//   }
-//   if (pathname.startsWith('/dashboard')) {
-//     return { title: 'Dashboard', eyebrow: isId ? 'Akun' : 'Account' };
-//   }
-//   if (pathname.startsWith('/notifications')) {
-//     return {
-//       title: isId ? 'Notifikasi' : 'Notifications',
-//       eyebrow: isId ? 'Update' : 'Updates',
-//     };
-//   }
-//   if (pathname.startsWith('/chat')) {
-//     return {
-//       title: 'Chat',
-//       eyebrow: isId ? 'Pesan' : 'Messages',
-//     };
-//   }
-//   if (pathname.startsWith('/settings')) {
-//     return {
-//       title: isId ? 'Pengaturan' : 'Settings',
-//       eyebrow: isId ? 'Akun' : 'Account',
-//     };
-//   }
-//   if (pathname.startsWith('/my-listings')) {
-//     return {
-//       title: isId ? 'Postingan Saya' : 'My Listings',
-//       eyebrow: isId ? 'Akun' : 'Account',
-//     };
-//   }
-//   if (pathname.startsWith('/my-projects')) {
-//     return {
-//       title: isId ? 'Proyek Saya' : 'My Projects',
-//       eyebrow: isId ? 'Aktivitas' : 'Activity',
-//     };
-//   }
-//   if (pathname.startsWith('/transactions')) {
-//     return {
-//       title: isId ? 'Transaksi' : 'Transactions',
-//       eyebrow: isId ? 'Aktivitas' : 'Activity',
-//     };
-//   }
-//   if (pathname.startsWith('/payments')) {
-//     return {
-//       title: isId ? 'Saldo' : 'Balance',
-//       eyebrow: isId ? 'Pembayaran' : 'Payments',
-//     };
-//   }
-//   if (pathname.startsWith('/profile/edit')) {
-//     return {
-//       title: isId ? 'Edit Profil' : 'Edit Profile',
-//       eyebrow: isId ? 'Akun' : 'Account',
-//     };
-//   }
-//   if (pathname === '/profile') {
-//     return {
-//       title: isId ? 'Profil' : 'Profile',
-//       eyebrow: isId ? 'Akun' : 'Account',
-//     };
-//   }
-//   if (pathname.startsWith('/microgigs')) {
-//     return {
-//       title: 'Microgigs',
-//       eyebrow: isId ? 'Jasa cepat' : 'Quick services',
-//     };
-//   }
-//   if (pathname.startsWith('/crm')) {
-//     return { title: 'CRM', eyebrow: isId ? 'Operasional' : 'Operations' };
-//   }
-//   if (pathname === '/jobs') {
-//     return {
-//       title: isId ? 'Pekerjaan' : 'Jobs',
-//       eyebrow: isId ? 'Jelajah' : 'Explore',
-//     };
-//   }
-//   if (pathname === '/property') {
-//     return {
-//       title: isId ? 'Properti' : 'Property',
-//       eyebrow: isId ? 'Jelajah' : 'Explore',
-//     };
-//   }
-//   if (pathname === '/freelancers') {
-//     return { title: 'Freelancers', eyebrow: 'Talent' };
-//   }
-
-//   return { title: isId ? 'Lajukan' : 'Lajukan' };
-// }
-
-
 function MobileRouteTopBar({
   title,
   eyebrow,
@@ -185,7 +30,7 @@ function MobileRouteTopBar({
   const handleBack = useAppBack(router, `/${isId ? 'id' : 'en'}/home`);
 
   return (
-    <header className="lajukan-mobile-topbar ui-layer-mobile-topbar fixed inset-x-0 top-0 border-x-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1 pt-[calc(env(safe-area-inset-top)+0.25rem)] shadow-[0_10px_24px_-24px_rgba(15,23,42,0.22)] backdrop-blur-xl lg:hidden dark:border-[color:var(--app-border-strong)]">
+    <header className="lajukan-mobile-topbar ui-layer-mobile-topbar fixed inset-x-0 top-0 border-x-0 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1 pt-[calc(env(safe-area-inset-top)+0.25rem)] shadow-[0_10px_24px_-24px_rgba(15,23,42,0.22)]  lg:hidden dark:border-[color:var(--app-border-strong)]">
       <div className="mx-auto grid min-h-[36px] max-w-[720px] grid-cols-[38px_minmax(0,1fr)_38px] items-center gap-1.5">
         <button
           type="button"
@@ -198,11 +43,11 @@ function MobileRouteTopBar({
 
         <div className="min-w-0 text-center">
           {eyebrow ? (
-            <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+            <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
               {eyebrow}
             </p>
           ) : null}
-          <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-white">
+          <p className="truncate text-sm font-bold text-[color:var(--app-text)] dark:text-white">
             {title}
           </p>
         </div>

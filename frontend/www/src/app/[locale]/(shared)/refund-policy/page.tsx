@@ -36,8 +36,8 @@ export default async function RefundPolicyPage({ params }: PageProps) {
       icon: ReceiptText,
       title: isId ? 'Pembayaran' : 'Payments',
       body: isId
-        ? 'Pembayaran diproses dari halaman Lajukan. Pengguna tidak diminta membayar lewat instruksi transfer di luar platform.'
-        : 'Payments are processed from Lajukan pages. Users are not asked to pay through off-platform transfer instructions.',
+        ? 'Untuk fase beta, komunikasi dan kesepakatan utama dilakukan lewat chat langsung. Pembayaran aman di Lajukan sedang disiapkan bertahap.'
+        : 'During beta, communication and agreements mainly happen through direct chat. Secure Lajukan payments are being prepared gradually.',
     },
     {
       icon: PackageCheck,
@@ -81,17 +81,17 @@ export default async function RefundPolicyPage({ params }: PageProps) {
 
   const evidenceItems = isId
     ? [
-        'Nomor akun atau nomor HP yang dipakai.',
-        'Link listing, room chat, atau ID transaksi bila ada.',
-        'Kronologi singkat dan bukti foto/video jika relevan.',
-        'Nominal pembayaran dalam Rupiah (IDR) bila transaksi sudah aktif.',
-      ]
+      'Nomor akun atau nomor HP yang dipakai.',
+      'Link listing, room chat, atau ID transaksi bila ada.',
+      'Kronologi singkat dan bukti foto/video jika relevan.',
+      'Nominal pembayaran dalam Rupiah (IDR) bila transaksi sudah aktif.',
+    ]
     : [
-        'Account number or phone number used.',
-        'Listing link, chat room, or transaction ID if available.',
-        'Short chronology and photo/video proof when relevant.',
-        'Payment amount in Indonesian Rupiah (IDR) when a transaction is active.',
-      ];
+      'Account number or phone number used.',
+      'Listing link, chat room, or transaction ID if available.',
+      'Short chronology and photo/video proof when relevant.',
+      'Payment amount in Indonesian Rupiah (IDR) when a transaction is active.',
+    ];
 
   return (
     <main className="page-shell page-rhythm pb-10 pt-6">
@@ -108,18 +108,18 @@ export default async function RefundPolicyPage({ params }: PageProps) {
             </h1>
             <p className="ui-page-copy mt-3 max-w-3xl">
               {isId
-                ? 'Halaman ini menjelaskan cara Lajukan menangani pengembalian dana, retur produk, komplain layanan, dan kontak bisnis resmi. Untuk fase listing, komunikasi utama dilakukan lewat chat; saat transaksi aktif, pembayaran tetap diproses dalam Rupiah dari halaman Lajukan.'
-                : 'This page explains how Lajukan handles refunds, product returns, service complaints, and official business contact. During the listing phase, communication happens mainly through chat; when transactions are active, payments are processed in Rupiah from Lajukan pages.'}
+                ? 'Halaman ini menjelaskan alur bantuan untuk refund, retur produk, komplain layanan, dan kontak bisnis resmi. Untuk fase beta, komunikasi utama dilakukan lewat chat langsung; pembayaran aman di Lajukan sedang disiapkan bertahap.'
+                : 'This page explains support flows for refunds, product returns, service complaints, and official business contact. During beta, communication mainly happens through direct chat; secure Lajukan payments are being prepared gradually.'}
             </p>
           </div>
 
           <aside className="rounded-[22px] border border-[color:var(--app-border)] bg-white/82 p-4 shadow-sm dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/50">
-            <p className="text-sm font-black text-[color:var(--app-text)]">
+            <p className="text-sm font-bold text-[color:var(--app-text)]">
               {isId ? 'Kontak bisnis resmi' : 'Official business contact'}
             </p>
             <a
               href={businessPhoneHref}
-              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-sm font-black text-white"
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-sm font-bold text-white"
             >
               <Phone className="h-4 w-4" />
               {businessPhoneDisplay}
@@ -128,7 +128,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
               href={businessWhatsappHref}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-black text-[color:var(--app-accent)]"
+              className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-bold text-[color:var(--app-accent)]"
             >
               <MessageCircle className="h-4 w-4" />
               WhatsApp
@@ -148,7 +148,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-[15px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 <Icon className="h-5 w-5" />
               </span>
-              <h2 className="mt-4 text-base font-black text-[color:var(--app-text)]">
+              <h2 className="mt-4 text-base font-bold text-[color:var(--app-text)]">
                 {item.title}
               </h2>
               <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -160,7 +160,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
       </section>
 
       <section className="ui-panel rounded-[24px] p-5 sm:p-6">
-        <h2 className="text-lg font-black text-[color:var(--app-text)]">
+        <h2 className="text-lg font-bold text-[color:var(--app-text)]">
           {isId ? 'Kapan refund atau retur bisa diajukan?' : 'When can refunds or returns be requested?'}
         </h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -176,7 +176,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
                     <Icon className="h-4 w-4" />
                   </span>
                   <div>
-                    <h3 className="text-sm font-black text-[color:var(--app-text)]">
+                    <h3 className="text-sm font-bold text-[color:var(--app-text)]">
                       {item.title}
                     </h3>
                     <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -192,7 +192,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="ui-panel rounded-[24px] p-5 sm:p-6">
-          <h2 className="text-lg font-black text-[color:var(--app-text)]">
+          <h2 className="text-lg font-bold text-[color:var(--app-text)]">
             {isId ? 'Data yang perlu disiapkan' : 'Information to prepare'}
           </h2>
           <ul className="mt-4 space-y-2 text-sm text-[color:var(--app-text-soft)]">
@@ -206,7 +206,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
         </div>
 
         <div className="ui-panel rounded-[24px] p-5 sm:p-6">
-          <h2 className="text-lg font-black text-[color:var(--app-text)]">
+          <h2 className="text-lg font-bold text-[color:var(--app-text)]">
             {isId ? 'Catatan penting' : 'Important notes'}
           </h2>
           <div className="mt-4 grid gap-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -230,7 +230,7 @@ export default async function RefundPolicyPage({ params }: PageProps) {
       </section>
 
       <section className="ui-panel rounded-[24px] p-5 text-center sm:p-6">
-        <h2 className="text-lg font-black text-[color:var(--app-text)]">
+        <h2 className="text-lg font-bold text-[color:var(--app-text)]">
           {isId ? 'Butuh bantuan soal refund atau retur?' : 'Need help with a refund or return?'}
         </h2>
         <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">

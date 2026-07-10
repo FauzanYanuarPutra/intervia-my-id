@@ -280,8 +280,8 @@ export function SimpleUsahaHub({
         forcedStoreId ||
         queryStoreId ||
         (shouldRestoreSelection &&
-        selectedStoreId &&
-        items.some(store => store.id === selectedStoreId)
+          selectedStoreId &&
+          items.some(store => store.id === selectedStoreId)
           ? selectedStoreId
           : shouldRestoreSelection
             ? items[0]?.id || ''
@@ -376,8 +376,8 @@ export function SimpleUsahaHub({
     ) {
       throw new Error(
         payload.error ||
-          payload.rejected?.[0]?.reason ||
-          (isId ? 'Upload media gagal.' : 'Media upload failed.'),
+        payload.rejected?.[0]?.reason ||
+        (isId ? 'Upload media gagal.' : 'Media upload failed.'),
       );
     }
 
@@ -660,10 +660,10 @@ export function SimpleUsahaHub({
         <div className="rounded-[28px] border border-[color:var(--app-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(247,250,247,0.94))] p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.18)] sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-2xl">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
                 {isId ? 'Usaha saya' : 'My businesses'}
               </p>
-              <h2 className="mt-1 text-[1.2rem] font-black ui-text sm:text-[1.5rem]">
+              <h2 className="mt-1 text-[1.2rem] font-bold ui-text sm:text-[1.5rem]">
                 {isId ? 'Pilih satu usaha' : 'Pick one business'}
               </h2>
               <p className="mt-1 text-sm leading-6 ui-text-soft">
@@ -681,7 +681,7 @@ export function SimpleUsahaHub({
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
+            <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]">
               {stores.length} {isId ? 'usaha' : 'businesses'}
             </span>
             <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)]">
@@ -714,25 +714,25 @@ export function SimpleUsahaHub({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-slate-950/12 to-transparent" />
                   <div className="absolute left-3 top-3 flex gap-2">
-                    <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)] backdrop-blur">
+                    <span className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] ">
                       {presentation.kindLabel}
                     </span>
-                    <span className="rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[10px] font-black text-white">
+                    <span className="rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[10px] font-bold text-white">
                       {presentation.statusLabel}
                     </span>
                   </div>
                 </div>
                 <div className="space-y-3 p-4">
                   <div>
-                    <h3 className="text-[1rem] font-black ui-text">{store.name}</h3>
+                    <h3 className="text-[1rem] font-bold ui-text">{store.name}</h3>
                     <p className="mt-1 text-sm leading-6 ui-text-soft">
                       {[store.city, store.address].filter(Boolean).join(' - ')}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
+                    <button
+                      type="button"
                       onClick={() =>
                         router.push(buildUsahaPath('profile', { storeId: store.id }))
                       }
@@ -771,17 +771,17 @@ export function SimpleUsahaHub({
               />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
                 {currentWorkspaceLabel}
               </p>
-              <h2 className="mt-1 truncate text-[1.2rem] font-black ui-text sm:text-[1.5rem]">
+              <h2 className="mt-1 truncate text-[1.2rem] font-bold ui-text sm:text-[1.5rem]">
                 {selectedStore.name}
               </h2>
               <p className="mt-1 text-sm leading-6 ui-text-soft">
                 {[selectedStore.city, selectedStore.address].filter(Boolean).join(' - ')}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
+                <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]">
                   {businessCategoryLabel}
                 </span>
                 <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)]">
@@ -797,7 +797,7 @@ export function SimpleUsahaHub({
           </div>
 
           <div className="flex flex-wrap gap-2">
-          <Link
+            <Link
               href={`${buildUsahaPath('home')}?view=list`}
               className="ui-button-secondary inline-flex min-h-11 items-center justify-center px-4 text-sm font-semibold"
             >
@@ -830,7 +830,7 @@ export function SimpleUsahaHub({
             },
           ].map(item => (
             <div key={item.label} className="rounded-[18px] border border-[color:var(--app-border)] bg-white px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
                 {item.label}
               </p>
               <p className="mt-1 text-sm font-semibold ui-text">{item.value}</p>
@@ -850,10 +850,10 @@ export function SimpleUsahaHub({
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.16)]">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
                   {isId ? 'Foto usaha' : 'Business photo'}
                 </p>
-                <h3 className="mt-1 text-[1rem] font-black ui-text">
+                <h3 className="mt-1 text-[1rem] font-bold ui-text">
                   {isId ? 'Wajib dipakai di maps dan daftar' : 'Required for maps and lists'}
                 </h3>
               </div>
@@ -892,16 +892,16 @@ export function SimpleUsahaHub({
                   )}
                 </div>
               </div>
+            </div>
           </div>
-        </div>
 
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.16)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
                   {isId ? 'Galeri media' : 'Media gallery'}
                 </p>
-                <h3 className="mt-1 text-[1rem] font-black ui-text">
+                <h3 className="mt-1 text-[1rem] font-bold ui-text">
                   {isId
                     ? 'Tambahkan banyak foto dan video usaha'
                     : 'Add multiple business photos and videos'}
@@ -933,10 +933,10 @@ export function SimpleUsahaHub({
                 </p>
 
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
+                  <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]">
                     {draft.galleryImages.length} {isId ? 'foto' : 'photos'}
                   </span>
-                  <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
+                  <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]">
                     {draft.galleryVideos.length} {isId ? 'video' : 'videos'}
                   </span>
                 </div>
@@ -956,7 +956,7 @@ export function SimpleUsahaHub({
                           sizes="(max-width: 768px) 50vw, 220px"
                         />
                       </div>
-                      <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-black text-[color:var(--app-accent)] backdrop-blur">
+                      <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)] ">
                         <ImageIcon className="h-3.5 w-3.5" />
                         {isId ? 'Foto' : 'Photo'}
                       </div>
@@ -984,7 +984,7 @@ export function SimpleUsahaHub({
                           preload="metadata"
                         />
                       </div>
-                      <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-black text-[color:var(--app-accent)] backdrop-blur">
+                      <div className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)] ">
                         <Video className="h-3.5 w-3.5" />
                         {isId ? 'Video' : 'Video'}
                       </div>
@@ -1009,7 +1009,7 @@ export function SimpleUsahaHub({
               </div>
 
               <div className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 text-sm leading-6 ui-text-soft">
-                <p className="font-black ui-text">
+                <p className="font-bold ui-text">
                   {isId ? 'Tips cepat' : 'Quick tip'}
                 </p>
                 <p className="mt-2">
@@ -1027,7 +1027,7 @@ export function SimpleUsahaHub({
           </div>
 
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.16)]">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
               {isId ? 'Info dasar' : 'Basic info'}
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -1098,10 +1098,10 @@ export function SimpleUsahaHub({
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.16)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
                   {isId ? 'Lokasi usaha' : 'Business location'}
                 </p>
-                <h3 className="mt-1 text-[1rem] font-black ui-text">
+                <h3 className="mt-1 text-[1rem] font-bold ui-text">
                   {isId ? 'Klik peta atau pakai lokasi sekarang' : 'Tap the map or use current location'}
                 </h3>
               </div>
@@ -1149,7 +1149,7 @@ export function SimpleUsahaHub({
 
         <aside className="space-y-4">
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,247,0.94))] p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.16)]">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
               {isId ? 'Aksi cepat' : 'Quick actions'}
             </p>
             <div className="mt-3 space-y-2">
@@ -1217,7 +1217,7 @@ export function SimpleUsahaHub({
                 : 'This page is intentionally short. Focus on photo, basics, and location first.'
             ) : (
               <>
-                <span className="block font-black ui-text">
+                <span className="block font-bold ui-text">
                   {isId
                     ? `Fokus halaman: ${currentWorkspaceLabel}`
                     : `Page focus: ${currentWorkspaceLabel}`}
@@ -1232,7 +1232,7 @@ export function SimpleUsahaHub({
           </div>
 
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.16)]">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
               {isId ? 'Simpan' : 'Save'}
             </p>
             <p className="mt-2 text-sm leading-6 ui-text-soft">

@@ -96,10 +96,10 @@ export function ZeroCapitalJourney({
     <section className={clsx('ui-panel rounded-[32px] p-5 sm:p-6', className)}>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="max-w-4xl">
-          <p className="text-[11px] font-black uppercase tracking-[0.22em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
             {isId ? 'Zero To Business Engine' : 'Zero To Business Engine'}
           </p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)] sm:text-3xl">
+          <h2 className="mt-2 text-2xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-3xl">
             {title}
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -123,7 +123,7 @@ export function ZeroCapitalJourney({
             },
           ].map((item) => (
             <div key={item.label} className="ui-panel-muted rounded-[20px] px-3 py-3">
-              <p className="text-lg font-black text-[color:var(--app-text)]">{item.value}</p>
+              <p className="text-lg font-bold text-[color:var(--app-text)]">{item.value}</p>
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                 {item.label}
               </p>
@@ -152,7 +152,7 @@ export function ZeroCapitalJourney({
                 <StageIcon className="h-4 w-4" />
               </span>
               <span>
-                <span className="block text-[10px] font-black uppercase tracking-[0.16em]">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.16em]">
                   {stage.level}
                 </span>
                 <span className="block text-sm font-semibold">{pickJourneyText(stage.title, locale)}</span>
@@ -165,7 +165,7 @@ export function ZeroCapitalJourney({
       <div className={clsx('mt-6 grid gap-4', variant === 'full' ? 'xl:grid-cols-[1.08fr_0.92fr]' : 'lg:grid-cols-[1.08fr_0.92fr]')}>
         <article className="overflow-hidden rounded-[28px] border text-[color:var(--app-accent)] bg-[linear-gradient(135deg,rgba(236,253,245,0.95),rgba(224,242,254,0.88))] p-5 shadow-[0_18px_50px_-40px_rgba(5,150,105,0.45)] text-[color:var(--app-accent)] dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.25),rgba(12,74,110,0.18))]">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full text-[color:var(--app-accent)] px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
+            <span className="rounded-full text-[color:var(--app-accent)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
               {activeStage.level}
             </span>
             <span className="rounded-full text-[color:var(--app-accent)] px-3 py-1 text-[11px] font-semibold bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
@@ -178,7 +178,7 @@ export function ZeroCapitalJourney({
               <ActiveIcon className="h-6 w-6" />
             </span>
             <div>
-              <h3 className="text-2xl font-black tracking-tight bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <h3 className="text-2xl font-bold tracking-tight bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {pickJourneyText(activeStage.title, locale)}
               </h3>
               <p className="mt-2 text-sm leading-6 bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
@@ -188,7 +188,7 @@ export function ZeroCapitalJourney({
           </div>
 
           <div className="mt-5 rounded-[24px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
               {isId ? 'Syarat naik level' : 'Level-up target'}
             </p>
             <p className="mt-2 text-sm leading-6 bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
@@ -198,7 +198,7 @@ export function ZeroCapitalJourney({
 
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                 {isId ? 'Misi inti' : 'Core missions'}
               </p>
               <div className="mt-3 space-y-2">
@@ -212,7 +212,7 @@ export function ZeroCapitalJourney({
             </div>
 
             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                 {isId ? 'Yang jangan dibalik' : 'Do not reverse this'}
               </p>
               <div className="mt-3 space-y-2">
@@ -239,11 +239,11 @@ export function ZeroCapitalJourney({
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
                     <ActionIcon className="h-5 w-5" />
                   </span>
-                  <span className="rounded-full text-[color:var(--app-accent)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                  <span className="rounded-full text-[color:var(--app-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
                     {pickJourneyText(action.tag, locale)}
                   </span>
                 </div>
-                <h3 className="mt-4 text-lg font-black tracking-tight">
+                <h3 className="mt-4 text-lg font-bold tracking-tight">
                   {pickJourneyText(action.title, locale)}
                 </h3>
                 <p className="mt-2 text-sm leading-6 opacity-90">
@@ -258,7 +258,7 @@ export function ZeroCapitalJourney({
           })}
 
           <div className="rounded-[24px] border text-[color:var(--app-accent)] bg-[color:var(--app-surface-muted)] p-4 text-[color:var(--app-accent)]">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
               {isId ? 'Boleh ditunda dulu' : 'Safe to postpone'}
             </p>
             <div className="mt-3 space-y-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -292,7 +292,7 @@ export function ZeroCapitalJourney({
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,_var(--app-accent),_var(--app-accent-strong))] text-[color:var(--app-accent)]">
                 <LaneIcon className="h-5 w-5" />
               </span>
-              <h3 className="mt-4 text-lg font-black tracking-tight text-[color:var(--app-text)]">
+              <h3 className="mt-4 text-lg font-bold tracking-tight text-[color:var(--app-text)]">
                 {pickJourneyText(lane.title, locale)}
               </h3>
               <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -311,7 +311,7 @@ export function ZeroCapitalJourney({
         <div className="mt-6 space-y-6">
           <div className="grid gap-4 xl:grid-cols-[1.04fr_0.96fr]">
             <article className="ui-panel-muted rounded-[28px] p-5">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {isId ? 'Track edukasi' : 'Education tracks'}
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -326,7 +326,7 @@ export function ZeroCapitalJourney({
                       <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-[color:var(--app-accent-soft)] border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
                         <ModuleIcon className="h-4 w-4" />
                       </span>
-                      <h3 className="mt-4 text-base font-black text-[color:var(--app-text)]">
+                      <h3 className="mt-4 text-base font-bold text-[color:var(--app-text)]">
                         {pickJourneyText(module.title, locale)}
                       </h3>
                       <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -346,7 +346,7 @@ export function ZeroCapitalJourney({
             </article>
 
             <article className="ui-panel-muted rounded-[28px] p-5">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {isId ? 'Tangga modal' : 'Capital ladder'}
               </p>
               <div className="mt-4 space-y-3">
@@ -363,10 +363,10 @@ export function ZeroCapitalJourney({
                           <LadderIcon className="h-4 w-4" />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                             {isId ? `Tahap ${index + 1}` : `Step ${index + 1}`}
                           </p>
-                          <h3 className="mt-1 text-base font-black text-[color:var(--app-text)]">
+                          <h3 className="mt-1 text-base font-bold text-[color:var(--app-text)]">
                             {pickJourneyText(item.title, locale)}
                           </h3>
                           <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -387,10 +387,10 @@ export function ZeroCapitalJourney({
           <article className="ui-panel-muted rounded-[28px] p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                   {isId ? 'Loop harian' : 'Daily loop'}
                 </p>
-                <h3 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)]">
+                <h3 className="mt-2 text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
                   {isId ? 'Kalau belum punya apa-apa, ini ritme yang sehat' : 'If you have nothing yet, this is the healthy rhythm'}
                 </h3>
               </div>
@@ -402,10 +402,10 @@ export function ZeroCapitalJourney({
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {ZERO_CAPITAL_DAILY_LOOP.map((item) => (
                 <div key={item.slug} className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                     {pickJourneyText(item.time, locale)}
                   </p>
-                  <h4 className="mt-3 text-lg font-black text-[color:var(--app-text)]">
+                  <h4 className="mt-3 text-lg font-bold text-[color:var(--app-text)]">
                     {pickJourneyText(item.title, locale)}
                   </h4>
                   <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">

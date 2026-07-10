@@ -27,15 +27,14 @@ export function PortfolioPanel({
         return (
           <article
             key={business.id}
-            className={`rounded-[24px] border p-4 ${
-              business.id === activeBusinessId
+            className={`rounded-[24px] border p-4 ${business.id === activeBusinessId
                 ? 'border-portal-forest/35 bg-[linear-gradient(180deg,rgba(29,106,67,0.08),rgba(255,253,248,1))]'
                 : 'border-portal-line/70 bg-white'
-            }`}
+              }`}
           >
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px] md:items-start">
               <div>
-                <h3 className="text-lg font-black tracking-[-0.04em] text-portal-ink">
+                <h3 className="text-lg font-bold tracking-[-0.04em] text-portal-ink">
                   {business.name}
                 </h3>
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">

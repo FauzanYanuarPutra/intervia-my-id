@@ -13,10 +13,10 @@ export function WorkspaceNavGrid({
     <section className="rounded-[20px] border border-[color:var(--app-border)] bg-white/92 p-3 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.14)] dark:bg-slate-900/80">
       <div className="flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
             {isId ? 'Alur kerja' : 'Work flow'}
           </p>
-          <h2 className="mt-1 text-[1rem] font-black ui-text">
+          <h2 className="mt-1 text-[1rem] font-bold ui-text">
             {isId
               ? 'Pilih bagian sesuai urutan kerja'
               : 'Pick a section in work order'}
@@ -60,12 +60,12 @@ function WorkspaceNavCard({
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0">
-        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
+        <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
           <span>{String(index + 1).padStart(2, '0')}</span>
           <span>{item.badge}</span>
         </span>
         <span className="mt-1 flex items-center gap-2">
-          <span className="truncate text-sm font-black ui-text">
+          <span className="truncate text-sm font-bold ui-text">
             {item.title}
           </span>
           {item.selected ? (

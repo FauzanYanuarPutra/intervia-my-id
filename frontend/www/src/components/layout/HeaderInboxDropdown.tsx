@@ -224,7 +224,7 @@ function EmptyState({
       <div className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)]">
         {icon}
       </div>
-      <p className="mt-3 text-sm font-black text-[color:var(--app-text)]">
+      <p className="mt-3 text-sm font-bold text-[color:var(--app-text)]">
         {title}
       </p>
       <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
@@ -383,7 +383,7 @@ export function HeaderInboxDropdown({
           <Bell className={cn('h-4 w-4', iconClassName)} />
         )}
         {badge ? (
-          <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+          <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
             {badge}
           </span>
         ) : null}
@@ -401,7 +401,7 @@ export function HeaderInboxDropdown({
           <span className="pointer-events-none absolute right-4 top-[-7px] h-3.5 w-3.5 rotate-45 border-l border-t border-[color:color-mix(in_srgb,var(--app-border)_82%,var(--app-text-soft)_18%)] bg-white shadow-[-4px_-4px_10px_-8px_rgba(15,23,42,0.45)] dark:border-slate-700/80 dark:bg-slate-950" />
           <div className="flex items-center justify-between gap-3 px-2 py-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+              <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
                 {title}
               </p>
               <p className="mt-0.5 text-[11px] font-medium text-[color:var(--app-text-soft)]">
@@ -450,7 +450,7 @@ export function HeaderInboxDropdown({
             </div>
           </div>
 
-          <div className="max-h-[min(440px,calc(100vh-150px))] space-y-1 overflow-y-auto px-1 pb-1">
+          <div className="max-h-[min(440px,calc(var(--app-viewport-height)-150px))] space-y-1 overflow-y-auto px-1 pb-1">
             {isChat ? (
               chatInbox.loading ? (
                 <LoadingRows />
@@ -497,7 +497,7 @@ export function HeaderInboxDropdown({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-black text-[color:var(--app-text)]">
+                          <span className="truncate text-sm font-bold text-[color:var(--app-text)]">
                             {name}
                           </span>
                           <span className="shrink-0 text-[10px] font-semibold text-[color:var(--app-text-soft)]">
@@ -519,7 +519,7 @@ export function HeaderInboxDropdown({
                             {roomMessage(room, idLocale)}
                           </span>
                           {unread > 0 ? (
-                            <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+                            <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                               {compactCount(unread)}
                             </span>
                           ) : null}
@@ -605,7 +605,7 @@ export function HeaderInboxDropdown({
                       <span className="flex items-center justify-between gap-2">
                         <span
                           className={cn(
-                            'truncate text-sm font-black',
+                            'truncate text-sm font-bold',
                             visual.titleClassName,
                           )}
                         >
@@ -677,7 +677,7 @@ export function HeaderInboxDropdown({
             <Link
               href={fullHref}
               onClick={() => setOpen(false)}
-              className="ui-pressable flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 text-xs font-black text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
+              className="ui-pressable flex min-h-[42px] items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 text-xs font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]"
             >
               {isChat
                 ? idLocale

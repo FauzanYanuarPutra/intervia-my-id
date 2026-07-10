@@ -127,6 +127,32 @@ export function backupImageForTopic(
   return DEFAULT_CONTENT_IMAGE;
 }
 
+const INTERNAL_MEDIA_HOSTS = new Set([
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  'host.docker.internal',
+  'minio',
+  'marketplace_service',
+  'marketplace-service',
+]);
+
+function isInternalMediaHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    INTERNAL_MEDIA_HOSTS.has(normalized) ||
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.docker')
+  );
+}
+
+function contentProxyPathFromSegments(segments: string[]): string {
+  const bucket = segments[0];
+  const key = segments.slice(1).map(encodeURIComponent).join('/');
+  return `/api/content/media/${encodeURIComponent(bucket)}/${key}`;
+}
+
 export function normalizeContentMediaUrl(raw?: string): string {
   let value = asString(raw);
   if (!value) return '';
@@ -164,9 +190,7 @@ export function normalizeContentMediaUrl(raw?: string): string {
     relativeSegments.length >= 3 &&
     relativeSegments[1] === 'content'
   ) {
-    const bucket = relativeSegments[0];
-    const key = relativeSegments.slice(1).map(encodeURIComponent).join('/');
-    return `/api/content/media/${encodeURIComponent(bucket)}/${key}`;
+    return contentProxyPathFromSegments(relativeSegments);
   }
 
   try {
@@ -181,9 +205,14 @@ export function normalizeContentMediaUrl(raw?: string): string {
     }
     const segments = parsed.pathname.split('/').filter(Boolean);
     if (segments.length >= 3 && segments[1] === 'content') {
-      const bucket = segments[0];
-      const key = segments.slice(1).map(encodeURIComponent).join('/');
-      return `/api/content/media/${encodeURIComponent(bucket)}/${key}`;
+      return contentProxyPathFromSegments(segments);
+    }
+    if (parsed.protocol === 'http:' && isInternalMediaHost(parsed.hostname)) {
+      return '';
+    }
+    if (parsed.protocol === 'http:') {
+      parsed.protocol = 'https:';
+      return parsed.toString();
     }
     return value;
   } catch {

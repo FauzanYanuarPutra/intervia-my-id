@@ -28,21 +28,21 @@ export function SuperAppLoginGate({
 }: SuperAppLoginGateProps) {
   const highlights = isId
     ? [
-        'Simpan alamat favorit',
-        'Tracking driver real-time',
-        'Bayar cepat pakai saldo/voucher',
-      ]
+      'Simpan alamat favorit',
+      'Tracking driver real-time',
+      'Bayar cepat pakai saldo/voucher',
+    ]
     : [
-        'Save Home, Work, and recent destinations',
-        'Unlock real-time driver tracking after booking',
-        'Move faster with wallet and promo checkout',
-      ];
+      'Save Home, Work, and recent destinations',
+      'Unlock real-time driver tracking after booking',
+      'Move faster with wallet and promo checkout',
+    ];
 
   return (
     <section className="ui-panel ui-hero-panel rounded-[32px] p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+          <p className="inline-flex items-center gap-2 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
             <Sparkles className="h-3.5 w-3.5" />
             {isId ? 'Lanjutkan booking' : 'Continue booking'}
           </p>

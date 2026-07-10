@@ -49,7 +49,7 @@ export function IncomingCall({
   };
 
   return (
-    <div className="ui-layer-modal fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="ui-layer-modal fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)]  flex items-center justify-center p-4">
       <div className="max-h-[80svh] w-full max-w-md overflow-y-auto rounded-2xl bg-[color:var(--app-surface-strong)] p-8 shadow-2xl animate-in fade-in zoom-in duration-300 dark:bg-[color:var(--app-surface-strong)]">
         <div className="text-center space-y-6">
           {/* Avatar */}

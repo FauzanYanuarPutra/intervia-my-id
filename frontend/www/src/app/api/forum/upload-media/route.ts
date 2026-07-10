@@ -73,7 +73,8 @@ async function uploadForumMediaLocally(req: NextRequest) {
       folder: 'forum',
       maxBytes: MEDIA_UPLOAD_RAW_MAX_BYTES,
       minioTarget: 'forum',
-      minioTimeoutMs: 2600,
+      requireMinio: true,
+      minioTimeoutMs: 20000,
     });
 
     if (uploaded.length === 0) {

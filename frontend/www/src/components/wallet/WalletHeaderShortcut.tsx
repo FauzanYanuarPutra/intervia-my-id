@@ -142,7 +142,7 @@ export function WalletHeaderShortcut({
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
               {isId ? 'Saldo & pembayaran' : 'Balance and payments'}
             </p>
-            <p className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+            <p className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
               {loading ? (isId ? 'Memuat saldo...' : 'Loading balance...') : amountLabel}
             </p>
             <p className="mt-1 text-xs text-[color:var(--app-text-soft)]">

@@ -26,6 +26,7 @@ const LISTING_TYPES = [
 const SIMPLE_MODE_ALLOWED_TYPES = [
   'product',
   'service',
+  'property',
   'business_transfer',
 ] as const;
 const UPSERT_LISTING_KEYS = [
@@ -46,6 +47,8 @@ const UPSERT_LISTING_KEYS = [
   'currency',
   'tags',
   'cover_image',
+  'image_urls',
+  'gallery_images',
   'category',
   'metadata',
   'content_status',
@@ -186,6 +189,10 @@ const UpsertListingSchema = z
     currency: z.string().optional(),
     tags: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
     cover_image: z.string().optional(),
+    image_urls: z.array(z.union([z.string(), z.object({}).passthrough()])).optional(),
+    gallery_images: z
+      .array(z.union([z.string(), z.object({}).passthrough()]))
+      .optional(),
     content_status: z.string().optional(),
     slug: z.string().optional(),
     metadata: z.unknown().optional(),
@@ -447,6 +454,8 @@ function hasPrimaryImage(
     normalizeText(metadata.cover_image, 1024);
   if (coverImage) return true;
   const imageCollections = [
+    payload.image_urls,
+    payload.gallery_images,
     metadata.image_urls,
     metadata.images,
     metadata.gallery,
@@ -469,6 +478,13 @@ function hasPrimaryImage(
 function isSimpleListing(metadata: Record<string, unknown>): boolean {
   const mode = normalizeText(metadata.listing_mode, 24)?.toLowerCase();
   return mode === 'simple';
+}
+
+function activeListingNeedsPrimaryImage(
+  listingType: string,
+  listingSide: string,
+): boolean {
+  return listingSide !== 'demand' && REQUIRED_IMAGE_TYPES.has(listingType);
 }
 
 function toBoolean(value: unknown): boolean {
@@ -660,6 +676,12 @@ function enforceStrictListingRules(
   if (!title) issues.push('title is required for active listing');
   if (!summary) issues.push('summary is required for active listing');
   if (!body) issues.push('body is required for active listing');
+  const listingSide = resolveListingSide({
+    type: listingType,
+    metadata,
+    title: title || '',
+    summary: summary || '',
+  });
 
   for (const field of requiredFieldsForType(listingType, metadata)) {
     if (
@@ -677,7 +699,7 @@ function enforceStrictListingRules(
   }
 
   if (
-    REQUIRED_IMAGE_TYPES.has(listingType) &&
+    activeListingNeedsPrimaryImage(listingType, listingSide) &&
     !hasPrimaryImage(payload, metadata)
   ) {
     issues.push(
@@ -1060,7 +1082,7 @@ export function validateListingPayload(
       }
     }
   }
-  if (metadata && finalType === 'tool_rental') {
+  if (metadata && finalType === 'tool_rental' && finalSide !== 'demand') {
     const moderation = asObject(metadata.lajukan_rental_review);
     const reviewState = normalizeText(
       moderation?.review_state,
@@ -1125,11 +1147,12 @@ export function validateListingPayload(
     (options.strictActiveValidation ||
       (options.mode === 'create' && finalStatus === 'active'));
   const moderation =
-    metadata && finalType === 'tool_rental'
+    metadata && finalType === 'tool_rental' && finalSide !== 'demand'
       ? asObject(metadata.lajukan_rental_review)
       : undefined;
   const shouldEnforceInspectionSubmission =
     finalType === 'tool_rental' &&
+    finalSide !== 'demand' &&
     normalizeText(moderation?.review_state, 64)?.toLowerCase() ===
       'pending_lajukan_review';
   if ((shouldEnforceStrict || shouldEnforceInspectionSubmission) && metadata) {
@@ -1143,7 +1166,7 @@ export function validateListingPayload(
     }
     if (
       finalStatus === 'active' &&
-      REQUIRED_IMAGE_TYPES.has(finalType) &&
+      activeListingNeedsPrimaryImage(finalType, finalSide) &&
       !hasPrimaryImage(payload, metadata)
     ) {
       issues.push('active simple listing requires at least one image');
@@ -1235,10 +1258,10 @@ export function canTransitionContentStatus(
   if (current === next) return true;
 
   const allowedNext: Record<string, Set<string>> = {
-    draft: new Set(['active', 'archived']),
-    active: new Set(['paused', 'archived']),
-    paused: new Set(['active', 'archived']),
-    archived: new Set(['draft', 'active']),
+    draft: new Set(['active', 'archived', 'deleted']),
+    active: new Set(['paused', 'archived', 'deleted']),
+    paused: new Set(['active', 'archived', 'deleted']),
+    archived: new Set(['draft', 'active', 'deleted']),
     deleted: new Set([]),
   };
 

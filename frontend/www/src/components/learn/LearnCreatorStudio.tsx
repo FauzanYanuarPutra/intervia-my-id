@@ -185,9 +185,8 @@ function formatCourseMeta(course: LearningCourse, isId: boolean) {
     FORMAT_OPTIONS[0];
   const level =
     LEVEL_OPTIONS.find(item => item.value === course.level) || LEVEL_OPTIONS[0];
-  return `${isId ? format.labelId : format.labelEn} - ${
-    isId ? level.labelId : level.labelEn
-  } - ${course.status}`;
+  return `${isId ? format.labelId : format.labelEn} - ${isId ? level.labelId : level.labelEn
+    } - ${course.status}`;
 }
 
 export function LearnCreatorStudio({ locale }: Props) {
@@ -323,7 +322,7 @@ export function LearnCreatorStudio({ locale }: Props) {
       setStatus('error');
       setMessage(
         payload.error ||
-          (isId ? 'Materi gagal disimpan.' : 'Could not save content.'),
+        (isId ? 'Materi gagal disimpan.' : 'Could not save content.'),
       );
       return;
     }
@@ -404,7 +403,7 @@ export function LearnCreatorStudio({ locale }: Props) {
       setStatus('error');
       setMessage(
         payload.error ||
-          (isId ? 'Status gagal diubah.' : 'Could not update status.'),
+        (isId ? 'Status gagal diubah.' : 'Could not update status.'),
       );
       return;
     }
@@ -442,7 +441,7 @@ export function LearnCreatorStudio({ locale }: Props) {
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-base font-black text-[color:var(--app-text)]">
+            <p className="text-base font-bold text-[color:var(--app-text)]">
               {isId ? 'Punya ilmu usaha?' : 'Have business knowledge?'}
             </p>
             <p className="mt-1 max-w-2xl text-sm text-[color:var(--app-text-soft)]">
@@ -473,11 +472,11 @@ export function LearnCreatorStudio({ locale }: Props) {
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-[11px] font-black uppercase text-[color:var(--app-accent)]">
+            <p className="inline-flex items-center gap-2 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-[11px] font-bold uppercase text-[color:var(--app-accent)]">
               <PencilLine className="h-3.5 w-3.5" />
               Creator Studio
             </p>
-            <h2 className="mt-3 text-xl font-black text-[color:var(--app-text)]">
+            <h2 className="mt-3 text-xl font-bold text-[color:var(--app-text)]">
               {isEditing
                 ? isId
                   ? 'Edit materi belajar'
@@ -506,7 +505,7 @@ export function LearnCreatorStudio({ locale }: Props) {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <label className="sm:col-span-2">
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Judul' : 'Title'}
             </span>
             <input
@@ -524,7 +523,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Format' : 'Format'}
             </span>
             <select
@@ -543,7 +542,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Level' : 'Level'}
             </span>
             <select
@@ -560,7 +559,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Kategori' : 'Category'}
             </span>
             <input
@@ -574,7 +573,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Estimasi menit' : 'Estimated minutes'}
             </span>
             <input
@@ -588,7 +587,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label className="sm:col-span-2">
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Ringkasan' : 'Summary'}
             </span>
             <textarea
@@ -608,7 +607,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label className="sm:col-span-2">
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId
                 ? 'Isi bacaan / deskripsi kelas'
                 : 'Reading body / course description'}
@@ -629,7 +628,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Harga IDR' : 'Price IDR'}
             </span>
             <input
@@ -644,7 +643,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Status' : 'Status'}
             </span>
             <select
@@ -661,7 +660,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               Thumbnail URL
             </span>
             <input
@@ -675,7 +674,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label>
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               {isId ? 'Video / resource URL' : 'Video / resource URL'}
             </span>
             <input
@@ -689,7 +688,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           </label>
 
           <label className="sm:col-span-2">
-            <span className="text-xs font-black text-[color:var(--app-text)]">
+            <span className="text-xs font-bold text-[color:var(--app-text)]">
               Tags
             </span>
             <input
@@ -747,7 +746,7 @@ export function LearnCreatorStudio({ locale }: Props) {
 
       <aside className="space-y-3">
         <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-          <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+          <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
             <ClipboardList className="h-4 w-4 text-[color:var(--app-accent)]" />
             {isId ? 'Kelola materi saya' : 'Manage my content'}
           </p>
@@ -786,7 +785,7 @@ export function LearnCreatorStudio({ locale }: Props) {
                         onClick={() => setSelectedCourseId(course.id)}
                         className="min-w-0 text-left"
                       >
-                        <p className="line-clamp-1 text-sm font-black text-[color:var(--app-text)]">
+                        <p className="line-clamp-1 text-sm font-bold text-[color:var(--app-text)]">
                           {course.title}
                         </p>
                         <p className="mt-1 text-[11px] font-bold uppercase text-[color:var(--app-text-soft)]">
@@ -852,7 +851,7 @@ export function LearnCreatorStudio({ locale }: Props) {
           onSubmit={handleLessonCreate}
           className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm"
         >
-          <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+          <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
             <BookOpen className="h-4 w-4 text-[color:var(--app-accent)]" />
             {isId ? 'Tambah lesson' : 'Add lesson'}
           </p>
@@ -942,7 +941,7 @@ export function LearnCreatorStudio({ locale }: Props) {
 
         {detail ? (
           <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-            <p className="text-sm font-black text-[color:var(--app-text)]">
+            <p className="text-sm font-bold text-[color:var(--app-text)]">
               {isId ? 'Struktur kelas' : 'Course structure'}
             </p>
             <div className="mt-3 space-y-2">
@@ -962,7 +961,7 @@ export function LearnCreatorStudio({ locale }: Props) {
                       key={module.id}
                       className="rounded-2xl bg-[color:var(--app-surface-muted)] p-3"
                     >
-                      <p className="text-xs font-black text-[color:var(--app-text)]">
+                      <p className="text-xs font-bold text-[color:var(--app-text)]">
                         {module.position}. {module.title}
                       </p>
                       <div className="mt-2 space-y-1">

@@ -730,14 +730,14 @@ export function VideoCall({
           />
           {!isRemoteVideoEnabled && (
             <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/82 sm:text-base">
-              <div className="max-w-sm rounded-3xl border border-white/10 bg-black/28 px-5 py-4 backdrop-blur">
+              <div className="max-w-sm rounded-3xl border border-white/10 bg-black/28 px-5 py-4 ">
                 <p>{waitingLabel}</p>
               </div>
             </div>
           )}
 
           <div className="absolute left-3 top-3 z-10 sm:left-5 sm:top-5">
-            <div className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-white/88 backdrop-blur sm:text-sm">
+            <div className="rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs font-semibold tracking-[0.02em] text-white/88  sm:text-sm">
               {connectionLabel}
             </div>
           </div>
@@ -747,7 +747,7 @@ export function VideoCall({
               <button
                 type="button"
                 onClick={() => void tryPlayRemoteVideo(true)}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-white/12 bg-black/48 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-black/56"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-white/12 bg-black/48 px-4 py-2 text-sm font-semibold text-white  transition hover:bg-black/56"
               >
                 {playbackButtonLabel}
               </button>
@@ -755,7 +755,7 @@ export function VideoCall({
           ) : null}
 
           <div
-            className={`absolute z-10 overflow-hidden rounded-[22px] border border-white/12 bg-black/52 shadow-[0_20px_40px_-26px_rgba(2,6,23,0.9)] backdrop-blur ${localPreviewPositionClass}`}
+            className={`absolute z-10 overflow-hidden rounded-[22px] border border-white/12 bg-black/52 shadow-[0_20px_40px_-26px_rgba(2,6,23,0.9)]  ${localPreviewPositionClass}`}
             style={localPreviewStyle}
           >
             <div className="absolute left-2 top-2 z-10 rounded-full bg-black/45 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/72">
@@ -778,7 +778,7 @@ export function VideoCall({
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-4 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur-sm">
+      <div className="flex items-center justify-center gap-4 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 ">
         <button
           onClick={toggleAudio}
           disabled={!hasLocalAudioTrack}

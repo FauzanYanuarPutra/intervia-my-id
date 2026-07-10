@@ -251,12 +251,17 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         r#"
         CREATE TABLE IF NOT EXISTS content_item_likes (
           content_id uuid NOT NULL REFERENCES content_items(id) ON DELETE CASCADE,
-          user_id uuid NOT NULL REFERENCES users_read_model(user_id) ON DELETE CASCADE,
+          user_id uuid NOT NULL,
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now(),
           PRIMARY KEY (content_id, user_id)
         )
         "#,
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE content_item_likes DROP CONSTRAINT IF EXISTS content_item_likes_user_id_fkey",
     )
     .execute(db)
     .await?;
@@ -275,12 +280,17 @@ async fn ensure_runtime_schema(db: &PgPool) -> anyhow::Result<()> {
         CREATE TABLE IF NOT EXISTS umkm_store_gallery_likes (
           store_id uuid NOT NULL REFERENCES umkm_stores(id) ON DELETE CASCADE,
           media_key text NOT NULL,
-          user_id uuid NOT NULL REFERENCES users_read_model(user_id) ON DELETE CASCADE,
+          user_id uuid NOT NULL,
           created_at timestamptz NOT NULL DEFAULT now(),
           updated_at timestamptz NOT NULL DEFAULT now(),
           PRIMARY KEY (store_id, media_key, user_id)
         )
         "#,
+    )
+    .execute(db)
+    .await?;
+    sqlx::query(
+        "ALTER TABLE umkm_store_gallery_likes DROP CONSTRAINT IF EXISTS umkm_store_gallery_likes_user_id_fkey",
     )
     .execute(db)
     .await?;
@@ -329,6 +339,12 @@ struct ListContentQuery {
     offset: Option<i64>,
 }
 
+#[derive(Debug, Deserialize, Default)]
+struct ListLikesQuery {
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
 #[derive(Debug, Deserialize)]
 struct ContentLikeRequest {
     liked: bool,
@@ -346,6 +362,25 @@ struct ContentLikeResponse {
     content_id: Uuid,
     liked: bool,
     like_count: i64,
+}
+
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+struct ContentLikerRow {
+    user_id: Uuid,
+    username: Option<String>,
+    full_name: Option<String>,
+    avatar_url: Option<String>,
+    liked_at: DateTime<Utc>,
+    is_viewer: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContentLikersResponse {
+    content_id: Uuid,
+    total: i64,
+    items: Vec<ContentLikerRow>,
 }
 
 #[derive(Debug, Serialize)]
@@ -383,6 +418,8 @@ struct UpsertContentRequest {
     currency: Option<String>,
     tags: Option<Vec<String>>,
     cover_image: Option<String>,
+    image_urls: Option<Vec<String>>,
+    gallery_images: Option<Vec<String>>,
     category: Option<String>,
     metadata: Option<Value>,
     content_status: Option<String>,
@@ -807,6 +844,7 @@ struct ContentResponse {
     promo_end_at: Option<DateTime<Utc>>,
     rating: Option<f32>,
     review_count: Option<i32>,
+    liked: bool,
     like_count: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     seller_stats: Option<SellerStats>,
@@ -817,6 +855,14 @@ struct ContentResponse {
 
 impl ContentResponse {
     fn from_row(value: ContentRow, seller_stats: Option<SellerStats>) -> Self {
+        Self::from_row_with_liked(value, seller_stats, false)
+    }
+
+    fn from_row_with_liked(
+        value: ContentRow,
+        seller_stats: Option<SellerStats>,
+        liked: bool,
+    ) -> Self {
         let image_urls = response_image_urls_for_content(
             &value.content_type,
             value.category.as_deref(),
@@ -861,6 +907,7 @@ impl ContentResponse {
             promo_end_at: value.promo_end_at,
             rating: value.rating,
             review_count: value.review_count,
+            liked,
             like_count: value.like_count,
             seller_stats,
             metadata,
@@ -1557,7 +1604,8 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let database_url = env::var("MARKETPLACE_DATABASE_URL").expect("MARKETPLACE_DATABASE_URL must be set");
+    let database_url =
+        env::var("MARKETPLACE_DATABASE_URL").expect("MARKETPLACE_DATABASE_URL must be set");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let port = env::var("APP_PORT").unwrap_or_else(|_| "8081".to_string());
     let addr = format!("0.0.0.0:{port}");
@@ -1585,10 +1633,9 @@ async fn main() -> anyhow::Result<()> {
     }
     if let Err(error) = migrator.run(&db).await {
         let message = error.to_string();
-        let checksum_mismatch =
-            message.contains("was previously applied but has been modified");
-        let missing_migration = message
-            .contains("was previously applied but is missing in the resolved migrations");
+        let checksum_mismatch = message.contains("was previously applied but has been modified");
+        let missing_migration =
+            message.contains("was previously applied but is missing in the resolved migrations");
 
         if !strict_migrations && (checksum_mismatch || missing_migration) {
             tracing::warn!(
@@ -1672,12 +1719,16 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/content", get(list_content).post(create_content))
         .route(
             "/v1/content/{id}",
-            get(get_content).put(update_content).patch(update_content),
+            get(get_content)
+                .put(update_content)
+                .patch(update_content)
+                .delete(delete_content),
         )
         .route(
             "/v1/content/{id}/like",
             get(get_content_like_state).put(update_content_like),
         )
+        .route("/v1/content/{id}/likes", get(list_content_likes))
         .route("/v1/content/{id}/reviews", get(list_reviews))
         .route("/v1/content/{id}/offers", post(create_offer))
         .route("/v1/events", post(collect_events))
@@ -5028,11 +5079,86 @@ fn attach_response_image_urls(metadata: Value, image_urls: &[String]) -> Value {
     Value::Object(map)
 }
 
+fn cleaned_string_array(values: Option<&Vec<String>>) -> Option<Value> {
+    let cleaned: Vec<Value> = values
+        .into_iter()
+        .flat_map(|items| items.iter())
+        .filter_map(|value| clean_text(Some(value.clone())))
+        .map(Value::String)
+        .collect();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(Value::Array(cleaned))
+    }
+}
+
+fn merge_upsert_media_into_metadata(
+    metadata: Value,
+    cover_image: Option<&String>,
+    image_urls: Option<&Vec<String>>,
+    gallery_images: Option<&Vec<String>>,
+) -> Value {
+    let mut map = match metadata {
+        Value::Object(map) => map,
+        other => return other,
+    };
+
+    if let Some(cleaned_cover) = cover_image.and_then(|value| clean_text(Some(value.clone()))) {
+        map.insert("cover_image".to_string(), Value::String(cleaned_cover));
+    }
+    if let Some(images) = cleaned_string_array(image_urls) {
+        map.insert("image_urls".to_string(), images);
+    }
+    if let Some(gallery) = cleaned_string_array(gallery_images) {
+        map.insert("gallery_images".to_string(), gallery);
+    }
+
+    Value::Object(map)
+}
+
 fn clean_json_string(value: Option<&Value>) -> Option<String> {
     value
         .and_then(Value::as_str)
         .map(|raw| raw.trim().to_lowercase())
         .filter(|raw| !raw.is_empty())
+}
+
+fn metadata_listing_side(metadata: &Value) -> Option<String> {
+    for path in [
+        ["listing_side"].as_slice(),
+        ["market_side"].as_slice(),
+        ["market_role"].as_slice(),
+        ["listing_intent"].as_slice(),
+        ["intent"].as_slice(),
+        ["direction"].as_slice(),
+        ["buyer_intent"].as_slice(),
+        ["request_mode"].as_slice(),
+    ] {
+        if let Some(value) = clean_json_string(json_lookup(metadata, path)) {
+            let normalized = value.replace('_', " ").replace('-', " ");
+            if !normalized.trim().is_empty() {
+                return Some(normalized);
+            }
+        }
+    }
+    None
+}
+
+fn is_demand_listing_metadata(metadata: &Value) -> bool {
+    match metadata_listing_side(metadata).as_deref() {
+        Some("demand")
+        | Some("need")
+        | Some("needs")
+        | Some("request")
+        | Some("requested")
+        | Some("seeker")
+        | Some("buyer request")
+        | Some("buy request")
+        | Some("butuh")
+        | Some("mencari") => true,
+        _ => false,
+    }
 }
 
 fn json_has_value_at(value: &Value, path: &[&str]) -> bool {
@@ -5168,12 +5294,14 @@ fn validate_content_media_requirements(
     if content_type == "image" && is_active && !has_primary_image {
         return Err("active image listing requires at least one image");
     }
-    if content_type_requires_primary_image(content_type) && is_active && !has_primary_image {
+    let requires_primary_image =
+        content_type_requires_primary_image(content_type) && !is_demand_listing_metadata(metadata);
+    if requires_primary_image && is_active && !has_primary_image {
         return Err(
             "active listing requires at least one image (cover_image or metadata.image_urls)",
         );
     }
-    if content_type == "tool_rental" {
+    if content_type == "tool_rental" && !is_demand_listing_metadata(metadata) {
         validate_tool_rental_review_gate(content_status, metadata)?;
     }
     Ok(())
@@ -5802,9 +5930,10 @@ fn fraud_signal_seed_for_event(event: &NormalizedEvent) -> Option<FraudSignalSee
 fn crm_lead_signal_for_event(event: &NormalizedEvent) -> Option<CrmLeadSignal> {
     let query = event_property_text(event, &["query", "q", "search", "intent"]);
     let entity_key = event_entity_key(event);
+    let capture_passive_intent = parse_env_bool("CRM_CREATE_LEADS_FROM_PASSIVE_EVENTS", false);
 
     match event.event_name.as_str() {
-        "search.submitted" => Some(CrmLeadSignal {
+        "search.submitted" if capture_passive_intent => Some(CrmLeadSignal {
             source: "search_intent",
             name: query
                 .as_ref()
@@ -5813,7 +5942,7 @@ fn crm_lead_signal_for_event(event: &NormalizedEvent) -> Option<CrmLeadSignal> {
             message: "User searched and may need guided supplier/request follow-up.".to_string(),
             entity_key,
         }),
-        "search.result_clicked" => Some(CrmLeadSignal {
+        "search.result_clicked" if capture_passive_intent => Some(CrmLeadSignal {
             source: "search_click",
             name: "Search result clicked".to_string(),
             message: "User clicked a result; monitor whether chat or transaction follows."
@@ -5826,13 +5955,15 @@ fn crm_lead_signal_for_event(event: &NormalizedEvent) -> Option<CrmLeadSignal> {
             message: "Conversation started; track seller response SLA and conversion.".to_string(),
             entity_key,
         }),
-        "maps.route_clicked" | "maps.profile_opened" => Some(CrmLeadSignal {
-            source: "local_intent",
-            name: "Local business intent".to_string(),
-            message: "User opened a local business route/profile; capture local demand."
-                .to_string(),
-            entity_key,
-        }),
+        "maps.route_clicked" | "maps.profile_opened" if capture_passive_intent => {
+            Some(CrmLeadSignal {
+                source: "local_intent",
+                name: "Local business intent".to_string(),
+                message: "User opened a local business route/profile; capture local demand."
+                    .to_string(),
+                entity_key,
+            })
+        }
         "payment.failed" => Some(CrmLeadSignal {
             source: "payment_recovery",
             name: "Payment recovery opportunity".to_string(),
@@ -6888,7 +7019,10 @@ async fn push_social_notification_for_event(
     )
     .or_else(|| {
         if event.event_name == "profile.viewed" {
-            event.entity_id.as_ref().and_then(|raw| Uuid::parse_str(raw).ok())
+            event
+                .entity_id
+                .as_ref()
+                .and_then(|raw| Uuid::parse_str(raw).ok())
         } else {
             None
         }
@@ -6951,42 +7085,40 @@ async fn push_social_notification_for_event(
             "name",
         ],
     )
-    .unwrap_or_else(|| {
-        match event.event_name.as_str() {
-            "profile.viewed" => {
-                if is_id {
-                    "profilmu".to_string()
-                } else {
-                    "your profile".to_string()
-                }
+    .unwrap_or_else(|| match event.event_name.as_str() {
+        "profile.viewed" => {
+            if is_id {
+                "profilmu".to_string()
+            } else {
+                "your profile".to_string()
             }
-            "reels.viewed" | "reels.liked" | "reels.commented" | "reels.replied" => {
-                if is_id {
-                    "reelsmu".to_string()
-                } else {
-                    "your reel".to_string()
-                }
+        }
+        "reels.viewed" | "reels.liked" | "reels.commented" | "reels.replied" => {
+            if is_id {
+                "reelsmu".to_string()
+            } else {
+                "your reel".to_string()
             }
-            "content.viewed" | "content.liked" | "content.commented" | "content.replied" => {
-                if is_id {
-                    "kontenmu".to_string()
-                } else {
-                    "your content".to_string()
-                }
+        }
+        "content.viewed" | "content.liked" | "content.commented" | "content.replied" => {
+            if is_id {
+                "kontenmu".to_string()
+            } else {
+                "your content".to_string()
             }
-            "maps.profile_opened" | "maps.route_clicked" => {
-                if is_id {
-                    "profil bisnismu".to_string()
-                } else {
-                    "your business profile".to_string()
-                }
+        }
+        "maps.profile_opened" | "maps.route_clicked" => {
+            if is_id {
+                "profil bisnismu".to_string()
+            } else {
+                "your business profile".to_string()
             }
-            _ => {
-                if is_id {
-                    "kontenmu".to_string()
-                } else {
-                    "your content".to_string()
-                }
+        }
+        _ => {
+            if is_id {
+                "kontenmu".to_string()
+            } else {
+                "your content".to_string()
             }
         }
     });
@@ -7089,7 +7221,12 @@ async fn push_social_notification_for_event(
     );
     let actor_name = event_property_clean_text(
         event,
-        &["actor_name", "actor_full_name", "viewer_name", "sender_name"],
+        &[
+            "actor_name",
+            "actor_full_name",
+            "viewer_name",
+            "sender_name",
+        ],
     );
     let actor_avatar_url = event_property_clean_text(
         event,
@@ -8395,6 +8532,7 @@ async fn create_umkm_product(
 
 async fn list_content(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<ListContentQuery>,
 ) -> impl IntoResponse {
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
@@ -8409,6 +8547,7 @@ async fn list_content(
         .map(|s| s.to_lowercase())
         .unwrap_or_else(|| "active".to_string());
     let owner_id = query.owner_id;
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
 
     let rows = sqlx::query_as::<_, ContentRow>(
         r#"
@@ -8533,6 +8672,13 @@ async fn list_content(
                     HashMap::new()
                 }
             };
+            let liked_ids = match fetch_liked_content_ids(&state.db, actor_user_id, &rows).await {
+                Ok(ids) => ids,
+                Err(e) => {
+                    tracing::error!("list_content liked state error: {:?}", e);
+                    HashSet::new()
+                }
+            };
 
             (
                 StatusCode::OK,
@@ -8540,8 +8686,9 @@ async fn list_content(
                     items: rows
                         .into_iter()
                         .map(|row| {
+                            let liked = liked_ids.contains(&row.id);
                             let seller_stats = stats_map.get(&row.owner_id).cloned();
-                            ContentResponse::from_row(row, seller_stats)
+                            ContentResponse::from_row_with_liked(row, seller_stats, liked)
                         })
                         .collect(),
                     limit,
@@ -8556,6 +8703,35 @@ async fn list_content(
             err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content").into_response()
         }
     }
+}
+
+async fn fetch_liked_content_ids(
+    db: &PgPool,
+    actor_user_id: Option<Uuid>,
+    rows: &[ContentRow],
+) -> Result<HashSet<Uuid>, sqlx::Error> {
+    let Some(user_id) = actor_user_id else {
+        return Ok(HashSet::new());
+    };
+    if rows.is_empty() {
+        return Ok(HashSet::new());
+    }
+
+    let content_ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
+    let liked_ids = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        SELECT content_id
+        FROM content_item_likes
+        WHERE user_id = $1
+          AND content_id = ANY($2)
+        "#,
+    )
+    .bind(user_id)
+    .bind(&content_ids)
+    .fetch_all(db)
+    .await?;
+
+    Ok(liked_ids.into_iter().collect())
 }
 
 async fn get_content(
@@ -8610,7 +8786,11 @@ async fn get_content_like_state(
         Ok(state) => (StatusCode::OK, Json(state)).into_response(),
         Err(error) => {
             tracing::error!("get_content_like_state error: {:?}", error);
-            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load like state").into_response()
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load like state",
+            )
+            .into_response()
         }
     }
 }
@@ -8641,12 +8821,19 @@ async fn update_content_like(
         }
     };
 
+    if let Err(error) = ensure_user_read_model_exists(&state.db, actor_user_id).await {
+        tracing::error!(
+            "update_content_like ensure user read model error: {:?}",
+            error
+        );
+        return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
+    }
+
     let mut tx = match state.db.begin().await {
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("update_content_like begin tx error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
         }
     };
 
@@ -8712,8 +8899,7 @@ async fn update_content_like(
         Ok(value) => value,
         Err(error) => {
             tracing::error!("update_content_like count error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
         }
     };
 
@@ -8729,6 +8915,106 @@ async fn update_content_like(
     };
 
     (StatusCode::OK, Json(response)).into_response()
+}
+
+async fn ensure_user_read_model_exists(db: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO users_read_model (user_id, status, metadata, synced_at)
+        VALUES ($1, 'active', '{}'::jsonb, now())
+        ON CONFLICT (user_id) DO NOTHING
+        "#,
+    )
+    .bind(user_id)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+async fn list_content_likes(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Query(query): Query<ListLikesQuery>,
+) -> impl IntoResponse {
+    let content_id = match Uuid::parse_str(id.trim()) {
+        Ok(value) => value,
+        Err(_) => return err(StatusCode::BAD_REQUEST, "invalid content id").into_response(),
+    };
+
+    match find_content(&state.db, &content_id.to_string()).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(error) => {
+            tracing::error!("list_content_likes load error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load content")
+                .into_response();
+        }
+    };
+
+    let limit = query.limit.unwrap_or(50).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0).max(0);
+    let actor_user_id = user_id_from_auth(&headers, &state.jwt_secret);
+
+    let total: i64 = match sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*)::bigint
+        FROM content_item_likes
+        WHERE content_id = $1
+        "#,
+    )
+    .bind(content_id)
+    .fetch_one(&state.db)
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::error!("list_content_likes count error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load likes").into_response();
+        }
+    };
+
+    let rows = match sqlx::query_as::<_, ContentLikerRow>(
+        r#"
+        SELECT
+          cil.user_id,
+          u.username::text AS username,
+          u.full_name,
+          u.avatar_url,
+          cil.created_at AS liked_at,
+          ($2::uuid IS NOT NULL AND cil.user_id = $2) AS is_viewer
+        FROM content_item_likes cil
+        LEFT JOIN users_read_model u ON u.user_id = cil.user_id
+        WHERE cil.content_id = $1
+        ORDER BY
+          CASE WHEN $2::uuid IS NOT NULL AND cil.user_id = $2 THEN 0 ELSE 1 END,
+          cil.created_at DESC
+        LIMIT $3 OFFSET $4
+        "#,
+    )
+    .bind(content_id)
+    .bind(actor_user_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&state.db)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => {
+            tracing::error!("list_content_likes query error: {:?}", error);
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load likes").into_response();
+        }
+    };
+
+    (
+        StatusCode::OK,
+        Json(ContentLikersResponse {
+            content_id,
+            total,
+            items: rows,
+        }),
+    )
+        .into_response()
 }
 
 async fn fetch_content_like_state(
@@ -8810,8 +9096,7 @@ async fn get_umkm_store_gallery_like_state(
         Ok(None) => return err(StatusCode::NOT_FOUND, "store not found").into_response(),
         Err(error) => {
             tracing::error!("get_umkm_store_gallery_like_state load error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store").into_response();
         }
     };
 
@@ -8820,8 +9105,11 @@ async fn get_umkm_store_gallery_like_state(
         Ok(state) => (StatusCode::OK, Json(state)).into_response(),
         Err(error) => {
             tracing::error!("get_umkm_store_gallery_like_state error: {:?}", error);
-            err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load like state")
-                .into_response()
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to load like state",
+            )
+            .into_response()
         }
     }
 }
@@ -8843,8 +9131,7 @@ async fn update_umkm_store_gallery_like(
         Ok(None) => return err(StatusCode::NOT_FOUND, "store not found").into_response(),
         Err(error) => {
             tracing::error!("update_umkm_store_gallery_like load error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to load store").into_response();
         }
     };
 
@@ -8859,8 +9146,7 @@ async fn update_umkm_store_gallery_like(
         Ok(tx) => tx,
         Err(error) => {
             tracing::error!("update_umkm_store_gallery_like begin tx error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
         }
     };
 
@@ -8925,8 +9211,7 @@ async fn update_umkm_store_gallery_like(
         Ok(value) => value,
         Err(error) => {
             tracing::error!("update_umkm_store_gallery_like count error: {:?}", error);
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
         }
     };
 
@@ -8949,8 +9234,7 @@ async fn update_umkm_store_gallery_like(
                 "update_umkm_store_gallery_like liked keys error: {:?}",
                 error
             );
-            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like")
-                .into_response();
+            return err(StatusCode::INTERNAL_SERVER_ERROR, "failed to update like").into_response();
         }
     };
 
@@ -9097,10 +9381,14 @@ async fn create_content(
         return err(StatusCode::BAD_REQUEST, "invalid content_status for create").into_response();
     }
 
-    let metadata = match sanitize_content_metadata(
-        &content_type,
+    let cover_image = clean_text(payload.cover_image.clone());
+    let raw_metadata = merge_upsert_media_into_metadata(
         payload.metadata.unwrap_or_else(|| json!({})),
-    ) {
+        cover_image.as_ref(),
+        payload.image_urls.as_ref(),
+        payload.gallery_images.as_ref(),
+    );
+    let metadata = match sanitize_content_metadata(&content_type, raw_metadata) {
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
@@ -9111,15 +9399,12 @@ async fn create_content(
         None
     };
     let metadata = attach_price_unit_metadata(metadata, price_unit.as_deref());
-    let seller_type = clean_text(payload.seller_type)
-        .or_else(|| json_text_at(&metadata, &["seller_type"]));
-    let minimum_order = clean_text(payload.minimum_order)
-        .or_else(|| json_text_at(&metadata, &["minimum_order"]));
-    let metadata = attach_supplier_metadata(
-        metadata,
-        seller_type.as_deref(),
-        minimum_order.as_deref(),
-    );
+    let seller_type =
+        clean_text(payload.seller_type).or_else(|| json_text_at(&metadata, &["seller_type"]));
+    let minimum_order =
+        clean_text(payload.minimum_order).or_else(|| json_text_at(&metadata, &["minimum_order"]));
+    let metadata =
+        attach_supplier_metadata(metadata, seller_type.as_deref(), minimum_order.as_deref());
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
@@ -9128,7 +9413,6 @@ async fn create_content(
         Ok(v) => v,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
-    let cover_image = clean_text(payload.cover_image);
     if content_type == "business_transfer" {
         if let Err(message) = validate_business_transfer_requirements(
             &content_status,
@@ -9434,10 +9718,15 @@ async fn update_content(
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
 
-    let metadata = match sanitize_content_metadata(
-        &content_type,
+    let payload_cover_image = clean_text(payload.cover_image.clone());
+    let cover_image = payload_cover_image.clone().or(existing.cover_image.clone());
+    let raw_metadata = merge_upsert_media_into_metadata(
         payload.metadata.unwrap_or(existing.metadata.clone()),
-    ) {
+        cover_image.as_ref(),
+        payload.image_urls.as_ref(),
+        payload.gallery_images.as_ref(),
+    );
+    let metadata = match sanitize_content_metadata(&content_type, raw_metadata) {
         Ok(value) => value,
         Err(message) => return err(StatusCode::BAD_REQUEST, message).into_response(),
     };
@@ -9456,15 +9745,11 @@ async fn update_content(
     let minimum_order = clean_text(payload.minimum_order)
         .or_else(|| json_text_at(&metadata, &["minimum_order"]))
         .or_else(|| existing.minimum_order.clone());
-    let metadata = attach_supplier_metadata(
-        metadata,
-        seller_type.as_deref(),
-        minimum_order.as_deref(),
-    );
+    let metadata =
+        attach_supplier_metadata(metadata, seller_type.as_deref(), minimum_order.as_deref());
     if !metadata_within_limit(&metadata) {
         return err(StatusCode::BAD_REQUEST, "metadata payload is too large").into_response();
     }
-    let cover_image = clean_text(payload.cover_image).or(existing.cover_image.clone());
     if content_type == "business_transfer" {
         if let Err(message) = validate_business_transfer_requirements(
             &content_status,
@@ -9569,6 +9854,78 @@ async fn update_content(
             err(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "failed to update content",
+            )
+            .into_response()
+        }
+    }
+}
+
+async fn delete_content(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let user_id = match user_id_from_auth(&headers, &state.jwt_secret) {
+        Some(id) => id,
+        None => return err(StatusCode::UNAUTHORIZED, "unauthorized").into_response(),
+    };
+    let existing = match find_content(&state.db, &id).await {
+        Ok(Some(row)) => row,
+        Ok(None) => return err(StatusCode::NOT_FOUND, "content not found").into_response(),
+        Err(e) => {
+            tracing::error!("delete_content read error: {:?}", e);
+            return err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to delete content",
+            )
+            .into_response();
+        }
+    };
+    if existing.owner_id != user_id {
+        return err(StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+
+    let deleted = sqlx::query_as::<_, ContentRow>(
+        r#"
+        UPDATE content_items
+        SET content_status = 'deleted', updated_at = NOW()
+        WHERE id = $1
+        RETURNING
+            id, owner_id, content_type, slug, title, summary, body, price_cents, price_unit,
+            currency, tags, cover_image, category, content_status, pricing_mode, original_price_cents,
+            seller_type, minimum_order, promo_label, promo_start_at, promo_end_at, rating, review_count,
+            COALESCE((
+                SELECT COUNT(*)::bigint
+                FROM content_item_likes cil
+                WHERE cil.content_id = id
+            ), 0) AS like_count,
+            metadata, created_at, updated_at
+        "#,
+    )
+    .bind(existing.id)
+    .fetch_one(&state.db)
+    .await;
+
+    match deleted {
+        Ok(row) => {
+            let seller_stats = match fetch_seller_stats(&state.db, &[row.owner_id]).await {
+                Ok(map) => map.get(&row.owner_id).cloned(),
+                Err(e) => {
+                    tracing::error!("delete_content seller_stats error: {:?}", e);
+                    None
+                }
+            };
+            (
+                StatusCode::OK,
+                Json(ContentResponse::from_row(row, seller_stats)),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("delete_content write error: {:?}", e);
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to delete content",
             )
             .into_response()
         }
@@ -19862,6 +20219,54 @@ mod tests {
     }
 
     #[test]
+    fn upsert_request_deserializes_top_level_media_arrays() {
+        let parsed: UpsertContentRequest = serde_json::from_value(json!({
+            "content_type": "product",
+            "title": "Kopi contoh",
+            "image_urls": ["https://cdn.example.com/coffee.jpg"],
+            "gallery_images": ["https://cdn.example.com/coffee-side.webp"]
+        }))
+        .expect("request should deserialize top-level media arrays");
+        assert_eq!(
+            parsed
+                .image_urls
+                .as_ref()
+                .and_then(|items| items.first())
+                .map(String::as_str),
+            Some("https://cdn.example.com/coffee.jpg")
+        );
+        assert_eq!(
+            parsed
+                .gallery_images
+                .as_ref()
+                .and_then(|items| items.first())
+                .map(String::as_str),
+            Some("https://cdn.example.com/coffee-side.webp")
+        );
+    }
+
+    #[test]
+    fn top_level_media_is_merged_into_metadata_before_sanitize() {
+        let metadata = merge_upsert_media_into_metadata(
+            json!({"listing_mode": "guided_business_create"}),
+            Some(&"/api/content/media/laju-chat/content/cover.jpg".to_string()),
+            Some(&vec![
+                "/api/content/media/laju-chat/content/cover.jpg".to_string(),
+                "/api/content/media/laju-chat/content/detail.png".to_string(),
+            ]),
+            Some(&vec![
+                "/api/content/media/laju-chat/content/side.webp".to_string()
+            ]),
+        );
+        let normalized = sanitize_content_metadata("product", metadata).expect("valid metadata");
+        let image_urls = normalized
+            .get("image_urls")
+            .and_then(Value::as_array)
+            .expect("image_urls should be normalized into metadata");
+        assert_eq!(image_urls.len(), 3);
+    }
+
+    #[test]
     fn midtrans_qris_direct_charge_payload_stays_minimal() {
         let (method, payload) =
             build_midtrans_direct_charge_request("TOPUP-DEV-TEST", 10_000, Some("qris"))
@@ -20076,6 +20481,23 @@ mod tests {
     fn active_product_requires_primary_image() {
         let result = validate_content_media_requirements("product", "active", None, &json!({}));
         assert!(result.is_err(), "active product should require an image");
+    }
+
+    #[test]
+    fn active_demand_product_allows_missing_image() {
+        let result = validate_content_media_requirements(
+            "product",
+            "active",
+            None,
+            &json!({
+                "listing_side": "demand",
+                "market_side": "demand"
+            }),
+        );
+        assert!(
+            result.is_ok(),
+            "active demand briefs can be published without a catalog image"
+        );
     }
 
     #[test]

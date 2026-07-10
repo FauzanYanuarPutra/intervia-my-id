@@ -9,6 +9,11 @@ import {
   DEFAULT_PROFILE_AVATAR,
   readProfileAvatarStyle,
 } from '@/lib/profile/avatar';
+import {
+  haversineKm,
+  isCoordinateValid,
+  type LatLng,
+} from '@/lib/super-app/location-guard';
 
 const marketplaceBase =
   process.env.INTERNAL_MARKETPLACE_URL ||
@@ -82,6 +87,176 @@ function toNumber(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+function readBoundedNumber(
+  source: ContentRecord | null | undefined,
+  keys: string[],
+  limit: number,
+): number | null {
+  if (!source) return null;
+  for (const key of keys) {
+    const parsed = toNumber(source[key]);
+    if (parsed !== null && Math.abs(parsed) <= limit) return parsed;
+  }
+  return null;
+}
+
+function readLatLngFromObject(value: unknown): LatLng | null {
+  const source = asObject(value);
+  if (!source) return null;
+
+  const lat = readBoundedNumber(
+    source,
+    [
+      'lat',
+      'latitude',
+      'location_lat',
+      'location_latitude',
+      'geo_lat',
+      'address_lat',
+      'pickup_lat',
+      'store_lat',
+      'outlet_lat',
+    ],
+    90,
+  );
+  const lng = readBoundedNumber(
+    source,
+    [
+      'lng',
+      'lon',
+      'long',
+      'longitude',
+      'location_lng',
+      'location_lon',
+      'location_longitude',
+      'geo_lng',
+      'address_lng',
+      'pickup_lng',
+      'store_lng',
+      'outlet_lng',
+    ],
+    180,
+  );
+
+  if (lat === null || lng === null) return null;
+  const point = { lat, lng };
+  return isCoordinateValid(point) ? point : null;
+}
+
+function collectLatLngCandidates(item: ContentRecord): LatLng[] {
+  const candidates: LatLng[] = [];
+  const addPoint = (point: LatLng | null) => {
+    if (!point) return;
+    if (
+      candidates.some(
+        existing =>
+          Math.abs(existing.lat - point.lat) < 0.000001 &&
+          Math.abs(existing.lng - point.lng) < 0.000001,
+      )
+    ) {
+      return;
+    }
+    candidates.push(point);
+  };
+
+  const metadata = asObject(item.metadata);
+  addPoint(readLatLngFromObject(item));
+  addPoint(readLatLngFromObject(metadata));
+
+  const nestedSources = [
+    metadata?.primary_umkm_store,
+    metadata?.store,
+    metadata?.outlet,
+    metadata?.pickup_location,
+    metadata?.return_location,
+  ];
+  for (const source of nestedSources) addPoint(readLatLngFromObject(source));
+
+  for (const key of [
+    'linked_umkm_stores',
+    'umkm_store_inventory',
+    'branches',
+    'outlets',
+  ]) {
+    const value = metadata?.[key];
+    if (!Array.isArray(value)) continue;
+    for (const entry of value.slice(0, 20)) {
+      addPoint(readLatLngFromObject(entry));
+    }
+  }
+
+  return candidates;
+}
+
+function nearestDistanceKm(
+  item: ContentRecord,
+  viewerLocation: LatLng,
+): number | null {
+  const candidates = collectLatLngCandidates(item);
+  if (candidates.length === 0) return null;
+  return candidates.reduce<number | null>((nearest, point) => {
+    const distance = haversineKm(viewerLocation, point);
+    if (!Number.isFinite(distance)) return nearest;
+    return nearest === null ? distance : Math.min(nearest, distance);
+  }, null);
+}
+
+function readItemDistanceKm(item: ContentRecord): number | null {
+  const direct = toNumber(item.distance_km);
+  if (direct !== null && direct >= 0) return direct;
+  const metadata = asObject(item.metadata);
+  const fromMeta = toNumber(metadata?.distance_km ?? metadata?.viewer_distance_km);
+  return fromMeta !== null && fromMeta >= 0 ? fromMeta : null;
+}
+
+function annotateNearbyDistance(
+  items: ContentRecord[],
+  viewerLocation: LatLng,
+): ContentRecord[] {
+  return items.map(item => {
+    const distanceKm = nearestDistanceKm(item, viewerLocation);
+    if (distanceKm === null) return item;
+    const roundedDistance = Number(distanceKm.toFixed(2));
+    const metadata = asObject(item.metadata) || {};
+    return {
+      ...item,
+      distance_km: roundedDistance,
+      metadata: {
+        ...metadata,
+        distance_km: roundedDistance,
+        viewer_distance_km: roundedDistance,
+      },
+    };
+  });
+}
+
+function sortByNearbyDistance(items: ContentRecord[]): ContentRecord[] {
+  return [...items].sort((left, right) => {
+    const leftDistance = readItemDistanceKm(left);
+    const rightDistance = readItemDistanceKm(right);
+    if (leftDistance !== null && rightDistance !== null) {
+      if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+    } else if (leftDistance !== null) {
+      return -1;
+    } else if (rightDistance !== null) {
+      return 1;
+    }
+
+    return (
+      toIsoTimestamp(right.updated_at) -
+      toIsoTimestamp(left.updated_at)
+    );
+  });
+}
+
+function parseViewerLocation(searchParams: URLSearchParams): LatLng | null {
+  const lat = toNumber(searchParams.get('viewer_lat'));
+  const lng = toNumber(searchParams.get('viewer_lng'));
+  if (lat === null || lng === null) return null;
+  const point = { lat, lng };
+  return isCoordinateValid(point) ? point : null;
 }
 
 function slugify(value: string): string {
@@ -1017,13 +1192,17 @@ function getAuthToken(req: NextRequest): string | null {
 
 async function fetchMarketplaceContent(
   params: URLSearchParams,
+  req?: NextRequest,
 ): Promise<{ response: Response; payload: ContentListPayload | null }> {
   const query = params.toString();
+  const token = req ? getAuthToken(req) : null;
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
   const response = await fetch(
     `${marketplaceBase}/v1/content${query ? `?${query}` : ''}`,
     {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: AbortSignal.timeout(15000),
     },
   );
@@ -1158,6 +1337,7 @@ async function fetchDiscoverContentCandidates(
 }
 
 async function fetchExpandedCandidates(
+  req: NextRequest,
   searchParams: URLSearchParams,
   limit: number,
 ): Promise<ContentRecord[]> {
@@ -1167,7 +1347,7 @@ async function fetchExpandedCandidates(
     params.set('offset', '0');
     params.set('limit', String(Math.min(Math.max(limit * 4, 40), 100)));
 
-    const { response, payload } = await fetchMarketplaceContent(params);
+    const { response, payload } = await fetchMarketplaceContent(params, req);
     if (!response.ok) return [];
     return normalizePayload(payload, limit, 0).items || [];
   } catch (error) {
@@ -1237,6 +1417,11 @@ export async function GET(req: NextRequest) {
     requestedTypeRaw === 'profile'
       ? 'freelancer'
       : normalizeSearchType(searchParams.get('type'));
+  const viewerLocation = parseViewerLocation(searchParams);
+  const nearbyRequested =
+    Boolean(viewerLocation) &&
+    (isEnabledFlag(searchParams.get('nearby')) ||
+      searchParams.get('sort') === 'nearby');
   const includeOwnerProfiles = shouldIncludeOwnerProfiles(searchParams);
   const databaseOnly =
     isEnabledFlag(searchParams.get('database_only')) ||
@@ -1253,7 +1438,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const { response: backendRes, payload: data } =
-      await fetchMarketplaceContent(searchParams);
+      await fetchMarketplaceContent(searchParams, req);
     if (!backendRes.ok) {
       console.error('[api/content] backend error:', backendRes.status, data);
       return NextResponse.json(
@@ -1305,12 +1490,48 @@ export async function GET(req: NextRequest) {
     }
 
     const shouldRunFuzzyRerank = queryText.length >= 2;
-    if (shouldRunFuzzyRerank) {
+    if (nearbyRequested && viewerLocation) {
+      let candidates = mergeUniqueContent(resolvedItems);
+      const shouldExpandCandidates =
+        candidates.length < Math.min(Math.max(requestedLimit * 4, 40), 100) ||
+        requestedOffset > 0;
+      if (shouldExpandCandidates) {
+        const expanded = await fetchExpandedCandidates(
+          req,
+          searchParams,
+          requestedLimit,
+        );
+        if (expanded.length > 0) {
+          candidates = mergeUniqueContent([...candidates, ...expanded]);
+        }
+      }
+
+      if (discoverCandidates.length > 0) {
+        candidates = mergeUniqueContent([...discoverCandidates, ...candidates]);
+      }
+
+      const relevantCandidates = shouldRunFuzzyRerank
+        ? rerankByQuery(candidates, queryText)
+        : candidates;
+      const nearbyItems = sortByNearbyDistance(
+        annotateNearbyDistance(relevantCandidates, viewerLocation),
+      );
+      const start = Math.min(requestedOffset, nearbyItems.length);
+      resolvedPayload = {
+        items: nearbyItems.slice(start, start + requestedLimit),
+        limit: requestedLimit,
+        offset: requestedOffset,
+        has_more:
+          start + requestedLimit < nearbyItems.length ||
+          resolvedPayload.has_more,
+      };
+    } else if (shouldRunFuzzyRerank) {
       let candidates = resolvedItems;
       const shouldExpandCandidates =
         candidates.length < Math.min(Math.max(requestedLimit * 2, 14), 40);
       if (shouldExpandCandidates) {
         const expanded = await fetchExpandedCandidates(
+          req,
           searchParams,
           requestedLimit,
         );

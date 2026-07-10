@@ -113,21 +113,21 @@ function buildOrientationConfig(
         'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
       actions: PROMO_ONLY_MODE
         ? [
-            {
-              href: '/chat',
-              label: isId ? 'Chat' : 'Chat',
-              icon: Bell,
-              primary: true,
-            },
-          ]
+          {
+            href: '/chat',
+            label: isId ? 'Chat' : 'Chat',
+            icon: Bell,
+            primary: true,
+          },
+        ]
         : [
-            {
-              href: '/transactions',
-              label: isId ? 'Transaksi' : 'Transactions',
-              icon: ReceiptText,
-              primary: true,
-            },
-          ],
+          {
+            href: '/transactions',
+            label: isId ? 'Transaksi' : 'Transactions',
+            icon: ReceiptText,
+            primary: true,
+          },
+        ],
     };
   }
 
@@ -257,31 +257,31 @@ function buildOrientationConfig(
         'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80 dark:bg-emerald-400/14 dark:text-emerald-200 dark:ring-emerald-400/20',
       actions: PROMO_ONLY_MODE
         ? [
-            {
-              href: '/chat',
-              label: isId ? 'Chat' : 'Chat',
-              icon: Bell,
-              primary: true,
-            },
-            {
-              href: '/my-listings',
-              label: isId ? 'Postingan' : 'Listings',
-              icon: FolderKanban,
-            },
-          ]
+          {
+            href: '/chat',
+            label: isId ? 'Chat' : 'Chat',
+            icon: Bell,
+            primary: true,
+          },
+          {
+            href: '/my-listings',
+            label: isId ? 'Postingan' : 'Listings',
+            icon: FolderKanban,
+          },
+        ]
         : [
-            {
-              href: '/transactions',
-              label: isId ? 'Transaksi' : 'Transactions',
-              icon: ReceiptText,
-              primary: true,
-            },
-            {
-              href: '/payments',
-              label: isId ? 'Saldo' : 'Balance',
-              icon: Wallet,
-            },
-          ],
+          {
+            href: '/transactions',
+            label: isId ? 'Transaksi' : 'Transactions',
+            icon: ReceiptText,
+            primary: true,
+          },
+          {
+            href: '/payments',
+            label: isId ? 'Saldo' : 'Balance',
+            icon: Wallet,
+          },
+        ],
     };
   }
 
@@ -361,7 +361,7 @@ export function RouteOrientationStrip() {
               <Icon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <p className="ui-route-kicker text-[10px] font-black uppercase tracking-[0.18em]">
+              <p className="ui-route-kicker text-[10px] font-bold uppercase tracking-[0.18em]">
                 {config.eyebrow}
               </p>
               <h2 className="mt-1 truncate text-sm font-bold leading-tight text-[color:var(--app-text)] xl:text-[15px]">

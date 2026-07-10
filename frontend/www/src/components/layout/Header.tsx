@@ -150,7 +150,7 @@ export function Header() {
     support: locale === 'id' ? 'Bantuan' : 'Get help',
     searchMenu: locale === 'id' ? 'Cari Menu' : 'Search Menu',
     social: locale === 'id' ? 'Sosial' : 'Social',
-    business: locale === 'id' ? 'Cari & Promosi' : 'Search and Promote',
+    business: locale === 'id' ? 'Cari Kebutuhan' : 'Business Search',
     professional: locale === 'id' ? 'Profesional' : 'Professional',
     createSection: locale === 'id' ? 'Buat' : 'Create',
     preferences: locale === 'id' ? 'Tampilan' : 'Display',
@@ -240,8 +240,8 @@ export function Header() {
               label: localeKey === 'id' ? 'Transaksi' : 'Transactions',
               caption:
                 localeKey === 'id'
-                  ? 'Deal, escrow, riwayat'
-                  : 'Deals, escrow, history',
+                  ? 'Deal, riwayat, status'
+                  : 'Deals, history, status',
               icon: Store,
               matchers: ['/transactions'],
             },
@@ -289,63 +289,49 @@ export function Header() {
       ];
   }, [accountHref, isAuthenticated, localeKey, manageHref]);
 
-  const menuGroups = useMemo<
-    Array<{ id: string; title: string; items: DrawerItem[] }>
-  >(() => {
+  const menuGroups = useMemo(() => {
+    const isId = localeKey === 'id';
     const guarded = (href: string) => (isAuthenticated ? href : '/login');
-    const drawerSurfaceCopy = getUmkmSurfaceCopy(localeKey);
 
     return [
       {
         id: 'social',
-        title: localeKey === 'id' ? 'Sosial' : 'Social',
+        title: isId ? 'Aktivitas Sosial' : 'Social Activities',
         items: [
           {
             href: '/home',
-            label: localeKey === 'id' ? 'Beranda' : 'Home',
-            caption: localeKey === 'id' ? 'Feed utama' : 'Main feed',
+            label: isId ? 'Beranda' : 'Home',
+            caption: isId ? 'Feed & update terbaru' : 'Main feed',
             icon: Home,
             matchers: ['/home', '/'],
           },
           {
             href: '/community',
-            label: localeKey === 'id' ? 'Komunitas' : 'Community',
-            caption:
-              localeKey === 'id'
-                ? 'Grup, diskusi, posting'
-                : 'Groups, posts, discussions',
+            label: isId ? 'Komunitas' : 'Community',
+            caption: isId ? 'Diskusi & grup usaha' : 'Business groups',
             icon: Users,
             matchers: ['/community'],
           },
           {
             href: '/reels',
             label: 'Reels',
-            caption:
-              localeKey === 'id'
-                ? 'Video usaha singkat'
-                : 'Short business videos',
+            caption: isId ? 'Video pendek UMKM' : 'Short business videos',
             icon: Clapperboard,
             matchers: ['/reels'],
           },
           {
             href: chatHref,
-            label: localeKey === 'id' ? 'Chat' : 'Chat',
-            caption:
-              localeKey === 'id'
-                ? PROMO_ONLY_MODE
-                  ? 'Tanya jawab langsung'
-                  : 'Pesan dan negosiasi'
-                : PROMO_ONLY_MODE
-                  ? 'Direct questions'
-                  : 'Messages and negotiation',
+            label: 'Chat',
+            caption: isId
+              ? (PROMO_ONLY_MODE ? 'Tanya jawab' : 'Pesan & negosiasi')
+              : (PROMO_ONLY_MODE ? 'Q&A' : 'Messages'),
             icon: MessageCircle,
             matchers: ['/chat'],
           },
           {
             href: guarded('/notifications'),
-            label: localeKey === 'id' ? 'Notifikasi' : 'Notifications',
-            caption:
-              localeKey === 'id' ? 'Update penting' : 'Important updates',
+            label: isId ? 'Notifikasi' : 'Notifications',
+            caption: isId ? 'Kabar penting' : 'Updates',
             icon: Bell,
             matchers: ['/notifications'],
           },
@@ -353,118 +339,38 @@ export function Header() {
       },
       {
         id: 'business',
-        title: text.business,
+        title: text.business || (isId ? 'Solusi Bisnis' : 'Business'),
         items: [
           {
             href: '/search',
-            label: localeKey === 'id' ? 'Cari' : 'Search',
-            caption:
-              localeKey === 'id'
-                ? 'Supplier, jasa, lokasi'
-                : 'Suppliers, services, places',
+            label: isId ? 'Cari' : 'Search',
+            caption: isId ? 'Cari supplier, jasa, & tempat' : 'Find everything',
             icon: SearchIcon,
             matchers: ['/search'],
           },
           {
             href: '/kategori',
-            label: localeKey === 'id' ? 'Kategori' : 'Categories',
-            caption:
-              localeKey === 'id'
-                ? 'Jalur cepat cari kebutuhan'
-                : 'Quick lanes for needs',
+            label: isId ? 'Kategori Usaha' : 'Categories',
+            caption: isId ? 'Pilah kebutuhan instan' : 'Browse by category',
             icon: LayoutGrid,
             matchers: ['/kategori'],
           },
           {
-            href: '/search?type=product',
-            label: 'Supplier',
-            caption:
-              localeKey === 'id'
-                ? 'Produk dan bahan usaha'
-                : 'Products and supplies',
-            icon: ShoppingBag,
-            matchers: ['/search'],
-          },
-          {
-            href: '/search?type=service',
-            label: localeKey === 'id' ? 'Jasa' : 'Services',
-            caption:
-              localeKey === 'id'
-                ? 'Operasional dan partner'
-                : 'Operations and partners',
-            icon: Wrench,
-            matchers: ['/search'],
-          },
-          {
             href: UMKM_DISCOVERY_PATH,
-            label: drawerSurfaceCopy.discovery,
-            caption:
-              localeKey === 'id'
-                ? 'Usaha lokal sekitar'
-                : 'Nearby local businesses',
+            label: getUmkmSurfaceCopy(localeKey).discovery || (isId ? 'Sekitar Anda' : 'Nearby'),
+            caption: isId ? 'Peluang & bisnis lokal' : 'Local businesses',
             icon: MapPinned,
             matchers: [UMKM_DISCOVERY_PATH],
           },
-          {
-            href: '/search?type=product&q=supplier',
-            label: 'Marketplace',
-            caption:
-              localeKey === 'id'
-                ? 'Produk siap pilih'
-                : 'Ready-to-browse products',
-            icon: Store,
-            matchers: ['/search'],
-          },
-        ],
-      },
-      {
-        id: 'professional',
-        title: localeKey === 'id' ? 'Profesional' : 'Professional',
-        items: [
-          {
-            href: '/search?type=job&q=lowongan',
-            label: localeKey === 'id' ? 'Loker' : 'Jobs',
-            caption:
-              localeKey === 'id'
-                ? 'Cari kerja dan kandidat'
-                : 'Jobs and candidates',
-            icon: BriefcaseBusiness,
-            matchers: ['/search'],
-          },
-          {
-            href: '/search?type=freelancer&q=umkm',
-            label: 'Talent',
-            caption:
-              localeKey === 'id'
-                ? 'Freelancer dan skill'
-                : 'Freelancers and skills',
-            icon: UserRound,
-            matchers: ['/search'],
-          },
-          {
-            href: '/search?type=property&q=lokasi%20jualan',
-            label: localeKey === 'id' ? 'Lokasi' : 'Property',
-            caption:
-              localeKey === 'id'
-                ? 'Ruko, tempat, booth'
-                : 'Shops, places, booths',
-            icon: Building2,
-            matchers: ['/search'],
-          },
-          ...(!PROMO_ONLY_MODE
-            ? [
-              {
-                href: guarded('/my-projects'),
-                label: localeKey === 'id' ? 'Proyek Saya' : 'My Projects',
-                caption:
-                  localeKey === 'id'
-                    ? 'Brief dan penawaran'
-                    : 'Briefs and offers',
-                icon: ClipboardList,
-                matchers: ['/my-projects'],
-              },
-            ]
-            : []),
+          ...(!PROMO_ONLY_MODE ? [
+            {
+              href: guarded('/my-projects'),
+              label: isId ? 'Kebutuhan Saya' : 'My Needs',
+              caption: isId ? 'Brief & penawaran aktif' : 'Briefs & offers',
+              icon: ClipboardList,
+              matchers: ['/my-projects'],
+            }
+          ] : []),
         ],
       },
     ];
@@ -551,7 +457,14 @@ export function Header() {
 
   const menuSearchNeedle = menuSearch.trim().toLowerCase();
   const visibleMenuGroups = useMemo(() => {
-    if (!menuSearchNeedle) return menuGroups;
+    if (!menuSearchNeedle) {
+      return menuGroups
+        .map(group => ({
+          ...group,
+          items: group.items.slice(0, 3),
+        }))
+        .filter(group => group.items.length > 0);
+    }
 
     return menuGroups
       .map(group => ({
@@ -566,7 +479,7 @@ export function Header() {
   }, [menuGroups, menuSearchNeedle]);
 
   const visibleCreateDrawerItems = useMemo(() => {
-    if (!menuSearchNeedle) return createDrawerItems;
+    if (!menuSearchNeedle) return createDrawerItems.slice(0, 3);
     return createDrawerItems.filter(item =>
       `${item.label} ${item.caption || ''}`
         .toLowerCase()
@@ -709,10 +622,10 @@ export function Header() {
       )}
     >
       <div className="flex items-center justify-between gap-3 px-2 py-1.5">
-        <p className="min-w-0 truncate text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+        <p className="min-w-0 truncate text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
           {title}
         </p>
-        <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-black text-[color:var(--app-text-soft)]">
+        <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[color:var(--app-surface-muted)] px-2 text-[10px] font-bold text-[color:var(--app-text-soft)]">
           {items.length}
         </span>
       </div>
@@ -728,9 +641,10 @@ export function Header() {
               key={`${title}-${item.href}-${item.label}`}
               href={item.href}
               onClick={closeAll}
+              title={item.caption}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'ui-pressable group flex min-h-[56px] min-w-0 items-center gap-3 rounded-[16px] px-2.5 py-2 text-left transition',
+                'ui-pressable group flex min-h-[46px] min-w-0 items-center gap-2.5 rounded-[15px] px-2.5 py-2 text-left transition',
                 active
                   ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                   : 'text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
@@ -738,7 +652,7 @@ export function Header() {
             >
               <span
                 className={cn(
-                  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px] border transition',
+                  'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] border transition',
                   active
                     ? 'border-[color:var(--app-accent-border)] bg-white text-[color:var(--app-accent)] dark:bg-white/10'
                     : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] group-hover:text-[color:var(--app-accent)]',
@@ -747,14 +661,9 @@ export function Header() {
                 <Icon className="h-4.5 w-4.5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="line-clamp-1 block text-[13px] font-black leading-tight">
+                <span className="line-clamp-1 block text-[13px] font-bold leading-tight">
                   {item.label}
                 </span>
-                {item.caption ? (
-                  <span className="mt-0.5 line-clamp-1 block text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">
-                    {item.caption}
-                  </span>
-                ) : null}
               </span>
               <ChevronRight
                 className={cn(
@@ -779,9 +688,9 @@ export function Header() {
             type="button"
             aria-label="Close mobile menu overlay"
             onClick={() => setMobileOpen(false)}
-            className="ui-layer-popover fixed inset-0 bg-slate-950/32 backdrop-blur-sm"
+            className="ui-layer-popover fixed inset-0 bg-slate-950/32 "
           />
-          <aside className="ui-layer-drawer fixed inset-y-0 right-0 flex h-[100dvh] max-h-[100dvh] w-[min(92vw,390px)] flex-col overflow-hidden border-l border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_86px_-34px_rgba(15,23,42,0.56)] ring-1 ring-black/[0.04] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-white/10 lg:inset-y-4 lg:right-4 lg:h-[calc(100dvh-2rem)] lg:w-[min(400px,calc(100vw-2rem))] lg:rounded-[28px] lg:border">
+          <aside className="ui-layer-drawer fixed inset-y-0 right-0 flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-[min(92vw,390px)] flex-col overflow-hidden border-l border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_86px_-34px_rgba(15,23,42,0.56)] ring-1 ring-black/[0.04] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:ring-white/10 lg:inset-y-4 lg:right-4 lg:h-[calc(var(--app-viewport-height)-2rem)] lg:w-[min(400px,calc(100vw-2rem))] lg:rounded-[28px] lg:border">
             <div className="shrink-0 border-b border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.85rem)] dark:border-[color:var(--app-border-strong)]">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -789,13 +698,11 @@ export function Header() {
                     <LajuloLogo className="h-6 w-6" textClassName="hidden" />
                   </span>
                   <div className="min-w-0">
-                    <h2 className="truncate text-[18px] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)]">
+                    <h2 className="truncate text-[18px] font-bold leading-tight tracking-[-0.03em] text-[color:var(--app-text)]">
                       {locale === 'id' ? 'Menu Lajukan' : 'Lajukan menu'}
                     </h2>
                     <p className="truncate text-[12px] font-semibold text-[color:var(--app-text-soft)]">
-                      {locale === 'id'
-                        ? 'Cari, posting, chat, dan kelola akun.'
-                        : 'Search, post, chat, and manage account.'}
+                      {locale === 'id' ? 'Akses cepat fitur utama.' : 'Quick access to main features.'}
                     </p>
                   </div>
                 </div>
@@ -838,7 +745,7 @@ export function Header() {
                       href={item.href}
                       onClick={closeAll}
                       className={cn(
-                        'ui-pressable group flex min-h-[68px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[18px] border px-2 py-2 text-center transition',
+                        'ui-pressable group flex min-h-[62px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[17px] border px-2 py-2 text-center transition',
                         active
                           ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
                           : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)]',
@@ -854,7 +761,7 @@ export function Header() {
                       >
                         <Icon className="h-4 w-4" />
                       </span>
-                      <span className="block max-w-full truncate text-[11px] font-black leading-tight">
+                      <span className="block max-w-full truncate text-[11px] font-bold leading-tight">
                         {item.label}
                       </span>
                     </Link>
@@ -879,7 +786,7 @@ export function Header() {
                         className="h-11 w-11 shrink-0 rounded-full border border-[color:var(--app-border)] object-cover"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+                        <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
                           {user?.username || user?.fullName || 'User'}
                         </p>
                         <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -911,7 +818,7 @@ export function Header() {
                           <Link
                             href="/payments"
                             onClick={closeAll}
-                            className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                            className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-bold text-[color:var(--app-text)]"
                           >
                             <Wallet className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                             {locale === 'id' ? 'Saldo' : 'Balance'}
@@ -919,7 +826,7 @@ export function Header() {
                           <Link
                             href="/transactions"
                             onClick={closeAll}
-                            className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                            className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-bold text-[color:var(--app-text)]"
                           >
                             <Store className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                             {locale === 'id' ? 'Transaksi' : 'Deals'}
@@ -929,7 +836,7 @@ export function Header() {
                       <Link
                         href={manageHref}
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-black text-[color:var(--app-text)]"
+                        className="ui-pressable inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-2 text-xs font-bold text-[color:var(--app-text)]"
                       >
                         <MapPinned className="h-3.5 w-3.5 text-[color:var(--app-accent)]" />
                         {locale === 'id' ? 'Usaha' : 'Business'}
@@ -938,7 +845,7 @@ export function Header() {
                   </div>
                 ) : (
                   <div className="relative">
-                    <p className="text-sm font-black text-[color:var(--app-text)]">
+                    <p className="text-sm font-bold text-[color:var(--app-text)]">
                       {locale === 'id' ? 'Masuk ke akun' : 'Sign in'}
                     </p>
                     <p className="mt-0.5 text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -954,14 +861,14 @@ export function Header() {
                       <Link
                         href="/login"
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text)]"
+                        className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)]"
                       >
                         {text.login}
                       </Link>
                       <Link
                         href="/register"
                         onClick={closeAll}
-                        className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-black text-[color:var(--app-text-inverse)]"
+                        className="ui-pressable inline-flex min-h-9 items-center justify-center rounded-[13px] bg-[color:var(--app-accent-strong)] px-3 text-sm font-bold text-[color:var(--app-text-inverse)]"
                       >
                         {text.register}
                       </Link>
@@ -971,14 +878,14 @@ export function Header() {
               </div>
 
               <section className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 shadow-[0_16px_40px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)]">
-                <p className="px-1 pb-2 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                   {text.preferences}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={openLanguageFromDrawer}
-                    className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)]"
+                    className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-bold text-[color:var(--app-text)]"
                   >
                     <Languages className="h-4 w-4 text-[color:var(--app-accent)]" />
                     <span className="min-w-0">
@@ -993,7 +900,7 @@ export function Header() {
                     type="button"
                     onClick={toggleDrawerTheme}
                     disabled={!isReady}
-                    className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-black text-[color:var(--app-text)] disabled:opacity-50"
+                    className="ui-pressable inline-flex min-h-10 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-left text-sm font-bold text-[color:var(--app-text)] disabled:opacity-50"
                   >
                     {isDark ? (
                       <Sun className="h-4 w-4 text-[color:var(--app-accent)]" />
@@ -1041,7 +948,7 @@ export function Header() {
                 <Link
                   href="/support"
                   onClick={closeAll}
-                  className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text)]"
+                  className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)]"
                 >
                   <CircleHelp className="h-4 w-4" />
                   {text.support}
@@ -1049,7 +956,7 @@ export function Header() {
                 <Link
                   href="/settings"
                   onClick={closeAll}
-                  className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-text)]"
+                  className="ui-pressable inline-flex min-h-10 items-center justify-center gap-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)]"
                 >
                   <Settings className="h-4 w-4" />
                   {locale === 'id' ? 'Setelan' : 'Settings'}
@@ -1062,7 +969,7 @@ export function Header() {
                     closeAll();
                     void logout();
                   }}
-                  className="ui-pressable mt-1.5 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[13px] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_58%,_transparent)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-black text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
+                  className="ui-pressable mt-1.5 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[13px] border border-[color:color-mix(in_srgb,_var(--app-danger-border)_58%,_transparent)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-danger)] hover:bg-[color:var(--app-danger-soft)]"
                 >
                   <LogOut className="h-4 w-4" />
                   {text.logout}
@@ -1078,7 +985,7 @@ export function Header() {
   return (
     <>
       <header
-        className="ui-layer-header fixed inset-x-0 top-0 border-x-0 border-b border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] backdrop-blur-xl dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)]"
+        className="ui-layer-header fixed inset-x-0 top-0 border-x-0 border-b border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)]  dark:border-[color:color-mix(in_srgb,_var(--app-border-strong)_70%,_transparent)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_94%,_transparent)]"
         data-tour="www-header"
       >
         <div style={{ height: 'env(safe-area-inset-top, 0px)' }} />
@@ -1260,7 +1167,7 @@ export function Header() {
                           className="h-11 w-11 shrink-0 rounded-full border-2 border-[color:var(--app-surface-strong)] object-cover shadow-[0_14px_28px_-24px_rgba(15,23,42,0.55)]"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-black text-[color:var(--app-text)]">
+                          <p className="truncate text-sm font-bold text-[color:var(--app-text)]">
                             {user?.username || user?.fullName || 'User'}
                           </p>
                           <p className="truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
@@ -1373,7 +1280,7 @@ export function Header() {
           </div>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2 lg:hidden">
-            <Link
+            {/* <Link
               href="/search"
               className={cn(
                 'ui-pressable inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border transition',
@@ -1402,7 +1309,7 @@ export function Header() {
             >
               <MessageCircle className="h-4 w-4" />
               {totalUnread > 0 ? (
-                <span className="absolute right-0 top-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-danger)] px-1 text-[9px] font-black text-[color:var(--app-text-inverse)]">
+                <span className="absolute right-0 top-0 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-danger)] px-1 text-[9px] font-bold text-[color:var(--app-text-inverse)]">
                   {totalUnread > 99 ? '99+' : totalUnread}
                 </span>
               ) : null}
@@ -1417,7 +1324,7 @@ export function Header() {
               data-testid="app-header-mobile-create-link"
             >
               <Plus className="h-4.5 w-4.5" />
-            </Link>
+            </Link> */}
 
             <button
               type="button"

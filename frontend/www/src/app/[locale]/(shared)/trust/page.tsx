@@ -28,7 +28,7 @@ export default async function TrustCenterPage({ params }: PageProps) {
           <ShieldCheck className="h-3.5 w-3.5" />
           {isId ? 'Pusat aman & aturan' : 'Trust Center'}
         </p>
-        <h1 className="mt-4 max-w-3xl text-3xl font-black tracking-tight text-[color:var(--app-text)] sm:text-4xl">
+        <h1 className="mt-4 max-w-3xl text-3xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-4xl">
           {isId
             ? 'Aman, jelas, nggak ribet.'
             : 'Transparency, controls, and safe flows for suppliers, services, and businesses.'}
@@ -61,7 +61,7 @@ export default async function TrustCenterPage({ params }: PageProps) {
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
               {isId ? 'Yang sering dicari' : 'Core topics'}
             </p>
-            <h2 className="mt-2 text-2xl font-black text-[color:var(--app-text)]">
+            <h2 className="mt-2 text-2xl font-bold text-[color:var(--app-text)]">
               {isId ? 'Yang sering ditanya' : 'Trust controls for the business economy'}
             </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
@@ -103,7 +103,7 @@ export default async function TrustCenterPage({ params }: PageProps) {
           description={
             isId
               ? 'Ringkas dulu. Detail tetap ada.'
-              : 'Privacy, terms, and cookie policy stay concise, while technical detail covers supplier deals, escrow, fulfillment, and data rights.'
+              : 'Privacy, terms, and cookie policy stay concise, while technical detail covers supplier deals, fulfillment, safety, and data rights.'
           }
           meta={isId ? 'Aturan dasar' : 'Legal'}
         >
@@ -136,7 +136,7 @@ export default async function TrustCenterPage({ params }: PageProps) {
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
               {isId ? 'Butuh bantuan' : 'Support'}
             </p>
-            <h2 className="mt-2 text-xl font-black text-[color:var(--app-text)]">
+            <h2 className="mt-2 text-xl font-bold text-[color:var(--app-text)]">
               {isId ? 'Ada masalah akun, data, atau transaksi?' : 'Need verification or reporting?'}
             </h2>
             <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">

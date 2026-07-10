@@ -16,7 +16,7 @@ export function StickySearchBar({
 }: StickySearchBarProps) {
   return (
     <section className="ui-page-section ui-sticky-controls z-30">
-      <div className="ui-feed-section rounded-[1.75rem] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,253,244,0.96))] p-2 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.4)] backdrop-blur dark:border-[color:var(--app-border)] dark:bg-[linear-gradient(180deg,rgba(24,24,24,0.96),rgba(10,10,10,0.94))]">
+      <div className="ui-feed-section rounded-[1.75rem] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(240,253,244,0.96))] p-2 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.4)]  dark:border-[color:var(--app-border)] dark:bg-[linear-gradient(180deg,rgba(24,24,24,0.96),rgba(10,10,10,0.94))]">
         <form
           onSubmit={onSearch}
           className="flex flex-col gap-2 sm:flex-row"
@@ -49,7 +49,7 @@ export function StickySearchBar({
           </label>
           <button
             type="submit"
-            className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[13px] font-black text-white shadow-[0_14px_28px_-24px_rgba(18,138,69,0.45)] transition hover:brightness-105"
+            className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-4 text-[13px] font-bold text-white shadow-[0_14px_28px_-24px_rgba(18,138,69,0.45)] transition hover:brightness-105"
           >
             {isId ? 'Cari' : 'Search'}
             <ArrowRight className="h-4 w-4" />

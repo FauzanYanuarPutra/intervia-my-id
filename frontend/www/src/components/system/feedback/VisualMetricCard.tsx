@@ -84,7 +84,7 @@ export function VisualMetricCard({
         <p className="truncate text-[11px] font-bold uppercase tracking-widest text-[color:var(--app-text-soft)] dark:text-[color:var(--app-text)]">
           {label}
         </p>
-        <h3 className="text-2xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <h3 className="text-2xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {value}
         </h3>
       </div>

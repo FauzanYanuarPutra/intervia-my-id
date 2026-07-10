@@ -72,11 +72,11 @@ export function MarketSectionHeading({
     <div className={cn('flex min-w-0 items-start justify-between gap-3', className)}>
       <div className="min-w-0">
         {eyebrow ? (
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
             {eyebrow}
           </p>
         ) : null}
-        <h2 className="mt-0.5 text-[0.98rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.05rem]">
+        <h2 className="mt-0.5 text-[0.98rem] font-bold leading-tight text-[color:var(--app-text)] sm:text-[1.05rem]">
           {title}
         </h2>
       </div>

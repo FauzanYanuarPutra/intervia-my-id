@@ -46,7 +46,7 @@ export default async function BuyerPagePreview({ params }: PageProps) {
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
             <article className="rounded-[28px] border border-portal-line/70 bg-white p-5">
               <p className="portal-kicker">Status tampilan publik</p>
-              <h3 className="mt-2 text-xl font-black tracking-[-0.04em] text-portal-ink">
+              <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
                 {business.buyerPageReady
                   ? 'Sudah siap dibuka ke pembeli'
                   : 'Masih perlu dirapikan'}
@@ -58,20 +58,20 @@ export default async function BuyerPagePreview({ params }: PageProps) {
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[20px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
-                    <p className="portal-label">URL publik</p>
+                <div className="rounded-[20px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
+                  <p className="portal-label">URL publik</p>
                   <p className="mt-1 text-sm font-semibold text-portal-ink">
                     {business.publicUrl}
                   </p>
                 </div>
-                  <div className="rounded-[20px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
-                    <p className="portal-label">Produk aktif</p>
+                <div className="rounded-[20px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
+                  <p className="portal-label">Produk aktif</p>
                   <p className="mt-1 text-sm font-semibold text-portal-ink">
                     {business.productsCount} item
                   </p>
                 </div>
-                  <div className="rounded-[20px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
-                    <p className="portal-label">Titipan aktif</p>
+                <div className="rounded-[20px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
+                  <p className="portal-label">Titipan aktif</p>
                   <p className="mt-1 text-sm font-semibold text-portal-ink">
                     {business.consignmentProductsCount ?? 0} item
                   </p>

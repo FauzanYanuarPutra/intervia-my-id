@@ -57,10 +57,10 @@ export function CreateSharePackPanel({
 
   if (compact) {
     return (
-      <div className="relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
+      <div className="relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.12)]  dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="inline-flex rounded-full border border-teal-200/80 bg-teal-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
+            <p className="inline-flex rounded-full border border-teal-200/80 bg-teal-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
               Share Pack
             </p>
             <p className="mt-2 text-[13px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
@@ -145,7 +145,7 @@ export function CreateSharePackPanel({
           {channels.slice(0, 4).map(channel => (
             <div
               key={channel.id}
-              className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2.5 shadow-[0_12px_22px_-18px_rgba(15,23,42,0.1)] backdrop-blur-sm dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/68"
+              className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2.5 shadow-[0_12px_22px_-18px_rgba(15,23,42,0.1)]  dark:border-[color:var(--app-border-strong)] dark:bg-slate-950/68"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -154,13 +154,12 @@ export function CreateSharePackPanel({
                       {channel.label}
                     </p>
                     <span
-                      className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold ${
-                        channel.status === 'connected'
+                      className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold ${channel.status === 'connected'
                           ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
                           : channel.status === 'ready'
                             ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-200'
                             : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
-                      }`}
+                        }`}
                     >
                       {channel.status === 'connected'
                         ? isId
@@ -221,7 +220,7 @@ export function CreateSharePackPanel({
     <div className="relative overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.12)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="inline-flex rounded-full border border-teal-200/80 bg-teal-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
+          <p className="inline-flex rounded-full border border-teal-200/80 bg-teal-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700 dark:border-teal-900/70 dark:bg-teal-950/20 dark:text-teal-200">
             {isId ? 'Share Pack' : 'Share Pack'}
           </p>
           <p className="mt-2.5 text-[15px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
@@ -342,13 +341,12 @@ export function CreateSharePackPanel({
                     {channel.label}
                   </p>
                   <span
-                    className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                      channel.status === 'connected'
+                    className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${channel.status === 'connected'
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200'
                         : channel.status === 'ready'
                           ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-200'
                           : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200'
-                    }`}
+                      }`}
                   >
                     {channel.status === 'connected'
                       ? isId

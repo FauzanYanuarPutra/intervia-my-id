@@ -62,7 +62,7 @@ export default function ChatIndexPage() {
           }}
         />
 
-        <div className="relative w-full max-w-xl rounded-[28px] border border-black/5 bg-white/70 p-8 text-center shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)] backdrop-blur dark:border-white/10 dark:bg-[#202c33]/78">
+        <div className="relative w-full max-w-xl rounded-[28px] border border-black/5 bg-white/70 p-8 text-center shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)]  dark:border-white/10 dark:bg-[#202c33]/78">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#d9fdd3] dark:bg-[#103529]">
             <MessageCircle className="h-9 w-9 text-[#128c7e] dark:text-[#d1f4cc]" />
           </div>

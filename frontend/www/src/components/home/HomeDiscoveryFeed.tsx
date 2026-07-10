@@ -116,19 +116,19 @@ const FILTER_OPTIONS: Array<{
   labelId: string;
   labelEn: string;
 }> = [
-  { value: 'all', labelId: 'Semua', labelEn: 'All' },
-  { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
-  { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
-  { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
-  { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
-  {
-    value: 'business_transfer',
-    labelId: 'Oper Usaha',
-    labelEn: 'Business Transfer',
-  },
-  { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
-  { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
-];
+    { value: 'all', labelId: 'Semua', labelEn: 'All' },
+    { value: 'product', labelId: 'Supplier', labelEn: 'Suppliers' },
+    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations' },
+    { value: 'service', labelId: 'Jasa', labelEn: 'Services' },
+    { value: 'tool_rental', labelId: 'Sewa', labelEn: 'Rentals' },
+    {
+      value: 'business_transfer',
+      labelId: 'Oper Usaha',
+      labelEn: 'Business Transfer',
+    },
+    { value: 'freelancer', labelId: 'Talent', labelEn: 'Talent' },
+    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business' },
+  ];
 
 function isDiscoveryFilter(value: string | null): value is DiscoveryFilter {
   return [
@@ -446,7 +446,10 @@ function mapContentItem(
     title,
     summary,
     location,
-    ratingLabel: reviewCount > 0 ? reviewCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US') : null,
+    ratingLabel:
+      reviewCount > 0
+        ? reviewCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US')
+        : null,
     priceLabel,
     typeLabel,
     typeKey,
@@ -634,7 +637,7 @@ function RailSkeleton({ locale }: { locale: 'id' | 'en' }) {
       {Array.from({ length: 3 }).map((_, index) => (
         <div
           key={index}
-          className="ui-skeleton ui-skeleton-pulse h-[284px] w-[82vw] min-w-[82vw] max-w-[256px] self-stretch rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_90%,white_10%)] shadow-[0_18px_32px_-30px_rgba(15,23,42,0.12)] sm:h-[292px] sm:w-[228px] sm:min-w-[228px] sm:max-w-[228px] sm:rounded-[24px] lg:h-[300px] lg:rounded-[26px] dark:border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] dark:shadow-[0_20px_34px_-28px_rgba(2,6,23,0.44)]"
+          className="ui-skeleton ui-skeleton-pulse h-[300px] min-h-[300px] max-h-[300px] w-[82vw] min-w-[82vw] max-w-[256px] self-stretch rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_90%,white_10%)] shadow-[0_18px_32px_-30px_rgba(15,23,42,0.12)] sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px] sm:w-[228px] sm:min-w-[228px] sm:max-w-[228px] sm:rounded-[24px] lg:rounded-[26px] dark:border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] dark:shadow-[0_20px_34px_-28px_rgba(2,6,23,0.44)]"
         />
       ))}
     </HorizontalRail>
@@ -768,9 +771,9 @@ export function HomeDiscoveryFeed({
       if (!response.ok) {
         throw new Error(
           (payload as { error?: string }).error ||
-            (isId
-              ? 'Konten belum bisa dimuat.'
-              : 'Content is unavailable right now.'),
+          (isId
+            ? 'Konten belum bisa dimuat.'
+            : 'Content is unavailable right now.'),
         );
       }
 
@@ -931,9 +934,9 @@ export function HomeDiscoveryFeed({
         ? allCards
         : filter === 'service'
           ? dedupeCards([
-              ...(cardsByFilter.service || []),
-              ...(cardsByFilter.tool_rental || []),
-            ])
+            ...(cardsByFilter.service || []),
+            ...(cardsByFilter.tool_rental || []),
+          ])
           : dedupeCards(cardsByFilter[filter] || fallback);
 
     return sortCards(source, 'top').slice(0, 12);
@@ -993,15 +996,15 @@ export function HomeDiscoveryFeed({
 
   const growthLinks = isId
     ? [
-        { href: '/community', label: 'Komunitas' },
-        { href: '/learn', label: 'Harga sehat' },
-        { href: '/search?type=product&q=distributor', label: 'Distributor' },
-      ]
+      { href: '/community', label: 'Komunitas' },
+      { href: '/learn', label: 'Harga sehat' },
+      { href: '/search?type=product&q=distributor', label: 'Distributor' },
+    ]
     : [
-        { href: '/community', label: 'Community' },
-        { href: '/learn', label: 'Healthy pricing' },
-        { href: '/search?type=product&q=distributor', label: 'Distributors' },
-      ];
+      { href: '/community', label: 'Community' },
+      { href: '/learn', label: 'Healthy pricing' },
+      { href: '/search?type=product&q=distributor', label: 'Distributors' },
+    ];
 
   const browseHref = resolveBrowseHref(filter, 'newest');
   const activeLoading = loading;
@@ -1019,7 +1022,7 @@ export function HomeDiscoveryFeed({
           {compact ? null : (
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_26%,white)] px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_20%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]">
                   <Sparkles className="h-3 w-3" />
                   {text.discoverLabel}
                 </div>
@@ -1072,7 +1075,7 @@ export function HomeDiscoveryFeed({
 
           {compact ? null : (
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,white)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]">
+              <span className="inline-flex min-h-[30px] items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:color-mix(in_srgb,var(--app-accent-soft)_22%,white)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_18%,rgba(15,23,42,0.98))] dark:text-[color:var(--app-accent)]">
                 {text.growthBadge}
               </span>
               <span className="text-[11px] font-medium text-[color:var(--app-text-soft)]">

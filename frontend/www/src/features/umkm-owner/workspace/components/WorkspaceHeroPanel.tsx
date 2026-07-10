@@ -28,10 +28,10 @@ export function WorkspaceHeroPanel({
     <div className="rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.16)] sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 max-w-2xl">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] ui-accent-text">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] ui-accent-text">
             {hero.eyebrow}
           </p>
-          <h2 className="mt-1 text-[1.15rem] font-black leading-tight ui-text sm:text-[1.45rem]">
+          <h2 className="mt-1 text-[1.15rem] font-bold leading-tight ui-text sm:text-[1.45rem]">
             {hero.title}
           </h2>
           <p className="mt-1.5 text-sm leading-6 ui-text-soft">{hero.desc}</p>
@@ -94,7 +94,7 @@ function SelectedStoreSummary({
         <Store className="h-5 w-5" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-sm font-black ui-text">
+        <span className="block truncate text-sm font-bold ui-text">
           {selectedStore.name}
         </span>
         <span className="mt-0.5 block truncate text-[11px] ui-text-soft">

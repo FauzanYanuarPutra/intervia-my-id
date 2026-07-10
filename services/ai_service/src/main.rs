@@ -353,7 +353,7 @@ async fn handle_verification(mut multipart: Multipart) -> Json<VerificationRespo
         }
     }
 
-    if ktp_bytes.is_none() || selfie_bytes.is_none() {
+    let (Some(ktp), Some(selfie)) = (ktp_bytes, selfie_bytes) else {
         return Json(VerificationResponse {
             status: "error".into(),
             ocr_data: json!({}),
@@ -364,10 +364,7 @@ async fn handle_verification(mut multipart: Multipart) -> Json<VerificationRespo
             is_verified: false,
             message: "Missing KTP or selfie image".into(),
         });
-    }
-
-    let ktp = ktp_bytes.unwrap();
-    let selfie = selfie_bytes.unwrap();
+    };
 
     let ocr_url = service_url("OCR_URL", "http://ocr_service:8000/predict");
     let liveness_url = service_url("LIVENESS_URL", "http://liveness_service:8000/check");

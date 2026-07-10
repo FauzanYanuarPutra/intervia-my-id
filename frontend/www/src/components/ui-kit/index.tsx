@@ -229,7 +229,7 @@ export function BottomNav({
   return (
     <nav
       className={[
-        'fixed bottom-0 left-0 right-0 z-50 overflow-x-hidden border-t border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_95%,_transparent)] backdrop-blur dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_95%,_transparent)] lg:hidden',
+        'fixed bottom-0 left-0 right-0 z-50 overflow-x-hidden border-t border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_95%,_transparent)]  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_95%,_transparent)] lg:hidden',
         padding,
         shadow,
         className,
@@ -260,7 +260,7 @@ export function BottomNav({
                   className="pointer-events-none h-4 w-4 min-[360px]:h-5 min-[360px]:w-5"
                 />
                 {badgeCount > 0 ? (
-                  <span className="pointer-events-none absolute right-1.5 top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-danger)] px-1 text-[9px] font-black text-[color:var(--app-text-inverse)] min-[360px]:right-2 min-[360px]:top-2">
+                  <span className="pointer-events-none absolute right-1.5 top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-danger)] px-1 text-[9px] font-bold text-[color:var(--app-text-inverse)] min-[360px]:right-2 min-[360px]:top-2">
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 ) : null}
@@ -291,10 +291,10 @@ export function HeroSection() {
       <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[color:color-mix(in_srgb,_var(--app-accent)_20%,_transparent)] blur-3xl" />
       <div className="absolute -bottom-20 left-1/2 h-48 w-48 rounded-full bg-[color:color-mix(in_srgb,_var(--app-info)_20%,_transparent)] blur-3xl" />
       <div className="relative">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)] dark:text-[color:var(--app-accent)]">
           Lajukan Workspace
         </p>
-        <h1 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
           Cari, pilih, chat, jalan.
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -354,7 +354,7 @@ export function BalanceDashboard({ user, t }: AnyRecord) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
         {safeTranslate(t, 'welcomeBack', 'Welcome back')}
       </p>
-      <h2 className="mt-1 text-2xl font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+      <h2 className="mt-1 text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
         {username}
       </h2>
       <p className="mt-2 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -514,7 +514,7 @@ function GenericCard({ kind, ...props }: GenericCardProps & { kind: string }) {
         }}
       />
       <div className="pointer-events-none absolute left-2 top-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1">
-        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text)] shadow-sm backdrop-blur dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] dark:text-[color:var(--app-text-soft)]">
+        <span className="rounded-full bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text)] shadow-sm  dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_88%,_transparent)] dark:text-[color:var(--app-text-soft)]">
           {badge}
         </span>
         {highlight ? (
@@ -623,7 +623,7 @@ export function PropertyDetail({
       ) : null}
 
       <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-        <h1 className="text-2xl font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <h1 className="text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {title}
         </h1>
         <p className="mt-1 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -687,7 +687,7 @@ export function JobDetail({
       ) : null}
 
       <div className="rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]">
-        <h1 className="text-2xl font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <h1 className="text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {title}
         </h1>
         <p className="mt-1 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">

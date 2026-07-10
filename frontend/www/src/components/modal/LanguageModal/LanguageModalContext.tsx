@@ -34,9 +34,9 @@ function writeCookie(name: string, value: string, maxAgeSeconds: number) {
 }
 
 function getInitialLocale(locale: string): SupportedLocale {
+  if (isSupportedLanguage(locale)) return locale;
   const savedLocale = readCookie(LOCALE_COOKIE);
   if (isSupportedLanguage(savedLocale)) return savedLocale;
-  if (isSupportedLanguage(locale)) return locale;
   return 'id';
 }
 

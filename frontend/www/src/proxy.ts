@@ -71,8 +71,8 @@ const LEGACY_PREFIX_REDIRECTS: Record<string, string> = {
   '/spatial': '/umkm',
 };
 const scriptSrc = IS_DEV
-  ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:"
-  : "script-src 'self' 'unsafe-inline' blob:";
+  ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://static.cloudflareinsights.com"
+  : "script-src 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com";
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "frame-ancestors 'none'",

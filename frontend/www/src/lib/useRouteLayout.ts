@@ -13,11 +13,6 @@ export function useRouteLayout() {
         [pathname],
     );
 
-    console.log('[useRouteLayout]', {
-        pathname,
-        meta,
-    });
-
     // 💡 VALIDASI GLOBAL: Jalankan efek pencegatan rute di sini
     useEffect(() => {
         if (meta?.isDisabled) {

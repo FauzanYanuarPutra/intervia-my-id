@@ -64,26 +64,26 @@ export default async function BusinessOperationsPage({ params }: PageProps) {
             <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                     Status usaha
                   </p>
-                  <p className="mt-2 text-lg font-black tracking-[-0.04em] text-portal-ink">
+                  <p className="mt-2 text-lg font-bold tracking-[-0.04em] text-portal-ink">
                     {business.isOpen ? 'Sedang buka' : 'Belum buka'}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                     Jam buka
                   </p>
-                  <p className="mt-2 text-lg font-black tracking-[-0.04em] text-portal-ink">
+                  <p className="mt-2 text-lg font-bold tracking-[-0.04em] text-portal-ink">
                     {business.schedule}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                     Stok tipis / habis
                   </p>
-                  <p className="mt-2 text-lg font-black tracking-[-0.04em] text-portal-ink">
+                  <p className="mt-2 text-lg font-bold tracking-[-0.04em] text-portal-ink">
                     {business.lowStockProductsCount ?? 0}
                   </p>
                 </div>

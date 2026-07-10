@@ -55,10 +55,10 @@ function DecisionPathCard({
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
               {eyebrow}
             </p>
-            <h2 className="mt-1.5 text-[0.98rem] font-black leading-tight text-[color:var(--app-text)]">
+            <h2 className="mt-1.5 text-[0.98rem] font-bold leading-tight text-[color:var(--app-text)]">
               {title}
             </h2>
           </div>
@@ -144,7 +144,7 @@ function DirectoryCard({
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0">
-          <p className="line-clamp-2 text-[13px] font-black leading-tight text-[color:var(--app-text)]">
+          <p className="line-clamp-2 text-[13px] font-bold leading-tight text-[color:var(--app-text)]">
             {title}
           </p>
           <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)]">
@@ -167,30 +167,30 @@ export default async function LainnyaPage({ params }: PageProps) {
   const financeRoutes = PROMO_ONLY_MODE
     ? []
     : [
-        {
-          href: '/payments',
-          title: isId ? 'Saldo & isi ulang' : 'Balance and top-up',
-          hint: isId ? 'Cek saldo dan isi ulang.' : 'Check balance and top up.',
-          icon: Wallet,
-          tone: 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
-        },
-        {
-          href: '/transactions',
-          title: isId ? 'Transaksi' : 'Transactions',
-          hint: isId ? 'Lihat order dan dana.' : 'Review orders and funds.',
-          icon: ReceiptText,
-          tone: 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
-        },
-        {
-          href: '/support',
-          title: isId ? 'Bantuan' : 'Support',
-          hint: isId
-            ? 'Kalau pembayaran bermasalah.'
-            : 'When payments need help.',
-          icon: ShieldCheck,
-          tone: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
-        },
-      ];
+      {
+        href: '/payments',
+        title: isId ? 'Saldo & isi ulang' : 'Balance and top-up',
+        hint: isId ? 'Cek saldo dan isi ulang.' : 'Check balance and top up.',
+        icon: Wallet,
+        tone: 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
+      },
+      {
+        href: '/transactions',
+        title: isId ? 'Transaksi' : 'Transactions',
+        hint: isId ? 'Lihat order dan dana.' : 'Review orders and funds.',
+        icon: ReceiptText,
+        tone: 'border-[color:var(--app-info-border)] bg-[color:var(--app-info-soft)] text-[color:var(--app-info)]',
+      },
+      {
+        href: '/support',
+        title: isId ? 'Bantuan' : 'Support',
+        hint: isId
+          ? 'Kalau pembayaran bermasalah.'
+          : 'When payments need help.',
+        icon: ShieldCheck,
+        tone: 'border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] text-[color:var(--app-warning)]',
+      },
+    ];
 
   const quickRoutes = [
     {
@@ -207,11 +207,11 @@ export default async function LainnyaPage({ params }: PageProps) {
     },
     ...(!PROMO_ONLY_MODE
       ? [
-          {
-            href: '/payments',
-            label: isId ? 'Saldo' : 'Balance',
-          },
-        ]
+        {
+          href: '/payments',
+          label: isId ? 'Saldo' : 'Balance',
+        },
+      ]
       : []),
   ];
 
@@ -352,22 +352,22 @@ export default async function LainnyaPage({ params }: PageProps) {
     },
     ...(!PROMO_ONLY_MODE
       ? [
-          {
-            eyebrow: isId ? 'Pembayaran' : 'Finance',
-            title: isId
-              ? 'Saldo, transaksi, bantuan'
-              : 'Balance, transactions, support',
-            hint: isId
-              ? 'Kalau uang sudah mulai jalan.'
-              : 'When money starts moving.',
-            meta: isId ? 'Keuangan' : 'Finance',
-            href: '/payments',
-            cta: isId ? 'Keuangan' : 'Open finance',
-            icon: Wallet,
-            toneClass:
-              'from-emerald-500/18 via-emerald-400/10 to-transparent',
-          },
-        ]
+        {
+          eyebrow: isId ? 'Pembayaran' : 'Finance',
+          title: isId
+            ? 'Saldo, transaksi, bantuan'
+            : 'Balance, transactions, support',
+          hint: isId
+            ? 'Kalau uang sudah mulai jalan.'
+            : 'When money starts moving.',
+          meta: isId ? 'Keuangan' : 'Finance',
+          href: '/payments',
+          cta: isId ? 'Keuangan' : 'Open finance',
+          icon: Wallet,
+          toneClass:
+            'from-emerald-500/18 via-emerald-400/10 to-transparent',
+        },
+      ]
       : []),
   ];
 
@@ -378,7 +378,7 @@ export default async function LainnyaPage({ params }: PageProps) {
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1.04fr)_minmax(320px,0.96fr)]">
             <div className="min-w-0">
               <p className="ui-page-eyebrow">{isId ? 'Lainnya' : 'More'}</p>
-              <h1 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)] sm:text-[2rem]">
+              <h1 className="mt-2 text-2xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-[2rem]">
                 {isId ? 'Mau ke mana?' : 'Open what you need now.'}
               </h1>
               <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[color:var(--app-text-soft)]">
@@ -443,10 +443,10 @@ export default async function LainnyaPage({ params }: PageProps) {
         <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="rounded-[22px] border border-[color:var(--app-border)]/80 bg-[color:var(--app-surface-strong)] px-3 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
                 {isId ? 'Shortcut' : 'Shortcuts'}
               </p>
-              <h2 className="mt-1.5 text-base font-black text-[color:var(--app-text)]">
+              <h2 className="mt-1.5 text-base font-bold text-[color:var(--app-text)]">
                 {isId ? 'Yang sering dipakai' : 'The four most-used buttons'}
               </h2>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -492,10 +492,10 @@ export default async function LainnyaPage({ params }: PageProps) {
 
         <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
           <div className="flex flex-col gap-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
               {isId ? 'Halaman bernilai' : 'Useful pages'}
             </p>
-            <h2 className="text-base font-black text-[color:var(--app-text)]">
+            <h2 className="text-base font-bold text-[color:var(--app-text)]">
               {isId
                 ? 'Yang disimpan karena membantu user'
                 : 'Kept because they help users'}
@@ -516,10 +516,10 @@ export default async function LainnyaPage({ params }: PageProps) {
 
         <section className="ui-panel ui-feed-section rounded-none border-x-0 p-4 sm:rounded-[28px] sm:border-x sm:p-4">
           <div className="flex flex-col gap-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
               {isId ? 'Jalur kanonis' : 'Canonical routes'}
             </p>
-            <h2 className="text-base font-black text-[color:var(--app-text)]">
+            <h2 className="text-base font-bold text-[color:var(--app-text)]">
               {isId
                 ? 'Halaman lama diarahkan ke pencarian'
                 : 'Older pages now point to search'}

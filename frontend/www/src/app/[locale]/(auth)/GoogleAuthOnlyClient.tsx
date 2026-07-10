@@ -45,7 +45,7 @@ export default function GoogleAuthOnlyClient({ mode }: Props) {
   }, [pathname]);
   const isId = locale === 'id';
   const googleHref = `/api/auth/google?callbackUrl=${encodeURIComponent(
-    callbackUrl || `/${locale}/dashboard`,
+    callbackUrl || `/${locale}/profile`,
   )}`;
   const mappedError = rawError ? errorCopy[rawError] : null;
 
@@ -76,7 +76,7 @@ export default function GoogleAuthOnlyClient({ mode }: Props) {
       <div className="space-y-3.5">
         <a
           href={googleHref}
-          className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-strong)]"
+          className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface-strong)]"
         >
           <svg width="24" height="24" viewBox="-0.5 0 48 48" version="1.1" xmlns="http://www.w3.org/2000/svg">
 

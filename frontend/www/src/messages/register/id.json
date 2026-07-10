@@ -1,22 +1,22 @@
 {
   "register": {
-    "title": "Daftar Akun Baru",
-    "subtitle": "Isi semua data untuk membuat akun Anda.",
-    "email_label": "Alamat Email",
+    "title": "Buat akun baru",
+    "subtitle": "Isi data utama dulu. Nanti bisa kamu lengkapi lagi.",
+    "email_label": "Email",
     "email_placeholder": "user@example.com",
     "password_label": "Kata Sandi",
     "password_placeholder": "Minimal 6 karakter",
-    "confirm_password_label": "Konfirmasi Kata Sandi",
+    "confirm_password_label": "Ulangi kata sandi",
     "confirm_password_placeholder": "Ulangi kata sandi",
     "register_button": "Daftar",
     "registering": "Mendaftar...",
     "error_password_mismatch": "Kata sandi tidak cocok.",
     "error_password_length": "Kata sandi minimal 6 karakter.",
     "error_register_failed": "Registrasi gagal.",
-    "success_registered": "Registrasi berhasil! Anda dapat masuk sekarang.",
+    "success_registered": "Akun sudah dibuat. Kamu bisa masuk sekarang.",
     "have_account": "Sudah punya akun?",
-    "login_link": "Masuk Sekarang",
-    "banner_title": "Mulai Perjalanan Anda",
-    "banner_subtitle": "Buat akun baru Anda untuk menikmati semua fitur kami."
+    "login_link": "Masuk sekarang",
+    "banner_title": "Mulai dari satu akun",
+    "banner_subtitle": "Cari kebutuhan, buat postingan, dan lanjutkan chat dengan lebih rapi."
   }
 }

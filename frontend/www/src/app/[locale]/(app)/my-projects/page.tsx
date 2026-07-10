@@ -473,11 +473,11 @@ function buildRequestAnalytics(item: RequestCardView): RequestAnalytics {
   const dealReadiness = clampNumber(
     Math.round(
       34 +
-        offerCount * 12 +
-        savedToCart * 0.45 +
-        chatLeads * 0.75 +
-        (tone === 'completed' ? 26 : 0) -
-        waitingPenalty,
+      offerCount * 12 +
+      savedToCart * 0.45 +
+      chatLeads * 0.75 +
+      (tone === 'completed' ? 26 : 0) -
+      waitingPenalty,
     ),
     18,
     96,
@@ -545,10 +545,10 @@ function buildProjectAnalytics(cards: RequestCardView[]): ProjectAnalytics {
   const dealReadiness = clampNumber(
     Math.round(
       35 +
-        highIntentCount * 8 +
-        totalOffers * 4 +
-        completedCount * 6 -
-        waitingCount * 4,
+      highIntentCount * 8 +
+      totalOffers * 4 +
+      completedCount * 6 -
+      waitingCount * 4,
     ),
     20,
     96,
@@ -736,7 +736,7 @@ function SummaryCard({
         <Icon className="h-4.5 w-4.5" />
       </span>
       <div className="min-w-0">
-        <p className="text-[1.35rem] font-black leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <p className="text-[1.35rem] font-bold leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {value}
         </p>
         <p className="mt-1 truncate text-[11px] font-bold leading-tight text-[color:var(--app-text-soft)]">
@@ -795,7 +795,7 @@ function ProjectFocusCard({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${statusPillClass(item.status)}`}
+                  className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusPillClass(item.status)}`}
                 >
                   {focusLabel}
                 </span>
@@ -803,7 +803,7 @@ function ProjectFocusCard({
                   {item.createdLabel}
                 </span>
               </div>
-              <h2 className="mt-2 line-clamp-2 text-xl font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              <h2 className="mt-2 line-clamp-2 text-xl font-bold leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                 {item.title}
               </h2>
               <p className="mt-2 line-clamp-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -833,10 +833,10 @@ function ProjectFocusCard({
 
         <div className="grid min-w-0 gap-2">
           <div className="rounded-[18px] bg-[color:var(--app-surface-muted)] p-3 ring-1 ring-[color:var(--app-border)]">
-            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-text-soft)]">
               Kesiapan deal
             </p>
-            <p className="mt-1 text-2xl font-black text-[color:var(--app-accent)]">
+            <p className="mt-1 text-2xl font-bold text-[color:var(--app-accent)]">
               {analytics.dealReadiness}%
             </p>
             <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -847,14 +847,14 @@ function ProjectFocusCard({
             <button
               type="button"
               onClick={onSelect}
-              className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-text)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] dark:bg-white dark:text-slate-950"
+              className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-full bg-[color:var(--app-text)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] dark:bg-white dark:text-slate-950"
             >
               <FileText className="h-3.5 w-3.5" />
               Detail
             </button>
             <Link
               href={secondaryHref}
-              className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-xs font-black text-[color:var(--app-text-inverse)]"
+              className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-3 text-xs font-bold text-[color:var(--app-text-inverse)]"
             >
               {secondaryLabel}
               <ArrowRight className="h-3.5 w-3.5" />
@@ -890,10 +890,10 @@ function AnalyticsCard({
     <article className="min-w-0 overflow-hidden rounded-[15px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_12px_26px_-28px_rgba(15,23,42,0.18)]">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+          <p className="truncate text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
             {label}
           </p>
-          <p className="mt-1 text-[1.2rem] font-black leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.35rem]">
+          <p className="mt-1 text-[1.2rem] font-bold leading-none tracking-[-0.03em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.35rem]">
             {value}
           </p>
         </div>
@@ -947,10 +947,10 @@ function ProjectFunnelPanel({ analytics }: { analytics: ProjectAnalytics }) {
     <section className="min-w-0 overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_12px_28px_-30px_rgba(15,23,42,0.18)] sm:p-3">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
             Alur Proyek
           </p>
-          <h2 className="mt-0.5 text-sm font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+          <h2 className="mt-0.5 text-sm font-bold tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
             Dari dilihat sampai jadi tawaran
           </h2>
         </div>
@@ -968,7 +968,7 @@ function ProjectFunnelPanel({ analytics }: { analytics: ProjectAnalytics }) {
                 <span className="min-w-0 truncate font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {stage.label}
                 </span>
-                <span className="shrink-0 font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <span className="shrink-0 font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {formatNumberId(stage.value)}
                 </span>
               </div>
@@ -1000,10 +1000,10 @@ function ProjectSuggestionPanel({
     <section className="min-w-0 overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--app-border)_84%,transparent)] bg-[color:var(--app-surface-strong)] p-2.5 shadow-[0_12px_28px_-30px_rgba(15,23,42,0.18)] sm:p-3">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
             Saran Hari Ini
           </p>
-          <h2 className="mt-0.5 text-sm font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+          <h2 className="mt-0.5 text-sm font-bold tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
             Biar proyek lebih cepat jalan
           </h2>
         </div>
@@ -1013,10 +1013,10 @@ function ProjectSuggestionPanel({
       </div>
 
       <div className="mt-2 rounded-[13px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2">
-        <p className="text-[11px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
           Paling siap deal
         </p>
-        <p className="mt-1 line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        <p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {analytics.bestProjectTitle}
         </p>
         <p className="mt-1 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1047,13 +1047,13 @@ function ProjectSuggestionPanel({
                   <Icon className="h-3.5 w-3.5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h3 className="line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[13px]">
+                  <h3 className="line-clamp-1 text-[12px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[13px]">
                     {suggestion.title}
                   </h3>
                   <p className="mt-0.5 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
                     {suggestion.description}
                   </p>
-                  <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-[color:var(--app-accent)]">
+                  <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-[color:var(--app-accent)]">
                     {suggestion.actionLabel}
                     <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
                   </span>
@@ -1093,10 +1093,10 @@ function ProjectInsightsDisclosure({
             <BarChart3 className="h-3.5 w-3.5" />
           </span>
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-accent)]">
               Analitik & saran
             </p>
-            <h2 className="mt-0.5 truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+            <h2 className="mt-0.5 truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
               Ringkasan progres
             </h2>
             <p className="mt-0.5 line-clamp-1 text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
@@ -1110,7 +1110,7 @@ function ProjectInsightsDisclosure({
             {analyticsCards.slice(0, 3).map(item => (
               <span
                 key={item.label}
-                className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text)]"
+                className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text)]"
               >
                 {item.label}: {item.value}
               </span>
@@ -1132,7 +1132,7 @@ function ProjectInsightsDisclosure({
               <p className="truncate text-[10px] font-bold text-[color:var(--app-text-soft)]">
                 {item.label}
               </p>
-              <p className="mt-0.5 truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              <p className="mt-0.5 truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                 {item.value}
               </p>
             </div>
@@ -1166,7 +1166,7 @@ function ProjectInsightsDisclosure({
           </p>
           <Link
             href="/usaha/analytics"
-            className="inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-black text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)]"
+            className="inline-flex min-h-9 items-center justify-center rounded-[12px] bg-[color:var(--app-accent)] px-3 text-[12px] font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)]"
           >
             Buka analitik
           </Link>
@@ -1189,7 +1189,7 @@ function DetailMetric({
     <div className="min-w-0 overflow-hidden rounded-[13px] border border-[color:color-mix(in_srgb,var(--app-border)_86%,white_14%)] bg-[color:var(--app-surface-muted)] px-2.5 py-2">
       <div className="flex items-center gap-1.5 text-[color:var(--app-accent)]">
         <Icon className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate text-[9px] font-black uppercase tracking-[0.08em] sm:text-[10px]">
+        <span className="truncate text-[9px] font-bold uppercase tracking-[0.08em] sm:text-[10px]">
           {label}
         </span>
       </div>
@@ -1277,7 +1277,7 @@ function RequestListCard({
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span
-              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-black ${statusPillClass(item.status)}`}
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusPillClass(item.status)}`}
             >
               {displayStatusLabel(item.status)}
             </span>
@@ -1285,7 +1285,7 @@ function RequestListCard({
               {item.createdLabel}
             </span>
           </div>
-          <h3 className="mt-1.5 line-clamp-2 text-base font-black leading-5 tracking-[-0.01em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <h3 className="mt-1.5 line-clamp-2 text-base font-bold leading-5 tracking-[-0.01em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {item.title}
           </h3>
           <p className="mt-1.5 line-clamp-2 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -1299,7 +1299,7 @@ function RequestListCard({
         <div className="shrink-0 rounded-[16px] bg-[color:var(--app-surface-muted)] px-2.5 py-2 text-center ring-1 ring-[color:var(--app-border)] transition group-hover:ring-[color:var(--app-accent-border)]">
           <p
             className={cn(
-              'text-lg font-black leading-none',
+              'text-lg font-bold leading-none',
               completed
                 ? 'text-[color:var(--app-text)]'
                 : 'text-[color:var(--app-accent)]',
@@ -1315,27 +1315,27 @@ function RequestListCard({
 
       <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="min-w-0 rounded-[15px] bg-[color:var(--app-surface-muted)] px-3 py-2 ring-1 ring-[color:var(--app-border)]">
-          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
             <Wallet className="h-3.5 w-3.5" />
             Budget
           </div>
-          <p className="mt-1 line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <p className="mt-1 line-clamp-1 text-[12px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {item.detail.budgetLabel}
           </p>
         </div>
         <div className="min-w-0 rounded-[15px] bg-[color:var(--app-surface-muted)] px-3 py-2 ring-1 ring-[color:var(--app-border)]">
-          <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-text-soft)]">
             <Clock3 className="h-3.5 w-3.5" />
             Deadline
           </div>
-          <p className="mt-1 line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+          <p className="mt-1 line-clamp-1 text-[12px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
             {item.detail.deadlineLabel}
           </p>
         </div>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:var(--app-border)] pt-3">
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-black text-[color:var(--app-accent)]">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-bold text-[color:var(--app-accent)]">
           <FileText className="h-3.5 w-3.5" />
           {nextAction}
         </span>
@@ -1351,7 +1351,7 @@ function OfferCard({ offer }: { offer: OfferPreview }) {
   return (
     <article className="min-w-0 overflow-hidden rounded-[14px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] p-2.5 sm:p-3">
       <div className="min-w-0">
-        <h4 className="truncate text-[13px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
+        <h4 className="truncate text-[13px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
           {offer.vendor}
         </h4>
         <p className="mt-0.5 text-[10px] text-[color:var(--app-text-soft)] sm:mt-1 sm:text-[11px]">
@@ -1416,7 +1416,7 @@ function RequestDetailDialog({
       <button
         type="button"
         aria-label="Tutup detail"
-        className="absolute inset-0 bg-slate-950/48 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/48 "
         onClick={onClose}
       />
 
@@ -1426,7 +1426,7 @@ function RequestDetailDialog({
         aria-labelledby="request-detail-title"
         className="relative z-10 flex max-h-[calc(100svh-1.5rem)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_80px_-38px_rgba(15,23,42,0.55)] sm:max-h-[calc(100svh-2.5rem)] sm:rounded-[26px]"
       >
-        <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] px-3 py-2.5 backdrop-blur-xl sm:px-4 sm:py-3">
+        <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] px-3 py-2.5  sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
             <ProjectThumbnail item={request} variant="detail" />
             <div className="min-w-0 flex-1">
@@ -1442,7 +1442,7 @@ function RequestDetailDialog({
               </div>
               <h2
                 id="request-detail-title"
-                className="mt-1 line-clamp-2 text-[1rem] font-black leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.25rem]"
+                className="mt-1 line-clamp-2 text-[1rem] font-bold leading-tight tracking-[-0.025em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.25rem]"
               >
                 {request.title}
               </h2>
@@ -1541,7 +1541,7 @@ function RequestDetailDialog({
           <section className="mt-3 min-w-0 overflow-hidden rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-muted)] p-2.5 sm:p-3">
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                   Analitik singkat
                 </h3>
                 <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)] sm:text-xs">
@@ -1565,7 +1565,7 @@ function RequestDetailDialog({
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                       <Icon className="h-3.5 w-3.5" />
                     </span>
-                    <h4 className="mt-2 line-clamp-1 text-[12px] font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <h4 className="mt-2 line-clamp-1 text-[12px] font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {suggestion.title}
                     </h4>
                     <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -1580,7 +1580,7 @@ function RequestDetailDialog({
           <section className="mt-3 min-w-0 overflow-hidden rounded-[16px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-muted)] p-2.5 sm:p-3">
             <div className="flex min-w-0 items-center justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
+                <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-base">
                   Tawaran Masuk
                 </h3>
                 <p className="mt-0.5 text-[11px] text-[color:var(--app-text-soft)] sm:text-xs">
@@ -1888,7 +1888,7 @@ export default function MyProjectsPage() {
             <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-[20px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
               <ShieldCheck className="h-6 w-6" />
             </span>
-            <h2 className="mt-4 text-2xl font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <h2 className="mt-4 text-2xl font-bold tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Masuk dulu
             </h2>
             <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -1897,7 +1897,7 @@ export default function MyProjectsPage() {
             </p>
             <Link
               href="/login"
-              className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-6 text-sm font-black text-[color:var(--app-text-inverse)]"
+              className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-6 text-sm font-bold text-[color:var(--app-text-inverse)]"
             >
               Masuk
             </Link>
@@ -1915,7 +1915,7 @@ export default function MyProjectsPage() {
             <span className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-[22px] bg-white/70 text-[color:var(--app-accent)] ring-1 ring-[color:var(--app-accent-border)] dark:bg-slate-950/50">
               <ClipboardList className="h-7 w-7" />
             </span>
-            <h2 className="mt-4 text-2xl font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <h2 className="mt-4 text-2xl font-bold tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               Belum ada kebutuhan
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -1924,7 +1924,7 @@ export default function MyProjectsPage() {
             </p>
             <Link
               href="/create"
-              className="mt-5 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-6 text-sm font-black text-[color:var(--app-text-inverse)]"
+              className="mt-5 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-6 text-sm font-bold text-[color:var(--app-text-inverse)]"
             >
               <Plus className="h-4 w-4" />
               Buat kebutuhan pertama
@@ -1941,11 +1941,11 @@ export default function MyProjectsPage() {
         <section className="min-w-0 overflow-hidden rounded-[26px] border border-[color:color-mix(in_srgb,var(--app-border)_78%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--app-surface-strong)_94%,white)_0%,color-mix(in_srgb,var(--app-info-soft)_28%,var(--app-surface-strong))_54%,color-mix(in_srgb,var(--app-accent-soft)_22%,var(--app-surface-strong))_100%)] p-4 shadow-[0_22px_48px_-42px_rgba(15,23,42,0.36)] sm:p-5">
           <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/74 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-[color:var(--app-accent)] ring-1 ring-[color:color-mix(in_srgb,var(--app-accent-border)_72%,transparent)] dark:bg-slate-950/54">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/74 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[color:var(--app-accent)] ring-1 ring-[color:color-mix(in_srgb,var(--app-accent-border)_72%,transparent)] dark:bg-slate-950/54">
                 <ClipboardList className="h-3.5 w-3.5" />
                 Workspace Proyek
               </div>
-              <h1 className="mt-3 text-[1.65rem] font-black leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[2.15rem]">
+              <h1 className="mt-3 text-[1.65rem] font-bold leading-tight tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[2.15rem]">
                 Semua kebutuhan usaha, tawaran, dan chat proyek dalam satu
                 tempat.
               </h1>
@@ -1956,14 +1956,14 @@ export default function MyProjectsPage() {
               <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                 <Link
                   href="/create"
-                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-black text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_-26px_color-mix(in_srgb,var(--app-accent)_58%,transparent)]"
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_-26px_color-mix(in_srgb,var(--app-accent)_58%,transparent)]"
                 >
                   <Plus className="h-4 w-4" />
                   Buat kebutuhan baru
                 </Link>
                 <Link
                   href="/chat"
-                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white/76 px-5 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] dark:bg-slate-950/56 dark:text-[color:var(--app-text-inverse)]"
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-white/76 px-5 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] dark:bg-slate-950/56 dark:text-[color:var(--app-text-inverse)]"
                 >
                   <MessageCircleMore className="h-4 w-4" />
                   Buka chat
@@ -2002,7 +2002,7 @@ export default function MyProjectsPage() {
                     <Store className="h-4.5 w-4.5" />
                   </span>
                   <div className="min-w-0">
-                    <h2 className="text-lg font-black tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <h2 className="text-lg font-bold tracking-[-0.02em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       Daftar proyek
                     </h2>
                     <p className="mt-0.5 text-sm text-[color:var(--app-text-soft)]">
@@ -2022,7 +2022,7 @@ export default function MyProjectsPage() {
                         type="button"
                         onClick={() => setProjectFilter(option.key)}
                         className={cn(
-                          'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-black transition',
+                          'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition',
                           active
                             ? 'bg-[color:var(--app-surface-strong)] text-[color:var(--app-accent)] shadow-sm ring-1 ring-[color:var(--app-accent-border)]'
                             : 'text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-strong)] hover:text-[color:var(--app-text)]',
@@ -2051,7 +2051,7 @@ export default function MyProjectsPage() {
                   ))
                 ) : (
                   <div className="rounded-[20px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-sm text-[color:var(--app-text-soft)] md:col-span-2">
-                    <p className="font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <p className="font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       Belum ada proyek{' '}
                       {projectFilterLabel(projectFilter).toLowerCase()}.
                     </p>

@@ -1,49 +1,49 @@
 {
   "Home": {
     "hero": {
-      "badge": "🔥 Alert 2026: Ekonomi Berbagi Bergerak Tanpa Anda",
-      "title_part1": "Berhenti Buang Uang,",
-      "title_highlight": "Setiap Detik Aset Anda Menganggur.",
-      "description": "Saat Anda menunggu, ribuan orang sudah mengubah aset diam mereka menjadi aliran cuan harian yang konsisten. Jangan biarkan potensi Anda menguap—gabung ke ekosistem sekarang sebelum akses gratis ditutup.",
-      "cta": "Amankan Slot Anda Sekarang",
-      "user_count": "12.400+ Sudah Menghasilkan",
-      "trust_label": "Ekosistem Terverifikasi",
-      "trust_sublabel": "Pendaftaran Gratis Segera Berakhir",
-      "feature1": "Aktivasi Instan",
-      "feature2": "Jaringan Permintaan Tinggi"
+      "badge": "Kebutuhan usaha dalam satu tempat",
+      "title_part1": "Cari kebutuhan usaha",
+      "title_highlight": "lebih cepat dan jelas.",
+      "description": "Temukan mesin, bahan, jasa, tempat usaha, dan penyedia lokal. Mulai dari pencarian sederhana, lalu hubungi langsung saat sudah cocok.",
+      "cta": "Cari sekarang",
+      "user_count": "Dipakai untuk cari dan menawarkan kebutuhan usaha",
+      "trust_label": "Langsung ke penyedia",
+      "trust_sublabel": "Cek profil dan detail sebelum lanjut",
+      "feature1": "Cari lintas kategori",
+      "feature2": "Kontak penyedia lebih mudah"
     },
     "visual": {
-      "badge": "Wujudkan Impianmu",
-      "core_title": "Mulai Melaju,\nPanen Cuan",
-      "item1": "Cuan",
-      "item2": "Mobil",
-      "item3": "Aset",
-      "item4": "Rumah",
+      "badge": "Mulai dari kebutuhanmu",
+      "core_title": "Cari, bandingkan,\nhubungi",
+      "item1": "Bahan",
+      "item2": "Mesin",
+      "item3": "Jasa",
+      "item4": "Tempat",
       "item5": "Hobi",
       "item6": "Bisnis",
-      "notif1": "Aset Tersewa! +Rp2jt",
-      "notif2": "Barang Terjual! ✅"
+      "notif1": "Penyedia ditemukan",
+      "notif2": "Chat siap dikirim"
     },
     "activityCard": {
-      "badge": "🚀 Peluang Tanpa Batas",
-      "title_part1": "Ubah Aset Jadi",
-      "title_highlight": "Penghasilan.",
-      "description": "Jangan biarkan barang atau keahlianmu menganggur. Mulai sewakan, jual, atau tawarkan jasamu sekarang juga.",
-      "cta": "Mulai Melaju",
+      "badge": "Mulai lebih simpel",
+      "title_part1": "Punya kebutuhan atau",
+      "title_highlight": "tawaran usaha?",
+      "description": "Pasang kebutuhan, tawarkan produk atau jasa, lalu lanjutkan obrolan dengan orang yang cocok.",
+      "cta": "Buat postingan",
       "features": {
-        "f1": "Passive Income",
-        "f2": "Ekosistem Aman",
-        "f3": "Pasar Global",
-        "f4": "Cair Instan"
+        "f1": "Posting cepat",
+        "f2": "Kontak langsung",
+        "f3": "Kategori usaha",
+        "f4": "Bisa dilengkapi nanti"
       }
     },
     "heroSection": {
       "ariaLabel": "Ringkasan platform dan metrik kinerja"
     },
-    "heroTagline": "Tingkatkan Kariermu",
-    "heroMain": "Temukan Pekerjaan, Proyek & Peluang Global",
-    "heroDesc": "Bergabung dengan Lajukan untuk bekerja, menghasilkan, dan menjelajah dunia—pekerjaan, freelance, marketplace, properti, dan travel.",
-    "audienceTitle": "Untuk Semua Orang, Di Mana Saja",
+    "heroTagline": "Temukan kebutuhan usahamu",
+    "heroMain": "Cari supplier, jasa, alat, dan tempat usaha",
+    "heroDesc": "Lajukan membantu kamu menemukan kebutuhan usaha dan menghubungi penyedia yang sesuai.",
+    "audienceTitle": "Dibuat untuk kebutuhan usaha lokal",
     "audiences": {
       "cariKerja": "Cari Pekerjaan Cepat",
       "jualJasa": "Dapatkan Proyek Freelance",
@@ -51,28 +51,28 @@
       "properti": "Investasi & Temukan Properti",
       "travel": "Jelajahi Trip & Promo"
     },
-    "btnStart": "Mulai Sekarang",
+    "btnStart": "Mulai cari",
     "btnFeatures": "Lihat Fitur",
     "Overview": {
       "kpi": {
         "transaksi": "Transaksi",
         "pengguna": "Pengguna"
       },
-      "socialProof": "Dipercaya oleh ribuan pengguna di seluruh dunia."
+      "socialProof": "Dibuat untuk pencari kebutuhan dan penyedia usaha."
     },
     "Marketplace": {
       "kpi": {
         "pelakuUsaha": "Penjual",
         "pesanan": "Pesanan"
       },
-      "socialProof": "Lebih dari 15.000 penjual aktif secara global."
+      "socialProof": "Temukan produk, jasa, dan penyedia yang relevan."
     },
     "Properties": {
       "kpi": {
-        "listing": "Listing Properti",
+        "listing": "Tempat usaha",
         "transaksi": "Transaksi"
       },
-      "socialProof": "Platform terkemuka untuk listing properti terpercaya."
+      "socialProof": "Cari ruko, kios, dan tempat usaha yang sesuai kebutuhanmu."
     },
     "featured": {
       "title": "Fitur Unggulan"
@@ -85,7 +85,7 @@
     },
     "features": {
       "title": "Modul & Fitur Utama",
-      "description": "Lajukan adalah SuperApp untuk bekerja, aset, belajar, dan menjelajah.",
+      "description": "Lajukan membantu kamu mencari, menawarkan, dan mengelola kebutuhan usaha.",
       "jobs": {
         "title": "Pasar Kerja",
         "desc": "Lamar pekerjaan global"
@@ -100,11 +100,11 @@
       },
       "marketplace": {
         "title": "Marketplace & UMKM",
-        "desc": "Beli & jual secara global"
+        "desc": "Cari dan tawarkan kebutuhan usaha"
       },
       "property": {
         "title": "Marketplace Properti",
-        "desc": "Temukan & kelola listing"
+        "desc": "Temukan dan kelola tempat usaha"
       },
       "travel": {
         "title": "Travel & Booking",
@@ -115,8 +115,8 @@
         "desc": "Jual beli aset game aman"
       },
       "payments": {
-        "title": "Escrow & Pembayaran Pintar",
-        "desc": "Transaksi global aman"
+        "title": "Pembayaran Aman",
+        "desc": "Segera hadir bertahap"
       },
       "education": {
         "title": "Pendidikan & Sertifikasi",
@@ -220,7 +220,7 @@
       "description": "Sederhanakan manajemen SDM dan penggajian global."
     },
     "welcomeBack": "Selamat datang kembali",
-    "dashboardReady": "Dashboard Anda siap digunakan.",
+    "dashboardReady": "Dashboard kamu siap digunakan.",
     "seeMore": "Lihat Lainnya"
   }
 }

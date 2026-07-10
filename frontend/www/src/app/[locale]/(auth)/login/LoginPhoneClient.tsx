@@ -123,33 +123,33 @@ export default function LoginPhoneClient() {
   const shellHighlights =
     locale === 'id'
       ? [
-          {
-            title: 'Nomor aktif',
-            description: 'Pakai nomor yang kamu pakai sekarang.',
-          },
-          {
-            title: 'Akses ringan',
-            description: 'Login dibuat tanpa kode tambahan di layar publik.',
-          },
-          {
-            title: 'Data aman',
-            description: 'Draft, chat, dan transaksi tetap tersimpan.',
-          },
-        ]
+        {
+          title: 'Nomor aktif',
+          description: 'Pakai nomor yang kamu pakai sekarang.',
+        },
+        {
+          title: 'Akses ringan',
+          description: 'Login dibuat tanpa kode tambahan di layar publik.',
+        },
+        {
+          title: 'Data aman',
+          description: 'Draft, chat, dan transaksi tetap tersimpan.',
+        },
+      ]
       : [
-          {
-            title: 'Active phone',
-            description: 'Use the number you use right now.',
-          },
-          {
-            title: 'Light access',
-            description: 'Public login stays free from extra code prompts.',
-          },
-          {
-            title: 'Data stays ready',
-            description: 'Drafts, chats, and transactions stay saved.',
-          },
-        ];
+        {
+          title: 'Active phone',
+          description: 'Use the number you use right now.',
+        },
+        {
+          title: 'Light access',
+          description: 'Public login stays free from extra code prompts.',
+        },
+        {
+          title: 'Data stays ready',
+          description: 'Drafts, chats, and transactions stay saved.',
+        },
+      ];
   const shellHelperText = '';
 
   const authInputClass =
@@ -521,7 +521,7 @@ export default function LoginPhoneClient() {
           <p className="min-w-0 flex-1 text-sm font-bold text-[color:var(--app-text)]">
             {locale === 'id' ? 'Akun tersimpan' : 'Saved accounts'}
           </p>
-          <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1 text-[10px] font-black text-[color:var(--app-text-soft)]">
+          <span className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface)] px-2 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)]">
             {savedAccounts.length}/8
           </span>
         </div>
@@ -533,11 +533,10 @@ export default function LoginPhoneClient() {
             return (
               <div
                 key={account.id}
-                className={`grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 rounded-[16px] border p-1.5 transition ${
-                  selected
+                className={`grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 rounded-[16px] border p-1.5 transition ${selected
                     ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
                     : 'border-[color:var(--app-border)] bg-[color:var(--app-surface)]'
-                }`}
+                  }`}
               >
                 <button
                   type="button"
@@ -566,7 +565,7 @@ export default function LoginPhoneClient() {
                     </span>
                   </span>
                   {selected ? (
-                    <span className="inline-flex rounded-full bg-[color:var(--app-surface)] px-2 py-1 text-[10px] font-black text-[color:var(--app-accent)]">
+                    <span className="inline-flex rounded-full bg-[color:var(--app-surface)] px-2 py-1 text-[10px] font-bold text-[color:var(--app-accent)]">
                       {locale === 'id' ? 'Dipilih' : 'Selected'}
                     </span>
                   ) : null}

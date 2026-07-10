@@ -6,6 +6,14 @@ param(
     [switch]$NoBuild,
     [switch]$PullLatest,
     [switch]$SkipCleanup,
+    [switch]$WithAi,
+    [switch]$NoAi,
+    [switch]$PullAiModels,
+    [switch]$SkipAiModels,
+    [switch]$SkipAiWarmup,
+    [switch]$AiTextOnly,
+    [string]$AiBusinessModel = "llama3.2:3b",
+    [string]$AiVisionModel = "moondream:latest",
     [string[]]$Services
 )
 
@@ -18,6 +26,48 @@ if (-not $PSBoundParameters.ContainsKey('SkipCleanup')) {
 
 $RuntimeDir = Join-Path $PSScriptRoot ".runtime"
 $StartupStateFile = Join-Path $RuntimeDir "stack-startup.json"
+
+function Get-EnvFileValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line -match '^\s*#') {
+            continue
+        }
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') {
+            if ($matches[1] -ne $Name) {
+                continue
+            }
+            $value = $matches[2].Trim()
+            if (
+                ($value.StartsWith('"') -and $value.EndsWith('"')) -or
+                ($value.StartsWith("'") -and $value.EndsWith("'"))
+            ) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            return $value
+        }
+    }
+
+    return $null
+}
+
+function Test-TruthyEnvValue {
+    param([AllowNull()][string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $false
+    }
+    return $Value.Trim() -match '^(1|true|yes|on|enabled)$'
+}
 
 function Write-StartupState {
     param(
@@ -76,6 +126,93 @@ $env:COMPOSE_DOCKER_CLI_BUILD = "1"
 $env:COMPOSE_PARALLEL_LIMIT = "6"
 $env:BUILDKIT_PROGRESS = "plain"
 
+$aiEnabled = $false
+if ($Mode -eq "dev" -and -not $NoAi) {
+    $aiEnabled = $true
+}
+if ($WithAi) {
+    $aiEnabled = $true
+}
+if ($NoAi) {
+    $aiEnabled = $false
+}
+
+$shouldPullAiModels = $aiEnabled -and -not $SkipAiModels
+if ($PullAiModels) {
+    $shouldPullAiModels = $true
+}
+
+$imageAiAssistSetting = $env:IMAGE_AI_ASSIST_ENABLED
+if ([string]::IsNullOrWhiteSpace($imageAiAssistSetting)) {
+    $imageAiAssistSetting = Get-EnvFileValue -Path $EnvFile -Name "IMAGE_AI_ASSIST_ENABLED"
+}
+if ([string]::IsNullOrWhiteSpace($imageAiAssistSetting)) {
+    $imageAiAssistSetting = Get-EnvFileValue -Path $EnvFile -Name "NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED"
+}
+$imageAiAssistEnabled = Test-TruthyEnvValue -Value $imageAiAssistSetting
+if (-not $imageAiAssistEnabled -and -not $PSBoundParameters.ContainsKey('AiTextOnly')) {
+    $AiTextOnly = $true
+}
+if (-not $imageAiAssistEnabled) {
+    $env:IMAGE_AI_ASSIST_ENABLED = "false"
+    $env:NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED = "false"
+}
+
+$skipAiWarmupSetting = $env:SKIP_AI_WARMUP
+if ([string]::IsNullOrWhiteSpace($skipAiWarmupSetting)) {
+    $skipAiWarmupSetting = Get-EnvFileValue -Path $EnvFile -Name "SKIP_AI_WARMUP"
+}
+if (
+    (Test-TruthyEnvValue -Value $skipAiWarmupSetting) -and
+    -not $PSBoundParameters.ContainsKey('SkipAiWarmup')
+) {
+    $SkipAiWarmup = $true
+}
+
+if ($aiEnabled) {
+    $profiles = @()
+    if (-not [string]::IsNullOrWhiteSpace($env:COMPOSE_PROFILES)) {
+        $profiles += @($env:COMPOSE_PROFILES -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+    }
+    if ($profiles -notcontains "ai") {
+        $profiles += "ai"
+    }
+    $env:COMPOSE_PROFILES = (($profiles | Select-Object -Unique) -join ",")
+    $env:USE_OLLAMA = "true"
+    $env:OLLAMA_URL = "http://ollama:11434"
+    $env:OLLAMA_MODEL = $AiBusinessModel
+    $env:OLLAMA_BUSINESS_MODEL = $AiBusinessModel
+    if ([string]::IsNullOrWhiteSpace($env:OLLAMA_KEEP_ALIVE)) {
+        $env:OLLAMA_KEEP_ALIVE = "10m"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:OLLAMA_NUM_PARALLEL)) {
+        $env:OLLAMA_NUM_PARALLEL = "1"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:OLLAMA_MAX_LOADED_MODELS)) {
+        $env:OLLAMA_MAX_LOADED_MODELS = "1"
+    }
+    if (-not $AiTextOnly) {
+        $env:OLLAMA_VISION_MODEL = $AiVisionModel
+    }
+
+    Write-Host "Local AI enabled via Docker profile 'ai'. Business model: $AiBusinessModel" -ForegroundColor Cyan
+    if ($shouldPullAiModels) {
+        Write-Host "AI model check/pull is enabled. Existing models will be reused." -ForegroundColor Cyan
+    }
+    if (-not $AiTextOnly) {
+        Write-Host "Vision model configured for photo assist: $AiVisionModel" -ForegroundColor Cyan
+    }
+    if (-not $SkipAiWarmup) {
+        Write-Host "AI warmup enabled. Ollama keep-alive: $env:OLLAMA_KEEP_ALIVE" -ForegroundColor Cyan
+    }
+    else {
+        Write-Host "AI warmup skipped. First AI request may be slower." -ForegroundColor Yellow
+    }
+    if ($AiTextOnly) {
+        Write-Host "AI text-only mode enabled. Vision model pull/config is skipped." -ForegroundColor Yellow
+    }
+}
+
 $composeV2Available = $false
 $composeLegacyV1 = $false
 try {
@@ -118,6 +255,120 @@ function Invoke-Compose {
     if ($LASTEXITCODE -ne 0) {
         throw "Compose command failed: $($Args -join ' ')"
     }
+}
+
+function Invoke-ComposeQuietExitCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Args
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $nativePreference = Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue
+    $previousNativePreference = $null
+
+    try {
+        $ErrorActionPreference = "Continue"
+        if ($nativePreference) {
+            $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        if ($composeV2Available) {
+            & docker compose @Args 1>$null 2>$null
+        }
+        else {
+            & docker-compose @Args 1>$null 2>$null
+        }
+        return $LASTEXITCODE
+    }
+    finally {
+        if ($nativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+        }
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
+function Ensure-OllamaServiceRunning {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EnvFilePath
+    )
+
+    Write-Host "Ensuring Ollama service is running..." -ForegroundColor Cyan
+    Invoke-Compose @("--env-file", $EnvFilePath, "up", "-d", "--no-build", "ollama")
+}
+
+function Wait-OllamaReady {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EnvFilePath
+    )
+
+    for ($attempt = 1; $attempt -le 20; $attempt++) {
+        $exitCode = Invoke-ComposeQuietExitCode -Args @("--env-file", $EnvFilePath, "exec", "-T", "ollama", "ollama", "list")
+        if ($exitCode -eq 0) {
+            return
+        }
+        Start-Sleep -Seconds 2
+    }
+
+    throw "Ollama did not become ready in time."
+}
+
+function Pull-OllamaModel {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EnvFilePath,
+        [Parameter(Mandatory = $true)]
+        [string]$ModelName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ModelName)) {
+        return
+    }
+
+    $showExitCode = Invoke-ComposeQuietExitCode -Args @("--env-file", $EnvFilePath, "exec", "-T", "ollama", "ollama", "show", $ModelName)
+    if ($showExitCode -eq 0) {
+        Write-Host "Ollama model already available: $ModelName" -ForegroundColor DarkGray
+        return
+    }
+
+    Write-Host "Ensuring Ollama model is available: $ModelName" -ForegroundColor Cyan
+    Invoke-Compose @("--env-file", $EnvFilePath, "exec", "-T", "ollama", "ollama", "pull", $ModelName)
+}
+
+function Warm-OllamaModel {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$EnvFilePath,
+        [Parameter(Mandatory = $true)]
+        [string]$ModelName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ModelName)) {
+        return
+    }
+    if ($ModelName -notmatch '^[A-Za-z0-9._:/-]+$') {
+        Write-Host "Skipping Ollama warmup for invalid model name: $ModelName" -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "Warming Ollama model: $ModelName (max 30s)" -ForegroundColor Cyan
+    $warmupCommand = "timeout 30s ollama run '$ModelName' 'Jawab hanya OK.' >/dev/null 2>&1"
+    $exitCode = Invoke-ComposeQuietExitCode -Args @(
+        "--env-file", $EnvFilePath,
+        "exec", "-T", "ollama",
+        "sh", "-lc",
+        $warmupCommand
+    )
+    if ($exitCode -eq 0) {
+        Write-Host "Ollama model warmed: $ModelName" -ForegroundColor DarkGray
+        return
+    }
+
+    Write-Host "Could not warm Ollama model: $ModelName. The first AI request may take longer." -ForegroundColor Yellow
 }
 
 function Configure-BuildBackend {
@@ -332,6 +583,39 @@ function Get-LatestWriteTicks {
     }
 
     return $latest
+}
+
+function Get-ServiceInputSignature {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Paths
+    )
+
+    return (($Paths | ForEach-Object { "$_".Trim().Replace('\', '/') } | Sort-Object) -join '|')
+}
+
+function Test-ServiceInputPaths {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ServiceName,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Paths
+    )
+
+    $existingCount = 0
+    foreach ($relativePath in $Paths) {
+        $fullPath = Join-Path $PSScriptRoot $relativePath
+        if (Test-Path -LiteralPath $fullPath) {
+            $existingCount++
+        }
+        else {
+            Write-Host "Watcher path missing for ${ServiceName}: ${relativePath}" -ForegroundColor Yellow
+        }
+    }
+
+    if ($existingCount -eq 0) {
+        throw "No watcher paths exist for service '$ServiceName'. Refusing to treat it as up to date."
+    }
 }
 
 function Test-LocalImage {
@@ -574,6 +858,7 @@ function Save-StateFile {
     foreach ($serviceName in $State.services.Keys) {
         $stateOut.services[$serviceName] = @{
             input_ticks = [int64]$State.services[$serviceName].input_ticks
+            input_paths = [string]$State.services[$serviceName].input_paths
             built_at    = [string]$State.services[$serviceName].built_at
         }
     }
@@ -593,6 +878,7 @@ if (Test-Path $stateFile) {
             foreach ($prop in $raw.services.PSObject.Properties) {
                 $state.services[$prop.Name] = @{
                     input_ticks = [int64]$prop.Value.input_ticks
+                    input_paths = [string]$prop.Value.input_paths
                     built_at    = [string]$prop.Value.built_at
                 }
             }
@@ -606,11 +892,11 @@ if (Test-Path $stateFile) {
 }
 
 $serviceInputs = @{
-    identity_service    = @("backend/rust_apps", "docker-compose.yml")
-    marketplace_service = @("backend/rust_apps", "docker-compose.yml")
-    community_service   = @("backend/rust_apps", "docker-compose.yml")
-    ai_service          = @("backend/rust_apps", "docker-compose.yml")
-    chat_service        = @("backend/chat_service", "docker-compose.yml")
+    identity_service    = @("services/identity_service", "docker-compose.yml")
+    marketplace_service = @("services/marketplace_service", "docker-compose.yml")
+    community_service   = @("services/community_service", "docker-compose.yml")
+    ai_service          = @("services/ai_service", "docker-compose.yml")
+    chat_service        = @("services/chat_service", "docker-compose.yml")
     ocr_service         = @("ai/ocr_paddle", "docker-compose.yml")
     liveness_service    = @("ai/liveness", "docker-compose.yml")
     www                 = @("frontend/www", "frontend/shared", "frontend/.dockerignore", "docker-compose.yml")
@@ -661,6 +947,7 @@ $defaultDevServices = @(
     "redis_cache",
     "rabbitmq",
     "meilisearch",
+    "minio",
     "identity_service",
     "marketplace_service",
     "community_service",
@@ -744,6 +1031,10 @@ else {
     $defaultDevServices
 }
 
+if ($aiEnabled -and ($selectedServices -notcontains "ollama")) {
+    $selectedServices = @("ollama") + @($selectedServices)
+}
+
 Write-StartupState -Active $true -Status "starting" -Phase "checking_images" -Message "Checking images and service inputs." -ServiceNames $selectedServices
 
 $startupServices = @($selectedServices | Where-Object {
@@ -756,6 +1047,7 @@ foreach ($serviceName in $startupServices) {
 }
 
 $currentTicksByService = @{}
+$inputSignatureByService = @{}
 $imageExistsByService = @{}
 foreach ($serviceName in $serviceInputs.Keys) {
     if ($availableServices.Count -gt 0 -and -not $availableServices.ContainsKey($serviceName)) {
@@ -764,7 +1056,9 @@ foreach ($serviceName in $serviceInputs.Keys) {
     if ($requestedServices.Count -gt 0 -and -not $startupServiceLookup.ContainsKey($serviceName)) {
         continue
     }
+    Test-ServiceInputPaths -ServiceName $serviceName -Paths $serviceInputs[$serviceName]
     $currentTicksByService[$serviceName] = Get-LatestWriteTicks -Paths $serviceInputs[$serviceName]
+    $inputSignatureByService[$serviceName] = Get-ServiceInputSignature -Paths $serviceInputs[$serviceName]
     $imageExistsByService[$serviceName] = Test-LocalImage -ImageName $serviceImages[$serviceName]
 }
 
@@ -780,22 +1074,33 @@ if (-not $NoBuild) {
         }
         $imageExists = [bool]$imageExistsByService[$serviceName]
         $previousTicks = [int64]0
+        $previousSignature = ""
+        $currentSignature = [string]$inputSignatureByService[$serviceName]
 
         if ($state.services.ContainsKey($serviceName)) {
             $previousTicks = [int64]$state.services[$serviceName].input_ticks
+            if ($state.services[$serviceName].ContainsKey('input_paths')) {
+                $previousSignature = [string]$state.services[$serviceName].input_paths
+            }
         }
         elseif ($imageExists -and -not $BuildAll) {
             # Bootstrap state dari image lokal yang sudah ada agar run pertama
             # tidak memaksa rebuild semua service.
             $previousTicks = [int64]$currentTicksByService[$serviceName]
+            $previousSignature = $currentSignature
             $state.services[$serviceName] = @{
                 input_ticks = [int64]$previousTicks
+                input_paths = $currentSignature
                 built_at    = "bootstrap-existing-image"
             }
         }
 
-        $needsBuild = $BuildAll -or (-not $imageExists) -or ($currentTicksByService[$serviceName] -gt $previousTicks)
+        $watcherChanged = $previousSignature -eq "" -or $previousSignature -ne $currentSignature
+        $needsBuild = $BuildAll -or (-not $imageExists) -or $watcherChanged -or ($currentTicksByService[$serviceName] -gt $previousTicks)
         if ($needsBuild) {
+            if ($watcherChanged) {
+                Write-Host "Watcher inputs changed for ${serviceName}; rebuilding image." -ForegroundColor Cyan
+            }
             $servicesToBuild += $serviceName
         }
     }
@@ -824,6 +1129,7 @@ if ($servicesToBuild.Count -gt 0) {
     foreach ($serviceName in $servicesToBuild) {
         $state.services[$serviceName] = @{
             input_ticks = [int64]$currentTicksByService[$serviceName]
+            input_paths = [string]$inputSignatureByService[$serviceName]
             built_at    = (Get-Date).ToString("o")
         }
     }
@@ -837,6 +1143,7 @@ else {
         if (-not $state.services.ContainsKey($serviceName) -and [bool]$imageExistsByService[$serviceName]) {
             $state.services[$serviceName] = @{
                 input_ticks = [int64]$currentTicksByService[$serviceName]
+                input_paths = [string]$inputSignatureByService[$serviceName]
                 built_at    = "bootstrap-no-build"
             }
         }
@@ -882,6 +1189,33 @@ else {
         else {
             # Jika belum pernah ada container untuk project ini, baru lakukan up.
             Invoke-Compose @("--env-file", $EnvFile, "up", "-d", "--no-build", "--no-recreate")
+        }
+    }
+}
+
+if ($aiEnabled) {
+    if ($shouldPullAiModels) {
+        Write-StartupState -Active $true -Status "starting_services" -Phase "pulling_ai_models" -Message "Preparing local Ollama models." -ServiceNames $startupServices
+        Ensure-OllamaServiceRunning -EnvFilePath $EnvFile
+        Wait-OllamaReady -EnvFilePath $EnvFile
+        Pull-OllamaModel -EnvFilePath $EnvFile -ModelName $AiBusinessModel
+        if (-not $AiTextOnly -and $AiVisionModel -ne $AiBusinessModel) {
+            Pull-OllamaModel -EnvFilePath $EnvFile -ModelName $AiVisionModel
+        }
+    }
+    else {
+        Ensure-OllamaServiceRunning -EnvFilePath $EnvFile
+        Write-Host "Local AI service is running. Model pull skipped by -SkipAiModels." -ForegroundColor Yellow
+    }
+
+    if (-not $SkipAiWarmup) {
+        Write-StartupState -Active $true -Status "starting_services" -Phase "warming_ai_model" -Message "Warming local AI model." -ServiceNames $startupServices
+        Wait-OllamaReady -EnvFilePath $EnvFile
+        if ($AiTextOnly) {
+            Warm-OllamaModel -EnvFilePath $EnvFile -ModelName $AiBusinessModel
+        }
+        else {
+            Warm-OllamaModel -EnvFilePath $EnvFile -ModelName $AiVisionModel
         }
     }
 }

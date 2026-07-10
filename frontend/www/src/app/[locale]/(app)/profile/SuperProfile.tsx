@@ -134,6 +134,7 @@ type ProfessionalEntry = {
 };
 
 type ProfessionalData = {
+  bio: string;
   headline: string;
   summary: string;
   skills: string[];
@@ -460,6 +461,7 @@ function buildProfessionalData(
   const links = collectLinks(root);
 
   return {
+    bio: readString(bioValue),
     headline,
     summary,
     skills,
@@ -1368,7 +1370,7 @@ export default function SuperProfile() {
             <div className="absolute right-3 top-3 flex items-center gap-2">
               <label
                 htmlFor="profile-cover-upload"
-                className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-none sm:backdrop-blur"
+                className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white  "
               >
                 {coverUploading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

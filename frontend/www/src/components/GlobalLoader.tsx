@@ -149,7 +149,7 @@ export default function GlobalLoader() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)] backdrop-blur-md flex items-center justify-center"
+          className="fixed inset-0 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)]  flex items-center justify-center"
           style={{ zIndex: Z_INDEX.loading }}
         >
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[color:var(--app-accent-border)] border-t-transparent" />

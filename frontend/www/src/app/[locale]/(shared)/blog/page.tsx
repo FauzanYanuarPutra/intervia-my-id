@@ -102,11 +102,11 @@ export default async function BlogIndexPage({ params }: PageProps) {
       <section className="overflow-hidden rounded-[32px] border border-emerald-100 bg-[linear-gradient(135deg,#fffdf6_0%,#effdf5_48%,#fff7ed_100%)] p-5 shadow-[0_24px_64px_-48px_rgba(15,23,42,0.34)] dark:border-white/10 dark:bg-[linear-gradient(135deg,#0f172a_0%,#052e24_58%,#1c1917_100%)] sm:p-8">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white">
+            <p className="inline-flex items-center gap-2 rounded-full bg-emerald-700 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-white">
               <BookOpenText className="h-3.5 w-3.5" />
               {isId ? 'Knowledge hub' : 'Knowledge hub'}
             </p>
-            <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-[-0.06em] text-slate-950 dark:text-white sm:text-5xl">
+            <h1 className="mt-4 max-w-4xl text-3xl font-bold tracking-[-0.06em] text-slate-950 dark:text-white sm:text-5xl">
               {isId
                 ? 'Panduan praktis supaya usaha lebih mudah ditemukan.'
                 : 'Practical guides to make businesses easier to discover.'}
@@ -121,7 +121,7 @@ export default async function BlogIndexPage({ params }: PageProps) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-emerald-100 bg-white px-3.5 text-sm font-black text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/10 dark:text-emerald-100"
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-emerald-100 bg-white px-3.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-400/20 dark:bg-white/10 dark:text-emerald-100"
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
@@ -130,8 +130,8 @@ export default async function BlogIndexPage({ params }: PageProps) {
             </div>
           </div>
 
-          <aside className="rounded-[26px] border border-white/80 bg-white/86 p-4 shadow-[0_20px_54px_-42px_rgba(15,23,42,0.42)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60">
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+          <aside className="rounded-[26px] border border-white/80 bg-white/86 p-4 shadow-[0_20px_54px_-42px_rgba(15,23,42,0.42)]  dark:border-white/10 dark:bg-slate-950/60">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
               {isId ? 'Fokus SEO sehat' : 'Healthy SEO focus'}
             </p>
             <div className="mt-3 grid gap-2 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
@@ -156,16 +156,16 @@ export default async function BlogIndexPage({ params }: PageProps) {
             href={buildBlogPath(featured.slug)}
             className="group overflow-hidden rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_22px_54px_-44px_rgba(15,23,42,0.32)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900 sm:p-6"
           >
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
               {isId ? 'Artikel utama' : 'Featured article'}
             </p>
-            <h2 className="mt-3 text-2xl font-black tracking-[-0.05em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200 sm:text-3xl">
+            <h2 className="mt-3 text-2xl font-bold tracking-[-0.05em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200 sm:text-3xl">
               {featured.localized.title}
             </h2>
             <p className="mt-3 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">
               {featured.localized.description}
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-black text-slate-500 dark:text-slate-400">
+            <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400">
               <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200">
                 {featured.localized.category}
               </span>
@@ -174,7 +174,7 @@ export default async function BlogIndexPage({ params }: PageProps) {
           </Link>
 
           <div className="rounded-[30px] border border-slate-200 bg-[#f8f5ee] p-5 dark:border-white/10 dark:bg-white/[0.04] sm:p-6">
-            <p className="text-sm font-black text-slate-950 dark:text-white">
+            <p className="text-sm font-bold text-slate-950 dark:text-white">
               {isId ? 'Kenapa blog penting?' : 'Why a blog matters'}
             </p>
             <p className="mt-3 text-sm font-semibold leading-7 text-slate-600 dark:text-slate-300">
@@ -193,16 +193,16 @@ export default async function BlogIndexPage({ params }: PageProps) {
             href={buildBlogPath(article.slug)}
             className="group flex min-h-[260px] flex-col rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_-40px_rgba(15,23,42,0.3)] transition hover:-translate-y-0.5 hover:border-emerald-200 dark:border-white/10 dark:bg-slate-900"
           >
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
               {article.localized.eyebrow}
             </p>
-            <h2 className="mt-3 text-xl font-black tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200">
+            <h2 className="mt-3 text-xl font-bold tracking-[-0.04em] text-slate-950 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-200">
               {article.localized.title}
             </h2>
             <p className="mt-3 line-clamp-4 text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
               {article.localized.description}
             </p>
-            <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-xs font-black">
+            <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-xs font-bold">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600 dark:bg-white/10 dark:text-slate-300">
                 {article.localized.readTime}
               </span>

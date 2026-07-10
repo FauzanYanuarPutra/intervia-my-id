@@ -96,18 +96,18 @@ export default function SupportPage() {
         />
 
         <div className="relative grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_380px] lg:items-stretch">
-          <div className="flex min-h-[360px] flex-col justify-between rounded-[28px] bg-white/72 p-5 ring-1 ring-white/80 backdrop-blur dark:bg-white/[0.06] dark:ring-white/10 sm:p-6">
+          <div className="flex min-h-[360px] flex-col justify-between rounded-[28px] bg-white/72 p-5 ring-1 ring-white/80  dark:bg-white/[0.06] dark:ring-white/10 sm:p-6">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] bg-emerald-600 text-white shadow-[0_16px_34px_-24px_rgba(5,150,105,0.7)]">
                   <LifeBuoy className="h-5 w-5" />
                 </span>
-                <span className="rounded-full border border-emerald-700/10 bg-white/82 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-emerald-200">
+                <span className="rounded-full border border-emerald-700/10 bg-white/82 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-emerald-200">
                   Pusat bantuan Lajukan
                 </span>
               </div>
 
-              <h1 className="mt-5 max-w-3xl text-[2.25rem] font-black leading-[0.98] tracking-[-0.065em] text-slate-950 dark:text-white sm:text-[3.4rem] lg:text-[4.2rem]">
+              <h1 className="mt-5 max-w-3xl text-[2.25rem] font-bold leading-[0.98] tracking-[-0.065em] text-slate-950 dark:text-white sm:text-[3.4rem] lg:text-[4.2rem]">
                 Ada kendala? Kita bereskan satu-satu.
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-700 dark:text-slate-200 sm:text-base">
@@ -120,14 +120,14 @@ export default function SupportPage() {
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
               <LocalizedLink
                 href="#ticket"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-black text-white shadow-[0_18px_38px_-26px_rgba(4,120,87,0.75)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 text-sm font-bold text-white shadow-[0_18px_38px_-26px_rgba(4,120,87,0.75)] transition hover:-translate-y-0.5 hover:bg-emerald-800"
               >
                 Buat ticket bantuan
                 <ArrowRight className="h-4 w-4" />
               </LocalizedLink>
               <LocalizedLink
                 href="/support?openLive=1#ticket"
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-emerald-800/10 bg-white/88 px-5 text-sm font-black text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-emerald-800/10 bg-white/88 px-5 text-sm font-bold text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-white"
               >
                 Buka chat & AI
                 <Sparkles className="h-4 w-4 text-emerald-600" />
@@ -137,10 +137,10 @@ export default function SupportPage() {
 
           <aside className="grid gap-3 rounded-[28px] bg-slate-950 p-4 text-white shadow-[0_30px_70px_-50px_rgba(2,6,23,0.9)]">
             <div className="rounded-[24px] bg-white/10 p-4 ring-1 ring-white/10">
-              <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-200">
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-200">
                 Jalur cepat
               </p>
-              <h2 className="mt-2 text-2xl font-black tracking-[-0.04em]">
+              <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em]">
                 Cari dulu, kalau belum ketemu langsung ticket.
               </h2>
               <div className="mt-4 flex min-h-12 items-center gap-2 rounded-full bg-white px-3 text-slate-900">
@@ -160,7 +160,7 @@ export default function SupportPage() {
                     className="rounded-[20px] bg-white/[0.08] p-3 ring-1 ring-white/10"
                   >
                     <Icon className="h-4 w-4 text-emerald-200" />
-                    <p className="mt-3 text-base font-black">{item.value}</p>
+                    <p className="mt-3 text-base font-bold">{item.value}</p>
                     <p className="mt-0.5 text-[10px] font-bold text-white/58">
                       {item.label}
                     </p>
@@ -173,7 +173,7 @@ export default function SupportPage() {
               <div className="flex items-start gap-3">
                 <BadgeCheck className="mt-0.5 h-5 w-5 text-emerald-200" />
                 <div>
-                  <p className="text-sm font-black">Tips biar cepat dibalas</p>
+                  <p className="text-sm font-bold">Tips biar cepat dibalas</p>
                   <p className="mt-1 text-xs leading-5 text-white/68">
                     Kirim subjek jelas, link posting/chat kalau ada, dan
                     kronologi singkat. Semakin rapi, triase makin cepat.
@@ -202,7 +202,7 @@ export default function SupportPage() {
                   <ChevronRight className="h-4 w-4" />
                 </span>
               </div>
-              <h2 className="mt-4 text-base font-black tracking-[-0.02em] text-slate-950 dark:text-white">
+              <h2 className="mt-4 text-base font-bold tracking-[-0.02em] text-slate-950 dark:text-white">
                 {topic.title}
               </h2>
               <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
@@ -220,10 +220,10 @@ export default function SupportPage() {
               <BookOpenCheck className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-200">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-200">
                 Sebelum kirim
               </p>
-              <h2 className="text-xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
+              <h2 className="text-xl font-bold tracking-[-0.04em] text-slate-950 dark:text-white">
                 Biar support langsung paham.
               </h2>
             </div>
@@ -245,16 +245,16 @@ export default function SupportPage() {
         <div className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#ffffff,#f7fbf8)] p-4 shadow-[0_18px_44px_-38px_rgba(15,23,42,0.2)] dark:border-white/10 dark:bg-white/[0.04] sm:p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-200">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-200">
                 Pilih contoh
               </p>
-              <h2 className="text-xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
+              <h2 className="text-xl font-bold tracking-[-0.04em] text-slate-950 dark:text-white">
                 Masalah yang sering terjadi.
               </h2>
             </div>
             <LocalizedLink
               href="#ticket"
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-bold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950"
             >
               Tulis ticket
               <ArrowRight className="h-3.5 w-3.5" />
@@ -270,7 +270,7 @@ export default function SupportPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-black text-slate-950 dark:text-white">
+                    <p className="text-sm font-bold text-slate-950 dark:text-white">
                       {item.label}
                     </p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
@@ -288,10 +288,10 @@ export default function SupportPage() {
       <section id="ticket" className="mt-5 scroll-mt-24">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-200">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-200">
               Kirim ticket
             </p>
-            <h2 className="mt-1 text-2xl font-black tracking-[-0.045em] text-slate-950 dark:text-white">
+            <h2 className="mt-1 text-2xl font-bold tracking-[-0.045em] text-slate-950 dark:text-white">
               Jelaskan kendalanya, nanti statusnya bisa dipantau.
             </h2>
           </div>

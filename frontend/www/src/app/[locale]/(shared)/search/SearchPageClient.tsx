@@ -2,42 +2,53 @@
 
 import { LajukanImage as Image } from '@/components/common/LajukanImage';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
+import {
+  type CardType,
+  type CategoryVisual,
+  type SearchCard,
+  type SearchFilterTabKey,
+  type SearchResultsView,
+  type SearchVisualKey,
+  type SideFilter,
+  type SortKey,
+  type TypeKey,
+} from './search.types';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHorizontalDragScroll } from '@/hooks/useHorizontalDragScroll';
 import { Link, useRouter } from '@/i18n/navigation';
+import useEmblaCarousel from 'embla-carousel-react';
+import { useInView } from 'react-intersection-observer';
 import { Modal } from '@/components/common/Modal';
 import { AuthCtaLink } from '@/components/home/AuthCtaLink';
-import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
+import { useAuth } from '@/context/AuthContext';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import { SearchUmkmPreview, type UmkmPreviewStore } from './SearchUmkmPreview';
 import {
   ArrowRight,
   BadgeCheck,
   BookmarkCheck,
-  BookmarkPlus,
   Briefcase,
   ChevronLeft,
   ChevronRight,
-  Clock3,
-  Eye,
   Filter,
   Handshake,
   Layers3,
   MapPin,
-  MoreHorizontal,
   Package,
   Plus,
   RefreshCcw,
   Search,
   ShieldCheck,
   Store,
-  Trash2,
   UserRound,
   Wrench,
   X,
   Bookmark,
+  Heart,
   type LucideIcon,
+  Compass,
+  Target,
 } from 'lucide-react';
 import {
   buildUmkmStorefrontPath,
@@ -66,10 +77,15 @@ import {
   resolveContentPriceUnitLabel,
 } from '@/lib/content/priceUnit';
 import { resolveSupplierListingBadges } from '@/lib/content/supplierInfo';
+import { buildPublicProfileHrefFromContent } from '@/lib/profile/publicProfileLink';
 import {
-  buildPublicProfileHref,
-  buildPublicProfileHrefFromContent,
-} from '@/lib/profile/publicProfileLink';
+  buildBusinessDiscoveryCreateHref,
+  RESULT_BUSINESS_DISCOVERY_CATEGORY_IDS,
+  getBusinessDiscoveryCategoryById,
+  isResultBusinessDiscoveryCategoryId,
+  type BusinessDiscoveryCategoryId,
+} from '@/lib/businessDiscoveryCategories';
+import { compareBusinessServiceability } from '@/lib/businessDiscoveryRanking';
 import {
   getListingSideContextLabel,
   getListingSideLabel,
@@ -82,165 +98,266 @@ import {
 } from '@/lib/umkmBusinessFlow';
 import { CONTENT_TYPES, getContentTypeShort } from '@/data/contentTypes';
 import { cn } from '@/lib/utils';
-
-type SortKey = 'relevance' | 'newest' | 'price_low' | 'price_high';
-type TypeKey =
-  | 'all'
-  | 'job'
-  | 'freelancer'
-  | 'product'
-  | 'property'
-  | 'service'
-  | 'tool_rental'
-  | 'business_transfer'
-  | 'umkm';
-type CardType = Exclude<TypeKey, 'all' | 'umkm'> | 'other';
-type SideFilter = 'all' | 'demand' | 'supply';
-type SearchResultsView = 'results' | 'umkm';
-type SearchVisualKey = TypeKey | 'other';
-type SearchFilterTabKey = TypeKey | 'used_goods';
-
-type SearchCard = {
-  id: string;
-  content_type: string;
-  title: string;
-  summary: string;
-  location: string;
-  priceLabel: string;
-  priceUnitLabel: string;
-  typeLabel: string;
-  typeKey: CardType;
-  side: ListingSide;
-  sideLabel: string;
-  sideContextLabel: string;
-  supplierBadges: string[];
-  image?: string;
-  images: string[];
-  href: string;
-  profileHref?: string | null;
-  updatedAt: number;
-  priceCents: number | null;
-  entityKind: 'person' | 'listing';
-  verified: boolean;
-  hasMedia: boolean;
-  ownerId?: string | null;
-  ownerName?: string | null;
-  storeId?: string | null;
-  storeSlug?: string | null;
-  storeName?: string | null;
-  productId?: string | null;
-};
-
-type DiscoverUser = {
-  id: string;
-  email?: string | null;
-  phone?: string | null;
-  username?: string | null;
-  full_name?: string | null;
-  avatar_url?: string | null;
-  avatar_style?: unknown;
-  metadata?: unknown;
-  location?: string | null;
-  bio?: string | null;
-  headline?: string | null;
-  roles?: string[] | null;
-  metadata_roles?: unknown;
-  level?: string | null;
-  rating?: number | null;
-  completed_jobs?: number | null;
-  hourly_rate?: number | null;
-  freelancer_profile?: unknown;
-  provider_profile?: unknown;
-  buyer_profile?: unknown;
-  created_at?: string | null;
-};
-
-type SearchProfileCard = {
-  id: string;
-  href: string;
-  name: string;
-  handle: string;
-  headline: string;
-  location: string;
-  avatarUrl: string;
-  verified: boolean;
-  roleLabel: string;
-  ratingLabel: string | null;
-  roles: string[];
-  createdAt: number;
-};
+import { useViewerLocation } from '@/components/super-app/useViewerLocation';
+import {
+  haversineKm,
+  isCoordinateValid,
+  type LatLng,
+} from '@/lib/super-app/location-guard';
+import { formatDistanceKm } from '@/lib/geo/distance';
 
 const PAGE_SIZE = 12;
+const MARKETPLACE_CARD_FIXED_HEIGHT_CLASS =
+  'h-[300px] min-h-[300px] max-h-[300px] sm:h-[312px] sm:min-h-[312px] sm:max-h-[312px]';
+type AuthFetch = (url: string, options?: RequestInit) => Promise<Response>;
+
+function getListingSideVisual(side: ListingSide) {
+  if (side === 'demand') {
+    return {
+      badgeClass:
+        'bg-emerald-600 text-white shadow-[0_10px_24px_-16px_rgba(5,150,105,0.75)]',
+      chipClass: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
+      priceClass: 'text-emerald-600',
+      Icon: Target,
+    };
+  }
+
+  return {
+    badgeClass:
+      'bg-rose-600 text-white shadow-[0_10px_24px_-16px_rgba(225,29,72,0.75)]',
+    chipClass: 'bg-rose-50 text-rose-700 ring-1 ring-rose-100',
+    priceClass: 'text-rose-600',
+    Icon: Store,
+  };
+}
+
+function readFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function readBoundedCoord(
+  source: Record<string, unknown> | null | undefined,
+  keys: string[],
+  limit: number,
+): number | null {
+  if (!source) return null;
+  for (const key of keys) {
+    const parsed = readFiniteNumber(source[key]);
+    if (parsed !== null && Math.abs(parsed) <= limit) return parsed;
+  }
+  return null;
+}
+
+function asSearchRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readLatLngFromRecord(value: unknown): LatLng | null {
+  const record = asSearchRecord(value);
+  if (!record) return null;
+  const lat = readBoundedCoord(
+    record,
+    [
+      'lat',
+      'latitude',
+      'location_lat',
+      'location_latitude',
+      'geo_lat',
+      'address_lat',
+      'pickup_lat',
+      'store_lat',
+      'outlet_lat',
+    ],
+    90,
+  );
+  const lng = readBoundedCoord(
+    record,
+    [
+      'lng',
+      'lon',
+      'long',
+      'longitude',
+      'location_lng',
+      'location_lon',
+      'location_longitude',
+      'geo_lng',
+      'address_lng',
+      'pickup_lng',
+      'store_lng',
+      'outlet_lng',
+    ],
+    180,
+  );
+  if (lat === null || lng === null) return null;
+  const point = { lat, lng };
+  return isCoordinateValid(point) ? point : null;
+}
+
+function collectSearchLocationPoints(item: ContentItem): LatLng[] {
+  const points: LatLng[] = [];
+  const metadata = asSearchRecord(item.metadata);
+  const addPoint = (point: LatLng | null) => {
+    if (!point) return;
+    if (
+      points.some(
+        existing =>
+          Math.abs(existing.lat - point.lat) < 0.000001 &&
+          Math.abs(existing.lng - point.lng) < 0.000001,
+      )
+    ) {
+      return;
+    }
+    points.push(point);
+  };
+
+  addPoint(readLatLngFromRecord(item));
+  addPoint(readLatLngFromRecord(metadata));
+  for (const nested of [
+    metadata?.primary_umkm_store,
+    metadata?.store,
+    metadata?.outlet,
+    metadata?.pickup_location,
+    metadata?.return_location,
+  ]) {
+    addPoint(readLatLngFromRecord(nested));
+  }
+  for (const key of [
+    'linked_umkm_stores',
+    'umkm_store_inventory',
+    'branches',
+    'outlets',
+  ]) {
+    const value = metadata?.[key];
+    if (!Array.isArray(value)) continue;
+    for (const entry of value.slice(0, 20)) {
+      addPoint(readLatLngFromRecord(entry));
+    }
+  }
+
+  return points;
+}
+
+function readDistanceKmFromContent(
+  item: ContentItem,
+  metadata: Record<string, unknown>,
+): number | null {
+  const root = item as ContentItem & { distance_km?: unknown; distanceKm?: unknown };
+  const distance =
+    readFiniteNumber(root.distance_km) ??
+    readFiniteNumber(root.distanceKm) ??
+    readFiniteNumber(metadata.distance_km) ??
+    readFiniteNumber(metadata.viewer_distance_km) ??
+    readFiniteNumber(metadata.distanceKm);
+  return distance !== null && distance >= 0 ? distance : null;
+}
+
+function formatSearchDistance(distanceKm: number | null | undefined): string | null {
+  return formatDistanceKm(distanceKm);
+}
+
+function withViewerDistance(
+  item: SearchCard,
+  viewerLocation: LatLng | null,
+): SearchCard {
+  if (
+    item.distanceKm !== null &&
+    item.distanceKm !== undefined &&
+    item.distanceLabel
+  ) {
+    return item;
+  }
+  if (
+    !viewerLocation ||
+    typeof item.lat !== 'number' ||
+    typeof item.lng !== 'number'
+  ) {
+    return item;
+  }
+  const distanceKm = haversineKm(viewerLocation, {
+    lat: item.lat,
+    lng: item.lng,
+  });
+  if (!Number.isFinite(distanceKm)) return item;
+  return {
+    ...item,
+    distanceKm,
+    distanceLabel: formatSearchDistance(distanceKm),
+  };
+}
+
 const FALLBACK_CITIES = [
-  'Jakarta',
   'Bandung',
+  'Jakarta',
   'Surabaya',
   'Medan',
   'Yogyakarta',
   'Makassar',
 ];
 
-const TYPE_OPTIONS: Array<{
-  value: TypeKey;
-  labelId: string;
-  labelEn: string;
-  icon: LucideIcon;
-}> = [
-    { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
-    { value: 'product', labelId: 'Supplier', labelEn: 'Supplier', icon: Store },
-    { value: 'service', labelId: 'Jasa', labelEn: 'Services', icon: Wrench },
-    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations', icon: MapPin },
-    {
-      value: 'freelancer',
-      labelId: 'Talent',
-      labelEn: 'Talent',
-      icon: UserRound,
-    },
-    { value: 'job', labelId: 'Loker', labelEn: 'Jobs', icon: Briefcase },
-    {
-      value: 'tool_rental',
-      labelId: 'Sewa',
-      labelEn: 'Rentals',
-      icon: ShieldCheck,
-    },
-    {
-      value: 'business_transfer',
-      labelId: 'Oper Usaha',
-      labelEn: 'Business Transfer',
-      icon: Handshake,
-    },
-    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business', icon: Store },
-  ];
-
 const SEARCH_FILTER_TABS: Array<{
   value: SearchFilterTabKey;
   labelId: string;
   labelEn: string;
+  badgeId?: string;
+  badgeEn?: string;
   icon: LucideIcon;
 }> = [
     { value: 'all', labelId: 'Semua', labelEn: 'All', icon: Layers3 },
-    { value: 'product', labelId: 'Supplier', labelEn: 'Supplier', icon: Store },
     {
-      value: 'used_goods',
-      labelId: 'Barang Bekas',
-      labelEn: 'Used Goods',
+      value: 'equipment',
+      labelId: 'Mesin & Alat',
+      labelEn: 'Equipment & Tools',
+      badgeId: 'Laris',
+      badgeEn: 'Popular',
+      icon: Briefcase,
+    },
+    {
+      value: 'supplies',
+      labelId: 'Bahan Usaha',
+      labelEn: 'Business Supplies',
+      badgeId: 'Grosir',
+      badgeEn: 'Wholesale',
       icon: Package,
     },
-    { value: 'service', labelId: 'Jasa', labelEn: 'Services', icon: Wrench },
-    { value: 'property', labelId: 'Lokasi', labelEn: 'Locations', icon: MapPin },
     {
-      value: 'business_transfer',
-      labelId: 'Oper Usaha',
-      labelEn: 'Business Transfer',
+      value: 'service',
+      labelId: 'Cari Jasa',
+      labelEn: 'Find Services',
+      badgeId: 'Expert',
+      badgeEn: 'Expert',
+      icon: Wrench,
+    },
+    {
+      value: 'property',
+      labelId: 'Tempat Usaha',
+      labelEn: 'Business Places',
+      badgeId: 'Prime',
+      badgeEn: 'Prime',
+      icon: MapPin,
+    },
+    {
+      value: 'opportunity',
+      labelId: 'Peluang Usaha',
+      labelEn: 'Business Opportunities',
+      badgeId: 'Cuan',
+      badgeEn: 'Grow',
       icon: Handshake,
     },
     {
-      value: 'freelancer',
-      labelId: 'Talent',
-      labelEn: 'Talent',
-      icon: UserRound,
+      value: 'nearby',
+      labelId: 'Usaha Sekitar',
+      labelEn: 'Nearby Businesses',
+      badgeId: 'Dekat',
+      badgeEn: 'Nearby',
+      icon: Store,
     },
-    { value: 'umkm', labelId: 'Usaha', labelEn: 'Business', icon: Store },
   ];
 
 const SORT_OPTIONS: Array<{
@@ -253,23 +370,6 @@ const SORT_OPTIONS: Array<{
     { value: 'price_low', labelId: 'Kisaran rendah', labelEn: 'Lower range' },
     { value: 'price_high', labelId: 'Kisaran tinggi', labelEn: 'Higher range' },
   ];
-
-type CategoryVisual = {
-  icon: LucideIcon;
-  hintId: string;
-  hintEn: string;
-  cardClass: string;
-  imageClass: string;
-  iconBubbleClass: string;
-  activeFilterClass: string;
-  inactiveFilterClass: string;
-  chipClass: string;
-  ribbonClass: string;
-  priceClass: string;
-  outlineButtonClass: string;
-  solidButtonClass: string;
-  sidePanelClass: string;
-};
 
 const CATEGORY_VISUALS: Record<SearchVisualKey, CategoryVisual> = {
   all: {
@@ -584,6 +684,83 @@ function getUsedGoodsQuery(query: string, locale: 'id' | 'en'): string {
   return cleaned ? `${cleaned} ${suffix}` : suffix;
 }
 
+function getSearchTabConfig(value: SearchFilterTabKey) {
+  return SEARCH_FILTER_TABS.find(tab => tab.value === value) || null;
+}
+
+function getSearchTabLabel(value: SearchFilterTabKey, locale: 'id' | 'en') {
+  const tab = getSearchTabConfig(value);
+  if (tab) return locale === 'id' ? tab.labelId : tab.labelEn;
+  const category = getBusinessDiscoveryCategoryById(value);
+  if (category) return locale === 'id' ? category.labelId : category.labelEn;
+  return locale === 'id' ? 'Semua' : 'All';
+}
+
+function getSearchTabBadge(value: SearchFilterTabKey, locale: 'id' | 'en') {
+  const tab = getSearchTabConfig(value);
+  if (tab?.badgeId || tab?.badgeEn) {
+    return locale === 'id'
+      ? tab.badgeId || tab.badgeEn
+      : tab.badgeEn || tab.badgeId;
+  }
+  const category = getBusinessDiscoveryCategoryById(value);
+  if (category) return locale === 'id' ? category.badgeId : category.badgeEn;
+  return '';
+}
+
+function getSearchTabHint(value: SearchFilterTabKey, locale: 'id' | 'en') {
+  const category = getBusinessDiscoveryCategoryById(value);
+  if (category) return locale === 'id' ? category.hintId : category.hintEn;
+  return getCategoryHint(searchTabVisualKey(value), locale);
+}
+
+function searchTabVisualKey(value: SearchFilterTabKey): SearchVisualKey {
+  if (value === 'equipment' || value === 'supplies') return 'product';
+  if (value === 'opportunity') return 'business_transfer';
+  if (value === 'nearby') return 'umkm';
+  if (value === 'used_goods') return 'product';
+  return value;
+}
+
+function normalizedQueryIncludes(query: string, needle: string): boolean {
+  const normalized = query.toLowerCase().replace(/\s+/g, ' ').trim();
+  return normalized.includes(needle);
+}
+
+function resolveActiveBusinessSearchTab({
+  query,
+  type,
+  usedOnly,
+}: {
+  query: string;
+  type: TypeKey;
+  usedOnly: boolean;
+}): SearchFilterTabKey {
+  if (usedOnly) return 'used_goods';
+  if (type === 'umkm') return 'nearby';
+  if (type === 'product' && normalizedQueryIncludes(query, 'mesin usaha')) {
+    return 'equipment';
+  }
+  if (type === 'product' && normalizedQueryIncludes(query, 'bahan usaha')) {
+    return 'supplies';
+  }
+  if (type === 'tool_rental') return 'equipment';
+  if (
+    type === 'business_transfer' ||
+    normalizedQueryIncludes(query, 'peluang usaha') ||
+    normalizedQueryIncludes(query, 'franchise') ||
+    normalizedQueryIncludes(query, 'kemitraan') ||
+    normalizedQueryIncludes(query, 'reseller')
+  ) {
+    return 'opportunity';
+  }
+  if (type === 'product') return 'supplies';
+  if (type === 'service') return 'service';
+  if (type === 'freelancer' || type === 'job') return 'service';
+  if (type === 'property') return 'property';
+  return type;
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -592,17 +769,6 @@ function slugify(value: string): string {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .slice(0, 80);
-}
-
-function formatShortDate(value: number, locale: 'id' | 'en'): string | null {
-  if (!value || !Number.isFinite(value)) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: '2-digit',
-  });
 }
 
 function resolveCardType(value: string): CardType {
@@ -640,6 +806,23 @@ function resolveCardType(value: string): CardType {
     return 'business_transfer';
   }
   return 'other';
+}
+
+function isResultCategoryId(
+  value: string | null | undefined,
+): value is BusinessDiscoveryCategoryId {
+  return isResultBusinessDiscoveryCategoryId(value);
+}
+
+function resolveBusinessCategory(
+  meta: Record<string, unknown>,
+): BusinessDiscoveryCategoryId | null {
+  const explicit =
+    asString(meta.create_category) ||
+    asString(meta.discovery_category) ||
+    asString(meta.business_discovery_category);
+  const category = explicit ? getBusinessDiscoveryCategoryById(explicit) : null;
+  return category && isResultCategoryId(category.id) ? category.id : null;
 }
 
 function inferSearchEntityKind(
@@ -817,6 +1000,7 @@ function mapContentItem(
   });
   const sideLabel = getListingSideLabel(side, locale);
   const sideContextLabel = resolveSearchSideContextLabel(side, typeKey, locale);
+  const businessCategory = resolveBusinessCategory(meta);
   const supplierBadges = resolveSupplierListingBadges(item, locale);
   const gallery = parseImages(item);
   const image = gallery[0];
@@ -829,6 +1013,20 @@ function mapContentItem(
     Date.parse(String(item.updated_at || item.created_at || '')) || 0;
   const priceCents =
     typeof item.price_cents === 'number' ? item.price_cents : null;
+  const likeCount =
+    readPositiveInteger((item as { likeCount?: unknown }).likeCount) ||
+    readPositiveInteger((item as { like_count?: unknown }).like_count) ||
+    readPositiveInteger((item as { likes_count?: unknown }).likes_count) ||
+    readPositiveInteger(meta.like_count) ||
+    readPositiveInteger(meta.likes_count);
+  const liked = Boolean(
+    (item as { liked?: unknown }).liked ||
+    (item as { is_liked?: unknown }).is_liked ||
+    (item as { viewer_liked?: unknown }).viewer_liked ||
+    meta.liked ||
+    meta.is_liked ||
+    meta.viewer_liked,
+  );
   const verified = Boolean(
     item.owner_profile?.identity_verified ||
     item.owner_profile?.transaction_eligible ||
@@ -861,9 +1059,14 @@ function mapContentItem(
     asString(meta.product_id) ||
     asString(meta.productId) ||
     null;
+  const locationPoints = collectSearchLocationPoints(item);
+  const primaryPoint = locationPoints[0] || null;
+  const distanceKm = readDistanceKmFromContent(item, meta);
+  const distanceLabel = formatSearchDistance(distanceKm);
 
   return {
     id,
+    content_type: item.content_type || item.category || typeKey,
     title,
     summary,
     location,
@@ -874,6 +1077,7 @@ function mapContentItem(
     side,
     sideLabel,
     sideContextLabel,
+    businessCategory,
     supplierBadges,
     image,
     images: gallery,
@@ -881,6 +1085,12 @@ function mapContentItem(
     profileHref,
     updatedAt,
     priceCents,
+    lat: primaryPoint?.lat ?? null,
+    lng: primaryPoint?.lng ?? null,
+    distanceKm,
+    distanceLabel,
+    liked,
+    likeCount,
     entityKind,
     verified,
     hasMedia: gallery.length > 0,
@@ -893,85 +1103,22 @@ function mapContentItem(
   };
 }
 
-function toTextList(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value
-      .map(entry => asString(entry))
-      .filter((entry): entry is string => Boolean(entry));
+function readPositiveInteger(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value));
   }
-
-  const raw = asString(value);
-  if (!raw) return [];
-
-  return raw
-    .split(/[\n,;|]/g)
-    .map(entry => entry.trim())
-    .filter(Boolean);
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.replace(/[^\d.-]/g, ''));
+    if (Number.isFinite(parsed)) return Math.max(0, Math.trunc(parsed));
+  }
+  return 0;
 }
 
-function formatRoleLabel(value: string): string {
-  return value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, token => token.toUpperCase());
-}
-
-function normalizeDiscoverUser(
-  user: DiscoverUser,
-  locale: 'id' | 'en',
-): SearchProfileCard | null {
-  const id = String(user.id || '').trim();
-  if (!id) return null;
-
-  const name =
-    user.full_name ||
-    user.username ||
-    user.email ||
-    (locale === 'id' ? 'Akun aktif' : 'Active account');
-  const handle = user.username ? `@${user.username}` : '';
-  const roles = [
-    ...toTextList(user.roles),
-    ...toTextList(user.metadata_roles),
-  ];
-  const headline =
+/*
     user.headline || user.bio || roles.slice(0, 2).join(' · ') ||
-    (locale === 'id'
-      ? 'Sudah register di Lajukan dan bisa dibuka profilnya.'
-      : 'Registered on Lajukan and ready to open as a profile.');
-  const location = user.location || (locale === 'id' ? 'Indonesia' : 'Indonesia');
-  const profileHref = buildPublicProfileHref({
-    id,
-    username: user.username || undefined,
-    full_name: user.full_name || name,
-    title: name,
-  });
-  const avatarUrl = profileAvatarSrc(
-    user.avatar_url,
-    readProfileAvatarStyle(user),
-    name,
-  );
-  const roleLabel =
-    roles[0] || (locale === 'id' ? 'Profil' : 'Profile');
-  const ratingLabel =
-    typeof user.rating === 'number' && Number.isFinite(user.rating)
       ? `${user.rating.toFixed(1)}★`
-      : null;
 
-  return {
-    id,
-    href: profileHref,
-    name,
-    handle,
-    headline,
-    location,
-    avatarUrl,
-    verified: false,
-    roleLabel: formatRoleLabel(roleLabel),
-    ratingLabel,
-    roles,
-    createdAt: Date.parse(String(user.created_at || '')) || 0,
-  };
-}
-
+*/
 function searchCartKindFromCard(item: SearchCard): SearchCartItemKind {
   if (item.typeKey === 'product') return 'product';
   if (item.typeKey === 'service') return 'service';
@@ -1058,21 +1205,6 @@ function buildStoreCartInput(
   };
 }
 
-function typeFilterClass(active: boolean, typeKey: SearchVisualKey) {
-  const visual = getCategoryVisual(typeKey);
-  return active
-    ? `${visual.activeFilterClass} shadow-[0_16px_28px_-24px_rgba(15,23,42,0.24)]`
-    : visual.inactiveFilterClass;
-}
-
-function sideFilterClass(active: boolean) {
-  if (!active) {
-    return 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]';
-  }
-
-  return 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]';
-}
-
 function SearchActiveChip({
   icon,
   label,
@@ -1136,7 +1268,7 @@ function SearchFilterTabs({
       onPointerUp={onPointerUp}
       onWheel={onWheel}
       className={cn(
-        'flex max-w-full gap-2 overflow-x-auto pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing',
+        'flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden select-none cursor-grab active:cursor-grabbing',
         className,
       )}
       role="tablist"
@@ -1162,6 +1294,18 @@ function SearchFilterTabs({
           >
             <Icon className="h-4 w-4" />
             {isId ? tab.labelId : tab.labelEn}
+            {tab.badgeId || tab.badgeEn ? (
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em]',
+                  active
+                    ? 'bg-white/18 text-white'
+                    : 'bg-emerald-50 text-emerald-700',
+                )}
+              >
+                {isId ? tab.badgeId || tab.badgeEn : tab.badgeEn || tab.badgeId}
+              </span>
+            ) : null}
           </button>
         );
       })}
@@ -1185,35 +1329,53 @@ function SearchResultScopeCard({
   onSelect: (value: SideFilter) => void;
 }) {
   const iconMap: Record<SideFilter, LucideIcon> = {
-    all: Layers3,
-    supply: Store,
-    demand: UserRound,
+    all: Compass,
+    supply: Package,
+    demand: Search,
   };
+
   const Icon = iconMap[value];
 
   return (
     <button
       type="button"
       onClick={() => onSelect(value)}
-      aria-label={hint ? `${label}. ${hint}` : label}
       className={cn(
-        'flex min-h-[54px] items-center justify-between gap-3 rounded-[16px] border px-3 py-2 text-left transition',
-        sideFilterClass(active),
+        'group flex items-center gap-3 rounded-2xl border p-3 text-left transition-all',
+        active
+          ? 'border-emerald-200 bg-emerald-50'
+          : 'border-zinc-200 bg-white hover:border-emerald-100 hover:bg-zinc-50',
       )}
     >
-      <span className="flex min-w-0 items-center gap-3">
-        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[16px] bg-white/70 text-current ring-1 ring-black/5">
-          <Icon className="h-4 w-4" />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[11px] font-bold leading-tight">
-            {label}
+      <div
+        className={cn(
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition',
+          active ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-600',
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-bold text-zinc-900">{label}</span>
+
+          <span
+            className={cn(
+              'rounded-full px-2 py-0.5 text-[10px] font-bold',
+              active
+                ? 'bg-emerald-600 text-white'
+                : 'bg-zinc-100 text-zinc-500',
+            )}
+          >
+            {count}
           </span>
-        </span>
-      </span>
-      <span className="inline-flex h-5 min-w-[22px] items-center justify-center rounded-full bg-white/80 px-1.5 text-[9px] font-bold text-current">
-        {count}
-      </span>
+        </div>
+
+        <p className="mt-0.5 text-[11px] text-zinc-500">{hint}</p>
+      </div>
+
+      {active && <BadgeCheck className="h-4 w-4 text-emerald-600" />}
     </button>
   );
 }
@@ -1315,7 +1477,7 @@ function SearchResultScopeCard({
 //           <div className="absolute left-2 top-2 sm:left-3 sm:top-3">
 //             <span
 //               className={cn(
-//                 'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-black shadow-sm backdrop-blur sm:text-[10px]',
+//                 'inline-flex max-w-full items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold shadow-sm  sm:text-[10px]',
 //                 visual.chipClass,
 //               )}
 //             >
@@ -1325,14 +1487,14 @@ function SearchResultScopeCard({
 //           </div>
 //           {mediaLabel ? (
 //             <div className="absolute bottom-2 left-2 right-2 sm:bottom-3 sm:left-3 sm:right-3">
-//               <span className="inline-flex max-w-full items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-black text-slate-700 shadow-sm backdrop-blur">
+//               <span className="inline-flex max-w-full items-center rounded-full bg-white/90 px-2.5 py-1 text-[9px] font-bold text-slate-700 shadow-sm ">
 //                 {mediaLabel}
 //               </span>
 //             </div>
 //           ) : null}
 //         </Link>
 
-//         <div className="min-w-0 border-l border-[color:var(--app-border)] bg-white/58 p-3 backdrop-blur-sm sm:p-4">
+//         <div className="min-w-0 border-l border-[color:var(--app-border)] bg-white/58 p-3  sm:p-4">
 //           <div className="min-w-0">
 //             <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:mb-2">
 //               <span
@@ -1351,7 +1513,7 @@ function SearchResultScopeCard({
 //               ) : null}
 //             </div>
 //             <Link href={item.href} className="group block">
-//               <h3 className="line-clamp-2 text-[0.92rem] font-black leading-[1.08] tracking-[-0.035em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.1rem]">
+//               <h3 className="line-clamp-2 text-[0.92rem] font-bold leading-[1.08] tracking-[-0.035em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.1rem]">
 //                 {item.title}
 //               </h3>
 //             </Link>
@@ -1383,12 +1545,12 @@ function SearchResultScopeCard({
 
 //           <div className="mt-2 xl:hidden">
 //             <div className="rounded-[14px] border border-white/70 bg-white/76 px-2.5 py-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.55)] sm:rounded-[16px] sm:px-3">
-//               <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+//               <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
 //                 {isId ? 'Info' : 'Info'}
 //               </p>
 //               <p
 //                 className={cn(
-//                   'mt-0.5 truncate text-[0.88rem] font-black leading-tight sm:text-[0.95rem]',
+//                   'mt-0.5 truncate text-[0.88rem] font-bold leading-tight sm:text-[0.95rem]',
 //                   visual.priceClass,
 //                 )}
 //               >
@@ -1405,7 +1567,7 @@ function SearchResultScopeCard({
 //               <Link
 //                 href={item.profileHref || item.href}
 //                 className={cn(
-//                   'inline-flex min-h-[40px] min-w-0 items-center justify-center gap-2 rounded-[14px] border px-3 text-[12px] font-black',
+//                   'inline-flex min-h-[40px] min-w-0 items-center justify-center gap-2 rounded-[14px] border px-3 text-[12px] font-bold',
 //                   visual.outlineButtonClass,
 //                 )}
 //               >
@@ -1419,7 +1581,7 @@ function SearchResultScopeCard({
 //                 }
 //                 aria-label={saveAriaLabel}
 //                 className={cn(
-//                   'relative inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-black',
+//                   'relative inline-flex min-h-[40px] items-center justify-center gap-2 rounded-[14px] px-3 text-[12px] font-bold',
 //                   visual.solidButtonClass,
 //                 )}
 //               >
@@ -1451,12 +1613,12 @@ function SearchResultScopeCard({
 //           )}
 //         >
 //           <div>
-//             <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+//             <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
 //               {isId ? 'Info' : 'Info'}
 //             </p>
 //             <p
 //               className={cn(
-//                 'mt-1 text-[1.06rem] font-black leading-tight',
+//                 'mt-1 text-[1.06rem] font-bold leading-tight',
 //                 visual.priceClass,
 //               )}
 //             >
@@ -1534,24 +1696,93 @@ function SearchResultListingCard({
   cartQuantity,
   onAddToCart,
   onRemoveFromCart,
+  onOpenCart,
+  authFetch,
+  userSignedIn,
 }: {
   item: SearchCard;
   locale: 'id' | 'en';
   cartQuantity: number;
   onAddToCart: (item: SearchCard) => void;
   onRemoveFromCart: (itemId: string) => void;
+  onOpenCart?: () => void;
+  authFetch: AuthFetch;
+  userSignedIn: boolean;
 }) {
   const isSaved = cartQuantity > 0;
+  const router = useRouter();
+  const [liked, setLiked] = useState(item.liked);
+  const [likeCount, setLikeCount] = useState(item.likeCount || 0);
+  const [likeBusy, setLikeBusy] = useState(false);
 
   const images =
     item.images?.length > 0 ? item.images : item.image ? [item.image] : [];
+  const sideVisual = getListingSideVisual(item.side);
+  const SideIcon = sideVisual.Icon;
+  const detailBadges = [
+    item.sideContextLabel,
+    ...item.supplierBadges,
+  ].filter(Boolean);
+
+  useEffect(() => {
+    setLiked(item.liked);
+    setLikeCount(item.likeCount || 0);
+    setLikeBusy(false);
+  }, [item.id, item.liked, item.likeCount]);
 
   const toggleSave = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (isSaved) onRemoveFromCart(item.id);
-    else onAddToCart(item);
+    else {
+      onAddToCart(item);
+      onOpenCart?.();
+    }
+  };
+
+  const toggleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!userSignedIn) {
+      router.push(`/login?callbackUrl=${encodeURIComponent(item.href)}`);
+      return;
+    }
+    if (likeBusy) return;
+
+    const previousLiked = liked;
+    const previousCount = likeCount;
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikeCount(Math.max(previousCount + (nextLiked ? 1 : -1), 0));
+    setLikeBusy(true);
+
+    try {
+      const response = await authFetch(
+        `/api/content/${encodeURIComponent(item.id)}/like`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ liked: nextLiked }),
+        },
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        liked?: unknown;
+        likeCount?: unknown;
+        like_count?: unknown;
+      };
+      if (!response.ok) throw new Error('like failed');
+      setLiked(Boolean(payload.liked));
+      setLikeCount(
+        readPositiveInteger(payload.likeCount ?? payload.like_count),
+      );
+    } catch {
+      setLiked(previousLiked);
+      setLikeCount(previousCount);
+    } finally {
+      setLikeBusy(false);
+    }
   };
 
   // const getTypeLabel = () => {
@@ -1561,11 +1792,15 @@ function SearchResultListingCard({
   // };
 
   return (
-    <Link href={item.href} className="block">
-      <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md">
-
+    <Link href={item.href} className="block h-full">
+      <article
+        className={cn(
+          'flex w-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md',
+          MARKETPLACE_CARD_FIXED_HEIGHT_CLASS,
+        )}
+      >
         {/* IMAGE */}
-        <div className="relative aspect-square w-full bg-gray-100">
+        <div className="relative h-[132px] w-full shrink-0 bg-gray-100 sm:h-[144px]">
           {images.length > 0 ? (
             <MediaPreviewCarousel
               items={images}
@@ -1582,21 +1817,56 @@ function SearchResultListingCard({
             </div>
           )}
 
+          <span
+            className={cn(
+              'absolute left-2 top-2 inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-bold uppercase tracking-[0.08em] ',
+              sideVisual.badgeClass,
+            )}
+          >
+            <SideIcon className="h-3.5 w-3.5" />
+            {item.sideLabel}
+          </span>
+
           {/* BOOKMARK */}
           <button
             onClick={toggleSave}
-            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur hover:bg-white"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm  hover:bg-white"
           >
             <Bookmark
               size={16}
               className={isSaved ? 'fill-black text-black' : 'text-gray-500'}
             />
           </button>
+
+          <button
+            type="button"
+            onClick={toggleLike}
+            disabled={likeBusy}
+            className="absolute bottom-2 left-2 inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white/92 px-2.5 text-[11px] font-bold text-slate-700 shadow-sm  transition hover:bg-white disabled:opacity-70"
+            aria-label={
+              liked
+                ? locale === 'id'
+                  ? 'Batal suka'
+                  : 'Unlike'
+                : locale === 'id'
+                  ? 'Suka'
+                  : 'Like'
+            }
+          >
+            <Heart
+              className={cn(
+                'h-3.5 w-3.5 text-rose-500',
+                liked ? 'fill-rose-500' : '',
+              )}
+            />
+            <span>
+              {likeCount.toLocaleString(locale === 'id' ? 'id-ID' : 'en-US')}
+            </span>
+          </button>
         </div>
 
         {/* CONTENT */}
-        <div className="flex flex-1 flex-col p-3">
-
+        <div className="flex min-h-0 flex-1 flex-col p-3">
           {/* LABEL */}
           {/* <span className="mb-1 w-fit rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600">
             {item.content_type}
@@ -1607,32 +1877,50 @@ function SearchResultListingCard({
             {item.title}
           </h3>
 
-          {item.supplierBadges.length > 0 ? (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {item.supplierBadges.slice(0, 3).map(badge => (
+          {detailBadges.length > 0 ? (
+            <div className="mt-1 flex h-[22px] max-h-[22px] flex-wrap gap-1 overflow-hidden">
+              {detailBadges.slice(0, 3).map((badge, index) => (
                 <span
                   key={badge}
-                  className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600"
+                  className={cn(
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                    index === 0
+                      ? sideVisual.chipClass
+                      : 'bg-gray-100 text-gray-600',
+                  )}
                 >
                   {badge}
                 </span>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <div className="mt-1 h-[22px] max-h-[22px]" />
+          )}
 
           {/* META */}
-          <p className="mt-1 line-clamp-1 text-xs text-gray-500">
-            {item.location}
-          </p>
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
+            {item.distanceLabel ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                <MapPin className="h-3 w-3" />
+                {item.distanceLabel}
+              </span>
+            ) : null}
+            <span className="min-w-0 truncate">{item.location}</span>
+          </div>
 
           {/* PRICE */}
-          <div className="mt-2">
-            <p className="text-base font-extrabold text-green-500">
+          <div className="mt-auto pt-2">
+            <p
+              className={cn(
+                'truncate text-base font-extrabold',
+                sideVisual.priceClass,
+              )}
+            >
               {item.priceLabel.split('/')[0]}
             </p>
 
             {item.priceUnitLabel && (
-              <p className="text-[11px] text-gray-500">
+              <p className="truncate text-[11px] text-gray-500">
                 Per {item.priceUnitLabel}
               </p>
             )}
@@ -1643,184 +1931,290 @@ function SearchResultListingCard({
   );
 }
 
-function SearchResultProfileCard({
-  item,
+type SearchResultRail = {
+  id: string;
+  title: string;
+  subtitle: string;
+  badge?: string;
+  items: SearchCard[];
+  typeKey: SearchFilterTabKey;
+};
+
+function itemTextIndex(item: SearchCard): string {
+  return [
+    item.businessCategory,
+    item.title,
+    item.summary,
+    item.typeLabel,
+    item.sideContextLabel,
+    item.supplierBadges.join(' '),
+    item.storeName,
+    item.ownerName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function isBusinessCategoryItem(
+  item: SearchCard,
+  categoryId: BusinessDiscoveryCategoryId,
+): boolean {
+  if (item.businessCategory) return item.businessCategory === categoryId;
+
+  const text = itemTextIndex(item);
+  if (categoryId === 'equipment') {
+    return (
+      item.typeKey === 'tool_rental' ||
+      (item.typeKey === 'product' &&
+        /(mesin|alat|equipment|tool|sewa|rental|freezer|oven|printer|kopi|espresso|sealer|produksi|workshop)/i.test(
+          text,
+        ))
+    );
+  }
+  if (categoryId === 'supplies') {
+    return (
+      item.typeKey === 'product' && !isBusinessCategoryItem(item, 'equipment')
+    );
+  }
+  if (categoryId === 'service') {
+    return (
+      item.typeKey === 'service' ||
+      item.typeKey === 'freelancer' ||
+      item.typeKey === 'job'
+    );
+  }
+  if (categoryId === 'property') return item.typeKey === 'property';
+  if (categoryId === 'opportunity') {
+    return (
+      item.typeKey === 'business_transfer' ||
+      /(peluang|franchise|waralaba|kemitraan|reseller|distributor|dropship|agen|partnership|business opportunity)/i.test(
+        text,
+      )
+    );
+  }
+  return false;
+}
+
+function SearchResultRailSection({
+  section,
   locale,
+  cartQuantities,
+  onAddToCart,
+  onRemoveFromCart,
+  onOpenCart,
+  onViewAll,
+  authFetch,
+  userSignedIn,
 }: {
-  item: SearchProfileCard;
+  section: SearchResultRail;
   locale: 'id' | 'en';
+  cartQuantities: Record<string, number>;
+  onAddToCart: (item: SearchCard) => void;
+  onRemoveFromCart: (itemId: string) => void;
+  onOpenCart: () => void;
+  onViewAll: (typeKey: SearchFilterTabKey) => void;
+  authFetch: AuthFetch;
+  userSignedIn: boolean;
 }) {
   const isId = locale === 'id';
-  const activeLabel = isId ? 'Profil aktif' : 'Active profile';
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align: 'start',
+    containScroll: 'keepSnaps',
+    dragFree: true,
+  });
+
+  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+
+  if (section.items.length === 0) return null;
 
   return (
-    <article
-      data-testid="search-profile-card"
-      className="group/card overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.98)_100%)] shadow-[0_18px_38px_-30px_rgba(15,23,42,0.2)] ring-1 ring-white/60 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_26px_58px_-40px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98)_0%,rgba(2,6,23,0.96)_100%)]"
-    >
-      <div className="flex min-w-0 gap-3 p-3 sm:p-4">
-        <Link
-          href={item.href}
-          className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[20px] ring-1 ring-black/5 transition group-hover/card:scale-[1.01] sm:h-18 sm:w-18"
-          aria-label={isId ? 'Buka profil' : 'Open profile'}
-        >
-          {item.avatarUrl ? (
-            <Image
-              src={item.avatarUrl}
-              alt={item.name}
-              fill
-              sizes="72px"
-              className="object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-              <UserRound className="h-7 w-7" />
-            </div>
-          )}
-        </Link>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-accent)]">
-              <UserRound className="h-3 w-3" />
-              {activeLabel}
-            </span>
-            {item.ratingLabel ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-                <BadgeCheck className="h-3 w-3" />
-                {item.ratingLabel}
+    <section className="min-w-0 max-w-full space-y-3 overflow-x-hidden">
+      <div className="flex min-w-0 items-end justify-between gap-3 px-1">
+        <div className="min-w-0">
+          <h2 className="text-[18px] font-bold tracking-[-0.04em] text-[color:var(--app-text)]">
+            {section.badge ? (
+              <span className="mr-2 inline-flex align-middle rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                {section.badge}
               </span>
             ) : null}
-          </div>
-
-
-          {item.handle ? (
-            <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-              {item.handle}
-            </p>
-          ) : null}
-
-          <Link href={item.href} className="group mt-1 block">
-            <h3 className="line-clamp-1 text-[0.96rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] group-hover:text-[color:var(--app-accent)] sm:text-[1.05rem]">
-              {item.name}
-            </h3>
-          </Link>
-
-
-          {/* <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[color:var(--app-text-soft)] sm:text-[12px]">
-            {item.headline}
-          </p> */}
-
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-semibold text-[color:var(--app-text-soft)] sm:text-[11px]">
-            <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" />
-              {item.location}
+            {section.title}
+            <span className="ml-2 align-middle text-[11px] font-semibold tracking-normal text-[color:var(--app-text-soft)]">
+              {section.items.length.toLocaleString(isId ? 'id-ID' : 'en-US')}
             </span>
-            {item.roles.length > 0 ? (
-              <span className="inline-flex items-center gap-1.5">
-                <UserRound className="h-3.5 w-3.5" />
-                {item.roles.slice(0, 2).join(' · ')}
-              </span>
-            ) : null}
+          </h2>
+          <p className="mt-0.5 line-clamp-1 text-[12px] font-medium text-[color:var(--app-text-soft)]">
+            {section.subtitle}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onViewAll(section.typeKey)}
+            className="inline-flex min-h-[34px] items-center gap-1 text-[12px] font-bold text-emerald-600"
+          >
+            {isId ? 'Lihat semua' : 'See all'}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+          <div className="hidden items-center gap-1 md:flex">
+            <button
+              type="button"
+              onClick={scrollPrev}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white text-[color:var(--app-text)]"
+              aria-label={isId ? 'Geser sebelumnya' : 'Previous slide'}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={scrollNext}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-white"
+              aria-label={isId ? 'Geser berikutnya' : 'Next slide'}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* <div className="flex items-center justify-between gap-3 border-t border-[color:var(--app-border)] px-3 py-2.5 sm:px-4">
-        <p className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-          {isId
-            ? 'Sudah register dan bisa dibuka profilnya'
-            : 'Registered and searchable'}
-        </p>
-        <Link
-          href={item.href}
-          className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold text-[color:var(--app-accent)] transition hover:-translate-y-0.5"
-        >
-          {isId ? 'Buka profil' : 'Open profile'}
-          <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
-      </div> */}
-    </article>
+      <div
+        className="min-w-0 max-w-full overflow-hidden"
+        ref={emblaRef}
+      >
+        <div className="flex min-w-0 touch-pan-y gap-2 py-1 md:gap-3">
+          {section.items.map(item => (
+            <div
+              key={`${section.id}-${item.id}`}
+              className="w-[48vw] min-w-[168px] max-w-[210px] shrink-0 select-none sm:w-[210px] md:w-[220px] lg:w-[230px]"
+              style={{ backfaceVisibility: 'hidden' }}
+            >
+              <SearchResultListingCard
+                item={item}
+                locale={locale}
+                cartQuantity={cartQuantities[item.id] || 0}
+                onAddToCart={onAddToCart}
+                onRemoveFromCart={onRemoveFromCart}
+                onOpenCart={onOpenCart}
+                authFetch={authFetch}
+                userSignedIn={userSignedIn}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
-function SearchProfileResultsSection({
+function SearchResultRails({
+  sections,
   locale,
-  activeTab,
-  profiles,
-  loading,
-  error,
+  cartQuantities,
+  onAddToCart,
+  onRemoveFromCart,
+  onOpenCart,
+  onViewAll,
+  authFetch,
+  userSignedIn,
 }: {
+  sections: SearchResultRail[];
   locale: 'id' | 'en';
-  activeTab: SearchFilterTabKey;
-  profiles: SearchProfileCard[];
-  loading: boolean;
-  error: string | null;
+  cartQuantities: Record<string, number>;
+  onAddToCart: (item: SearchCard) => void;
+  onRemoveFromCart: (itemId: string) => void;
+  onOpenCart: () => void;
+  onViewAll: (typeKey: SearchFilterTabKey) => void;
+  authFetch: AuthFetch;
+  userSignedIn: boolean;
+}) {
+  return (
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
+      {sections.map(section => (
+        <SearchResultRailSection
+          key={section.id}
+          section={section}
+          locale={locale}
+          cartQuantities={cartQuantities}
+          onAddToCart={onAddToCart}
+          onRemoveFromCart={onRemoveFromCart}
+          onOpenCart={onOpenCart}
+          onViewAll={onViewAll}
+          authFetch={authFetch}
+          userSignedIn={userSignedIn}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SearchResultVerticalList({
+  section,
+  locale,
+  cartQuantities,
+  onAddToCart,
+  onRemoveFromCart,
+  onOpenCart,
+  authFetch,
+  userSignedIn,
+  hasMore,
+}: {
+  section: SearchResultRail;
+  locale: 'id' | 'en';
+  cartQuantities: Record<string, number>;
+  onAddToCart: (item: SearchCard) => void;
+  onRemoveFromCart: (itemId: string) => void;
+  onOpenCart: () => void;
+  authFetch: AuthFetch;
+  userSignedIn: boolean;
+  hasMore: boolean;
 }) {
   const isId = locale === 'id';
-  const shouldRender = profiles.length > 0 || loading || error;
-  if (!shouldRender) return null;
-  if (!loading && !error && profiles.length === 0) return null;
-
-  const title =
-    activeTab === 'freelancer'
-      ? isId
-        ? 'Profil talent aktif'
-        : 'Active talent profiles'
-      : isId
-        ? 'Profil akun aktif'
-        : 'Active registered profiles';
-  const subtitle = isId
-    ? 'Orang yang sudah register di Lajukan tampil di sini.'
-    : 'Registered users appear here as active profiles.';
+  if (section.items.length === 0) return null;
 
   return (
-    <section className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.18)] sm:p-4 overflow-hidden">
-      <div className="flex items-start justify-between gap-3">
+    <section
+      className="min-w-0 max-w-full space-y-3 overflow-x-hidden"
+      data-testid="search-category-vertical-results"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3 px-1">
         <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-            {title}
-          </p>
-          <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
-            {subtitle}
+          <h2 className="text-[18px] font-bold tracking-[-0.04em] text-[color:var(--app-text)]">
+            {section.badge ? (
+              <span className="mr-2 inline-flex align-middle rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                {section.badge}
+              </span>
+            ) : null}
+            {section.title}
+            <span className="ml-2 align-middle text-[11px] font-semibold tracking-normal text-[color:var(--app-text-soft)]">
+              {section.items.length.toLocaleString(isId ? 'id-ID' : 'en-US')}
+              {hasMore ? '+' : ''}
+            </span>
+          </h2>
+          <p className="mt-0.5 line-clamp-2 text-[12px] font-medium text-[color:var(--app-text-soft)]">
+            {isId
+              ? `${section.subtitle} Hasil kategori ini ditampilkan vertikal.`
+              : `${section.subtitle} This category is shown as a vertical feed.`}
           </p>
         </div>
-        <span className="inline-flex min-h-[32px] shrink-0 items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold text-[color:var(--app-accent)]">
-          {profiles.length.toLocaleString(isId ? 'id-ID' : 'en-US')}{' '}
-          {isId ? 'profil' : 'profiles'}
-        </span>
       </div>
 
-      {loading ? (
-        <div className="mt-3 flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div
-              key={`profile-skeleton-${index}`}
-              className="ui-skeleton ui-skeleton-pulse h-[172px] w-[280px] min-w-[280px] shrink-0 rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
-            />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="mt-3 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
-          {error}
-        </div>
-      ) : (
-        <div className="-mx-4 mt-3 overflow-x-auto px-4 pb-2 scrollbar-hide">
-          <div className="flex gap-3">
-            {profiles.map(profile => (
-              <div
-                key={profile.id}
-                className="w-[280px] min-w-[280px] shrink-0"
-              >
-                <SearchResultProfileCard
-                  item={profile}
-                  locale={locale}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="grid min-w-0 max-w-full grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3 xl:grid-cols-4 2xl:grid-cols-5">
+        {section.items.map(item => (
+          <SearchResultListingCard
+            key={`${section.id}-${item.id}`}
+            item={item}
+            locale={locale}
+            cartQuantity={cartQuantities[item.id] || 0}
+            onAddToCart={onAddToCart}
+            onRemoveFromCart={onRemoveFromCart}
+            onOpenCart={onOpenCart}
+            authFetch={authFetch}
+            userSignedIn={userSignedIn}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -1849,12 +2243,11 @@ function SearchCartDock({
 
   return (
     <div className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] z-[70] lg:bottom-5 lg:right-5 lg:left-auto lg:w-[360px]">
-
       {/* COLLAPSED */}
       {!open ? (
         <button
           onClick={() => onOpenChange(true)}
-          className="pointer-events-auto flex w-full items-center justify-between rounded-[18px] border bg-white/90 px-3 py-2.5 shadow-lg backdrop-blur"
+          className="pointer-events-auto flex w-full items-center justify-between rounded-[18px] border bg-white/90 px-3 py-2.5 shadow-lg "
         >
           <div className="flex items-center gap-2 min-w-0">
             <div className="relative flex h-9 w-9 items-center justify-center rounded-[12px] bg-black text-white">
@@ -1881,16 +2274,13 @@ function SearchCartDock({
       ) : (
         /* EXPANDED */
         <section className="pointer-events-auto flex max-h-[60vh] flex-col overflow-hidden rounded-[20px] border bg-white shadow-xl">
-
           {/* HEADER */}
           <div className="flex items-center justify-between border-b px-3 py-2">
             <div className="min-w-0">
               <p className="truncate text-[13px] font-bold">
                 {isId ? 'Referensi' : 'Saved'}
               </p>
-              <p className="truncate text-[10px] text-gray-500">
-                {countLabel}
-              </p>
+              <p className="truncate text-[10px] text-gray-500">{countLabel}</p>
             </div>
 
             <button
@@ -1903,7 +2293,6 @@ function SearchCartDock({
 
           {/* LIST */}
           <div className="flex-1 overflow-auto px-2 py-2 space-y-2">
-
             {items.map(item => (
               <div
                 key={item.id}
@@ -2018,15 +2407,17 @@ function SearchRightRail({
               <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                 {isId ? 'Hasil' : 'Results'}
               </p>
-              <p className="mt-0.5 text-lg font-black text-[color:var(--app-text)]">
-                {hasMore ? `${resultCountLabel}+` : resultCountLabel}
+              <p className="mt-0.5 text-lg font-bold text-[color:var(--app-text)]">
+                {hasMore && resultCountLabel !== '0'
+                  ? `${resultCountLabel}+`
+                  : resultCountLabel}
               </p>
             </div>
             <div className="rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2">
               <p className="text-[10px] font-semibold text-[color:var(--app-text-soft)]">
                 {isId ? 'Kota' : 'City'}
               </p>
-              <p className="mt-0.5 truncate text-sm font-black text-[color:var(--app-text)]">
+              <p className="mt-0.5 truncate text-sm font-bold text-[color:var(--app-text)]">
                 {popularCities[0] || 'Indonesia'}
               </p>
             </div>
@@ -2034,7 +2425,7 @@ function SearchRightRail({
         </section>
 
         <section className="rounded-[22px] border border-emerald-100 bg-[linear-gradient(180deg,#f4fff8_0%,#ffffff_100%)] p-3 shadow-[0_18px_36px_-32px_rgba(22,163,74,0.22)]">
-          <p className="text-[0.95rem] font-black text-[color:var(--app-text)]">
+          <p className="text-[0.95rem] font-bold text-[color:var(--app-text)]">
             {isId ? 'Aksi' : 'Actions'}
           </p>
           <div className="mt-2 grid gap-2">
@@ -2076,7 +2467,7 @@ function SearchRightRail({
 
         {leadingStores.length > 0 ? (
           <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_18px_36px_-32px_rgba(15,23,42,0.14)]">
-            <h2 className="text-[0.95rem] font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+            <h2 className="text-[0.95rem] font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
               {isId ? 'Usaha terkait' : 'Related businesses'}
             </h2>
             <div className="mt-3 space-y-2">
@@ -2108,6 +2499,7 @@ function SearchRightRail({
 
 export default function SearchPageClient() {
   const router = useRouter();
+  const { user, authFetch } = useAuth();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const locale = detectLocale(pathname);
@@ -2119,6 +2511,7 @@ export default function SearchPageClient() {
   const normalizedInitialType = normalizeType(searchParams.get('type'));
   const initialSort = normalizeSort(searchParams.get('sort'));
   const initialSideFilter = normalizeSideFilter(searchParams.get('side'));
+  const initialNearbyEnabled = searchParams.get('nearby') !== '0';
   const initialUsedOnly = normalizeUsedGoodsFilter(
     searchParams.get('condition'),
     initialQuery,
@@ -2132,7 +2525,17 @@ export default function SearchPageClient() {
   const [type, setType] = useState<TypeKey>(initialType);
   const [sort, setSort] = useState<SortKey>(initialSort);
   const [sideFilter, setSideFilter] = useState<SideFilter>(initialSideFilter);
+  const [nearbyEnabled, setNearbyEnabled] = useState(initialNearbyEnabled);
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
   const [usedOnly, setUsedOnly] = useState(initialUsedOnly);
+  const [selectedSearchTab, setSelectedSearchTab] =
+    useState<SearchFilterTabKey>(() =>
+      resolveActiveBusinessSearchTab({
+        query: initialQuery,
+        type: initialType,
+        usedOnly: initialUsedOnly,
+      }),
+    );
   const [resultsView, setResultsView] = useState<SearchResultsView>(
     initialType === 'umkm' ? 'umkm' : 'results',
   );
@@ -2142,26 +2545,31 @@ export default function SearchPageClient() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const offsetRef = useRef(0);
+  const requestSeqRef = useRef(0);
+  const appendBusyRef = useRef(false);
 
   const [umkmStores, setUmkmStores] = useState<UmkmPreviewStore[]>([]);
   const [umkmLoading, setUmkmLoading] = useState(false);
   const [umkmError, setUmkmError] = useState<string | null>(null);
-  const [discoverProfiles, setDiscoverProfiles] = useState<SearchProfileCard[]>([]);
-  const [discoverLoading, setDiscoverLoading] = useState(false);
-  const [discoverError, setDiscoverError] = useState<string | null>(null);
   const [searchCart, setSearchCart] = useState<SearchCartSession>(
     EMPTY_SEARCH_CART_SESSION,
   );
   const [cartOpen, setCartOpen] = useState(false);
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
-  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
-  const [searchSuggestionsLoading, setSearchSuggestionsLoading] = useState(false);
-  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
-  const searchSuggestionsId = useId();
-  const searchSuggestionsTimeoutRef = useRef<number | undefined>(undefined);
+  const {
+    viewerLocation,
+    locating,
+    locationError,
+    locationEnabled,
+    locationPromptDismissed,
+    requestViewerLocation,
+    dismissLocationPrompt,
+  } = useViewerLocation({
+    isId,
+    autoRequest: false,
+  });
   const {
     ref: mobileActionsRailRef,
     onClickCapture: onMobileActionsClickCapture,
@@ -2176,7 +2584,30 @@ export default function SearchPageClient() {
   const canToggleUmkmView = type === 'all' || type === 'umkm';
   const shouldShowUmkmPreview = resultsView === 'umkm' || type === 'umkm';
   const shouldShowResultCards = !shouldShowUmkmPreview;
-  const shouldShowDiscoverProfiles = true;
+  const nearbyActive = nearbyEnabled && Boolean(viewerLocation);
+  const nearbyStatusLabel = nearbyActive
+    ? isId
+      ? 'Terdekat dari lokasi saya'
+      : 'Nearest to me'
+    : nearbyEnabled
+      ? isId
+        ? 'Lokasi belum aktif'
+        : 'Location not active yet'
+      : isId
+        ? 'Urutan biasa'
+        : 'Regular order';
+  const autoLoadEnabled =
+    shouldShowResultCards && !loading && !loadingMore && hasMore && !error;
+  const { ref: mobileLoadMoreRef, inView: mobileLoadMoreInView } = useInView({
+    rootMargin: '720px 0px',
+    threshold: 0,
+    skip: !autoLoadEnabled,
+  });
+  const { ref: desktopLoadMoreRef, inView: desktopLoadMoreInView } = useInView({
+    rootMargin: '720px 0px',
+    threshold: 0,
+    skip: !autoLoadEnabled,
+  });
 
   useEffect(() => {
     const syncCart = () => setSearchCart(readSearchCartSession());
@@ -2236,69 +2667,42 @@ export default function SearchPageClient() {
     setCartOpen(false);
   }, []);
 
+  const closeLocationPrompt = useCallback(() => {
+    dismissLocationPrompt();
+    setLocationPromptOpen(false);
+  }, [dismissLocationPrompt]);
+
+  const openLocationPrompt = useCallback(() => {
+    setLocationPromptOpen(true);
+  }, []);
+
+  const enableNearbyLocation = useCallback(async () => {
+    const nextLocation = viewerLocation || (await requestViewerLocation());
+    if (!nextLocation) return;
+    setNearbyEnabled(true);
+    setLocationInput('');
+    setLocation('');
+    setLocationPromptOpen(false);
+    setRefreshKey(value => value + 1);
+  }, [requestViewerLocation, viewerLocation]);
+
+  const disableNearbyLocation = useCallback(() => {
+    setNearbyEnabled(false);
+  }, []);
+
+  const skipNearbyLocation = useCallback(() => {
+    setNearbyEnabled(false);
+    closeLocationPrompt();
+  }, [closeLocationPrompt]);
+
   const applyFilters = useCallback(() => {
     const nextQuery = queryInput.trim();
     const nextLocation = locationInput.trim();
-    setMobileActionsOpen(false);
     setQuery(nextQuery);
     setLocation(nextLocation);
     if (type === 'umkm') setResultsView('umkm');
     if (resultsView !== 'umkm') setResultsView('results');
   }, [locationInput, queryInput, resultsView, type]);
-
-  const fetchSearchSuggestions = useCallback(async (searchQuery: string) => {
-    const trimmed = searchQuery.trim();
-    if (trimmed.length < 3) {
-      setSearchSuggestions([]);
-      setShowSearchSuggestions(false);
-      return;
-    }
-
-    setSearchSuggestionsLoading(true);
-    try {
-      const res = await fetch('/api/ai/search-suggestions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: trimmed }),
-      });
-      const payload = (await res.json().catch(() => ({}))) as { suggestions?: unknown };
-      const suggestions = Array.isArray(payload.suggestions)
-        ? payload.suggestions
-          .filter((item): item is string => typeof item === 'string')
-          .map(item => item.trim())
-          .filter(Boolean)
-          .slice(0, 5)
-        : [];
-      setSearchSuggestions(suggestions);
-      setShowSearchSuggestions(suggestions.length > 0);
-    } catch {
-      setSearchSuggestions([]);
-      setShowSearchSuggestions(false);
-    } finally {
-      setSearchSuggestionsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (searchSuggestionsTimeoutRef.current) {
-      window.clearTimeout(searchSuggestionsTimeoutRef.current);
-    }
-
-    if (queryInput.trim().length >= 3) {
-      searchSuggestionsTimeoutRef.current = window.setTimeout(() => {
-        void fetchSearchSuggestions(queryInput);
-      }, 420);
-    } else {
-      setSearchSuggestions([]);
-      setShowSearchSuggestions(false);
-    }
-
-    return () => {
-      if (searchSuggestionsTimeoutRef.current) {
-        window.clearTimeout(searchSuggestionsTimeoutRef.current);
-      }
-    };
-  }, [fetchSearchSuggestions, queryInput]);
 
   const resetAllFilters = useCallback(() => {
     setQueryInput('');
@@ -2306,12 +2710,13 @@ export default function SearchPageClient() {
     setQuery('');
     setLocation('');
     setType('all');
+    setSelectedSearchTab('all');
     setSort('relevance');
     setSideFilter('all');
+    setNearbyEnabled(true);
     setUsedOnly(false);
     setResultsView('results');
     setFiltersOpen(false);
-    setMobileActionsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -2322,21 +2727,40 @@ export default function SearchPageClient() {
     if (usedOnly) params.set('condition', 'used');
     if (sort !== 'relevance') params.set('sort', sort);
     if (sideFilter !== 'all') params.set('side', sideFilter);
+    if (!nearbyEnabled) params.set('nearby', '0');
     const search = params.toString();
     router.replace(search ? `${pathname}?${search}` : pathname, {
       scroll: false,
     });
-  }, [location, pathname, query, router, sideFilter, sort, type, usedOnly]);
+  }, [
+    location,
+    nearbyEnabled,
+    pathname,
+    query,
+    router,
+    sideFilter,
+    sort,
+    type,
+    usedOnly,
+  ]);
 
   const loadResults = useCallback(
     async (mode: 'replace' | 'append') => {
       if (type === 'umkm') {
         setItems([]);
+        offsetRef.current = 0;
         setHasMore(false);
         setLoading(false);
         setLoadingMore(false);
         return;
       }
+
+      if (mode === 'append' && appendBusyRef.current) return;
+
+      const requestSeq =
+        mode === 'replace' ? requestSeqRef.current + 1 : requestSeqRef.current;
+      if (mode === 'replace') requestSeqRef.current = requestSeq;
+      if (mode === 'append') appendBusyRef.current = true;
 
       if (mode === 'replace') {
         setLoading(true);
@@ -2350,15 +2774,21 @@ export default function SearchPageClient() {
         const effectiveQuery = usedOnly
           ? getUsedGoodsQuery(query, locale)
           : query;
+        const requestOffset = mode === 'append' ? offsetRef.current : 0;
         if (effectiveQuery) params.set('q', effectiveQuery);
         if (location) params.set('location', location);
         if (type !== 'all') params.set('type', type);
+        if (nearbyEnabled && viewerLocation) {
+          params.set('nearby', '1');
+          params.set('viewer_lat', String(viewerLocation.lat));
+          params.set('viewer_lng', String(viewerLocation.lng));
+        }
         params.set('status', 'active');
         params.set('include_owner', '1');
         params.set('limit', String(PAGE_SIZE));
-        params.set('offset', String(mode === 'append' ? offset : 0));
+        params.set('offset', String(requestOffset));
 
-        const response = await fetch(`/api/content?${params.toString()}`, {
+        const response = await authFetch(`/api/content?${params.toString()}`, {
           cache: 'no-store',
         });
         const payload = await response.json().catch(() => ({}));
@@ -2372,29 +2802,95 @@ export default function SearchPageClient() {
           );
         }
 
-        const nextItems = extractContentItems(payload)
+        const rawItems = extractContentItems(payload);
+        const nextItems = rawItems
           .map(item => mapContentItem(item, locale))
           .filter((item): item is SearchCard => Boolean(item));
+        const payloadHasMore =
+          typeof (payload as { has_more?: unknown }).has_more === 'boolean'
+            ? Boolean((payload as { has_more?: unknown }).has_more)
+            : typeof (payload as { hasMore?: unknown }).hasMore === 'boolean'
+              ? Boolean((payload as { hasMore?: unknown }).hasMore)
+              : rawItems.length === PAGE_SIZE;
 
-        setItems(prev =>
-          mode === 'append' ? [...prev, ...nextItems] : nextItems,
-        );
-        setOffset((mode === 'append' ? offset : 0) + nextItems.length);
-        setHasMore(nextItems.length === PAGE_SIZE);
+        if (requestSeq !== requestSeqRef.current) return;
+
+        setItems(prev => {
+          if (mode !== 'append') return nextItems;
+          const existingIds = new Set(prev.map(item => item.id));
+          return [
+            ...prev,
+            ...nextItems.filter(item => !existingIds.has(item.id)),
+          ];
+        });
+        offsetRef.current = requestOffset + rawItems.length;
+        setHasMore(rawItems.length > 0 && payloadHasMore);
       } catch (err) {
+        if (requestSeq !== requestSeqRef.current) return;
         setError(err instanceof Error ? err.message : 'Failed to load results');
         if (mode === 'replace') setItems([]);
       } finally {
-        if (mode === 'replace') setLoading(false);
-        else setLoadingMore(false);
+        if (mode === 'append') {
+          appendBusyRef.current = false;
+          setLoadingMore(false);
+        } else if (requestSeq === requestSeqRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [isId, locale, location, offset, query, type, usedOnly],
+    [
+      authFetch,
+      isId,
+      locale,
+      location,
+      nearbyEnabled,
+      query,
+      type,
+      usedOnly,
+      viewerLocation,
+    ],
   );
 
   useEffect(() => {
     void loadResults('replace');
   }, [loadResults, refreshKey]);
+
+  useEffect(() => {
+    if (
+      !nearbyEnabled ||
+      viewerLocation ||
+      location ||
+      locationEnabled ||
+      locationPromptDismissed ||
+      locating
+    ) {
+      return;
+    }
+    if (typeof window === 'undefined') return;
+
+    const timer = window.setTimeout(() => {
+      setLocationPromptOpen(true);
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    location,
+    locationEnabled,
+    locationPromptDismissed,
+    locating,
+    nearbyEnabled,
+    viewerLocation,
+  ]);
+
+  useEffect(() => {
+    if (!autoLoadEnabled) return;
+    if (!mobileLoadMoreInView && !desktopLoadMoreInView) return;
+    void loadResults('append');
+  }, [
+    autoLoadEnabled,
+    desktopLoadMoreInView,
+    loadResults,
+    mobileLoadMoreInView,
+  ]);
 
   useEffect(() => {
     if (type !== 'all' && type !== 'umkm') {
@@ -2412,6 +2908,10 @@ export default function SearchPageClient() {
         const params = new URLSearchParams();
         if (query) params.set('q', query);
         if (location) params.set('city', location);
+        if (nearbyEnabled && viewerLocation) {
+          params.set('viewer_lat', String(viewerLocation.lat));
+          params.set('viewer_lng', String(viewerLocation.lng));
+        }
         params.set('backend_only', '1');
         params.set('limit', '10');
 
@@ -2445,117 +2945,122 @@ export default function SearchPageClient() {
     };
 
     void load();
-  }, [isId, location, query, type]);
+  }, [isId, location, nearbyEnabled, query, type, viewerLocation]);
 
-  useEffect(() => {
-    if (!shouldShowDiscoverProfiles) {
-      setDiscoverProfiles([]);
-      setDiscoverLoading(false);
-      setDiscoverError(null);
-      return;
-    }
+  const activeSearchTab = selectedSearchTab;
+  const activeTypeLabel = getSearchTabLabel(activeSearchTab, locale);
+  const activeBusinessCategory =
+    getBusinessDiscoveryCategoryById(activeSearchTab);
+  const activeResultCategory =
+    activeBusinessCategory && isResultCategoryId(activeBusinessCategory.id)
+      ? activeBusinessCategory
+      : null;
 
-    const controller = new AbortController();
-
-    const loadProfiles = async () => {
-      setDiscoverLoading(true);
-      setDiscoverError(null);
-
-      try {
-        const params = new URLSearchParams();
-        params.set('limit', String(PAGE_SIZE));
-        if (query.trim()) params.set('q', query.trim());
-
-        const response = await fetch(
-          `/api/users/discover?${params.toString()}`,
-          {
-            cache: 'no-store',
-            credentials: 'include',
-            signal: controller.signal,
-          },
-        );
-        const payload = (await response.json().catch(() => ({}))) as {
-          data?: unknown[];
-          error?: string;
-        };
-
-        if (!response.ok) {
-          throw new Error(
-            payload.error || (isId ? 'Gagal memuat profil' : 'Failed to load profiles'),
-          );
-        }
-
-        const nextProfiles = Array.isArray(payload.data)
-          ? payload.data
-            .map(item => normalizeDiscoverUser(item as DiscoverUser, locale))
-            .filter((item): item is SearchProfileCard => Boolean(item))
-            .filter(profile =>
-              location.trim()
-                ? profile.location
-                  .toLowerCase()
-                  .includes(location.trim().toLowerCase())
-                : true,
-            )
-          : [];
-
-        setDiscoverProfiles(nextProfiles);
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setDiscoverProfiles([]);
-        setDiscoverError(
-          err instanceof Error
-            ? err.message
-            : isId
-              ? 'Gagal memuat profil'
-              : 'Failed to load profiles',
-        );
-      } finally {
-        if (!controller.signal.aborted) {
-          setDiscoverLoading(false);
-        }
-      }
-    };
-
-    void loadProfiles();
-
-    return () => controller.abort();
-  }, [isId, locale, location, query, shouldShowDiscoverProfiles]);
+  const categoryFilteredItems = useMemo(() => {
+    if (!activeResultCategory) return items;
+    return items.filter(item =>
+      isBusinessCategoryItem(item, activeResultCategory.id),
+    );
+  }, [activeResultCategory, items]);
 
   const visibleItems = useMemo(() => {
-    const next = [...items].filter(item => {
-      if (sideFilter !== 'all' && item.side !== sideFilter) return false;
-      return true;
-    });
+    const next = [...categoryFilteredItems]
+      .map(item =>
+        nearbyEnabled ? withViewerDistance(item, viewerLocation) : item,
+      )
+      .filter(item => {
+        if (sideFilter !== 'all' && item.side !== sideFilter) return false;
+        return true;
+      });
 
-    if (sort === 'newest') {
+    if (nearbyActive) {
+      next.sort(compareBusinessServiceability);
+    } else if (sort === 'newest') {
       next.sort((a, b) => b.updatedAt - a.updatedAt);
-    }
-    if (sort === 'price_low') {
+    } else if (sort === 'price_low') {
       next.sort(
         (a, b) =>
           (a.priceCents ?? Number.MAX_SAFE_INTEGER) -
           (b.priceCents ?? Number.MAX_SAFE_INTEGER),
       );
-    }
-    if (sort === 'price_high') {
+    } else if (sort === 'price_high') {
       next.sort((a, b) => (b.priceCents ?? 0) - (a.priceCents ?? 0));
     }
 
     return next;
-  }, [items, sideFilter, sort]);
+  }, [
+    categoryFilteredItems,
+    nearbyActive,
+    nearbyEnabled,
+    sideFilter,
+    sort,
+    viewerLocation,
+  ]);
 
-  const visibleProfiles = useMemo(
-    () =>
-      discoverProfiles.filter(profile => {
-        if (!location.trim()) return true;
-        return profile.location.toLowerCase().includes(location.trim().toLowerCase());
-      }),
-    [discoverProfiles, location],
-  );
+  const searchResultSections = useMemo<SearchResultRail[]>(() => {
+    const unfilteredSections: SearchResultRail[] =
+      RESULT_BUSINESS_DISCOVERY_CATEGORY_IDS.flatMap(id => {
+        const category = getBusinessDiscoveryCategoryById(id);
+        if (!category) return [];
+        return [
+          {
+            id,
+            title: isId ? category.labelId : category.labelEn,
+            subtitle: isId ? category.hintId : category.hintEn,
+            badge: isId ? category.badgeId : category.badgeEn,
+            items: visibleItems.filter(item =>
+              isBusinessCategoryItem(item, id),
+            ),
+            typeKey: id,
+          },
+        ];
+      },
+    );
+    const sections = unfilteredSections.filter(
+      section => section.items.length > 0,
+    );
+
+    if (sections.length > 0 || visibleItems.length === 0) return sections;
+
+    const fallbackSections: SearchResultRail[] = [
+      {
+        id: 'other',
+        title: isId ? 'Hasil Lainnya' : 'Other Results',
+        subtitle: isId
+          ? 'Listing lain yang masih cocok dengan pencarian kamu.'
+          : 'Other listings that still match your search.',
+        items: visibleItems,
+        typeKey: 'all',
+      },
+    ];
+    return fallbackSections;
+  }, [isId, visibleItems]);
+
+  const categoryResultSection = useMemo<SearchResultRail | null>(() => {
+    if (!activeResultCategory) return null;
+    return {
+      id: activeResultCategory.id,
+      title: isId ? activeResultCategory.labelId : activeResultCategory.labelEn,
+      subtitle: isId
+        ? activeResultCategory.hintId
+        : activeResultCategory.hintEn,
+      badge: isId ? activeResultCategory.badgeId : activeResultCategory.badgeEn,
+      items: visibleItems,
+      typeKey: activeResultCategory.id,
+    };
+  }, [activeResultCategory, isId, visibleItems]);
 
   const resultCountLabel = new Intl.NumberFormat(
     isId ? 'id-ID' : 'en-US',
   ).format(visibleItems.length);
+  const canShowApproximateCount = hasMore && visibleItems.length > 0;
+  const resultCountDisplayLabel = canShowApproximateCount
+    ? `${resultCountLabel}+`
+    : resultCountLabel;
+  const selectedLocationLabel =
+    location ||
+    locationInput ||
+    (isId ? 'Bandung, Jawa Barat' : 'Bandung, West Java');
   const popularCities = useMemo(() => {
     const citySet = new Set<string>();
     [
@@ -2569,15 +3074,18 @@ export default function SearchPageClient() {
   }, [umkmStores, visibleItems]);
   const sideCounts = useMemo(
     () => ({
-      all: items.length,
-      supply: items.filter(item => item.side === 'supply').length,
-      demand: items.filter(item => item.side === 'demand').length,
+      all: categoryFilteredItems.length,
+      supply: categoryFilteredItems.filter(item => item.side === 'supply')
+        .length,
+      demand: categoryFilteredItems.filter(item => item.side === 'demand')
+        .length,
     }),
-    [items],
+    [categoryFilteredItems],
   );
   const activeFilterCount =
     Number(Boolean(query)) +
     Number(Boolean(location)) +
+    Number(nearbyActive) +
     Number(type !== 'all') +
     Number(usedOnly) +
     Number(sort !== 'relevance') +
@@ -2596,58 +3104,59 @@ export default function SearchPageClient() {
         ? 'Memuat hasil...'
         : 'Loading results...'
       : isId
-        ? `${hasMore ? `${resultCountLabel}+` : resultCountLabel} hasil ditemukan`
-        : `${hasMore ? `${resultCountLabel}+` : resultCountLabel} results found`;
-  const activeTypeLabel =
-    TYPE_OPTIONS.find(option => option.value === type)?.[
-    isId ? 'labelId' : 'labelEn'
-    ] || (isId ? 'Semua' : 'All');
+        ? `${resultCountDisplayLabel} hasil ditemukan`
+        : `${resultCountDisplayLabel} results found`;
   const activeSortLabel =
     SORT_OPTIONS.find(option => option.value === sort)?.[
     isId ? 'labelId' : 'labelEn'
     ] || (isId ? 'Paling relevan' : 'Most relevant');
+  const displaySortLabel = nearbyActive ? nearbyStatusLabel : activeSortLabel;
   const topResult = visibleItems[0];
-  const activeSearchTab: SearchFilterTabKey = usedOnly ? 'used_goods' : type;
-  const mobileMapLabel =
-    canToggleUmkmView && resultsView === 'umkm'
-      ? isId
-        ? 'Daftar'
-        : 'List'
-      : isId
-        ? 'Peta'
-        : 'Map';
   const usedGoodsSellHref = `${resolveMarketplaceCreateHref(locale, 'product', 'supply')}?condition=used&q=${encodeURIComponent(isId ? 'barang bekas' : 'used goods')}`;
   const briefCreateHref = usedOnly
     ? usedGoodsSellHref
-    : resolveUmkmCreateHrefForType(locale, type);
+    : activeBusinessCategory
+      ? buildBusinessDiscoveryCreateHref({
+        locale,
+        side: 'demand',
+        category: activeBusinessCategory,
+      })
+      : resolveUmkmCreateHrefForType(locale, type);
   const briefCreateLabel = usedOnly
     ? isId
       ? 'Tawarkan barang bekas'
       : 'Sell used goods'
-    : isId
-      ? type === 'service'
-        ? 'Cari jasa'
-        : type === 'business_transfer'
-          ? 'Tawarkan usaha'
-          : type === 'freelancer' || type === 'job'
-            ? 'Cari talent'
-            : 'Cari supplier'
-      : type === 'service'
-        ? 'Post a service need'
-        : type === 'business_transfer'
-          ? 'List a business transfer'
-          : type === 'freelancer' || type === 'job'
-            ? 'Post a talent need'
-            : 'Post a supplier need';
+    : activeBusinessCategory
+      ? isId
+        ? `Buat kebutuhan ${activeBusinessCategory.labelId}`
+        : `Post ${activeBusinessCategory.labelEn.toLowerCase()} need`
+      : isId
+        ? type === 'service'
+          ? 'Cari jasa'
+          : type === 'business_transfer'
+            ? 'Tawarkan usaha'
+            : type === 'freelancer' || type === 'job'
+              ? 'Cari talent'
+              : 'Cari supplier'
+        : type === 'service'
+          ? 'Post a service need'
+          : type === 'business_transfer'
+            ? 'List a business transfer'
+            : type === 'freelancer' || type === 'job'
+              ? 'Post a talent need'
+              : 'Post a supplier need';
 
   const openUmkmPreview = () => router.push(UMKM_DISCOVERY_PATH);
   const applyCity = (city: string) => {
     setLocationInput(city);
     setLocation(city);
+    setNearbyEnabled(false);
   };
 
   const selectSearchTab = useCallback(
     (nextTab: SearchFilterTabKey) => {
+      setSelectedSearchTab(nextTab);
+
       if (nextTab === 'used_goods') {
         const nextQuery = getUsedGoodsQuery(queryInput, locale);
         setUsedOnly(true);
@@ -2659,8 +3168,21 @@ export default function SearchPageClient() {
         return;
       }
 
+      const category = getBusinessDiscoveryCategoryById(nextTab);
+      if (category) {
+        const nextType =
+          category.searchType === 'umkm' ? 'umkm' : category.searchType;
+        setUsedOnly(false);
+        setType(nextType);
+        setSideFilter('all');
+        setQueryInput(category.query);
+        setQuery(category.query);
+        setResultsView(category.searchType === 'umkm' ? 'umkm' : 'results');
+        return;
+      }
+
       setUsedOnly(false);
-      setType(nextTab);
+      setType(nextTab as TypeKey);
       if (nextTab === 'umkm') {
         setResultsView('umkm');
       } else {
@@ -2671,10 +3193,10 @@ export default function SearchPageClient() {
   );
 
   return (
-    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen px-1 pb-6 pt-0 sm:px-4 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
-      <div className="lajukan-home-shell lajukan-search-shell mx-auto h-full lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-        <div className="space-y-4 lg:hidden">
-          <div className="ui-layer-local-topbar fixed inset-x-0 top-0 z-[80] flex items-center gap-2 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)] backdrop-blur-xl sm:px-3">
+    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen min-h-[100dvh] w-full max-w-full overflow-x-hidden px-1 pb-6 pt-0 sm:px-4 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+      <div className="lajukan-home-shell lajukan-search-shell mx-auto h-full w-full max-w-full overflow-x-hidden lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
+        <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden lg:hidden">
+          <div className="ui-layer-local-topbar fixed inset-x-0 top-0 z-[80] flex items-center gap-2 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)]  sm:px-3">
             <button
               type="button"
               onClick={handleBack}
@@ -2699,63 +3221,15 @@ export default function SearchPageClient() {
                   name="q"
                   enterKeyHint="search"
                   value={queryInput}
-                  onChange={event => {
-                    setQueryInput(event.target.value);
-                    setShowSearchSuggestions(true);
-                  }}
-                  onFocus={() => {
-                    if (searchSuggestions.length > 0) setShowSearchSuggestions(true);
-                  }}
-                  onBlur={() => {
-                    window.setTimeout(() => setShowSearchSuggestions(false), 160);
-                  }}
+                  onChange={event => setQueryInput(event.target.value)}
                   placeholder={
                     isId
                       ? 'Cari supplier, jasa, lokasi...'
                       : 'Search suppliers, places, services...'
                   }
                   className="ui-navbar-search-input"
-                  role="combobox"
-                  aria-autocomplete="list"
-                  aria-expanded={showSearchSuggestions && searchSuggestions.length > 0}
-                  aria-controls={searchSuggestionsId}
-                  aria-busy={searchSuggestionsLoading}
                 />
               </label>
-              {showSearchSuggestions && searchSuggestions.length > 0 ? (
-                <div
-                  id={searchSuggestionsId}
-                  role="listbox"
-                  className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[82] overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_20px_48px_-30px_rgba(15,23,42,0.3)] dark:border-[color:var(--app-border-strong)]"
-                >
-                  <div className="flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
-                    <span>{isId ? 'Saran pencarian' : 'Search suggestions'}</span>
-                    {searchSuggestionsLoading ? (
-                      <span>{isId ? 'Memuat...' : 'Loading...'}</span>
-                    ) : null}
-                  </div>
-                  <div className="p-1.5 pt-0">
-                    {searchSuggestions.map(suggestion => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        role="option"
-                        aria-selected="false"
-                        className="flex w-full items-start gap-2 rounded-[16px] px-3 py-2 text-left text-[13px] font-semibold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
-                        onMouseDown={event => event.preventDefault()}
-                        onClick={() => {
-                          setQueryInput(suggestion);
-                          setShowSearchSuggestions(false);
-                          applyFilters();
-                        }}
-                      >
-                        <Search className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
-                        <span className="line-clamp-2">{suggestion}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
             </form>
             <AuthCtaLink
               hrefWhenAuth={briefCreateHref}
@@ -2765,197 +3239,125 @@ export default function SearchPageClient() {
             >
               <Plus className="h-4.5 w-4.5" />
             </AuthCtaLink>
-            <div className="relative shrink-0">
-              {mobileActionsOpen ? (
-                <button
-                  type="button"
-                  className="fixed inset-0 z-[71] cursor-default bg-transparent"
-                  aria-label={isId ? 'Tutup menu' : 'Close menu'}
-                  onClick={() => setMobileActionsOpen(false)}
-                />
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className={cn(
+                'ui-pressable relative inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border text-[color:var(--app-text)] shadow-[0_12px_24px_-22px_rgba(15,23,42,0.18)]',
+                activeFilterCount > 0
+                  ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                  : 'border-[color:var(--app-border)] bg-white',
+              )}
+              data-testid="search-mobile-filter-button"
+              aria-label={isId ? 'Filter pencarian' : 'Search filters'}
+            >
+              <Filter className="h-4.5 w-4.5" />
+              {activeFilterCount > 0 ? (
+                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-1 text-[9px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
               ) : null}
-              <button
-                type="button"
-                onClick={() => setMobileActionsOpen(value => !value)}
-                className={cn(
-                  'ui-pressable relative z-[72] inline-flex h-10 min-h-10 w-10 min-w-10 items-center justify-center rounded-full border text-[color:var(--app-text)] shadow-[0_12px_24px_-22px_rgba(15,23,42,0.18)]',
-                  mobileActionsOpen
-                    ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)]'
-                    : 'border-[color:var(--app-border)] bg-white',
-                )}
-                data-testid="search-mobile-actions-button"
-                aria-label={isId ? 'Menu pencarian' : 'Search actions'}
-                aria-expanded={mobileActionsOpen}
-              >
-                <MoreHorizontal className="h-5 w-5" />
-                {activeFilterCount > 0 ? (
-                  <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-1 text-[9px] font-black text-white">
-                    {activeFilterCount}
-                  </span>
-                ) : null}
-              </button>
-              {mobileActionsOpen ? (
-                <div
-                  role="menu"
-                  className="absolute right-0 top-[calc(100%+0.55rem)] z-[72] w-[min(17rem,calc(100vw-1rem))] overflow-hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-1.5 text-left shadow-[0_24px_54px_-26px_rgba(15,23,42,0.34)]"
-                >
-                  <div className="px-3 py-2">
-                    <p className="text-[13px] font-black text-[color:var(--app-text)]">
-                      {isId ? 'Aksi pencarian' : 'Search actions'}
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                      {hasMore ? `${resultCountLabel}+` : resultCountLabel}{' '}
-                      {isId ? 'hasil' : 'results'}
-                    </p>
-                  </div>
-
-                  <div className="grid gap-1">
-                    {searchCart.items.length > 0 ? (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setCartOpen(true);
-                          setMobileActionsOpen(false);
-                        }}
-                        className="flex min-h-[46px] items-center justify-between gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
-                      >
-                        <span className="inline-flex min-w-0 items-center gap-3">
-                          <BookmarkCheck className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-                          <span className="truncate">
-                            {isId ? 'Buka referensi' : 'Open references'}
-                          </span>
-                        </span>
-                        <span className="rounded-full bg-[color:var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-black text-[color:var(--app-accent)]">
-                          {searchCart.items.length}
-                        </span>
-                      </button>
-                    ) : null}
-                    {canToggleUmkmView ? (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setResultsView(
-                            resultsView === 'umkm' ? 'results' : 'umkm',
-                          );
-                          setMobileActionsOpen(false);
-                        }}
-                        className="flex min-h-[46px] items-center gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
-                        data-testid="search-mobile-view-toggle"
-                      >
-                        <Layers3 className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-                        <span>{mobileMapLabel}</span>
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setFiltersOpen(true);
-                        setMobileActionsOpen(false);
-                      }}
-                      className="flex min-h-[46px] items-center justify-between gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]"
-                    >
-                      <span className="inline-flex min-w-0 items-center gap-3">
-                        <Filter className="h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-                        <span className="truncate">
-                          {isId ? 'Filter & urutkan' : 'Filter & sort'}
-                        </span>
-                      </span>
-                      <span className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                        {activeSortLabel}
-                      </span>
-                    </button>
-                    {canReset ? (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={resetAllFilters}
-                        className="flex min-h-[46px] items-center gap-3 rounded-[16px] px-3 text-left text-[13px] font-bold text-[color:var(--app-accent)] hover:bg-[color:var(--app-accent-soft)]"
-                      >
-                        <RefreshCcw className="h-4 w-4 shrink-0" />
-                        <span>{isId ? 'Reset pencarian' : 'Reset search'}</span>
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            </button>
           </div>
           <div
             aria-hidden="true"
             className="h-[calc(3.55rem+env(safe-area-inset-top))]"
           />
 
-          <section className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-border)_90%,white_10%)] bg-white/96 p-3.5 shadow-[0_20px_44px_-36px_rgba(15,23,42,0.14)] backdrop-blur-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h1 className="text-[1.35rem] font-black text-[color:var(--app-text)]">
-                  {query
-                    ? isId
-                      ? 'Hasil pencarian'
-                      : 'Search results'
-                    : resultsHeading}
-                </h1>
-                <p className="mt-1 text-[13px] text-[color:var(--app-text-soft)]">
-                  <span className="font-semibold text-emerald-600">
-                    {hasMore ? `${resultCountLabel}+` : resultCountLabel}
-                  </span>{' '}
-                  {isId ? 'hasil ditemukan' : 'results found'}
-                </p>
+          <section className="min-w-0 max-w-full overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-white p-3 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.12)]">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h1 className="truncate text-[1.12rem] font-bold tracking-[-0.025em] text-[color:var(--app-text)]">
+                    {query || resultsHeading}
+                  </h1>
+                  <p className="mt-0.5 text-[12px] font-semibold text-[color:var(--app-text-soft)]">
+                    {resultCountDisplayLabel}{' '}
+                    {isId ? 'hasil' : 'results'} / {displaySortLabel}
+                  </p>
+                </div>
               </div>
-              <div className="inline-flex min-h-[36px] shrink-0 items-center gap-2 rounded-full bg-[color:var(--app-surface-muted)] px-3 text-[12px] font-bold text-[color:var(--app-text-soft)]">
-                <Filter className="h-4.5 w-4.5" />
-                <span>
-                  {activeFilterCount > 0
-                    ? `${activeFilterCount} ${isId ? 'filter' : 'filters'}`
-                    : activeSortLabel}
-                </span>
-              </div>
-            </div>
 
-            <SearchFilterTabs
-              locale={locale}
-              activeTab={activeSearchTab}
-              onSelect={selectSearchTab}
-              className="mt-3"
-            />
-
-            <div
-              ref={mobileActionsRailRef}
-              onClickCapture={onMobileActionsClickCapture}
-              onPointerCancel={onMobileActionsPointerCancel}
-              onPointerDown={onMobileActionsPointerDown}
-              onPointerLeave={onMobileActionsPointerLeave}
-              onPointerMove={onMobileActionsPointerMove}
-              onPointerUp={onMobileActionsPointerUp}
-              onWheel={onMobileActionsWheel}
-              className="mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
-            >
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(true)}
-                className="inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-[13px] border border-emerald-200 bg-emerald-50 px-3 text-[12px] font-semibold text-emerald-700"
-                data-testid="search-mobile-filter-button"
-              >
-                <Filter className="h-4 w-4" />
-                {activeFilterCount > 0
-                  ? `${isId ? 'Filter' : 'Filters'} (${activeFilterCount})`
-                  : isId
-                    ? 'Filter'
-                    : 'Filters'}
-              </button>
-              {canReset ? (
+              <div className="flex items-center gap-2 rounded-[16px] bg-[color:var(--app-surface-muted)] px-3 py-2.5">
+                <MapPin className="h-4 w-4 shrink-0 text-emerald-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-bold text-[color:var(--app-text)]">
+                    {nearbyActive
+                      ? nearbyStatusLabel
+                      : selectedLocationLabel}
+                  </p>
+                  {nearbyActive ? (
+                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-emerald-700">
+                      <BadgeCheck className="h-3 w-3" />
+                      {isId ? 'Filter jarak aktif' : 'Distance filter active'}
+                    </p>
+                  ) : null}
+                </div>
                 <button
                   type="button"
-                  onClick={resetAllFilters}
-                  className="inline-flex min-h-[38px] shrink-0 items-center gap-2 rounded-[13px] px-3 text-[12px] font-semibold text-emerald-600"
+                  onClick={
+                    viewerLocation || locationEnabled
+                      ? enableNearbyLocation
+                      : openLocationPrompt
+                  }
+                  className="inline-flex min-h-[34px] shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 text-[11px] font-semibold text-emerald-700"
                 >
-                  <RefreshCcw className="h-4 w-4" />
-                  {isId ? 'Reset' : 'Reset'}
+                  <Target className="h-4 w-4" />
+                  {locating
+                    ? isId
+                      ? 'Mencari...'
+                      : 'Locating...'
+                    : isId
+                      ? 'Lokasi saya'
+                      : 'My location'}
                 </button>
-              ) : null}
+              </div>
+
+              <div
+                ref={mobileActionsRailRef}
+                onClickCapture={onMobileActionsClickCapture}
+                onPointerCancel={onMobileActionsPointerCancel}
+                onPointerDown={onMobileActionsPointerDown}
+                onPointerLeave={onMobileActionsPointerLeave}
+                onPointerMove={onMobileActionsPointerMove}
+                onPointerUp={onMobileActionsPointerUp}
+                onWheel={onMobileActionsWheel}
+                className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 no-scrollbar select-none cursor-grab active:cursor-grabbing"
+              >
+                {SEARCH_FILTER_TABS.map(option => {
+                  const active = activeSearchTab === option.value;
+                  const Icon = option.icon;
+                  const badge = getSearchTabBadge(option.value, locale);
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => selectSearchTab(option.value)}
+                      className={cn(
+                        'inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-[14px] border px-3 text-[12px] font-semibold transition',
+                        active
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)]',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{isId ? option.labelId : option.labelEn}</span>
+                      {badge ? (
+                        <span
+                          className={cn(
+                            'rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em]',
+                            active
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-emerald-50 text-emerald-700',
+                          )}
+                        >
+                          {badge}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
 
@@ -2971,14 +3373,6 @@ export default function SearchPageClient() {
               onOpenCart={() => setCartOpen(true)}
             />
           ) : null}
-
-          <SearchProfileResultsSection
-            locale={locale}
-            activeTab={activeSearchTab}
-            profiles={visibleProfiles}
-            loading={discoverLoading}
-            error={discoverError}
-          />
 
           {shouldShowResultCards ? (
             loading ? (
@@ -3002,18 +3396,18 @@ export default function SearchPageClient() {
                   {isId ? 'Coba lagi' : 'Retry'}
                 </button>
               </div>
-            ) : visibleItems.length === 0 && visibleProfiles.length === 0 ? (
+            ) : visibleItems.length === 0 ? (
               <div className="rounded-[28px] border border-[color:var(--app-border)] bg-[radial-gradient(circle_at_top,#ecfdf5_0%,#ffffff_46%,#f8fafc_100%)] px-5 py-8 text-center shadow-[0_20px_42px_-30px_rgba(15,23,42,0.18)]">
                 <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-[20px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                   <Search className="h-5 w-5" />
                 </span>
-                <p className="mt-3 text-[17px] font-black tracking-[-0.035em] text-[color:var(--app-text)]">
+                <p className="mt-3 text-[17px] font-bold tracking-[-0.035em] text-[color:var(--app-text)]">
                   {isId ? 'Belum ketemu yang pas' : 'No good match yet'}
                 </p>
                 <p className="mx-auto mt-1 max-w-[26rem] text-[13px] leading-5 text-[color:var(--app-text-soft)]">
                   {isId
-                    ? 'Coba longgarkan filter, pakai kata kunci lain, atau buka tab Talent untuk lihat profil yang sudah register.'
-                    : 'Try broader filters, another keyword, or open the Talent tab to see registered profiles.'}
+                    ? 'Coba longgarkan filter, pakai kata kunci lain, atau pilih kategori bisnis seperti Bahan Usaha dan Cari Jasa.'
+                    : 'Try broader filters, another keyword, or choose a business category like Business Supplies or Find Services.'}
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                   <AuthCtaLink
@@ -3026,29 +3420,47 @@ export default function SearchPageClient() {
                   </AuthCtaLink>
                 </div>
               </div>
+            ) : categoryResultSection ? (
+              <SearchResultVerticalList
+                section={categoryResultSection}
+                locale={locale}
+                cartQuantities={cartQuantities}
+                onAddToCart={addSearchCardToCart}
+                onRemoveFromCart={removeSearchItemFromCart}
+                onOpenCart={() => setCartOpen(true)}
+                authFetch={authFetch}
+                userSignedIn={Boolean(user)}
+                hasMore={hasMore}
+              />
             ) : (
-              <div className="mt-3 grid grid-cols-2 gap-1 md:gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {visibleItems.map(item => (
-                  <SearchResultListingCard
-                    key={item.id}
-                    item={item}
-                    locale={locale}
-                    cartQuantity={cartQuantities[item.id] || 0}
-                    onAddToCart={addSearchCardToCart}
-                    onRemoveFromCart={removeSearchItemFromCart}
-                    onOpenCart={() => setCartOpen(true)}
-                  />
-                ))}
-              </div>
+              <SearchResultRails
+                sections={searchResultSections}
+                locale={locale}
+                cartQuantities={cartQuantities}
+                onAddToCart={addSearchCardToCart}
+                onRemoveFromCart={removeSearchItemFromCart}
+                onOpenCart={() => setCartOpen(true)}
+                onViewAll={selectSearchTab}
+                authFetch={authFetch}
+                userSignedIn={Boolean(user)}
+              />
             )
+          ) : null}
+
+          {visibleItems.length > 0 && shouldShowResultCards && !loading ? (
+            <div
+              ref={mobileLoadMoreRef}
+              className="h-2 w-full"
+              aria-hidden="true"
+            />
           ) : null}
 
           {visibleItems.length > 0 && shouldShowResultCards && !loading ? (
             <div className="flex items-center justify-between gap-3 px-1">
               <p className="text-[13px] text-[color:var(--app-text-soft)]">
                 {isId
-                  ? `Menampilkan 1 - ${visibleItems.length} dari ${hasMore ? `${resultCountLabel}+` : resultCountLabel} hasil`
-                  : `Showing 1 - ${visibleItems.length} of ${hasMore ? `${resultCountLabel}+` : resultCountLabel} results`}
+                  ? `Menampilkan 1 - ${visibleItems.length} dari ${resultCountDisplayLabel} hasil`
+                  : `Showing 1 - ${visibleItems.length} of ${resultCountDisplayLabel} results`}
               </p>
               {hasMore ? (
                 <button
@@ -3069,7 +3481,7 @@ export default function SearchPageClient() {
           ) : null}
         </div>
 
-        <div className="lajukan-home-desktop-shell lajukan-search-desktop-shell hidden min-h-0 overflow-hidden lg:flex lg:flex-1 lg:flex-col">
+        <div className="lajukan-home-desktop-shell lajukan-search-desktop-shell hidden min-h-0 w-full max-w-full overflow-hidden lg:flex lg:flex-1 lg:flex-col">
           <div className="lajukan-home-desktop-grid lajukan-search-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1700px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_260px] 2xl:grid-cols-[280px_minmax(0,1fr)_280px]">
             <aside className="hidden lg:block lg:h-full lg:min-h-0 lg:overflow-hidden">
               <div
@@ -3079,7 +3491,7 @@ export default function SearchPageClient() {
                 <section className="rounded-[24px] p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[1rem] font-black tracking-[-0.03em] text-[color:var(--app-text)]">
+                      <p className="text-[1rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">
                         {isId ? 'Filter' : 'Filters'}
                       </p>
                       <p className="text-[12px] text-[color:var(--app-text-soft)]">
@@ -3102,21 +3514,60 @@ export default function SearchPageClient() {
                   </div>
 
                   <div className="mt-3 space-y-3">
-                    <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                        {isId ? 'Lokasi' : 'Location'}
-                      </p>
-                      <label className="mt-2 flex min-w-0 items-center gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2">
-                        <MapPin className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+                    <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                          <MapPin className="h-5 w-5" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-[14px] font-bold text-[color:var(--app-text)]">
+                            {isId ? 'Di Sekitarmu' : 'Nearby'}
+                          </h3>
+
+                          <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
+                            {isId
+                              ? 'Temukan supplier, jasa, dan peluang usaha terdekat.'
+                              : 'Find suppliers, services, and opportunities nearby.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={
+                          viewerLocation || locationEnabled
+                            ? enableNearbyLocation
+                            : openLocationPrompt
+                        }
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-[14px] bg-emerald-50 px-4 py-3 text-[13px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                      >
+                        <Target className="h-4 w-4" />
+                        {locating
+                          ? isId
+                            ? 'Mencari lokasi...'
+                            : 'Finding location...'
+                          : nearbyActive
+                            ? nearbyStatusLabel
+                            : isId
+                              ? 'Gunakan Lokasi Saya'
+                              : 'Use My Location'}
+                      </button>
+
+                      <label className="mt-3 flex min-w-0 items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2">
+                        <Search className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
+
                         <input
                           value={locationInput}
-                          onChange={event =>
-                            setLocationInput(event.target.value)
-                          }
-                          placeholder={isId ? 'Cari lokasi' : 'Search location'}
-                          className="min-h-[32px] w-full min-w-0 bg-transparent text-[13px] text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)]"
+                          onChange={event => {
+                            setLocationInput(event.target.value);
+                            if (nearbyEnabled) setNearbyEnabled(false);
+                          }}
+                          placeholder={isId ? 'Cari kota...' : 'Search city...'}
+                          className="min-h-[34px] w-full bg-transparent text-[13px] outline-none placeholder:text-[color:var(--app-text-soft)]"
                         />
                       </label>
+
                       <div className="mt-3 flex flex-wrap gap-2">
                         {popularCities.map(city => (
                           <button
@@ -3124,10 +3575,10 @@ export default function SearchPageClient() {
                             type="button"
                             onClick={() => applyCity(city)}
                             className={cn(
-                              'inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold transition',
+                              'rounded-full px-3 py-1.5 text-[11px] font-semibold transition',
                               location === city || locationInput === city
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-surface-muted)]',
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200',
                             )}
                           >
                             {city}
@@ -3137,48 +3588,69 @@ export default function SearchPageClient() {
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                        {isId ? 'Kategori' : 'Category'}
-                      </p>
-                      <div className="mt-2 grid gap-2">
-                        {TYPE_OPTIONS.map(option => {
-                          const visual = getCategoryVisual(option.value);
-                          const active = type === option.value;
+                      <div className="mb-3">
+                        <h3 className="text-[14px] font-bold text-[color:var(--app-text)]">
+                          {isId
+                            ? 'Apa yang ingin kamu cari?'
+                            : 'What are you looking for?'}
+                        </h3>
+
+                        <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
+                          {isId
+                            ? 'Pilih kebutuhan bisnis yang ingin kamu temukan.'
+                            : 'Choose the business need you want to discover.'}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        {SEARCH_FILTER_TABS.map(option => {
+                          const visual = getCategoryVisual(
+                            searchTabVisualKey(option.value),
+                          );
+                          const active = activeSearchTab === option.value;
 
                           return (
                             <button
                               key={option.value}
                               type="button"
-                              onClick={() => {
-                                setUsedOnly(false);
-                                setType(option.value);
-                                if (option.value === 'umkm')
-                                  setResultsView('umkm');
-                              }}
+                              onClick={() => selectSearchTab(option.value)}
                               className={cn(
-                                'flex min-h-[54px] items-center gap-2.5 rounded-[16px] border px-3 py-2 text-left transition',
-                                typeFilterClass(active, option.value),
+                                'group flex min-h-[68px] items-center gap-3 rounded-[18px] border px-4 py-3 text-left transition-all',
+                                active
+                                  ? 'border-emerald-200 bg-emerald-50 shadow-sm'
+                                  : 'border-[color:var(--app-border)] bg-white hover:border-emerald-100 hover:bg-emerald-50/40',
                               )}
                             >
-                              <span
+                              <div
                                 className={cn(
-                                  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[13px]',
-                                  visual.iconBubbleClass,
+                                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl',
+                                  active
+                                    ? 'bg-emerald-600 text-white'
+                                    : visual.iconBubbleClass,
                                 )}
                               >
-                                <option.icon className="h-4.5 w-4.5" />
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12px] font-black">
+                                <option.icon className="h-5 w-5" />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="text-[13px] font-bold">
                                   {isId ? option.labelId : option.labelEn}
-                                </span>
-                                <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-80">
-                                  {getCategoryHint(option.value, locale)}
-                                </span>
-                              </span>
-                              {active ? (
-                                <BadgeCheck className="h-4 w-4 shrink-0" />
-                              ) : null}
+                                </div>
+
+                                <div className="mt-1 text-[11px] text-[color:var(--app-text-soft)]">
+                                  {getSearchTabHint(option.value, locale)}
+                                </div>
+                              </div>
+
+                              <div>
+                                {active ? (
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white">
+                                    <BadgeCheck className="h-4 w-4" />
+                                  </div>
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-zinc-400 transition group-hover:translate-x-0.5" />
+                                )}
+                              </div>
                             </button>
                           );
                         })}
@@ -3186,39 +3658,52 @@ export default function SearchPageClient() {
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
-                        {isId ? 'Sisi listing' : 'Listing side'}
-                      </p>
-                      <div className="mt-2 grid gap-2">
+                      <div className="mb-3">
+                        <h3 className="text-[14px] font-bold text-[color:var(--app-text)]">
+                          {isId ? 'Aktivitas Bisnis' : 'Business Activity'}
+                        </h3>
+
+                        <p className="mt-1 text-[12px] text-[color:var(--app-text-soft)]">
+                          {isId
+                            ? 'Lihat siapa yang menawarkan dan siapa yang sedang mencari.'
+                            : 'See who is offering and who is looking.'}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2">
                         <SearchResultScopeCard
                           value="all"
                           label={isId ? 'Semua' : 'All'}
                           hint={
-                            isId ? 'Lihat semua listing' : 'See every listing'
+                            isId
+                              ? 'Lihat semua aktivitas bisnis'
+                              : 'See all business activities'
                           }
                           count={sideCounts.all}
                           active={sideFilter === 'all'}
                           onSelect={setSideFilter}
                         />
+
                         <SearchResultScopeCard
                           value="supply"
-                          label={isId ? 'Penyedia' : 'Providers'}
+                          label={isId ? 'Menawarkan' : 'Offering'}
                           hint={
                             isId
-                              ? 'Supplier siap dihubungi'
-                              : 'Suppliers ready to contact'
+                              ? 'Supplier, jasa, produk, dan talent'
+                              : 'Suppliers, services, products, and talent'
                           }
                           count={sideCounts.supply}
                           active={sideFilter === 'supply'}
                           onSelect={setSideFilter}
                         />
+
                         <SearchResultScopeCard
                           value="demand"
-                          label={isId ? 'Pencari' : 'Seekers'}
+                          label={isId ? 'Mencari' : 'Looking For'}
                           hint={
                             isId
-                              ? 'Buyer dan kebutuhan aktif'
-                              : 'Buyers and active needs'
+                              ? 'Proyek, kebutuhan, vendor, dan partner'
+                              : 'Projects, needs, vendors, and partners'
                           }
                           count={sideCounts.demand}
                           active={sideFilter === 'demand'}
@@ -3228,7 +3713,7 @@ export default function SearchPageClient() {
                     </div>
 
                     <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-text-soft)]">
                         {isId ? 'Urutkan' : 'Sort'}
                       </p>
                       <div className="mt-2 grid gap-2">
@@ -3270,14 +3755,14 @@ export default function SearchPageClient() {
             </aside>
 
             <section
-              className="min-h-0 min-w-0 overflow-y-auto pr-1 pt-2 overscroll-contain"
+              className="min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto pr-1 pt-2 overscroll-contain"
               data-auto-scrollbar
             >
-              <div className="w-full space-y-3 pb-5">
-                <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white/96 p-4 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.13)] backdrop-blur-xl">
+              <div className="min-w-0 max-w-full space-y-3 overflow-x-hidden pb-5">
+                <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white/96 p-4 shadow-[0_20px_48px_-38px_rgba(15,23,42,0.13)] ">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h1 className="text-[1.38rem] font-black text-[color:var(--app-text)]">
+                      <h1 className="text-[1.38rem] font-bold text-[color:var(--app-text)]">
                         {resultsHeading}
                       </h1>
                       <p className="mt-1 text-[13px] text-[color:var(--app-text-soft)]">
@@ -3312,7 +3797,7 @@ export default function SearchPageClient() {
                         className="inline-flex min-h-[42px] items-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-[13px] font-semibold text-[color:var(--app-text)]"
                       >
                         <Filter className="h-4 w-4" />
-                        {activeSortLabel}
+                        {displaySortLabel}
                       </button>
                     </div>
                   </div>
@@ -3335,22 +3820,32 @@ export default function SearchPageClient() {
                         }}
                       />
                     ) : null}
+                    {nearbyActive ? (
+                      <SearchActiveChip
+                        icon={Target}
+                        label={nearbyStatusLabel}
+                        onRemove={disableNearbyLocation}
+                      />
+                    ) : null}
                     {usedOnly ? (
                       <SearchActiveChip
                         icon={Package}
                         label={isId ? 'Barang Bekas' : 'Used Goods'}
-                        onRemove={() => setUsedOnly(false)}
+                        onRemove={() => {
+                          setUsedOnly(false);
+                          setSelectedSearchTab('all');
+                        }}
                       />
                     ) : null}
                     {type !== 'all' && !usedOnly ? (
                       <SearchActiveChip
-                        icon={
-                          TYPE_OPTIONS.find(option => option.value === type)
-                            ?.icon
-                        }
+                        icon={getSearchTabConfig(activeSearchTab)?.icon}
                         label={activeTypeLabel}
-                        typeKey={type}
-                        onRemove={() => setType('all')}
+                        typeKey={searchTabVisualKey(activeSearchTab)}
+                        onRemove={() => {
+                          setType('all');
+                          setSelectedSearchTab('all');
+                        }}
                       />
                     ) : null}
                     {sideFilter !== 'all' ? (
@@ -3393,14 +3888,6 @@ export default function SearchPageClient() {
                   />
                 ) : null}
 
-                <SearchProfileResultsSection
-                  locale={locale}
-                  activeTab={activeSearchTab}
-                  profiles={visibleProfiles}
-                  loading={discoverLoading}
-                  error={discoverError}
-                />
-
                 {shouldShowResultCards ? (
                   loading ? (
                     <div className="space-y-3">
@@ -3423,18 +3910,18 @@ export default function SearchPageClient() {
                         {isId ? 'Coba lagi' : 'Retry'}
                       </button>
                     </div>
-                  ) : visibleItems.length === 0 && visibleProfiles.length === 0 ? (
+                  ) : visibleItems.length === 0 ? (
                     <div className="rounded-[30px] border border-[color:var(--app-border)] bg-[radial-gradient(circle_at_top,#ecfdf5_0%,#ffffff_44%,#f8fafc_100%)] px-6 py-11 text-center shadow-[0_22px_48px_-32px_rgba(15,23,42,0.18)]">
                       <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-[22px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                         <Search className="h-6 w-6" />
                       </span>
-                      <p className="mt-3 text-[20px] font-black tracking-[-0.045em] text-[color:var(--app-text)]">
+                      <p className="mt-3 text-[20px] font-bold tracking-[-0.045em] text-[color:var(--app-text)]">
                         {isId ? 'Belum ketemu yang pas' : 'No good match yet'}
                       </p>
                       <p className="mx-auto mt-1 max-w-[34rem] text-[14px] leading-6 text-[color:var(--app-text-soft)]">
                         {isId
-                          ? 'Coba longgarkan filter, pakai kata kunci lain, atau jadilah listing pertama untuk kebutuhan ini.'
-                          : 'Try broader filters, another keyword, or become the first listing for this need.'}
+                          ? 'Coba longgarkan filter, pilih kategori bisnis lain, atau buat kebutuhan agar penyedia yang cocok datang ke kamu.'
+                          : 'Try broader filters, choose another business category, or post a need so matching providers come to you.'}
                       </p>
                       <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                         <AuthCtaLink
@@ -3447,21 +3934,41 @@ export default function SearchPageClient() {
                         </AuthCtaLink>
                       </div>
                     </div>
+                  ) : categoryResultSection ? (
+                    <SearchResultVerticalList
+                      section={categoryResultSection}
+                      locale={locale}
+                      cartQuantities={cartQuantities}
+                      onAddToCart={addSearchCardToCart}
+                      onRemoveFromCart={removeSearchItemFromCart}
+                      onOpenCart={() => setCartOpen(true)}
+                      authFetch={authFetch}
+                      userSignedIn={Boolean(user)}
+                      hasMore={hasMore}
+                    />
                   ) : (
-                    <div className="mt-3 grid grid-cols-2 gap-1 md:gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                      {visibleItems.map(item => (
-                        <SearchResultListingCard
-                          key={item.id}
-                          item={item}
-                          locale={locale}
-                          cartQuantity={cartQuantities[item.id] || 0}
-                          onAddToCart={addSearchCardToCart}
-                          onRemoveFromCart={removeSearchItemFromCart}
-                          onOpenCart={() => setCartOpen(true)}
-                        />
-                      ))}
-                    </div>
+                    <SearchResultRails
+                      sections={searchResultSections}
+                      locale={locale}
+                      cartQuantities={cartQuantities}
+                      onAddToCart={addSearchCardToCart}
+                      onRemoveFromCart={removeSearchItemFromCart}
+                      onOpenCart={() => setCartOpen(true)}
+                      onViewAll={selectSearchTab}
+                      authFetch={authFetch}
+                      userSignedIn={Boolean(user)}
+                    />
                   )
+                ) : null}
+
+                {visibleItems.length > 0 &&
+                  shouldShowResultCards &&
+                  !loading ? (
+                  <div
+                    ref={desktopLoadMoreRef}
+                    className="h-2 w-full"
+                    aria-hidden="true"
+                  />
                 ) : null}
 
                 {visibleItems.length > 0 &&
@@ -3470,8 +3977,8 @@ export default function SearchPageClient() {
                   <div className="flex items-center justify-between gap-3 px-1">
                     <p className="text-[13px] text-[color:var(--app-text-soft)]">
                       {isId
-                        ? `Menampilkan 1 - ${visibleItems.length} dari ${hasMore ? `${resultCountLabel}+` : resultCountLabel} hasil`
-                        : `Showing 1 - ${visibleItems.length} of ${hasMore ? `${resultCountLabel}+` : resultCountLabel} results`}
+                        ? `Menampilkan 1 - ${visibleItems.length} dari ${resultCountDisplayLabel} hasil`
+                        : `Showing 1 - ${visibleItems.length} of ${resultCountDisplayLabel} results`}
                     </p>
                     {hasMore ? (
                       <button
@@ -3498,7 +4005,7 @@ export default function SearchPageClient() {
             <SearchRightRail
               isId={isId}
               resultCountLabel={resultCountLabel}
-              hasMore={hasMore}
+              hasMore={canShowApproximateCount}
               topResult={topResult}
               umkmStores={umkmStores}
               popularCities={popularCities}
@@ -3522,6 +4029,59 @@ export default function SearchPageClient() {
         onRemove={removeSearchItemFromCart}
         onClear={clearSearchCart}
       />
+
+      <Modal
+        open={locationPromptOpen}
+        title={isId ? 'Gunakan lokasi terdekat?' : 'Use nearby location?'}
+        onClose={closeLocationPrompt}
+        className="max-w-none rounded-[24px] rounded-b-none p-4 sm:max-w-md sm:rounded-[28px] sm:p-5"
+        footer={
+          <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+            <button
+              type="button"
+              onClick={skipNearbyLocation}
+              className="inline-flex min-h-[42px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white px-4 text-[13px] font-semibold text-[color:var(--app-text)]"
+            >
+              {isId ? 'Nanti saja' : 'Maybe later'}
+            </button>
+            <button
+              type="button"
+              onClick={enableNearbyLocation}
+              disabled={locating}
+              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--app-accent),var(--app-accent-strong))] px-5 text-[13px] font-bold text-white shadow-[0_18px_34px_-22px_color-mix(in_srgb,var(--app-accent)_52%,transparent)] disabled:opacity-70"
+            >
+              <Target className="h-4 w-4" />
+              {locating
+                ? isId
+                  ? 'Mencari lokasi...'
+                  : 'Finding location...'
+                : isId
+                  ? 'Aktifkan lokasi'
+                  : 'Enable location'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/70 p-4 text-emerald-900">
+            <p className="text-sm font-bold">
+              {isId
+                ? 'Lajukan akan mengurutkan hasil dari yang paling dekat dengan posisimu.'
+                : 'Lajukan will sort results from the closest to your position.'}
+            </p>
+            <p className="mt-1 text-[12px] leading-5 text-emerald-800/80">
+              {isId
+                ? 'Koordinat hanya dipakai untuk menghitung jarak dan tidak ditaruh di URL pencarian.'
+                : 'Coordinates are only used to calculate distance and are not placed in the search URL.'}
+            </p>
+          </div>
+          {locationError ? (
+            <p className="rounded-[16px] border border-rose-100 bg-rose-50 px-3 py-2 text-[12px] font-semibold text-rose-700">
+              {locationError}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         open={filtersOpen}
@@ -3553,7 +4113,7 @@ export default function SearchPageClient() {
       >
         <div className="space-y-5">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
               {isId ? 'Mau cari apa?' : 'What are you looking for?'}
             </p>
             <SearchFilterTabs
@@ -3565,18 +4125,73 @@ export default function SearchPageClient() {
           </div>
 
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
               {isId ? 'Lokasi' : 'Location'}
             </p>
             <label className="mt-2 flex min-w-0 items-center gap-2 rounded-[16px] border border-[color:var(--app-border)] bg-white px-3 py-2">
               <MapPin className="h-4 w-4 shrink-0 text-[color:var(--app-text-soft)]" />
               <input
                 value={locationInput}
-                onChange={event => setLocationInput(event.target.value)}
+                onChange={event => {
+                  setLocationInput(event.target.value);
+                  if (nearbyEnabled) setNearbyEnabled(false);
+                }}
                 placeholder={isId ? 'Cari lokasi' : 'Search location'}
                 className="min-h-[34px] w-full min-w-0 bg-transparent text-[13px] text-[color:var(--app-text)] outline-none placeholder:text-[color:var(--app-text-soft)]"
               />
             </label>
+            <div className="mt-3 grid gap-2 rounded-[18px] border border-emerald-100 bg-emerald-50/60 p-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-[12px] font-bold text-emerald-800">
+                  <Target className="h-4 w-4 shrink-0" />
+                  {nearbyStatusLabel}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-4 text-emerald-700/80">
+                  {isId
+                    ? 'Urutkan hasil dari yang paling dekat dengan posisimu.'
+                    : 'Sort results from the closest to your position.'}
+                </p>
+                {locationError ? (
+                  <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                    {locationError}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex gap-2">
+                {nearbyActive ? (
+                  <button
+                    type="button"
+                    onClick={disableNearbyLocation}
+                    className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-emerald-200 bg-white px-3 text-[12px] font-semibold text-emerald-700"
+                  >
+                    {isId ? 'Matikan' : 'Disable'}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={enableNearbyLocation}
+                  disabled={locating}
+                  className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-full bg-emerald-600 px-3 text-[12px] font-bold text-white disabled:opacity-70 sm:flex-none"
+                >
+                  {nearbyActive ? (
+                    <BadgeCheck className="h-4 w-4" />
+                  ) : (
+                    <Target className="h-4 w-4" />
+                  )}
+                  {locating
+                    ? isId
+                      ? 'Mencari...'
+                      : 'Locating...'
+                    : nearbyActive
+                      ? isId
+                        ? 'Aktif'
+                        : 'Active'
+                      : isId
+                        ? 'Pakai lokasi saya'
+                        : 'Use my location'}
+                </button>
+              </div>
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {popularCities.map(city => (
                 <button
@@ -3597,49 +4212,51 @@ export default function SearchPageClient() {
           </div>
 
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-              {isId ? 'Kategori' : 'Category'}
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+              {isId ? 'Tampilkan' : 'Show'}
             </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {TYPE_OPTIONS.map(option => {
-                const visual = getCategoryVisual(option.value);
-                const active = type === option.value;
-
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                {
+                  value: 'all' as SideFilter,
+                  label: isId ? 'Semua' : 'All',
+                  count: sideCounts.all,
+                },
+                {
+                  value: 'supply' as SideFilter,
+                  label: isId ? 'Penyedia' : 'Providers',
+                  count: sideCounts.supply,
+                },
+                {
+                  value: 'demand' as SideFilter,
+                  label: isId ? 'Pencari' : 'Seekers',
+                  count: sideCounts.demand,
+                },
+              ].map(option => {
+                const active = sideFilter === option.value;
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => {
-                      setUsedOnly(false);
-                      setType(option.value);
-                      if (option.value === 'umkm') setResultsView('umkm');
-                    }}
+                    onClick={() => setSideFilter(option.value)}
                     className={cn(
-                      'flex min-h-[62px] items-center justify-between gap-2 rounded-[18px] border px-3 py-2 text-left transition',
-                      typeFilterClass(active, option.value),
+                      'inline-flex min-h-[40px] items-center gap-2 rounded-full border px-3 text-[12px] font-bold transition',
+                      active
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-[color:var(--app-border)] bg-white text-[color:var(--app-text-soft)]',
                     )}
                   >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <span
-                        className={cn(
-                          'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px]',
-                          visual.iconBubbleClass,
-                        )}
-                      >
-                        <option.icon className="h-4.5 w-4.5" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-[12px] font-black">
-                          {isId ? option.labelId : option.labelEn}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[10px] font-semibold opacity-80">
-                          {getCategoryHint(option.value, locale)}
-                        </span>
-                      </span>
+                    <span>{option.label}</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px]',
+                        active
+                          ? 'bg-white text-emerald-700'
+                          : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
+                      )}
+                    >
+                      {option.count}
                     </span>
-                    {active ? (
-                      <BadgeCheck className="h-4 w-4 shrink-0" />
-                    ) : null}
                   </button>
                 );
               })}
@@ -3647,45 +4264,7 @@ export default function SearchPageClient() {
           </div>
 
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-              {isId ? 'Sisi listing' : 'Listing side'}
-            </p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              <SearchResultScopeCard
-                value="all"
-                label={isId ? 'Semua' : 'All'}
-                hint={isId ? 'Lihat semua listing' : 'See every listing'}
-                count={sideCounts.all}
-                active={sideFilter === 'all'}
-                onSelect={setSideFilter}
-              />
-              <SearchResultScopeCard
-                value="supply"
-                label={isId ? 'Penyedia' : 'Providers'}
-                hint={
-                  isId
-                    ? 'Supplier siap dihubungi'
-                    : 'Suppliers ready to contact'
-                }
-                count={sideCounts.supply}
-                active={sideFilter === 'supply'}
-                onSelect={setSideFilter}
-              />
-              <SearchResultScopeCard
-                value="demand"
-                label={isId ? 'Pencari' : 'Seekers'}
-                hint={
-                  isId ? 'Buyer dan kebutuhan aktif' : 'Buyers and active needs'
-                }
-                count={sideCounts.demand}
-                active={sideFilter === 'demand'}
-                onSelect={setSideFilter}
-              />
-            </div>
-          </div>
-
-          <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
               {isId ? 'Urutkan' : 'Sort'}
             </p>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">

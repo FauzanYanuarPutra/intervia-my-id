@@ -60,18 +60,18 @@ function MaintenanceScreen({ locale, state }: MaintenanceScreenProps) {
   const services = state?.services?.slice(0, 4) || [];
 
   return (
-    <main className="grid min-h-[100svh] place-items-center overflow-hidden bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_38%,#f8fafc_100%)] px-5 py-8 text-[color:var(--app-text)] dark:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16)_0%,#07111d_42%,#020617_100%)]">
-      <section className="relative w-full max-w-[560px] overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] p-5 text-center shadow-[0_34px_80px_-48px_rgba(15,23,42,0.42)] backdrop-blur-xl dark:border-[color:var(--app-border-strong)] sm:p-7">
+    <main className="grid min-h-[var(--app-viewport-height)] place-items-center overflow-hidden bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_38%,#f8fafc_100%)] px-5 py-8 text-[color:var(--app-text)] dark:bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.16)_0%,#07111d_42%,#020617_100%)]">
+      <section className="relative w-full max-w-[560px] overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] p-5 text-center shadow-[0_34px_80px_-48px_rgba(15,23,42,0.42)]  dark:border-[color:var(--app-border-strong)] sm:p-7">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[26px] border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-[0_22px_48px_-34px_rgba(16,185,129,0.5)] dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-300">
           <ServerCog className="h-9 w-9" />
         </div>
 
-        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)]">
+        <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)]">
           <Construction className="h-3.5 w-3.5" />
           Maintenance
         </div>
 
-        <h1 className="mt-4 text-[1.7rem] font-black leading-tight tracking-[-0.03em] text-[color:var(--app-text)] dark:text-white sm:text-[2rem]">
+        <h1 className="mt-4 text-[1.7rem] font-bold leading-tight tracking-[-0.03em] text-[color:var(--app-text)] dark:text-white sm:text-[2rem]">
           {isId
             ? 'Lajukan lagi disiapkan'
             : 'Lajukan is getting ready'}
@@ -87,7 +87,7 @@ function MaintenanceScreen({ locale, state }: MaintenanceScreenProps) {
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
               {isId ? 'Status' : 'Status'}
             </p>
-            <p className="mt-1 text-xs font-black text-[color:var(--app-text)] dark:text-white">
+            <p className="mt-1 text-xs font-bold text-[color:var(--app-text)] dark:text-white">
               {getPhaseLabel(state, isId)}
             </p>
           </div>
@@ -95,7 +95,7 @@ function MaintenanceScreen({ locale, state }: MaintenanceScreenProps) {
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
               {isId ? 'Update' : 'Updated'}
             </p>
-            <p className="mt-1 text-xs font-black text-[color:var(--app-text)] dark:text-white">
+            <p className="mt-1 text-xs font-bold text-[color:var(--app-text)] dark:text-white">
               {updatedTime || (isId ? 'Baru saja' : 'Just now')}
             </p>
           </div>
@@ -103,7 +103,7 @@ function MaintenanceScreen({ locale, state }: MaintenanceScreenProps) {
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
               {isId ? 'Refresh' : 'Refresh'}
             </p>
-            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-black text-[color:var(--app-text)] dark:text-white">
+            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-[color:var(--app-text)] dark:text-white">
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-[color:var(--app-accent)]" />
               {isId ? 'Otomatis' : 'Automatic'}
             </p>
@@ -202,7 +202,7 @@ export function StackMaintenanceGate({
     );
   }, [active, children, chrome, footer, locale, state]);
 
-  return <div className={cn(active && 'min-h-[100svh]')}>{content}</div>;
+  return <div className={cn(active && 'min-h-[var(--app-viewport-height)]')}>{content}</div>;
 }
 
 export default StackMaintenanceGate;

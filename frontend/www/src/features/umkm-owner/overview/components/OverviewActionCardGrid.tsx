@@ -44,7 +44,7 @@ export function OverviewActionCardGrid({
               />
             </span>
             <span>
-              <span className="block text-[15px] font-black">{card.label}</span>
+              <span className="block text-[15px] font-bold">{card.label}</span>
               <span
                 className={cn(
                   'mt-1 block text-[11px] leading-5',

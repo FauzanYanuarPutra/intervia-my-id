@@ -71,11 +71,11 @@ export default function AuthFlowShell({
         <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--app-accent)_18%,var(--app-border))] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,white_4%)] p-4 shadow-[0_24px_60px_-42px_rgba(15,23,42,0.48)] sm:p-5">
           <div>
             {badge ? (
-              <span className="mb-3 inline-flex min-h-7 items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent-strong)]">
+              <span className="mb-3 inline-flex min-h-7 items-center rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent-strong)]">
                 {badge}
               </span>
             ) : null}
-            <h1 className="text-[1.48rem] font-black leading-tight tracking-[-0.035em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.62rem]">
+            <h1 className="text-[1.48rem] font-bold leading-tight tracking-[-0.035em] text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-[1.62rem]">
               {title}
             </h1>
 
@@ -100,13 +100,13 @@ export default function AuthFlowShell({
                     <span
                       key={index}
                       className={`h-2 rounded-full transition-all ${index + 1 <= safeStep
-                          ? 'w-6 bg-[color:var(--app-accent)]'
-                          : 'w-2 bg-[color:var(--app-surface-muted)]'
+                        ? 'w-6 bg-[color:var(--app-accent)]'
+                        : 'w-2 bg-[color:var(--app-surface-muted)]'
                         }`}
                     />
                   ))}
                 </div>
-                <span className="text-[11px] font-black text-[color:var(--app-text-soft)]">
+                <span className="text-[11px] font-bold text-[color:var(--app-text-soft)]">
                   {safeStep}/{safeTotalSteps}
                 </span>
               </div>
@@ -126,7 +126,7 @@ export default function AuthFlowShell({
                   key={`${item.title}-${item.description}`}
                   className="rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2"
                 >
-                  <p className="text-xs font-black text-[color:var(--app-text)]">
+                  <p className="text-xs font-bold text-[color:var(--app-text)]">
                     {item.title}
                   </p>
                   <p className="mt-0.5 text-[11px] font-semibold leading-4 text-[color:var(--app-text-soft)]">

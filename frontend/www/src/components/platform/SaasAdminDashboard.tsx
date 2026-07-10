@@ -180,7 +180,7 @@ function SalesTooltip({
   const newCustomers = payload.find((item) => item.dataKey === 'newCustomers')?.value ?? 0;
 
   return (
-    <div className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-4 py-3 shadow-xl text-[color:var(--app-accent)] backdrop-blur">
+    <div className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-4 py-3 shadow-xl text-[color:var(--app-accent)] ">
       <p className="text-xs font-semibold text-[color:var(--app-accent)]">{label}</p>
       <p className="mt-1 text-xs text-[color:var(--app-accent)]">Revenue: ${revenue}K</p>
       <p className="text-xs text-[color:var(--app-accent)]">New customers: {newCustomers}</p>
@@ -247,13 +247,13 @@ export default function SaasAdminDashboard({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_26%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.14),_transparent_24%),linear-gradient(180deg,_rgba(255,255,255,0.82),_rgba(243,247,251,0.55))]" />
       <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(148,163,184,0.14)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.14)_1px,transparent_1px)] [background-size:24px_24px]" />
       <div
-        className={`fixed inset-0 z-40 text-[color:var(--app-accent)] backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+        className={`fixed inset-0 z-40 text-[color:var(--app-accent)]  transition-opacity duration-300 lg:hidden ${
           isSidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={() => setIsSidebarOpen(false)}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r text-[color:var(--app-accent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] text-[color:var(--app-accent)] shadow-[0_30px_70px_-24px_rgba(15,23,42,0.9)] backdrop-blur-2xl transition-all duration-300 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r text-[color:var(--app-accent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] text-[color:var(--app-accent)] shadow-[0_30px_70px_-24px_rgba(15,23,42,0.9)]  transition-all duration-300 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isSidebarCollapsed ? 'lg:w-24' : 'lg:w-72'} w-[86vw] max-w-[320px] lg:translate-x-0`}
       >
@@ -348,7 +348,7 @@ export default function SaasAdminDashboard({
       >
         <div className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col px-4 py-4 sm:px-6 sm:py-6 xl:px-8">
           <header className="sticky top-4 z-30">
-            <div className="rounded-[28px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-4 py-4 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.45)] backdrop-blur-xl sm:px-5">
+            <div className="rounded-[28px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-4 py-4 shadow-[0_20px_50px_-30px_rgba(15,23,42,0.45)]  sm:px-5">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex items-center gap-3">
                   <button
@@ -411,7 +411,7 @@ export default function SaasAdminDashboard({
                       </button>
 
                       <div
-                        className={`absolute right-0 top-[calc(100%+12px)] w-60 rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-2 shadow-[0_25px_60px_-28px_rgba(15,23,42,0.35)] backdrop-blur-xl transition ${
+                        className={`absolute right-0 top-[calc(100%+12px)] w-60 rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-2 shadow-[0_25px_60px_-28px_rgba(15,23,42,0.35)]  transition ${
                           isProfileOpen
                             ? 'translate-y-0 opacity-100'
                             : 'pointer-events-none -translate-y-2 opacity-0'
@@ -437,7 +437,7 @@ export default function SaasAdminDashboard({
 
           <main className="relative z-10 flex-1 pt-6">
             <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_360px]">
-              <div className="rounded-[32px] border text-[color:var(--app-accent)] bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(255,255,255,0.68)),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_34%)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] backdrop-blur-xl sm:p-8">
+              <div className="rounded-[32px] border text-[color:var(--app-accent)] bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(255,255,255,0.68)),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.12),transparent_34%)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)]  sm:p-8">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[color:var(--app-accent)]">
                     {workspaceTag}
@@ -468,7 +468,7 @@ export default function SaasAdminDashboard({
                 </div>
               </div>
 
-              <div className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+              <div className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] ">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[color:var(--app-accent)]">
                   Workspace pulse
                 </p>
@@ -502,7 +502,7 @@ export default function SaasAdminDashboard({
                 return (
                   <article
                     key={item.label}
-                    className={`rounded-[30px] border text-[color:var(--app-accent)] bg-gradient-to-br ${item.tone} border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_18px_48px_-34px_rgba(15,23,42,0.42)] backdrop-blur-xl`}
+                    className={`rounded-[30px] border text-[color:var(--app-accent)] bg-gradient-to-br ${item.tone} border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_18px_48px_-34px_rgba(15,23,42,0.42)] `}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -530,7 +530,7 @@ export default function SaasAdminDashboard({
             </section>
 
             <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_380px]">
-              <article className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] backdrop-blur-xl sm:p-7">
+              <article className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)]  sm:p-7">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[color:var(--app-accent)]">
@@ -600,7 +600,7 @@ export default function SaasAdminDashboard({
               </article>
 
               <div className="grid gap-5">
-                <article className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+                <article className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] ">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[color:var(--app-accent)]">
                     Recent activity
                   </p>
@@ -633,7 +633,7 @@ export default function SaasAdminDashboard({
                   </div>
                 </article>
 
-                <article className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] backdrop-blur-xl">
+                <article className="rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] ">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[color:var(--app-accent)]">
                     Task list
                   </p>
@@ -665,7 +665,7 @@ export default function SaasAdminDashboard({
               </div>
             </section>
 
-            <section className="mt-5 rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)] backdrop-blur-xl sm:p-7">
+            <section className="mt-5 rounded-[32px] border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-6 shadow-[0_24px_60px_-36px_rgba(15,23,42,0.4)]  sm:p-7">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[color:var(--app-accent)]">

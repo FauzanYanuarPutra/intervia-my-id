@@ -532,6 +532,7 @@ services:
   # ---------------- Storage ----------------
   minio:
     image: minio/minio
+    restart: unless-stopped
     ports:
       - "${PORT_MINIO_API:-9002}:9002" # API
       - "${PORT_MINIO_UI:-9005}:9001" # UI/Console (Changed default to 9005)
@@ -541,6 +542,12 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --address ":9002" --console-address ":9001"
+    healthcheck:
+      test: [ "CMD-SHELL", "mc alias set local http://localhost:9002 \"$${MINIO_ROOT_USER}\" \"$${MINIO_ROOT_PASSWORD}\" >/dev/null 2>&1 && mc ready local" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - web
 
@@ -575,7 +582,24 @@ services:
       COMMUNITY_SERVICE_URL: http://community_service:8082
       NEXT_PUBLIC_COMMUNITY_URL: http://localhost:8082
       INTERNAL_CHAT_URL: http://chat_service:4000
-      # INTERNAL_AI_URL: http://ai_service:8080
+      INTERNAL_AI_URL: ${INTERNAL_AI_URL:-}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-}
+      SUPER_APP_POSTGRES_URL: ${SUPER_APP_POSTGRES_URL:-postgres://${DB_USER}:${DB_PASS}@marketplace_db:5432/marketplace_db}
+      PERSONAL_AI_STORE_DIR: ${PERSONAL_AI_STORE_DIR:-/app/www/.runtime/personal-ai}
+      USE_OLLAMA: ${USE_OLLAMA:-false}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_BUSINESS_MODEL: ${OLLAMA_BUSINESS_MODEL:-llama3.2:3b}
+      OLLAMA_VISION_MODEL: ${OLLAMA_VISION_MODEL:-moondream:latest}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
+      PERSONAL_AI_FAST_PROVIDER_FIRST: ${PERSONAL_AI_FAST_PROVIDER_FIRST:-true}
+      IMAGE_AI_ASSIST_ENABLED: ${IMAGE_AI_ASSIST_ENABLED:-false}
+      NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED: ${NEXT_PUBLIC_IMAGE_AI_ASSIST_ENABLED:-false}
+      AI_LEARNING_ENABLED: ${AI_LEARNING_ENABLED:-true}
+      AI_LEARNING_LOG_DIR: ${AI_LEARNING_LOG_DIR:-/app/www/.runtime/ai-learning}
+      AI_LEARNING_MEMORY_FILE: ${AI_LEARNING_MEMORY_FILE:-/app/www/.runtime/ai-learning/create-from-image-memory.json}
+      OLLAMA_VISION_TIMEOUT_MS: ${OLLAMA_VISION_TIMEOUT_MS:-45000}
+      INTERNAL_VISION_TIMEOUT_MS: ${INTERNAL_VISION_TIMEOUT_MS:-45000}
+      OPENAI_VISION_TIMEOUT_MS: ${OPENAI_VISION_TIMEOUT_MS:-45000}
       MINIO_ENDPOINT: http://minio:9002
       MINIO_ACCESS_KEY: ${MINIO_USER}
       MINIO_SECRET_KEY: ${MINIO_PASS}
@@ -612,6 +636,8 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
     volumes:
       - ./.runtime:/app/www/.runtime:ro
+      - ./.runtime/ai-learning:/app/www/.runtime/ai-learning
+      - ./.runtime/personal-ai:/app/www/.runtime/personal-ai
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 20s
@@ -623,6 +649,7 @@ services:
       marketplace_service: { condition: service_healthy }
       community_service: { condition: service_healthy }
       chat_service: { condition: service_healthy }
+      minio: { condition: service_healthy }
       # ai_service: { condition: service_healthy }
     networks:
       - web
@@ -696,6 +723,7 @@ services:
       marketplace_service: { condition: service_healthy }
       community_service: { condition: service_healthy }
       chat_service: { condition: service_healthy }
+      minio: { condition: service_healthy }
     networks:
       - web
     restart: unless-stopped
@@ -784,8 +812,10 @@ services:
   cloudflare_tunnel:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
+    profiles:
+      - tunnel
     environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN in your env file}
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
     command: tunnel --protocol http2 run
     networks:
       - web
@@ -928,6 +958,22 @@ services:
   #   networks:
   #     - web
 
+  ollama:
+    image: ollama/ollama:latest
+    profiles:
+      - ai
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+    networks:
+      - web
+    restart: unless-stopped
+
 volumes:
   # postgres_data:
   redis_data:
@@ -942,6 +988,7 @@ volumes:
   identity_postgres_data:
   community_postgres_data:
   marketplace_postgres_data:
+  ollama_data:
     # grafana_data:
 
 networks:

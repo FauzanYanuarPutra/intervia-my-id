@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, MapPin, Star } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import {
   MapContainer,
   Marker,
@@ -24,7 +24,6 @@ import { isCoordinateValid } from '@/lib/super-app/location-guard';
 import type { LatLng } from '@/lib/super-app/maps';
 import { buildUmkmPlacePresentation } from '@/lib/super-app/umkm-place-ui';
 import { buildUmkmStorefrontPath } from '@/lib/umkmSurface';
-import { LajukanImage } from '@/components/common/LajukanImage';
 import type {
   UmkmMapRouteSummary,
   UmkmMapStore,
@@ -70,7 +69,6 @@ const MARKER_FOCUS_DURATION = 0.45;
 const MARKER_CLUSTER_FRAME_WIDTH_RATIO = 0.58;
 const MARKER_CLUSTER_FRAME_HEIGHT_RATIO = 0.5;
 const CLUSTER_POPUP_VISIBLE_LIMIT = 6;
-const ONLINE_TRACKER_INTERVAL_MS = 3200;
 const STORE_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 const CLUSTER_MARKER_ICON_CACHE = new Map<string, DivIcon>();
 
@@ -103,13 +101,13 @@ type StoreCluster = {
 
 type StoreMarkerLayerItem =
   | {
-      kind: 'single';
-      item: StorePresentation;
-    }
+    kind: 'single';
+    item: StorePresentation;
+  }
   | {
-      kind: 'cluster';
-      cluster: StoreCluster;
-    };
+    kind: 'cluster';
+    cluster: StoreCluster;
+  };
 
 const MAP_THEME_CONFIG: Record<
   UmkmMapTheme,
@@ -425,165 +423,6 @@ function buildViewerMarkerIcon(): DivIcon {
   return icon;
 }
 
-function readMetadataBoolean(
-  metadata: Record<string, unknown> | null | undefined,
-  keys: string[],
-): boolean {
-  if (!metadata) return false;
-
-  return keys.some(key => {
-    const value = metadata[key];
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'number') return value > 0;
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase();
-      return ['1', 'true', 'yes', 'ya', 'online', 'active', 'aktif'].includes(
-        normalized,
-      );
-    }
-    return false;
-  });
-}
-
-function metadataIncludesAny(
-  metadata: Record<string, unknown> | null | undefined,
-  keys: string[],
-  tokens: string[],
-): boolean {
-  if (!metadata) return false;
-
-  return keys.some(key => {
-    const value = metadata[key];
-    if (typeof value !== 'string') return false;
-    const normalized = value.toLowerCase();
-    return tokens.some(token => normalized.includes(token));
-  });
-}
-
-function isOnlineTrackableStore(store: UmkmMapStore): boolean {
-  return Boolean(
-    store.online_order_enabled ||
-    store.recommended_qr === 'online' ||
-    readMetadataBoolean(store.metadata, [
-      'online_order_enabled',
-      'delivery_enabled',
-      'accepts_online_orders',
-      'is_online',
-      'live_tracking_enabled',
-      'mobile_service_enabled',
-    ]) ||
-    metadataIncludesAny(
-      store.metadata,
-      ['fulfillment_mode', 'service_mode', 'location_mode', 'presence_mode'],
-      ['online', 'delivery', 'mobile', 'keliling', 'antar'],
-    ),
-  );
-}
-
-function buildOnlineTrackerIcon(isId: boolean): DivIcon {
-  const label = escapeHtml(isId ? 'Online' : 'Online');
-
-  return divIcon({
-    className: 'leaflet-superapp-online-tracker-host',
-    iconSize: [96, 58],
-    iconAnchor: [48, 49],
-    tooltipAnchor: [0, -42],
-    html: `
-      <span
-        style="
-          position:relative;
-          display:inline-flex;
-          width:96px;
-          height:58px;
-          align-items:center;
-          justify-content:center;
-          font-family:ui-sans-serif,system-ui,sans-serif;
-          pointer-events:none;
-        "
-      >
-        <style>
-          @keyframes umkmOnlineTrackerBob {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
-          }
-          @keyframes umkmOnlineTrackerPulse {
-            0% { transform: scale(.74); opacity:.35; }
-            70% { transform: scale(1.45); opacity:.08; }
-            100% { transform: scale(1.55); opacity:0; }
-          }
-        </style>
-        <span
-          style="
-            position:absolute;
-            bottom:3px;
-            left:31px;
-            width:34px;
-            height:12px;
-            border-radius:999px;
-            background:rgba(15,23,42,0.2);
-            filter:blur(4px);
-          "
-        ></span>
-        <span
-          style="
-            position:absolute;
-            bottom:9px;
-            left:30px;
-            width:36px;
-            height:36px;
-            border-radius:999px;
-            background:rgba(14,165,233,0.24);
-            animation:umkmOnlineTrackerPulse 1.9s ease-out infinite;
-          "
-        ></span>
-        <span
-          style="
-            position:relative;
-            display:inline-flex;
-            align-items:center;
-            gap:5px;
-            min-height:38px;
-            border-radius:999px;
-            border:2px solid #ffffff;
-            background:linear-gradient(135deg,#0284c7,#0f766e);
-            box-shadow:0 18px 30px rgba(15,23,42,0.28);
-            color:#ffffff;
-            padding:0 10px 0 7px;
-            animation:umkmOnlineTrackerBob 1.8s ease-in-out infinite;
-          "
-        >
-          <span
-            style="
-              display:inline-flex;
-              width:24px;
-              height:24px;
-              align-items:center;
-              justify-content:center;
-              border-radius:999px;
-              background:rgba(255,255,255,0.18);
-            "
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M13 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-              <path d="M10 7.5 8 13l4 2 2-4 4 1.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="m9 15-2 5M14 15l3 5" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </span>
-          <span
-            style="
-              font-size:11px;
-              font-weight:900;
-              letter-spacing:.01em;
-              line-height:1;
-              text-shadow:0 1px 1px rgba(15,23,42,.25);
-            "
-          >${label}</span>
-        </span>
-      </span>
-    `,
-  });
-}
-
 function StoreKindChip({
   ui,
   compact = false,
@@ -595,11 +434,10 @@ function StoreKindChip({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border font-semibold ${
-        compact
+      className={`inline-flex items-center rounded-full border font-semibold ${compact
           ? 'gap-1 px-1.5 py-1 text-[10px]'
           : 'gap-1.5 px-2 py-1 text-[11px]'
-      }`}
+        }`}
       style={{
         borderColor: palette.border,
         backgroundColor: 'rgba(255,255,255,0.92)',
@@ -608,9 +446,8 @@ function StoreKindChip({
       title={ui.kindLabel}
     >
       <span
-        className={`inline-flex items-center justify-center rounded-full ${
-          compact ? 'h-4 w-4' : 'h-5 w-5'
-        }`}
+        className={`inline-flex items-center justify-center rounded-full ${compact ? 'h-4 w-4' : 'h-5 w-5'
+          }`}
         style={{ backgroundColor: palette.badge, color: '#ffffff' }}
         dangerouslySetInnerHTML={{
           __html: buildMarkerSymbolSvg({ kind: ui.kind }),
@@ -625,7 +462,6 @@ function StorePreviewCard({
   store,
   ui,
   active = false,
-  compact = false,
   selectable = false,
   onClick,
   isId,
@@ -633,48 +469,47 @@ function StorePreviewCard({
   store: UmkmMapStore;
   ui: StorePresentation['ui'];
   active?: boolean;
-  compact?: boolean;
   selectable?: boolean;
   onClick?: () => void;
   isId: boolean;
 }) {
-  const cardClass = `w-full rounded-2xl border p-1.5 text-left transition ${
-    active
+  const locationLabel =
+    ui.distanceLabel ||
+    store.city ||
+    ui.addressLine ||
+    (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
+  const isOpen = ui.openNow !== false;
+  const cardClass = `w-full rounded-2xl border p-1.5 text-left transition ${active
       ? 'border-emerald-500 bg-emerald-50/90 text-emerald-950'
       : 'border-slate-200 bg-white text-slate-800'
-  }`;
+    }`;
 
   return (
     <div className={cardClass}>
-      <div className="flex min-w-0 items-center gap-1.5">
-        <LajukanImage
-          src={ui.coverImage || ui.gallery[0]}
-          alt={store.name}
-          width={48}
-          height={48}
-          className={`${compact ? 'h-9 w-9 rounded-lg' : 'h-11 w-11 rounded-xl'} shrink-0 border border-slate-200 object-cover`}
-        />
+      <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <p className="line-clamp-1 text-[11px] font-black leading-tight text-slate-950">
-              {store.name}
-            </p>
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
-              <Star className="h-2.5 w-2.5 fill-current" />
-              {ui.ratingLabel}
-            </span>
-          </div>
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[9.5px] font-semibold text-slate-500">
+          <p className="line-clamp-1 text-[11.5px] font-bold leading-tight text-slate-950">
+            {store.name}
+          </p>
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-slate-500">
             <StoreKindChip ui={ui} compact />
-            <span className="truncate">{store.city}</span>
+            <span className="truncate">{locationLabel}</span>
           </div>
         </div>
+        <span
+          className={`inline-flex shrink-0 rounded-full px-1.5 py-0.5 text-[9.5px] font-bold ${isOpen
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-slate-100 text-slate-500'
+            }`}
+        >
+          {isOpen ? (isId ? 'Buka' : 'Open') : isId ? 'Tutup' : 'Closed'}
+        </span>
       </div>
 
       <div className="mt-1.5 grid grid-cols-2 gap-1">
         <a
           href={buildUmkmStorefrontPath(store.slug)}
-          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-black text-white transition hover:bg-emerald-700"
+          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700"
         >
           {isId ? 'Detail' : 'Details'}
         </a>
@@ -683,11 +518,10 @@ function StorePreviewCard({
             type="button"
             onClick={onClick}
             disabled={!onClick}
-            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-black transition ${
-              active
+            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-bold transition ${active
                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                 : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
-            }`}
+              }`}
           >
             {active
               ? isId
@@ -699,10 +533,10 @@ function StorePreviewCard({
           </button>
         ) : (
           <a
-            href={ui.googleMapsPlaceUrl}
+            href={ui.googleMapsDirectionsUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-[28px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-black text-slate-700 transition hover:border-slate-300"
+            className="inline-flex min-h-[28px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300"
           >
             {isId ? 'Rute' : 'Route'}
           </a>
@@ -727,46 +561,37 @@ function StorePopupSummary({
   onSelect?: () => void;
   isId: boolean;
 }) {
-  return (
-    <div className="w-[min(68vw,225px)] space-y-1.5">
-      <div className="min-w-0">
-        <div className="flex min-w-0 items-start justify-between gap-2">
-          <p className="line-clamp-1 text-[12px] font-black leading-tight text-slate-950">
-            {store.name}
-          </p>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-700">
-            <Star className="h-3 w-3 fill-current" />
-            {ui.ratingLabel}
-          </span>
-        </div>
+  const locationLabel =
+    ui.distanceLabel ||
+    store.city ||
+    ui.addressLine ||
+    (isId ? 'Lokasi belum lengkap' : 'Location unavailable');
+  const isOpen = ui.openNow !== false;
 
-        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
-          <StoreKindChip ui={ui} compact />
-          <span className="inline-flex min-h-[20px] items-center rounded-full bg-slate-100 px-1.5 text-[9.5px] font-bold text-slate-600">
-            {store.city}
+  return (
+    <div className="w-[min(72vw,238px)] space-y-2">
+      <div className="min-w-0">
+        <p className="line-clamp-1 text-[13px] font-bold leading-tight text-slate-950">
+          {store.name}
+        </p>
+
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
+            <MapPin className="h-3 w-3 shrink-0" />
+            <span className="truncate">{locationLabel}</span>
           </span>
           <span
-            className={`inline-flex min-h-[20px] items-center rounded-full px-1.5 text-[9.5px] font-bold ${
-              ui.openNow !== false
+            className={`inline-flex min-h-[22px] items-center rounded-full px-2 text-[10px] font-bold ${isOpen
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-slate-100 text-slate-500'
-            }`}
+              }`}
           >
-            {ui.openNow !== false
-              ? isId
-                ? 'Buka'
-                : 'Open'
-              : isId
-                ? 'Tutup'
-                : 'Closed'}
+            {isOpen ? (isId ? 'Buka' : 'Open') : isId ? 'Tutup' : 'Closed'}
           </span>
         </div>
 
-        <p className="mt-1 flex min-w-0 items-center gap-1 text-[10px] leading-4 text-slate-500">
-          <MapPin className="h-3 w-3 shrink-0" />
-          <span className="line-clamp-1">
-            {ui.addressLine || store.address}
-          </span>
+        <p className="mt-1.5 line-clamp-2 text-[10.5px] leading-4 text-slate-500">
+          {ui.addressLine || store.address || store.city}
         </p>
       </div>
 
@@ -775,28 +600,26 @@ function StorePopupSummary({
       >
         <a
           href={buildUmkmStorefrontPath(store.slug)}
-          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-black text-white transition hover:bg-emerald-700"
+          className="inline-flex min-h-[28px] items-center justify-center rounded-full bg-emerald-600 px-2 text-[9.5px] font-bold text-white transition hover:bg-emerald-700"
         >
           {isId ? 'Detail' : 'Details'}
         </a>
         <a
-          href={ui.googleMapsPlaceUrl}
+          href={ui.googleMapsDirectionsUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex min-h-[28px] items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-black text-slate-700 transition hover:border-slate-300"
+          className="inline-flex min-h-[28px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[9.5px] font-bold text-slate-700 transition hover:border-slate-300"
         >
           {isId ? 'Rute' : 'Route'}
-          <ExternalLink className="h-2.5 w-2.5" />
         </a>
         {selectable ? (
           <button
             type="button"
             onClick={onSelect}
-            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-black transition ${
-              active
+            className={`inline-flex min-h-[28px] items-center justify-center rounded-full border px-2 text-[9.5px] font-bold transition ${active
                 ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                 : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:text-emerald-700'
-            }`}
+              }`}
           >
             {active
               ? isId
@@ -1437,7 +1260,7 @@ function StoreMarkersLayer({
                 ratingLabel: ui.ratingLabel,
                 markerTone: ui.markerTone,
                 locationMode: ui.locationMode,
-                liveNow: ui.liveNow,
+                liveNow: null,
                 selected: selectedStoreId === store.id,
               })}
               zIndexOffset={active ? 480 : 220}
@@ -1461,9 +1284,9 @@ function StoreMarkersLayer({
                   onSelect={
                     onSelectStore
                       ? () => {
-                          focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
-                          onSelectStore(store.id);
-                        }
+                        focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
+                        onSelectStore(store.id);
+                      }
                       : undefined
                   }
                 />
@@ -1509,7 +1332,7 @@ function StoreMarkersLayer({
               <Popup className="umkm-store-map-popup" maxWidth={250}>
                 <div className="w-[min(72vw,240px)] space-y-2">
                   <div>
-                    <p className="text-[12px] font-black leading-tight text-slate-950">
+                    <p className="text-[12px] font-bold leading-tight text-slate-950">
                       {cluster.tight
                         ? isId
                           ? `${cluster.items.length} usaha di titik ini`
@@ -1534,15 +1357,14 @@ function StoreMarkersLayer({
                           store={store}
                           ui={ui}
                           active={active}
-                          compact
                           selectable={Boolean(onSelectStore)}
                           isId={isId}
                           onClick={
                             onSelectStore
                               ? () => {
-                                  focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
-                                  onSelectStore(store.id);
-                                }
+                                focusMarker(store, MARKER_CLICK_FOCUS_ZOOM);
+                                onSelectStore(store.id);
+                              }
                               : undefined
                           }
                         />
@@ -1597,17 +1419,6 @@ export function UmkmStoreMapClient({
     () => stores.filter(store => hasValidLatLng(store)),
     [stores],
   );
-  const onlineTrackerStores = useMemo(() => {
-    const explicitOnlineStores = validStores.filter(isOnlineTrackableStore);
-    const fallbackStores = validStores.slice(
-      0,
-      Math.min(validStores.length, 5),
-    );
-    return (
-      explicitOnlineStores.length ? explicitOnlineStores : fallbackStores
-    ).slice(0, 12);
-  }, [validStores]);
-  const [onlineTrackerIndex, setOnlineTrackerIndex] = useState(0);
 
   const storePresentations = useMemo(
     () =>
@@ -1633,20 +1444,6 @@ export function UmkmStoreMapClient({
   > | null>(null);
   const [manualMarkerFocus, setManualMarkerFocus] =
     useState<MarkerFocusTarget | null>(null);
-  const onlineTrackerStore =
-    onlineTrackerStores.length > 0
-      ? onlineTrackerStores[onlineTrackerIndex % onlineTrackerStores.length]
-      : null;
-
-  useEffect(() => {
-    if (onlineTrackerStores.length < 2) return;
-
-    const intervalId = window.setInterval(() => {
-      setOnlineTrackerIndex(current => current + 1);
-    }, ONLINE_TRACKER_INTERVAL_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [onlineTrackerStores.length]);
 
   const handleMarkerFocus = useCallback(
     (target: Omit<MarkerFocusTarget, 'nonce'>) => {
@@ -1798,21 +1595,6 @@ export function UmkmStoreMapClient({
         onMarkerFocus={handleMarkerFocus}
         isId={isId}
       />
-
-      {onlineTrackerStore ? (
-        <Marker
-          key={`online-tracker-${onlineTrackerStore.id}`}
-          position={[onlineTrackerStore.lat, onlineTrackerStore.lng]}
-          icon={buildOnlineTrackerIcon(isId)}
-          zIndexOffset={760}
-        >
-          <Tooltip direction="top" offset={[0, -12]}>
-            {isId
-              ? `Usaha online aktif: ${onlineTrackerStore.name}`
-              : `Active online business: ${onlineTrackerStore.name}`}
-          </Tooltip>
-        </Marker>
-      ) : null}
 
       {routePositions ? (
         <Polyline

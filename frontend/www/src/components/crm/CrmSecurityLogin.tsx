@@ -52,15 +52,15 @@ export default function CrmSecurityLogin({
       securityTitle: isId ? 'Kenapa dua langkah' : 'Why two steps',
       securityItems: isId
         ? [
-            'Approval transaksi dan trust hold butuh agent identity yang jelas.',
-            'Support CRM terhubung ke order, payout, dan review risiko.',
-            'Step-up OTP dipakai lagi untuk aksi sensitif di dalam panel.',
-          ]
+          'Approval transaksi dan trust hold butuh agent identity yang jelas.',
+          'Support CRM terhubung ke order, payout, dan review risiko.',
+          'Step-up OTP dipakai lagi untuk aksi sensitif di dalam panel.',
+        ]
         : [
-            'Transaction approval and trust holds require clear agent identity.',
-            'CRM support is tied to orders, payouts, and risk review.',
-            'Step-up OTP is requested again for sensitive actions inside the panel.',
-          ],
+          'Transaction approval and trust holds require clear agent identity.',
+          'CRM support is tied to orders, payouts, and risk review.',
+          'Step-up OTP is requested again for sensitive actions inside the panel.',
+        ],
       backHome: isId ? 'Kembali ke home' : 'Back to home',
     }),
     [isId],
@@ -98,7 +98,7 @@ export default function CrmSecurityLogin({
           <div className="relative">
             <div className="inline-flex items-center gap-3 rounded-full border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_92%,_transparent)] px-3 py-2">
               <LajukanLogo />
-              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                 {text.eyebrow}
               </span>
             </div>
@@ -116,7 +116,7 @@ export default function CrmSecurityLogin({
                   key={item}
                   className="ui-panel-muted rounded-[24px] border border-[color:var(--app-border)]/80 p-4"
                 >
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] ui-accent-text">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] ui-accent-text">
                     0{index + 1}
                   </p>
                   <p className="mt-3 text-[13px] leading-6 text-[color:var(--app-text)]">

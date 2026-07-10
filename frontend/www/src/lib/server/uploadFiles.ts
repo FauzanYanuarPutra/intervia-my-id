@@ -24,6 +24,7 @@ type StoreUploadOptions = {
   folder: string;
   maxBytes: number;
   minioTarget: string;
+  requireMinio?: boolean;
   minioTimeoutMs?: number;
   concurrency?: number;
 };
@@ -247,15 +248,23 @@ async function tryMinioUpload(
   filename: string,
   options: StoreUploadOptions,
 ) {
-  if (!isMinIOConfigured()) return '';
+  if (!isMinIOConfigured()) {
+    if (options.requireMinio) {
+      throw new Error('storage is not configured');
+    }
+    return '';
+  }
   try {
     const { url } = await withTimeout(
       uploadToMinIO(options.minioTarget, buffer, mime, filename || file.name),
-      options.minioTimeoutMs || 2200,
+      options.minioTimeoutMs || 15000,
     );
     return url;
   } catch (error) {
     console.error('[UPLOAD_MINIO_FALLBACK]', error);
+    if (options.requireMinio) {
+      throw new Error('storage upload failed');
+    }
     return '';
   }
 }

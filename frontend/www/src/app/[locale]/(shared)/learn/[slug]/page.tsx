@@ -189,7 +189,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
         <section className="overflow-hidden rounded-[26px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
           <div className="grid lg:grid-cols-[minmax(0,1fr)_420px]">
             <div className="p-5 sm:p-6">
-              <div className="flex flex-wrap gap-2 text-[11px] font-black uppercase text-[color:var(--app-accent)]">
+              <div className="flex flex-wrap gap-2 text-[11px] font-bold uppercase text-[color:var(--app-accent)]">
                 <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1">
                   <GraduationCap className="h-3.5 w-3.5" />
                   {formatLabel(course.primary_format, isId)}
@@ -201,7 +201,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
                   {course.category}
                 </span>
               </div>
-              <h1 className="mt-4 max-w-3xl text-2xl font-black leading-tight text-[color:var(--app-text)] sm:text-3xl lg:text-4xl">
+              <h1 className="mt-4 max-w-3xl text-2xl font-bold leading-tight text-[color:var(--app-text)] sm:text-3xl lg:text-4xl">
                 {course.title}
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -243,7 +243,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
                     className="rounded-2xl bg-[color:var(--app-surface-muted)] p-3"
                   >
                     <item.icon className="h-4 w-4 text-[color:var(--app-accent)]" />
-                    <p className="mt-2 truncate text-base font-black text-[color:var(--app-text)]">
+                    <p className="mt-2 truncate text-base font-bold text-[color:var(--app-text)]">
                       {item.value}
                     </p>
                     <p className="text-xs font-bold text-[color:var(--app-text-soft)]">
@@ -282,7 +282,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
                 className="object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4 rounded-2xl bg-white/92 p-3 text-sm font-black text-slate-950 shadow-lg">
+              <div className="absolute bottom-4 left-4 right-4 rounded-2xl bg-white/92 p-3 text-sm font-bold text-slate-950 shadow-lg">
                 <span className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-emerald-600" />
                   {(
@@ -301,7 +301,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
           <div className="space-y-4">
             <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
               <div className="border-b border-[color:var(--app-border)] px-4 py-3">
-                <h2 className="flex items-center gap-2 text-base font-black text-[color:var(--app-text)]">
+                <h2 className="flex items-center gap-2 text-base font-bold text-[color:var(--app-text)]">
                   <PlayCircle className="h-5 w-5 text-[color:var(--app-accent)]" />
                   {isId ? 'Ruang belajar' : 'Learning room'}
                 </h2>
@@ -327,7 +327,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                   <div className="absolute bottom-5 left-5 right-5">
-                    <p className="max-w-xl text-xl font-black text-white">
+                    <p className="max-w-xl text-xl font-bold text-white">
                       {isId
                         ? 'Creator belum menaruh embed video. Gunakan resource dan curriculum di bawah.'
                         : 'The creator has not added an embedded video yet. Use the resources and curriculum below.'}
@@ -339,7 +339,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
 
             {readingBlocks.length > 0 ? (
               <section className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm sm:p-5">
-                <h2 className="flex items-center gap-2 text-base font-black text-[color:var(--app-text)]">
+                <h2 className="flex items-center gap-2 text-base font-bold text-[color:var(--app-text)]">
                   <FileText className="h-5 w-5 text-[color:var(--app-accent)]" />
                   {isId ? 'Catatan bacaan' : 'Reading notes'}
                 </h2>
@@ -368,7 +368,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
                       key={module.id}
                       className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm"
                     >
-                      <h2 className="text-base font-black text-[color:var(--app-text)]">
+                      <h2 className="text-base font-bold text-[color:var(--app-text)]">
                         {module.position}. {module.title}
                       </h2>
                       <div className="mt-3 divide-y divide-[color:var(--app-border)]">
@@ -383,7 +383,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
                                   <LessonIcon type={lesson.lesson_type} />
                                 </span>
                                 <div className="min-w-0">
-                                  <p className="line-clamp-1 text-sm font-black text-[color:var(--app-text)]">
+                                  <p className="line-clamp-1 text-sm font-bold text-[color:var(--app-text)]">
                                     {lesson.title}
                                   </p>
                                   <p className="mt-0.5 text-xs text-[color:var(--app-text-soft)]">
@@ -428,7 +428,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
 
           <aside className="space-y-3">
             <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-              <p className="flex items-center gap-2 text-sm font-black text-[color:var(--app-text)]">
+              <p className="flex items-center gap-2 text-sm font-bold text-[color:var(--app-text)]">
                 <ShieldCheck className="h-4 w-4 text-[color:var(--app-accent)]" />
                 {isId ? 'Belajar aman' : 'Safe learning'}
               </p>
@@ -455,7 +455,7 @@ export default async function LearnDetailPage({ params }: PageProps) {
             </div>
 
             <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-sm">
-              <p className="text-sm font-black text-[color:var(--app-text)]">
+              <p className="text-sm font-bold text-[color:var(--app-text)]">
                 {isId ? 'Tags' : 'Tags'}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">

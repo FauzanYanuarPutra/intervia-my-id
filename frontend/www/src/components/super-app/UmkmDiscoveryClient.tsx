@@ -225,7 +225,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
   };
 
   return (
-    <main className="relative h-[100dvh] min-h-[100svh] w-full overflow-hidden bg-slate-100 text-[color:var(--app-text)] dark:bg-slate-950">
+    <main className="relative h-[var(--app-viewport-height)] min-h-[var(--app-viewport-height)] w-full overflow-hidden bg-slate-100 text-[color:var(--app-text)] dark:bg-slate-950">
       <UmkmDiscoveryPanel
         isId={isId}
         query={discoveryQuery}
@@ -251,23 +251,19 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
         variant="immersive"
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1300] px-3 pt-[calc(env(safe-area-inset-top)+0.65rem)] sm:px-4 lg:inset-x-auto lg:left-3 lg:w-[486px] lg:px-0 lg:pt-[calc(env(safe-area-inset-top)+0.9rem)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1400] px-3 pt-[calc(env(safe-area-inset-top)+0.65rem)] sm:px-4 lg:inset-x-auto lg:left-3 lg:w-[486px] lg:px-0 lg:pt-[calc(env(safe-area-inset-top)+0.9rem)]">
         <div className="mx-auto flex w-full max-w-[860px] flex-col gap-1.5 lg:mx-0 lg:max-w-none">
           <form
             onSubmit={handleSearch}
-            className="pointer-events-auto overflow-hidden rounded-full bg-white/96 shadow-[0_16px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-900/5 backdrop-blur-2xl dark:bg-slate-950/92 dark:ring-white/10"
+            className="pointer-events-auto overflow-hidden rounded-full bg-white/96 shadow-[0_16px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-900/5  dark:bg-slate-950/92 dark:ring-white/10"
           >
-            <div className="flex min-h-[44px] items-center gap-1.5 px-2 sm:min-h-[48px] sm:gap-2 sm:px-3    !border-0
-    !ring-0
-    !outline-none
-    !shadow-none
-    focus:!border-0
-    focus:!ring-0
-    focus:!outline-none
-    focus:!shadow-none"   style={{
+            <div
+              className="flex min-h-[44px] items-center gap-1.5 px-2 !border-0 !outline-none !ring-0 !shadow-none focus:!border-0 focus:!outline-none focus:!ring-0 focus:!shadow-none sm:min-h-[48px] sm:gap-2 sm:px-3"
+              style={{
                 borderColor: 'transparent',
                 boxShadow: 'none',
-              }}>
+              }}
+            >
               <button
                 type="button"
                 onClick={handleBack}
@@ -300,7 +296,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               </button>
               <button
                 type="submit"
-                className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-black text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105 sm:min-h-[36px] sm:px-3.5"
+                className="inline-flex min-h-[34px] shrink-0 items-center justify-center rounded-full bg-[color:var(--app-accent)] px-3 text-[11px] font-bold text-white shadow-[0_14px_28px_-22px_color-mix(in_srgb,var(--app-accent)_46%,transparent)] transition hover:brightness-105 sm:min-h-[36px] sm:px-3.5"
               >
                 {isId ? 'Cari' : 'Search'}
               </button>
@@ -317,7 +313,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               type="button"
               onClick={handleUseCurrentLocation}
               className={cn(
-                'inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-black shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-xl transition hover:-translate-y-0.5 sm:min-h-[34px]',
+                'inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)]  transition hover:-translate-y-0.5 sm:min-h-[34px]',
                 cleanedCity
                   ? 'border-white/80 bg-white/92 text-slate-700 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100'
                   : 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
@@ -330,7 +326,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
               <button
                 type="button"
                 onClick={handleUseCurrentLocation}
-                className="inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] px-2.5 text-[11px] font-black text-white shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-xl transition hover:-translate-y-0.5 sm:min-h-[34px]"
+                className="inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] px-2.5 text-[11px] font-bold text-white shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)]  transition hover:-translate-y-0.5 sm:min-h-[34px]"
               >
                 <MapPin className="h-3.5 w-3.5" />
                 {cleanedCity}
@@ -345,7 +341,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
                   type="button"
                   onClick={() => handleLanePick(lane)}
                   className={cn(
-                    'inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-black shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-xl transition hover:-translate-y-0.5 sm:min-h-[34px] sm:px-3',
+                    'inline-flex min-h-[32px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)]  transition hover:-translate-y-0.5 sm:min-h-[34px] sm:px-3',
                     active
                       ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-white'
                       : 'border-white/80 bg-white/92 text-slate-700 hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/86 dark:text-slate-100',
@@ -363,14 +359,14 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
       <div className="pointer-events-none absolute bottom-[calc(12.5rem+env(safe-area-inset-bottom))] right-3 z-[1240] hidden flex-col gap-2 lg:flex">
         <Link
           href={manageBusinessHref}
-          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-black text-slate-800 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.34)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
+          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-bold text-slate-800 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.34)]  transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
         >
           <Store className="h-4 w-4 text-[color:var(--app-accent)]" />
           {isId ? 'Daftarkan usaha' : 'List business'}
         </Link>
         <Link
           href={requestHref}
-          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-black text-slate-800 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.34)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
+          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/80 bg-white/94 px-4 text-[12px] font-bold text-slate-800 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.34)]  transition hover:-translate-y-0.5 hover:text-[color:var(--app-accent)] dark:border-white/10 dark:bg-slate-950/88 dark:text-slate-100"
         >
           <MessageCircle className="h-4 w-4 text-[color:var(--app-accent)]" />
           {isId ? 'Buat permintaan' : 'Create request'}

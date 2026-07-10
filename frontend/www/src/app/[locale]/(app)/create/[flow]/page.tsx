@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import CreatePostingClient from '../CreatePostingClient';
+import SimpleCreateFlow from '../SimpleCreateFlow';
 import {
   buildCreateBasePath,
   normalizeCreateFlowSegment,
@@ -15,7 +15,7 @@ export default async function CreateFlowPage({ params }: PageProps) {
   const intent = normalizeCreateFlowSegment(flow);
   if (!intent) notFound();
 
-  return <CreatePostingClient entryMode={intent} forcedListingSide={intent} />;
+  return <SimpleCreateFlow entryMode={intent} />;
 }
 
 export async function generateMetadata({

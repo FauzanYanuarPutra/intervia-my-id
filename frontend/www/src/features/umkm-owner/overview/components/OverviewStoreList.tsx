@@ -19,7 +19,7 @@ export function OverviewStoreList({
     <section className="rounded-[18px] border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-slate-900">
       <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
             {isId ? 'Daftar usaha kamu' : 'Your businesses'}
           </p>
           <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -66,11 +66,11 @@ function StoreChoiceCard({
       </span>
       <span className="min-w-0">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="block truncate text-[13px] font-black text-[color:var(--app-text)]">
+          <span className="block truncate text-[13px] font-bold text-[color:var(--app-text)]">
             {store.name}
           </span>
           {store.selected ? (
-            <span className="shrink-0 rounded-full bg-[color:var(--app-accent)] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-white">
+            <span className="shrink-0 rounded-full bg-[color:var(--app-accent)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-white">
               {isId ? 'Fokus' : 'Focus'}
             </span>
           ) : null}

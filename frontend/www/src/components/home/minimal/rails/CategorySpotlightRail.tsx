@@ -59,7 +59,7 @@ export function CategorySpotlightRail({
     <section className="border-t border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] pt-4 dark:border-[color:var(--app-border-strong)] sm:rounded-3xl sm:border sm:border-[color:color-mix(in_srgb,_var(--app-border)_80%,_transparent)] sm:bg-[color:var(--app-surface-strong)] sm:p-4 sm:pt-4 sm:shadow-sm sm:dark:border-[color:var(--app-border-strong)] sm:dark:bg-[color:var(--app-surface-strong)]">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-base">
+          <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-base">
             {isId ? 'Sorotan kategori' : 'Category spotlight'}
           </h3>
           <p className="text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-sm">
@@ -94,12 +94,12 @@ export function CategorySpotlightRail({
                   </span>
                 </div>
                 <div className="mt-3">
-                  <p className="text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">{spotlight.label}</p>
+                  <p className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">{spotlight.label}</p>
                   <p className="mt-1 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">{spotlight.description}</p>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                   <span>{isId ? 'Tersedia' : 'Available'}</span>
-                  <span className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  <span className="text-base font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                     {formatCompact(count)}
                   </span>
                 </div>

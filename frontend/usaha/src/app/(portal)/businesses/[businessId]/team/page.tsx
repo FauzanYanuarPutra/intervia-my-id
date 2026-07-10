@@ -40,26 +40,26 @@ export default async function BusinessTeamPage({ params }: PageProps) {
             <>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                     Anggota aktif
                   </p>
-                  <p className="mt-2 text-xl font-black tracking-[-0.04em] text-portal-ink">
+                  <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
                     {business.teamMembers.length}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                     Undangan pending
                   </p>
-                  <p className="mt-2 text-xl font-black tracking-[-0.04em] text-portal-ink">
+                  <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
                     {business.invites.filter(invite => invite.status === 'pending').length}
                   </p>
                 </div>
                 <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                     Aksesmu
                   </p>
-                  <p className="mt-2 text-xl font-black tracking-[-0.04em] text-portal-ink">
+                  <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
                     {canManageRoles ? 'Bisa atur akses' : 'Pantau tim'}
                   </p>
                 </div>

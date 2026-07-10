@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,7 +23,9 @@ export function Modal({
   footer,
   className,
 }: ModalProps) {
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
         <motion.div
@@ -30,7 +33,7 @@ export function Modal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="ui-layer-modal fixed inset-0 flex items-end justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-0 backdrop-blur-md sm:items-center sm:p-4"
+          className="ui-layer-modal fixed inset-0 z-[10000] flex min-h-[100dvh] w-screen items-end justify-center overflow-y-auto bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-0  sm:items-center sm:p-4"
         >
           <motion.section
             role="dialog"
@@ -71,6 +74,7 @@ export function Modal({
           </motion.section>
         </motion.div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

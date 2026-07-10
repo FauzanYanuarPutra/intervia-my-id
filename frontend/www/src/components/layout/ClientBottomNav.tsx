@@ -10,7 +10,6 @@ import {
   Plus,
   User,
   SquarePen,
-  Video,
   type LucideIcon,
 } from 'lucide-react';
 import { LocalizedAnchor as Link } from '@/components/navigation/LocalizedAnchor';
@@ -89,10 +88,10 @@ export default function ClientBottomNav() {
 
   const items = useMemo<MobileNavItem[]>(() => {
     const text = {
-      home: locale === 'id' ? 'Home' : 'Home',
-      explore: locale === 'id' ? 'Explore' : 'Explore',
+      home: locale === 'id' ? 'Beranda' : 'Home',
+      explore: locale === 'id' ? 'Cari' : 'Search',
       chat: locale === 'id' ? 'Chat' : 'Chat',
-      profile: locale === 'id' ? 'Profile' : 'Profile',
+      profile: locale === 'id' ? 'Akun' : 'Account',
     };
 
     return [
@@ -139,23 +138,23 @@ export default function ClientBottomNav() {
   const createActions = useMemo<CreateAction[]>(
     () => [
       {
-        key: 'reels',
-        label: locale === 'id' ? 'Buat Reels' : 'Create Reels',
+        key: 'listing',
+        label: locale === 'id' ? 'Tawarkan produk/jasa' : 'Offer product/service',
         description:
           locale === 'id'
-            ? 'Langsung rekam video atau upload media pendek.'
-            : 'Go straight to video capture or short media upload.',
-        href: '/reels?create=1',
-        icon: Video,
+            ? 'Buat listing yang bisa ditemukan calon pembeli.'
+            : 'Create a listing buyers can find.',
+        href: '/create',
+        icon: SquarePen,
       },
       {
-        key: 'listing',
-        label: locale === 'id' ? 'Buat Listing' : 'Create Listing',
+        key: 'need',
+        label: locale === 'id' ? 'Pasang kebutuhan' : 'Post a need',
         description:
           locale === 'id'
-            ? 'Bikin produk, jasa, atau kebutuhan dengan rapi.'
-            : 'Create a clean product, service, or request listing.',
-        href: '/create',
+            ? 'Tulis apa yang kamu cari agar penyedia bisa menghubungi.'
+            : 'Describe what you need so providers can respond.',
+        href: '/create?side=demand',
         icon: SquarePen,
       },
       {
@@ -204,7 +203,7 @@ export default function ClientBottomNav() {
   return (
     <>
       <nav
-        className="ui-layer-bottom-nav fixed inset-x-0 bottom-0 overflow-visible border-x-0 border-t border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_97%,transparent)] px-1.5 pt-2 shadow-[0_-10px_24px_-24px_rgba(15,23,42,0.28)] backdrop-blur-xl lg:hidden dark:border-white/10 dark:bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)]"
+        className="ui-layer-bottom-nav fixed inset-x-0 bottom-0 overflow-visible border-x-0 border-t border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_97%,transparent)] px-1.5 pt-2 shadow-[0_-10px_24px_-24px_rgba(15,23,42,0.28)]  lg:hidden dark:border-white/10 dark:bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)]"
         data-compact-bottom-nav="true"
         data-testid="mobile-bottom-nav"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.35rem)' }}
@@ -305,7 +304,7 @@ export default function ClientBottomNav() {
                   >
                     <span
                       className={cn(
-                        'pointer-events-none inline-flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full transition',
+                        'pointer-events-none inline-flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full transition !p-0',
                         active
                           ? 'bg-white text-[color:var(--app-accent)]'
                           : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
@@ -340,7 +339,7 @@ export default function ClientBottomNav() {
 
       <div
         className={cn(
-          'fixed inset-0 z-[80] bg-slate-950/48 backdrop-blur-[3px] transition-opacity duration-200 lg:hidden',
+          'fixed inset-0 z-[80] bg-slate-950/48  transition-opacity duration-200 lg:hidden',
           sheetOpen
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0',

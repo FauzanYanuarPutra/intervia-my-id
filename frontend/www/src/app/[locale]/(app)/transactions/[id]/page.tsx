@@ -593,9 +593,9 @@ export default function TransactionDetailPage({
         if (!res.ok) {
           throw new Error(
             asString((payload as { error?: string }).error) ||
-              (locale === 'id'
-                ? 'Gagal memuat detail transaksi.'
-                : 'Failed to load transaction details.'),
+            (locale === 'id'
+              ? 'Gagal memuat detail transaksi.'
+              : 'Failed to load transaction details.'),
           );
         }
 
@@ -765,7 +765,7 @@ export default function TransactionDetailPage({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
                   {locale === 'id' ? 'Nominal' : 'Amount'}
                 </p>
-                <p className="mt-1 text-lg font-black text-[color:var(--app-accent)]">
+                <p className="mt-1 text-lg font-bold text-[color:var(--app-accent)]">
                   {formatPrice(transaction.amount_cents, transaction.currency, locale)}
                 </p>
               </div>
@@ -785,11 +785,10 @@ export default function TransactionDetailPage({
                 <Link
                   key={`${transaction.id}-${action.label}`}
                   href={action.href}
-                  className={`inline-flex min-h-[42px] items-center gap-2 rounded-2xl px-4 text-sm font-semibold transition ${
-                    action.tone === 'primary'
+                  className={`inline-flex min-h-[42px] items-center gap-2 rounded-2xl px-4 text-sm font-semibold transition ${action.tone === 'primary'
                       ? 'border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] hover:bg-[color:var(--app-accent-strong)]'
                       : 'border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] text-[color:var(--app-text)] hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]'
-                  }`}
+                    }`}
                 >
                   <action.Icon className="h-4 w-4" />
                   {action.label}

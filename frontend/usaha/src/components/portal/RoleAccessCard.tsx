@@ -13,7 +13,7 @@ export function RoleAccessCard({ role }: RoleAccessCardProps) {
     <div className="grid gap-4 xl:grid-cols-2">
       <article className="rounded-[24px] border border-portal-line/70 bg-white p-5">
         <p className="portal-kicker">Peran kamu</p>
-        <h3 className="mt-1 text-xl font-black tracking-[-0.05em] text-portal-ink">
+        <h3 className="mt-1 text-xl font-bold tracking-[-0.05em] text-portal-ink">
           {summary.label}
         </h3>
         <p className="mt-2 text-sm leading-6 text-portal-soft">{summary.description}</p>

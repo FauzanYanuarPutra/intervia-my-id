@@ -113,9 +113,9 @@ export default function MicrogigsClient() {
         if (!response.ok) {
           throw new Error(
             (payload as { error?: string }).error ||
-              (locale === 'id'
-                ? 'Gagal memuat microgigs'
-                : 'Failed to load microgigs'),
+            (locale === 'id'
+              ? 'Gagal memuat microgigs'
+              : 'Failed to load microgigs'),
           );
         }
 
@@ -166,7 +166,7 @@ export default function MicrogigsClient() {
     <section className="page-shell py-10">
       <div className="page-rhythm">
         <div className="ui-panel ui-hero-panel p-6 sm:p-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
             {text.title}
           </p>
           <h1 className="mt-2 text-3xl font-[1000] tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">

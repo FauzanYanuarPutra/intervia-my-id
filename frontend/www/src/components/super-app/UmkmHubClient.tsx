@@ -179,23 +179,23 @@ type StoreCreateStepId =
 type StoreListFilterId = 'all' | 'attention' | 'active' | 'live';
 type SimpleWorkspaceHero =
   | {
-      eyebrow: string;
-      title: string;
-      desc: string;
-      primaryLabel: string;
-      primaryHref: string;
-      secondaryLabel: string;
-      secondaryHref: string;
-    }
+    eyebrow: string;
+    title: string;
+    desc: string;
+    primaryLabel: string;
+    primaryHref: string;
+    secondaryLabel: string;
+    secondaryHref: string;
+  }
   | {
-      eyebrow: string;
-      title: string;
-      desc: string;
-      primaryLabel: string;
-      primaryTarget: string;
-      secondaryLabel: string;
-      secondaryHref: string;
-    };
+    eyebrow: string;
+    title: string;
+    desc: string;
+    primaryLabel: string;
+    primaryTarget: string;
+    secondaryLabel: string;
+    secondaryHref: string;
+  };
 type BasicStoreEditFormState = Pick<
   StoreFormState,
   'name' | 'description' | 'city' | 'address' | 'phone'
@@ -214,15 +214,15 @@ type LaunchRecommendationCard = {
 };
 type GuidedFlowAction =
   | {
-      kind: 'href';
-      href: string;
-      label: string;
-    }
+    kind: 'href';
+    href: string;
+    label: string;
+  }
   | {
-      kind: 'target';
-      target: string;
-      label: string;
-    };
+    kind: 'target';
+    target: string;
+    label: string;
+  };
 type GuidedFlowCard = {
   id: string;
   stepLabel: string;
@@ -719,13 +719,13 @@ export function UmkmHubClient({
       if (view === 'detail' && activeStoreId) {
         return isAssistantSetupRoute
           ? buildUsahaPath('assistant', {
-              storeId: activeStoreId,
-              hash,
-            })
+            storeId: activeStoreId,
+            hash,
+          })
           : buildUsahaPath('profile', {
-              storeId: activeStoreId,
-              hash,
-            });
+            storeId: activeStoreId,
+            hash,
+          });
       }
 
       const basePath = isAssistantSetupRoute
@@ -1133,12 +1133,12 @@ export function UmkmHubClient({
         summary:
           storeForm.name.trim() || storeForm.city.trim()
             ? [
-                storeForm.name.trim() ||
-                  (isId ? 'Nama belum diisi' : 'Name missing'),
-                storeForm.city.trim(),
-              ]
-                .filter(Boolean)
-                .join(' - ')
+              storeForm.name.trim() ||
+              (isId ? 'Nama belum diisi' : 'Name missing'),
+              storeForm.city.trim(),
+            ]
+              .filter(Boolean)
+              .join(' - ')
             : isId
               ? 'Isi nama, jenis, kota, dan alamat.'
               : 'Fill the core data.',
@@ -1323,7 +1323,7 @@ export function UmkmHubClient({
     if (selectedStore) {
       return parseCapabilityList(
         selectedStore.metadata?.business_capabilities ??
-          selectedStore.metadata?.capabilities,
+        selectedStore.metadata?.capabilities,
         selectedBusinessCategory,
       );
     }
@@ -1456,15 +1456,14 @@ export function UmkmHubClient({
         icon: PackagePlus,
         title: isId ? 'Nama & jenis' : 'Name and type',
         body: productForm.name.trim()
-          ? `${productForm.name.trim()} / ${
-              productForm.product_kind === 'digital'
-                ? isId
-                  ? 'digital'
-                  : 'digital'
-                : isId
-                  ? 'fisik'
-                  : 'physical'
-            }`
+          ? `${productForm.name.trim()} / ${productForm.product_kind === 'digital'
+            ? isId
+              ? 'digital'
+              : 'digital'
+            : isId
+              ? 'fisik'
+              : 'physical'
+          }`
           : isId
             ? 'Isi nama listing yang jelas.'
             : 'Add a clear listing name.',
@@ -1476,9 +1475,8 @@ export function UmkmHubClient({
         title: isId ? 'Harga & stok' : 'Price and stock',
         body:
           Number(productForm.price_rupiah) > 0
-            ? `${isId ? 'Rp' : 'Rp'} ${productForm.price_rupiah || '0'} / ${
-                isId ? 'stok' : 'stock'
-              } ${productForm.stock_qty || '0'}`
+            ? `${isId ? 'Rp' : 'Rp'} ${productForm.price_rupiah || '0'} / ${isId ? 'stok' : 'stock'
+            } ${productForm.stock_qty || '0'}`
             : isId
               ? 'Isi harga dulu.'
               : 'Set the price first.',
@@ -1497,15 +1495,15 @@ export function UmkmHubClient({
                 ? 'Digital'
                 : 'Digital'
               : [
-                  productForm.allow_pickup ? (isId ? 'Pickup' : 'Pickup') : '',
-                  productForm.allow_courier_shipping
-                    ? isId
-                      ? 'Kurir'
-                      : 'Courier'
-                    : '',
-                ]
-                  .filter(Boolean)
-                  .join(' / '),
+                productForm.allow_pickup ? (isId ? 'Pickup' : 'Pickup') : '',
+                productForm.allow_courier_shipping
+                  ? isId
+                    ? 'Kurir'
+                    : 'Courier'
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' / '),
           ]
             .filter(Boolean)
             .join(' / ') ||
@@ -1565,9 +1563,9 @@ export function UmkmHubClient({
     () =>
       normalizeSingleLineInput(
         (isSetupDetailView ? selectedStore?.city : '') ||
-          storeForm.city ||
-          selectedStore?.city ||
-          '',
+        storeForm.city ||
+        selectedStore?.city ||
+        '',
       ),
     [isSetupDetailView, selectedStore?.city, storeForm.city],
   );
@@ -2166,11 +2164,11 @@ export function UmkmHubClient({
           },
           ...(services.includes('food')
             ? [
-                {
-                  label: isId ? 'Foto menu' : 'Menu photo',
-                  done: hasMenuPhoto,
-                },
-              ]
+              {
+                label: isId ? 'Foto menu' : 'Menu photo',
+                done: hasMenuPhoto,
+              },
+            ]
             : []),
           {
             label: isId ? 'Kanal jual' : 'Selling channel',
@@ -2285,24 +2283,24 @@ export function UmkmHubClient({
             : 'Core data, trust, and sales channels are tidy enough for daily work.'
           : isId
             ? `Masih perlu: ${missingItems
-                .slice(0, 3)
-                .join(
-                  ', ',
-                )}${attentionCount > 3 ? `, +${attentionCount - 3} lainnya` : ''}.`
+              .slice(0, 3)
+              .join(
+                ', ',
+              )}${attentionCount > 3 ? `, +${attentionCount - 3} lainnya` : ''}.`
             : `Still missing: ${missingItems
-                .slice(0, 3)
-                .join(
-                  ', ',
-                )}${attentionCount > 3 ? `, +${attentionCount - 3} more` : ''}.`;
+              .slice(0, 3)
+              .join(
+                ', ',
+              )}${attentionCount > 3 ? `, +${attentionCount - 3} more` : ''}.`;
 
         const badges = [
           ...(businessCategoryLabel
             ? [
-                {
-                  label: businessCategoryLabel,
-                  tone: 'accent' as const,
-                },
-              ]
+              {
+                label: businessCategoryLabel,
+                tone: 'accent' as const,
+              },
+            ]
             : []),
           {
             label: presenceLabel,
@@ -2320,27 +2318,27 @@ export function UmkmHubClient({
           },
           ...(liveNow
             ? [
-                {
-                  label: 'Live',
-                  tone: 'accent' as const,
-                },
-              ]
+              {
+                label: 'Live',
+                tone: 'accent' as const,
+              },
+            ]
             : []),
           ...(store.online_order_enabled
             ? [
-                {
-                  label: 'Online',
-                  tone: 'accent' as const,
-                },
-              ]
+              {
+                label: 'Online',
+                tone: 'accent' as const,
+              },
+            ]
             : []),
           ...(store.offline_order_enabled
             ? [
-                {
-                  label: 'Offline',
-                  tone: 'default' as const,
-                },
-              ]
+              {
+                label: 'Offline',
+                tone: 'default' as const,
+              },
+            ]
             : []),
           {
             label: roleLabel,
@@ -2639,8 +2637,8 @@ export function UmkmHubClient({
         const savedStoreId =
           typeof window !== 'undefined'
             ? window.localStorage
-                .getItem(UMKM_ACTIVE_STORE_STORAGE_KEY)
-                ?.trim() || ''
+              .getItem(UMKM_ACTIVE_STORE_STORAGE_KEY)
+              ?.trim() || ''
             : '';
         const useBlankCreateSelection = !forcedStoreId && isSetupCreateView;
 
@@ -2694,8 +2692,8 @@ export function UmkmHubClient({
             PROMO_ONLY_MODE
               ? Promise.resolve(null)
               : authFetch(
-                  `/api/super-app/umkm/orders?store_id=${encodeURIComponent(storeId)}&limit=120`,
-                ),
+                `/api/super-app/umkm/orders?store_id=${encodeURIComponent(storeId)}&limit=120`,
+              ),
             authFetch(
               `/api/super-app/umkm/reservations?store_id=${encodeURIComponent(storeId)}&limit=120`,
             ),
@@ -2712,13 +2710,13 @@ export function UmkmHubClient({
         const qrPayload = PROMO_ONLY_MODE
           ? (emptyCollection as CollectionResponse<QrRecord>)
           : ((await qrRes
-              ?.json()
-              .catch(() => ({}))) as CollectionResponse<QrRecord>);
+            ?.json()
+            .catch(() => ({}))) as CollectionResponse<QrRecord>);
         const orderPayload = PROMO_ONLY_MODE
           ? (emptyCollection as CollectionResponse<OrderRecord>)
           : ((await orderRes
-              ?.json()
-              .catch(() => ({}))) as CollectionResponse<OrderRecord>);
+            ?.json()
+            .catch(() => ({}))) as CollectionResponse<OrderRecord>);
         const reservationPayload = (await reservationRes
           .json()
           .catch(() => ({}))) as CollectionResponse<ReservationRecord>;
@@ -2868,12 +2866,12 @@ export function UmkmHubClient({
       live_now: Object.prototype.hasOwnProperty.call(meta, 'live_now')
         ? readMetaBool(meta, 'live_now', current.live_now)
         : readMetaBool(
-            meta,
-            'outlet_active',
-            current.live_now ||
-              selectedStore.online_order_enabled ||
-              selectedStore.offline_order_enabled,
-          ),
+          meta,
+          'outlet_active',
+          current.live_now ||
+          selectedStore.online_order_enabled ||
+          selectedStore.offline_order_enabled,
+        ),
       auto_live_schedule_enabled: readMetaBool(
         meta,
         'auto_live_schedule_enabled',
@@ -3106,10 +3104,10 @@ export function UmkmHubClient({
     setProductForm(current => {
       const nextKind =
         defaultKind === 'digital' &&
-        !products.length &&
-        !current.name &&
-        !current.description &&
-        !current.image_url
+          !products.length &&
+          !current.name &&
+          !current.description &&
+          !current.image_url
           ? 'digital'
           : current.product_kind;
 
@@ -3124,12 +3122,12 @@ export function UmkmHubClient({
         allow_pickup:
           nextKind === 'physical'
             ? current.allow_pickup ||
-              selectedBusinessCapabilities.includes('pickup')
+            selectedBusinessCapabilities.includes('pickup')
             : false,
         allow_courier_shipping:
           nextKind === 'physical'
             ? current.allow_courier_shipping ||
-              supportsShipping(selectedBusinessCapabilities)
+            supportsShipping(selectedBusinessCapabilities)
             : false,
         publish_food: publishSet.has('food'),
         publish_mart: publishSet.has('mart'),
@@ -3138,7 +3136,7 @@ export function UmkmHubClient({
           current.channel_offline || defaultChannels.has('offline'),
         weight_grams:
           nextKind === 'physical' &&
-          supportsShipping(selectedBusinessCapabilities)
+            supportsShipping(selectedBusinessCapabilities)
             ? current.weight_grams || '500'
             : nextKind === 'digital'
               ? '0'
@@ -4348,9 +4346,9 @@ export function UmkmHubClient({
               publish_services: publishServices,
               ...(trimmedBusinessFocus
                 ? {
-                    umkm_focus: trimmedBusinessFocus,
-                    business_focus: trimmedBusinessFocus,
-                  }
+                  umkm_focus: trimmedBusinessFocus,
+                  business_focus: trimmedBusinessFocus,
+                }
                 : {}),
               prep_minutes: prepMinutes || undefined,
               sku: trimmedSku || undefined,
@@ -4372,9 +4370,9 @@ export function UmkmHubClient({
           selectedBusinessCapabilities,
           verificationForm.publish_food || verificationForm.publish_mart
             ? [
-                ...(verificationForm.publish_food ? (['food'] as const) : []),
-                ...(verificationForm.publish_mart ? (['mart'] as const) : []),
-              ]
+              ...(verificationForm.publish_food ? (['food'] as const) : []),
+              ...(verificationForm.publish_mart ? (['mart'] as const) : []),
+            ]
             : storePublishServices,
         ),
       );
@@ -4705,9 +4703,9 @@ export function UmkmHubClient({
     orderId: string,
     body:
       | {
-          action: 'update_status';
-          status: 'pending' | 'preparing' | 'served' | 'paid' | 'cancelled';
-        }
+        action: 'update_status';
+        status: 'pending' | 'preparing' | 'served' | 'paid' | 'cancelled';
+      }
       | { action: 'checkout' }
       | { action: 'confirm_bill' }
       | { action: 'move_table'; to_table_id: string },
@@ -5060,48 +5058,48 @@ export function UmkmHubClient({
     () =>
       selectedStore
         ? [
-            {
-              label: isId ? 'Produk' : 'Products',
-              value: products.length,
-              desc: isId ? 'Sudah masuk' : 'Added already',
-            },
-            {
-              label: isId ? 'Siap promosi' : 'Promo ready',
-              value: products.filter(product => product.image_url).length,
-              desc: isId ? 'Punya foto' : 'With photos',
-            },
-            {
-              label: isId ? 'Perlu dicek' : 'Needs attention',
-              value: ownerAlerts.length,
-              desc:
-                ownerAlerts.length > 0
-                  ? isId
-                    ? 'Beresin dulu'
-                    : 'Fix first'
-                  : isId
-                    ? 'Aman'
-                    : 'Healthy',
-            },
-          ]
+          {
+            label: isId ? 'Produk' : 'Products',
+            value: products.length,
+            desc: isId ? 'Sudah masuk' : 'Added already',
+          },
+          {
+            label: isId ? 'Siap promosi' : 'Promo ready',
+            value: products.filter(product => product.image_url).length,
+            desc: isId ? 'Punya foto' : 'With photos',
+          },
+          {
+            label: isId ? 'Perlu dicek' : 'Needs attention',
+            value: ownerAlerts.length,
+            desc:
+              ownerAlerts.length > 0
+                ? isId
+                  ? 'Beresin dulu'
+                  : 'Fix first'
+                : isId
+                  ? 'Aman'
+                  : 'Healthy',
+          },
+        ]
         : [
-            {
-              label: isId ? 'Usaha' : 'Businesses',
-              value: myStores.length,
-              desc: isId
-                ? `${activeStoreCount} aktif`
-                : `${activeStoreCount} active`,
-            },
-            {
-              label: isId ? 'Aktif' : 'Active',
-              value: activeStoreCount,
-              desc: isId ? 'Sudah siap dibuka' : 'Ready to be opened',
-            },
-            {
-              label: isId ? 'Mulai' : 'Start',
-              value: isId ? 'Bikin usaha' : 'Add one',
-              desc: isId ? 'Simpan satu dulu' : 'Save one first',
-            },
-          ],
+          {
+            label: isId ? 'Usaha' : 'Businesses',
+            value: myStores.length,
+            desc: isId
+              ? `${activeStoreCount} aktif`
+              : `${activeStoreCount} active`,
+          },
+          {
+            label: isId ? 'Aktif' : 'Active',
+            value: activeStoreCount,
+            desc: isId ? 'Sudah siap dibuka' : 'Ready to be opened',
+          },
+          {
+            label: isId ? 'Mulai' : 'Start',
+            value: isId ? 'Bikin usaha' : 'Add one',
+            desc: isId ? 'Simpan satu dulu' : 'Save one first',
+          },
+        ],
     [
       activeStoreCount,
       isId,
@@ -5854,17 +5852,17 @@ export function UmkmHubClient({
     () =>
       selectedStore
         ? workspaceJumpTiles.filter(item =>
-            [
-              'register',
-              'portfolio',
-              'verification',
-              'products',
-              PROMO_ONLY_MODE ? 'promo' : 'orders',
-            ].includes(item.id),
-          )
+          [
+            'register',
+            'portfolio',
+            'verification',
+            'products',
+            PROMO_ONLY_MODE ? 'promo' : 'orders',
+          ].includes(item.id),
+        )
         : workspaceJumpTiles.filter(item =>
-            ['register', 'portfolio'].includes(item.id),
-          ),
+          ['register', 'portfolio'].includes(item.id),
+        ),
     [selectedStore, workspaceJumpTiles],
   );
 
@@ -6376,16 +6374,16 @@ export function UmkmHubClient({
       ...(PROMO_ONLY_MODE
         ? []
         : [
-            {
-              id: 'orders',
-              icon: WalletCards,
-              title: isId ? 'Pesanan' : 'Orders',
-              desc: isId ? 'Yang lagi jalan.' : 'Live queue.',
-              badge: `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
-              selected: currentWorkspace === 'orders',
-              href: buildWorkspaceHref('orders'),
-            },
-          ]),
+          {
+            id: 'orders',
+            icon: WalletCards,
+            title: isId ? 'Pesanan' : 'Orders',
+            desc: isId ? 'Yang lagi jalan.' : 'Live queue.',
+            badge: `${orderSummary.unpaid} ${isId ? 'aktif' : 'active'}`,
+            selected: currentWorkspace === 'orders',
+            href: buildWorkspaceHref('orders'),
+          },
+        ]),
       {
         id: 'team',
         icon: Users,
@@ -6425,45 +6423,45 @@ export function UmkmHubClient({
     currentWorkspace === 'setup'
       ? isSetupCreateView
         ? {
-            href: buildSetupHref('list'),
-            label: isId ? 'Daftar outlet' : 'See outlets',
-          }
+          href: buildSetupHref('list'),
+          label: isId ? 'Daftar outlet' : 'See outlets',
+        }
         : isSetupDetailView
           ? {
-              href: buildSetupHref('list'),
-              label: isId ? 'Pilih outlet' : 'Choose outlet',
-            }
+            href: buildSetupHref('list'),
+            label: isId ? 'Pilih outlet' : 'Choose outlet',
+          }
           : {
-              href: buildSetupHref('create'),
-              label: isId ? 'Tambah usaha' : 'Add business',
-            }
+            href: buildSetupHref('create'),
+            label: isId ? 'Tambah usaha' : 'Add business',
+          }
       : null;
   const setupHeaderCopy =
     currentWorkspace === 'setup'
       ? isSetupCreateView
         ? {
-            eyebrow: isId ? 'Buka usaha' : 'Add business',
-            title: isId
-              ? 'Buat profil usaha yang rapi'
-              : 'Create a clean business profile',
-            desc: isId
-              ? 'Ikuti alur singkat: info dasar, lokasi, kontak, operasional, lalu review.'
-              : 'Follow the short flow: basic info, location, contact, operations, then review.',
-          }
+          eyebrow: isId ? 'Buka usaha' : 'Add business',
+          title: isId
+            ? 'Buat profil usaha yang rapi'
+            : 'Create a clean business profile',
+          desc: isId
+            ? 'Ikuti alur singkat: info dasar, lokasi, kontak, operasional, lalu review.'
+            : 'Follow the short flow: basic info, location, contact, operations, then review.',
+        }
         : isSetupDetailView
           ? {
-              eyebrow: isId ? 'Edit usaha' : 'Edit business',
-              title:
-                selectedStore?.name || (isId ? 'Edit usaha' : 'Edit business'),
-              desc: isId ? 'Ubah yang perlu aja.' : 'Change only what matters.',
-            }
+            eyebrow: isId ? 'Edit usaha' : 'Edit business',
+            title:
+              selectedStore?.name || (isId ? 'Edit usaha' : 'Edit business'),
+            desc: isId ? 'Ubah yang perlu aja.' : 'Change only what matters.',
+          }
           : {
-              eyebrow: isId ? 'Daftar outlet' : 'Outlet list',
-              title: isId ? 'Pilih outlet' : 'Pick one outlet',
-              desc: isId
-                ? 'Tap outlet yang mau dipakai sekarang.'
-                : 'Tap the outlet you want to use right now.',
-            }
+            eyebrow: isId ? 'Daftar outlet' : 'Outlet list',
+            title: isId ? 'Pilih outlet' : 'Pick one outlet',
+            desc: isId
+              ? 'Tap outlet yang mau dipakai sekarang.'
+              : 'Tap the outlet you want to use right now.',
+          }
       : null;
   const promoOnlyWorkspaceCopy = useMemo(() => {
     const isQrRoute = isDirectQrWorkspaceRoute;
@@ -6485,20 +6483,20 @@ export function UmkmHubClient({
           : 'For the early launch phase, orders, balance, payments, and cashier tools are intentionally hidden. Users can still view the business, browse the catalog, and chat.',
       primaryAction: selectedStore
         ? {
-            href: buildWorkspaceHref('catalog', selectedStore.id),
-            label: isId ? 'Buka katalog' : 'Open catalog',
-          }
+          href: buildWorkspaceHref('catalog', selectedStore.id),
+          label: isId ? 'Buka katalog' : 'Open catalog',
+        }
         : {
-            href: buildSetupHref(myStores.length > 0 ? 'list' : 'create'),
-            label:
-              myStores.length > 0
-                ? isId
-                  ? 'Pilih usaha'
-                  : 'Choose business'
-                : isId
-                  ? 'Buat profil usaha'
-                  : 'Create business profile',
-          },
+          href: buildSetupHref(myStores.length > 0 ? 'list' : 'create'),
+          label:
+            myStores.length > 0
+              ? isId
+                ? 'Pilih usaha'
+                : 'Choose business'
+              : isId
+                ? 'Buat profil usaha'
+                : 'Create business profile',
+        },
       secondaryAction: {
         href: '/chat',
         label: isId ? 'Buka chat' : 'Open chat',
@@ -6575,12 +6573,12 @@ export function UmkmHubClient({
     }));
     const overviewSelectedStore: OverviewStore | null = selectedStore
       ? {
-          address: selectedStore.address,
-          city: selectedStore.city,
-          id: selectedStore.id,
-          name: selectedStore.name,
-          slug: selectedStore.slug,
-        }
+        address: selectedStore.address,
+        city: selectedStore.city,
+        id: selectedStore.id,
+        name: selectedStore.name,
+        slug: selectedStore.slug,
+      }
       : null;
     const overviewModel = buildUsahaOverviewModel({
       icons: {
@@ -6631,10 +6629,10 @@ export function UmkmHubClient({
                 <div className={manageDashboardCardClass}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 max-w-2xl">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]">
                         {isId ? 'Dashboard usaha' : 'Business dashboard'}
                       </p>
-                      <h1 className="mt-1 text-[1.18rem] font-black leading-tight tracking-tight text-[color:var(--app-text)] sm:text-[1.55rem]">
+                      <h1 className="mt-1 text-[1.18rem] font-bold leading-tight tracking-tight text-[color:var(--app-text)] sm:text-[1.55rem]">
                         {selectedStore
                           ? isId
                             ? selectedStore.name
@@ -6768,10 +6766,10 @@ export function UmkmHubClient({
                     <div className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,247,240,0.94))] p-4 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.16)]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                             {isId ? 'Fokus sekarang' : 'Current focus'}
                           </p>
-                          <h2 className="mt-1 text-[1rem] font-black text-[color:var(--app-text)] sm:text-[1.08rem]">
+                          <h2 className="mt-1 text-[1rem] font-bold text-[color:var(--app-text)] sm:text-[1.08rem]">
                             {selectedStore
                               ? selectedStore.name
                               : isId
@@ -6793,7 +6791,7 @@ export function UmkmHubClient({
                         >
                           {selectedStore
                             ? nextOwnerStep?.label ||
-                              (isId ? 'Siap lanjut' : 'Ready to continue')
+                            (isId ? 'Siap lanjut' : 'Ready to continue')
                             : isId
                               ? 'Belum aktif'
                               : 'Inactive'}
@@ -6813,10 +6811,10 @@ export function UmkmHubClient({
                                   : 'border-emerald-100 bg-white/90',
                             )}
                           >
-                            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
                               {item.label}
                             </p>
-                            <p className="mt-1 text-[1.05rem] font-black text-[color:var(--app-text)]">
+                            <p className="mt-1 text-[1.05rem] font-bold text-[color:var(--app-text)]">
                               {item.value}
                             </p>
                             <p className="mt-1 line-clamp-1 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
@@ -6828,7 +6826,7 @@ export function UmkmHubClient({
                     </div>
 
                     <div className="rounded-[22px] border border-slate-200/80 bg-white/92 p-4 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.14)]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                         {isId ? 'Langkah berikutnya' : 'Next step'}
                       </p>
                       <div className="mt-3 space-y-2">
@@ -6844,7 +6842,7 @@ export function UmkmHubClient({
                           >
                             <span
                               className={cn(
-                                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-black',
+                                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
                                 step.done
                                   ? 'bg-emerald-600 text-white'
                                   : 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]',
@@ -6853,7 +6851,7 @@ export function UmkmHubClient({
                               {step.done ? '✓' : step.badge.slice(0, 1)}
                             </span>
                             <span className="min-w-0">
-                              <span className="block text-[12px] font-black text-[color:var(--app-text)]">
+                              <span className="block text-[12px] font-bold text-[color:var(--app-text)]">
                                 {step.title}
                               </span>
                               <span className="mt-1 block text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -6882,7 +6880,7 @@ export function UmkmHubClient({
                         <div className="flex items-start justify-between gap-3">
                           <span
                             className={cn(
-                              'inline-flex min-h-[30px] min-w-8 items-center justify-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em]',
+                              'inline-flex min-h-[30px] min-w-8 items-center justify-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]',
                               step.done
                                 ? 'bg-emerald-600 text-white'
                                 : step.tone === 'warning'
@@ -6896,7 +6894,7 @@ export function UmkmHubClient({
                             {step.badge}
                           </InlineBadge>
                         </div>
-                        <p className="mt-3 text-[14px] font-black leading-tight text-[color:var(--app-text)]">
+                        <p className="mt-3 text-[14px] font-bold leading-tight text-[color:var(--app-text)]">
                           {step.title}
                         </p>
                         <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -6924,12 +6922,12 @@ export function UmkmHubClient({
                       <>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                               {isId
                                 ? 'Usaha yang dipakai sekarang'
                                 : 'Selected business'}
                             </p>
-                            <h3 className="mt-1 truncate text-[14px] font-black text-[color:var(--app-text)]">
+                            <h3 className="mt-1 truncate text-[14px] font-bold text-[color:var(--app-text)]">
                               {selectedStore.name}
                             </h3>
                             <p className="mt-1 line-clamp-2 text-[10px] leading-4 ui-text-soft sm:text-[11px]">
@@ -6941,9 +6939,9 @@ export function UmkmHubClient({
                           <InlineBadge tone="accent">
                             {selectedStore.access_role
                               ? formatLaunchTeamRole(
-                                  selectedStore.access_role,
-                                  isId,
-                                )
+                                selectedStore.access_role,
+                                isId,
+                              )
                               : isId
                                 ? 'Pemilik'
                                 : 'Owner'}
@@ -6962,13 +6960,13 @@ export function UmkmHubClient({
                           <InlineBadge
                             tone={
                               hasEnabledPublishChannel &&
-                              verificationGapCount === 0
+                                verificationGapCount === 0
                                 ? 'success'
                                 : 'warning'
                             }
                           >
                             {hasEnabledPublishChannel &&
-                            verificationGapCount === 0
+                              verificationGapCount === 0
                               ? isId
                                 ? 'Publish siap'
                                 : 'Publish ready'
@@ -7008,10 +7006,10 @@ export function UmkmHubClient({
                                     : 'border-emerald-100 bg-white/88 text-emerald-800 dark:border-emerald-400/16 dark:bg-white/[0.07] dark:text-emerald-100',
                               )}
                             >
-                              <p className="text-[9px] font-black uppercase tracking-[0.14em] opacity-70">
+                              <p className="text-[9px] font-bold uppercase tracking-[0.14em] opacity-70">
                                 {item.label}
                               </p>
-                              <p className="mt-1 text-[1.15rem] font-black leading-none tracking-tight">
+                              <p className="mt-1 text-[1.15rem] font-bold leading-none tracking-tight">
                                 {item.value}
                               </p>
                               <p className="mt-1 line-clamp-1 text-[10px] font-semibold opacity-72">
@@ -7024,7 +7022,7 @@ export function UmkmHubClient({
                     ) : (
                       <div className="space-y-3">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                             {myStores.length > 0
                               ? isId
                                 ? 'Pilih usaha'
@@ -7033,7 +7031,7 @@ export function UmkmHubClient({
                                 ? 'Mulai dari sini'
                                 : 'Start here'}
                           </p>
-                          <h3 className="mt-1 text-[14px] font-black text-[color:var(--app-text)]">
+                          <h3 className="mt-1 text-[14px] font-bold text-[color:var(--app-text)]">
                             {myStores.length > 0
                               ? isId
                                 ? 'Pilih usaha yang dikerjakan'
@@ -7073,7 +7071,7 @@ export function UmkmHubClient({
                   <div className="rounded-[20px] border border-amber-100/90 bg-[linear-gradient(135deg,#fffbeb_0%,#ffffff_100%)] px-3.5 py-3.5 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.18)] dark:border-amber-400/14 dark:bg-[linear-gradient(135deg,rgba(120,53,15,0.18),rgba(15,23,42,0.92))]">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                           {isId ? 'Prioritas sekarang' : 'Priority now'}
                         </p>
                         <p className="mt-1 text-[11px] leading-5 ui-text-soft">
@@ -7134,7 +7132,7 @@ export function UmkmHubClient({
                                 <AlertIcon className="h-4 w-4" />
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[12px] font-black text-[color:var(--app-text)]">
+                                <p className="text-[12px] font-bold text-[color:var(--app-text)]">
                                   {alert.title}
                                 </p>
                                 <p className="mt-1 line-clamp-2 text-[10px] leading-4 ui-text-soft sm:text-[11px] sm:leading-5">
@@ -7158,12 +7156,12 @@ export function UmkmHubClient({
                       <div>
                         <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                           <div className="max-w-3xl">
-                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[color:var(--app-accent)]/72">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[color:var(--app-accent)]/72">
                               {isId
                                 ? 'Control center'
                                 : 'Multi-business control center'}
                             </p>
-                            <h3 className="mt-1 text-[1.02rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.18rem]">
+                            <h3 className="mt-1 text-[1.02rem] font-bold leading-tight text-[color:var(--app-text)] sm:text-[1.18rem]">
                               {isId
                                 ? 'Pilih usaha. Cek prioritas. Lanjut aksi.'
                                 : 'Pick a business, review priorities, then jump into the next action'}
@@ -7176,10 +7174,10 @@ export function UmkmHubClient({
                           </div>
 
                           <div className="w-full rounded-[20px] border border-white/70 bg-white/92 px-4 py-3 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.18)] xl:max-w-[290px]">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
                               {isId ? 'Fokus portofolio' : 'Portfolio focus'}
                             </p>
-                            <p className="mt-1.5 text-[13px] font-black text-[color:var(--app-text)]">
+                            <p className="mt-1.5 text-[13px] font-bold text-[color:var(--app-text)]">
                               {portfolioPriorityStore
                                 ? portfolioPriorityStore.store.name
                                 : isId
@@ -7297,7 +7295,7 @@ export function UmkmHubClient({
                                   <span>{option.label}</span>
                                   <span
                                     className={cn(
-                                      'inline-flex h-6 min-w-[1.8rem] items-center justify-center rounded-full px-2 text-[10px] font-black',
+                                      'inline-flex h-6 min-w-[1.8rem] items-center justify-center rounded-full px-2 text-[10px] font-bold',
                                       active
                                         ? 'bg-[color:var(--app-accent)] text-white'
                                         : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
@@ -7318,17 +7316,17 @@ export function UmkmHubClient({
                               <div className="mt-4 flex flex-wrap gap-2">
                                 {(hasStoreListQuery ||
                                   storeListFilter !== 'all') && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setStoreListQuery('');
-                                      setStoreListFilter('all');
-                                    }}
-                                    className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
-                                  >
-                                    {isId ? 'Reset pencarian' : 'Reset search'}
-                                  </button>
-                                )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setStoreListQuery('');
+                                        setStoreListFilter('all');
+                                      }}
+                                      className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
+                                    >
+                                      {isId ? 'Reset pencarian' : 'Reset search'}
+                                    </button>
+                                  )}
                                 <Link
                                   href={buildSetupHref('create')}
                                   className="ui-button-primary ui-button-compact inline-flex px-4 text-sm font-semibold"
@@ -7389,10 +7387,10 @@ export function UmkmHubClient({
                         <div className="rounded-[20px] border border-slate-200/80 bg-white/92 px-4 py-4 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.14)] dark:border-slate-800/80 dark:bg-slate-950/86">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                                 {isId ? 'Sedang dipakai' : 'Current focus'}
                               </p>
-                              <p className="mt-1 text-[13px] font-black text-[color:var(--app-text)]">
+                              <p className="mt-1 text-[13px] font-bold text-[color:var(--app-text)]">
                                 {selectedStoreInsight
                                   ? selectedStoreInsight.store.name
                                   : isId
@@ -7454,10 +7452,10 @@ export function UmkmHubClient({
                         <div className="rounded-[20px] border border-slate-200/80 bg-slate-50/92 px-4 py-4 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.14)] dark:border-slate-800/80 dark:bg-slate-900/78">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                                 {isId ? 'Berikutnya' : 'Up next'}
                               </p>
-                              <p className="mt-1 text-[13px] font-black text-[color:var(--app-text)]">
+                              <p className="mt-1 text-[13px] font-bold text-[color:var(--app-text)]">
                                 {portfolioNextStore
                                   ? portfolioNextStore.store.name
                                   : isId
@@ -7527,7 +7525,7 @@ export function UmkmHubClient({
                         </div>
 
                         <div className="rounded-[20px] border border-slate-200/80 bg-white/92 px-4 py-4 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.14)] dark:border-slate-800/80 dark:bg-slate-950/86">
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                             {isId ? 'Jalur cepat owner' : 'Owner quick links'}
                           </p>
                           <div className="mt-3 space-y-2">
@@ -7580,10 +7578,10 @@ export function UmkmHubClient({
                 <div className="rounded-[18px] bg-slate-50/92 p-3 ring-1 ring-slate-200/80 dark:bg-slate-900/78 dark:ring-slate-800/80 sm:rounded-[20px] sm:p-3.5">
                   <div className="flex flex-col gap-2.5 min-[520px]:flex-row min-[520px]:items-start min-[520px]:justify-between">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
                         Lajukan UMKM
                       </p>
-                      <h1 className="mt-1 text-[1.12rem] font-black tracking-tight ui-text sm:text-[1.4rem]">
+                      <h1 className="mt-1 text-[1.12rem] font-bold tracking-tight ui-text sm:text-[1.4rem]">
                         {isId ? 'Kerjain yang penting dulu' : 'Manage fast'}
                       </h1>
                       <p className="mt-1 max-w-2xl text-[11px] leading-4 ui-text-soft sm:text-[12px]">
@@ -7671,12 +7669,12 @@ export function UmkmHubClient({
                       <>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                               {isId
                                 ? 'Usaha yang lagi dipakai'
                                 : 'Active business'}
                             </p>
-                            <h3 className="mt-1 truncate text-[14px] font-black text-[color:var(--app-text)]">
+                            <h3 className="mt-1 truncate text-[14px] font-bold text-[color:var(--app-text)]">
                               {selectedStore.name}
                             </h3>
                             <p className="mt-1 line-clamp-2 text-[10px] leading-4 ui-text-soft sm:text-[11px]">
@@ -7688,9 +7686,9 @@ export function UmkmHubClient({
                           <InlineBadge tone="accent">
                             {selectedStore.access_role
                               ? formatLaunchTeamRole(
-                                  selectedStore.access_role,
-                                  isId,
-                                )
+                                selectedStore.access_role,
+                                isId,
+                              )
                               : isId
                                 ? 'Pemilik'
                                 : 'Owner'}
@@ -7707,13 +7705,13 @@ export function UmkmHubClient({
                             </InlineBadge>
                           ) : null}
                           {!PROMO_ONLY_MODE &&
-                          selectedStore.online_order_enabled ? (
+                            selectedStore.online_order_enabled ? (
                             <InlineBadge tone="accent">
                               {isId ? 'Online nyala' : 'Online live'}
                             </InlineBadge>
                           ) : null}
                           {!PROMO_ONLY_MODE &&
-                          selectedStore.offline_order_enabled ? (
+                            selectedStore.offline_order_enabled ? (
                             <InlineBadge tone="success">
                               {isId ? 'Offline nyala' : 'Offline live'}
                             </InlineBadge>
@@ -7801,7 +7799,7 @@ export function UmkmHubClient({
                                     <AlertIcon className="h-4 w-4" />
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="text-[12px] font-black text-[color:var(--app-text)]">
+                                    <p className="text-[12px] font-bold text-[color:var(--app-text)]">
                                       {alert.title}
                                     </p>
                                     <p className="mt-1 line-clamp-2 text-[10px] leading-4 ui-text-soft sm:text-[11px] sm:leading-5">
@@ -7817,10 +7815,10 @@ export function UmkmHubClient({
                     ) : (
                       <div className="flex h-full flex-col justify-between gap-3.5">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                             {isId ? 'Belum ada usaha' : 'No business yet'}
                           </p>
-                          <h3 className="mt-1 text-[14px] font-black text-[color:var(--app-text)]">
+                          <h3 className="mt-1 text-[14px] font-bold text-[color:var(--app-text)]">
                             {isId
                               ? 'Bikin usaha dulu, yuk'
                               : 'Add a business first'}
@@ -7859,7 +7857,7 @@ export function UmkmHubClient({
           className={cn(
             'ui-panel rounded-none border-x-0 p-3 sm:rounded-[24px] sm:border-x sm:p-4',
             isSimpleHubMode &&
-              'border-slate-200 bg-white shadow-[0_22px_52px_-44px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 sm:rounded-[30px] sm:p-5',
+            'border-slate-200 bg-white shadow-[0_22px_52px_-44px_rgba(15,23,42,0.22)] dark:border-white/10 dark:bg-slate-900 sm:rounded-[30px] sm:p-5',
           )}
         >
           {isSetupCreateView ? (
@@ -7869,7 +7867,7 @@ export function UmkmHubClient({
                   setupPrimaryAction ? (
                     <Link
                       href={setupPrimaryAction.href}
-                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
+                      className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50 dark:border-white/10 dark:bg-white/8 dark:text-white"
                     >
                       {setupPrimaryAction.label}
                     </Link>
@@ -7912,10 +7910,10 @@ export function UmkmHubClient({
               <div className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-3.5 shadow-[0_16px_30px_-26px_rgba(15,23,42,0.14)] sm:px-4 sm:py-4 dark:border-[color:var(--app-border-strong)]">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div className="min-w-0 max-w-3xl">
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
                       {isId ? 'Bikin usaha' : 'Add business'}
                     </p>
-                    <h2 className="mt-1.5 text-lg font-black ui-text sm:text-[1.35rem]">
+                    <h2 className="mt-1.5 text-lg font-bold ui-text sm:text-[1.35rem]">
                       {isId
                         ? 'Mulai dari usaha pertama dulu'
                         : 'Start with the first business'}
@@ -7972,22 +7970,22 @@ export function UmkmHubClient({
               steps={
                 isSetupDetailView && selectedStore
                   ? setupDetailSteps.map(step => ({
-                      label: step.title,
-                      active: step.id === activeSetupDetailStep,
-                      done: step.done,
-                    }))
+                    label: step.title,
+                    active: step.id === activeSetupDetailStep,
+                    done: step.done,
+                  }))
                   : [
-                      {
-                        label: isId ? 'Pilih usaha' : 'Choose business',
-                        active: isSetupListView,
-                        done: myStores.length > 0,
-                      },
-                      {
-                        label: isId ? 'Buat usaha' : 'Add business',
-                        active: false,
-                        done: myStores.length > 0,
-                      },
-                    ]
+                    {
+                      label: isId ? 'Pilih usaha' : 'Choose business',
+                      active: isSetupListView,
+                      done: myStores.length > 0,
+                    },
+                    {
+                      label: isId ? 'Buat usaha' : 'Add business',
+                      active: false,
+                      done: myStores.length > 0,
+                    },
+                  ]
               }
               title={
                 setupHeaderCopy?.title ||
@@ -8026,13 +8024,13 @@ export function UmkmHubClient({
               selectedStore={
                 selectedStore
                   ? {
-                      name: selectedStore.name,
-                      summary:
-                        [selectedStore.city, selectedStore.address]
-                          .filter(Boolean)
-                          .join(' - ') ||
-                        (isId ? 'Lokasi belum diisi' : 'No location yet'),
-                    }
+                    name: selectedStore.name,
+                    summary:
+                      [selectedStore.city, selectedStore.address]
+                        .filter(Boolean)
+                        .join(' - ') ||
+                      (isId ? 'Lokasi belum diisi' : 'No location yet'),
+                  }
                   : null
               }
               stats={selectedStore ? simpleWorkspaceStats : []}
@@ -8042,7 +8040,7 @@ export function UmkmHubClient({
               {currentWorkspace === 'setup' ? (
                 <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_340px]">
                   <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,247,0.92))] p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.92))]">
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] ui-accent-text">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] ui-accent-text">
                       {isId ? 'Langkah usaha' : 'Business steps'}
                     </p>
                     <div className="mt-3 space-y-2.5">
@@ -8085,7 +8083,7 @@ export function UmkmHubClient({
                           >
                             <span
                               className={cn(
-                                'mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black',
+                                'mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
                                 active
                                   ? 'bg-[color:var(--app-accent)] text-white'
                                   : unlocked
@@ -8096,7 +8094,7 @@ export function UmkmHubClient({
                               {index + 1}
                             </span>
                             <span className="min-w-0">
-                              <span className="block text-[13px] font-black ui-text">
+                              <span className="block text-[13px] font-bold ui-text">
                                 {label}
                               </span>
                               <span className="mt-0.5 block text-[11px] leading-5 ui-text-soft">
@@ -8130,10 +8128,10 @@ export function UmkmHubClient({
                   <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.18)] sm:p-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                       <div className="max-w-2xl">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
                           {setupHeaderCopy?.eyebrow}
                         </p>
-                        <h2 className="mt-1 text-[1.2rem] font-black tracking-[-0.02em] ui-text sm:text-[1.5rem]">
+                        <h2 className="mt-1 text-[1.2rem] font-bold tracking-[-0.02em] ui-text sm:text-[1.5rem]">
                           {setupHeaderCopy?.title}
                         </h2>
                         <p className="mt-1 text-sm leading-6 ui-text-soft">
@@ -8157,19 +8155,19 @@ export function UmkmHubClient({
                   </div>
 
                   <div className="rounded-[24px] border border-[color:var(--app-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,247,0.92))] p-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.18)] dark:border-[color:var(--app-border-strong)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.92))]">
-                    <p className="text-[10px] font-black uppercase tracking-[0.24em] ui-accent-text">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] ui-accent-text">
                       {isId ? 'Ringkasan' : 'Summary'}
                     </p>
                     <div className="mt-3 rounded-[22px] border border-[color:var(--app-border)] bg-white p-4 dark:border-[color:var(--app-border-strong)] dark:bg-slate-950">
-                      <p className="text-sm font-black ui-text">
+                      <p className="text-sm font-bold ui-text">
                         {selectedStore?.name ||
                           (isId ? 'Usaha baru' : 'New business')}
                       </p>
                       <p className="mt-1 text-sm leading-6 ui-text-soft">
                         {selectedStore
                           ? [selectedStore.city, selectedStore.address]
-                              .filter(Boolean)
-                              .join(' - ')
+                            .filter(Boolean)
+                            .join(' - ')
                           : isId
                             ? 'Setelah data inti tersimpan, ringkasan dan saran langkah berikutnya akan muncul di sini.'
                             : 'After the core data is saved, the summary and next-step hints appear here.'}
@@ -8181,7 +8179,7 @@ export function UmkmHubClient({
                 <>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.22em] ui-accent-text">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] ui-accent-text">
                         {isOverviewWorkspace
                           ? isId
                             ? 'Area kerja'
@@ -8196,7 +8194,7 @@ export function UmkmHubClient({
                         </p>
                       ) : (
                         <>
-                          <h2 className="mt-1 text-lg font-black ui-text">
+                          <h2 className="mt-1 text-lg font-bold ui-text">
                             {isId
                               ? 'Kerjakan yang penting dulu'
                               : 'Do the main task first'}
@@ -8249,10 +8247,10 @@ export function UmkmHubClient({
               <div className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,244,235,0.94))] p-4 shadow-[0_18px_32px_-28px_rgba(15,23,42,0.18)] sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="max-w-3xl">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[color:var(--app-accent)]/72">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[color:var(--app-accent)]/72">
                       {isId ? 'Alur setup ringkas' : 'Simple setup flow'}
                     </p>
-                    <h3 className="mt-1 text-[1.02rem] font-black text-[color:var(--app-text)] sm:text-[1.18rem]">
+                    <h3 className="mt-1 text-[1.02rem] font-bold text-[color:var(--app-text)] sm:text-[1.18rem]">
                       {isId
                         ? `Pilih satu langkah untuk ${selectedStore.name}`
                         : `Pick one step for ${selectedStore.name}`}
@@ -8291,12 +8289,12 @@ export function UmkmHubClient({
                           )}
                         >
                           <span className="flex min-w-0 items-center justify-between gap-2">
-                            <span className="truncate text-[10px] font-black uppercase tracking-[0.12em]">
+                            <span className="truncate text-[10px] font-bold uppercase tracking-[0.12em]">
                               {step.stepLabel}
                             </span>
                             <StepIcon className="h-4 w-4 shrink-0" />
                           </span>
-                          <span className="mt-2 truncate text-[12px] font-black">
+                          <span className="mt-2 truncate text-[12px] font-bold">
                             {step.title}
                           </span>
                         </Link>
@@ -8314,12 +8312,12 @@ export function UmkmHubClient({
                           aria-current={active ? 'step' : undefined}
                         >
                           <span className="flex min-w-0 items-center justify-between gap-2">
-                            <span className="truncate text-[10px] font-black uppercase tracking-[0.12em]">
+                            <span className="truncate text-[10px] font-bold uppercase tracking-[0.12em]">
                               {step.stepLabel}
                             </span>
                             <StepIcon className="h-4 w-4 shrink-0" />
                           </span>
-                          <span className="mt-2 truncate text-[12px] font-black">
+                          <span className="mt-2 truncate text-[12px] font-bold">
                             {step.title}
                           </span>
                         </button>
@@ -8336,7 +8334,7 @@ export function UmkmHubClient({
                           </span>
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                 {activeSetupDetailStepMeta.stepLabel}
                               </span>
                               <InlineBadge
@@ -8345,7 +8343,7 @@ export function UmkmHubClient({
                                 {activeSetupDetailStepMeta.badge}
                               </InlineBadge>
                             </div>
-                            <p className="mt-1 text-[15px] font-black text-[color:var(--app-text)]">
+                            <p className="mt-1 text-[15px] font-bold text-[color:var(--app-text)]">
                               {activeSetupDetailStepMeta.title}
                             </p>
                             <p className="mt-1 max-w-2xl text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -8401,7 +8399,7 @@ export function UmkmHubClient({
                 <div className="rounded-[22px] border border-slate-200/80 bg-white px-4 py-4 shadow-[0_16px_28px_-24px_rgba(15,23,42,0.16)] dark:border-slate-800/80 dark:bg-slate-950">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                         {isId ? 'Prioritas sekarang' : 'Priority now'}
                       </p>
                       <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -8428,7 +8426,7 @@ export function UmkmHubClient({
                   </div>
 
                   <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3.5 py-3">
-                    <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                    <p className="text-[13px] font-bold text-[color:var(--app-accent)]">
                       {ownerAlerts[0]?.title ||
                         (isId
                           ? 'Setup inti sudah aman'
@@ -8453,7 +8451,7 @@ export function UmkmHubClient({
                 </div>
 
                 <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/92 px-4 py-4 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.16)] dark:border-slate-800/80 dark:bg-slate-900/72">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                     {isId ? 'Jalur cepat' : 'Quick links'}
                   </p>
                   <div className="mt-3 space-y-2">
@@ -8486,16 +8484,16 @@ export function UmkmHubClient({
           ) : null}
 
           {!isOverviewWorkspace &&
-          currentWorkspace !== 'setup' &&
-          !useSimpleWorkspaceShell ? (
+            currentWorkspace !== 'setup' &&
+            !useSimpleWorkspaceShell ? (
             <div className="mt-3 rounded-[20px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] px-3.5 py-3.5">
               {selectedStore && !isSetupCreateView ? (
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] ui-accent-text">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] ui-accent-text">
                       {isId ? 'Usaha yang lagi dipakai' : 'Active business'}
                     </p>
-                    <h2 className="mt-2 text-lg font-black ui-text">
+                    <h2 className="mt-2 text-lg font-bold ui-text">
                       {selectedStore.name}
                     </h2>
                     <p className="mt-1 text-sm leading-6 ui-text-soft">
@@ -8660,10 +8658,10 @@ export function UmkmHubClient({
                           <div className="space-y-4">
                             <div className="rounded-3xl border border-[color:var(--app-accent-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,237,0.96))] p-4 sm:p-5 text-[color:var(--app-accent)] shadow-sm">
                               <div className="max-w-2xl">
-                                <p className="text-xs font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                   {isId ? 'Biar lebih siap mulai' : 'So the first step feels safer'}
                                 </p>
-                                <h3 className="mt-2 text-lg font-black leading-tight text-[color:var(--app-accent)] sm:text-[1.15rem]">
+                                <h3 className="mt-2 text-lg font-bold leading-tight text-[color:var(--app-accent)] sm:text-[1.15rem]">
                                   {isId
                                     ? 'Mulai dari yang paling penting dulu'
                                     : 'Start from the most important things first'}
@@ -8681,7 +8679,7 @@ export function UmkmHubClient({
                                     key={note.title}
                                     className="rounded-2xl border border-[color:var(--app-accent-border)] bg-white px-4 py-3"
                                   >
-                                    <p className="text-sm font-black text-[color:var(--app-accent)]">
+                                    <p className="text-sm font-bold text-[color:var(--app-accent)]">
                                       {note.title}
                                     </p>
                                     <p className="mt-1 text-sm leading-6 text-[color:var(--app-accent)]/76">
@@ -8695,7 +8693,7 @@ export function UmkmHubClient({
                             <div className="rounded-3xl border border-[color:var(--app-accent-border)] bg-white p-4 sm:p-5 text-[color:var(--app-accent)]">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0">
-                                  <p className="text-xs font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                     {isId ? 'Contoh usaha yang bisa ditiru' : 'Quick playbooks'}
                                   </p>
                                   <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/76">
@@ -8731,10 +8729,10 @@ export function UmkmHubClient({
                           <div className="space-y-4">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
-                                <p className="text-xs font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                   {isId ? 'Mulai dari kebutuhan nyata' : 'Start from the clearest need'}
                                 </p>
-                                <h3 className="mt-2 text-lg font-black leading-tight text-[color:var(--app-accent)] sm:text-[1.15rem]">
+                                <h3 className="mt-2 text-lg font-bold leading-tight text-[color:var(--app-accent)] sm:text-[1.15rem]">
                                   {isId
                                     ? 'Cari partner, lokasi, atau bantuan yang paling dibutuhkan'
                                     : 'Find the partners, location, or support you need first'}
@@ -8770,7 +8768,7 @@ export function UmkmHubClient({
                                       </InlineBadge>
                                     </div>
 
-                                    <p className="mt-3 text-sm font-black text-[color:var(--app-accent)]">
+                                    <p className="mt-3 text-sm font-bold text-[color:var(--app-accent)]">
                                       {card.title}
                                     </p>
 
@@ -8779,7 +8777,7 @@ export function UmkmHubClient({
                                     </p>
 
                                     <div className="mt-3 rounded-2xl border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-3">
-                                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                         {isId ? 'Contoh pencarian' : 'Search query idea'}
                                       </p>
                                       <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/82 break-words">
@@ -8808,7 +8806,7 @@ export function UmkmHubClient({
                             </div>
 
                             <div className="rounded-3xl border border-[color:var(--app-accent-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,237,0.96))] p-4 sm:p-5 text-[color:var(--app-accent)] shadow-sm">
-                              <p className="text-xs font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                 {isId ? 'Biar owner lebih tenang' : 'So the owner feels safer'}
                               </p>
                               <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/78">
@@ -8877,17 +8875,17 @@ export function UmkmHubClient({
                             className={cn(
                               manageFormHeroClass,
                               useSimpleSetupCreateLayout &&
-                                'rounded-[18px] px-3 py-3 sm:px-3.5 sm:py-3.5',
+                              'rounded-[18px] px-3 py-3 sm:px-3.5 sm:py-3.5',
                             )}
                           >
                             <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-emerald-200/50 blur-3xl dark:bg-emerald-400/10" />
                             <div className="pointer-events-none absolute -bottom-16 -left-12 h-28 w-28 rounded-full bg-sky-200/42 blur-3xl dark:bg-sky-400/10" />
                             <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
                               <div className="relative max-w-3xl">
-                                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[color:var(--app-accent)]/68">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[color:var(--app-accent)]/68">
                                   {storeRegistrationCopy.sectionTitle}
                                 </p>
-                                <h4 className="mt-1 text-[1.05rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.25rem]">
+                                <h4 className="mt-1 text-[1.05rem] font-bold leading-tight text-[color:var(--app-text)] sm:text-[1.25rem]">
                                   {isId
                                     ? 'Lengkapi data inti'
                                     : 'Complete the core data'}
@@ -8923,10 +8921,10 @@ export function UmkmHubClient({
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/62">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/62">
                                       {isId ? 'Sekarang' : 'Now'}
                                     </p>
-                                    <p className="mt-1 text-[13px] font-black text-[color:var(--app-text)]">
+                                    <p className="mt-1 text-[13px] font-bold text-[color:var(--app-text)]">
                                       {currentStoreCreateStep.title}
                                     </p>
                                   </div>
@@ -9031,7 +9029,7 @@ export function UmkmHubClient({
                           {!useSimpleSetupCreateLayout ? (
                             <div className={manageSectionBlockClass}>
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/68">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]/68">
                                   {isId ? 'Urutan isi' : 'Fill order'}
                                 </p>
                                 <InlineBadge
@@ -9095,7 +9093,7 @@ export function UmkmHubClient({
                                           index + 1
                                         )}
                                       </span>
-                                      <span className="whitespace-nowrap text-[11px] font-black text-[color:var(--app-text)]">
+                                      <span className="whitespace-nowrap text-[11px] font-bold text-[color:var(--app-text)]">
                                         {step.title}
                                       </span>
                                     </button>
@@ -9104,7 +9102,7 @@ export function UmkmHubClient({
                               </div>
 
                               <div className={cn(manageInfoCardClass, 'mt-2')}>
-                                <p className="text-[11px] font-black">
+                                <p className="text-[11px] font-bold">
                                   {isId
                                     ? `Fokus ke ${currentStoreCreateStep.title.toLowerCase()} aja dulu.`
                                     : `Focus on ${currentStoreCreateStep.title.toLowerCase()} only for now.`}
@@ -9126,7 +9124,7 @@ export function UmkmHubClient({
                               >
                                 <div className="flex min-w-0 items-center justify-between gap-2">
                                   <div className="min-w-0">
-                                    <p className="truncate text-[13px] font-black text-[color:var(--app-text)]">
+                                    <p className="truncate text-[13px] font-bold text-[color:var(--app-text)]">
                                       {isId
                                         ? 'Mulai cepat, isi yang penting saja.'
                                         : 'Quick start. Fill only what matters.'}
@@ -9149,7 +9147,7 @@ export function UmkmHubClient({
                                 <div className={manageStorePanelClass}>
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                         {storeRegistrationCopy.modelLabel}
                                       </p>
                                       <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
@@ -9207,13 +9205,13 @@ export function UmkmHubClient({
                                               ) : null}
                                             </span>
                                             <span className="mt-2 min-w-0">
-                                              <span className="line-clamp-2 text-[12px] font-black leading-4 text-[color:var(--app-text)]">
+                                              <span className="line-clamp-2 text-[12px] font-bold leading-4 text-[color:var(--app-text)]">
                                                 {option.title}
                                               </span>
                                               <span className="mt-1 line-clamp-2 text-[10px] leading-4 text-[color:var(--app-text-soft)]">
                                                 {option.desc}
                                               </span>
-                                              <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-[color:var(--app-accent)]">
+                                              <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-accent)]">
                                                 {option.badge}
                                               </span>
                                             </span>
@@ -9290,8 +9288,8 @@ export function UmkmHubClient({
                                     )}
                                   </SelectInput>
                                   {!isGuidedStoreSetup ||
-                                  showStoreBusinessFocus ||
-                                  storeForm.business_focus.trim().length > 0 ? (
+                                    showStoreBusinessFocus ||
+                                    storeForm.business_focus.trim().length > 0 ? (
                                     <TextInput
                                       label={
                                         isId
@@ -9315,8 +9313,8 @@ export function UmkmHubClient({
                                 </div>
 
                                 {isGuidedStoreSetup &&
-                                !showStoreBusinessFocus &&
-                                storeForm.business_focus.trim().length === 0 ? (
+                                  !showStoreBusinessFocus &&
+                                  storeForm.business_focus.trim().length === 0 ? (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -9329,7 +9327,7 @@ export function UmkmHubClient({
                                 ) : null}
 
                                 <div className={manageStoreSoftPanelClass}>
-                                  <p className="font-black text-[color:var(--app-accent)]">
+                                  <p className="font-bold text-[color:var(--app-accent)]">
                                     {getUmkmBusinessCategoryLabel(
                                       storeForm.business_category,
                                       isId,
@@ -9348,7 +9346,7 @@ export function UmkmHubClient({
                             {storeCreateStep === 'identity' ? (
                               <>
                                 <div className={manageStorePanelClass}>
-                                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                     {isGuidedStoreSetup
                                       ? isId
                                         ? 'Profil usaha'
@@ -9401,10 +9399,10 @@ export function UmkmHubClient({
                                               <Icon className="h-3.5 w-3.5" />
                                             </span>
                                             <span className="min-w-0">
-                                              <span className="line-clamp-2 text-[11px] font-black leading-4 text-[color:var(--app-text)]">
+                                              <span className="line-clamp-2 text-[11px] font-bold leading-4 text-[color:var(--app-text)]">
                                                 {option.title}
                                               </span>
-                                              <span className="mt-0.5 block truncate text-[9px] font-black uppercase tracking-[0.08em] text-[color:var(--app-accent)]">
+                                              <span className="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-[0.08em] text-[color:var(--app-accent)]">
                                                 {option.badge}
                                               </span>
                                             </span>
@@ -9417,7 +9415,7 @@ export function UmkmHubClient({
                                     className={cn(
                                       'mt-3 grid gap-3 sm:grid-cols-2',
                                       useSimpleSetupCreateLayout &&
-                                        '[&>*:last-child]:sm:col-span-2',
+                                      '[&>*:last-child]:sm:col-span-2',
                                     )}
                                   >
                                     <TextInput
@@ -9510,7 +9508,7 @@ export function UmkmHubClient({
                                   <div className="mt-3 rounded-[18px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] p-3">
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                       <div className="min-w-0">
-                                        <p className="text-[12px] font-black text-[color:var(--app-accent)]">
+                                        <p className="text-[12px] font-bold text-[color:var(--app-accent)]">
                                           {isId
                                             ? 'Foto usaha'
                                             : 'Business photo'}
@@ -9527,7 +9525,7 @@ export function UmkmHubClient({
                                       </div>
                                       <label className="ui-button-secondary ui-button-compact inline-flex cursor-pointer items-center justify-center gap-2 px-3 text-xs font-bold">
                                         {uploadingKey ===
-                                        'new_store_photo_url' ? (
+                                          'new_store_photo_url' ? (
                                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                         ) : (
                                           <UploadCloud className="h-3.5 w-3.5" />
@@ -9571,8 +9569,8 @@ export function UmkmHubClient({
                                     ) : null}
                                   </div>
                                   {storeSuggestedBaseAddress &&
-                                  normalizeSingleLineInput(storeForm.address)
-                                    .length < 3 ? (
+                                    normalizeSingleLineInput(storeForm.address)
+                                      .length < 3 ? (
                                     <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] px-4 py-3">
                                       <p className="text-xs leading-5 text-[color:var(--app-accent)]/74">
                                         {isId
@@ -9598,7 +9596,7 @@ export function UmkmHubClient({
                               <div className="rounded-[20px] border border-emerald-100/90 bg-[linear-gradient(135deg,#ecfdf5_0%,#ffffff_72%)] px-3 py-3 text-[color:var(--app-accent)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.24)] dark:border-emerald-400/14 dark:bg-[linear-gradient(135deg,rgba(6,78,59,0.2),rgba(2,6,23,0.94))] sm:px-4 sm:py-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
                                       {isGuidedStoreSetup
                                         ? isId
                                           ? 'Cek sebelum disimpan'
@@ -9634,10 +9632,10 @@ export function UmkmHubClient({
                                       key={card.label}
                                       className="rounded-[16px] border border-emerald-100/90 bg-white px-3 py-2.5 shadow-[0_10px_20px_-22px_rgba(15,23,42,0.16)] dark:border-emerald-400/14 dark:bg-slate-950/76"
                                     >
-                                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/62">
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/62">
                                         {card.label}
                                       </p>
-                                      <p className="mt-1 line-clamp-2 text-[12px] font-black leading-4 text-[color:var(--app-text)]">
+                                      <p className="mt-1 line-clamp-2 text-[12px] font-bold leading-4 text-[color:var(--app-text)]">
                                         {card.value ||
                                           (isId ? 'Belum diisi' : 'Not filled')}
                                       </p>
@@ -9648,7 +9646,7 @@ export function UmkmHubClient({
                                 {isGuidedStoreSetup ? (
                                   <>
                                     <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white px-3 py-3">
-                                      <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                                      <p className="text-[13px] font-bold text-[color:var(--app-accent)]">
                                         {isId
                                           ? 'Fitur awal yang aktif'
                                           : 'Starts enabled'}
@@ -9676,7 +9674,7 @@ export function UmkmHubClient({
 
                                     {storeTablePlanningAvailable ? (
                                       <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-white px-3 py-3">
-                                        <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                                        <p className="text-[13px] font-bold text-[color:var(--app-accent)]">
                                           {isId
                                             ? 'Usaha ini pakai meja?'
                                             : 'Use tables?'}
@@ -9763,7 +9761,7 @@ export function UmkmHubClient({
                                 ) : null}
 
                                 {!isGuidedStoreSetup ||
-                                showDetailedStoreOperations ? (
+                                  showDetailedStoreOperations ? (
                                   <>
                                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                                       {storePrimaryCapabilities
@@ -9794,7 +9792,7 @@ export function UmkmHubClient({
                                     </div>
 
                                     <div className="mt-4">
-                                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
+                                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
                                         {isId
                                           ? 'Fitur yang dipakai usaha ini'
                                           : 'Relevant capabilities'}
@@ -9860,7 +9858,7 @@ export function UmkmHubClient({
 
                                         {showAdvancedStoreCapabilities ? (
                                           <div className="mt-3 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                                            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                               {isId
                                                 ? 'Opsi tambahan untuk usaha hybrid'
                                                 : 'Extra options for hybrid businesses'}
@@ -9912,15 +9910,15 @@ export function UmkmHubClient({
                             ) : null}
 
                             {storeCreateStep === 'identity' &&
-                            (!isGuidedStoreSetup ||
-                              showOptionalStoreIdentity ||
-                              storeForm.phone.trim().length > 0 ||
-                              storeForm.description.trim().length > 0) ? (
+                              (!isGuidedStoreSetup ||
+                                showOptionalStoreIdentity ||
+                                storeForm.phone.trim().length > 0 ||
+                                storeForm.description.trim().length > 0) ? (
                               <>
                                 <div className={manageStorePanelClass}>
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
-                                      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                         {isId
                                           ? 'WhatsApp & cerita singkat'
                                           : 'Additional info'}
@@ -9983,10 +9981,10 @@ export function UmkmHubClient({
                             ) : null}
 
                             {storeCreateStep === 'identity' &&
-                            isGuidedStoreSetup &&
-                            !showOptionalStoreIdentity &&
-                            storeForm.phone.trim().length === 0 &&
-                            storeForm.description.trim().length === 0 ? (
+                              isGuidedStoreSetup &&
+                              !showOptionalStoreIdentity &&
+                              storeForm.phone.trim().length === 0 &&
+                              storeForm.description.trim().length === 0 ? (
                               <button
                                 type="button"
                                 onClick={() =>
@@ -10001,7 +9999,7 @@ export function UmkmHubClient({
                             ) : null}
 
                             {storeCreateStep === 'location' &&
-                            storeRegistrationCopy.locationHint ? (
+                              storeRegistrationCopy.locationHint ? (
                               <div className={manageStoreSoftPanelClass}>
                                 {storeRegistrationCopy.locationHint}
                               </div>
@@ -10011,7 +10009,7 @@ export function UmkmHubClient({
                               <div className={manageStorePanelClass}>
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                       {isId
                                         ? 'Cara jualan / layanan'
                                         : 'Location pattern'}
@@ -10071,7 +10069,7 @@ export function UmkmHubClient({
                                                 <ArrowRightLeft className="h-4 w-4" />
                                               )}
                                             </span>
-                                            <p className="mt-2 text-[13px] font-black text-[color:var(--app-accent)]">
+                                            <p className="mt-2 text-[13px] font-bold text-[color:var(--app-accent)]">
                                               {getUmkmLocationModeLabel(
                                                 mode,
                                                 isId,
@@ -10104,7 +10102,7 @@ export function UmkmHubClient({
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
                                       {storeForm.location_mode === 'mobile'
                                         ? isId
                                           ? 'Tandai base / area awal'
@@ -10179,8 +10177,8 @@ export function UmkmHubClient({
 
                             {storeCreateStep === 'operations' ? (
                               storeSupportsTables &&
-                              (!isGuidedStoreSetup ||
-                                showDetailedStoreOperations) ? (
+                                (!isGuidedStoreSetup ||
+                                  showDetailedStoreOperations) ? (
                                 <div className="grid gap-4 sm:grid-cols-3">
                                   <TextInput
                                     label={
@@ -10228,7 +10226,7 @@ export function UmkmHubClient({
                               ) : null
                             ) : null}
 
-                            <div className="sticky bottom-2 z-20 rounded-[20px] border border-emerald-100/90 bg-white/96 px-3 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.44)] backdrop-blur dark:border-emerald-400/14 dark:bg-slate-950/92 sm:px-4">
+                            <div className="sticky bottom-2 z-20 rounded-[20px] border border-emerald-100/90 bg-white/96 px-3 py-3 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.44)]  dark:border-emerald-400/14 dark:bg-slate-950/92 sm:px-4">
                               <div
                                 className={cn(
                                   'flex gap-3',
@@ -10239,7 +10237,7 @@ export function UmkmHubClient({
                               >
                                 {!useSimpleSetupCreateLayout ? (
                                   <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
                                       {isId ? 'Aksi' : 'Action'}
                                     </p>
                                     <p className="mt-1.5 text-[12px] leading-5 text-[color:var(--app-accent)]/76">
@@ -10254,12 +10252,12 @@ export function UmkmHubClient({
                                   </div>
                                 ) : (
                                   <div className="min-w-0">
-                                    <p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
+                                    <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/72">
                                       {isId
                                         ? `Langkah ${storeCreateStepIndex + 1} dari ${STORE_CREATE_STEP_ORDER.length}`
                                         : `Step ${storeCreateStepIndex + 1} of ${STORE_CREATE_STEP_ORDER.length}`}
                                     </p>
-                                    <p className="mt-0.5 truncate text-[12px] font-black text-[color:var(--app-text)]">
+                                    <p className="mt-0.5 truncate text-[12px] font-bold text-[color:var(--app-text)]">
                                       {currentStoreCreateStep.title}
                                     </p>
                                   </div>
@@ -10349,7 +10347,7 @@ export function UmkmHubClient({
                     >
                       {myStores.length === 0 ? (
                         <div className="rounded-[28px] border border-dashed border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,244,235,0.92))] px-4 py-7 text-sm ui-text-soft sm:px-5">
-                          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                             {isId
                               ? 'Mulai workspace owner'
                               : 'Start the owner workspace'}
@@ -10383,12 +10381,12 @@ export function UmkmHubClient({
                           <div className="rounded-[28px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,244,235,0.94))] p-4 shadow-[0_18px_36px_-28px_rgba(15,23,42,0.18)] sm:p-5">
                             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                               <div className="max-w-3xl">
-                                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[color:var(--app-accent)]/72">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[color:var(--app-accent)]/72">
                                   {isId
                                     ? 'Control center owner'
                                     : 'Owner control center'}
                                 </p>
-                                <h4 className="mt-1 text-[1.05rem] font-black leading-tight text-[color:var(--app-text)] sm:text-[1.25rem]">
+                                <h4 className="mt-1 text-[1.05rem] font-bold leading-tight text-[color:var(--app-text)] sm:text-[1.25rem]">
                                   {isId
                                     ? 'Pilih usaha yang mau diberesin sekarang'
                                     : 'Pick the business you want to work on right now'}
@@ -10405,10 +10403,10 @@ export function UmkmHubClient({
                               </div>
 
                               <div className="w-full rounded-[22px] border border-white/70 bg-white/92 px-4 py-3 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.18)] xl:max-w-[300px]">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]/72">
                                   {isId ? 'Fokus owner' : 'Owner focus'}
                                 </p>
-                                <p className="mt-1.5 text-[13px] font-black text-[color:var(--app-text)]">
+                                <p className="mt-1.5 text-[13px] font-bold text-[color:var(--app-text)]">
                                   {selectedStoreInsight
                                     ? selectedStoreInsight.nextActionLabel
                                     : isId
@@ -10504,7 +10502,7 @@ export function UmkmHubClient({
                                       <span>{option.label}</span>
                                       <span
                                         className={cn(
-                                          'inline-flex h-6 min-w-[1.8rem] items-center justify-center rounded-full px-2 text-[10px] font-black',
+                                          'inline-flex h-6 min-w-[1.8rem] items-center justify-center rounded-full px-2 text-[10px] font-bold',
                                           active
                                             ? 'bg-[color:var(--app-accent)] text-white'
                                             : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)]',
@@ -10525,17 +10523,17 @@ export function UmkmHubClient({
                               <div className="mt-4 flex flex-wrap gap-2">
                                 {(hasStoreListQuery ||
                                   storeListFilter !== 'all') && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setStoreListQuery('');
-                                      setStoreListFilter('all');
-                                    }}
-                                    className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
-                                  >
-                                    {isId ? 'Reset pencarian' : 'Reset search'}
-                                  </button>
-                                )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setStoreListQuery('');
+                                        setStoreListFilter('all');
+                                      }}
+                                      className="ui-button-secondary ui-button-compact inline-flex px-4 text-sm font-semibold"
+                                    >
+                                      {isId ? 'Reset pencarian' : 'Reset search'}
+                                    </button>
+                                  )}
                                 <Link
                                   href={buildSetupHref('create')}
                                   className="ui-button-primary ui-button-compact inline-flex px-4 text-sm font-semibold"
@@ -10603,9 +10601,9 @@ export function UmkmHubClient({
                 ) : null}
 
                 {selectedStore &&
-                currentWorkspace !== 'setup' &&
-                !useSimpleOverviewLayout &&
-                !useSimpleWorkspaceShell ? (
+                  currentWorkspace !== 'setup' &&
+                  !useSimpleOverviewLayout &&
+                  !useSimpleWorkspaceShell ? (
                   <>
                     <SectionCard
                       title={
@@ -10712,10 +10710,10 @@ export function UmkmHubClient({
                       <div className="mt-5 grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
                         {nextOwnerStep ? (
                           <div className="rounded-[30px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,244,235,0.94))] px-5 py-5 text-[color:var(--app-accent)] shadow-sm">
-                            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                               {isId ? 'Mulai dari sini' : 'Start here'}
                             </p>
-                            <h4 className="mt-2 text-lg font-black text-[color:var(--app-accent)]">
+                            <h4 className="mt-2 text-lg font-bold text-[color:var(--app-accent)]">
                               {nextOwnerStep.label}
                             </h4>
                             <p className="mt-1 text-sm text-[color:var(--app-accent)]/80">
@@ -10726,7 +10724,7 @@ export function UmkmHubClient({
                               onClick={() =>
                                 scrollToSection(nextOwnerStep.target)
                               }
-                              className="mt-4 inline-flex min-h-[42px] items-center gap-2 rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-sm font-black text-white"
+                              className="mt-4 inline-flex min-h-[42px] items-center gap-2 rounded-2xl border border-[color:var(--app-accent)] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-white"
                             >
                               <ArrowRightLeft className="h-4 w-4" />
                               {isId ? 'Buka' : 'Open'}
@@ -10737,7 +10735,7 @@ export function UmkmHubClient({
                         <div className="rounded-[30px] border border-[color:var(--app-accent-border)] bg-white px-5 py-5 shadow-sm">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                 {isId ? 'Cek dulu' : 'Check first'}
                               </p>
                               <p className="mt-2 text-sm text-[color:var(--app-accent)]/78">
@@ -10783,7 +10781,7 @@ export function UmkmHubClient({
                                         <AlertIcon className="h-4 w-4 text-[color:var(--app-accent)]" />
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="text-sm font-black text-[color:var(--app-accent)]">
+                                        <p className="text-sm font-bold text-[color:var(--app-accent)]">
                                           {alert.title}
                                         </p>
                                         <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
@@ -10805,7 +10803,7 @@ export function UmkmHubClient({
                       <div className="mt-5">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                               {isId ? 'Mode kerja' : 'Work modes'}
                             </p>
                             <p className="mt-2 text-sm text-[color:var(--app-accent)]/78">
@@ -10837,7 +10835,7 @@ export function UmkmHubClient({
                       <div className="mt-5">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                               {isId ? 'Link & QR' : 'Links & QR'}
                             </p>
                             <p className="mt-2 text-sm text-[color:var(--app-accent)]/78">
@@ -10895,7 +10893,7 @@ export function UmkmHubClient({
                       <div className="mt-5 grid gap-5 xl:grid-cols-[330px_minmax(0,1fr)]">
                         <div className="space-y-4">
                           <div className="rounded-[28px] border border-[color:var(--app-accent-border)] bg-white p-4 text-[color:var(--app-accent)] shadow-sm">
-                            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
                               {isId ? 'Link toko' : 'Store link'}
                             </p>
                             <p className="mt-2 break-all text-sm text-[color:var(--app-accent)]">
@@ -10916,7 +10914,7 @@ export function UmkmHubClient({
 
                           {onlineQr ? (
                             <div className="rounded-[28px] border border-[color:var(--app-accent-border)] bg-white p-4 text-[color:var(--app-accent)] shadow-sm">
-                              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]">
                                 {isId ? 'QR online' : 'Online QR'}
                               </p>
                               <p className="mt-2 break-all text-sm text-[color:var(--app-accent)]">
@@ -10968,7 +10966,7 @@ export function UmkmHubClient({
                       </div>
                     </SectionCard>
                     {isSetupDetailView &&
-                    activeSetupDetailStep === 'summary' ? (
+                      activeSetupDetailStep === 'summary' ? (
                       <SectionCard
                         id="umkm-setup-summary"
                         title={
@@ -11052,7 +11050,7 @@ export function UmkmHubClient({
                                     <AlertIcon className="h-4 w-4 text-[color:var(--app-accent)]" />
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="text-[13px] font-black text-[color:var(--app-accent)]">
+                                    <p className="text-[13px] font-bold text-[color:var(--app-accent)]">
                                       {alert.title}
                                     </p>
                                     <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-accent)]/76">
@@ -11178,7 +11176,7 @@ export function UmkmHubClient({
                             <div className="rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-surface)] p-4">
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="min-w-0">
-                                  <p className="text-sm font-black text-[color:var(--app-accent)]">
+                                  <p className="text-sm font-bold text-[color:var(--app-accent)]">
                                     {isId ? 'Foto usaha' : 'Business photo'}
                                   </p>
                                   <p className="mt-0.5 truncate text-xs text-[color:var(--app-accent)]/72">
@@ -11260,12 +11258,12 @@ export function UmkmHubClient({
                           <div className="rounded-[30px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,237,0.96))] p-5 text-[color:var(--app-accent)] shadow-sm">
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div>
-                                <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
                                   {isId
                                     ? 'Flow owner multi usaha'
                                     : 'Multi-business owner flow'}
                                 </p>
-                                <h4 className="mt-3 text-lg font-black">
+                                <h4 className="mt-3 text-lg font-bold">
                                   {isId
                                     ? 'Edit outlet ini tanpa ganggu usaha lain'
                                     : 'Edit this outlet without affecting the others'}
@@ -11284,10 +11282,10 @@ export function UmkmHubClient({
 
                             <div className="mt-4 grid gap-3 sm:grid-cols-2">
                               <div className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/74">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/74">
                                   {isId ? 'Outlet aktif' : 'Active outlet'}
                                 </p>
-                                <p className="mt-2 text-sm font-black">
+                                <p className="mt-2 text-sm font-bold">
                                   {selectedStore.name}
                                 </p>
                                 <p className="mt-2 text-xs leading-5 text-[color:var(--app-accent)]/76">
@@ -11297,12 +11295,12 @@ export function UmkmHubClient({
                                 </p>
                               </div>
                               <div className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/74">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/74">
                                   {isId
                                     ? 'Kategori & akses'
                                     : 'Category & access'}
                                 </p>
-                                <p className="mt-2 text-sm font-black">
+                                <p className="mt-2 text-sm font-bold">
                                   {getUmkmBusinessCategoryLabel(
                                     selectedBusinessCategory,
                                     isId,
@@ -11355,7 +11353,7 @@ export function UmkmHubClient({
                     ) : null}
 
                     {isSetupDetailView &&
-                    activeSetupDetailStep === 'recommendations' ? (
+                      activeSetupDetailStep === 'recommendations' ? (
                       <SectionCard
                         id="umkm-start-recommendations"
                         title={
@@ -11397,7 +11395,7 @@ export function UmkmHubClient({
                                         {card.badge}
                                       </InlineBadge>
                                     </div>
-                                    <p className="mt-3 text-sm font-black text-[color:var(--app-accent)]">
+                                    <p className="mt-3 text-sm font-bold text-[color:var(--app-accent)]">
                                       {card.title}
                                     </p>
                                     <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
@@ -11405,7 +11403,7 @@ export function UmkmHubClient({
                                     </p>
 
                                     <div className="mt-3 rounded-[18px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-3">
-                                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                         {isId
                                           ? 'Cari via search'
                                           : 'Search through the marketplace'}
@@ -11462,7 +11460,7 @@ export function UmkmHubClient({
                             </div>
 
                             <div className="rounded-[28px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,237,0.96))] p-5 text-[color:var(--app-accent)] shadow-sm">
-                              <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
                                 {isId
                                   ? 'Supaya owner merasa aman'
                                   : 'So the owner feels safer'}
@@ -11473,7 +11471,7 @@ export function UmkmHubClient({
                                     key={note.title}
                                     className="rounded-[20px] border border-[color:var(--app-accent-border)] bg-white px-4 py-3"
                                   >
-                                    <p className="text-sm font-black">
+                                    <p className="text-sm font-bold">
                                       {note.title}
                                     </p>
                                     <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
@@ -11484,7 +11482,7 @@ export function UmkmHubClient({
                               </div>
 
                               <div className="mt-4 rounded-[20px] border border-dashed border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/72">
                                   {isId
                                     ? 'Kalau masih ragu'
                                     : 'If it still feels uncertain'}
@@ -11564,7 +11562,7 @@ export function UmkmHubClient({
                         <div className="mt-5 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                           <div className="space-y-4">
                             <div>
-                              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                 {isId ? 'Roster outlet' : 'Outlet roster'}
                               </p>
                               <p className="mt-2 text-sm leading-6 text-[color:var(--app-accent)]/78">
@@ -11590,7 +11588,7 @@ export function UmkmHubClient({
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                          <p className="text-sm font-black text-[color:var(--app-accent)]">
+                                          <p className="text-sm font-bold text-[color:var(--app-accent)]">
                                             {member.name}
                                           </p>
                                           <InlineBadge
@@ -11632,13 +11630,13 @@ export function UmkmHubClient({
                                       </div>
 
                                       {canManageTeam &&
-                                      member.role !== 'owner' ? (
+                                        member.role !== 'owner' ? (
                                         <div className="flex flex-wrap gap-2">
                                           <button
                                             type="button"
                                             disabled={
                                               actingTeamMemberId ===
-                                                member.id ||
+                                              member.id ||
                                               member.status === 'active'
                                             }
                                             onClick={() =>
@@ -11655,7 +11653,7 @@ export function UmkmHubClient({
                                             type="button"
                                             disabled={
                                               actingTeamMemberId ===
-                                                member.id ||
+                                              member.id ||
                                               member.status === 'disabled'
                                             }
                                             onClick={() =>
@@ -11689,12 +11687,12 @@ export function UmkmHubClient({
                           </div>
 
                           <div className="rounded-[30px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,245,237,0.96))] p-5 text-[color:var(--app-accent)] shadow-sm">
-                            <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
                               {isId
                                 ? 'Tambah akses outlet'
                                 : 'Add outlet access'}
                             </p>
-                            <h4 className="mt-3 text-lg font-black">
+                            <h4 className="mt-3 text-lg font-bold">
                               {canManageTeam
                                 ? isId
                                   ? 'Undang admin chat, katalog, atau operasional'
@@ -11839,7 +11837,7 @@ export function UmkmHubClient({
                         <div className="mt-6">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                 {isId
                                   ? 'Blueprint role MVP'
                                   : 'MVP role blueprint'}
@@ -11870,7 +11868,7 @@ export function UmkmHubClient({
                         <div className="mt-5 rounded-[30px] border border-[color:var(--app-accent-border)] bg-[linear-gradient(135deg,rgba(255,249,241,0.92),rgba(255,255,255,0.98))] p-5 text-[color:var(--app-accent)] shadow-sm">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <p className="text-[11px] font-black uppercase tracking-[0.16em]">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
                                 {isId
                                   ? 'Cara pakai MVP sekarang'
                                   : 'How to use this MVP today'}
@@ -11903,7 +11901,7 @@ export function UmkmHubClient({
 
                           <div className="mt-4 grid gap-3 md:grid-cols-3">
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                              <p className="text-sm font-black">
+                              <p className="text-sm font-bold">
                                 {isId ? 'Per outlet dulu' : 'Start per outlet'}
                               </p>
                               <p className="mt-2 text-xs leading-5 text-[color:var(--app-accent)]/76">
@@ -11915,7 +11913,7 @@ export function UmkmHubClient({
                               </p>
                             </div>
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                              <p className="text-sm font-black">
+                              <p className="text-sm font-bold">
                                 {isId
                                   ? 'Bagi berdasarkan ritme kerja'
                                   : 'Split by work rhythm'}
@@ -11931,7 +11929,7 @@ export function UmkmHubClient({
                               </p>
                             </div>
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4">
-                              <p className="text-sm font-black">
+                              <p className="text-sm font-bold">
                                 {isId
                                   ? 'Siapkan role matrix berikutnya'
                                   : 'Prepare the next role matrix'}
@@ -11948,7 +11946,7 @@ export function UmkmHubClient({
                     ) : null}
 
                     {isSetupDetailView &&
-                    activeSetupDetailStep === 'publish' ? (
+                      activeSetupDetailStep === 'publish' ? (
                       <SectionCard
                         id="umkm-verification"
                         title={isId ? 'Profil & publish' : 'Profile & publish'}
@@ -12081,7 +12079,7 @@ export function UmkmHubClient({
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 py-4 text-[color:var(--app-accent)]">
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                  <p className="text-sm font-black">
+                                  <p className="text-sm font-bold">
                                     {isId
                                       ? selectedManageProfile.labelId
                                       : selectedManageProfile.labelEn}
@@ -12098,7 +12096,7 @@ export function UmkmHubClient({
                               </div>
 
                               <div className="mt-4">
-                                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
                                   {isId
                                     ? 'Yang cocok buat usaha ini'
                                     : 'Relevant setup'}
@@ -12214,7 +12212,7 @@ export function UmkmHubClient({
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4 text-[color:var(--app-accent)]">
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                  <p className="text-sm font-black">
+                                  <p className="text-sm font-bold">
                                     {isId
                                       ? 'Mode lokasi & status live'
                                       : 'Location mode & live status'}
@@ -12320,7 +12318,7 @@ export function UmkmHubClient({
 
                               {verificationForm.auto_live_schedule_enabled ? (
                                 <div className="mt-4 rounded-[22px] border border-dashed border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] p-4">
-                                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
+                                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
                                     {isId ? 'Jadwal live' : 'Live schedule'}
                                   </p>
                                   <div className="mt-3 flex flex-wrap gap-2">
@@ -12389,9 +12387,9 @@ export function UmkmHubClient({
                               <div className="mt-4 rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4 text-[color:var(--app-accent)]">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-sm font-black">
+                                    <p className="text-sm font-bold">
                                       {verificationForm.location_mode ===
-                                      'mobile'
+                                        'mobile'
                                         ? isId
                                           ? 'Titik live usaha'
                                           : 'Live business point'
@@ -12426,7 +12424,7 @@ export function UmkmHubClient({
                                     isId={isId}
                                     markerLabel={
                                       verificationForm.location_mode ===
-                                      'mobile'
+                                        'mobile'
                                         ? isId
                                           ? 'Titik live usaha'
                                           : 'Live business point'
@@ -12496,7 +12494,7 @@ export function UmkmHubClient({
                                   <p className="mt-2">{liveLocationMessage}</p>
                                 ) : null}
                                 {verificationForm.location_mode === 'mobile' &&
-                                !canShareLiveLocation ? (
+                                  !canShareLiveLocation ? (
                                   <p className="mt-2">
                                     {isId
                                       ? 'Agar titik bisa ikut bergerak, aktifkan dulu usaha lalu nyalakan status live.'
@@ -12709,7 +12707,7 @@ export function UmkmHubClient({
                             <div className="rounded-[24px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4 text-[color:var(--app-accent)]">
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                  <p className="text-sm font-black">
+                                  <p className="text-sm font-bold">
                                     {isId
                                       ? 'Kebutuhan custom per usaha'
                                       : 'Custom business requirements'}
@@ -12730,7 +12728,7 @@ export function UmkmHubClient({
                                 verificationForm.business_type,
                               ).suggestedCustomFields.length > 0 ? (
                                 <div className="mt-4">
-                                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
+                                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-accent)]/76">
                                     {isId
                                       ? 'Saran praktis'
                                       : 'Quick suggestions'}
@@ -12933,7 +12931,7 @@ export function UmkmHubClient({
                                             </p>
                                           ) : null}
                                           {field.options &&
-                                          field.options.length > 0 ? (
+                                            field.options.length > 0 ? (
                                             <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/72">
                                               {field.options.join(' / ')}
                                             </p>
@@ -13014,7 +13012,7 @@ export function UmkmHubClient({
                               ].map(item => {
                                 const currentValue =
                                   verificationForm[
-                                    item.key as keyof typeof verificationForm
+                                  item.key as keyof typeof verificationForm
                                   ];
 
                                 return (
@@ -13058,7 +13056,7 @@ export function UmkmHubClient({
                                       />
                                     </label>
                                     {typeof currentValue === 'string' &&
-                                    currentValue ? (
+                                      currentValue ? (
                                       <p className="mt-2 break-all text-xs  text-[color:var(--app-accent)]">
                                         {currentValue}
                                       </p>
@@ -13078,12 +13076,12 @@ export function UmkmHubClient({
                           <div className="space-y-4">
                             {canUseFoodChannel ? (
                               <div className="rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-                                <p className="text-[11px] font-black uppercase tracking-[0.16em]  text-[color:var(--app-accent)]">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em]  text-[color:var(--app-accent)]">
                                   {isId
                                     ? 'Kesiapan kanal Food'
                                     : 'Food channel readiness'}
                                 </p>
-                                <p className="mt-2 text-lg font-black  text-[color:var(--app-accent)]">
+                                <p className="mt-2 text-lg font-bold  text-[color:var(--app-accent)]">
                                   {publishReadiness.food.ok
                                     ? isId
                                       ? 'Siap publish'
@@ -13106,12 +13104,12 @@ export function UmkmHubClient({
 
                             {canUseMartChannel ? (
                               <div className="rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-                                <p className="text-[11px] font-black uppercase tracking-[0.16em]  text-[color:var(--app-accent)]">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em]  text-[color:var(--app-accent)]">
                                   {isId
                                     ? 'Kesiapan kanal Mart'
                                     : 'Mart channel readiness'}
                                 </p>
-                                <p className="mt-2 text-lg font-black  text-[color:var(--app-accent)]">
+                                <p className="mt-2 text-lg font-bold  text-[color:var(--app-accent)]">
                                   {publishReadiness.mart.ok
                                     ? isId
                                       ? 'Siap publish'
@@ -13134,10 +13132,10 @@ export function UmkmHubClient({
 
                             {!canUseFoodChannel && !canUseMartChannel ? (
                               <div className="rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4">
-                                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                   {isId ? 'Model publish' : 'Publish model'}
                                 </p>
-                                <p className="mt-2 text-lg font-black text-[color:var(--app-accent)]">
+                                <p className="mt-2 text-lg font-bold text-[color:var(--app-accent)]">
                                   {isId
                                     ? 'Booking / brief dulu'
                                     : 'Booking / brief first'}
@@ -13151,7 +13149,7 @@ export function UmkmHubClient({
                             ) : null}
 
                             <div className="rounded-3xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
-                              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
                                 {isId
                                   ? 'Kanal publish aktif'
                                   : 'Active publish channels'}
@@ -13217,7 +13215,7 @@ export function UmkmHubClient({
                             className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent)] px-4 py-4 text-white shadow-[0_18px_32px_-26px_rgba(15,23,42,0.3)] transition hover:-translate-y-0.5"
                           >
                             <PackagePlus className="h-5 w-5" />
-                            <p className="mt-3 text-sm font-black">
+                            <p className="mt-3 text-sm font-bold">
                               {isId ? 'Tambah jualan' : 'Add listing'}
                             </p>
                             <p className="mt-1 text-xs leading-5 text-white/82">
@@ -13231,7 +13229,7 @@ export function UmkmHubClient({
                             className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4 text-[color:var(--app-accent)] shadow-[0_14px_26px_-24px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5"
                           >
                             <Store className="h-5 w-5" />
-                            <p className="mt-3 text-sm font-black">
+                            <p className="mt-3 text-sm font-bold">
                               {storefrontActionLabel}
                             </p>
                             <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
@@ -13250,7 +13248,7 @@ export function UmkmHubClient({
                             className="rounded-[22px] border border-[color:var(--app-accent-border)] bg-white px-4 py-4 text-left text-[color:var(--app-accent)] shadow-[0_14px_26px_-24px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5"
                           >
                             <CheckCircle2 className="h-5 w-5" />
-                            <p className="mt-3 text-sm font-black">
+                            <p className="mt-3 text-sm font-bold">
                               {isId ? 'Cek ulang' : 'Review again'}
                             </p>
                             <p className="mt-1 text-xs leading-5 text-[color:var(--app-accent)]/76">
@@ -13264,7 +13262,7 @@ export function UmkmHubClient({
                     ) : null}
 
                     {currentWorkspace === 'catalog' ||
-                    currentWorkspace === 'operations' ? (
+                      currentWorkspace === 'operations' ? (
                       <div className="grid gap-6 2xl:grid-cols-2">
                         {currentWorkspace === 'catalog' ? (
                           <SectionCard
@@ -13283,10 +13281,10 @@ export function UmkmHubClient({
                               <div className={manageFormHeroClass}>
                                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                                   <div className="max-w-2xl">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]/68">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]/68">
                                       {isId ? 'Listing cepat' : 'Quick listing'}
                                     </p>
-                                    <h4 className="mt-1.5 text-lg font-black text-[color:var(--app-text)]">
+                                    <h4 className="mt-1.5 text-lg font-bold text-[color:var(--app-text)]">
                                       {isId
                                         ? 'Bikin listing yang cepat dipahami buyer'
                                         : 'Create a listing buyers can understand fast'}
@@ -13333,7 +13331,7 @@ export function UmkmHubClient({
                                                   : 'Fill'}
                                             </InlineBadge>
                                           </div>
-                                          <p className="mt-3 text-[12px] font-black text-[color:var(--app-text)]">
+                                          <p className="mt-3 text-[12px] font-bold text-[color:var(--app-text)]">
                                             {card.title}
                                           </p>
                                           <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -13347,10 +13345,10 @@ export function UmkmHubClient({
                               </div>
 
                               <div className={manageSectionBlockClass}>
-                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
                                   {isId ? 'Inti listing' : 'Listing core'}
                                 </p>
-                                <h5 className="mt-1.5 text-sm font-black text-[color:var(--app-text)]">
+                                <h5 className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
                                   {isId
                                     ? 'Yang buyer lihat duluan'
                                     : 'What buyers see first'}
@@ -13417,12 +13415,12 @@ export function UmkmHubClient({
                                           allow_pickup:
                                             nextKind === 'physical'
                                               ? current.allow_pickup ||
-                                                !current.allow_courier_shipping
+                                              !current.allow_courier_shipping
                                               : false,
                                           allow_courier_shipping:
                                             nextKind === 'physical'
                                               ? current.allow_courier_shipping ||
-                                                !current.allow_pickup
+                                              !current.allow_pickup
                                               : false,
                                         }));
                                       }}
@@ -13463,10 +13461,10 @@ export function UmkmHubClient({
                               </div>
 
                               <div className={manageSectionBlockClass}>
-                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
                                   {isId ? 'Harga & stok' : 'Price and stock'}
                                 </p>
-                                <h5 className="mt-1.5 text-sm font-black text-[color:var(--app-text)]">
+                                <h5 className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
                                   {isId
                                     ? 'Yang bikin buyer cepat ambil keputusan'
                                     : 'What helps buyers decide faster'}
@@ -13562,12 +13560,12 @@ export function UmkmHubClient({
                               </div>
 
                               <div className={manageSectionBlockClass}>
-                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
                                   {isId
                                     ? 'Foto & detail tambahan'
                                     : 'Photo and extra detail'}
                                 </p>
-                                <h5 className="mt-1.5 text-sm font-black text-[color:var(--app-text)]">
+                                <h5 className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
                                   {isId
                                     ? 'Lengkapi kalau memang perlu'
                                     : 'Fill these when they matter'}
@@ -13588,7 +13586,7 @@ export function UmkmHubClient({
                                       }
                                       disabled={
                                         productForm.product_kind !==
-                                          'physical' ||
+                                        'physical' ||
                                         !productForm.allow_courier_shipping
                                       }
                                     />
@@ -13647,12 +13645,12 @@ export function UmkmHubClient({
                               </div>
 
                               <div className={manageSectionBlockClass}>
-                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
                                   {isId
                                     ? 'Kanal & kirim'
                                     : 'Channels and delivery'}
                                 </p>
-                                <h5 className="mt-1.5 text-sm font-black text-[color:var(--app-text)]">
+                                <h5 className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
                                   {isId
                                     ? 'Pilih yang benar-benar aktif'
                                     : 'Choose only the active ones'}
@@ -13782,14 +13780,14 @@ export function UmkmHubClient({
                               </div>
 
                               {listingRequirementFields.length > 0 ||
-                              orderRequirementFields.length > 0 ? (
+                                orderRequirementFields.length > 0 ? (
                                 <div className={manageSectionBlockClass}>
-                                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
+                                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
                                     {isId
                                       ? 'Kebutuhan buyer'
                                       : 'Buyer requirements'}
                                   </p>
-                                  <p className="mt-1.5 text-sm font-black text-[color:var(--app-text)]">
+                                  <p className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
                                     {isId
                                       ? 'Yang ikut terbawa ke listing'
                                       : 'What is carried into the listing'}
@@ -13813,10 +13811,10 @@ export function UmkmHubClient({
                               ) : null}
 
                               <div className={manageFormHeroClass}>
-                                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]/68">
                                   {isId ? 'Preview buyer' : 'Buyer preview'}
                                 </p>
-                                <p className="mt-1.5 text-sm font-black text-[color:var(--app-text)]">
+                                <p className="mt-1.5 text-sm font-bold text-[color:var(--app-text)]">
                                   {isId
                                     ? 'Buyer akan lihat alur sesingkat ini'
                                     : 'This is the flow buyers will see'}
@@ -13832,15 +13830,15 @@ export function UmkmHubClient({
                                       {[
                                         productForm.publish_food
                                           ? getUmkmPublishServiceLabel(
-                                              'food',
-                                              isId,
-                                            )
+                                            'food',
+                                            isId,
+                                          )
                                           : '',
                                         productForm.publish_mart
                                           ? getUmkmPublishServiceLabel(
-                                              'mart',
-                                              isId,
-                                            )
+                                            'mart',
+                                            isId,
+                                          )
                                           : '',
                                       ]
                                         .filter(Boolean)
@@ -13884,20 +13882,20 @@ export function UmkmHubClient({
                                           ? 'Digital / instan'
                                           : 'Digital / instant'
                                         : [
-                                            productForm.allow_pickup
-                                              ? 'Pickup'
-                                              : '',
-                                            productForm.allow_courier_shipping
-                                              ? isId
-                                                ? 'Ekspedisi'
-                                                : 'Courier'
-                                              : '',
-                                          ]
-                                            .filter(Boolean)
-                                            .join(' / ') ||
-                                          (isId
-                                            ? 'Belum valid'
-                                            : 'Not valid yet')}
+                                          productForm.allow_pickup
+                                            ? 'Pickup'
+                                            : '',
+                                          productForm.allow_courier_shipping
+                                            ? isId
+                                              ? 'Ekspedisi'
+                                              : 'Courier'
+                                            : '',
+                                        ]
+                                          .filter(Boolean)
+                                          .join(' / ') ||
+                                        (isId
+                                          ? 'Belum valid'
+                                          : 'Not valid yet')}
                                     </p>
                                   </div>
                                   <div className={manageInfoCardClass}>
@@ -13919,23 +13917,23 @@ export function UmkmHubClient({
                                 </div>
                                 <p className="mt-3 text-[11px] leading-5">
                                   {productForm.product_kind === 'digital' &&
-                                  !productForm.digital_delivery_note.trim()
+                                    !productForm.digital_delivery_note.trim()
                                     ? isId
                                       ? 'Tambahkan catatan kirim digital.'
                                       : 'Add a digital delivery note so buyers know where files, vouchers, or access will be sent.'
                                     : productForm.product_kind === 'physical' &&
-                                        productForm.channel_online &&
-                                        !productForm.allow_pickup &&
-                                        !productForm.allow_courier_shipping
+                                      productForm.channel_online &&
+                                      !productForm.allow_pickup &&
+                                      !productForm.allow_courier_shipping
                                       ? isId
                                         ? 'Produk fisik online belum valid. Aktifkan pickup atau ekspedisi.'
                                         : 'This physical online product is not valid yet. Enable pickup or courier.'
                                       : productForm.product_kind ===
-                                            'physical' &&
-                                          productForm.allow_courier_shipping &&
-                                          !(
-                                            Number(productForm.weight_grams) > 0
-                                          )
+                                        'physical' &&
+                                        productForm.allow_courier_shipping &&
+                                        !(
+                                          Number(productForm.weight_grams) > 0
+                                        )
                                         ? isId
                                           ? 'Isi berat produk untuk hitung ongkir.'
                                           : 'Fill product weight so courier fees can be calculated correctly.'
@@ -14014,11 +14012,10 @@ export function UmkmHubClient({
                         {currentWorkspace === 'operations' ? (
                           <SectionCard
                             id="umkm-tables"
-                            title={`5. ${
-                              isId
+                            title={`5. ${isId
                                 ? selectedManageProfile.operationsTitleId
                                 : selectedManageProfile.operationsTitleEn
-                            }`}
+                              }`}
                             desc={getUmkmOperationsSummary(
                               selectedBusinessCategory,
                               selectedBusinessCapabilities,
@@ -14154,7 +14151,7 @@ export function UmkmHubClient({
                                       className="rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] p-4 border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]"
                                     >
                                       <div className="flex items-center justify-between gap-2">
-                                        <p className="text-sm font-black  text-[color:var(--app-accent)]">
+                                        <p className="text-sm font-bold  text-[color:var(--app-accent)]">
                                           {table.table_code}
                                         </p>
                                         <span
@@ -14299,17 +14296,17 @@ export function UmkmHubClient({
                                 typeof order.metadata.shipping_option ===
                                   'object' && order.metadata.shipping_option
                                   ? (order.metadata.shipping_option as Record<
-                                      string,
-                                      unknown
-                                    >)
+                                    string,
+                                    unknown
+                                  >)
                                   : {};
                               const shippingFeeCents =
                                 typeof order.shipping_fee_cents === 'number'
                                   ? order.shipping_fee_cents
                                   : readMetaNumber(
-                                      order.metadata || {},
-                                      'shipping_fee_cents',
-                                    ) || 0;
+                                    order.metadata || {},
+                                    'shipping_fee_cents',
+                                  ) || 0;
                               const paymentStage =
                                 order.payment_stage ||
                                 (order.payment_status === 'paid'
@@ -14336,7 +14333,7 @@ export function UmkmHubClient({
                                   <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div className="min-w-0">
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <p className="text-sm font-black  text-[color:var(--app-accent)]">
+                                        <p className="text-sm font-bold  text-[color:var(--app-accent)]">
                                           {order.customer_name ||
                                             (order.channel === 'offline'
                                               ? isId
@@ -14404,9 +14401,9 @@ export function UmkmHubClient({
                                   </div>
 
                                   {order.channel === 'online' &&
-                                  (deliveryAddress ||
-                                    (deliveryLat !== null &&
-                                      deliveryLng !== null)) ? (
+                                    (deliveryAddress ||
+                                      (deliveryLat !== null &&
+                                        deliveryLng !== null)) ? (
                                     <div className="mt-3 rounded-2xl border border-[color:var(--app-accent-border)] text-[color:var(--app-accent)] px-3 py-3 text-xs  border-[color:var(--app-accent-border)] border-[color:var(--app-accent-border)] text-[color:var(--app-accent)]">
                                       <p>
                                         {isId ? 'Alamat:' : 'Address:'}{' '}
@@ -14414,7 +14411,7 @@ export function UmkmHubClient({
                                           `${deliveryLat?.toFixed(5)}, ${deliveryLng?.toFixed(5)}`}
                                       </p>
                                       {deliveryLat !== null &&
-                                      deliveryLng !== null ? (
+                                        deliveryLng !== null ? (
                                         <a
                                           href={`https://www.google.com/maps?q=${deliveryLat},${deliveryLng}`}
                                           target="_blank"
@@ -14428,7 +14425,7 @@ export function UmkmHubClient({
                                         </a>
                                       ) : null}
                                       {Object.keys(shippingOption).length >
-                                      0 ? (
+                                        0 ? (
                                         <p className="mt-2">
                                           {isId ? 'Metode:' : 'Mode:'}{' '}
                                           {formatOrderFulfillmentLabel(
@@ -14436,7 +14433,7 @@ export function UmkmHubClient({
                                             isId,
                                           )}
                                           {typeof shippingOption.label ===
-                                          'string'
+                                            'string'
                                             ? ` / ${shippingOption.label}`
                                             : ''}
                                         </p>
@@ -14528,7 +14525,7 @@ export function UmkmHubClient({
                                     </button>
 
                                     {paymentStage ===
-                                    'awaiting_confirmation' ? (
+                                      'awaiting_confirmation' ? (
                                       <button
                                         type="button"
                                         disabled={actingOrderId === order.id}
@@ -14586,7 +14583,7 @@ export function UmkmHubClient({
                                   </div>
 
                                   {order.channel === 'offline' &&
-                                  order.payment_status === 'unpaid' ? (
+                                    order.payment_status === 'unpaid' ? (
                                     <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
                                       <select
                                         value={moveTargets[order.id] || ''}
@@ -14711,7 +14708,7 @@ export function UmkmHubClient({
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <p className="text-sm font-black  text-[color:var(--app-accent)]">
+                                      <p className="text-sm font-bold  text-[color:var(--app-accent)]">
                                         {reservation.customer_name}
                                       </p>
                                       <span

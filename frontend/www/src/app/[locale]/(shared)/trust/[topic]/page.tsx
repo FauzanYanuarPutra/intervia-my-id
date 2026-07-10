@@ -43,7 +43,7 @@ export default async function TrustTopicPage({ params }: PageProps) {
 
       <section className="ui-panel ui-hero-panel rounded-[28px] p-6 sm:p-8">
         <TrustBadge label={pickText(locale, entry.badge)} />
-        <h1 className="mt-4 text-3xl font-black tracking-tight text-[color:var(--app-text)] sm:text-4xl">
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-4xl">
           {title}
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">

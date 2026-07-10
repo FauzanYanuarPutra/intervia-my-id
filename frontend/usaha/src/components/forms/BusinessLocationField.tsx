@@ -209,12 +209,12 @@ export function BusinessLocationField({
     <div className="grid gap-3 rounded-[18px] border border-portal-line/70 bg-portal-sand/20 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-black text-portal-ink">Titik peta</p>
+          <p className="text-sm font-bold text-portal-ink">Titik peta</p>
           <p className="mt-0.5 text-xs leading-5 text-portal-soft">
             Paste link Maps, cari tempat, atau pakai GPS.
           </p>
         </div>
-        <span className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-portal-forest">
+        <span className="rounded-full border border-portal-line/70 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-portal-forest">
           {point ? 'Tersimpan' : 'Opsional'}
         </span>
       </div>

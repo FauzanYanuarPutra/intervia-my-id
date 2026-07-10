@@ -50,10 +50,10 @@ export function SuperAppSnapshot() {
     <section className="ui-panel rounded-[28px] p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
             {isId ? 'Operating system produk' : 'Product operating system'}
           </p>
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)]">
+          <h2 className="mt-2 text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
             {isId ? 'Platform ini tidak boleh hanya kaya fitur' : 'This platform cannot be feature-rich only'}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -72,7 +72,7 @@ export function SuperAppSnapshot() {
       <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => (
           <article key={item.title} className="ui-panel-muted rounded-[22px] p-4">
-            <h3 className="text-sm font-black text-[color:var(--app-text)]">{item.title}</h3>
+            <h3 className="text-sm font-bold text-[color:var(--app-text)]">{item.title}</h3>
             <p className="mt-2 text-xs leading-5 text-[color:var(--app-text-soft)]">{item.description}</p>
           </article>
         ))}
@@ -84,7 +84,7 @@ export function SuperAppSnapshot() {
 function MetricCard({ value, label }: { value: number; label: string }) {
   return (
     <div className="ui-panel-muted rounded-[18px] px-3 py-3">
-      <p className="text-lg font-black text-[color:var(--app-text)]">{value}</p>
+      <p className="text-lg font-bold text-[color:var(--app-text)]">{value}</p>
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
         {label}
       </p>
@@ -105,10 +105,10 @@ export function SuperAppOperatingSystem() {
   return (
     <section className="space-y-6">
       <div className="ui-panel ui-hero-panel rounded-[32px] p-6 sm:p-8 lg:p-10">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
           {isId ? 'Peta ilmu super app' : 'Super app knowledge map'}
         </p>
-        <h2 className="mt-3 max-w-4xl text-3xl font-black tracking-tight text-[color:var(--app-text)] sm:text-4xl">
+        <h2 className="mt-3 max-w-4xl text-3xl font-bold tracking-tight text-[color:var(--app-text)] sm:text-4xl">
           {isId
             ? '150 disiplin yang mempengaruhi bagaimana produk ini harus dibangun'
             : '150 disciplines shaping how this product should be built'}
@@ -136,11 +136,10 @@ export function SuperAppOperatingSystem() {
                 key={domain.slug}
                 type="button"
                 onClick={() => setActiveSlug(domain.slug)}
-                className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 text-sm font-semibold transition ${
-                  active
+                className={`inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 text-sm font-semibold transition ${active
                     ? 'bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] shadow-[0_16px_28px_-18px_rgba(5,150,105,0.65)]'
                     : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
-                }`}
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 <span>{isId ? domain.titleId : domain.titleEn}</span>
@@ -152,16 +151,16 @@ export function SuperAppOperatingSystem() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <article className="ui-panel rounded-[28px] p-5">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
             {isId ? activeDomain.eyebrowId : activeDomain.eyebrowEn}
           </p>
-          <h3 className="mt-2 text-2xl font-black tracking-tight text-[color:var(--app-text)]">
+          <h3 className="mt-2 text-2xl font-bold tracking-tight text-[color:var(--app-text)]">
             {isId ? activeDomain.titleId : activeDomain.titleEn}
           </h3>
 
           <div className="mt-5 space-y-3">
             <div className="ui-panel-muted rounded-[22px] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.14em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {isId ? 'Kenapa penting' : 'Why it matters'}
               </p>
               <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -170,7 +169,7 @@ export function SuperAppOperatingSystem() {
             </div>
 
             <div className="ui-panel-muted rounded-[22px] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.14em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {isId ? 'Kalau diabaikan' : 'If ignored'}
               </p>
               <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -179,7 +178,7 @@ export function SuperAppOperatingSystem() {
             </div>
 
             <div className="ui-panel-muted rounded-[22px] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.14em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {isId ? 'Terjemahan ke produk' : 'Translation into product'}
               </p>
               <p className="mt-2 text-sm leading-6 text-[color:var(--app-text-soft)]">
@@ -192,10 +191,10 @@ export function SuperAppOperatingSystem() {
         <article className="ui-panel rounded-[28px] p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
                 {isId ? 'Disiplin & subtopik' : 'Disciplines & subtopics'}
               </p>
-              <h3 className="mt-2 text-xl font-black tracking-tight text-[color:var(--app-text)]">
+              <h3 className="mt-2 text-xl font-bold tracking-tight text-[color:var(--app-text)]">
                 {isId ? 'Daftar rinci untuk domain terpilih' : 'Detailed list for the selected domain'}
               </h3>
             </div>
@@ -207,7 +206,7 @@ export function SuperAppOperatingSystem() {
           <div className="mt-5 grid grid-cols-1 gap-3">
             {activeDomain.disciplines.map((discipline) => (
               <div key={discipline.name} className="ui-panel-muted rounded-[22px] p-4">
-                <h4 className="text-sm font-black text-[color:var(--app-text)]">{discipline.name}</h4>
+                <h4 className="text-sm font-bold text-[color:var(--app-text)]">{discipline.name}</h4>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {discipline.subtopics.map((subtopic) => (
                     <span

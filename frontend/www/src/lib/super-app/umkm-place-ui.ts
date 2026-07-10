@@ -16,7 +16,8 @@ import {
   getUmkmLocationModeLabel,
   type UmkmLocationMode,
 } from './umkm-live-ops';
-import { haversineKm } from './location-guard';
+import { formatDistanceKm } from '@/lib/geo/distance';
+import { haversineKm, isCoordinateValid } from './location-guard';
 import {
   buildGoogleMapsDirectionsUrl,
   buildGoogleMapsPlaceUrl,
@@ -138,6 +139,7 @@ function buildTelHref(phone: string | null | undefined): string | null {
 function buildWhatsAppHref(
   phone: string | null | undefined,
   label: string,
+  isId: boolean,
   message?: string | null,
 ): string | null {
   const normalized = normalizePhone(phone || '');
@@ -145,7 +147,25 @@ function buildWhatsAppHref(
   const digits = normalized.replace(/[^\d]/g, '');
   const text =
     message?.trim() ||
-    `Halo, saya menemukan usaha ini dari www.lajukan.com dan ingin tanya tentang ${label}.`;
+    (isId
+      ? [
+          `Halo Kak, saya menemukan ${label} dari Lajukan.`,
+          '',
+          'Saya ingin tanya dulu:',
+          '1. Produk/jasa ini masih tersedia?',
+          '2. Bisa kirim foto/video terbaru?',
+          '3. Alamat/lokasi usahanya di mana?',
+          '4. Apakah bisa COD, survey, atau ambil langsung?',
+        ].join('\n')
+      : [
+          `Hi, I found ${label} on Lajukan.`,
+          '',
+          'I would like to check first:',
+          '1. Is this product/service still available?',
+          '2. Can you send recent photos or videos?',
+          '3. Where is the business location?',
+          '4. Is COD, a visit, or direct pickup possible?',
+        ].join('\n'));
   const params = new URLSearchParams({
     text,
   });
@@ -490,9 +510,12 @@ function getManagedPresenceStatus(
   };
 }
 
-export function formatUmkmPlaceDistance(distanceKm: number | null | undefined, isId: boolean): string | null {
-  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return null;
-  return isId ? `${distanceKm.toFixed(1)} km` : `${distanceKm.toFixed(1)} km`;
+export function formatUmkmPlaceDistance(
+  distanceKm: number | null | undefined,
+  _isId: boolean,
+): string | null {
+  void _isId;
+  return formatDistanceKm(distanceKm);
 }
 
 export function supportsUmkmTableFlow(place: UmkmPlaceLike): boolean {
@@ -659,7 +682,9 @@ export function buildUmkmPlacePresentation(
   const effectiveDistanceKm =
     typeof place.distance_km === 'number' && Number.isFinite(place.distance_km)
       ? place.distance_km
-      : viewerLocation
+      : viewerLocation &&
+          isCoordinateValid(viewerLocation) &&
+          isCoordinateValid({ lat: place.lat, lng: place.lng })
         ? haversineKm(viewerLocation, { lat: place.lat, lng: place.lng })
         : null;
   const distanceLabel = formatUmkmPlaceDistance(effectiveDistanceKm, isId);
@@ -722,6 +747,11 @@ export function buildUmkmPlacePresentation(
     googleMapsDirectionsUrl: googleMapsDirectionsByMode.driving,
     googleMapsDirectionsByMode,
     telHref: buildTelHref(place.phone),
-    whatsappHref: buildWhatsAppHref(whatsappPhone, place.name, whatsappMessage),
+    whatsappHref: buildWhatsAppHref(
+      whatsappPhone,
+      place.name,
+      isId,
+      whatsappMessage,
+    ),
   };
 }

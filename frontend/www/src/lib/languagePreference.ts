@@ -1,7 +1,7 @@
 import type { SupportedLocale } from '@/lib/locale';
 
 export const LANGUAGE_CONFIRM_COOKIE = 'LAJUKAN_LANG_SELECTED';
-export const LANGUAGE_PREFERENCE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+export const LANGUAGE_PREFERENCE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 export function hasConfirmedLanguageSelection(
   localeCookie: string | null | undefined,

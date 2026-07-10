@@ -36,26 +36,26 @@ export default async function BusinessProductsPage({ params }: PageProps) {
         <div className="grid gap-5">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                 Produk aktif
               </p>
-              <p className="mt-2 text-xl font-black tracking-[-0.04em] text-portal-ink">
+              <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
                 {business.productsCount}
               </p>
             </div>
             <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                 Barang titipan
               </p>
-              <p className="mt-2 text-xl font-black tracking-[-0.04em] text-portal-ink">
+              <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
                 {business.consignmentProductsCount ?? 0}
               </p>
             </div>
             <div className="rounded-[24px] border border-portal-line/70 bg-white p-4">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-portal-soft">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-portal-soft">
                 Perlu cek stok
               </p>
-              <p className="mt-2 text-xl font-black tracking-[-0.04em] text-portal-ink">
+              <p className="mt-2 text-xl font-bold tracking-[-0.04em] text-portal-ink">
                 {(business.lowStockProductsCount ?? 0) + (business.stockCheckCount ?? 0)}
               </p>
             </div>
@@ -85,7 +85,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-lg font-black tracking-[-0.04em] text-portal-ink">
+                        <h3 className="text-lg font-bold tracking-[-0.04em] text-portal-ink">
                           {product.name}
                         </h3>
                         <p className="mt-1 text-sm text-portal-soft">{product.category}</p>
@@ -103,7 +103,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                     </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[18px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-portal-soft">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-portal-soft">
                           Harga
                         </p>
                         <p className="mt-1 text-sm font-semibold text-portal-ink">
@@ -111,7 +111,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                         </p>
                       </div>
                       <div className="rounded-[18px] border border-portal-line/70 bg-portal-sand/35 px-4 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-portal-soft">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-portal-soft">
                           Stok
                         </p>
                         <p className="mt-1 text-sm font-semibold text-portal-ink">
@@ -121,7 +121,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                     </div>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[18px] border border-portal-line/70 bg-white px-4 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-portal-soft">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-portal-soft">
                           Pemilik barang
                         </p>
                         <p className="mt-1 text-sm font-semibold text-portal-ink">
@@ -129,7 +129,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                         </p>
                       </div>
                       <div className="rounded-[18px] border border-portal-line/70 bg-white px-4 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-portal-soft">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-portal-soft">
                           Status cek stok
                         </p>
                         <p className="mt-1 text-sm font-semibold text-portal-ink">
@@ -145,7 +145,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                     </div>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[18px] border border-portal-line/70 bg-white px-4 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-portal-soft">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-portal-soft">
                           Mode stok
                         </p>
                         <p className="mt-1 text-sm font-semibold text-portal-ink">
@@ -155,7 +155,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
                         </p>
                       </div>
                       <div className="rounded-[18px] border border-portal-line/70 bg-white px-4 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-portal-soft">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-portal-soft">
                           Update terakhir
                         </p>
                         <p className="mt-1 text-sm font-semibold text-portal-ink">
@@ -182,7 +182,7 @@ export default async function BusinessProductsPage({ params }: PageProps) {
               </div>
             ) : (
               <div className="rounded-[28px] border border-dashed border-portal-line bg-portal-sand/40 p-6">
-                <p className="text-lg font-black tracking-[-0.04em] text-portal-ink">
+                <p className="text-lg font-bold tracking-[-0.04em] text-portal-ink">
                   Belum ada produk
                 </p>
                 <p className="mt-3 text-sm leading-6 text-portal-soft">

@@ -22,6 +22,36 @@ type Props = {
   initialLanguageSelectionRequired: boolean;
 };
 
+function resolveRouteIntent(pathname: string | null, metaIntent?: string) {
+  if (metaIntent) return metaIntent === 'map-discovery' ? 'super' : metaIntent;
+
+  const normalizedPath = (pathname || '/').replace(/^\/(id|en)(?=\/|$)/, '') || '/';
+  const firstSegment = normalizedPath.split('/').filter(Boolean)[0] || 'home';
+  const routeIntentMap: Record<string, string> = {
+    home: 'home',
+    search: 'search',
+    create: 'create',
+    chat: 'chat',
+    reels: 'reels',
+    community: 'community',
+    profile: 'profile',
+    notifications: 'notifications',
+    settings: 'settings',
+    dashboard: 'dashboard',
+    jobs: 'jobs',
+    support: 'support',
+    property: 'property',
+    marketplace: 'market',
+    microgigs: 'market',
+    'my-listings': 'dashboard',
+    'super-app': 'super',
+    usaha: 'super',
+    umkm: 'super',
+  };
+
+  return routeIntentMap[firstSegment] || firstSegment;
+}
+
 function DesktopRouteHeader() {
   return (
     <>
@@ -43,6 +73,7 @@ export default function ClientLayoutWrapper({
   initialLanguageSelectionRequired,
 }: Props) {
   const {
+    pathname,
     showHeaderDesktop,
     showBottomNavMobile,
     showTopBarMobile,
@@ -52,12 +83,13 @@ export default function ClientLayoutWrapper({
   } = useRouteLayout();
   const isImmersiveRoute = meta.immersive === true;
   const showFooter = showFooterMobile || showFooterDesktop;
+  const routeIntent = resolveRouteIntent(pathname, meta.routeIntent);
 
   const mobileChrome = {
     showTopBar: showTopBarMobile,
     showBottomNav: showBottomNavMobile,
-    title: '',
-    eyebrow: '',
+    title: meta.title || '',
+    eyebrow: meta.description || '',
   };
 
   return (
@@ -74,7 +106,8 @@ export default function ClientLayoutWrapper({
         <div
           className={cn(
             'lajukan-route-surface',
-            isImmersiveRoute && 'h-[100dvh] overflow-hidden',
+            isImmersiveRoute &&
+            'h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] overflow-hidden',
             showTopBarMobile &&
             !isImmersiveRoute &&
             'pt-[calc(2.75rem+env(safe-area-inset-top))] lg:pt-0',
@@ -82,8 +115,10 @@ export default function ClientLayoutWrapper({
             !isImmersiveRoute &&
             'pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0',
           )}
-        // data-route-intent={resolveRouteIntent(pathname)}
-        // data-mobile-bottom-nav={showBottomNavMobile ? 'true' : 'false'}
+          data-route-intent={routeIntent}
+          data-route-immersive={isImmersiveRoute ? 'true' : 'false'}
+          data-mobile-topbar={showTopBarMobile ? 'true' : 'false'}
+          data-mobile-bottom-nav={showBottomNavMobile ? 'true' : 'false'}
         >
           <StackMaintenanceGate
             chrome={

@@ -36,21 +36,19 @@ export function ProgressTracker({ steps }: ProgressTrackerProps) {
         {steps.map((step, index) => (
           <article
             key={step.id}
-            className={`rounded-[24px] border p-4 ${
-              step.done
+            className={`rounded-[24px] border p-4 ${step.done
                 ? 'border-portal-forest/25 bg-[linear-gradient(180deg,rgba(29,106,67,0.08),rgba(255,255,255,1))]'
                 : index === nextStepIndex
                   ? 'border-portal-amber/30 bg-[linear-gradient(180deg,rgba(200,141,47,0.12),rgba(255,255,255,1))]'
                   : 'border-portal-line/70 bg-white'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-3">
               <span
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${
-                  step.done
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border ${step.done
                     ? 'border-portal-forest bg-portal-forest text-white'
                     : 'border-portal-line bg-white text-portal-soft'
-                }`}
+                  }`}
               >
                 {step.done ? (
                   <CheckCircle2 className="h-4 w-4" />
@@ -65,13 +63,12 @@ export function ProgressTracker({ steps }: ProgressTrackerProps) {
             </div>
             <div className="mt-3">
               <span
-                className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] ${
-                  step.done
+                className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${step.done
                     ? 'bg-portal-forest text-white'
                     : index === nextStepIndex
                       ? 'bg-portal-amber text-white'
                       : 'border border-portal-line/70 bg-portal-paper text-portal-ink'
-                }`}
+                  }`}
               >
                 {step.done ? 'Beres' : index === nextStepIndex ? 'Berikutnya' : 'Menunggu'}
               </span>

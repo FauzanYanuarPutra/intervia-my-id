@@ -1,22 +1,22 @@
 {
   "register": {
-    "title": "Create a New Account",
-    "subtitle": "Fill in all the details to create your account.",
-    "email_label": "Email Address",
+    "title": "Create a new account",
+    "subtitle": "Add the main details first. You can complete the rest later.",
+    "email_label": "Email",
     "email_placeholder": "user@example.com",
     "password_label": "Password",
     "password_placeholder": "Minimum 6 characters",
-    "confirm_password_label": "Confirm Password",
+    "confirm_password_label": "Repeat password",
     "confirm_password_placeholder": "Repeat your password",
     "register_button": "Register",
     "registering": "Registering...",
     "error_password_mismatch": "Passwords do not match.",
     "error_password_length": "Password must be at least 6 characters.",
     "error_register_failed": "Registration failed.",
-    "success_registered": "Registration successful! You can now log in.",
+    "success_registered": "Your account is ready. You can log in now.",
     "have_account": "Already have an account?",
-    "login_link": "Log In Now",
-    "banner_title": "Start Your Journey",
-    "banner_subtitle": "Create your new account to enjoy all our features."
+    "login_link": "Log in now",
+    "banner_title": "Start from one account",
+    "banner_subtitle": "Search needs, create posts, and keep chats organized."
   }
 }

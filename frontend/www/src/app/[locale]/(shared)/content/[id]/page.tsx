@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import NextImage from 'next/image';
 import { Link, useRouter } from '@/i18n/navigation';
 import { MediaPreviewCarousel } from '@/components/common/MediaPreviewCarousel';
+import {
+  ContentLocationMap,
+  type ContentMapPoint,
+} from '@/components/content/ContentLocationMap';
 import { useLocale } from 'next-intl';
 import {
   BadgePercent,
@@ -71,6 +75,9 @@ import {
 } from '@/lib/identityVerification';
 import { recordListingView } from '@/lib/listingViewHistory';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
+import { useViewerLocation } from '@/components/super-app/useViewerLocation';
+import { haversineKm, isCoordinateValid } from '@/lib/super-app/location-guard';
+import { formatDistanceKm } from '@/lib/geo/distance';
 
 type ContentItem = {
   id: string;
@@ -127,6 +134,20 @@ type ReviewItem = {
   rating: number;
   comment?: string | null;
   created_at?: string | null;
+};
+
+type ContentLikerItem = {
+  userId?: string;
+  user_id?: string;
+  username?: string | null;
+  fullName?: string | null;
+  full_name?: string | null;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
+  likedAt?: string | null;
+  liked_at?: string | null;
+  isViewer?: boolean;
+  is_viewer?: boolean;
 };
 
 type QuickApplyData = {
@@ -432,6 +453,233 @@ function readMetaText(
   return '';
 }
 
+const CONTENT_LATITUDE_KEYS = [
+  'lat',
+  'latitude',
+  'location_lat',
+  'location_latitude',
+  'geo_lat',
+  'address_lat',
+  'pickup_lat',
+  'return_lat',
+  'store_lat',
+  'outlet_lat',
+  'branch_lat',
+];
+
+const CONTENT_LONGITUDE_KEYS = [
+  'lng',
+  'lon',
+  'long',
+  'longitude',
+  'location_lng',
+  'location_lon',
+  'location_longitude',
+  'geo_lng',
+  'address_lng',
+  'pickup_lng',
+  'pickup_lon',
+  'return_lng',
+  'return_lon',
+  'store_lng',
+  'store_lon',
+  'outlet_lng',
+  'outlet_lon',
+  'branch_lng',
+  'branch_lon',
+];
+
+const CONTENT_NESTED_LOCATION_KEYS = [
+  'metadata',
+  'location',
+  'geo',
+  'geometry',
+  'coordinates',
+  'coordinate',
+  'coords',
+  'latlng',
+  'lat_lng',
+  'position',
+  'point',
+  'address',
+  'pickup',
+  'pickup_location',
+  'return_location',
+  'store',
+  'outlet',
+  'branch',
+  'primary_umkm_store',
+  'umkm_store',
+  'linked_umkm_stores',
+  'umkm_store_inventory',
+  'branches',
+  'outlets',
+];
+
+function asContentRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readContentCoordinateNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value.trim().replace(',', '.'));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function readBoundedContentCoordinate(
+  source: Record<string, unknown>,
+  keys: string[],
+  limit: number,
+): number | null {
+  for (const key of keys) {
+    const parsed = readContentCoordinateNumber(source[key]);
+    if (parsed !== null && Math.abs(parsed) <= limit) return parsed;
+  }
+  return null;
+}
+
+function readContentLatLngFromRecord(value: unknown): ContentMapPoint | null {
+  const record = asContentRecord(value);
+  if (!record) return null;
+  const lat = readBoundedContentCoordinate(record, CONTENT_LATITUDE_KEYS, 90);
+  const lng = readBoundedContentCoordinate(record, CONTENT_LONGITUDE_KEYS, 180);
+  if (lat === null || lng === null) return null;
+  const point = { lat, lng };
+  return isCoordinateValid(point) ? point : null;
+}
+
+function readContentLatLngFromArray(value: unknown[]): ContentMapPoint | null {
+  if (value.length < 2) return null;
+  const first = readContentCoordinateNumber(value[0]);
+  const second = readContentCoordinateNumber(value[1]);
+  if (first === null || second === null) return null;
+
+  const latLng = { lat: first, lng: second };
+  if (isCoordinateValid(latLng)) return latLng;
+
+  const lngLat = { lat: second, lng: first };
+  return isCoordinateValid(lngLat) ? lngLat : null;
+}
+
+function extractContentLocationPoint(
+  value: unknown,
+  depth = 0,
+): ContentMapPoint | null {
+  if (depth > 4 || value == null) return null;
+
+  if (Array.isArray(value)) {
+    const directPoint = readContentLatLngFromArray(value);
+    if (directPoint) return directPoint;
+    for (const entry of value.slice(0, 20)) {
+      const point = extractContentLocationPoint(entry, depth + 1);
+      if (point) return point;
+    }
+    return null;
+  }
+
+  const record = asContentRecord(value);
+  if (!record) return null;
+
+  const directPoint = readContentLatLngFromRecord(record);
+  if (directPoint) return directPoint;
+
+  for (const key of CONTENT_NESTED_LOCATION_KEYS) {
+    const point = extractContentLocationPoint(record[key], depth + 1);
+    if (point) return point;
+  }
+
+  return null;
+}
+
+function resolveContentLocationPoint(
+  item: ContentItem,
+  meta: Record<string, unknown>,
+): ContentMapPoint | null {
+  return extractContentLocationPoint(item) || extractContentLocationPoint(meta);
+}
+
+function readLocationTextFromValue(value: unknown): string {
+  const record = asContentRecord(value);
+  if (!record) return '';
+  return readMetaText(
+    record,
+    'full_address',
+    'street_address',
+    'address',
+    'location_address',
+    'pickup_address',
+    'return_address',
+    'formatted_address',
+    'place_name',
+    'name',
+    'label',
+    'city',
+    'region',
+  );
+}
+
+function resolveContentLocationAddress(
+  meta: Record<string, unknown>,
+  fallback: string,
+): string {
+  const directAddress = readMetaText(
+    meta,
+    'full_address',
+    'street_address',
+    'address',
+    'location_address',
+    'pickup_address',
+    'return_address',
+    'formatted_address',
+    'place_name',
+    'location',
+    'city',
+    'region',
+  );
+  if (directAddress) return directAddress;
+
+  for (const key of CONTENT_NESTED_LOCATION_KEYS) {
+    const value = meta[key];
+    if (Array.isArray(value)) {
+      for (const entry of value.slice(0, 10)) {
+        const text = readLocationTextFromValue(entry);
+        if (text) return text;
+      }
+      continue;
+    }
+
+    const text = readLocationTextFromValue(value);
+    if (text) return text;
+  }
+
+  return fallback;
+}
+
+function formatContentDistanceLabel(distanceKm: number | null): string {
+  return formatDistanceKm(distanceKm) || '';
+}
+
+function buildContentGoogleMapsSearchUrl(
+  point: ContentMapPoint,
+  title: string,
+  address: string,
+): string {
+  const label = [title, address].filter(Boolean).join(', ');
+  const query = label
+    ? `${label} @ ${point.lat},${point.lng}`
+    : `${point.lat},${point.lng}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function buildContentGoogleMapsDirectionsUrl(point: ContentMapPoint): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}`;
+}
+
 function readMetaList(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
@@ -478,7 +726,10 @@ const LISTING_COPY_NOISE_MARKERS = [
   'bisa ditambahin setelah',
 ];
 
-function cleanListingCopyText(value?: string | null, title?: string | null): string {
+function cleanListingCopyText(
+  value?: string | null,
+  title?: string | null,
+): string {
   const text = collapseWhitespace(value);
   if (!text) return '';
 
@@ -591,7 +842,9 @@ function readPositiveInteger(value: unknown): number {
 function resolveListingLikeCount(item: ContentItem | null): number {
   if (!item) return 0;
   const meta =
-    item.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+    item.metadata &&
+      typeof item.metadata === 'object' &&
+      !Array.isArray(item.metadata)
       ? (item.metadata as Record<string, unknown>)
       : {};
   const candidates = [
@@ -619,6 +872,10 @@ export default function ContentDetailPage({ params }: PageProps) {
   const handleBack = useAppBack(router, '/search');
   const locale = useLocale() || 'id';
   const { user, authFetch } = useAuth();
+  const { viewerLocation } = useViewerLocation({
+    autoRequest: false,
+    isId: locale === 'id',
+  });
   const { getSectorById } = useSectors();
   const [item, setItem] = useState<ContentItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -663,6 +920,11 @@ export default function ContentDetailPage({ params }: PageProps) {
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [contentLiked, setContentLiked] = useState(false);
   const [contentLikeCount, setContentLikeCount] = useState<number | null>(null);
+  const [showLikesModal, setShowLikesModal] = useState(false);
+  const [likers, setLikers] = useState<ContentLikerItem[]>([]);
+  const [likersTotal, setLikersTotal] = useState(0);
+  const [likersLoading, setLikersLoading] = useState(false);
+  const [likersError, setLikersError] = useState<string | null>(null);
   const [relatedTx, setRelatedTx] = useState<RelatedTransaction | null>(null);
   const [relatedTxLoading, setRelatedTxLoading] = useState(false);
   const [nowTs, setNowTs] = useState<number>(Date.now());
@@ -926,6 +1188,57 @@ export default function ContentDetailPage({ params }: PageProps) {
       // ignore storage failures
     }
   }, [contentLiked, resolvedContentId]);
+
+  useEffect(() => {
+    if (!showLikesModal || !resolvedContentId) return;
+    let active = true;
+
+    const loadLikers = async () => {
+      setLikersLoading(true);
+      setLikersError(null);
+      try {
+        const res = await authFetch(
+          `/api/content/${encodeURIComponent(resolvedContentId)}/likes?limit=80`,
+          {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+          },
+        );
+        const payload = (await res.json().catch(() => ({}))) as {
+          items?: unknown;
+          total?: unknown;
+          error?: string;
+        };
+        if (!active) return;
+        if (!res.ok) {
+          throw new Error(payload.error || 'Failed to load likes');
+        }
+        setLikers(
+          Array.isArray(payload.items)
+            ? (payload.items as ContentLikerItem[])
+            : [],
+        );
+        setLikersTotal(readPositiveInteger(payload.total));
+      } catch (error) {
+        if (!active) return;
+        setLikers([]);
+        setLikersError(
+          error instanceof Error && error.message
+            ? error.message
+            : locale === 'id'
+              ? 'Gagal memuat daftar like.'
+              : 'Failed to load likes.',
+        );
+      } finally {
+        if (active) setLikersLoading(false);
+      }
+    };
+
+    void loadLikers();
+    return () => {
+      active = false;
+    };
+  }, [authFetch, locale, resolvedContentId, showLikesModal]);
 
   useEffect(() => {
     if (PROMO_ONLY_MODE) {
@@ -2056,6 +2369,33 @@ export default function ContentDetailPage({ params }: PageProps) {
     localeCode,
   );
   const isDemandListing = listingSide === 'demand';
+  const ListingSideIcon = isDemandListing ? Target : Package;
+  const listingSideVisual = isDemandListing
+    ? {
+      chip: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/12 dark:text-blue-200 dark:ring-blue-400/20',
+      badge:
+        'bg-blue-600 text-white shadow-[0_14px_30px_-18px_rgba(37,99,235,0.82)]',
+      panel:
+        'border-blue-100 bg-blue-50/86 text-blue-900 ring-blue-100/80 dark:border-blue-400/20 dark:bg-blue-500/10 dark:text-blue-100 dark:ring-blue-400/15',
+      icon: 'bg-white text-blue-600 dark:bg-blue-950 dark:text-blue-200',
+      price: 'text-blue-600 dark:text-blue-300',
+    }
+    : {
+      chip: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/12 dark:text-emerald-200 dark:ring-emerald-400/20',
+      badge:
+        'bg-emerald-600 text-white shadow-[0_14px_30px_-18px_rgba(5,150,105,0.82)]',
+      panel:
+        'border-emerald-100 bg-emerald-50/86 text-emerald-900 ring-emerald-100/80 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-400/15',
+      icon: 'bg-white text-emerald-600 dark:bg-emerald-950 dark:text-emerald-200',
+      price: 'text-emerald-600 dark:text-emerald-300',
+    };
+  const listingSideDescription = isDemandListing
+    ? locale === 'id'
+      ? 'Pemilik listing sedang mencari pemasok, jasa, lokasi, atau partner yang bisa memenuhi kebutuhan ini.'
+      : 'This listing owner is looking for a provider, service, place, or partner to fulfill this need.'
+    : locale === 'id'
+      ? 'Pemilik listing menawarkan produk, jasa, lokasi, atau aset yang bisa langsung ditanyakan.'
+      : 'This listing owner is offering a product, service, place, or asset that can be contacted directly.';
   const listingHref = buildContentHref(
     resolvedContentId || item.id,
     item.title,
@@ -2530,12 +2870,8 @@ export default function ContentDetailPage({ params }: PageProps) {
           : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]';
   const updatedLabel = formatDate(item.updated_at);
   const createdLabel = formatDate(item.created_at);
-  const listingLikeCount =
-    contentLikeCount ?? resolveListingLikeCount(item);
-  const listingCommentCount = Math.max(
-    item.review_count || 0,
-    reviews.length,
-  );
+  const listingLikeCount = contentLikeCount ?? resolveListingLikeCount(item);
+  const listingCommentCount = Math.max(item.review_count || 0, reviews.length);
   const sellerStats = item.seller_stats || null;
   const sellerRating =
     !PROMO_ONLY_MODE && typeof sellerStats?.rating === 'number'
@@ -3362,7 +3698,7 @@ export default function ContentDetailPage({ params }: PageProps) {
       .trim();
 
   const safeSummary = normalizeText(
-    cleanListingCopyText(item.summary, item.title)
+    cleanListingCopyText(item.summary, item.title),
   );
 
   const safeBodyPreview = normalizeText(
@@ -3370,8 +3706,8 @@ export default function ContentDetailPage({ params }: PageProps) {
       undefined,
       item.body,
       item.title,
-      PROMO_ONLY_MODE ? 62 : 110
-    )
+      PROMO_ONLY_MODE ? 62 : 110,
+    ),
   );
 
   const summaryPreview = safeSummary || safeBodyPreview;
@@ -3387,7 +3723,8 @@ export default function ContentDetailPage({ params }: PageProps) {
         ? 120
         : 140,
   );
-  const bodyDisplayText = cleanListingCopyText(item.body, item.title) || item.body || '';
+  const bodyDisplayText =
+    cleanListingCopyText(item.body, item.title) || item.body || '';
   const deliveryDaysLabel =
     meta.delivery_days != null && String(meta.delivery_days).trim()
       ? `${meta.delivery_days} ${locale === 'id' ? 'hari kerja' : 'business days'}`
@@ -4002,23 +4339,22 @@ export default function ContentDetailPage({ params }: PageProps) {
   const detailInsetClass = `rounded-[16px] px-2.5 py-2.5 ring-1 sm:px-3 sm:py-3 ${detailTone.inset}`;
   const detailInsetCompactClass = `rounded-[14px] px-2.5 py-2 ring-1 sm:rounded-[16px] sm:px-3 sm:py-2.5 ${detailTone.compact}`;
   const detailPrimaryButtonClass =
-    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-[color:var(--app-accent)] px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_60%,transparent)] transition hover:brightness-110';
+    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-[color:var(--app-accent)] px-5 py-3 text-sm font-bold text-white shadow-[0_18px_34px_-24px_color-mix(in_srgb,var(--app-accent)_60%,transparent)] transition hover:brightness-110';
 
   const detailSecondaryButtonClass =
     'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl border border-[color:var(--app-border)] bg-white px-5 py-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)]';
 
   const detailDangerButtonClass =
-    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-[0_18px_34px_-24px_rgba(225,29,72,0.55)] transition hover:bg-rose-500';
+    'inline-flex w-full sm:w-auto items-center justify-center rounded-2xl bg-rose-600 px-5 py-3 text-sm font-bold text-white shadow-[0_18px_34px_-24px_rgba(225,29,72,0.55)] transition hover:bg-rose-500';
 
   const detailTextLinkClass =
     'text-sm font-bold text-[color:var(--app-accent)] transition hover:underline';
-  const actionCardClass = `${detailSectionClass} border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(255,255,255,0.98))] dark:border-emerald-400/20 dark:bg-[linear-gradient(180deg,rgba(4,20,13,0.36),rgba(2,6,23,0.96))]`;
-  const priceValueClass =
-    'text-4xl font-black leading-none tracking-tight text-emerald-600 dark:text-emerald-300 sm:text-5xl';
-  const priceSupportClass =
-    'mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-500/12 dark:text-emerald-200';
+  const actionCardClass = isDemandListing
+    ? `${detailSectionClass} border-blue-200/80 bg-[linear-gradient(180deg,rgba(239,246,255,0.98),rgba(255,255,255,0.98))] dark:border-blue-400/20 dark:bg-[linear-gradient(180deg,rgba(23,37,84,0.36),rgba(2,6,23,0.96))]`
+    : `${detailSectionClass} border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(255,255,255,0.98))] dark:border-emerald-400/20 dark:bg-[linear-gradient(180deg,rgba(4,20,13,0.36),rgba(2,6,23,0.96))]`;
+  const priceValueClass = `text-4xl font-bold leading-none tracking-tight sm:text-5xl ${listingSideVisual.price}`;
   const detailChatButtonClass =
-    '!inline-flex !min-h-[44px] !items-center !justify-center !gap-2 !rounded-full !bg-emerald-800 !px-4 !text-sm !font-black !text-white !shadow-[0_18px_34px_-24px_rgba(16,185,129,0.6)] !ring-1 !ring-transparent !transition !duration-200 hover:!-translate-y-0.5 hover:!bg-emerald-700 active:!translate-y-0 active:!scale-[0.98] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-emerald-500 focus-visible:!ring-offset-2 disabled:!cursor-not-allowed disabled:!opacity-60';
+    '!inline-flex !min-h-[44px] !items-center !justify-center !gap-2 !rounded-full !bg-emerald-800 !px-4 !text-sm !font-bold !text-white !shadow-[0_18px_34px_-24px_rgba(16,185,129,0.6)] !ring-1 !ring-transparent !transition !duration-200 hover:!-translate-y-0.5 hover:!bg-emerald-700 active:!translate-y-0 active:!scale-[0.98] focus-visible:!outline-none focus-visible:!ring-2 focus-visible:!ring-emerald-500 focus-visible:!ring-offset-2 disabled:!cursor-not-allowed disabled:!opacity-60';
   const heroSummaryCard =
     summaryPreview || bodyPreview ? (
       <div className="mt-2.5 rounded-[16px] bg-white/68 p-2.5 text-sm leading-5 text-[color:var(--app-text)] ring-1 ring-slate-200/60 dark:bg-slate-950/58 dark:text-[color:var(--app-text-soft)] dark:ring-slate-800 sm:p-3 sm:leading-6">
@@ -4178,8 +4514,14 @@ export default function ContentDetailPage({ params }: PageProps) {
           {displayPriceHeading}
         </span>
         <div className="flex flex-wrap justify-end gap-2">
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">
-            {listingSideContextLabel}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${listingSideVisual.chip}`}
+          >
+            <ListingSideIcon className="h-3.5 w-3.5" />
+            {listingSideLabel}
+            <span className="font-semibold opacity-80">
+              {listingSideContextLabel}
+            </span>
           </span>
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${statusBadgeClass}`}
@@ -4188,8 +4530,26 @@ export default function ContentDetailPage({ params }: PageProps) {
           </span>
         </div>
       </div>
-      <div className={`mt-2 ${priceValueClass}`}>
-        {primaryPrice}
+      <div className={`mt-2 ${priceValueClass}`}>{primaryPrice}</div>
+
+      <div
+        className={`mt-3 rounded-[18px] border px-3 py-2.5 text-xs font-semibold leading-5 ring-1 ${listingSideVisual.panel}`}
+      >
+        <div className="flex items-start gap-2.5">
+          <span
+            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] ${listingSideVisual.icon}`}
+          >
+            <ListingSideIcon className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em]">
+              {listingSideLabel}
+            </p>
+            <p className="mt-0.5 text-[12px] opacity-85">
+              {listingSideDescription}
+            </p>
+          </div>
+        </div>
       </div>
 
       {hasOriginalPrice && (
@@ -4231,10 +4591,10 @@ export default function ContentDetailPage({ params }: PageProps) {
             </div>
             <span
               className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold ${promotionSnapshot.status === 'safe'
-                ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_56%,white)] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))]'
-                : promotionSnapshot.status === 'unsafe'
-                  ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
-                  : 'bg-white text-[color:var(--app-text)] dark:bg-slate-950'
+                  ? 'bg-[color:color-mix(in_srgb,var(--app-accent-soft)_56%,white)] text-[color:var(--app-accent)] dark:bg-[color:color-mix(in_srgb,var(--app-accent)_24%,rgba(15,23,42,0.96))]'
+                  : promotionSnapshot.status === 'unsafe'
+                    ? 'bg-[color:var(--app-danger-soft)] text-[color:var(--app-danger)]'
+                    : 'bg-white text-[color:var(--app-text)] dark:bg-slate-950'
                 }`}
             >
               {promotionSnapshot.status === 'safe'
@@ -4263,29 +4623,35 @@ export default function ContentDetailPage({ params }: PageProps) {
       )} */}
       {/* <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"> */}
 
-      {/* Like button */}
-      {/* <button
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+        <button
           type="button"
           onClick={() => void toggleListingLike()}
           className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 py-2 font-semibold transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--app-accent)] ${contentLiked
-            ? "bg-rose-500 text-white ring-rose-300"
-            : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-900"
+              ? 'bg-rose-500 text-white ring-rose-300'
+              : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-900'
             }`}
         >
-          <Heart className={`h-3.5 w-3.5 ${contentLiked ? "fill-current" : ""}`} />
+          <Heart
+            className={`h-3.5 w-3.5 ${contentLiked ? 'fill-current' : ''}`}
+          />
           {contentLiked
-            ? locale === "id"
-              ? "Disukai"
-              : "Liked"
-            : locale === "id"
-              ? "Suka"
-              : "Like"}
-        </button> */}
+            ? locale === 'id'
+              ? 'Disukai'
+              : 'Liked'
+            : locale === 'id'
+              ? 'Suka'
+              : 'Like'}
+        </button>
 
-      {/* Like count */}
-      {/* <span className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800">
-          {listingLikeCount} {locale === "id" ? "like" : "likes"}
-        </span> */}
+        <button
+          type="button"
+          onClick={() => setShowLikesModal(true)}
+          className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800 dark:hover:bg-slate-800"
+        >
+          {listingLikeCount} {locale === 'id' ? 'like' : 'likes'}
+        </button>
+      </div>
 
       {/* Comment count */}
       {/* <span className="inline-flex min-h-9 items-center rounded-full bg-slate-100 px-3 py-2 font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-800">
@@ -4476,6 +4842,26 @@ export default function ContentDetailPage({ params }: PageProps) {
     quickSpecs.find(spec => spec.key === 'location')?.value ||
     readMetaText(meta, 'location', 'city', 'region', 'address') ||
     (locale === 'id' ? 'Indonesia' : 'Indonesia');
+  const contentLocationPoint = resolveContentLocationPoint(item, meta);
+  const contentLocationAddress = resolveContentLocationAddress(
+    meta,
+    locationLabel,
+  );
+  const contentDistanceKm =
+    contentLocationPoint && viewerLocation && isCoordinateValid(viewerLocation)
+      ? haversineKm(viewerLocation, contentLocationPoint)
+      : null;
+  const contentDistanceLabel = formatContentDistanceLabel(contentDistanceKm);
+  const contentGoogleMapsUrl = contentLocationPoint
+    ? buildContentGoogleMapsSearchUrl(
+      contentLocationPoint,
+      item.title,
+      contentLocationAddress,
+    )
+    : '';
+  const contentDirectionsUrl = contentLocationPoint
+    ? buildContentGoogleMapsDirectionsUrl(contentLocationPoint)
+    : '';
   const localizedListingHref = listingHref.startsWith(`/${locale}/`)
     ? listingHref
     : `/${locale}${listingHref.startsWith('/') ? listingHref : `/${listingHref}`}`;
@@ -4507,9 +4893,7 @@ export default function ContentDetailPage({ params }: PageProps) {
     const previousCount = contentLikeCount ?? resolveListingLikeCount(item);
     const nextLiked = !contentLiked;
     setContentLiked(nextLiked);
-    setContentLikeCount(
-      Math.max(previousCount + (nextLiked ? 1 : -1), 0),
-    );
+    setContentLikeCount(Math.max(previousCount + (nextLiked ? 1 : -1), 0));
 
     try {
       const response = await authFetch(
@@ -4686,7 +5070,13 @@ export default function ContentDetailPage({ params }: PageProps) {
                                   ? 'Terverifikasi'
                                   : 'Verified'}
                             </span>
-                            <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold backdrop-blur">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold  ${listingSideVisual.badge}`}
+                            >
+                              <ListingSideIcon className="h-3.5 w-3.5" />
+                              {listingSideLabel}
+                            </span>
+                            <span className="rounded-full bg-white/18 px-2.5 py-1 text-[11px] font-semibold ">
                               {listingSideContextLabel}
                             </span>
                           </div>
@@ -4697,6 +5087,65 @@ export default function ContentDetailPage({ params }: PageProps) {
                 </section>
 
                 {heroSummaryCard}
+
+                {contentLocationPoint ? (
+                  <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
+                          {locale === 'id'
+                            ? 'Lokasi listing'
+                            : 'Listing location'}
+                        </p>
+                        <h2 className="mt-1 text-base font-bold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-lg">
+                          {contentLocationAddress}
+                        </h2>
+                        <p className="mt-1 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                          {contentDistanceLabel
+                            ? locale === 'id'
+                              ? `${contentDistanceLabel} dari lokasimu`
+                              : `${contentDistanceLabel} from you`
+                            : locale === 'id'
+                              ? 'Titik lokasi sudah tersedia untuk membantu rute dan estimasi jarak.'
+                              : 'Location point is available for routes and distance context.'}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${detailVisual.chip}`}
+                      >
+                        <MapPin className="h-3.5 w-3.5" />
+                        {locale === 'id' ? 'Ada peta' : 'Map ready'}
+                      </span>
+                    </div>
+                    <div className="mt-3 h-[236px] overflow-hidden rounded-[18px] bg-emerald-50 ring-1 ring-emerald-100 dark:bg-slate-950 dark:ring-slate-800 sm:h-[280px]">
+                      <ContentLocationMap
+                        point={contentLocationPoint}
+                        title={item.title}
+                        address={contentLocationAddress}
+                      />
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={contentDirectionsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-full bg-emerald-700 px-4 text-sm font-bold text-white shadow-[0_14px_28px_-20px_rgba(5,150,105,0.8)] transition hover:bg-emerald-800"
+                      >
+                        {locale === 'id' ? 'Rute' : 'Directions'}
+                      </a>
+                      <a
+                        href={contentGoogleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-full bg-white px-4 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50 dark:bg-slate-950 dark:text-emerald-300 dark:ring-slate-800"
+                      >
+                        {locale === 'id'
+                          ? 'Buka Google Maps'
+                          : 'Open Google Maps'}
+                      </a>
+                    </div>
+                  </section>
+                ) : null}
 
                 <div className="min-w-0 space-y-3">
                   {/* 
@@ -4749,7 +5198,7 @@ export default function ContentDetailPage({ params }: PageProps) {
                                   {summaryPreview || bodyPreview || bodyDisplayText}
                                 </p>
                               <details className="group mt-2">
-                                  <summary className="cursor-pointer list-none text-xs font-black text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]">
+                                  <summary className="cursor-pointer list-none text-xs font-bold text-[color:var(--app-accent)] transition hover:text-[color:var(--app-accent-strong)]">
                                     {locale === 'id'
                                       ? 'Lihat detail'
                                       : 'View full details'}
@@ -4864,7 +5313,9 @@ export default function ContentDetailPage({ params }: PageProps) {
                     ) : null}
                   </section>
 */}
-                  {reviewsLoading || reviews.length > 0 || listingLikeCount > 0 ? (
+                  {/* {reviewsLoading ||
+                  reviews.length > 0 ||
+                  listingLikeCount > 0 ? (
                     <section className={`${detailSurfaceClass} p-3 sm:p-3.5`}>
                       <div className="grid gap-3 md:grid-cols-[170px_minmax(0,1fr)]">
                         <div>
@@ -4928,14 +5379,16 @@ export default function ContentDetailPage({ params }: PageProps) {
                         </div>
                       </div>
                     </section>
-                  ) : null}
+                  ) : null} */}
 
                   {!PROMO_ONLY_MODE && showSellerStats ? (
                     <section
                       className={`${detailSurfaceClass} p-3.5 sm:p-4 lg:hidden`}
                     >
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--app-text-soft)]">
-                        {locale === 'id' ? 'Kepercayaan penjual' : 'Seller trust'}
+                        {locale === 'id'
+                          ? 'Kepercayaan penjual'
+                          : 'Seller trust'}
                       </p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-3">
                         {[
@@ -4945,7 +5398,9 @@ export default function ContentDetailPage({ params }: PageProps) {
                                 ? 'Rating penjual'
                                 : 'Seller rating',
                             value:
-                              sellerRating > 0 ? sellerRating.toFixed(1) : '0.0',
+                              sellerRating > 0
+                                ? sellerRating.toFixed(1)
+                                : '0.0',
                           },
                           {
                             label:
@@ -5064,7 +5519,6 @@ export default function ContentDetailPage({ params }: PageProps) {
                   </section>
                 </div>
               </aside>
-
             </div>
           </div>
         </section>
@@ -5073,11 +5527,111 @@ export default function ContentDetailPage({ params }: PageProps) {
           className="fixed inset-x-0 bottom-0 z-40 px-2 pt-2 lg:hidden"
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}
         >
-          <div className="mx-auto max-w-md rounded-[20px] border border-slate-200/80 bg-white/96 p-1.5 shadow-[0_18px_44px_-26px_rgba(15,23,42,0.36)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/94">
+          <div className="mx-auto max-w-md rounded-[20px] border border-slate-200/80 bg-white/96 p-1.5 shadow-[0_18px_44px_-26px_rgba(15,23,42,0.36)]  dark:border-slate-800 dark:bg-slate-950/94">
             {actionButtons}
           </div>
         </div>
       </div>
+
+      {showLikesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
+          <div className="max-h-[80svh] w-full max-w-md overflow-hidden rounded-[28px] bg-white/98 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+            <div className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)] p-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-500">
+                  {locale === 'id' ? 'Disukai oleh' : 'Liked by'}
+                </p>
+                <h2 className="mt-1 text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {(likersTotal || listingLikeCount).toLocaleString(
+                    locale === 'id' ? 'id-ID' : 'en-US',
+                  )}{' '}
+                  {locale === 'id' ? 'like' : 'likes'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLikesModal(false)}
+                className="rounded-full bg-slate-100 p-2 text-[color:var(--app-text)] transition hover:bg-slate-200 dark:bg-slate-900 dark:text-[color:var(--app-text-soft)] dark:hover:bg-slate-800"
+                aria-label={locale === 'id' ? 'Tutup' : 'Close'}
+              >
+                X
+              </button>
+            </div>
+
+            <div className="max-h-[56svh] overflow-y-auto p-3">
+              {likersLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div
+                      key={`liker-skeleton-${index}`}
+                      className="h-14 rounded-2xl bg-slate-100 dark:bg-slate-900"
+                    />
+                  ))}
+                </div>
+              ) : likersError ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {likersError}
+                </div>
+              ) : likers.length > 0 ? (
+                <div className="space-y-2">
+                  {likers.map(liker => {
+                    const likerId = liker.userId || liker.user_id || '';
+                    const isViewer = Boolean(liker.isViewer || liker.is_viewer);
+                    const rawName =
+                      liker.fullName ||
+                      liker.full_name ||
+                      liker.username ||
+                      (locale === 'id' ? 'Pengguna Lajukan' : 'Lajukan user');
+                    const displayName = isViewer
+                      ? locale === 'id'
+                        ? 'Anda'
+                        : 'You'
+                      : rawName;
+                    const avatar = profileAvatarSrc(
+                      liker.avatarUrl || liker.avatar_url || '',
+                      undefined,
+                      rawName,
+                    );
+                    const handle = liker.username ? `@${liker.username}` : '';
+
+                    return (
+                      <div
+                        key={`${likerId}-${liker.likedAt || liker.liked_at || ''}`}
+                        className="flex items-center gap-3 rounded-2xl px-2.5 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-900"
+                      >
+                        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
+                          <NextImage
+                            src={avatar}
+                            alt={displayName}
+                            fill
+                            sizes="44px"
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {displayName}
+                          </p>
+                          {handle ? (
+                            <p className="truncate text-xs text-[color:var(--app-text-soft)]">
+                              {handle}
+                            </p>
+                          ) : null}
+                        </div>
+                        <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-[color:var(--app-text-soft)]">
+                  {locale === 'id' ? 'Belum ada yang like.' : 'No likes yet.'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showReportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">

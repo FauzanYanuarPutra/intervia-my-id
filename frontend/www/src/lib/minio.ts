@@ -20,8 +20,37 @@ const publicUrl = process.env.MINIO_PUBLIC_URL ?? '';
 let cachedClient: S3Client | null = null;
 let bucketReady: Promise<void> | null = null;
 
+const EXT_BY_MIME: Record<string, string> = {
+  'image/avif': '.avif',
+  'image/bmp': '.bmp',
+  'image/gif': '.gif',
+  'image/heic': '.heic',
+  'image/heif': '.heif',
+  'image/jpeg': '.jpg',
+  'image/jpg': '.jpg',
+  'image/png': '.png',
+  'image/svg+xml': '.svg',
+  'image/webp': '.webp',
+  'video/mp4': '.mp4',
+  'video/quicktime': '.mov',
+  'video/webm': '.webm',
+  'audio/aac': '.aac',
+  'audio/mpeg': '.mp3',
+  'audio/mp4': '.m4a',
+  'audio/ogg': '.ogg',
+  'audio/wav': '.wav',
+  'application/pdf': '.pdf',
+};
+
 function safeRoomKey(id: string): string {
   return id.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function safeObjectExtension(originalName: string, mime: string): string {
+  const byMime = EXT_BY_MIME[mime.toLowerCase()];
+  if (byMime) return byMime;
+  const ext = path.extname(originalName || '').toLowerCase();
+  return /^[a-z0-9.]{2,12}$/.test(ext) ? ext : '.bin';
 }
 
 export function isMinIOConfigured(): boolean {
@@ -67,7 +96,7 @@ export async function uploadToMinIO(
 ): Promise<{ url: string; key: string }> {
   const client = getMinioClient();
 
-  const ext = path.extname(originalName || '').toLowerCase() || '.bin';
+  const ext = safeObjectExtension(originalName, mime);
   // Support untuk content upload (roomId = 'content') atau chat upload
   const key =
     roomId === 'content'
@@ -84,6 +113,8 @@ export async function uploadToMinIO(
       Key: key,
       Body: buffer,
       ContentType: mime,
+      CacheControl: 'public, max-age=31536000, immutable',
+      ContentDisposition: 'inline',
     }),
   );
 

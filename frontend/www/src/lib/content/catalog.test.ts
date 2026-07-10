@@ -44,6 +44,26 @@ describe('normalizeContentMediaUrl', () => {
     ).toBe('/api/content/media/laju-chat/content/example.webp');
   });
 
+  it('converts internal MinIO content URLs to proxy URLs', () => {
+    expect(
+      normalizeContentMediaUrl(
+        'http://minio:9000/laju-chat/content/example.jpg',
+      ),
+    ).toBe('/api/content/media/laju-chat/content/example.jpg');
+  });
+
+  it('drops internal absolute URLs that cannot be proxied by the browser', () => {
+    expect(normalizeContentMediaUrl('http://localhost:9000/random.jpg')).toBe(
+      '',
+    );
+  });
+
+  it('upgrades external HTTP media URLs to HTTPS', () => {
+    expect(normalizeContentMediaUrl('http://cdn.example.com/image.jpg')).toBe(
+      'https://cdn.example.com/image.jpg',
+    );
+  });
+
   it('normalizes upload paths that are missing the leading slash', () => {
     expect(normalizeContentMediaUrl('uploads/content/example.jpg')).toBe(
       '/uploads/content/example.jpg',

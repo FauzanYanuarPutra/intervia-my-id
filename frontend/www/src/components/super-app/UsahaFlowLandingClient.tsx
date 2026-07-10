@@ -263,10 +263,10 @@ function SummaryMetricCard({
 }) {
   return (
     <div className="rounded-[20px] border border-slate-200 bg-white/92 px-4 py-3 shadow-[0_16px_30px_-28px_rgba(15,23,42,0.34)] dark:border-slate-800 dark:bg-slate-950/84">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
         {label}
       </p>
-      <p className="mt-1 text-[1.3rem] font-black leading-none text-[color:var(--app-text)]">
+      <p className="mt-1 text-[1.3rem] font-bold leading-none text-[color:var(--app-text)]">
         {value}
       </p>
       <p className="mt-1 text-[11px] leading-5 text-[color:var(--app-text-soft)]">
@@ -288,16 +288,16 @@ function WorkflowCard({ action }: { action: WorkflowAction }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--app-accent)]">
             {action.step}
           </p>
-          <h3 className="mt-1 text-[1rem] font-black tracking-[-0.03em] text-[color:var(--app-text)]">
+          <h3 className="mt-1 text-[1rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">
             {action.title}
           </h3>
         </div>
         <span
           className={cn(
-            'inline-flex min-h-[28px] max-h-[28px] shrink-0 items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]',
+            'inline-flex min-h-[28px] max-h-[28px] shrink-0 items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em]',
             toneBadgeClass(action.done ? 'success' : action.tone),
           )}
         >
@@ -358,7 +358,7 @@ function ShortcutCard({ item }: { item: WorkspaceShortcut }) {
         </span>
         <span
           className={cn(
-            'inline-flex min-h-[26px] items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em]',
+            'inline-flex min-h-[26px] items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]',
             toneBadgeClass(item.tone),
           )}
         >
@@ -366,7 +366,7 @@ function ShortcutCard({ item }: { item: WorkspaceShortcut }) {
         </span>
       </div>
 
-      <h3 className="mt-4 text-[15px] font-black tracking-[-0.02em] text-[color:var(--app-text)]">
+      <h3 className="mt-4 text-[15px] font-bold tracking-[-0.02em] text-[color:var(--app-text)]">
         {item.title}
       </h3>
       <p className="mt-1 text-[12px] leading-5 text-[color:var(--app-text-soft)]">
@@ -948,10 +948,10 @@ export function UsahaFlowLandingClient({
             <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(255,163,26,0.15),transparent_36%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98))] p-4 shadow-[0_24px_48px_-34px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-[radial-gradient(circle_at_top_left,rgba(249,115,22,0.12),transparent_30%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] sm:p-5 lg:p-6">
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
                 <div>
-                  <div className="inline-flex min-h-[30px] items-center rounded-full bg-[color:color-mix(in_srgb,var(--app-accent-soft)_72%,white)] px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                  <div className="inline-flex min-h-[30px] items-center rounded-full bg-[color:color-mix(in_srgb,var(--app-accent-soft)_72%,white)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                     {isId ? 'Control hub usaha' : 'Business control hub'}
                   </div>
-                  <h1 className="mt-3 max-w-3xl text-[1.4rem] font-black leading-tight tracking-[-0.05em] text-[color:var(--app-text)] sm:text-[1.85rem]">
+                  <h1 className="mt-3 max-w-3xl text-[1.4rem] font-bold leading-tight tracking-[-0.05em] text-[color:var(--app-text)] sm:text-[1.85rem]">
                     {isId
                       ? 'Pilih usaha aktif, lihat statusnya, lalu lanjut tepat ke flow yang dibutuhkan.'
                       : 'Pick the active business, review its status, then continue into the exact flow you need.'}
@@ -992,10 +992,10 @@ export function UsahaFlowLandingClient({
                     </div>
                   ) : stores.length === 0 ? (
                     <div className="mt-5 rounded-[22px] border border-[color:var(--app-accent-border)] bg-white/92 p-4 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.16)] dark:bg-slate-950/82">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                         {isId ? 'Mulai dari nol' : 'Start from zero'}
                       </p>
-                      <h2 className="mt-1 text-[1.05rem] font-black tracking-[-0.03em] text-[color:var(--app-text)]">
+                      <h2 className="mt-1 text-[1.05rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">
                         {isId ? 'Belum ada usaha yang tersimpan' : 'No businesses have been saved yet'}
                       </h2>
                       <p className="mt-2 text-[13px] leading-6 text-[color:var(--app-text-soft)]">
@@ -1019,14 +1019,14 @@ export function UsahaFlowLandingClient({
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 max-w-2xl">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                               {isId ? 'Fokus kerja sekarang' : 'Current focus'}
                             </p>
-                            <span className={cn('inline-flex min-h-[28px] items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]', toneBadgeClass(selectedStoreStatus?.tone || 'default'))}>
+                            <span className={cn('inline-flex min-h-[28px] items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em]', toneBadgeClass(selectedStoreStatus?.tone || 'default'))}>
                               {selectedStoreStatus?.label}
                             </span>
                           </div>
-                          <h2 className="mt-1 text-[1.1rem] font-black tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
+                          <h2 className="mt-1 text-[1.1rem] font-bold tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
                             {selectedStore.name}
                           </h2>
                           <p className="mt-1 text-[13px] leading-6 text-[color:var(--app-text-soft)]">
@@ -1095,7 +1095,7 @@ export function UsahaFlowLandingClient({
 
                 <div className="grid gap-3">
                   <div className="rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.16)] dark:border-slate-800 dark:bg-slate-950/78">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                       {isId ? 'Ringkasan portfolio' : 'Portfolio summary'}
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
@@ -1115,7 +1115,7 @@ export function UsahaFlowLandingClient({
                   </div>
 
                   <div className="rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.16)] dark:border-slate-800 dark:bg-slate-950/78">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                       {isId ? 'Akses cepat' : 'Quick access'}
                     </p>
                     <div className="mt-4 grid gap-2">
@@ -1149,10 +1149,10 @@ export function UsahaFlowLandingClient({
               <div className="ui-home-section-content rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_42px_-34px_rgba(15,23,42,0.14)] dark:border-slate-800 dark:bg-slate-950 sm:p-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-3xl">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                       {isId ? 'Pilih fokus usaha' : 'Choose the active business'}
                     </p>
-                    <h2 className="mt-1 text-[1.1rem] font-black tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
+                    <h2 className="mt-1 text-[1.1rem] font-bold tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
                       {isId ? 'Pindah fokus tanpa memutus flow kerja' : 'Switch focus without breaking the workflow'}
                     </h2>
                     <p className="mt-1 text-[13px] leading-6 text-[color:var(--app-text-soft)]">
@@ -1200,8 +1200,8 @@ export function UsahaFlowLandingClient({
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="truncate text-[1rem] font-black tracking-[-0.03em] text-[color:var(--app-text)]">{store.name}</h3>
-                                <span className={cn('inline-flex min-h-[26px] items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em]', toneBadgeClass(status.tone))}>
+                                <h3 className="truncate text-[1rem] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">{store.name}</h3>
+                                <span className={cn('inline-flex min-h-[26px] items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]', toneBadgeClass(status.tone))}>
                                   {status.label}
                                 </span>
                               </div>
@@ -1260,17 +1260,17 @@ export function UsahaFlowLandingClient({
                   <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_42px_-34px_rgba(15,23,42,0.14)] dark:border-slate-800 dark:bg-slate-950 sm:p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="max-w-2xl">
-                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                           {isId ? 'Langkah prioritas' : 'Priority flow'}
                         </p>
-                        <h2 className="mt-1 text-[1.1rem] font-black tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
+                        <h2 className="mt-1 text-[1.1rem] font-bold tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
                           {isId ? `Jalankan ${selectedStore.name} tanpa lompat-lompat flow` : `Run ${selectedStore.name} without jumping between flows`}
                         </h2>
                         <p className="mt-1 text-[13px] leading-6 text-[color:var(--app-text-soft)]">
                           {isId ? 'Urutan dibuat biar langkah berikutnya jelas.' : 'This order keeps the next step obvious for the user.'}
                         </p>
                       </div>
-                      <span className={cn('inline-flex min-h-[28px] items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]', toneBadgeClass(completedFlowSteps === selectedStoreWorkflow.length ? 'success' : 'primary'))}>
+                      <span className={cn('inline-flex min-h-[28px] items-center rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em]', toneBadgeClass(completedFlowSteps === selectedStoreWorkflow.length ? 'success' : 'primary'))}>
                         {completedFlowSteps}/{selectedStoreWorkflow.length} {isId ? 'langkah rapi' : 'steps tidy'}
                       </span>
                     </div>
@@ -1284,10 +1284,10 @@ export function UsahaFlowLandingClient({
 
                   <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_24px_42px_-34px_rgba(15,23,42,0.14)] dark:border-slate-800 dark:bg-slate-950 sm:p-5">
                     <div className="max-w-2xl">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                         {isId ? 'Workspace cepat' : 'Fast workspaces'}
                       </p>
-                      <h2 className="mt-1 text-[1.1rem] font-black tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
+                      <h2 className="mt-1 text-[1.1rem] font-bold tracking-[-0.04em] text-[color:var(--app-text)] sm:text-[1.3rem]">
                         {isId ? 'Semua tombol penting sudah dikontekstualkan ke usaha aktif' : 'Every important button is now scoped to the active business'}
                       </h2>
                       <p className="mt-1 text-[13px] leading-6 text-[color:var(--app-text-soft)]">

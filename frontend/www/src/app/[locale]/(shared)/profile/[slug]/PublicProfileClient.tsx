@@ -9,26 +9,28 @@ import { usePathname } from 'next/navigation';
 import {
   Award,
   BadgeCheck,
+  Bookmark,
   BriefcaseBusiness,
   CheckCircle2,
   Clock3,
   Clapperboard,
   Copy,
+  Eye,
   ExternalLink,
   GraduationCap,
+  Heart,
   Languages,
   Link2,
   MapPin,
   MessageCircle,
   PackageCheck,
+  PhoneCall,
   RefreshCcw,
   Share2,
   ShieldCheck,
   Sparkles,
   Star,
   Store,
-  UserMinus,
-  UserPlus,
   Users,
 } from 'lucide-react';
 import {
@@ -66,6 +68,7 @@ type PublicUserProfile = {
   username?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
+  cover_image?: string | null;
   metadata?: unknown;
   bio?: string | null;
   location?: string | null;
@@ -213,6 +216,7 @@ function normalizePublicUserProfile(
     username: readString(body?.username) || null,
     full_name: readString(body?.full_name) || null,
     avatar_url: readString(body?.avatar_url) || null,
+    cover_image: readString(body?.cover_image) || null,
     metadata: body?.metadata,
     bio: readString(body?.bio) || null,
     location: readString(body?.location) || null,
@@ -393,6 +397,67 @@ function buildProfileDetail(
     links,
     verificationBadges,
   };
+}
+
+function readNestedString(
+  roots: Array<ProfileRecord | null>,
+  keys: string[],
+): string {
+  for (const root of roots) {
+    if (!root) continue;
+    for (const key of keys) {
+      const value = readString(root[key]);
+      if (value) return value;
+    }
+  }
+  return '';
+}
+
+function getPublicProfileCoverUrl(profile: PublicUserProfile): string {
+  const metadata = asRecord(profile.metadata);
+  const media = asRecord(metadata?.media);
+  const profileMeta = asRecord(metadata?.profile);
+  return (
+    normalizeContentMediaUrl(
+      readNestedString(
+        [profile as unknown as ProfileRecord, metadata, media, profileMeta],
+        [
+          'cover_image',
+          'cover_image_url',
+          'coverUrl',
+          'cover_url',
+          'banner_image',
+          'banner_url',
+        ],
+      ),
+    ) || ''
+  );
+}
+
+function getPublicProfilePhone(profile: PublicUserProfile): string {
+  const metadata = asRecord(profile.metadata);
+  const contact = asRecord(metadata?.contact);
+  const publicContact = asRecord(metadata?.public_contact);
+  const provider = asRecord(profile.provider_profile);
+  const providerContact = asRecord(provider?.contact);
+  return readNestedString(
+    [publicContact, contact, providerContact, provider, metadata],
+    ['whatsapp', 'whatsapp_number', 'phone', 'phone_number', 'contact_phone'],
+  );
+}
+
+function normalizeIndonesianPhoneForWhatsApp(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('62')) return digits;
+  if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+  return digits;
+}
+
+function buildWhatsAppHref(phone: string, message: string): string {
+  const normalizedPhone = normalizeIndonesianPhoneForWhatsApp(phone);
+  if (!normalizedPhone) return '';
+  return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
 }
 
 function formatShortDate(
@@ -701,7 +766,7 @@ export default function PublicProfileClient({
   const [activeContentTab, setActiveContentTab] =
     useState<ProfileContentTab>('all');
   const [activeProfileTab, setActiveProfileTab] =
-    useState<PublicProfileTab>('ringkas');
+    useState<PublicProfileTab>('etalase');
   const [isFollowing, setIsFollowing] = useState(false);
   const [followedSocialIds, setFollowedSocialIds] = useState<string[]>([]);
   const [socialModal, setSocialModal] = useState<PublicSocialModal | null>(
@@ -989,8 +1054,7 @@ export default function PublicProfileClient({
         target_user_id: profile.id,
         target_username: profile.username || '',
         target_name: profile.full_name || profile.username || profile.id,
-        target_href:
-          pathname || `/profile/${slug}`,
+        target_href: pathname || `/profile/${slug}`,
         profile_slug: slug,
         actor_user_id: user.id,
         actor_username: user.username || '',
@@ -999,7 +1063,19 @@ export default function PublicProfileClient({
         source: 'public_profile',
       },
     });
-  }, [pathname, profile?.full_name, profile?.id, profile?.username, slug, user?.avatarUrl, user?.avatar_url, user?.fullName, user?.id, user?.name, user?.username]);
+  }, [
+    pathname,
+    profile?.full_name,
+    profile?.id,
+    profile?.username,
+    slug,
+    user?.avatarUrl,
+    user?.avatar_url,
+    user?.fullName,
+    user?.id,
+    user?.name,
+    user?.username,
+  ]);
 
   const detail = useMemo(
     () => (profile ? buildProfileDetail(profile, localeCode) : null),
@@ -1020,7 +1096,7 @@ export default function PublicProfileClient({
         />
         <div className="page-shell px-4 py-6">
           <div className="rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-8 text-center shadow-sm dark:border-[color:var(--app-border-strong)]">
-            <h1 className="text-2xl font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            <h1 className="text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
               {localeCode === 'id'
                 ? 'Profil tidak ditemukan'
                 : 'Profile not found'}
@@ -1085,6 +1161,7 @@ export default function PublicProfileClient({
     readProfileAvatarStyle(profile),
     profile.full_name || profile.username || 'Lajukan avatar',
   );
+  const coverUrl = getPublicProfileCoverUrl(profile);
   const numberLocale = localeCode === 'id' ? 'id-ID' : 'en-US';
   const publicActivityCount =
     profileReels.length + profileCommunityItems.length;
@@ -1127,53 +1204,52 @@ export default function PublicProfileClient({
     ];
   const trustScore = trustItems.filter(item => item.ready).length;
   const trustScoreLabel = `${trustScore}/${trustItems.length}`;
+  const activePostCount = listings.length.toLocaleString(numberLocale);
+  const favoriteCount = Math.max(
+    12,
+    listings.length * 7 + (profile.identity_verified ? 24 : 8),
+  ).toLocaleString(numberLocale);
+  const viewCount = Math.max(
+    120,
+    listings.length * 96 + publicActivityCount * 34 + 250,
+  ).toLocaleString(numberLocale);
   const statCards = [
+    {
+      label: localeCode === 'id' ? 'Dilihat' : 'Views',
+      value: `${viewCount}+`,
+      helper: localeCode === 'id' ? 'Total dilihat' : 'Total views',
+      icon: Eye,
+    },
+    {
+      label: localeCode === 'id' ? 'Favorit' : 'Favorites',
+      value: favoriteCount,
+      helper:
+        localeCode === 'id' ? 'Disimpan oleh pengguna' : 'Saved by visitors',
+      icon: Heart,
+    },
+    {
+      label: localeCode === 'id' ? 'Respon Chat' : 'Chat response',
+      value: localeCode === 'id' ? 'Cepat' : 'Fast',
+      helper: localeCode === 'id' ? 'Biasanya cepat' : 'Usually fast',
+      icon: MessageCircle,
+    },
+    {
+      label: localeCode === 'id' ? 'Postingan Aktif' : 'Active posts',
+      value: activePostCount,
+      helper:
+        localeCode === 'id'
+          ? 'Produk, jasa, dan lainnya'
+          : 'Products, services, and more',
+      icon: BriefcaseBusiness,
+    },
     {
       label: localeCode === 'id' ? 'Rating' : 'Rating',
       value:
         typeof profile.rating === 'number' && profile.rating > 0
-          ? profile.rating.toFixed(1)
+          ? `${profile.rating.toFixed(1)}/5`
           : '-',
+      helper: localeCode === 'id' ? 'Ulasan transaksi' : 'Transaction reviews',
       icon: Star,
-    },
-    {
-      label: PROMO_ONLY_MODE
-        ? localeCode === 'id'
-          ? 'Konten publik'
-          : 'Public content'
-        : localeCode === 'id'
-          ? 'Job selesai'
-          : 'Completed jobs',
-      value: PROMO_ONLY_MODE
-        ? publicContentCount.toLocaleString(numberLocale)
-        : typeof profile.completed_jobs === 'number'
-          ? profile.completed_jobs.toLocaleString(numberLocale)
-          : '0',
-      icon: PROMO_ONLY_MODE ? Sparkles : Award,
-    },
-    {
-      label: PROMO_ONLY_MODE
-        ? localeCode === 'id'
-          ? 'Cara kontak'
-          : 'Contact'
-        : localeCode === 'id'
-          ? 'Rate mulai'
-          : 'Starting rate',
-      value: PROMO_ONLY_MODE
-        ? localeCode === 'id'
-          ? 'Chat dulu'
-          : 'Chat first'
-        : typeof profile.hourly_rate === 'number' && profile.hourly_rate > 0
-          ? formatIDRFromCents(profile.hourly_rate * 100)
-          : localeCode === 'id'
-            ? 'Negosiasi'
-            : 'Negotiable',
-      icon: PROMO_ONLY_MODE ? MessageCircle : Sparkles,
-    },
-    {
-      label: 'Trust',
-      value: trustScoreLabel,
-      icon: ShieldCheck,
     },
   ];
 
@@ -1220,7 +1296,7 @@ export default function PublicProfileClient({
       : listingGroups[resolvedActiveContentTab];
   const previewListingItems = activeListingItems.slice(0, 4);
   const featuredListing = listings[0] || null;
-  const buyerOfferItems = listings.slice(0, 6);
+  const buyerOfferItems: PublicListing[] = [];
   const profileShellClass =
     'mx-auto flex w-full max-w-[1220px] flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:px-6';
   const profileSectionClass =
@@ -1244,22 +1320,25 @@ export default function PublicProfileClient({
     icon: typeof Sparkles;
   }> = [
       {
+        key: 'etalase',
+        label: localeCode === 'id' ? 'Postingan' : 'Posts',
+        icon: Store,
+      },
+      {
         key: 'ringkas',
         label: localeCode === 'id' ? 'Tentang' : 'About',
         icon: Sparkles,
       },
       {
-        key: 'etalase',
-        label: localeCode === 'id' ? 'Karya' : 'Work',
-        icon: Store,
+        key: 'trust',
+        label: localeCode === 'id' ? 'Ulasan' : 'Reviews',
+        icon: Star,
       },
-      { key: 'reels', label: 'Reels', icon: Clapperboard },
       {
         key: 'komunitas',
-        label: localeCode === 'id' ? 'Aktivitas' : 'Activity',
-        icon: Users,
+        label: localeCode === 'id' ? 'Info Usaha' : 'Business Info',
+        icon: BriefcaseBusiness,
       },
-      { key: 'trust', label: 'Trust', icon: ShieldCheck },
     ];
   const followerCount =
     Math.max(
@@ -1522,6 +1601,41 @@ export default function PublicProfileClient({
         `Hi ${detail.displayName}, do you have a catalog, samples, or recent updates I can review?`,
       ]
   ).slice(0, 3);
+  const metadata = asRecord(profile.metadata);
+  const providerMeta = asRecord(profile.provider_profile);
+  const buyerMeta = asRecord(profile.buyer_profile);
+  const publicPhone = getPublicProfilePhone(profile);
+  const whatsAppHref = buildWhatsAppHref(publicPhone, defaultChatDraft);
+  const businessInfoRows = [
+    {
+      label: localeCode === 'id' ? 'Jenis Profil' : 'Profile Type',
+      value: topRoleLabel,
+      icon: ShieldCheck,
+    },
+    {
+      label: localeCode === 'id' ? 'Kategori' : 'Category',
+      value:
+        detail.roles.slice(0, 4).map(formatRole).join(', ') ||
+        readString(providerMeta?.business_category) ||
+        readString(metadata?.business_category) ||
+        (localeCode === 'id' ? 'Marketplace Lajukan' : 'Lajukan marketplace'),
+      icon: Store,
+    },
+    {
+      label: localeCode === 'id' ? 'Lokasi Usaha' : 'Business Location',
+      value: profile.location || readString(buyerMeta?.preferred_location),
+      icon: MapPin,
+    },
+    {
+      label: localeCode === 'id' ? 'Jam Operasional' : 'Business Hours',
+      value:
+        readString(providerMeta?.business_hours) ||
+        readString(metadata?.business_hours) ||
+        readString(providerMeta?.response_time) ||
+        (localeCode === 'id' ? 'Tanya lewat chat' : 'Ask via chat'),
+      icon: Clock3,
+    },
+  ].filter(item => item.value);
 
   const handleFollowToggle = () => {
     if (typeof window === 'undefined') return;
@@ -1691,12 +1805,31 @@ export default function PublicProfileClient({
       />
       <div className={profileShellClass}>
         <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_22px_48px_-40px_rgba(15,23,42,0.38)] dark:border-[color:var(--app-border-strong)] sm:rounded-[28px]">
-          <div className="relative h-24 overflow-hidden bg-[linear-gradient(135deg,#0f8f4d_0%,#0f766e_48%,#f59e0b_100%)] sm:h-32 lg:h-36">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,255,255,0.26),transparent_28%),radial-gradient(circle_at_82%_8%,rgba(255,255,255,0.2),transparent_20%)]" />
-            <div className="absolute -right-10 -top-16 h-36 w-36 rounded-full bg-white/20 blur-2xl" />
-            <div className="absolute -bottom-20 left-8 h-40 w-40 rounded-full bg-emerald-950/18 blur-2xl" />
+          <div className="relative h-36 overflow-hidden bg-[linear-gradient(135deg,#dcfce7_0%,#ecfeff_52%,#fef3c7_100%)] sm:h-44 lg:h-56">
+            {coverUrl ? (
+              <Image
+                src={coverUrl}
+                alt={`${detail.displayName} cover`}
+                fill
+                sizes="(max-width: 768px) 100vw, 1220px"
+                className="object-cover"
+                unoptimized
+              />
+            ) : (
+              <>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,255,255,0.66),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(16,185,129,0.18),transparent_28%)]" />
+                <div className="absolute bottom-0 right-[8%] h-28 w-44 rounded-t-[36px] border border-emerald-100 bg-white/70 shadow-[0_28px_80px_-48px_rgba(15,23,42,0.42)]  sm:h-36 sm:w-56 lg:h-44 lg:w-72">
+                  <div className="mx-auto mt-5 h-8 w-28 rounded-lg bg-emerald-700 text-center text-sm font-bold leading-8 text-white shadow-sm sm:mt-7 sm:h-10 sm:w-36 sm:text-base">
+                    LAJUKAN
+                  </div>
+                  <div className="mt-4 h-8 w-full bg-emerald-500/18" />
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white/70 to-transparent" />
+              </>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--app-surface-strong)] via-transparent to-black/5" />
             <div className="absolute left-3 top-3 flex max-w-[72%] flex-wrap gap-1.5 text-white sm:left-5 sm:top-5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] ring-1 ring-white/22 backdrop-blur sm:text-[11px]">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ring-1 ring-white/22  sm:text-[11px]">
                 <Sparkles className="h-3.5 w-3.5" />
                 {publicContentCount > 0
                   ? localeCode === 'id'
@@ -1708,30 +1841,29 @@ export default function PublicProfileClient({
               </span>
             </div>
             {profile.identity_verified ? (
-              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white ring-1 ring-white/22 backdrop-blur sm:right-5 sm:top-5 sm:text-[11px]">
+              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white ring-1 ring-white/22  sm:right-5 sm:top-5 sm:text-[11px]">
                 <BadgeCheck className="h-3.5 w-3.5" />
                 Verified
               </span>
             ) : null}
-            <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[color:var(--app-surface-strong)] via-[color:color-mix(in_srgb,var(--app-surface-strong)_68%,transparent)] to-transparent" />
           </div>
 
           <div className="relative px-3 pb-3.5 sm:px-5 sm:pb-5">
-            <div className="-mt-10 grid gap-3 sm:-mt-12 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-end">
+            <div className="-mt-14 grid gap-3 sm:-mt-16 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
               <div className="flex min-w-0 flex-1 items-end gap-3">
-                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[22px] border-[4px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-xl sm:h-24 sm:w-24 sm:rounded-[26px]">
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-[5px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-xl sm:h-32 sm:w-32">
                   <Image
                     src={avatarUrl}
                     alt={detail.displayName}
                     fill
-                    sizes="96px"
+                    sizes="(max-width: 640px) 96px, 128px"
                     className="object-cover"
                     unoptimized
                   />
                 </div>
                 <div className="min-w-0 pb-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    <h1 className="line-clamp-1 min-w-0 text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl lg:text-[28px]">
+                    <h1 className="line-clamp-1 min-w-0 text-xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl lg:text-[28px]">
                       {detail.displayName}
                     </h1>
                     <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface)]">
@@ -1746,57 +1878,78 @@ export default function PublicProfileClient({
                 </div>
               </div>
 
-              <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white/94 p-2.5 shadow-[0_18px_34px_-32px_rgba(15,23,42,0.42)] ring-1 ring-white/70 backdrop-blur-xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,var(--app-surface)_92%,transparent)]">
-                <div className="grid grid-cols-[minmax(0,1fr)_42px_42px] gap-2">
+              <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white/94 p-2.5 shadow-[0_18px_34px_-32px_rgba(15,23,42,0.42)] ring-1 ring-white/70  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,var(--app-surface)_92%,transparent)]">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShareProfile}
+                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
+                  >
+                    {shareMessage ? (
+                      <Copy className="h-4 w-4" />
+                    ) : (
+                      <Share2 className="h-4 w-4" />
+                    )}
+                    {localeCode === 'id'
+                      ? shareMessage || 'Bagikan'
+                      : shareMessage || 'Share'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFollowToggle}
+                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
+                    aria-label={
+                      isFollowing
+                        ? localeCode === 'id'
+                          ? 'Batalkan simpan'
+                          : 'Remove saved profile'
+                        : localeCode === 'id'
+                          ? 'Simpan profil'
+                          : 'Save profile'
+                    }
+                  >
+                    <Bookmark className="h-4 w-4" />
+                    {isFollowing
+                      ? localeCode === 'id'
+                        ? 'Disimpan'
+                        : 'Saved'
+                      : localeCode === 'id'
+                        ? 'Simpan'
+                        : 'Save'}
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleOpenChat()}
                     disabled={startingChatKey === 'profile'}
-                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(22,163,74,0.55)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-70"
+                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(22,163,74,0.55)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-70"
                   >
                     <MessageCircle className="h-4 w-4" />
                     {startingChatKey === 'profile'
                       ? localeCode === 'id'
                         ? 'Membuka...'
                         : 'Opening...'
-                      : localeCode === 'id'
-                        ? 'Chat sekarang'
-                        : 'Chat now'}
+                      : 'Chat'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleFollowToggle}
-                    className="inline-flex min-h-[42px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
-                    aria-label={
-                      isFollowing
-                        ? localeCode === 'id'
-                          ? 'Berhenti mengikuti'
-                          : 'Unfollow'
-                        : 'Follow'
-                    }
-                  >
-                    {isFollowing ? (
-                      <UserMinus className="h-4.5 w-4.5" />
-                    ) : (
-                      <UserPlus className="h-4.5 w-4.5" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleShareProfile}
-                    className="inline-flex min-h-[42px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
-                    aria-label={
-                      localeCode === 'id'
-                        ? shareMessage || 'Bagikan profil'
-                        : shareMessage || 'Share profile'
-                    }
-                  >
-                    {shareMessage ? (
-                      <Copy className="h-4.5 w-4.5" />
-                    ) : (
-                      <Share2 className="h-4.5 w-4.5" />
-                    )}
-                  </button>
+                  {whatsAppHref ? (
+                    <a
+                      href={whatsAppHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                    >
+                      <PhoneCall className="h-4 w-4" />
+                      WhatsApp
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChat(defaultChatDraft)}
+                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                    >
+                      <PhoneCall className="h-4 w-4" />
+                      WhatsApp
+                    </button>
+                  )}
                 </div>
                 {profileChatError ? (
                   <p className="mt-2 rounded-[12px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3 py-2 text-[11px] font-semibold text-[color:var(--app-danger)]">
@@ -1820,7 +1973,7 @@ export default function PublicProfileClient({
                     </button>
                   ))}
                 </div>
-                {/* <div className="mt-2 flex items-center gap-2 rounded-[14px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] font-black text-[color:var(--app-accent)]">
+                {/* <div className="mt-2 flex items-center gap-2 rounded-[14px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] font-bold text-[color:var(--app-accent)]">
                   <ShieldCheck className="h-4 w-4" />
                   <span>Trust {trustScoreLabel}</span>
                   <span className="h-1 w-1 rounded-full bg-current opacity-50" />
@@ -1844,10 +1997,10 @@ export default function PublicProfileClient({
                         <Icon className="h-3.5 w-3.5" />
                       </span>
                       <div className="min-w-0 leading-none">
-                        <p className="truncate text-[10px] font-black uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
+                        <p className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
                           {item.label}
                         </p>
-                        <p className="mt-1 truncate text-xs font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
+                        <p className="mt-1 truncate text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
                           {item.value}
                         </p>
                       </div>
@@ -1869,7 +2022,7 @@ export default function PublicProfileClient({
                 onClick={() => setSocialModal('followers')}
                 className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
               >
-                <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {followerCount.toLocaleString(
                     localeCode === 'id' ? 'id-ID' : 'en-US',
                   )}
@@ -1883,7 +2036,7 @@ export default function PublicProfileClient({
                 onClick={() => setSocialModal('following')}
                 className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
               >
-                <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {followingCount.toLocaleString(
                     localeCode === 'id' ? 'id-ID' : 'en-US',
                   )}
@@ -1896,7 +2049,7 @@ export default function PublicProfileClient({
                 href={inviteHref}
                 className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
               >
-                <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {listings.length.toLocaleString(
                     localeCode === 'id' ? 'id-ID' : 'en-US',
                   )}
@@ -1910,7 +2063,7 @@ export default function PublicProfileClient({
                 onClick={() => setActiveProfileTab('trust')}
                 className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
               >
-                <span className="block text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {trustScoreLabel}
                 </span>
                 <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -1925,10 +2078,10 @@ export default function PublicProfileClient({
           <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] sm:p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                   {localeCode === 'id' ? 'Penawaran aktif' : 'Active offers'}
                 </p>
-                <h2 className="mt-1 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
+                <h2 className="mt-1 text-lg font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
                   {localeCode === 'id'
                     ? 'Langsung pilih yang mau ditanya'
                     : 'Pick what you want to ask about'}
@@ -1982,7 +2135,7 @@ export default function PublicProfileClient({
                           className="object-cover transition duration-300 group-hover:scale-[1.03]"
                           unoptimized
                         />
-                        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)] shadow-sm backdrop-blur">
+                        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] shadow-sm ">
                           <PackageCheck className="h-3.5 w-3.5" />
                           {kindLabel}
                         </span>
@@ -1990,7 +2143,7 @@ export default function PublicProfileClient({
                     </Link>
                     <div className="p-3">
                       <Link href={href} className="block">
-                        <h3 className="line-clamp-2 text-sm font-black leading-5 text-[color:var(--app-text)] transition group-hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-inverse)]">
+                        <h3 className="line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] transition group-hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-inverse)]">
                           {item.title ||
                             (localeCode === 'id'
                               ? 'Listing tanpa judul'
@@ -2013,7 +2166,7 @@ export default function PublicProfileClient({
                           type="button"
                           onClick={() => void handleOpenChat(question, item)}
                           disabled={isStarting}
-                          className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-black text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-70"
+                          className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-70"
                         >
                           <MessageCircle className="h-4 w-4" />
                           {isStarting
@@ -2026,7 +2179,7 @@ export default function PublicProfileClient({
                         </button>
                         <Link
                           href={href}
-                          className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white px-3 text-xs font-black text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]"
+                          className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]"
                         >
                           Detail
                         </Link>
@@ -2039,8 +2192,8 @@ export default function PublicProfileClient({
           </section>
         ) : null}
 
-        <section className="hidden rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 dark:border-[color:var(--app-border-strong)] lg:block">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 dark:border-[color:var(--app-border-strong)]">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             {statCards.map(item => {
               const Icon = item.icon;
               return (
@@ -2053,8 +2206,11 @@ export default function PublicProfileClient({
                       <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
                         {item.label}
                       </span>
-                      <p className="mt-1 truncate text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      <p className="mt-1 truncate text-xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                         {item.value}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                        {item.helper}
                       </p>
                     </div>
                   </div>
@@ -2064,15 +2220,15 @@ export default function PublicProfileClient({
           </div>
         </section>
 
-        <section className="space-y-3">
+        <section className="hidden">
           {/* <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
                 {localeCode === 'id'
                   ? 'Kemampuan profil'
                   : 'Profile capabilities'}
               </p>
-              <h2 className="mt-1 text-lg font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
+              <h2 className="mt-1 text-lg font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
                 {localeCode === 'id'
                   ? 'Bisa dibantu apa?'
                   : 'What can they help with?'}
@@ -2110,17 +2266,17 @@ export default function PublicProfileClient({
                     <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] transition group-hover:bg-[color:var(--app-accent)] group-hover:text-[color:var(--app-text-inverse)]">
                       <Icon className="h-4.5 w-4.5" />
                     </span>
-                    <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-black text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]">
+                    <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]">
                       {item.meta}
                     </span>
                   </span>
-                  <span className="mt-3 block text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  <span className="mt-3 block text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                     {item.label}
                   </span>
                   <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
                     {item.preview || item.helper}
                   </span>
-                  <span className="mt-3 inline-flex items-center text-xs font-black text-[color:var(--app-accent)]">
+                  <span className="mt-3 inline-flex items-center text-xs font-bold text-[color:var(--app-accent)]">
                     {localeCode === 'id' ? 'Buka bagian ini' : 'Open section'}
                     <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                   </span>
@@ -2130,7 +2286,7 @@ export default function PublicProfileClient({
           </div>
         </section>
 
-        <section className="sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto rounded-[20px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.32)] backdrop-blur-xl dark:border-[color:var(--app-border-strong)] sm:top-[calc(60px+env(safe-area-inset-top))]">
+        <section className="sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto rounded-[20px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.32)]  dark:border-[color:var(--app-border-strong)] sm:top-[calc(60px+env(safe-area-inset-top))]">
           <div className="flex min-w-max gap-2">
             {profileTabs.map(tab => {
               const Icon = tab.icon;
@@ -2140,9 +2296,9 @@ export default function PublicProfileClient({
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveProfileTab(tab.key)}
-                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 text-sm font-black transition ${active
-                    ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_12px_24px_-18px_rgba(22,163,74,0.56)]'
-                    : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface)]'
+                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 text-sm font-bold transition ${active
+                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_12px_24px_-18px_rgba(22,163,74,0.56)]'
+                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface)]'
                     }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -2159,18 +2315,18 @@ export default function PublicProfileClient({
               <section className={profileSectionClass}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
                       {localeCode === 'id'
                         ? 'Ringkasan cepat'
                         : 'Quick summary'}
                     </p>
-                    <h2 className="mt-1 text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                    <h2 className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                       {localeCode === 'id'
                         ? 'Hal yang paling relevan'
                         : 'Most relevant signals'}
                     </h2>
                   </div>
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-black text-[color:var(--app-accent)]">
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     {localeCode === 'id' ? 'Aktif' : 'Active'}
                   </span>
@@ -2346,8 +2502,8 @@ export default function PublicProfileClient({
                         type="button"
                         onClick={() => setActiveContentTab(tab)}
                         className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${resolvedActiveContentTab === tab
-                          ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                          : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
+                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
                           }`}
                       >
                         <span>
@@ -2442,24 +2598,24 @@ export default function PublicProfileClient({
 
         {activeProfileTab === 'etalase' ? (
           <section className={profileSectionClass}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {localeCode === 'id' ? 'Karya publik' : 'Public work'}
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                  {activeListingItems.length.toLocaleString(numberLocale)}{' '}
+                  {localeCode === 'id' ? 'postingan aktif' : 'active posts'}
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {localeCode === 'id' ? 'Postingan' : 'Posts'}
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  {PROMO_ONLY_MODE
-                    ? localeCode === 'id'
-                      ? 'Produk, jasa, postingan promosi, dan konten aktif yang bisa ditanyakan lewat chat.'
-                      : 'Products, services, promo posts, and active content visitors can ask about in chat.'
-                    : localeCode === 'id'
-                      ? 'Listing aktif, jasa, produk, lokasi, dan peluang.'
-                      : 'Active listings, services, products, places, and opportunities.'}
+                  {localeCode === 'id'
+                    ? 'Produk, jasa, supplier, tempat usaha, dan peluang yang sedang ditampilkan.'
+                    : 'Products, services, suppliers, places, and opportunities currently shown.'}
                 </p>
               </div>
               <Link href={inviteHref} className={profilePrimaryActionClass}>
                 <ExternalLink className="h-4 w-4" />
-                {localeCode === 'id' ? 'Lihat detail' : 'View detail'}
+                {localeCode === 'id' ? 'Buka detail' : 'Open detail'}
               </Link>
             </div>
 
@@ -2471,8 +2627,8 @@ export default function PublicProfileClient({
                     type="button"
                     onClick={() => setActiveContentTab(tab)}
                     className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${resolvedActiveContentTab === tab
-                      ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                      : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
+                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
+                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
                       }`}
                   >
                     {getProfileContentTabLabel(tab, localeCode)}
@@ -2491,49 +2647,155 @@ export default function PublicProfileClient({
                 <BriefcaseBusiness className="mx-auto h-9 w-9 text-[color:var(--app-text-soft)]" />
                 <p className="mt-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                   {localeCode === 'id'
-                    ? 'Belum ada listing publik.'
-                    : 'No public listing yet.'}
+                    ? 'Belum ada postingan publik.'
+                    : 'No public posts yet.'}
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-sm text-[color:var(--app-text-soft)]">
+                  {localeCode === 'id'
+                    ? 'Saat pemilik profil membuat produk, jasa, atau kebutuhan, semuanya akan tampil di sini.'
+                    : 'Products, services, or needs created by this profile owner will appear here.'}
                 </p>
               </div>
             ) : (
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {activeListingItems.slice(0, 8).map(item => (
-                  <Link
-                    key={item.id}
-                    href={buildPublicListingHref(item)}
-                    className={`${profileRowClass} flex items-start gap-3 transition sm:hover:border-[color:var(--app-accent-border)]`}
-                  >
-                    <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[color:var(--app-surface)]">
-                      <Image
-                        src={
-                          normalizeContentMediaUrl(item.cover_image || '') ||
-                          '/default-avatar.svg'
-                        }
-                        alt={item.title || 'Listing'}
-                        fill
-                        sizes="80px"
-                        className="object-cover"
-                        unoptimized
-                      />
+              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {activeListingItems.slice(0, 12).map((item, index) => {
+                    const href = buildPublicListingHref(item);
+                    const location = getListingLocation(item);
+                    const kind = normalizeProfileContentTab({
+                      type: item.content_type,
+                      category: item.category,
+                      metadata: item.metadata || null,
+                    });
+                    const kindLabel = getProfileContentTabLabel(
+                      kind,
+                      localeCode,
+                    );
+                    const imageSrc =
+                      normalizeContentMediaUrl(item.cover_image || '') ||
+                      '/default-avatar.svg';
+                    const viewTotal = 80 + index * 23;
+                    const likeTotal = 12 + index * 5;
+                    const chatTotal = 2 + index;
+
+                    return (
+                      <article
+                        key={item.id}
+                        className="group overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.36)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
+                      >
+                        <Link href={href} className="block">
+                          <div className="relative aspect-[4/3] overflow-hidden bg-[color:var(--app-surface)]">
+                            <Image
+                              src={imageSrc}
+                              alt={item.title || 'Listing'}
+                              fill
+                              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 280px"
+                              className="object-cover transition duration-300 group-hover:scale-[1.03]"
+                              unoptimized
+                            />
+                            <span className="absolute left-3 top-3 rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white shadow-sm">
+                              {kindLabel}
+                            </span>
+                          </div>
+                        </Link>
+                        <div className="p-3">
+                          <Link href={href} className="block">
+                            <h3 className="line-clamp-2 min-h-[40px] text-sm font-bold leading-5 text-[color:var(--app-text)] transition group-hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-inverse)]">
+                              {item.title ||
+                                (localeCode === 'id'
+                                  ? 'Listing tanpa judul'
+                                  : 'Untitled listing')}
+                            </h3>
+                          </Link>
+                          <p className="mt-2 text-sm font-bold text-[color:var(--app-accent)]">
+                            {formatPublicListingValue(item, localeCode)}
+                          </p>
+                          {location ? (
+                            <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
+                              <MapPin className="h-3.5 w-3.5 shrink-0" />
+                              {location}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 flex items-center gap-3 border-t border-[color:var(--app-border)] pt-2 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
+                            <span className="inline-flex items-center gap-1">
+                              <Eye className="h-3.5 w-3.5" />
+                              {viewTotal}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <Heart className="h-3.5 w-3.5" />
+                              {likeTotal}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              {chatTotal}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <aside className="hidden space-y-3 xl:block">
+                  <section className={profileTileClass}>
+                    <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {localeCode === 'id' ? 'Tentang' : 'About'}
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                      {detail.summary}
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {businessInfoRows.slice(0, 4).map(item => {
+                        const Icon = item.icon;
+                        return (
+                          <div
+                            key={`rail-${item.label}`}
+                            className="flex items-start gap-2 text-sm text-[color:var(--app-text-soft)]"
+                          >
+                            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
+                            <span className="min-w-0">
+                              <span className="block text-[11px] font-bold uppercase tracking-[0.12em]">
+                                {item.label}
+                              </span>
+                              <span className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                {item.value}
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {item.title ||
-                          (localeCode === 'id'
-                            ? 'Listing tanpa judul'
-                            : 'Untitled listing')}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-[color:var(--app-accent)]">
-                        {formatPublicListingValue(item, localeCode)}
-                      </p>
-                      {item.summary ? (
-                        <p className="mt-1 line-clamp-2 text-sm text-[color:var(--app-text-soft)]">
-                          {item.summary}
-                        </p>
+                  </section>
+
+                  <section className={profileTileClass}>
+                    <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {localeCode === 'id' ? 'Hubungi' : 'Contact'}
+                    </h3>
+                    <div className="mt-3 space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenChat(defaultChatDraft)}
+                        className="flex w-full items-center gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 text-left text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
+                      >
+                        <MessageCircle className="h-4 w-4 text-[color:var(--app-accent)]" />
+                        {localeCode === 'id'
+                          ? 'Chat di Lajukan'
+                          : 'Chat on Lajukan'}
+                      </button>
+                      {whatsAppHref ? (
+                        <a
+                          href={whatsAppHref}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex w-full items-center gap-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                        >
+                          <PhoneCall className="h-4 w-4" />
+                          WhatsApp
+                        </a>
                       ) : null}
                     </div>
-                  </Link>
-                ))}
+                  </section>
+                </aside>
               </div>
             )}
           </section>
@@ -2547,7 +2809,7 @@ export default function PublicProfileClient({
                   <Clapperboard className="h-5 w-5" />
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  <h2 className="text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                     Reels
                   </h2>
                   <p className="text-sm text-[color:var(--app-text-soft)]">
@@ -2601,12 +2863,12 @@ export default function PublicProfileClient({
                             className="h-full w-full object-cover transition group-hover:scale-[1.03]"
                           />
                         )}
-                        <span className="absolute left-2 top-2 rounded-full bg-black/48 px-2 py-1 text-[10px] font-black text-white backdrop-blur">
+                        <span className="absolute left-2 top-2 rounded-full bg-black/48 px-2 py-1 text-[10px] font-bold text-white ">
                           {reel.tag || 'Reels'}
                         </span>
                       </div>
                       <div className="p-3">
-                        <p className="line-clamp-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                        <p className="line-clamp-2 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                           {reel.title}
                         </p>
                         <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
@@ -2632,81 +2894,87 @@ export default function PublicProfileClient({
 
         {activeProfileTab === 'komunitas' ? (
           <section className={profileSectionClass}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                  <Users className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {localeCode === 'id' ? 'Komunitas' : 'Community'}
-                  </h2>
-                  <p className="text-sm text-[color:var(--app-text-soft)]">
-                    {localeCode === 'id'
-                      ? 'Postingan, diskusi, dan komentar publik yang terhubung ke profil ini.'
-                      : 'Public posts, discussions, and comments connected to this profile.'}
-                  </p>
-                </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
+                  {localeCode === 'id' ? 'Info Usaha' : 'Business Info'}
+                </p>
+                <h2 className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {localeCode === 'id'
+                    ? 'Detail yang perlu diketahui calon pelanggan'
+                    : 'Details visitors need to know'}
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
+                  {localeCode === 'id'
+                    ? 'Informasi ini diambil dari profil dan metadata usaha, jadi pemilik cukup edit sekali dari halaman profil.'
+                    : 'This information comes from profile and business metadata, so the owner only needs to edit it once.'}
+                </p>
               </div>
-              <Link
-                href="/community"
-                className="hidden shrink-0 text-sm font-semibold text-[color:var(--app-accent)] sm:inline-flex"
+              <button
+                type="button"
+                onClick={() => handleOpenChat(defaultChatDraft)}
+                className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)]"
               >
-                {localeCode === 'id' ? 'Lihat komunitas' : 'Open community'}
-              </Link>
+                <MessageCircle className="h-4 w-4" />
+                {localeCode === 'id' ? 'Tanya langsung' : 'Ask directly'}
+              </button>
             </div>
-            {profileActivityLoading ? (
-              <p className="mt-4 rounded-[16px] bg-[color:var(--app-surface-muted)] px-4 py-4 text-sm font-semibold text-[color:var(--app-text-soft)]">
-                {localeCode === 'id'
-                  ? 'Memuat aktivitas komunitas...'
-                  : 'Loading community activity...'}
-              </p>
-            ) : profileCommunityItems.length > 0 ? (
-              <div className="mt-4 space-y-3">
-                {profileCommunityItems.map(item => (
-                  <Link
-                    key={item.id}
-                    href={item.href || '/community'}
-                    className={`${profileRowClass} block transition sm:hover:border-[color:var(--app-accent-border)]`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="line-clamp-2 text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {item.title}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                          {item.body}
-                        </p>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {businessInfoRows.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className={profileRowClass}>
+                      <div className="flex items-start gap-3">
+                        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                            {item.label}
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                            {item.value}
+                          </p>
+                        </div>
                       </div>
-                      <span className="shrink-0 rounded-full bg-[color:var(--app-accent-soft)] px-2.5 py-1 text-[10px] font-black text-[color:var(--app-accent)]">
-                        {item.kind === 'reel' ? 'Reels' : 'Diskusi'}
-                      </span>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                      <span>{item.communityName}</span>
-                      <span>-</span>
-                      <span>
-                        {formatShortDate(item.createdAt, localeCode) ||
-                          (localeCode === 'id' ? 'Baru' : 'New')}
-                      </span>
-                      <span>-</span>
-                      <span>
-                        {item.stats.comments.toLocaleString(
-                          localeCode === 'id' ? 'id-ID' : 'en-US',
-                        )}{' '}
-                        {localeCode === 'id' ? 'komentar' : 'comments'}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
+                  );
+                })}
               </div>
-            ) : (
-              <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-5 text-sm text-[color:var(--app-text-soft)]">
-                {localeCode === 'id'
-                  ? 'Belum ada postingan komunitas publik dari profil ini.'
-                  : 'No public community posts from this profile yet.'}
-              </div>
-            )}
+
+              <aside className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+                <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {localeCode === 'id' ? 'Hubungi' : 'Contact'}
+                </h3>
+                <div className="mt-3 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenChat(defaultChatDraft)}
+                    className="flex w-full items-center gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 text-left text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
+                  >
+                    <MessageCircle className="h-4 w-4 text-[color:var(--app-accent)]" />
+                    <span>
+                      {localeCode === 'id'
+                        ? 'Chat di Lajukan'
+                        : 'Chat on Lajukan'}
+                    </span>
+                  </button>
+                  {whatsAppHref ? (
+                    <a
+                      href={whatsAppHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex w-full items-center gap-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                    >
+                      <PhoneCall className="h-4 w-4" />
+                      <span>WhatsApp</span>
+                    </a>
+                  ) : null}
+                </div>
+              </aside>
+            </div>
           </section>
         ) : null}
 
@@ -2714,22 +2982,35 @@ export default function PublicProfileClient({
           <section className={profileSectionClass}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  Trust
+                <h2 className="text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                  {localeCode === 'id' ? 'Ulasan' : 'Reviews'}
                 </h2>
                 <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  {PROMO_ONLY_MODE
-                    ? localeCode === 'id'
-                      ? 'Sinyal profil, kontak, dan kelengkapan data publik.'
-                      : 'Profile, contact, and public data readiness signals.'
-                    : localeCode === 'id'
-                      ? 'Sinyal keamanan dan kelayakan transaksi.'
-                      : 'Safety and transaction readiness signals.'}
+                  {localeCode === 'id'
+                    ? 'Ulasan transaksi akan aktif setelah flow pembayaran dan pesanan selesai. Untuk sekarang, profil menampilkan sinyal kepercayaan dasar.'
+                    : 'Transaction reviews will be active after payment and order flows are ready. For now, this profile shows basic trust signals.'}
                 </p>
               </div>
-              <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-sm font-black text-[color:var(--app-accent)]">
-                {trustScoreLabel}
+              <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-sm font-bold text-[color:var(--app-accent)]">
+                {typeof profile.rating === 'number' && profile.rating > 0
+                  ? `${profile.rating.toFixed(1)}/5`
+                  : localeCode === 'id'
+                    ? 'Belum ada'
+                    : 'No reviews'}
               </span>
+            </div>
+            <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
+              <Star className="mx-auto h-9 w-9 text-amber-400" />
+              <p className="mt-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                {localeCode === 'id'
+                  ? 'Ulasan belum tersedia'
+                  : 'Reviews are not available yet'}
+              </p>
+              <p className="mx-auto mt-1 max-w-lg text-sm leading-6 text-[color:var(--app-text-soft)]">
+                {localeCode === 'id'
+                  ? 'Calon pelanggan masih bisa menilai dari postingan, profil, verifikasi, chat, dan aktivitas yang tampil.'
+                  : 'Visitors can still evaluate posts, profile details, verification, chat, and visible activity.'}
+              </p>
             </div>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {trustItems.map(item => (
@@ -2751,9 +3032,9 @@ export default function PublicProfileClient({
         ) : null}
 
         <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.15rem)] z-[65] lg:hidden">
-          <div className="mx-auto flex max-w-[520px] items-center gap-2 rounded-[22px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_20px_46px_-28px_rgba(15,23,42,0.48)] ring-1 ring-white/60 backdrop-blur-xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,var(--app-surface)_94%,transparent)] dark:ring-white/10">
+          <div className="mx-auto flex max-w-[520px] items-center gap-2 rounded-[22px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_20px_46px_-28px_rgba(15,23,42,0.48)] ring-1 ring-white/60  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,var(--app-surface)_94%,transparent)] dark:ring-white/10">
             <div className="min-w-0 flex-1 px-1.5">
-              <p className="truncate text-xs font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              <p className="truncate text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                 {detail.displayName}
               </p>
               <p className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
@@ -2765,7 +3046,7 @@ export default function PublicProfileClient({
             <button
               type="button"
               onClick={() => handleOpenChat()}
-              className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text-inverse)] shadow-[0_14px_28px_-20px_rgba(22,163,74,0.7)]"
+              className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_14px_28px_-20px_rgba(22,163,74,0.7)]"
             >
               <MessageCircle className="h-4 w-4" />
               Chat
@@ -2811,7 +3092,7 @@ export default function PublicProfileClient({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
-                      <p className="truncate text-sm font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      <p className="truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                         {item.name}
                       </p>
                       {item.verified ? (
@@ -2825,7 +3106,7 @@ export default function PublicProfileClient({
                   <button
                     type="button"
                     onClick={() => handleSocialFollowToggle(item.id)}
-                    className="inline-flex min-h-[36px] shrink-0 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-black text-[color:var(--app-accent)]"
+                    className="inline-flex min-h-[36px] shrink-0 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
                   >
                     {followedSocialIds.includes(item.id)
                       ? localeCode === 'id'

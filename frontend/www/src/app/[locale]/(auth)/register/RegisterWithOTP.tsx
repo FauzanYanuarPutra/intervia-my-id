@@ -105,7 +105,7 @@ export default function RegisterWithOTP() {
   const passwordPolicyError = validatePasswordStrength(password);
   const passwordIdentityError =
     password &&
-    passwordContainsIdentityHint(password, [normalizedUsername, fullName])
+      passwordContainsIdentityHint(password, [normalizedUsername, fullName])
       ? 'Password cannot contain username or name'
       : null;
   const passwordBlockingError = passwordPolicyError || passwordIdentityError;
@@ -285,7 +285,7 @@ export default function RegisterWithOTP() {
         </div>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             {isId ? 'Nama lengkap' : 'Full name'}
           </span>
           <span className="relative block">
@@ -302,7 +302,7 @@ export default function RegisterWithOTP() {
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             Username
           </span>
           <span className="relative block">
@@ -328,7 +328,7 @@ export default function RegisterWithOTP() {
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             Email OTP
           </span>
           <span className="relative block">
@@ -367,7 +367,7 @@ export default function RegisterWithOTP() {
             type="button"
             onClick={sendEmailOtp}
             disabled={sendingOtp || !normalizedEmail.includes('@') || otpCooldownLeft > 0}
-            className="inline-flex min-h-[48px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-black text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
+            className="inline-flex min-h-[48px] items-center justify-center rounded-[14px] border border-[color:var(--app-border)] bg-white px-4 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]"
           >
             {sendingOtp
               ? 'SEND...'
@@ -383,7 +383,7 @@ export default function RegisterWithOTP() {
           type="button"
           onClick={verifyEmailOtp}
           disabled={verifyingOtp || otp.length !== 6 || !normalizedEmail.includes('@') || Boolean(otpToken)}
-          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-black text-[color:var(--app-accent-strong)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_70%,white_30%)] disabled:cursor-not-allowed disabled:border-[color:var(--app-border)] disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]"
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-4 text-sm font-bold text-[color:var(--app-accent-strong)] transition hover:bg-[color:color-mix(in_srgb,var(--app-accent-soft)_70%,white_30%)] disabled:cursor-not-allowed disabled:border-[color:var(--app-border)] disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)]"
         >
           {verifyingOtp ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -409,7 +409,7 @@ export default function RegisterWithOTP() {
         />
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             Password
           </span>
           <span className="relative block">
@@ -452,7 +452,7 @@ export default function RegisterWithOTP() {
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-xs font-black text-[color:var(--app-text)]">
+          <span className="mb-1.5 block text-xs font-bold text-[color:var(--app-text)]">
             {isId ? 'Ulangi password' : 'Confirm password'}
           </span>
           <span className="relative block">
@@ -504,7 +504,7 @@ export default function RegisterWithOTP() {
         <button
           type="submit"
           disabled={!canSubmit || submitting}
-          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-black text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_-24px_rgba(0,128,64,0.75)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] disabled:shadow-none"
+          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_18px_34px_-24px_rgba(0,128,64,0.75)] transition hover:bg-[color:var(--app-accent-strong)] active:translate-y-px disabled:cursor-not-allowed disabled:bg-[color:var(--app-surface-muted)] disabled:text-[color:var(--app-text-soft)] disabled:shadow-none"
         >
           {submitting ? (
             <Loader2 className="h-4 w-4 animate-spin" />

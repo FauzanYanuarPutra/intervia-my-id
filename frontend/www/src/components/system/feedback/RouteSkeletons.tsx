@@ -1210,7 +1210,7 @@ export function ContentDetailSkeleton() {
 export function ChatIndexSkeleton() {
   return (
     <section className="hidden h-full min-h-0 flex-1 flex-col bg-gradient-to-br from-[color:color-mix(in_srgb,_var(--app-accent-soft)_80%,_transparent)] via-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] to-[color:color-mix(in_srgb,_var(--app-info-soft)_80%,_transparent)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:color-mix(in_srgb,_var(--app-surface-strong)_95%,_transparent)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)] lg:flex">
-      <div className="flex min-h-[72px] items-center justify-between border-b border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-6 backdrop-blur dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)]">
+      <div className="flex min-h-[72px] items-center justify-between border-b border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)] px-6  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_70%,_transparent)]">
         <div>
           <Pulse className="h-3 w-28 rounded-full" />
           <Pulse className="mt-3 h-4 w-56 rounded-full" />
@@ -1219,7 +1219,7 @@ export function ChatIndexSkeleton() {
 
       <div className="relative min-h-0 flex-1 overflow-y-auto px-6 py-6 xl:px-8">
         <div className="relative flex min-h-full items-center justify-center">
-          <div className="w-full max-w-2xl rounded-[32px] border border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-6 shadow-[0_14px_36px_-24px_rgba(15,23,42,0.32)] backdrop-blur dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] sm:p-8">
+          <div className="w-full max-w-2xl rounded-[32px] border border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-6 shadow-[0_14px_36px_-24px_rgba(15,23,42,0.32)]  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] sm:p-8">
             <Pulse className="h-3 w-32 rounded-full" />
             <Pulse className="mt-4 h-8 w-2/3" />
             <SkeletonBlock lines={3} className="mt-4" />

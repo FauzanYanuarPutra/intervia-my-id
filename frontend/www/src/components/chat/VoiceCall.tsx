@@ -346,7 +346,7 @@ export function VoiceCall({ roomId, userId, callId, channel, isCaller = false, u
       <div className="text-center text-[color:var(--app-text-inverse)] space-y-6">
         {/* Avatar */}
         <div className="flex justify-center">
-          <div className="w-32 h-32 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)] rounded-full flex items-center justify-center backdrop-blur-sm">
+          <div className="w-32 h-32 bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_20%,_transparent)] rounded-full flex items-center justify-center ">
             <User className="w-16 h-16 text-[color:var(--app-text-inverse)]" />
           </div>
         </div>
