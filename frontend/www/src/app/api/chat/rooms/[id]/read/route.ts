@@ -10,16 +10,26 @@ function safeDecodeRoomId(id: string): string {
   }
 }
 
+function isSafeRoomId(value: string): boolean {
+  return Boolean(value) && value.length <= 180 && !/[\u0000-\u001F\u007F]/.test(value);
+}
+
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
     const roomId = safeDecodeRoomId(id);
-    const token =
-      req.headers.get('authorization')?.replace('Bearer ', '') ||
-      req.cookies.get('access_token')?.value;
+    const bearerToken = req.headers.get('authorization')?.replace('Bearer ', '').trim();
+    const cookieToken = req.cookies.get('access_token')?.value?.trim();
+    const preferCookie = process.env.NODE_ENV === 'production';
+    const token = preferCookie
+      ? cookieToken || bearerToken
+      : bearerToken || cookieToken;
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!isSafeRoomId(roomId)) {
+      return NextResponse.json({ error: 'Invalid room id' }, { status: 400 });
     }
 
     const pathSegment = encodeURIComponent(roomId);

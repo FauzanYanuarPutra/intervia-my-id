@@ -588,6 +588,7 @@ defmodule ChatServiceWeb.RoomChannel do
     if AidaBot.should_reply?(room_id, sender_id) do
       reply_text =
         AidaBot.build_reply(incoming.content || incoming.body || "",
+          room_id: room_id,
           message_type: incoming.message_type,
           attachments: incoming.attachments || []
         )

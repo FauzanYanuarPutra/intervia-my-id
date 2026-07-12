@@ -44,6 +44,7 @@ import { useToast } from '@/components/system/feedback/ToastProvider';
 import { Footer } from '@/components/layout/Footer';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import {
   isPreviewableContentMediaUrl,
   normalizeContentMediaUrl,
@@ -159,7 +160,7 @@ const COMMUNITY_MODAL_SHELL_CLASS =
   'ui-layer-modal fixed inset-0 z-[10000] flex items-end justify-center bg-slate-950/45 p-0  sm:items-center sm:p-4';
 
 const COMMUNITY_MODAL_SURFACE_CLASS =
-  'flex h-full w-full flex-col overflow-hidden shadow-[0_30px_80px_-40px_rgba(15,23,42,0.42)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-[24px]';
+  'flex h-full w-full flex-col overflow-hidden shadow-[0_30px_80px_-40px_rgba(15,23,42,0.42)] sm:h-auto sm:max-h-[calc(var(--app-viewport-height)-2rem)] sm:rounded-[24px]';
 
 const TABS: Array<{
   id: CommunityFeedTab;
@@ -888,7 +889,7 @@ function CommunityMediaGalleryPreview({
             <X className="h-6 w-6" />
           </button>
 
-          <div className="h-[86svh] w-full max-w-6xl">
+          <div className="h-[min(calc(var(--app-viewport-height)-2rem),860px)] w-full max-w-6xl">
             <MediaPreviewCarousel
               items={items}
               alt={title}
@@ -1985,6 +1986,7 @@ export function CommunityDetailModal({
   const [saving, setSaving] = useState(false);
   const trackedThreadViewRef = useRef<string | null>(null);
   const loginHref = buildLoginHref(pathname, searchParams.toString());
+  useBodyScrollLock(Boolean(threadId));
 
   useEffect(() => {
     if (!threadId) return;
@@ -1992,12 +1994,9 @@ export function CommunityDetailModal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [onClose, threadId]);
@@ -4639,7 +4638,7 @@ export default function CommunityFeedClient({
   };
 
   return (
-    <main className="lajukan-home-compact min-h-screen min-h-[100dvh] bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <main className="lajukan-home-compact min-h-screen min-h-[100svh] bg-[radial-gradient(circle_at_top,#eef9f1_0%,#f8fbff_34%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell mx-auto flex h-full flex-col lg:overflow-hidden">
         <div className="lajukan-home-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1700px] flex-1 gap-4 lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_320px] 2xl:grid-cols-[280px_minmax(0,1fr)_340px]">
           <LeftRail

@@ -2273,7 +2273,7 @@ function SearchCartDock({
         </button>
       ) : (
         /* EXPANDED */
-        <section className="pointer-events-auto flex max-h-[60vh] flex-col overflow-hidden rounded-[20px] border bg-white shadow-xl">
+        <section className="pointer-events-auto flex max-h-[min(calc(var(--app-viewport-height)-10rem),520px)] flex-col overflow-hidden rounded-[20px] border bg-white shadow-xl">
           {/* HEADER */}
           <div className="flex items-center justify-between border-b px-3 py-2">
             <div className="min-w-0">
@@ -3193,7 +3193,7 @@ export default function SearchPageClient() {
   );
 
   return (
-    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen min-h-[100dvh] w-full max-w-full overflow-x-hidden px-1 pb-6 pt-0 sm:px-4 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <div className="lajukan-home-compact lajukan-market-page lajukan-market-search lajukan-search-compact min-h-screen min-h-[100svh] w-full max-w-full overflow-x-hidden px-1 pb-6 pt-0 sm:px-4 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell lajukan-search-shell mx-auto h-full w-full max-w-full overflow-x-hidden lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
         <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden lg:hidden">
           <div className="ui-layer-local-topbar fixed inset-x-0 top-0 z-[80] flex items-center gap-2 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_96%,transparent)] px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)+0.35rem)] shadow-[0_12px_26px_-24px_rgba(15,23,42,0.26)]  sm:px-3">

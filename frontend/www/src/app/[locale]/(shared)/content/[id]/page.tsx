@@ -4920,20 +4920,48 @@ export default function ContentDetailPage({ params }: PageProps) {
         readPositiveInteger(payload.likeCount ?? payload.like_count),
       );
 
-      try {
-        await trackLajukanEvent('content.liked', {
-          entityType: 'content',
-          entityId: resolvedContentId || item.id,
-          page: localizedListingHref,
-          properties: {
-            entity_label: item.title,
-            href: localizedListingHref,
-            action: nextLiked ? 'like' : 'unlike',
-            source: 'content_detail',
-          },
-        });
-      } catch {
-        // Analytics is best-effort and should never undo the like itself.
+      if (nextLiked) {
+        try {
+          const targetUserId = String(
+            item.owner_id || item.owner_profile?.id || '',
+          ).trim();
+          const actorId = String(user.id || '').trim();
+          const actorName =
+            user.fullName ||
+            user.full_name ||
+            user.name ||
+            user.username ||
+            user.email ||
+            '';
+          await trackLajukanEvent('content.liked', {
+            entityType: 'content',
+            entityId: resolvedContentId || item.id,
+            page: localizedListingHref,
+            properties: {
+              entity_label: item.title,
+              href: localizedListingHref,
+              target_href: localizedListingHref,
+              target_user_id: targetUserId,
+              target_username:
+                item.owner_profile?.username ||
+                item.owner_profile?.full_name ||
+                '',
+              target_name:
+                item.owner_profile?.full_name ||
+                item.owner_profile?.username ||
+                '',
+              actor_user_id: actorId,
+              actor_username: String(user.username || '').trim(),
+              actor_name: actorName,
+              actor_avatar_url: user.avatarUrl || user.avatar_url || '',
+              action: 'like',
+              source: 'content_detail',
+              surface: 'content',
+            },
+          });
+        } catch {
+          // Analytics is best-effort and should never undo the like itself.
+        }
       }
     } catch {
       setContentLiked(previousLiked);
@@ -5535,7 +5563,7 @@ export default function ContentDetailPage({ params }: PageProps) {
 
       {showLikesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[80svh] w-full max-w-md overflow-hidden rounded-[28px] bg-white/98 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-hidden rounded-[28px] bg-white/98 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
             <div className="flex items-start justify-between gap-3 border-b border-[color:var(--app-border)] p-5">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-500">
@@ -5558,7 +5586,7 @@ export default function ContentDetailPage({ params }: PageProps) {
               </button>
             </div>
 
-            <div className="max-h-[56svh] overflow-y-auto p-3">
+            <div className="max-h-[min(calc(var(--app-viewport-height)-12rem),520px)] overflow-y-auto p-3">
               {likersLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 5 }).map((_, index) => (
@@ -5593,10 +5621,18 @@ export default function ContentDetailPage({ params }: PageProps) {
                       rawName,
                     );
                     const handle = liker.username ? `@${liker.username}` : '';
+                    const likerHref = isViewer
+                      ? '/profile'
+                      : buildPublicProfileHref({
+                        id: likerId,
+                        username: liker.username || undefined,
+                        full_name: rawName,
+                      });
 
                     return (
-                      <div
+                      <Link
                         key={`${likerId}-${liker.likedAt || liker.liked_at || ''}`}
+                        href={likerHref}
                         className="flex items-center gap-3 rounded-2xl px-2.5 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-900"
                       >
                         <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
@@ -5612,14 +5648,15 @@ export default function ContentDetailPage({ params }: PageProps) {
                           <p className="truncate text-sm font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
                             {displayName}
                           </p>
-                          {handle ? (
-                            <p className="truncate text-xs text-[color:var(--app-text-soft)]">
-                              {handle}
-                            </p>
-                          ) : null}
+                          <p className="truncate text-xs text-[color:var(--app-text-soft)]">
+                            {handle ||
+                              (locale === 'id'
+                                ? 'Profil Lajukan'
+                                : 'Lajukan profile')}
+                          </p>
                         </div>
                         <Heart className="h-4 w-4 fill-rose-500 text-rose-500" />
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -5635,7 +5672,7 @@ export default function ContentDetailPage({ params }: PageProps) {
 
       {showReportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[80svh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-warning)]">
@@ -5756,7 +5793,7 @@ export default function ContentDetailPage({ params }: PageProps) {
 
       {showShareModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[80svh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-info)]">
@@ -5855,7 +5892,7 @@ export default function ContentDetailPage({ params }: PageProps) {
 
       {showApplyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[80svh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-xl overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
@@ -6041,7 +6078,7 @@ export default function ContentDetailPage({ params }: PageProps) {
 
       {showDealChoiceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[80svh] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-lg overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
@@ -6403,7 +6440,7 @@ export default function ContentDetailPage({ params }: PageProps) {
 
       {showOfferModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:color-mix(in_srgb,_var(--app-overlay)_50%,_transparent)] p-3">
-          <div className="max-h-[80svh] w-full max-w-md overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
+          <div className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-[28px] bg-white/98 p-5 shadow-[0_28px_56px_-32px_rgba(15,23,42,0.32)] dark:bg-slate-950/96 dark:shadow-[0_32px_60px_-36px_rgba(2,6,23,0.8)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">

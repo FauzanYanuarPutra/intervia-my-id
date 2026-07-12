@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { Loader2, Minus, Move, Plus, RotateCcw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 type CropTargetShape = 'round' | 'rect';
 
@@ -102,6 +103,8 @@ export function ImageCropModal({
   onCancel,
   onConfirm,
 }: ImageCropModalProps) {
+  useBodyScrollLock(open);
+
   const imageRef = useRef<HTMLImageElement | null>(null);
   const stageShellRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
@@ -487,7 +490,7 @@ export function ImageCropModal({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="flex max-h-[96svh] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[26px] border border-white/15 bg-[color:var(--app-surface-strong)] shadow-[0_24px_90px_-30px_rgba(0,0,0,0.55)] sm:max-w-[1040px] sm:rounded-[32px]">
+      <div className="flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[26px] border border-white/15 bg-[color:var(--app-surface-strong)] shadow-[0_24px_90px_-30px_rgba(0,0,0,0.55)] sm:max-w-[1040px] sm:rounded-[32px]">
         <div className="shrink-0 border-b border-[color:var(--app-border)] px-3 pb-3 pt-3 sm:px-5">
           <div className="mx-auto mb-3 h-1.5 w-14 rounded-full bg-[color:var(--app-surface-muted)] sm:hidden" />
           <div className="flex items-start justify-between gap-3">

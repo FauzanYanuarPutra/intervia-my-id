@@ -87,21 +87,36 @@ export function notificationSocialContext(notification: NotificationLike) {
     readNotificationDataText(notification, [
       'actor_name',
       'actor_full_name',
+      'actor_display_name',
       'viewer_name',
       'viewer_full_name',
       'sender_name',
+      'sender_full_name',
+      'full_name',
+      'display_name',
+      'name',
     ]) || '';
   const actorHandle =
     readNotificationDataText(notification, [
       'actor_username',
+      'actor_handle',
       'viewer_username',
       'sender_username',
+      'username',
     ]) || '';
   const actorAvatarUrl =
     readNotificationDataText(notification, [
       'actor_avatar_url',
+      'actor_avatar',
+      'actor_photo_url',
+      'actor_profile_image_url',
       'viewer_avatar_url',
+      'viewer_avatar',
       'sender_avatar_url',
+      'sender_avatar',
+      'avatar_url',
+      'photo_url',
+      'picture_url',
     ]) || '';
   const entityLabel =
     readNotificationDataText(notification, [
@@ -118,6 +133,12 @@ export function notificationSocialContext(notification: NotificationLike) {
     readNotificationDataText(notification, ['action', 'event_name']) ||
     String(notification.event_type || '').split('.').pop() ||
     '';
+  const actionCopy =
+    readNotificationDataText(notification, [
+      'action_copy',
+      'action_label',
+      'verb',
+    ]) || '';
 
   return {
     actorName,
@@ -126,7 +147,73 @@ export function notificationSocialContext(notification: NotificationLike) {
     entityLabel,
     entityType,
     action,
+    actionCopy,
     href: notificationTargetHref(notification),
+  };
+}
+
+export function notificationSocialSummary(
+  notification: NotificationLike,
+  locale: 'id' | 'en' = 'id',
+) {
+  const social = notificationSocialContext(notification);
+  const event = String(notification.event_type || '')
+    .trim()
+    .toLowerCase();
+  const actor =
+    social.actorName ||
+    (social.actorHandle
+      ? social.actorHandle.startsWith('@')
+        ? social.actorHandle
+        : `@${social.actorHandle}`
+      : '');
+  const entity = social.entityLabel || '';
+  const entityTypeLabel = notificationTargetLabel(social.entityType);
+  const fallbackTitle =
+    String(notification.title || '').trim() ||
+    (locale === 'id' ? 'Notifikasi baru' : 'New notification');
+
+  const verb = (() => {
+    if (event.includes('liked') || event.includes('like')) {
+      return locale === 'id' ? 'menyukai' : 'liked';
+    }
+    if (event.includes('commented') || event.includes('comment')) {
+      return locale === 'id' ? 'mengomentari' : 'commented on';
+    }
+    if (event.includes('replied') || event.includes('reply')) {
+      return locale === 'id' ? 'membalas' : 'replied to';
+    }
+    if (event.includes('viewed') || event.includes('profile_opened')) {
+      return locale === 'id' ? 'melihat' : 'viewed';
+    }
+    if (event.includes('route_clicked')) {
+      return locale === 'id' ? 'membuka rute ke' : 'opened directions to';
+    }
+    if (event.includes('message')) {
+      return locale === 'id' ? 'mengirim pesan di' : 'sent a message in';
+    }
+    return social.actionCopy || (locale === 'id' ? 'memperbarui' : 'updated');
+  })();
+
+  const target = entity || entityTypeLabel;
+  const subtitle = target
+    ? `${verb.charAt(0).toUpperCase()}${verb.slice(1)} ${target}.`
+    : String(notification.message || '').trim() ||
+      (locale === 'id' ? 'Ada update baru.' : 'There is a new update.');
+
+  return {
+    title: actor || fallbackTitle,
+    handle:
+      social.actorHandle && social.actorName
+        ? social.actorHandle.startsWith('@')
+          ? social.actorHandle
+          : `@${social.actorHandle}`
+        : '',
+    subtitle,
+    actor,
+    entity,
+    entityTypeLabel,
+    href: social.href,
   };
 }
 

@@ -4822,7 +4822,7 @@ export function CreatePostingClient({
       >
         <div className="flex h-full items-end justify-center sm:items-center">
           <div
-            className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_26px_60px_-34px_rgba(15,23,42,0.28)]  dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+            className="flex max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_26px_60px_-34px_rgba(15,23,42,0.28)]  dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
             onClick={event => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 border-b border-slate-200/75 px-3.5 py-3.5 dark:border-slate-800/70">

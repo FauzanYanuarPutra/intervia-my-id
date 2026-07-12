@@ -2354,7 +2354,7 @@ function CommunityPanel({
   });
 
   return (
-    <section className="rounded-[24px] p-1.5  sm:p-2">
+    <section className="rounded-[24px]">
       <div className="flex items-end justify-between px-1 sm:px-3 md:px-6">
         <div className="space-y-0.5">
           <h2 className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-800 tracking-tight">
@@ -2389,11 +2389,11 @@ function CommunityPanel({
       Ditambahkan hardware acceleration via Tailwind agar geseran super lancar di HP spek rendah sekalipun.
     */}
         <div className="relative">
-          <div className="mb-2 px-1">
+          {/* <div className="mb-2 px-1">
             <p className="text-xs font-bold uppercase tracking-wide text-zinc-400">
               Pilih kategori
             </p>
-          </div>
+          </div> */}
 
           <div
             role="tablist"
@@ -2460,11 +2460,11 @@ function CommunityPanel({
             })}
           </div>
 
-          {tabs.find(tab => tab.id === activeTab)?.caption && (
+          {/* {tabs.find(tab => tab.id === activeTab)?.caption && (
             <p className="mt-1 px-2 text-xs font-semibold text-zinc-500">
               {tabs.find(tab => tab.id === activeTab)?.caption}
             </p>
-          )}
+          )} */}
         </div>
       </div>
       <div className="mt-3">

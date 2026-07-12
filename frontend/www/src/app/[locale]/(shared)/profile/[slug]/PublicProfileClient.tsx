@@ -1,67 +1,70 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { LajukanImage as Image } from '@/components/common/LajukanImage';
-import { Modal } from '@/components/common/Modal';
-import { useAuth } from '@/context/AuthContext';
-import { Link, useRouter } from '@/i18n/navigation';
+import {
+  type ComponentType,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { usePathname } from 'next/navigation';
 import {
-  Award,
   BadgeCheck,
   Bookmark,
   BriefcaseBusiness,
+  CalendarDays,
   CheckCircle2,
   Clock3,
-  Clapperboard,
   Copy,
+  Edit3,
   Eye,
   ExternalLink,
-  GraduationCap,
   Heart,
-  Languages,
-  Link2,
+  Loader2,
   MapPin,
   MessageCircle,
-  PackageCheck,
+  Package,
   PhoneCall,
   RefreshCcw,
   Share2,
   ShieldCheck,
-  Sparkles,
   Star,
   Store,
-  Users,
+  Wrench,
 } from 'lucide-react';
+
+import { LajukanImage as Image } from '@/components/common/LajukanImage';
+import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
+import { useAuth } from '@/context/AuthContext';
+import { Link, useRouter } from '@/i18n/navigation';
+import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import {
   extractContentItems,
   formatIDRFromCents,
   normalizeContentMediaUrl,
 } from '@/lib/content/catalog';
+import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
+import { normalizeProfileMediaUrl } from '@/lib/profile/profileMedia';
+import {
+  getProfileContentTabLabel,
+  normalizeProfileContentTab,
+  type ProfileContentTab,
+  type ProfileLeafTab,
+} from '@/lib/profile/profileContentTabs';
 import {
   buildPublicProfileSlug,
   decodePublicProfileSlug,
   extractPublicProfileIdFromSlug,
   matchesPublicProfileSlug,
 } from '@/lib/profile/publicProfileLink';
-import {
-  getProfileContentTabDefinition,
-  getProfileContentTabLabel,
-  normalizeProfileContentTab,
-  type ProfileContentTab,
-  type ProfileLeafTab,
-} from '@/lib/profile/profileContentTabs';
-import type { CommunityFeedItem } from '@/lib/community/types';
-import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
-import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
-import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
-import { DetailMobileTopBar } from '@/components/layout/DetailMobileTopBar';
-import type { LajukanReel } from '../../../_data/reels';
 
 type PublicProfileClientProps = {
   locale: string;
   slug: string;
 };
+
+type ProfileRecord = Record<string, unknown>;
 
 type PublicUserProfile = {
   id: string;
@@ -69,19 +72,24 @@ type PublicUserProfile = {
   full_name?: string | null;
   avatar_url?: string | null;
   cover_image?: string | null;
-  metadata?: unknown;
   bio?: string | null;
   location?: string | null;
   headline?: string | null;
+  created_at?: string | null;
+  joined_at?: string | null;
+
   roles?: string[] | null;
   metadata_roles?: unknown;
-  level?: string | null;
-  rating?: number | null;
-  completed_jobs?: number | null;
-  hourly_rate?: number | null;
+  metadata?: unknown;
+
   freelancer_profile?: unknown;
   provider_profile?: unknown;
   buyer_profile?: unknown;
+
+  rating?: number | null;
+  review_count?: number | null;
+  completed_jobs?: number | null;
+
   email_verified?: boolean | null;
   phone_verified?: boolean | null;
   identity_verified?: boolean | null;
@@ -100,12 +108,15 @@ type PublicListing = {
   price_cents?: number | null;
   created_at?: string;
   updated_at?: string;
-};
 
-type ProfileRecord = Record<string, unknown>;
+  view_count?: number;
+  favorite_count?: number;
+  chat_count?: number;
+};
 
 type ProfileDetail = {
   displayName: string;
+  handle: string;
   headline: string;
   summary: string;
   roles: string[];
@@ -115,27 +126,40 @@ type ProfileDetail = {
   education: string[];
   certifications: string[];
   links: Array<{ label: string; url: string }>;
-  verificationBadges: string[];
 };
 
-type PublicProfileTab = 'ringkas' | 'etalase' | 'reels' | 'komunitas' | 'trust';
+type PublicProfileTab = 'posts' | 'about' | 'reviews' | 'business';
 
-type PublicSocialModal = 'followers' | 'following';
-
-type PublicSocialUser = {
+type PublicReview = {
   id: string;
   name: string;
-  handle: string;
   avatarUrl: string;
-  badge: string;
-  verified: boolean;
+  rating: number;
+  comment: string;
+  date: string;
 };
 
-type PublicProfileActivityPayload<T> = {
-  items?: T[];
+type PublicStat = {
+  key: string;
+  label: string;
+  value: string;
+  helper: string;
+  icon: ComponentType<{ className?: string }>;
+  iconClassName: string;
 };
 
-const PUBLIC_PROFILE_FOLLOW_KEY = 'lajukan.public-profile.following.v1';
+const PUBLIC_PROFILE_SAVE_KEY = 'lajukan.public-profile.saved.v2';
+
+const PROFILE_LEAF_TABS: ProfileLeafTab[] = [
+  'job',
+  'freelancer',
+  'product',
+  'service',
+  'tool_rental',
+  'business_transfer',
+  'property',
+  'umkm',
+];
 
 function asRecord(value: unknown): ProfileRecord | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -150,28 +174,45 @@ function readString(value: unknown): string {
 
 function readNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
+
   if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value);
+    const parsed = Number(value.replace(/[^\d.-]/g, ''));
     if (Number.isFinite(parsed)) return parsed;
   }
+
   return undefined;
 }
 
 function readBoolean(value: unknown): boolean {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value !== 0;
+
   if (typeof value === 'string') {
-    return ['true', '1', 'yes', 'y', 'on'].includes(value.trim().toLowerCase());
+    return ['true', '1', 'yes', 'y', 'on', 'verified', 'approved'].includes(
+      value.trim().toLowerCase(),
+    );
   }
+
   return false;
+}
+
+function firstString(...values: unknown[]): string {
+  for (const value of values) {
+    const result = readString(value);
+    if (result) return result;
+  }
+
+  return '';
 }
 
 function toStringList(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value.map(entry => readString(entry)).filter(Boolean);
+    return value.map(item => readString(item)).filter(Boolean);
   }
+
   const text = readString(value);
   if (!text) return [];
+
   return text
     .split(/[\n,;|]/g)
     .map(item => item.trim())
@@ -180,14 +221,27 @@ function toStringList(value: unknown): string[] {
 
 function dedupeStrings(values: string[]): string[] {
   const seen = new Set<string>();
-  const next: string[] = [];
+  const result: string[] = [];
+
   for (const value of values) {
     const key = value.toLowerCase();
     if (seen.has(key)) continue;
+
     seen.add(key);
-    next.push(value);
+    result.push(value);
   }
-  return next;
+
+  return result;
+}
+
+function normalizeExternalUrl(raw: string): string {
+  const value = raw.trim();
+  if (!value) return '';
+
+  if (/^https?:\/\//i.test(value)) return value;
+  if (/^[a-z]+:\/\//i.test(value)) return '';
+
+  return `https://${value}`;
 }
 
 function formatRole(value: string): string {
@@ -196,42 +250,114 @@ function formatRole(value: string): string {
     .replace(/\b\w/g, token => token.toUpperCase());
 }
 
-function normalizeExternalUrl(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^[a-z]+:\/\//i.test(trimmed)) return '';
-  return `https://${trimmed}`;
+function readNestedString(
+  roots: Array<ProfileRecord | null>,
+  keys: string[],
+): string {
+  for (const root of roots) {
+    if (!root) continue;
+
+    for (const key of keys) {
+      const value = readString(root[key]);
+      if (value) return value;
+    }
+  }
+
+  return '';
+}
+
+function readNestedNumber(
+  roots: Array<ProfileRecord | null>,
+  keys: string[],
+): number | undefined {
+  for (const root of roots) {
+    if (!root) continue;
+
+    for (const key of keys) {
+      const value = readNumber(root[key]);
+      if (value !== undefined) return value;
+    }
+  }
+
+  return undefined;
 }
 
 function normalizePublicUserProfile(
   payload: unknown,
 ): PublicUserProfile | null {
-  const body = asRecord(payload);
+  const root = asRecord(payload);
+  const body =
+    asRecord(root?.data) ||
+    asRecord(root?.user) ||
+    asRecord(root?.profile) ||
+    root;
+
   const id = readString(body?.id);
   if (!id) return null;
+  const metadata = asRecord(body?.metadata);
+  const metadataProfile = asRecord(metadata?.profile);
+  const metadataMedia = asRecord(metadata?.media);
+  const bodyMedia = asRecord(body?.media);
 
   return {
     id,
     username: readString(body?.username) || null,
-    full_name: readString(body?.full_name) || null,
-    avatar_url: readString(body?.avatar_url) || null,
-    cover_image: readString(body?.cover_image) || null,
-    metadata: body?.metadata,
+    full_name: firstString(body?.full_name, body?.fullName, body?.name) || null,
+    avatar_url:
+      firstString(
+        body?.avatar_url,
+        body?.avatarUrl,
+        body?.avatar,
+        body?.photo_url,
+        body?.picture,
+        metadata?.avatar_url,
+        metadata?.avatarUrl,
+        metadataProfile?.avatar_url,
+        metadataProfile?.avatarUrl,
+        metadataMedia?.avatar_url,
+        metadataMedia?.avatarUrl,
+        metadataMedia?.photo_url,
+        bodyMedia?.avatar_url,
+        bodyMedia?.avatarUrl,
+        bodyMedia?.photo_url,
+      ) || null,
+    cover_image:
+      firstString(
+        body?.cover_image,
+        body?.cover_image_url,
+        body?.coverUrl,
+        body?.cover_url,
+        metadata?.cover_image,
+        metadata?.cover_image_url,
+        metadataProfile?.cover_image,
+        metadataProfile?.cover_image_url,
+        metadataMedia?.cover_image,
+        metadataMedia?.cover_url,
+        bodyMedia?.cover_image,
+        bodyMedia?.cover_url,
+      ) || null,
     bio: readString(body?.bio) || null,
-    location: readString(body?.location) || null,
-    headline: readString(body?.headline) || null,
+    location: firstString(body?.location, body?.city, body?.region) || null,
+    headline:
+      firstString(body?.headline, body?.professional_title, body?.tagline) ||
+      null,
+    created_at: firstString(body?.created_at, body?.createdAt) || null,
+    joined_at: firstString(body?.joined_at, body?.joinedAt) || null,
+
     roles: Array.isArray(body?.roles)
-      ? body.roles.map(entry => readString(entry)).filter(Boolean)
+      ? body.roles.map(item => readString(item)).filter(Boolean)
       : [],
     metadata_roles: body?.metadata_roles,
-    level: readString(body?.level) || null,
-    rating: readNumber(body?.rating) ?? null,
-    completed_jobs: readNumber(body?.completed_jobs) ?? null,
-    hourly_rate: readNumber(body?.hourly_rate) ?? null,
+    metadata: body?.metadata,
+
     freelancer_profile: body?.freelancer_profile,
     provider_profile: body?.provider_profile,
     buyer_profile: body?.buyer_profile,
+
+    rating: readNumber(body?.rating) ?? null,
+    review_count: readNumber(body?.review_count ?? body?.reviews_count) ?? null,
+    completed_jobs: readNumber(body?.completed_jobs) ?? null,
+
     email_verified: readBoolean(body?.email_verified),
     phone_verified: readBoolean(body?.phone_verified),
     identity_verified: readBoolean(body?.identity_verified),
@@ -239,65 +365,49 @@ function normalizePublicUserProfile(
   };
 }
 
-function mapProfileToSocialUser(
-  profile: PublicUserProfile,
-  localeCode: 'id' | 'en',
-): PublicSocialUser {
-  const name =
-    readString(profile.full_name) ||
-    readString(profile.username) ||
-    (localeCode === 'id' ? 'Member Lajukan' : 'Lajukan member');
-  const handle = readString(profile.username)
-    ? `@${readString(profile.username).toLowerCase()}`
-    : '@lajukan';
-  const roles = [
-    ...(Array.isArray(profile.roles) ? profile.roles : []),
-    ...toStringList(profile.metadata_roles),
-  ];
-
-  return {
-    id: profile.id,
-    name,
-    handle,
-    avatarUrl: profileAvatarSrc(
-      profile.avatar_url,
-      readProfileAvatarStyle(profile),
-      name,
-    ),
-    badge:
-      roles.length > 0
-        ? roles.slice(0, 1).map(formatRole).join('')
-        : profile.identity_verified
-          ? localeCode === 'id'
-            ? 'Trusted'
-            : 'Trusted'
-          : localeCode === 'id'
-            ? 'Member'
-            : 'Member',
-    verified: Boolean(profile.identity_verified),
-  };
-}
-
 function collectLinks(
-  root: ProfileRecord | null,
+  roots: Array<ProfileRecord | null>,
 ): Array<{ label: string; url: string }> {
   const links: Array<{ label: string; url: string }> = [];
 
-  const register = (label: string, value: unknown) => {
+  const add = (label: string, value: unknown) => {
     const url = normalizeExternalUrl(readString(value));
     if (!url) return;
-    if (links.some(item => item.url.toLowerCase() === url.toLowerCase()))
+
+    if (links.some(item => item.url.toLowerCase() === url.toLowerCase())) {
       return;
+    }
+
     links.push({ label, url });
   };
 
-  register('Portfolio', root?.portfolio_url);
-  register('Portfolio', root?.portfolio);
-  register('Website', root?.website);
-  register('LinkedIn', root?.linkedin);
-  register('LinkedIn', root?.linkedin_url);
-  register('GitHub', root?.github);
-  register('GitHub', root?.github_url);
+  for (const root of roots) {
+    if (!root) continue;
+
+    add('Portfolio', root.portfolio_url);
+    add('Portfolio', root.portfolio);
+    add('Website', root.website);
+    add('LinkedIn', root.linkedin);
+    add('LinkedIn', root.linkedin_url);
+    add('GitHub', root.github);
+    add('GitHub', root.github_url);
+    add('Instagram', root.instagram);
+    add('Instagram', root.instagram_url);
+    add('TikTok', root.tiktok);
+    add('TikTok', root.tiktok_url);
+
+    if (Array.isArray(root.links)) {
+      for (const item of root.links) {
+        const row = asRecord(item);
+        if (!row) continue;
+
+        add(
+          firstString(row.label, row.name) || 'Link',
+          firstString(row.url, row.href, row.link),
+        );
+      }
+    }
+  }
 
   return links;
 }
@@ -306,86 +416,94 @@ function buildProfileDetail(
   profile: PublicUserProfile,
   localeCode: 'id' | 'en',
 ): ProfileDetail {
+  const metadata = asRecord(profile.metadata);
+  const metadataProfile = asRecord(metadata?.profile);
   const freelancer = asRecord(profile.freelancer_profile);
   const provider = asRecord(profile.provider_profile);
   const buyer = asRecord(profile.buyer_profile);
+
   const displayName =
-    readString(profile.full_name) ||
-    readString(profile.username) ||
-    'Lajukan member';
+    firstString(profile.full_name, profile.username) ||
+    (localeCode === 'id' ? 'Member Lajukan' : 'Lajukan member');
+
+  const handle = readString(profile.username) || profile.id.slice(0, 8);
+
   const headline =
-    readString(freelancer?.professional_title) ||
-    readString(freelancer?.tagline) ||
-    readString(provider?.headline) ||
-    readString(profile.headline) ||
-    readString(profile.level) ||
-    (localeCode === 'id' ? 'Profil publik Lajukan' : 'Public Lajukan profile');
-  const summary =
-    readString(freelancer?.bio) ||
-    readString(provider?.summary) ||
-    readString(provider?.bio) ||
-    readString(profile.bio) ||
-    readString(buyer?.intent) ||
+    firstString(
+      freelancer?.professional_title,
+      freelancer?.tagline,
+      provider?.headline,
+      provider?.tagline,
+      profile.headline,
+      metadataProfile?.headline,
+      metadata?.headline,
+    ) ||
     (localeCode === 'id'
-      ? 'Pengguna ini belum menambahkan ringkasan publik.'
-      : 'This user has not added a public summary yet.');
+      ? 'Profil publik di Lajukan'
+      : 'Public profile on Lajukan');
+
+  const summary =
+    firstString(
+      freelancer?.bio,
+      freelancer?.summary,
+      provider?.summary,
+      provider?.bio,
+      profile.bio,
+      metadataProfile?.bio,
+      metadata?.about,
+      buyer?.intent,
+    ) ||
+    (localeCode === 'id'
+      ? 'Pengguna ini belum menambahkan deskripsi publik.'
+      : 'This user has not added a public description yet.');
 
   const roles = dedupeStrings([
     ...(Array.isArray(profile.roles) ? profile.roles : []),
     ...toStringList(profile.metadata_roles),
+    ...toStringList(metadata?.roles),
+    ...toStringList(metadataProfile?.roles),
   ]);
 
   const skills = dedupeStrings([
     ...toStringList(freelancer?.skills),
+    ...toStringList(freelancer?.skill_set),
     ...toStringList(provider?.skills),
+    ...toStringList(provider?.expertise),
+    ...toStringList(metadata?.skills),
   ]);
 
   const languages = dedupeStrings([
     ...toStringList(freelancer?.languages),
     ...toStringList(provider?.languages),
+    ...toStringList(metadata?.languages),
   ]);
 
   const experience = dedupeStrings([
     ...toStringList(freelancer?.experience),
     ...toStringList(freelancer?.work_history),
+    ...toStringList(freelancer?.work_experience),
     ...toStringList(provider?.experience),
+    ...toStringList(metadata?.experience),
   ]);
 
   const education = dedupeStrings([
     ...toStringList(freelancer?.education),
     ...toStringList(provider?.education),
+    ...toStringList(metadata?.education),
   ]);
 
   const certifications = dedupeStrings([
     ...toStringList(freelancer?.certifications),
     ...toStringList(freelancer?.certificates),
     ...toStringList(provider?.certifications),
+    ...toStringList(metadata?.certifications),
   ]);
 
-  const links = [...collectLinks(freelancer), ...collectLinks(provider)].filter(
-    (item, index, list) =>
-      list.findIndex(
-        entry => entry.url.toLowerCase() === item.url.toLowerCase(),
-      ) === index,
-  );
-
-  const verificationBadges = [
-    profile.identity_verified
-      ? localeCode === 'id'
-        ? 'Identitas terverifikasi'
-        : 'Identity verified'
-      : '',
-    !PROMO_ONLY_MODE && profile.transaction_eligible
-      ? localeCode === 'id'
-        ? 'Siap transaksi'
-        : 'Transaction ready'
-      : '',
-    profile.email_verified ? 'Email verified' : '',
-    profile.phone_verified ? 'Phone verified' : '',
-  ].filter(Boolean);
+  const links = collectLinks([freelancer, provider, metadataProfile, metadata]);
 
   return {
     displayName,
+    handle,
     headline,
     summary,
     roles,
@@ -395,32 +513,18 @@ function buildProfileDetail(
     education,
     certifications,
     links,
-    verificationBadges,
   };
-}
-
-function readNestedString(
-  roots: Array<ProfileRecord | null>,
-  keys: string[],
-): string {
-  for (const root of roots) {
-    if (!root) continue;
-    for (const key of keys) {
-      const value = readString(root[key]);
-      if (value) return value;
-    }
-  }
-  return '';
 }
 
 function getPublicProfileCoverUrl(profile: PublicUserProfile): string {
   const metadata = asRecord(profile.metadata);
   const media = asRecord(metadata?.media);
-  const profileMeta = asRecord(metadata?.profile);
+  const metadataProfile = asRecord(metadata?.profile);
+
   return (
-    normalizeContentMediaUrl(
+    normalizeProfileMediaUrl(
       readNestedString(
-        [profile as unknown as ProfileRecord, metadata, media, profileMeta],
+        [profile as unknown as ProfileRecord, metadata, media, metadataProfile],
         [
           'cover_image',
           'cover_image_url',
@@ -434,12 +538,40 @@ function getPublicProfileCoverUrl(profile: PublicUserProfile): string {
   );
 }
 
+function getPublicProfileAvatarUrl(profile: PublicUserProfile): string {
+  const metadata = asRecord(profile.metadata);
+  const media = asRecord(metadata?.media);
+  const metadataProfile = asRecord(metadata?.profile);
+
+  return (
+    normalizeProfileMediaUrl(
+      readNestedString(
+        [profile as unknown as ProfileRecord, metadata, media, metadataProfile],
+        [
+          'avatar_url',
+          'avatarUrl',
+          'avatar',
+          'photo_url',
+          'photoUrl',
+          'picture',
+          'picture_url',
+          'profile_image',
+          'profile_image_url',
+          'image',
+          'image_url',
+        ],
+      ),
+    ) || ''
+  );
+}
+
 function getPublicProfilePhone(profile: PublicUserProfile): string {
   const metadata = asRecord(profile.metadata);
   const contact = asRecord(metadata?.contact);
   const publicContact = asRecord(metadata?.public_contact);
   const provider = asRecord(profile.provider_profile);
   const providerContact = asRecord(provider?.contact);
+
   return readNestedString(
     [publicContact, contact, providerContact, provider, metadata],
     ['whatsapp', 'whatsapp_number', 'phone', 'phone_number', 'contact_phone'],
@@ -449,29 +581,46 @@ function getPublicProfilePhone(profile: PublicUserProfile): string {
 function normalizeIndonesianPhoneForWhatsApp(value: string): string {
   const digits = value.replace(/\D/g, '');
   if (!digits) return '';
+
   if (digits.startsWith('62')) return digits;
   if (digits.startsWith('0')) return `62${digits.slice(1)}`;
+
   return digits;
 }
 
 function buildWhatsAppHref(phone: string, message: string): string {
   const normalizedPhone = normalizeIndonesianPhoneForWhatsApp(phone);
   if (!normalizedPhone) return '';
+
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
 }
 
-function formatShortDate(
-  value: string | undefined,
+function formatJoinedDate(
+  value: string | null | undefined,
   localeCode: 'id' | 'en',
 ): string {
   if (!value) return '';
+
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(localeCode === 'id' ? 'id-ID' : 'en-US', {
-    day: '2-digit',
+
+  return new Intl.DateTimeFormat(localeCode === 'id' ? 'id-ID' : 'en-US', {
     month: 'short',
     year: 'numeric',
-  });
+  }).format(date);
+}
+
+function formatReviewDate(value: string, localeCode: 'id' | 'en'): string {
+  if (!value) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return new Intl.DateTimeFormat(localeCode === 'id' ? 'id-ID' : 'en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
 }
 
 function buildPublicListingHref(item: PublicListing): string {
@@ -487,33 +636,77 @@ function formatPublicListingValue(
   if (PROMO_ONLY_MODE) {
     return localeCode === 'id' ? 'Tanya detail' : 'Ask details';
   }
-  return typeof item.price_cents === 'number' && item.price_cents > 0
-    ? formatIDRFromCents(item.price_cents)
-    : localeCode === 'id'
-      ? 'Negosiasi'
-      : 'Negotiable';
-}
 
-function getPublicListingKindLabel(
-  item: PublicListing,
-  localeCode: 'id' | 'en',
-): string {
-  const tab = normalizeProfileContentTab({
-    type: item.content_type,
-    category: item.category,
-    metadata: item.metadata || null,
-  });
-  return getProfileContentTabLabel(tab, localeCode);
+  if (typeof item.price_cents === 'number' && item.price_cents > 0) {
+    return formatIDRFromCents(item.price_cents);
+  }
+
+  return localeCode === 'id' ? 'Negosiasi' : 'Negotiable';
 }
 
 function getListingLocation(item: PublicListing): string {
-  const meta = item.metadata || {};
-  return (
-    readString(meta.location) ||
-    readString(meta.city) ||
-    readString(meta.region) ||
-    readString(meta.address)
+  const metadata = item.metadata || {};
+
+  return firstString(
+    metadata.location,
+    metadata.city,
+    metadata.region,
+    metadata.address,
   );
+}
+
+function getListingMetric(item: PublicListing, keys: string[]): number {
+  const metadata = item.metadata || {};
+  const stats =
+    asRecord(metadata.stats) ||
+    asRecord(metadata.metrics) ||
+    asRecord(metadata.analytics);
+
+  const direct = item as unknown as ProfileRecord;
+  const value = readNestedNumber([direct, metadata, stats], keys);
+
+  return Math.max(0, value ?? 0);
+}
+
+function getProfileMetric(
+  profile: PublicUserProfile,
+  keys: string[],
+): number | undefined {
+  const metadata = asRecord(profile.metadata);
+  const stats =
+    asRecord(metadata?.stats) ||
+    asRecord(metadata?.profile_stats) ||
+    asRecord(metadata?.metrics) ||
+    asRecord(metadata?.analytics);
+
+  return readNestedNumber(
+    [profile as unknown as ProfileRecord, metadata, stats],
+    keys,
+  );
+}
+
+function formatCompactNumber(value: number, localeCode: 'id' | 'en'): string {
+  return new Intl.NumberFormat(localeCode === 'id' ? 'id-ID' : 'en-US', {
+    notation: value >= 10_000 ? 'compact' : 'standard',
+    maximumFractionDigits: 1,
+  }).format(Math.max(0, value));
+}
+
+function getTabTone(tab: ProfileContentTab): string {
+  switch (tab) {
+    case 'service':
+    case 'freelancer':
+      return 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300';
+    case 'tool_rental':
+      return 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300';
+    case 'property':
+    case 'business_transfer':
+      return 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
+    case 'job':
+      return 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300';
+    default:
+      return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300';
+  }
 }
 
 function buildPublicListingChatQuestion(
@@ -523,42 +716,44 @@ function buildPublicListingChatQuestion(
 ): string {
   const title =
     readString(item.title) ||
-    (localeCode === 'id' ? 'penawaran ini' : 'this listing');
+    (localeCode === 'id' ? 'postingan ini' : 'this listing');
+
   const kind = normalizeProfileContentTab({
     type: item.content_type,
     category: item.category,
     metadata: item.metadata || null,
   });
+
   const greeting =
     localeCode === 'id' ? `Halo ${displayName},` : `Hi ${displayName},`;
 
   if (kind === 'product') {
     return localeCode === 'id'
-      ? `${greeting} ${title} masih tersedia? Boleh info stok, MOQ, dan cara kirimnya?`
-      : `${greeting} is ${title} still available? Could you share stock, MOQ, and delivery details?`;
+      ? `${greeting} ${title} masih tersedia? Boleh info stok, jumlah minimum, dan cara kirimnya?`
+      : `${greeting} is ${title} still available? Could you share stock, minimum quantity, and delivery details?`;
   }
 
   if (kind === 'service' || kind === 'freelancer') {
     return localeCode === 'id'
-      ? `${greeting} saya tertarik dengan ${title}. Boleh tanya paket, harga, jadwal, dan output yang didapat?`
-      : `${greeting} I am interested in ${title}. Could you share packages, price, schedule, and deliverables?`;
+      ? `${greeting} saya tertarik dengan ${title}. Boleh tanya paket, harga, jadwal, dan hasil yang didapat?`
+      : `${greeting} I am interested in ${title}. Could you share packages, pricing, schedule, and deliverables?`;
   }
 
   if (kind === 'tool_rental') {
     return localeCode === 'id'
-      ? `${greeting} saya tertarik sewa ${title}. Jadwal ready, deposit, dan cara ambilnya gimana?`
-      : `${greeting} I am interested in renting ${title}. What is the availability, deposit, and pickup flow?`;
+      ? `${greeting} saya tertarik menyewa ${title}. Boleh info jadwal, deposit, dan cara pengambilannya?`
+      : `${greeting} I am interested in renting ${title}. Could you share availability, deposit, and pickup details?`;
   }
 
   if (kind === 'property') {
     return localeCode === 'id'
-      ? `${greeting} saya tertarik lokasi ${title}. Bisa tanya harga, jadwal survey, dan fasilitasnya?`
-      : `${greeting} I am interested in ${title}. Could I ask about price, viewing schedule, and facilities?`;
+      ? `${greeting} saya tertarik dengan ${title}. Boleh tanya harga, fasilitas, dan jadwal surveinya?`
+      : `${greeting} I am interested in ${title}. Could you share the price, facilities, and viewing schedule?`;
   }
 
   return localeCode === 'id'
-    ? `${greeting} saya tertarik dengan ${title}. Boleh tanya detailnya dulu?`
-    : `${greeting} I am interested in ${title}. Could I ask for the details first?`;
+    ? `${greeting} saya tertarik dengan ${title}. Boleh tanya detailnya?`
+    : `${greeting} I am interested in ${title}. Could I ask for more details?`;
 }
 
 function buildPublicListingChatPayload(
@@ -566,12 +761,12 @@ function buildPublicListingChatPayload(
   profile: PublicUserProfile,
   localeCode: 'id' | 'en',
 ): Record<string, unknown> {
-  const meta = item.metadata || {};
+  const metadata = item.metadata || {};
   const href = buildPublicListingHref(item);
   const kind = normalizeProfileContentTab({
     type: item.content_type,
     category: item.category,
-    metadata: meta,
+    metadata,
   });
 
   return {
@@ -580,13 +775,13 @@ function buildPublicListingChatPayload(
     content_id: item.id,
     content_title:
       readString(item.title) ||
-      (localeCode === 'id' ? 'Listing tanpa judul' : 'Untitled listing'),
+      (localeCode === 'id' ? 'Postingan tanpa judul' : 'Untitled listing'),
     summary: readString(item.summary),
     cover_image: item.cover_image || '',
     pricing_mode:
       !PROMO_ONLY_MODE &&
-        typeof item.price_cents === 'number' &&
-        item.price_cents > 0
+      typeof item.price_cents === 'number' &&
+      item.price_cents > 0
         ? 'fixed'
         : 'request',
     price_cents:
@@ -596,10 +791,11 @@ function buildPublicListingChatPayload(
     currency: 'IDR',
     content_type: item.content_type || item.category || kind,
     market_side:
-      readString(meta.market_side) ||
-      readString(meta.listing_side) ||
-      readString(meta.listingSide) ||
-      'supply',
+      firstString(
+        metadata.market_side,
+        metadata.listing_side,
+        metadata.listingSide,
+      ) || 'supply',
     deal_kind: item.content_type || item.category || kind,
     slug: item.slug || null,
     content_url: href,
@@ -609,46 +805,53 @@ function buildPublicListingChatPayload(
   };
 }
 
-function normalizeComparableName(value?: string | null): string {
-  return (value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function profileNameCandidates(profile: PublicUserProfile): string[] {
-  return Array.from(
-    new Set(
-      [profile.id, profile.username, profile.full_name]
-        .map(item => normalizeComparableName(item))
-        .filter(Boolean),
-    ),
-  );
-}
-
-function isImageMediaUrl(value?: string | null): boolean {
-  const lower = (value || '').split('?')[0]?.toLowerCase() || '';
-  return /\.(avif|gif|jpe?g|png|webp)$/.test(lower);
-}
-
-function matchesPublicProfileReel(
-  reel: LajukanReel,
+function normalizeReviews(
   profile: PublicUserProfile,
-): boolean {
-  if (reel.creatorUserId && reel.creatorUserId === profile.id) return true;
-  const candidates = profileNameCandidates(profile);
-  const creator = normalizeComparableName(reel.creator);
-  return Boolean(creator && candidates.includes(creator));
-}
+  localeCode: 'id' | 'en',
+): PublicReview[] {
+  const metadata = asRecord(profile.metadata);
+  const source =
+    (Array.isArray(metadata?.reviews) && metadata.reviews) ||
+    (Array.isArray(metadata?.ratings) && metadata.ratings) ||
+    [];
 
-function matchesPublicProfileCommunityItem(
-  item: CommunityFeedItem,
-  profile: PublicUserProfile,
-): boolean {
-  if (item.author?.id && item.author.id === profile.id) return true;
-  const candidates = profileNameCandidates(profile);
-  const author = normalizeComparableName(item.author?.name);
-  return Boolean(author && candidates.includes(author));
+  return source
+    .map((item, index) => {
+      const row = asRecord(item);
+      if (!row) return null;
+
+      const rating = Math.min(
+        5,
+        Math.max(0, readNumber(row.rating ?? row.score) ?? 0),
+      );
+
+      const name =
+        firstString(
+          row.reviewer_name,
+          row.author_name,
+          row.name,
+          asRecord(row.author)?.name,
+        ) || (localeCode === 'id' ? 'Pengguna Lajukan' : 'Lajukan user');
+
+      const avatarUrl = normalizeContentMediaUrl(
+        firstString(
+          row.reviewer_avatar,
+          row.author_avatar,
+          row.avatar_url,
+          asRecord(row.author)?.avatar_url,
+        ),
+      );
+
+      return {
+        id: firstString(row.id, row.review_id) || `review-${index}`,
+        name,
+        avatarUrl,
+        rating,
+        comment: firstString(row.comment, row.review, row.body, row.text),
+        date: firstString(row.created_at, row.date, row.updated_at),
+      } satisfies PublicReview;
+    })
+    .filter((item): item is PublicReview => Boolean(item));
 }
 
 async function fetchProfileById(
@@ -659,7 +862,9 @@ async function fetchProfileById(
     cache: 'no-store',
     signal,
   });
+
   if (!response.ok) return null;
+
   const payload = await response.json().catch(() => null);
   return normalizePublicUserProfile(payload);
 }
@@ -671,6 +876,7 @@ async function fetchDiscoverProfiles(
 ): Promise<PublicUserProfile[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   const normalizedQuery = query?.trim();
+
   if (normalizedQuery) {
     params.set('q', normalizedQuery);
   }
@@ -679,11 +885,22 @@ async function fetchDiscoverProfiles(
     cache: 'no-store',
     signal,
   });
+
   if (!response.ok) return [];
+
   const payload = (await response.json().catch(() => ({}))) as {
     data?: unknown[];
+    results?: unknown[];
+    items?: unknown[];
   };
-  return (Array.isArray(payload.data) ? payload.data : [])
+
+  const items =
+    (Array.isArray(payload.data) && payload.data) ||
+    (Array.isArray(payload.results) && payload.results) ||
+    (Array.isArray(payload.items) && payload.items) ||
+    [];
+
+  return items
     .map(item => normalizePublicUserProfile(item))
     .filter((item): item is PublicUserProfile => Boolean(item));
 }
@@ -694,53 +911,118 @@ function PublicProfileLoadingState({
   localeCode: 'id' | 'en';
 }) {
   return (
-    <div className="lajukan-market-page lajukan-market-profile min-h-screen bg-[color:var(--app-surface-muted)] pb-6 pt-0 dark:bg-[color:var(--app-surface)]">
+    <div className="min-h-screen bg-[color:var(--app-surface-muted)] pb-10 dark:bg-[color:var(--app-surface)]">
       <DetailMobileTopBar
         title={localeCode === 'id' ? 'Memuat profil' : 'Loading profile'}
         eyebrow={localeCode === 'id' ? 'Profil publik' : 'Public profile'}
         backLabel={localeCode === 'id' ? 'Kembali' : 'Back'}
       />
-      <div className="mx-auto flex w-full max-w-[1220px] flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:px-6">
-        <section className="overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_24px_52px_-38px_rgba(15,23,42,0.42)] dark:border-[color:var(--app-border-strong)]">
-          <div className="relative h-36 bg-[linear-gradient(135deg,#dcfce7_0%,#ecfeff_52%,#fef3c7_100%)] sm:h-44 lg:h-52">
-            <div className="absolute left-5 top-5 h-7 w-36 rounded-full bg-white/48" />
-            <div className="absolute left-5 top-16 h-8 w-[min(420px,70%)] rounded-full bg-white/42" />
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[color:var(--app-surface-strong)] to-transparent" />
-          </div>
-          <div className="px-4 pb-4 sm:px-5">
-            <div className="-mt-12 grid gap-3 sm:-mt-14 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
-              <div className="flex items-end gap-3 sm:gap-4">
-                <div className="ui-skeleton ui-skeleton-pulse h-24 w-24 rounded-[26px] border-[4px] border-[color:var(--app-surface-strong)] sm:h-28 sm:w-28" />
-                <div className="min-w-0 flex-1 pb-2">
-                  <div className="ui-skeleton ui-skeleton-pulse h-7 max-w-[320px] rounded-full" />
-                  <div className="ui-skeleton ui-skeleton-pulse mt-3 h-4 max-w-[520px] rounded-full" />
-                  <div className="ui-skeleton ui-skeleton-pulse mt-2 h-4 max-w-[280px] rounded-full" />
-                </div>
-              </div>
-              <div className="rounded-[24px] border border-[color:var(--app-border)] bg-white/80 p-3 dark:border-[color:var(--app-border-strong)] dark:bg-white/8">
-                <div className="ui-skeleton ui-skeleton-pulse h-4 w-28 rounded-full" />
-                <div className="ui-skeleton ui-skeleton-pulse mt-3 h-10 rounded-[14px]" />
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div className="ui-skeleton ui-skeleton-pulse h-10 rounded-[14px]" />
-                  <div className="ui-skeleton ui-skeleton-pulse h-10 rounded-[14px]" />
-                </div>
+
+      <div className="page-shell py-3 sm:py-6">
+        <section className="overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+          <div className="ui-skeleton ui-skeleton-pulse h-40 sm:h-56 lg:h-64" />
+
+          <div className="px-4 pb-6 sm:px-7">
+            <div className="-mt-12 flex items-end gap-4 sm:-mt-16">
+              <div className="ui-skeleton ui-skeleton-pulse h-24 w-24 shrink-0 rounded-full border-[5px] border-[color:var(--app-surface-strong)] sm:h-32 sm:w-32" />
+
+              <div className="min-w-0 flex-1 pb-2">
+                <div className="ui-skeleton ui-skeleton-pulse h-7 max-w-xs rounded-full" />
+                <div className="ui-skeleton ui-skeleton-pulse mt-3 h-4 max-w-lg rounded-full" />
+                <div className="ui-skeleton ui-skeleton-pulse mt-2 h-4 max-w-sm rounded-full" />
               </div>
             </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, index) => (
+
+            <div className="mt-6 flex gap-3 overflow-hidden">
+              {Array.from({ length: 5 }).map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-3 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
-                >
-                  <div className="ui-skeleton ui-skeleton-pulse h-4 w-20 rounded-full" />
-                  <div className="ui-skeleton ui-skeleton-pulse mt-3 h-5 w-32 rounded-full" />
-                  <div className="ui-skeleton ui-skeleton-pulse mt-2 h-3 w-full rounded-full" />
-                </div>
+                  className="ui-skeleton ui-skeleton-pulse h-24 min-w-[160px] flex-1 rounded-2xl"
+                />
               ))}
             </div>
           </div>
         </section>
+
+        <section className="mt-4 h-96 rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)]">
+          <div className="ui-skeleton ui-skeleton-pulse h-full rounded-[28px]" />
+        </section>
       </div>
+    </div>
+  );
+}
+
+function StatCard({ item }: { item: PublicStat }) {
+  const Icon = item.icon;
+
+  return (
+    <div className="min-w-0 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 sm:p-4">
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${item.iconClassName}`}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+
+        <div className="min-w-0">
+          <p className="truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
+            {item.label}
+          </p>
+          <p className="mt-0.5 truncate text-xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+            {item.value}
+          </p>
+          <p className="mt-1 line-clamp-1 text-[10px] text-[color:var(--app-text-soft)]">
+            {item.helper}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({
+  icon: Icon = Package,
+  title,
+  description,
+}: {
+  icon?: ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex min-h-64 flex-col items-center justify-center px-5 py-12 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+        <Icon className="h-6 w-6" />
+      </div>
+
+      <h3 className="mt-4 text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        {title}
+      </h3>
+
+      <p className="mt-2 max-w-sm text-sm leading-6 text-[color:var(--app-text-soft)]">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function SectionTitle({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div>
+      <h2 className="text-base font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+        {title}
+      </h2>
+      {subtitle ? (
+        <p className="mt-1 text-xs leading-5 text-[color:var(--app-text-soft)]">
+          {subtitle}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -752,41 +1034,206 @@ export default function PublicProfileClient({
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, authFetch } = useAuth();
-  const localeCode = locale === 'id' ? 'id' : 'en';
+
+  const localeCode: 'id' | 'en' = locale === 'id' ? 'id' : 'en';
+
+  const copy = useMemo(
+    () =>
+      localeCode === 'id'
+        ? {
+            publicProfile: 'Profil publik',
+            back: 'Kembali',
+            notFound: 'Profil tidak ditemukan',
+            notFoundDescription:
+              'Profil ini belum tersedia atau alamat profilnya sudah berubah.',
+            findOthers: 'Cari profil lain',
+            loadFailed: 'Gagal memuat profil',
+            retry: 'Coba lagi',
+
+            share: 'Bagikan',
+            linkCopied: 'Link disalin',
+            copyFailed: 'Gagal menyalin',
+            save: 'Simpan',
+            saved: 'Disimpan',
+            chat: 'Chat',
+            opening: 'Membuka...',
+            editProfile: 'Edit Profil',
+            managePosts: 'Kelola Postingan',
+
+            verified: 'Akun Terverifikasi',
+            joined: 'Bergabung',
+            locationFallback: 'Lokasi belum ditambahkan',
+
+            views: 'Dilihat',
+            viewsHelper: 'Total kunjungan profil',
+            favorites: 'Favorit',
+            favoritesHelper: 'Disimpan oleh pengguna',
+            response: 'Respon Chat',
+            responseHelper: 'Waktu balas rata-rata',
+            activePosts: 'Postingan Aktif',
+            activePostsHelper: 'Produk, jasa, dan lainnya',
+            rating: 'Rating',
+            ratingHelper: 'Dari ulasan pengguna',
+            notAvailable: 'Belum ada',
+
+            posts: 'Postingan',
+            about: 'Tentang',
+            reviews: 'Ulasan',
+            businessInfo: 'Info Usaha',
+
+            all: 'Semua',
+            newest: 'Terbaru',
+            noPosts: 'Belum ada postingan aktif',
+            noPostsDescription:
+              'Pengguna ini belum menampilkan produk, jasa, atau kebutuhan publik.',
+            viewAllPosts: 'Lihat Semua Postingan',
+            askDetails: 'Tanya detail',
+            active: 'Aktif',
+
+            aboutTitle: 'Tentang',
+            skills: 'Keahlian',
+            roles: 'Peran di Lajukan',
+            languages: 'Bahasa',
+            experience: 'Pengalaman',
+            education: 'Pendidikan',
+            certifications: 'Sertifikasi',
+            links: 'Tautan',
+            noAbout: 'Informasi tambahan belum dilengkapi oleh pemilik profil.',
+
+            reviewSummary: 'Ringkasan ulasan',
+            reviewCount: 'ulasan',
+            noReviews: 'Belum ada ulasan',
+            noReviewsDescription:
+              'Ulasan akan muncul setelah pengguna menerima penilaian yang valid.',
+
+            businessType: 'Jenis Profil',
+            category: 'Kategori',
+            businessLocation: 'Lokasi Usaha',
+            businessHours: 'Jam Operasional',
+            contact: 'Hubungi',
+            chatOnLajukan: 'Chat di Lajukan',
+            whatsapp: 'WhatsApp',
+            fastResponse: 'Respon cepat',
+            askByChat: 'Tanya lewat chat',
+            noBusinessInfo:
+              'Informasi usaha belum dilengkapi oleh pemilik profil.',
+
+            chatFailed: 'Gagal membuka chat.',
+            chatRoomFailed: 'Room chat belum bisa dibuat.',
+          }
+        : {
+            publicProfile: 'Public profile',
+            back: 'Back',
+            notFound: 'Profile not found',
+            notFoundDescription:
+              'This profile is unavailable or its address has changed.',
+            findOthers: 'Find other profiles',
+            loadFailed: 'Failed to load profile',
+            retry: 'Retry',
+
+            share: 'Share',
+            linkCopied: 'Link copied',
+            copyFailed: 'Copy failed',
+            save: 'Save',
+            saved: 'Saved',
+            chat: 'Chat',
+            opening: 'Opening...',
+            editProfile: 'Edit Profile',
+            managePosts: 'Manage Posts',
+
+            verified: 'Verified Account',
+            joined: 'Joined',
+            locationFallback: 'Location has not been added',
+
+            views: 'Views',
+            viewsHelper: 'Total profile visits',
+            favorites: 'Favorites',
+            favoritesHelper: 'Saved by users',
+            response: 'Chat Response',
+            responseHelper: 'Average response time',
+            activePosts: 'Active Posts',
+            activePostsHelper: 'Products, services, and more',
+            rating: 'Rating',
+            ratingHelper: 'From user reviews',
+            notAvailable: 'Not available',
+
+            posts: 'Posts',
+            about: 'About',
+            reviews: 'Reviews',
+            businessInfo: 'Business Info',
+
+            all: 'All',
+            newest: 'Newest',
+            noPosts: 'No active posts yet',
+            noPostsDescription:
+              'This user has not published products, services, or public needs.',
+            viewAllPosts: 'View All Posts',
+            askDetails: 'Ask details',
+            active: 'Active',
+
+            aboutTitle: 'About',
+            skills: 'Skills',
+            roles: 'Roles on Lajukan',
+            languages: 'Languages',
+            experience: 'Experience',
+            education: 'Education',
+            certifications: 'Certifications',
+            links: 'Links',
+            noAbout:
+              'Additional information has not been completed by the profile owner.',
+
+            reviewSummary: 'Review summary',
+            reviewCount: 'reviews',
+            noReviews: 'No reviews yet',
+            noReviewsDescription:
+              'Reviews will appear after the user receives valid ratings.',
+
+            businessType: 'Profile Type',
+            category: 'Category',
+            businessLocation: 'Business Location',
+            businessHours: 'Business Hours',
+            contact: 'Contact',
+            chatOnLajukan: 'Chat on Lajukan',
+            whatsapp: 'WhatsApp',
+            fastResponse: 'Fast response',
+            askByChat: 'Ask via chat',
+            noBusinessInfo:
+              'Business information has not been completed by the profile owner.',
+
+            chatFailed: 'Failed to open chat.',
+            chatRoomFailed: 'Chat room could not be created.',
+          },
+    [localeCode],
+  );
+
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [listings, setListings] = useState<PublicListing[]>([]);
-  const [profileReels, setProfileReels] = useState<LajukanReel[]>([]);
-  const [profileCommunityItems, setProfileCommunityItems] = useState<
-    CommunityFeedItem[]
-  >([]);
-  const [profileActivityLoading, setProfileActivityLoading] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  const [activeProfileTab, setActiveProfileTab] =
+    useState<PublicProfileTab>('posts');
   const [activeContentTab, setActiveContentTab] =
     useState<ProfileContentTab>('all');
-  const [activeProfileTab, setActiveProfileTab] =
-    useState<PublicProfileTab>('etalase');
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followedSocialIds, setFollowedSocialIds] = useState<string[]>([]);
-  const [socialModal, setSocialModal] = useState<PublicSocialModal | null>(
-    null,
-  );
-  const [socialUsers, setSocialUsers] = useState<PublicSocialUser[]>([]);
+
+  const [isSaved, setIsSaved] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
   const [startingChatKey, setStartingChatKey] = useState<string | null>(null);
-  const [profileChatError, setProfileChatError] = useState('');
+  const [chatError, setChatError] = useState('');
+
   const trackedProfileViewRef = useRef<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
 
-    const load = async () => {
+    async function load() {
       setLoading(true);
-      setError(null);
       setNotFound(false);
-      setProfileReels([]);
-      setProfileCommunityItems([]);
+      setError('');
+      setProfile(null);
+      setListings([]);
 
       try {
         let nextProfile: PublicUserProfile | null = null;
@@ -803,14 +1250,18 @@ export default function PublicProfileClient({
 
           if (!slugHandle && !searchTerm) {
             setNotFound(true);
-            setProfile(null);
-            setListings([]);
             return;
           }
 
           const directSlugProfile = slugHandle
             ? await fetchProfileById(slugHandle, controller.signal)
             : null;
+
+          let candidate =
+            directSlugProfile &&
+            matchesPublicProfileSlug(slug, directSlugProfile)
+              ? directSlugProfile
+              : null;
 
           const searchVariants = Array.from(
             new Set(
@@ -819,19 +1270,16 @@ export default function PublicProfileClient({
                 .filter(Boolean),
             ),
           );
-          let candidate =
-            directSlugProfile &&
-              matchesPublicProfileSlug(slug, directSlugProfile)
-              ? directSlugProfile
-              : null;
 
           for (const variant of searchVariants) {
             if (candidate) break;
+
             const candidates = await fetchDiscoverProfiles(
               controller.signal,
               variant,
               32,
             );
+
             candidate =
               candidates.find(item => matchesPublicProfileSlug(slug, item)) ||
               null;
@@ -843,6 +1291,7 @@ export default function PublicProfileClient({
               undefined,
               100,
             );
+
             candidate =
               candidates.find(item => matchesPublicProfileSlug(slug, item)) ||
               null;
@@ -850,8 +1299,6 @@ export default function PublicProfileClient({
 
           if (!candidate) {
             setNotFound(true);
-            setProfile(null);
-            setListings([]);
             return;
           }
 
@@ -862,8 +1309,6 @@ export default function PublicProfileClient({
 
         if (!nextProfile) {
           setNotFound(true);
-          setProfile(null);
-          setListings([]);
           return;
         }
 
@@ -877,8 +1322,6 @@ export default function PublicProfileClient({
           router.replace(`/profile/${canonicalSlug}`);
         }
 
-        setProfile(nextProfile);
-
         const listingResponse = await fetch(
           `/api/content?owner_id=${encodeURIComponent(nextProfile.id)}&limit=36&status=active`,
           {
@@ -887,155 +1330,91 @@ export default function PublicProfileClient({
           },
         );
 
-        const listingPayload = await listingResponse.json().catch(() => ({}));
-        const nextListings = extractContentItems(listingPayload).map(item => ({
-          id: item.id,
-          slug: item.slug,
-          title: item.title,
-          summary: item.summary,
-          content_type: item.content_type,
-          category: item.category,
-          metadata: item.metadata || null,
-          cover_image: item.cover_image,
-          price_cents: item.price_cents,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-        }));
+        let nextListings: PublicListing[] = [];
 
-        setListings(nextListings);
-      } catch (err) {
+        if (listingResponse.ok) {
+          const listingPayload = await listingResponse.json().catch(() => ({}));
+
+          nextListings = extractContentItems(listingPayload).map(item => {
+            const raw = item as unknown as ProfileRecord;
+            const metadata = asRecord(item.metadata) || {};
+
+            return {
+              id: item.id,
+              slug: item.slug,
+              title: item.title,
+              summary: item.summary,
+              content_type: item.content_type,
+              category: item.category,
+              metadata,
+              cover_image:
+                normalizeContentMediaUrl(item.cover_image ?? undefined) || null,
+              price_cents: item.price_cents,
+              created_at: item.created_at,
+              updated_at: item.updated_at,
+              view_count:
+                readNumber(
+                  raw.view_count ??
+                    raw.views_count ??
+                    metadata.view_count ??
+                    metadata.views_count,
+                ) ?? 0,
+              favorite_count:
+                readNumber(
+                  raw.favorite_count ??
+                    raw.favorites_count ??
+                    raw.like_count ??
+                    metadata.favorite_count ??
+                    metadata.favorites_count,
+                ) ?? 0,
+              chat_count:
+                readNumber(
+                  raw.chat_count ??
+                    raw.comment_count ??
+                    raw.comments_count ??
+                    metadata.chat_count ??
+                    metadata.comment_count,
+                ) ?? 0,
+            };
+          });
+        }
+
+        if (!controller.signal.aborted) {
+          setProfile(nextProfile);
+          setListings(nextListings);
+        }
+      } catch (loadError) {
         if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : 'Failed to load profile');
-        setProfile(null);
-        setListings([]);
+
+        setError(
+          loadError instanceof Error ? loadError.message : copy.loadFailed,
+        );
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
         }
       }
-    };
+    }
 
     void load();
+
     return () => controller.abort();
-  }, [router, slug]);
+  }, [copy.loadFailed, router, slug]);
 
   useEffect(() => {
     if (!profile || typeof window === 'undefined') return;
+
     try {
-      const raw = window.localStorage.getItem(PUBLIC_PROFILE_FOLLOW_KEY);
+      const raw = window.localStorage.getItem(PUBLIC_PROFILE_SAVE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       const ids = Array.isArray(parsed)
         ? parsed.map(item => String(item)).filter(Boolean)
         : [];
-      setFollowedSocialIds(ids);
-      setIsFollowing(ids.includes(profile.id));
+
+      setIsSaved(ids.includes(profile.id));
     } catch {
-      setFollowedSocialIds([]);
-      setIsFollowing(false);
+      setIsSaved(false);
     }
-  }, [profile]);
-
-  useEffect(() => {
-    if (!profile) return;
-    const controller = new AbortController();
-    const profileId = profile.id;
-
-    async function loadSocialUsers() {
-      try {
-        const response = await fetch('/api/users/discover?limit=16', {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        const payload = (await response.json().catch(() => ({}))) as {
-          data?: unknown[];
-        };
-        const users = Array.isArray(payload.data)
-          ? payload.data
-            .map(item => normalizePublicUserProfile(item))
-            .filter((item): item is PublicUserProfile => Boolean(item))
-            .filter(item => item.id !== profileId)
-            .map(item => mapProfileToSocialUser(item, localeCode))
-          : [];
-        if (!controller.signal.aborted) {
-          setSocialUsers(users);
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setSocialUsers([]);
-        }
-      }
-    }
-
-    void loadSocialUsers();
-
-    return () => controller.abort();
-  }, [localeCode, profile]);
-
-  useEffect(() => {
-    if (!profile) {
-      return;
-    }
-
-    const controller = new AbortController();
-    const activeProfile = profile;
-
-    async function loadPublicActivity() {
-      setProfileActivityLoading(true);
-      try {
-        const [reelsResponse, communityResponse] = await Promise.all([
-          fetch('/api/reels?limit=36', {
-            cache: 'no-store',
-            signal: controller.signal,
-          }),
-          fetch('/api/community/feed?limit=36&tab=for-you', {
-            cache: 'no-store',
-            signal: controller.signal,
-          }),
-        ]);
-
-        const [reelsPayload, communityPayload] = await Promise.all([
-          reelsResponse.json().catch(() => ({})),
-          communityResponse.json().catch(() => ({})),
-        ]);
-
-        if (controller.signal.aborted) return;
-
-        const nextReels = Array.isArray(
-          (reelsPayload as PublicProfileActivityPayload<LajukanReel>).items,
-        )
-          ? (reelsPayload as PublicProfileActivityPayload<LajukanReel>)
-            .items!.filter(item =>
-              matchesPublicProfileReel(item, activeProfile),
-            )
-            .slice(0, 6)
-          : [];
-        const nextCommunityItems = Array.isArray(
-          (communityPayload as PublicProfileActivityPayload<CommunityFeedItem>)
-            .items,
-        )
-          ? (
-            communityPayload as PublicProfileActivityPayload<CommunityFeedItem>
-          )
-            .items!.filter(item =>
-              matchesPublicProfileCommunityItem(item, activeProfile),
-            )
-            .slice(0, 6)
-          : [];
-
-        setProfileReels(nextReels);
-        setProfileCommunityItems(nextCommunityItems);
-      } catch {
-        if (!controller.signal.aborted) {
-          setProfileReels([]);
-          setProfileCommunityItems([]);
-        }
-      } finally {
-        if (!controller.signal.aborted) setProfileActivityLoading(false);
-      }
-    }
-
-    void loadPublicActivity();
-    return () => controller.abort();
   }, [profile]);
 
   useEffect(() => {
@@ -1044,6 +1423,7 @@ export default function PublicProfileClient({
 
     const trackingKey = `${profile.id}:${user.id}`;
     if (trackedProfileViewRef.current === trackingKey) return;
+
     trackedProfileViewRef.current = trackingKey;
 
     void trackLajukanEvent('profile.viewed', {
@@ -1082,38 +1462,40 @@ export default function PublicProfileClient({
     [localeCode, profile],
   );
 
-  if (loading) return <PublicProfileLoadingState localeCode={localeCode} />;
+  const reviews = useMemo(
+    () => (profile ? normalizeReviews(profile, localeCode) : []),
+    [localeCode, profile],
+  );
+
+  if (loading) {
+    return <PublicProfileLoadingState localeCode={localeCode} />;
+  }
 
   if (notFound) {
     return (
-      <div className="lajukan-market-page lajukan-market-profile min-h-screen bg-[color:var(--app-surface-muted)] pb-6">
+      <div className="min-h-screen bg-[color:var(--app-surface-muted)] pb-10 dark:bg-[color:var(--app-surface)]">
         <DetailMobileTopBar
-          title={
-            localeCode === 'id' ? 'Profil tidak ditemukan' : 'Profile not found'
-          }
-          eyebrow={localeCode === 'id' ? 'Profil publik' : 'Public profile'}
-          backLabel={localeCode === 'id' ? 'Kembali' : 'Back'}
+          title={copy.notFound}
+          eyebrow={copy.publicProfile}
+          backLabel={copy.back}
         />
-        <div className="page-shell px-4 py-6">
-          <div className="rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-8 text-center shadow-sm dark:border-[color:var(--app-border-strong)]">
-            <h1 className="text-2xl font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-              {localeCode === 'id'
-                ? 'Profil tidak ditemukan'
-                : 'Profile not found'}
+
+        <div className="page-shell py-6">
+          <div className="rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-8 text-center">
+            <h1 className="text-2xl font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+              {copy.notFound}
             </h1>
-            <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
-              {localeCode === 'id'
-                ? 'Profil publik ini belum tersedia atau slug-nya tidak cocok.'
-                : 'This public profile is not available or the slug does not match.'}
+
+            <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-[color:var(--app-text-soft)]">
+              {copy.notFoundDescription}
             </p>
-            <div className="mt-5 flex items-center justify-center gap-2">
-              <Link
-                href="/search?type=freelancer"
-                className="rounded-full bg-[color:var(--app-accent)] px-4 py-2 text-sm font-semibold text-[color:var(--app-text-inverse)]"
-              >
-                {localeCode === 'id' ? 'Cari talent lain' : 'Find more talent'}
-              </Link>
-            </div>
+
+            <Link
+              href="/search"
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white transition hover:bg-emerald-700"
+            >
+              {copy.findOthers}
+            </Link>
           </div>
         </div>
       </div>
@@ -1122,33 +1504,30 @@ export default function PublicProfileClient({
 
   if (error || !profile || !detail) {
     return (
-      <div className="lajukan-market-page lajukan-market-profile min-h-screen bg-[color:var(--app-surface-muted)] pb-6">
+      <div className="min-h-screen bg-[color:var(--app-surface-muted)] pb-10 dark:bg-[color:var(--app-surface)]">
         <DetailMobileTopBar
-          title={
-            localeCode === 'id'
-              ? 'Gagal memuat profil'
-              : 'Failed to load profile'
-          }
-          eyebrow={localeCode === 'id' ? 'Profil publik' : 'Public profile'}
-          backLabel={localeCode === 'id' ? 'Kembali' : 'Back'}
+          title={copy.loadFailed}
+          eyebrow={copy.publicProfile}
+          backLabel={copy.back}
         />
-        <div className="page-shell px-4 py-6">
-          <div className="rounded-[2rem] border border-[color:var(--app-warning-border)] bg-[color:var(--app-warning-soft)] p-6 text-center">
-            <h1 className="text-xl font-bold text-[color:var(--app-text)]">
-              {localeCode === 'id'
-                ? 'Gagal memuat profil'
-                : 'Failed to load profile'}
+
+        <div className="page-shell py-6">
+          <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-8 text-center dark:border-rose-900/60 dark:bg-rose-500/10">
+            <h1 className="text-xl font-black text-rose-900 dark:text-rose-200">
+              {copy.loadFailed}
             </h1>
-            <p className="mt-2 text-sm text-[color:var(--app-text-soft)]">
-              {error || 'Unknown error'}
+
+            <p className="mt-2 text-sm text-rose-700 dark:text-rose-300">
+              {error || copy.loadFailed}
             </p>
+
             <button
               type="button"
               onClick={() => router.refresh()}
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-[color:var(--app-warning-border)] bg-[color:var(--app-surface-strong)] px-4 py-2 text-sm font-semibold text-[color:var(--app-text)]"
+              className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-300 bg-white px-5 text-sm font-bold text-rose-800 dark:border-rose-800 dark:bg-transparent dark:text-rose-200"
             >
               <RefreshCcw className="h-4 w-4" />
-              {localeCode === 'id' ? 'Coba lagi' : 'Retry'}
+              {copy.retry}
             </button>
           </div>
         </div>
@@ -1156,524 +1535,291 @@ export default function PublicProfileClient({
     );
   }
 
+  const isOwnProfile = Boolean(user?.id && user.id === profile.id);
+
   const avatarUrl = profileAvatarSrc(
-    profile.avatar_url,
+    getPublicProfileAvatarUrl(profile),
     readProfileAvatarStyle(profile),
-    profile.full_name || profile.username || 'Lajukan avatar',
+    detail.displayName,
   );
+
   const coverUrl = getPublicProfileCoverUrl(profile);
-  const numberLocale = localeCode === 'id' ? 'id-ID' : 'en-US';
-  const publicActivityCount =
-    profileReels.length + profileCommunityItems.length;
-  const publicContentCount = listings.length + publicActivityCount;
-  const profileReady =
-    detail.summary.length > 70 ||
-    detail.skills.length > 0 ||
-    listings.length > 0 ||
-    publicActivityCount > 0;
-  const trustItems = PROMO_ONLY_MODE
-    ? [
-      {
-        label: localeCode === 'id' ? 'Identitas' : 'Identity',
-        ready: Boolean(profile.identity_verified),
-      },
-      { label: 'Email', ready: Boolean(profile.email_verified) },
-      {
-        label: localeCode === 'id' ? 'Telepon' : 'Phone',
-        ready: Boolean(profile.phone_verified),
-      },
-      {
-        label: localeCode === 'id' ? 'Profil lengkap' : 'Profile ready',
-        ready: profileReady,
-      },
-    ]
-    : [
-      {
-        label: localeCode === 'id' ? 'Identitas' : 'Identity',
-        ready: Boolean(profile.identity_verified),
-      },
-      {
-        label: localeCode === 'id' ? 'Transaksi' : 'Transaction',
-        ready: Boolean(profile.transaction_eligible),
-      },
-      { label: 'Email', ready: Boolean(profile.email_verified) },
-      {
-        label: localeCode === 'id' ? 'Telepon' : 'Phone',
-        ready: Boolean(profile.phone_verified),
-      },
-    ];
-  const trustScore = trustItems.filter(item => item.ready).length;
-  const trustScoreLabel = `${trustScore}/${trustItems.length}`;
-  const activePostCount = listings.length.toLocaleString(numberLocale);
-  const favoriteCount = Math.max(
-    12,
-    listings.length * 7 + (profile.identity_verified ? 24 : 8),
-  ).toLocaleString(numberLocale);
-  const viewCount = Math.max(
-    120,
-    listings.length * 96 + publicActivityCount * 34 + 250,
-  ).toLocaleString(numberLocale);
-  const statCards = [
-    {
-      label: localeCode === 'id' ? 'Dilihat' : 'Views',
-      value: `${viewCount}+`,
-      helper: localeCode === 'id' ? 'Total dilihat' : 'Total views',
-      icon: Eye,
-    },
-    {
-      label: localeCode === 'id' ? 'Favorit' : 'Favorites',
-      value: favoriteCount,
-      helper:
-        localeCode === 'id' ? 'Disimpan oleh pengguna' : 'Saved by visitors',
-      icon: Heart,
-    },
-    {
-      label: localeCode === 'id' ? 'Respon Chat' : 'Chat response',
-      value: localeCode === 'id' ? 'Cepat' : 'Fast',
-      helper: localeCode === 'id' ? 'Biasanya cepat' : 'Usually fast',
-      icon: MessageCircle,
-    },
-    {
-      label: localeCode === 'id' ? 'Postingan Aktif' : 'Active posts',
-      value: activePostCount,
-      helper:
-        localeCode === 'id'
-          ? 'Produk, jasa, dan lainnya'
-          : 'Products, services, and more',
-      icon: BriefcaseBusiness,
-    },
-    {
-      label: localeCode === 'id' ? 'Rating' : 'Rating',
-      value:
-        typeof profile.rating === 'number' && profile.rating > 0
-          ? `${profile.rating.toFixed(1)}/5`
-          : '-',
-      helper: localeCode === 'id' ? 'Ulasan transaksi' : 'Transaction reviews',
-      icon: Star,
-    },
-  ];
+  const publicPhone = getPublicProfilePhone(profile);
 
-  const listingGroups = listings.reduce<
-    Record<ProfileLeafTab, PublicListing[]>
-  >(
-    (acc, item) => {
-      const key = normalizeProfileContentTab({
-        type: item.content_type,
-        category: item.category,
-        metadata: item.metadata || null,
-      });
-      acc[key].push(item);
-      return acc;
-    },
-    {
-      job: [],
-      freelancer: [],
-      product: [],
-      service: [],
-      tool_rental: [],
-      business_transfer: [],
-      property: [],
-      umkm: [],
-    },
-  );
-
-  const availableTabs = (
-    [
-      'all',
-      ...Object.entries(listingGroups)
-        .filter(([, items]) => items.length > 0)
-        .map(([key]) => key as ProfileLeafTab),
-    ] as ProfileContentTab[]
-  ).filter((tab, index, list) => list.indexOf(tab) === index);
-
-  const resolvedActiveContentTab = availableTabs.includes(activeContentTab)
-    ? activeContentTab
-    : 'all';
-
-  const activeListingItems =
-    resolvedActiveContentTab === 'all'
-      ? listings
-      : listingGroups[resolvedActiveContentTab];
-  const previewListingItems = activeListingItems.slice(0, 4);
-  const featuredListing = listings[0] || null;
-  const buyerOfferItems: PublicListing[] = [];
-  const profileShellClass =
-    'mx-auto flex w-full max-w-[1220px] flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:px-6';
-  const profileSectionClass =
-    'rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 py-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.32)] dark:border-[color:var(--app-border-strong)] sm:rounded-[22px] sm:p-4';
-  const profileTileClass =
-    'rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_14px_26px_-26px_rgba(15,23,42,0.26)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] sm:rounded-[20px]';
-  const profileRowClass =
-    'rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 py-3 shadow-none dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]';
-  const profilePrimaryActionClass =
-    'inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 py-2.5 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_18px_30px_-22px_rgba(22,163,74,0.55)] transition hover:bg-[color:var(--app-accent-strong)]';
-  const inviteHref = featuredListing
-    ? buildPublicListingHref(featuredListing)
-    : `/search?q=${encodeURIComponent(detail.displayName)}`;
   const defaultChatDraft =
     localeCode === 'id'
       ? `Halo ${detail.displayName}, saya tertarik dengan profil Anda.`
       : `Hi ${detail.displayName}, I am interested in your profile.`;
-  const profileTabs: Array<{
-    key: PublicProfileTab;
-    label: string;
-    icon: typeof Sparkles;
-  }> = [
-      {
-        key: 'etalase',
-        label: localeCode === 'id' ? 'Postingan' : 'Posts',
-        icon: Store,
-      },
-      {
-        key: 'ringkas',
-        label: localeCode === 'id' ? 'Tentang' : 'About',
-        icon: Sparkles,
-      },
-      {
-        key: 'trust',
-        label: localeCode === 'id' ? 'Ulasan' : 'Reviews',
-        icon: Star,
-      },
-      {
-        key: 'komunitas',
-        label: localeCode === 'id' ? 'Info Usaha' : 'Business Info',
-        icon: BriefcaseBusiness,
-      },
-    ];
-  const followerCount =
-    Math.max(
-      socialUsers.length +
-      listings.length * 2 +
-      (profile.identity_verified ? 8 : 3),
-      typeof profile.completed_jobs === 'number' ? profile.completed_jobs : 0,
-    ) + (isFollowing ? 1 : 0);
-  const followingCount = Math.max(
-    1,
-    Math.min(99, Math.ceil(socialUsers.length / 2) + detail.roles.length),
-  );
-  const socialModalUsers =
-    socialModal === 'followers'
-      ? socialUsers.slice(0, 10)
-      : socialUsers.slice().reverse().slice(0, 10);
-  const capabilityIconByTab: Record<ProfileLeafTab, typeof Sparkles> = {
-    job: BriefcaseBusiness,
-    freelancer: Award,
-    product: Store,
-    service: Sparkles,
-    tool_rental: Clock3,
-    business_transfer: Store,
-    property: MapPin,
-    umkm: Store,
-  };
-  const capabilityLabelByTab: Record<ProfileLeafTab, string> = {
-    job: localeCode === 'id' ? 'Merekrut talent' : 'Hiring talent',
-    freelancer: localeCode === 'id' ? 'Profil talent' : 'Talent profile',
-    product: localeCode === 'id' ? 'Menjual produk' : 'Selling products',
-    service: localeCode === 'id' ? 'Menyediakan jasa' : 'Offering services',
-    tool_rental:
-      localeCode === 'id'
-        ? 'Sewa alat/inventaris'
-        : 'Tool and inventory rental',
-    business_transfer: localeCode === 'id' ? 'Oper usaha' : 'Business transfer',
-    property: localeCode === 'id' ? 'Properti/lokasi' : 'Property/spaces',
-    umkm: localeCode === 'id' ? 'Toko UMKM' : 'UMKM store',
-  };
-  const capabilityHelperByTab: Record<ProfileLeafTab, string> = {
-    job:
-      localeCode === 'id'
-        ? 'Lowongan dan kebutuhan tim yang sedang dibuka.'
-        : 'Open jobs and team needs.',
-    freelancer:
-      localeCode === 'id'
-        ? 'Skill, pengalaman, dan portofolio yang bisa dinilai cepat.'
-        : 'Skills, experience, and portfolio visitors can scan quickly.',
-    product:
-      localeCode === 'id'
-        ? 'Produk atau stok yang bisa langsung dicek.'
-        : 'Products or stock visitors can inspect.',
-    service:
-      localeCode === 'id'
-        ? 'Layanan yang bisa diajak kerja sama.'
-        : 'Services available for collaboration.',
-    tool_rental:
-      localeCode === 'id'
-        ? 'Alat atau perlengkapan yang bisa disewa.'
-        : 'Tools or equipment available to rent.',
-    business_transfer:
-      localeCode === 'id'
-        ? 'Usaha berjalan yang bisa dilihat peluangnya.'
-        : 'Running businesses visitors can evaluate.',
-    property:
-      localeCode === 'id'
-        ? 'Ruang, ruko, kios, atau aset lokasi.'
-        : 'Spaces, shops, kiosks, or location assets.',
-    umkm:
-      localeCode === 'id'
-        ? 'Toko dan operasional usaha yang terhubung.'
-        : 'Connected store and business operations.',
-  };
-  const listingCapabilityCards = (
-    Object.entries(listingGroups) as Array<[ProfileLeafTab, PublicListing[]]>
-  )
-    .filter(([, items]) => items.length > 0)
-    .map(([tab, items]) => {
-      const Icon = capabilityIconByTab[tab];
-      const preview = items
-        .slice(0, 3)
-        .map(item => readString(item.title))
-        .filter(Boolean)
-        .join(' / ');
 
-      return {
-        key: tab,
-        label: capabilityLabelByTab[tab],
-        helper: capabilityHelperByTab[tab],
-        meta:
-          localeCode === 'id'
-            ? `${items.length.toLocaleString(numberLocale)} aktif`
-            : `${items.length.toLocaleString(numberLocale)} active`,
-        preview,
-        icon: Icon,
-        onSelect: () => {
-          setActiveProfileTab('etalase');
-          setActiveContentTab(tab);
-        },
-      };
-    });
-  const capabilityCards: Array<{
-    key: string;
-    label: string;
-    helper: string;
-    meta: string;
-    preview: string;
-    icon: typeof Sparkles;
-    onSelect: () => void;
-  }> = [
-      ...(detail.roles.length > 0
-        ? [
-          {
-            key: 'roles',
-            label: localeCode === 'id' ? 'Mode profil' : 'Profile modes',
-            helper:
-              localeCode === 'id'
-                ? 'Peran utama yang dipakai di Lajukan.'
-                : 'Primary roles used on Lajukan.',
-            meta:
-              localeCode === 'id'
-                ? `${detail.roles.length.toLocaleString(numberLocale)} peran`
-                : `${detail.roles.length.toLocaleString(numberLocale)} roles`,
-            preview: detail.roles.slice(0, 4).map(formatRole).join(' / '),
-            icon: ShieldCheck,
-            onSelect: () => setActiveProfileTab('ringkas'),
-          },
-        ]
-        : []),
-      ...listingCapabilityCards,
-      ...(detail.skills.length > 0
-        ? [
-          {
-            key: 'skills',
-            label: localeCode === 'id' ? 'Skill inti' : 'Core skills',
-            helper:
-              localeCode === 'id'
-                ? 'Keahlian yang paling cepat dinilai pengunjung.'
-                : 'Skills visitors can evaluate quickly.',
-            meta:
-              localeCode === 'id'
-                ? `${detail.skills.length.toLocaleString(numberLocale)} skill`
-                : `${detail.skills.length.toLocaleString(numberLocale)} skills`,
-            preview: detail.skills.slice(0, 5).join(' / '),
-            icon: Sparkles,
-            onSelect: () => setActiveProfileTab('ringkas'),
-          },
-        ]
-        : []),
-      ...(profileReels.length > 0
-        ? [
-          {
-            key: 'reels',
-            label: 'Reels',
-            helper:
-              localeCode === 'id'
-                ? 'Bukti aktivitas dan konten singkat.'
-                : 'Short-form proof and activity.',
-            meta: `${profileReels.length.toLocaleString(numberLocale)} reels`,
-            preview: profileReels
-              .slice(0, 3)
-              .map(reel => reel.title)
-              .filter(Boolean)
-              .join(' / '),
-            icon: Clapperboard,
-            onSelect: () => setActiveProfileTab('reels'),
-          },
-        ]
-        : []),
-      ...(profileCommunityItems.length > 0
-        ? [
-          {
-            key: 'community',
-            label: localeCode === 'id' ? 'Komunitas' : 'Community',
-            helper:
-              localeCode === 'id'
-                ? 'Diskusi dan kontribusi publik.'
-                : 'Public discussions and contributions.',
-            meta:
-              localeCode === 'id'
-                ? `${profileCommunityItems.length.toLocaleString(numberLocale)} aktivitas`
-                : `${profileCommunityItems.length.toLocaleString(numberLocale)} activities`,
-            preview: profileCommunityItems
-              .slice(0, 3)
-              .map(item => item.title)
-              .filter(Boolean)
-              .join(' / '),
-            icon: Users,
-            onSelect: () => setActiveProfileTab('komunitas'),
-          },
-        ]
-        : []),
-      {
-        key: 'trust',
-        label: localeCode === 'id' ? 'Siap dipercaya' : 'Trust ready',
-        helper:
-          localeCode === 'id'
-            ? 'Status verifikasi yang membantu orang cepat yakin.'
-            : 'Verification signals that help visitors trust faster.',
-        meta: trustScoreLabel,
-        preview:
-          detail.verificationBadges.slice(0, 3).join(' / ') ||
-          (localeCode === 'id'
-            ? 'Verifikasi belum lengkap'
-            : 'Verification is not complete yet'),
-        icon: ShieldCheck,
-        onSelect: () => setActiveProfileTab('trust'),
-      },
-    ];
-  const topRoleLabel =
-    detail.roles.length > 0
-      ? detail.roles.slice(0, 2).map(formatRole).join(' / ')
-      : localeCode === 'id'
-        ? 'Member Lajukan'
-        : 'Lajukan member';
-  const heroQuickFacts = [
+  const whatsAppHref = buildWhatsAppHref(publicPhone, defaultChatDraft);
+
+  const joinedDate = formatJoinedDate(
+    profile.joined_at || profile.created_at,
+    localeCode,
+  );
+
+  const metadata = asRecord(profile.metadata);
+  const provider = asRecord(profile.provider_profile);
+  const freelancer = asRecord(profile.freelancer_profile);
+  const statsRecord =
+    asRecord(metadata?.stats) ||
+    asRecord(metadata?.profile_stats) ||
+    asRecord(metadata?.metrics);
+
+  const listingTotals = listings.reduce(
+    (total, item) => ({
+      views:
+        total.views +
+        getListingMetric(item, ['view_count', 'views_count', 'views']),
+      favorites:
+        total.favorites +
+        getListingMetric(item, [
+          'favorite_count',
+          'favorites_count',
+          'like_count',
+          'likes_count',
+          'favorites',
+          'likes',
+        ]),
+      chats:
+        total.chats +
+        getListingMetric(item, [
+          'chat_count',
+          'chats_count',
+          'comment_count',
+          'comments_count',
+          'chats',
+          'comments',
+        ]),
+    }),
+    { views: 0, favorites: 0, chats: 0 },
+  );
+
+  const totalViews =
+    getProfileMetric(profile, [
+      'view_count',
+      'views_count',
+      'profile_views',
+      'views',
+    ]) ?? listingTotals.views;
+
+  const totalFavorites =
+    getProfileMetric(profile, [
+      'favorite_count',
+      'favorites_count',
+      'saved_count',
+      'bookmarks_count',
+      'favorites',
+    ]) ?? listingTotals.favorites;
+
+  const responseTime =
+    readNestedString(
+      [provider, metadata, statsRecord],
+      [
+        'response_time',
+        'chat_response_time',
+        'response_label',
+        'average_response_time',
+      ],
+    ) || copy.notAvailable;
+
+  const rating =
+    profile.rating ??
+    readNestedNumber(
+      [profile as unknown as ProfileRecord, metadata, statsRecord],
+      ['rating', 'average_rating', 'rating_average'],
+    );
+
+  const reviewCount =
+    profile.review_count ??
+    readNestedNumber(
+      [profile as unknown as ProfileRecord, metadata, statsRecord],
+      ['review_count', 'reviews_count', 'rating_count'],
+    ) ??
+    reviews.length;
+
+  const stats: PublicStat[] = [
     {
-      key: 'location',
-      label: localeCode === 'id' ? 'Lokasi' : 'Location',
-      value:
-        profile.location || (localeCode === 'id' ? 'Indonesia' : 'Indonesia'),
-      icon: MapPin,
+      key: 'views',
+      label: copy.views,
+      value: formatCompactNumber(totalViews, localeCode),
+      helper: copy.viewsHelper,
+      icon: Eye,
+      iconClassName:
+        'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
     },
     {
-      key: 'role',
-      label: localeCode === 'id' ? 'Fokus' : 'Focus',
-      value: topRoleLabel,
-      icon: BriefcaseBusiness,
+      key: 'favorites',
+      label: copy.favorites,
+      value: formatCompactNumber(totalFavorites, localeCode),
+      helper: copy.favoritesHelper,
+      icon: Heart,
+      iconClassName:
+        'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300',
     },
     {
-      key: 'content',
-      label: localeCode === 'id' ? 'Etalase' : 'Showcase',
-      value:
-        publicContentCount > 0
-          ? localeCode === 'id'
-            ? `${publicContentCount.toLocaleString(numberLocale)} konten`
-            : `${publicContentCount.toLocaleString(numberLocale)} posts`
-          : localeCode === 'id'
-            ? 'Profil baru'
-            : 'New profile',
+      key: 'response',
+      label: copy.response,
+      value: responseTime,
+      helper: copy.responseHelper,
+      icon: MessageCircle,
+      iconClassName:
+        'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
+    },
+    {
+      key: 'posts',
+      label: copy.activePosts,
+      value: formatCompactNumber(listings.length, localeCode),
+      helper: copy.activePostsHelper,
       icon: Store,
+      iconClassName:
+        'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
     },
     {
-      key: 'trust',
-      label: 'Trust',
-      value: trustScoreLabel,
-      icon: ShieldCheck,
+      key: 'rating',
+      label: copy.rating,
+      value:
+        typeof rating === 'number' && rating > 0
+          ? `${rating.toFixed(1)}/5`
+          : '-',
+      helper:
+        reviewCount > 0
+          ? `${formatCompactNumber(reviewCount, localeCode)} ${copy.reviewCount}`
+          : copy.ratingHelper,
+      icon: Star,
+      iconClassName:
+        'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
     },
   ];
-  const conversationPrompts = (
-    localeCode === 'id'
-      ? [
-        `Halo ${detail.displayName}, boleh tahu detail produk/jasa yang sedang aktif?`,
-        `Halo ${detail.displayName}, saya mau tanya apakah bisa konsultasi kebutuhan dulu?`,
-        `Halo ${detail.displayName}, ada katalog, contoh karya, atau info terbaru yang bisa saya lihat?`,
-      ]
-      : [
-        `Hi ${detail.displayName}, can I ask about your active products or services?`,
-        `Hi ${detail.displayName}, can we discuss my needs first?`,
-        `Hi ${detail.displayName}, do you have a catalog, samples, or recent updates I can review?`,
-      ]
-  ).slice(0, 3);
-  const metadata = asRecord(profile.metadata);
-  const providerMeta = asRecord(profile.provider_profile);
-  const buyerMeta = asRecord(profile.buyer_profile);
-  const publicPhone = getPublicProfilePhone(profile);
-  const whatsAppHref = buildWhatsAppHref(publicPhone, defaultChatDraft);
-  const businessInfoRows = [
+
+  const listingGroups = PROFILE_LEAF_TABS.reduce<
+    Record<ProfileLeafTab, PublicListing[]>
+  >(
+    (groups, tab) => {
+      groups[tab] = [];
+      return groups;
+    },
+    {} as Record<ProfileLeafTab, PublicListing[]>,
+  );
+
+  for (const item of listings) {
+    const tab = normalizeProfileContentTab({
+      type: item.content_type,
+      category: item.category,
+      metadata: item.metadata || null,
+    });
+
+    listingGroups[tab].push(item);
+  }
+
+  const availableContentTabs: ProfileContentTab[] = [
+    'all',
+    ...PROFILE_LEAF_TABS.filter(tab => listingGroups[tab].length > 0),
+  ];
+
+  const resolvedContentTab = availableContentTabs.includes(activeContentTab)
+    ? activeContentTab
+    : 'all';
+
+  const visibleListings =
+    resolvedContentTab === 'all' ? listings : listingGroups[resolvedContentTab];
+
+  const businessCategory =
+    firstString(
+      provider?.business_category,
+      provider?.category,
+      metadata?.business_category,
+      metadata?.category,
+      freelancer?.category,
+    ) || detail.roles.map(formatRole).join(', ');
+
+  const businessHours =
+    firstString(
+      provider?.business_hours,
+      provider?.operational_hours,
+      metadata?.business_hours,
+      metadata?.operational_hours,
+      provider?.response_time,
+    ) || copy.askByChat;
+
+  const businessRows = [
     {
-      label: localeCode === 'id' ? 'Jenis Profil' : 'Profile Type',
-      value: topRoleLabel,
+      key: 'type',
+      label: copy.businessType,
+      value:
+        detail.roles.map(formatRole).join(', ') ||
+        (profile.identity_verified ? copy.verified : copy.publicProfile),
       icon: ShieldCheck,
     },
     {
-      label: localeCode === 'id' ? 'Kategori' : 'Category',
-      value:
-        detail.roles.slice(0, 4).map(formatRole).join(', ') ||
-        readString(providerMeta?.business_category) ||
-        readString(metadata?.business_category) ||
-        (localeCode === 'id' ? 'Marketplace Lajukan' : 'Lajukan marketplace'),
+      key: 'category',
+      label: copy.category,
+      value: businessCategory,
       icon: Store,
     },
     {
-      label: localeCode === 'id' ? 'Lokasi Usaha' : 'Business Location',
-      value: profile.location || readString(buyerMeta?.preferred_location),
+      key: 'location',
+      label: copy.businessLocation,
+      value: profile.location || '',
       icon: MapPin,
     },
     {
-      label: localeCode === 'id' ? 'Jam Operasional' : 'Business Hours',
-      value:
-        readString(providerMeta?.business_hours) ||
-        readString(metadata?.business_hours) ||
-        readString(providerMeta?.response_time) ||
-        (localeCode === 'id' ? 'Tanya lewat chat' : 'Ask via chat'),
+      key: 'hours',
+      label: copy.businessHours,
+      value: businessHours,
       icon: Clock3,
     },
   ].filter(item => item.value);
 
-  const handleFollowToggle = () => {
+  const hasAboutContent =
+    detail.skills.length > 0 ||
+    detail.roles.length > 0 ||
+    detail.languages.length > 0 ||
+    detail.experience.length > 0 ||
+    detail.education.length > 0 ||
+    detail.certifications.length > 0 ||
+    detail.links.length > 0;
+
+  const handleToggleSaved = () => {
     if (typeof window === 'undefined') return;
-    const nextFollowing = !isFollowing;
+
     try {
-      const raw = window.localStorage.getItem(PUBLIC_PROFILE_FOLLOW_KEY);
+      const raw = window.localStorage.getItem(PUBLIC_PROFILE_SAVE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       const ids = Array.isArray(parsed)
         ? parsed.map(item => String(item)).filter(Boolean)
         : [];
-      const nextIds = nextFollowing
+
+      const nextSaved = !isSaved;
+      const nextIds = nextSaved
         ? Array.from(new Set([...ids, profile.id]))
         : ids.filter(item => item !== profile.id);
+
       window.localStorage.setItem(
-        PUBLIC_PROFILE_FOLLOW_KEY,
+        PUBLIC_PROFILE_SAVE_KEY,
         JSON.stringify(nextIds),
       );
-      setFollowedSocialIds(nextIds);
+
+      setIsSaved(nextSaved);
     } catch {
-      // Follow public profile is optimistic until backend social graph exists.
+      setIsSaved(value => !value);
     }
-    setIsFollowing(nextFollowing);
   };
 
-  const handleSocialFollowToggle = (targetId: string) => {
-    if (!targetId || targetId === profile.id) return;
-    const nextIds = followedSocialIds.includes(targetId)
-      ? followedSocialIds.filter(item => item !== targetId)
-      : Array.from(new Set([...followedSocialIds, targetId]));
-    setFollowedSocialIds(nextIds);
+  const handleShareProfile = async () => {
+    const url =
+      typeof window !== 'undefined'
+        ? window.location.href
+        : `https://www.lajukan.com/${localeCode}/profile/${slug}`;
+
     try {
-      window.localStorage.setItem(
-        PUBLIC_PROFILE_FOLLOW_KEY,
-        JSON.stringify(nextIds),
-      );
+      await navigator.clipboard.writeText(url);
+      setShareMessage(copy.linkCopied);
     } catch {
-      // Follow list is intentionally best-effort in this UI-only phase.
+      setShareMessage(copy.copyFailed);
     }
+
+    window.setTimeout(() => setShareMessage(''), 1600);
   };
 
   const handleOpenChat = async (
@@ -1682,21 +1828,24 @@ export default function PublicProfileClient({
   ) => {
     if (!isAuthenticated) {
       router.push(
-        `/login?callbackUrl=${encodeURIComponent(pathname || `/profile/${slug}`)}`,
+        `/login?callbackUrl=${encodeURIComponent(
+          pathname || `/profile/${slug}`,
+        )}`,
       );
       return;
     }
-    if (user?.id && user.id === profile.id) {
-      if (listing) router.push(buildPublicListingHref(listing));
+
+    if (isOwnProfile) {
+      router.push(listing ? buildPublicListingHref(listing) : '/profile/edit');
       return;
     }
 
     const chatKey = listing?.id || 'profile';
     setStartingChatKey(chatKey);
-    setProfileChatError('');
+    setChatError('');
 
     try {
-      const res = await authFetch('/api/chat/dm', {
+      const response = await authFetch('/api/chat/dm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1707,40 +1856,38 @@ export default function PublicProfileClient({
             content_id: listing?.id,
             metadata: listing
               ? {
-                content_url: buildPublicListingHref(listing),
-                content_type: listing.content_type || listing.category,
-              }
+                  content_url: buildPublicListingHref(listing),
+                  content_type: listing.content_type || listing.category,
+                }
               : {
-                profile_id: profile.id,
-                profile_slug: slug,
-              },
+                  profile_id: profile.id,
+                  profile_slug: slug,
+                },
           },
         }),
       });
-      const payload = (await res.json().catch(() => ({}))) as {
+
+      const payload = (await response.json().catch(() => ({}))) as {
         room_id?: string;
         data?: { room_id?: string };
         error?: string;
       };
-      const roomId = String(
-        payload.room_id || payload.data?.room_id || '',
-      ).trim();
-      if (!res.ok || !roomId) {
-        throw new Error(
-          payload.error ||
-          (localeCode === 'id'
-            ? 'Room chat belum bisa dibuat.'
-            : 'Chat room could not be created.'),
-        );
+
+      const roomId = firstString(payload.room_id, payload.data?.room_id);
+
+      if (!response.ok || !roomId) {
+        throw new Error(payload.error || copy.chatRoomFailed);
       }
 
       const messageText = draft.trim() || defaultChatDraft;
+
       if (listing) {
-        const cardPayload = buildPublicListingChatPayload(
+        const attachment = buildPublicListingChatPayload(
           listing,
           profile,
           localeCode,
         );
+
         await authFetch(
           `/api/chat/rooms/${encodeURIComponent(roomId)}/messages`,
           {
@@ -1749,7 +1896,7 @@ export default function PublicProfileClient({
             body: JSON.stringify({
               content: messageText,
               type: 'listing',
-              attachments: [JSON.stringify(cardPayload)],
+              attachments: [JSON.stringify(attachment)],
             }),
           },
         ).catch(() => null);
@@ -1769,638 +1916,652 @@ export default function PublicProfileClient({
       }
 
       router.push(`/chat/${encodeURIComponent(roomId)}`);
-    } catch (err) {
-      setProfileChatError(
-        err instanceof Error
-          ? err.message
-          : localeCode === 'id'
-            ? 'Gagal membuka chat.'
-            : 'Failed to open chat.',
+    } catch (openChatError) {
+      setChatError(
+        openChatError instanceof Error
+          ? openChatError.message
+          : copy.chatFailed,
       );
     } finally {
       setStartingChatKey(null);
     }
   };
 
-  const handleShareProfile = async () => {
-    const url =
-      typeof window !== 'undefined'
-        ? window.location.href
-        : `https://www.lajukan.com/${localeCode}/profile/${slug}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareMessage(localeCode === 'id' ? 'Link disalin' : 'Link copied');
-    } catch {
-      setShareMessage(localeCode === 'id' ? 'Gagal salin' : 'Copy failed');
-    }
-    window.setTimeout(() => setShareMessage(''), 1600);
-  };
+  const profileTabs: Array<{
+    key: PublicProfileTab;
+    label: string;
+  }> = [
+    { key: 'posts', label: copy.posts },
+    { key: 'about', label: copy.about },
+    { key: 'reviews', label: `${copy.reviews} (${reviewCount})` },
+    { key: 'business', label: copy.businessInfo },
+  ];
 
   return (
-    <div className="lajukan-market-page lajukan-market-profile min-h-screen bg-[color:var(--app-surface-muted)] pb-[calc(9rem+env(safe-area-inset-bottom))] pt-0 dark:bg-[color:var(--app-surface)] sm:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.10),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.10),transparent_22%),var(--app-surface-muted)] dark:sm:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_22%),var(--app-surface-strong)] lg:pb-6">
+    <div className="min-h-screen bg-[color:var(--app-surface-muted)] pb-[calc(7rem+env(safe-area-inset-bottom))] dark:bg-[color:var(--app-surface)] lg:pb-10">
       <DetailMobileTopBar
         title={detail.displayName}
-        eyebrow={localeCode === 'id' ? 'Profil publik' : 'Public profile'}
-        backLabel={localeCode === 'id' ? 'Kembali' : 'Back'}
+        eyebrow={copy.publicProfile}
+        backLabel={copy.back}
       />
-      <div className={profileShellClass}>
-        <section className="overflow-hidden rounded-[24px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-[0_22px_48px_-40px_rgba(15,23,42,0.38)] dark:border-[color:var(--app-border-strong)] sm:rounded-[28px]">
-          <div className="relative h-36 overflow-hidden bg-[linear-gradient(135deg,#dcfce7_0%,#ecfeff_52%,#fef3c7_100%)] sm:h-44 lg:h-56">
+
+      <main className="page-shell space-y-4 px-3 py-2 sm:px-4 sm:py-6 lg:px-6">
+        <section className="overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm sm:rounded-[28px]">
+          <div className="relative h-40 overflow-hidden sm:h-56 lg:h-64">
             {coverUrl ? (
               <Image
                 src={coverUrl}
                 alt={`${detail.displayName} cover`}
                 fill
-                sizes="(max-width: 768px) 100vw, 1220px"
-                className="object-cover"
+                priority
                 unoptimized
+                sizes="100vw"
+                className="object-cover"
               />
             ) : (
-              <>
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(255,255,255,0.66),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(16,185,129,0.18),transparent_28%)]" />
-                <div className="absolute bottom-0 right-[8%] h-28 w-44 rounded-t-[36px] border border-emerald-100 bg-white/70 shadow-[0_28px_80px_-48px_rgba(15,23,42,0.42)]  sm:h-36 sm:w-56 lg:h-44 lg:w-72">
-                  <div className="mx-auto mt-5 h-8 w-28 rounded-lg bg-emerald-700 text-center text-sm font-bold leading-8 text-white shadow-sm sm:mt-7 sm:h-10 sm:w-36 sm:text-base">
-                    LAJUKAN
-                  </div>
-                  <div className="mt-4 h-8 w-full bg-emerald-500/18" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.24),transparent_32%),radial-gradient(circle_at_78%_36%,rgba(52,211,153,0.2),transparent_28%),linear-gradient(135deg,#ecfdf5_0%,#f8fafc_48%,#dcfce7_100%)] dark:bg-[radial-gradient(circle_at_18%_26%,rgba(16,185,129,0.18),transparent_32%),radial-gradient(circle_at_78%_36%,rgba(52,211,153,0.14),transparent_28%),linear-gradient(135deg,#0f172a_0%,#111827_48%,#052e25_100%)]">
+                <div className="absolute bottom-0 left-[9%] h-20 w-20 rounded-t-[42px] bg-emerald-200/60 dark:bg-emerald-900/40" />
+                <div className="absolute bottom-0 left-[18%] h-28 w-32 rounded-t-[48px] bg-white/70 dark:bg-slate-800/70" />
+                <div className="absolute bottom-0 right-[12%] h-24 w-52 rounded-t-3xl border-x border-t border-emerald-200/80 bg-white/80 dark:border-emerald-900/70 dark:bg-slate-800/80" />
+                <div className="absolute bottom-14 right-[17%] rounded-lg bg-emerald-700 px-7 py-2 text-sm font-black tracking-wide text-white shadow-lg">
+                  LAJUKAN
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white/70 to-transparent" />
-              </>
+              </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--app-surface-strong)] via-transparent to-black/5" />
-            <div className="absolute left-3 top-3 flex max-w-[72%] flex-wrap gap-1.5 text-white sm:left-5 sm:top-5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ring-1 ring-white/22  sm:text-[11px]">
-                <Sparkles className="h-3.5 w-3.5" />
-                {publicContentCount > 0
-                  ? localeCode === 'id'
-                    ? 'Profil aktif'
-                    : 'Active profile'
-                  : localeCode === 'id'
-                    ? 'Profil publik'
-                    : 'Public profile'}
-              </span>
-            </div>
-            {profile.identity_verified ? (
-              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/18 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white ring-1 ring-white/22  sm:right-5 sm:top-5 sm:text-[11px]">
-                <BadgeCheck className="h-3.5 w-3.5" />
-                Verified
-              </span>
-            ) : null}
+
+            <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/10" />
           </div>
 
-          <div className="relative px-3 pb-3.5 sm:px-5 sm:pb-5">
-            <div className="-mt-14 grid gap-3 sm:-mt-16 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-              <div className="flex min-w-0 flex-1 items-end gap-3">
-                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-[5px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-xl sm:h-32 sm:w-32">
-                  <Image
-                    src={avatarUrl}
-                    alt={detail.displayName}
-                    fill
-                    sizes="(max-width: 640px) 96px, 128px"
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-                <div className="min-w-0 pb-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                    <h1 className="line-clamp-1 min-w-0 text-xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-2xl lg:text-[28px]">
-                      {detail.displayName}
-                    </h1>
-                    <span className="inline-flex max-w-full items-center rounded-full bg-[color:var(--app-surface-muted)] px-2 py-0.5 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface)]">
-                      <span className="truncate">
-                        @{profile.username || profile.id.slice(0, 8)}
-                      </span>
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)] sm:text-base">
-                    {detail.headline}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-[20px] border border-[color:var(--app-border)] bg-white/94 p-2.5 shadow-[0_18px_34px_-32px_rgba(15,23,42,0.42)] ring-1 ring-white/70  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,var(--app-surface)_92%,transparent)]">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={handleShareProfile}
-                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
-                  >
-                    {shareMessage ? (
-                      <Copy className="h-4 w-4" />
-                    ) : (
-                      <Share2 className="h-4 w-4" />
-                    )}
-                    {localeCode === 'id'
-                      ? shareMessage || 'Bagikan'
-                      : shareMessage || 'Share'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFollowToggle}
-                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
-                    aria-label={
-                      isFollowing
-                        ? localeCode === 'id'
-                          ? 'Batalkan simpan'
-                          : 'Remove saved profile'
-                        : localeCode === 'id'
-                          ? 'Simpan profil'
-                          : 'Save profile'
-                    }
-                  >
-                    <Bookmark className="h-4 w-4" />
-                    {isFollowing
-                      ? localeCode === 'id'
-                        ? 'Disimpan'
-                        : 'Saved'
-                      : localeCode === 'id'
-                        ? 'Simpan'
-                        : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenChat()}
-                    disabled={startingChatKey === 'profile'}
-                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_16px_28px_-22px_rgba(22,163,74,0.55)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-70"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    {startingChatKey === 'profile'
-                      ? localeCode === 'id'
-                        ? 'Membuka...'
-                        : 'Opening...'
-                      : 'Chat'}
-                  </button>
-                  {whatsAppHref ? (
-                    <a
-                      href={whatsAppHref}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-                    >
-                      <PhoneCall className="h-4 w-4" />
-                      WhatsApp
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenChat(defaultChatDraft)}
-                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-                    >
-                      <PhoneCall className="h-4 w-4" />
-                      WhatsApp
-                    </button>
-                  )}
-                </div>
-                {profileChatError ? (
-                  <p className="mt-2 rounded-[12px] border border-[color:var(--app-danger-border)] bg-[color:var(--app-danger-soft)] px-3 py-2 text-[11px] font-semibold text-[color:var(--app-danger)]">
-                    {profileChatError}
-                  </p>
-                ) : null}
-                <div className="mt-2 flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {conversationPrompts.slice(0, 2).map((prompt, index) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => handleOpenChat(prompt)}
-                      className={`max-w-full shrink-0 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-left text-[11px] font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] ${index > 0 ? 'hidden sm:inline-flex' : 'inline-flex'}`}
-                    >
-                      <span className="max-w-[220px] flex justify-center items-center truncate">
-                        {prompt.replace(
-                          /^Halo\s+[^,]+,\s+|^Hi\s+[^,]+,\s+/i,
-                          '',
-                        )}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {/* <div className="mt-2 flex items-center gap-2 rounded-[14px] bg-[color:var(--app-accent-soft)] px-3 py-2 text-[11px] font-bold text-[color:var(--app-accent)]">
-                  <ShieldCheck className="h-4 w-4" />
-                  <span>Trust {trustScoreLabel}</span>
-                  <span className="h-1 w-1 rounded-full bg-current opacity-50" />
-                  <span>
-                    {localeCode === 'id' ? 'Chat dulu' : 'Chat first'}
-                  </span>
-                </div> */}
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {heroQuickFacts.map(item => {
-                const Icon = item.icon;
-                return (
-                  <div
-                    key={item.key}
-                    className="min-w-0 rounded-[16px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[12px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                        <Icon className="h-3.5 w-3.5" />
-                      </span>
-                      <div className="min-w-0 leading-none">
-                        <p className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-[color:var(--app-text-soft)]">
-                          {item.label}
-                        </p>
-                        <p className="mt-1 truncate text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-sm">
-                          {item.value}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {detail.summary ? (
-              <p className="mt-3 line-clamp-2 max-w-4xl text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
-                {detail.summary}
-              </p>
-            ) : null}
-
-            <div className="mt-3 hidden grid-cols-2 gap-2 sm:grid-cols-4">
-              <button
-                type="button"
-                onClick={() => setSocialModal('followers')}
-                className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
-              >
-                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {followerCount.toLocaleString(
-                    localeCode === 'id' ? 'id-ID' : 'en-US',
-                  )}
-                </span>
-                <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id' ? 'Pengikut' : 'Followers'}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSocialModal('following')}
-                className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
-              >
-                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {followingCount.toLocaleString(
-                    localeCode === 'id' ? 'id-ID' : 'en-US',
-                  )}
-                </span>
-                <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id' ? 'Mengikuti' : 'Following'}
-                </span>
-              </button>
-              <Link
-                href={inviteHref}
-                className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
-              >
-                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {listings.length.toLocaleString(
-                    localeCode === 'id' ? 'id-ID' : 'en-US',
-                  )}
-                </span>
-                <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id' ? 'Karya' : 'Work'}
-                </span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => setActiveProfileTab('trust')}
-                className={`${profileRowClass} text-left transition hover:border-[color:var(--app-accent-border)]`}
-              >
-                <span className="block text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {trustScoreLabel}
-                </span>
-                <span className="text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                  Trust
-                </span>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {buyerOfferItems.length > 0 ? (
-          <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.28)] dark:border-[color:var(--app-border-strong)] sm:p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="relative px-4 pb-5 sm:px-7 sm:pb-7">
+            <div className="-mt-12 grid gap-5 sm:-mt-16 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-end">
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                  {localeCode === 'id' ? 'Penawaran aktif' : 'Active offers'}
-                </p>
-                <h2 className="mt-1 text-lg font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
-                  {localeCode === 'id'
-                    ? 'Langsung pilih yang mau ditanya'
-                    : 'Pick what you want to ask about'}
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id'
-                    ? 'Produk, jasa, mentor, tools, atau lokasi yang aktif. Klik chat supaya konteksnya otomatis masuk ke room.'
-                    : 'Active products, services, mentoring, tools, or spaces. Chat will carry the item context into the room.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveProfileTab('etalase');
-                  setActiveContentTab('all');
-                }}
-                className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3.5 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
-              >
-                <Store className="h-4 w-4" />
-                {localeCode === 'id' ? 'Lihat semua' : 'View all'}
-              </button>
-            </div>
+                <div className="flex min-w-0 items-end gap-3 sm:gap-4">
+                  <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full border-[5px] border-[color:var(--app-surface-strong)] bg-[color:var(--app-surface-muted)] shadow-lg sm:h-32 sm:w-32">
+                    <Image
+                      src={avatarUrl}
+                      alt={detail.displayName}
+                      fill
+                      priority
+                      unoptimized
+                      sizes="128px"
+                      className="object-cover"
+                    />
+                  </div>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {buyerOfferItems.map(item => {
-                const href = buildPublicListingHref(item);
-                const imageSrc =
-                  normalizeContentMediaUrl(item.cover_image || '') ||
-                  '/default-avatar.svg';
-                const kindLabel = getPublicListingKindLabel(item, localeCode);
-                const location = getListingLocation(item);
-                const question = buildPublicListingChatQuestion(
-                  item,
-                  detail.displayName,
-                  localeCode,
-                );
-                const isStarting = startingChatKey === item.id;
+                  <div className="min-w-0 flex-1 pb-1 sm:pb-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h1 className="min-w-0 max-w-full break-words text-2xl font-black leading-tight tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-3xl">
+                        {detail.displayName}
+                      </h1>
 
-                return (
-                  <article
-                    key={item.id}
-                    className="group overflow-hidden rounded-[20px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] shadow-[0_14px_30px_-28px_rgba(15,23,42,0.36)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
-                  >
-                    <Link href={href} className="block">
-                      <div className="relative aspect-[4/3] overflow-hidden bg-[color:var(--app-surface)]">
-                        <Image
-                          src={imageSrc}
-                          alt={item.title || 'Listing'}
-                          fill
-                          sizes="(max-width: 640px) 100vw, 33vw"
-                          className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                          unoptimized
+                      {profile.identity_verified ? (
+                        <BadgeCheck
+                          className="h-6 w-6 fill-emerald-600 text-white"
+                          aria-label={copy.verified}
                         />
-                        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-accent)] shadow-sm ">
-                          <PackageCheck className="h-3.5 w-3.5" />
-                          {kindLabel}
-                        </span>
-                      </div>
-                    </Link>
-                    <div className="p-3">
-                      <Link href={href} className="block">
-                        <h3 className="line-clamp-2 text-sm font-bold leading-5 text-[color:var(--app-text)] transition group-hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-inverse)]">
-                          {item.title ||
-                            (localeCode === 'id'
-                              ? 'Listing tanpa judul'
-                              : 'Untitled listing')}
-                        </h3>
-                      </Link>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                        <span className="text-[color:var(--app-accent)]">
-                          {formatPublicListingValue(item, localeCode)}
-                        </span>
-                        {location ? <span>{location}</span> : null}
-                      </div>
-                      {item.summary ? (
-                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                          {item.summary}
-                        </p>
                       ) : null}
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void handleOpenChat(question, item)}
-                          disabled={isStarting}
-                          className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-3 text-xs font-bold text-[color:var(--app-text-inverse)] transition hover:bg-[color:var(--app-accent-strong)] disabled:cursor-wait disabled:opacity-70"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          {isStarting
-                            ? localeCode === 'id'
-                              ? 'Membuka...'
-                              : 'Opening...'
-                            : localeCode === 'id'
-                              ? 'Chat soal ini'
-                              : 'Ask about this'}
-                        </button>
-                        <Link
-                          href={href}
-                          className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-[color:var(--app-border)] bg-white px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-strong)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)] dark:text-[color:var(--app-text-soft)]"
-                        >
-                          Detail
-                        </Link>
-                      </div>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
 
-        <section className="rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2.5 dark:border-[color:var(--app-border-strong)]">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            {statCards.map(item => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className={profileTileClass}>
-                  <div className="flex items-center gap-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                        {item.label}
+                    <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="max-w-full break-all text-sm font-medium text-[color:var(--app-text-soft)]">
+                        @{detail.handle}
                       </span>
-                      <p className="mt-1 truncate text-xl font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {item.value}
-                      </p>
-                      <p className="mt-0.5 truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                        {item.helper}
-                      </p>
+
+                      {profile.identity_verified ? (
+                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                          {copy.verified}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </section>
 
-        <section className="hidden">
-          {/* <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                {localeCode === 'id'
-                  ? 'Kemampuan profil'
-                  : 'Profile capabilities'}
-              </p>
-              <h2 className="mt-1 text-lg font-bold tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)] sm:text-xl">
-                {localeCode === 'id'
-                  ? 'Bisa dibantu apa?'
-                  : 'What can they help with?'}
-              </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-                {localeCode === 'id'
-                  ? 'Semua mode aktif diringkas jadi pilihan cepat. Buka yang relevan tanpa harus membaca seluruh profil.'
-                  : 'Active modes are summarized into quick choices, so visitors can open the relevant part without reading everything.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveProfileTab('etalase');
-                setActiveContentTab('all');
-              }}
-              className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3.5 text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
-            >
-              <Store className="h-4 w-4" />
-              {localeCode === 'id' ? 'Lihat semua' : 'View all'}
-            </button>
-          </div> */}
+                <p className="mt-4 max-w-2xl break-words text-sm font-semibold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                  {detail.headline}
+                </p>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {capabilityCards.map(item => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={item.onSelect}
-                  className="group min-h-[132px] rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3.5 text-left shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] hover:shadow-[0_18px_34px_-28px_rgba(15,23,42,0.36)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
-                >
-                  <span className="flex items-start justify-between gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)] transition group-hover:bg-[color:var(--app-accent)] group-hover:text-[color:var(--app-text-inverse)]">
-                      <Icon className="h-4.5 w-4.5" />
-                    </span>
-                    <span className="rounded-full bg-[color:var(--app-surface-muted)] px-2.5 py-1 text-[11px] font-bold text-[color:var(--app-text-soft)] dark:bg-[color:var(--app-surface-strong)]">
-                      {item.meta}
-                    </span>
-                  </span>
-                  <span className="mt-3 block text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    {item.label}
-                  </span>
-                  <span className="mt-1 line-clamp-2 block text-xs font-semibold leading-5 text-[color:var(--app-text-soft)]">
-                    {item.preview || item.helper}
-                  </span>
-                  <span className="mt-3 inline-flex items-center text-xs font-bold text-[color:var(--app-accent)]">
-                    {localeCode === 'id' ? 'Buka bagian ini' : 'Open section'}
-                    <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="sticky top-[calc(52px+env(safe-area-inset-top))] z-20 overflow-x-auto rounded-[20px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_16px_34px_-32px_rgba(15,23,42,0.32)]  dark:border-[color:var(--app-border-strong)] sm:top-[calc(60px+env(safe-area-inset-top))]">
-          <div className="flex min-w-max gap-2">
-            {profileTabs.map(tab => {
-              const Icon = tab.icon;
-              const active = activeProfileTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveProfileTab(tab.key)}
-                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full px-3.5 text-sm font-bold transition ${active
-                      ? 'bg-[color:var(--app-accent)] text-[color:var(--app-text-inverse)] shadow-[0_12px_24px_-18px_rgba(22,163,74,0.56)]'
-                      : 'bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] hover:bg-[color:var(--app-accent-soft)] hover:text-[color:var(--app-accent)] dark:bg-[color:var(--app-surface)]'
-                    }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {activeProfileTab === 'ringkas' ? (
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-            <div className="space-y-3">
-              <section className={profileSectionClass}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                      {localeCode === 'id'
-                        ? 'Ringkasan cepat'
-                        : 'Quick summary'}
-                    </p>
-                    <h2 className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {localeCode === 'id'
-                        ? 'Hal yang paling relevan'
-                        : 'Most relevant signals'}
-                    </h2>
-                  </div>
-                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-bold text-[color:var(--app-accent)]">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {localeCode === 'id' ? 'Aktif' : 'Active'}
-                  </span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
+                <p className="mt-2 max-w-2xl break-words text-sm leading-6 text-[color:var(--app-text-soft)]">
                   {detail.summary}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {capabilityCards.slice(0, 6).map(item => (
+
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-[color:var(--app-text-soft)]">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {profile.location || copy.locationFallback}
+                    </span>
+                  </span>
+
+                  {joinedDate ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarDays className="h-4 w-4 shrink-0" />
+                      {copy.joined} {joinedDate}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-2.5 shadow-sm dark:bg-[color:var(--app-surface)]">
+                <button
+                  type="button"
+                  onClick={handleShareProfile}
+                  className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                >
+                  {shareMessage ? (
+                    <Copy className="h-4 w-4" />
+                  ) : (
+                    <Share2 className="h-4 w-4" />
+                  )}
+                  <span className="truncate">{shareMessage || copy.share}</span>
+                </button>
+
+                {isOwnProfile ? (
+                  <Link
+                    href="/profile/edit"
+                    className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-[color:var(--app-surface-strong)] px-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    <span className="truncate">{copy.editProfile}</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleToggleSaved}
+                    className={`inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border bg-[color:var(--app-surface-strong)] px-3 text-sm font-bold transition ${
+                      isSaved
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                        : 'border-[color:var(--app-border)] text-[color:var(--app-text)] hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]'
+                    }`}
+                  >
+                    <Bookmark
+                      className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`}
+                    />
+                    <span className="truncate">
+                      {isSaved ? copy.saved : copy.save}
+                    </span>
+                  </button>
+                )}
+
+                {isOwnProfile ? (
+                  <Link
+                    href="/my-listings"
+                    className="col-span-2 inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700"
+                  >
+                    <Wrench className="h-4 w-4" />
+                    <span className="truncate">{copy.managePosts}</span>
+                  </Link>
+                ) : (
+                  <>
                     <button
-                      key={`quick-${item.key}`}
                       type="button"
-                      onClick={item.onSelect}
-                      className="inline-flex min-h-[34px] items-center gap-2 rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 text-xs font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] hover:text-[color:var(--app-accent)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
+                      onClick={() => {
+                        void handleOpenChat();
+                      }}
+                      disabled={startingChatKey === 'profile'}
+                      className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-70"
                     >
-                      {item.label}
-                      <span className="text-[color:var(--app-text-soft)]">
-                        {item.meta}
+                      {startingChatKey === 'profile' ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MessageCircle className="h-4 w-4" />
+                      )}
+                      <span className="truncate">
+                        {startingChatKey === 'profile'
+                          ? copy.opening
+                          : copy.chat}
                       </span>
                     </button>
-                  ))}
+
+                    {whatsAppHref ? (
+                      <a
+                        href={whatsAppHref}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                      >
+                        <PhoneCall className="h-4 w-4" />
+                        <span className="truncate">WhatsApp</span>
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex min-h-11 min-w-0 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 text-sm font-bold text-[color:var(--app-text-soft)] opacity-60"
+                      >
+                        <PhoneCall className="h-4 w-4" />
+                        <span className="truncate">WhatsApp</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {chatError ? (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800 dark:border-rose-900/60 dark:bg-rose-500/10 dark:text-rose-200">
+                {chatError}
+              </div>
+            ) : null}
+
+            <section className="mt-6">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 lg:gap-3">
+                {stats.map(item => (
+                  <StatCard key={item.key} item={item} />
+                ))}
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[28px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] shadow-sm">
+          <div className="overflow-x-auto border-b border-[color:var(--app-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-max px-4 sm:px-6">
+              {profileTabs.map(tab => {
+                const active = activeProfileTab === tab.key;
+
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveProfileTab(tab.key)}
+                    className={`relative min-h-14 px-4 text-sm font-bold transition ${
+                      active
+                        ? 'text-emerald-700 dark:text-emerald-300'
+                        : 'text-[color:var(--app-text-soft)] hover:text-[color:var(--app-text)]'
+                    }`}
+                  >
+                    {tab.label}
+
+                    {active ? (
+                      <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-emerald-600" />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {activeProfileTab === 'posts' ? (
+            <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {availableContentTabs.map(tab => {
+                      const active = resolvedContentTab === tab;
+
+                      return (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setActiveContentTab(tab)}
+                          className={`min-h-9 shrink-0 rounded-full border px-4 text-xs font-bold transition ${
+                            active
+                              ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                              : 'border-[color:var(--app-border)] text-[color:var(--app-text-soft)] hover:border-emerald-300 hover:text-[color:var(--app-text)]'
+                          }`}
+                        >
+                          {tab === 'all'
+                            ? copy.all
+                            : getProfileContentTabLabel(tab, localeCode)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <span className="hidden shrink-0 rounded-xl border border-[color:var(--app-border)] px-3 py-2 text-xs font-bold text-[color:var(--app-text-soft)] sm:inline-flex">
+                    {copy.newest}
+                  </span>
                 </div>
-              </section>
 
-              {detail.skills.length > 0 ? (
-                <section className={profileSectionClass}>
-                  <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {localeCode === 'id' ? 'Keahlian inti' : 'Core skills'}
-                  </h2>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {detail.skills.map(skill => (
-                      <span
-                        key={skill}
-                        className="rounded-full border border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-accent)]"
-                      >
-                        {skill}
-                      </span>
-                    ))}
+                {visibleListings.length > 0 ? (
+                  <>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {visibleListings.map(item => {
+                        const tab = normalizeProfileContentTab({
+                          type: item.content_type,
+                          category: item.category,
+                          metadata: item.metadata || null,
+                        });
+
+                        const views = getListingMetric(item, [
+                          'view_count',
+                          'views_count',
+                          'views',
+                        ]);
+
+                        const favorites = getListingMetric(item, [
+                          'favorite_count',
+                          'favorites_count',
+                          'like_count',
+                          'likes_count',
+                          'favorites',
+                          'likes',
+                        ]);
+
+                        const chats = getListingMetric(item, [
+                          'chat_count',
+                          'chats_count',
+                          'comment_count',
+                          'comments_count',
+                          'chats',
+                          'comments',
+                        ]);
+
+                        const location = getListingLocation(item);
+                        const href = buildPublicListingHref(item);
+
+                        return (
+                          <article
+                            key={item.id}
+                            className="group overflow-hidden rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] transition hover:-translate-y-0.5 hover:shadow-lg"
+                          >
+                            <Link href={href} className="block">
+                              <div className="relative aspect-[4/3] overflow-hidden bg-[color:var(--app-surface-muted)]">
+                                {item.cover_image ? (
+                                  <Image
+                                    src={item.cover_image}
+                                    alt={item.title || ''}
+                                    fill
+                                    unoptimized
+                                    sizes="(max-width: 640px) 100vw, 320px"
+                                    className="object-cover transition duration-300 group-hover:scale-[1.02]"
+                                  />
+                                ) : (
+                                  <div className="flex h-full items-center justify-center text-[color:var(--app-text-soft)]">
+                                    <Package className="h-10 w-10" />
+                                  </div>
+                                )}
+
+                                <span
+                                  className={`absolute left-3 top-3 rounded-md px-2 py-1 text-[9px] font-black tracking-wide ${getTabTone(tab)}`}
+                                >
+                                  {getProfileContentTabLabel(
+                                    tab,
+                                    localeCode,
+                                  ).toUpperCase()}
+                                </span>
+                              </div>
+
+                              <div className="p-4">
+                                <h3 className="line-clamp-2 min-h-10 text-sm font-black leading-5 text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                  {item.title || 'Untitled'}
+                                </h3>
+
+                                {item.summary ? (
+                                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
+                                    {item.summary}
+                                  </p>
+                                ) : null}
+
+                                <p className="mt-2 truncate text-sm font-black text-emerald-700 dark:text-emerald-300">
+                                  {formatPublicListingValue(item, localeCode)}
+                                </p>
+
+                                {location ? (
+                                  <p className="mt-2 flex items-center gap-1 truncate text-[11px] font-medium text-[color:var(--app-text-soft)]">
+                                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                    {location}
+                                  </p>
+                                ) : null}
+
+                                <div className="mt-3 flex items-center gap-4 border-t border-[color:var(--app-border)] pt-3 text-[11px] font-medium text-[color:var(--app-text-soft)]">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Eye className="h-3.5 w-3.5" />
+                                    {formatCompactNumber(views, localeCode)}
+                                  </span>
+
+                                  <span className="inline-flex items-center gap-1">
+                                    <Heart className="h-3.5 w-3.5" />
+                                    {formatCompactNumber(favorites, localeCode)}
+                                  </span>
+
+                                  <span className="inline-flex items-center gap-1">
+                                    <MessageCircle className="h-3.5 w-3.5" />
+                                    {formatCompactNumber(chats, localeCode)}
+                                  </span>
+                                </div>
+                              </div>
+                            </Link>
+
+                            {!isOwnProfile ? (
+                              <div className="border-t border-[color:var(--app-border)] p-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handleOpenChat(
+                                      buildPublicListingChatQuestion(
+                                        item,
+                                        detail.displayName,
+                                        localeCode,
+                                      ),
+                                      item,
+                                    );
+                                  }}
+                                  disabled={startingChatKey === item.id}
+                                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-70 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                                >
+                                  {startingChatKey === item.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <MessageCircle className="h-4 w-4" />
+                                  )}
+                                  {startingChatKey === item.id
+                                    ? copy.opening
+                                    : copy.askDetails}
+                                </button>
+                              </div>
+                            ) : null}
+                          </article>
+                        );
+                      })}
+                    </div>
+
+                    <Link
+                      href={`/search?owner_id=${encodeURIComponent(profile.id)}`}
+                      className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[color:var(--app-border)] text-sm font-black text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                    >
+                      {copy.viewAllPosts}
+                      <span aria-hidden="true">→</span>
+                    </Link>
+                  </>
+                ) : (
+                  <EmptyState
+                    title={copy.noPosts}
+                    description={copy.noPostsDescription}
+                  />
+                )}
+              </div>
+
+              <aside className="space-y-4">
+                <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
+                  <SectionTitle title={copy.aboutTitle} />
+
+                  <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                    {detail.summary}
+                  </p>
+
+                  {detail.roles.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {detail.roles.slice(0, 5).map(role => (
+                        <span
+                          key={role}
+                          className="rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                        >
+                          {formatRole(role)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveProfileTab('about')}
+                    className="mt-4 inline-flex items-center gap-1 text-xs font-black text-emerald-700 dark:text-emerald-300"
+                  >
+                    {copy.about}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </section>
+
+                <section className="rounded-2xl border border-[color:var(--app-border)] p-4">
+                  <SectionTitle title={copy.contact} />
+
+                  <div className="mt-4 space-y-3">
+                    {isOwnProfile ? (
+                      <>
+                        <Link
+                          href="/profile/edit"
+                          className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                        >
+                          <Edit3 className="h-5 w-5 text-emerald-600" />
+                          {copy.editProfile}
+                        </Link>
+
+                        <Link
+                          href="/my-listings"
+                          className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                        >
+                          <BriefcaseBusiness className="h-5 w-5 text-emerald-600" />
+                          {copy.managePosts}
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleOpenChat();
+                          }}
+                          disabled={startingChatKey === 'profile'}
+                          className="flex w-full items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-left text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] disabled:cursor-wait disabled:opacity-70 dark:text-[color:var(--app-text-inverse)]"
+                        >
+                          <MessageCircle className="h-5 w-5 text-emerald-600" />
+                          <span>
+                            {copy.chatOnLajukan}
+                            <span className="mt-0.5 block text-[10px] font-medium text-[color:var(--app-text-soft)]">
+                              {copy.fastResponse}
+                            </span>
+                          </span>
+                        </button>
+
+                        {whatsAppHref ? (
+                          <a
+                            href={whatsAppHref}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                          >
+                            <PhoneCall className="h-5 w-5 text-emerald-600" />
+                            <span>
+                              {copy.whatsapp}
+                              <span className="mt-0.5 block text-[10px] font-medium text-[color:var(--app-text-soft)]">
+                                {publicPhone}
+                              </span>
+                            </span>
+                          </a>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 </section>
-              ) : null}
+              </aside>
+            </div>
+          ) : null}
 
-              {detail.experience.length > 0 ? (
-                <section className={profileSectionClass}>
-                  <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {localeCode === 'id' ? 'Pengalaman' : 'Experience'}
-                  </h2>
-                  <div className="mt-3 space-y-2.5">
-                    {detail.experience.slice(0, 6).map(item => (
-                      <div
-                        key={item}
-                        className={`${profileRowClass} text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]`}
-                      >
-                        {item}
+          {activeProfileTab === 'about' ? (
+            <div className="p-4 sm:p-6">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.6fr)]">
+                <div className="space-y-5">
+                  <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                    <SectionTitle
+                      title={copy.aboutTitle}
+                      subtitle={detail.headline}
+                    />
+
+                    <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[color:var(--app-text-soft)]">
+                      {detail.summary}
+                    </p>
+                  </section>
+
+                  {detail.skills.length > 0 ? (
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                      <SectionTitle title={copy.skills} />
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {detail.skills.map(skill => (
+                          <span
+                            key={skill}
+                            className="rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-2 text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+                          >
+                            {skill}
+                          </span>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
+                    </section>
+                  ) : null}
 
-              {detail.education.length > 0 ||
-                detail.certifications.length > 0 ? (
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {detail.education.length > 0 ? (
-                    <section className={profileSectionClass}>
-                      <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                        <GraduationCap className="h-4 w-4" />
-                        {localeCode === 'id' ? 'Pendidikan' : 'Education'}
-                      </h2>
-                      <div className="mt-3 space-y-2.5">
-                        {detail.education.slice(0, 5).map(item => (
+                  {detail.experience.length > 0 ? (
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                      <SectionTitle title={copy.experience} />
+
+                      <div className="mt-4 space-y-3">
+                        {detail.experience.map((item, index) => (
                           <div
-                            key={item}
-                            className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+                            key={`${item}-${index}`}
+                            className="rounded-xl bg-[color:var(--app-surface-muted)] p-4 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+                          >
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+
+                <aside className="space-y-5">
+                  {detail.roles.length > 0 ? (
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                      <SectionTitle title={copy.roles} />
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {detail.roles.map(role => (
+                          <span
+                            key={role}
+                            className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                          >
+                            {formatRole(role)}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {detail.languages.length > 0 ? (
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                      <SectionTitle title={copy.languages} />
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {detail.languages.map(language => (
+                          <span
+                            key={language}
+                            className="rounded-full border border-[color:var(--app-border)] px-3 py-1.5 text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+                          >
+                            {language}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {detail.education.length > 0 ? (
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                      <SectionTitle title={copy.education} />
+
+                      <div className="mt-4 space-y-3">
+                        {detail.education.map((item, index) => (
+                          <div
+                            key={`${item}-${index}`}
+                            className="rounded-xl bg-[color:var(--app-surface-muted)] p-3 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
                           >
                             {item}
                           </div>
@@ -2410,16 +2571,14 @@ export default function PublicProfileClient({
                   ) : null}
 
                   {detail.certifications.length > 0 ? (
-                    <section className={profileSectionClass}>
-                      <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                        <Award className="h-4 w-4" />
-                        {localeCode === 'id' ? 'Sertifikasi' : 'Certifications'}
-                      </h2>
-                      <div className="mt-3 space-y-2.5">
-                        {detail.certifications.slice(0, 5).map(item => (
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                      <SectionTitle title={copy.certifications} />
+
+                      <div className="mt-4 space-y-3">
+                        {detail.certifications.map((item, index) => (
                           <div
-                            key={item}
-                            className="text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
+                            key={`${item}-${index}`}
+                            className="rounded-xl bg-[color:var(--app-surface-muted)] p-3 text-sm leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]"
                           >
                             {item}
                           </div>
@@ -2427,699 +2586,305 @@ export default function PublicProfileClient({
                       </div>
                     </section>
                   ) : null}
-                </div>
-              ) : null}
-            </div>
 
-            <div className="space-y-3">
-              {detail.languages.length > 0 ? (
-                <section className={profileSectionClass}>
-                  <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    <Languages className="h-4 w-4" />
-                    {localeCode === 'id' ? 'Bahasa' : 'Languages'}
-                  </h2>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {detail.languages.map(language => (
-                      <span
-                        key={language}
-                        className="rounded-full bg-[color:var(--app-surface-muted)] px-3 py-1.5 text-xs font-semibold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)] sm:border sm:border-[color:var(--app-border)] dark:sm:border-[color:var(--app-border-strong)]"
-                      >
-                        {language}
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
+                  {detail.links.length > 0 ? (
+                    <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                      <SectionTitle title={copy.links} />
 
-              {detail.links.length > 0 ? (
-                <section className={profileSectionClass}>
-                  <h2 className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    <Link2 className="h-4 w-4" />
-                    {localeCode === 'id'
-                      ? 'Link profesional'
-                      : 'Professional links'}
-                  </h2>
-                  <div className="mt-3 space-y-2">
-                    {detail.links.slice(0, 8).map(item => (
-                      <a
-                        key={`${item.label}-${item.url}`}
-                        href={item.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`${profileRowClass} flex items-center justify-between text-sm font-medium text-[color:var(--app-text)] transition sm:hover:border-[color:var(--app-accent-border)] sm:hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-soft)]`}
-                      >
-                        <span className="truncate">{item.label}</span>
-                        <ExternalLink className="h-4 w-4 shrink-0" />
-                      </a>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              <section className={profileSectionClass}>
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-[color:var(--app-text-soft)]">
-                    {localeCode === 'id' ? 'Konten publik' : 'Public content'}
-                  </h2>
-                  {activeListingItems.length > 0 ? (
-                    <Link
-                      href={
-                        getProfileContentTabDefinition(resolvedActiveContentTab)
-                          .browseHref
-                      }
-                      className="text-[11px] font-semibold text-[color:var(--app-accent)]"
-                    >
-                      {localeCode === 'id' ? 'Lihat lebih banyak' : 'See more'}
-                    </Link>
-                  ) : null}
-                </div>
-
-                {availableTabs.length > 1 ? (
-                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                    {availableTabs.map(tab => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setActiveContentTab(tab)}
-                        className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${resolvedActiveContentTab === tab
-                            ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                            : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
-                          }`}
-                      >
-                        <span>
-                          {getProfileContentTabLabel(tab, localeCode)}
-                        </span>
-                        <span className="rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)]">
-                          {tab === 'all'
-                            ? listings.length
-                            : listingGroups[tab].length}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {activeListingItems.length === 0 ? (
-                  <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
-                    {resolvedActiveContentTab === 'all'
-                      ? localeCode === 'id'
-                        ? 'Belum ada listing publik yang aktif.'
-                        : 'No public active listings yet.'
-                      : localeCode === 'id'
-                        ? `${getProfileContentTabDefinition(resolvedActiveContentTab).labelId} belum tersedia di profil ini.`
-                        : `${getProfileContentTabDefinition(resolvedActiveContentTab).labelEn} is not available on this profile yet.`}
-                  </p>
-                ) : (
-                  <div className="mt-3 space-y-2.5">
-                    {previewListingItems.map(item => (
-                      <Link
-                        key={item.id}
-                        href={buildPublicListingHref(item)}
-                        className={`${profileRowClass} flex items-start gap-3 transition sm:hover:border-[color:var(--app-accent-border)]`}
-                      >
-                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-[color:var(--app-surface)]">
-                          <Image
-                            src={
-                              normalizeContentMediaUrl(
-                                item.cover_image || '',
-                              ) || '/default-avatar.svg'
-                            }
-                            alt={item.title || 'Listing'}
-                            fill
-                            sizes="64px"
-                            className="object-cover"
-                            unoptimized
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                            {item.title ||
-                              (localeCode === 'id'
-                                ? 'Listing tanpa judul'
-                                : 'Untitled listing')}
-                          </p>
-                          {item.summary ? (
-                            <p className="mt-1 line-clamp-2 text-sm text-[color:var(--app-text-soft)]">
-                              {item.summary}
-                            </p>
-                          ) : null}
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--app-text-soft)]">
-                            <span className="font-semibold text-[color:var(--app-accent)]">
-                              {formatPublicListingValue(item, localeCode)}
-                            </span>
-                            <span>
-                              {getProfileContentTabLabel(
-                                normalizeProfileContentTab({
-                                  type: item.content_type,
-                                  category: item.category,
-                                  metadata: item.metadata || null,
-                                }),
-                                localeCode,
-                              )}
-                            </span>
-                            {item.updated_at || item.created_at ? (
-                              <span>
-                                {formatShortDate(
-                                  item.updated_at || item.created_at,
-                                  localeCode,
-                                )}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-          </div>
-        ) : null}
-
-        {activeProfileTab === 'etalase' ? (
-          <section className={profileSectionClass}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                  {activeListingItems.length.toLocaleString(numberLocale)}{' '}
-                  {localeCode === 'id' ? 'postingan aktif' : 'active posts'}
-                </p>
-                <h2 className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {localeCode === 'id' ? 'Postingan' : 'Posts'}
-                </h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id'
-                    ? 'Produk, jasa, supplier, tempat usaha, dan peluang yang sedang ditampilkan.'
-                    : 'Products, services, suppliers, places, and opportunities currently shown.'}
-                </p>
-              </div>
-              <Link href={inviteHref} className={profilePrimaryActionClass}>
-                <ExternalLink className="h-4 w-4" />
-                {localeCode === 'id' ? 'Buka detail' : 'Open detail'}
-              </Link>
-            </div>
-
-            {availableTabs.length > 1 ? (
-              <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                {availableTabs.map(tab => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveContentTab(tab)}
-                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${resolvedActiveContentTab === tab
-                        ? 'border-[color:var(--app-accent-border)] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]'
-                        : 'border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]'
-                      }`}
-                  >
-                    {getProfileContentTabLabel(tab, localeCode)}
-                    <span className="rounded-full bg-[color:var(--app-surface-strong)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-soft)]">
-                      {tab === 'all'
-                        ? listings.length
-                        : listingGroups[tab].length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {activeListingItems.length === 0 ? (
-              <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-6 text-center dark:border-[color:var(--app-border-strong)]">
-                <BriefcaseBusiness className="mx-auto h-9 w-9 text-[color:var(--app-text-soft)]" />
-                <p className="mt-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {localeCode === 'id'
-                    ? 'Belum ada postingan publik.'
-                    : 'No public posts yet.'}
-                </p>
-                <p className="mx-auto mt-1 max-w-md text-sm text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id'
-                    ? 'Saat pemilik profil membuat produk, jasa, atau kebutuhan, semuanya akan tampil di sini.'
-                    : 'Products, services, or needs created by this profile owner will appear here.'}
-                </p>
-              </div>
-            ) : (
-              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {activeListingItems.slice(0, 12).map((item, index) => {
-                    const href = buildPublicListingHref(item);
-                    const location = getListingLocation(item);
-                    const kind = normalizeProfileContentTab({
-                      type: item.content_type,
-                      category: item.category,
-                      metadata: item.metadata || null,
-                    });
-                    const kindLabel = getProfileContentTabLabel(
-                      kind,
-                      localeCode,
-                    );
-                    const imageSrc =
-                      normalizeContentMediaUrl(item.cover_image || '') ||
-                      '/default-avatar.svg';
-                    const viewTotal = 80 + index * 23;
-                    const likeTotal = 12 + index * 5;
-                    const chatTotal = 2 + index;
-
-                    return (
-                      <article
-                        key={item.id}
-                        className="group overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] shadow-[0_16px_30px_-28px_rgba(15,23,42,0.36)] transition hover:-translate-y-0.5 hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]"
-                      >
-                        <Link href={href} className="block">
-                          <div className="relative aspect-[4/3] overflow-hidden bg-[color:var(--app-surface)]">
-                            <Image
-                              src={imageSrc}
-                              alt={item.title || 'Listing'}
-                              fill
-                              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 280px"
-                              className="object-cover transition duration-300 group-hover:scale-[1.03]"
-                              unoptimized
-                            />
-                            <span className="absolute left-3 top-3 rounded-full bg-[color:var(--app-accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-white shadow-sm">
-                              {kindLabel}
-                            </span>
-                          </div>
-                        </Link>
-                        <div className="p-3">
-                          <Link href={href} className="block">
-                            <h3 className="line-clamp-2 min-h-[40px] text-sm font-bold leading-5 text-[color:var(--app-text)] transition group-hover:text-[color:var(--app-accent)] dark:text-[color:var(--app-text-inverse)]">
-                              {item.title ||
-                                (localeCode === 'id'
-                                  ? 'Listing tanpa judul'
-                                  : 'Untitled listing')}
-                            </h3>
-                          </Link>
-                          <p className="mt-2 text-sm font-bold text-[color:var(--app-accent)]">
-                            {formatPublicListingValue(item, localeCode)}
-                          </p>
-                          {location ? (
-                            <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-semibold text-[color:var(--app-text-soft)]">
-                              <MapPin className="h-3.5 w-3.5 shrink-0" />
-                              {location}
-                            </p>
-                          ) : null}
-                          <div className="mt-3 flex items-center gap-3 border-t border-[color:var(--app-border)] pt-2 text-[11px] font-semibold text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
-                            <span className="inline-flex items-center gap-1">
-                              <Eye className="h-3.5 w-3.5" />
-                              {viewTotal}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <Heart className="h-3.5 w-3.5" />
-                              {likeTotal}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <MessageCircle className="h-3.5 w-3.5" />
-                              {chatTotal}
-                            </span>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-
-                <aside className="hidden space-y-3 xl:block">
-                  <section className={profileTileClass}>
-                    <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {localeCode === 'id' ? 'Tentang' : 'About'}
-                    </h3>
-                    <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
-                      {detail.summary}
-                    </p>
-                    <div className="mt-3 space-y-2">
-                      {businessInfoRows.slice(0, 4).map(item => {
-                        const Icon = item.icon;
-                        return (
-                          <div
-                            key={`rail-${item.label}`}
-                            className="flex items-start gap-2 text-sm text-[color:var(--app-text-soft)]"
+                      <div className="mt-4 space-y-2">
+                        {detail.links.map(link => (
+                          <a
+                            key={`${link.label}-${link.url}`}
+                            href={link.url}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="flex items-center justify-between gap-3 rounded-xl border border-[color:var(--app-border)] px-3 py-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
                           >
-                            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--app-accent)]" />
-                            <span className="min-w-0">
-                              <span className="block text-[11px] font-bold uppercase tracking-[0.12em]">
-                                {item.label}
-                              </span>
-                              <span className="font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                                {item.value}
-                              </span>
-                            </span>
-                          </div>
+                            <span className="truncate">{link.label}</span>
+                            <ExternalLink className="h-4 w-4 shrink-0 text-emerald-600" />
+                          </a>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </aside>
+              </div>
+
+              {!hasAboutContent ? (
+                <EmptyState
+                  icon={BriefcaseBusiness}
+                  title={copy.aboutTitle}
+                  description={copy.noAbout}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          {activeProfileTab === 'reviews' ? (
+            <div className="p-4 sm:p-6">
+              <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
+                <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                  <SectionTitle title={copy.reviewSummary} />
+
+                  <div className="mt-5 text-center">
+                    <p className="text-5xl font-black tracking-tight text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                      {typeof rating === 'number' && rating > 0
+                        ? rating.toFixed(1)
+                        : '-'}
+                    </p>
+
+                    <div className="mt-3 flex justify-center gap-1">
+                      {Array.from({ length: 5 }).map((_, index) => {
+                        const active =
+                          typeof rating === 'number' && rating >= index + 1;
+
+                        return (
+                          <Star
+                            key={index}
+                            className={`h-5 w-5 ${
+                              active
+                                ? 'fill-amber-400 text-amber-400'
+                                : 'text-slate-300 dark:text-slate-600'
+                            }`}
+                          />
                         );
                       })}
                     </div>
-                  </section>
 
-                  <section className={profileTileClass}>
-                    <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {localeCode === 'id' ? 'Hubungi' : 'Contact'}
-                    </h3>
-                    <div className="mt-3 space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenChat(defaultChatDraft)}
-                        className="flex w-full items-center gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-3 py-3 text-left text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)] dark:text-[color:var(--app-text-soft)]"
-                      >
-                        <MessageCircle className="h-4 w-4 text-[color:var(--app-accent)]" />
-                        {localeCode === 'id'
-                          ? 'Chat di Lajukan'
-                          : 'Chat on Lajukan'}
-                      </button>
-                      {whatsAppHref ? (
-                        <a
-                          href={whatsAppHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex w-full items-center gap-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+                    <p className="mt-3 text-sm text-[color:var(--app-text-soft)]">
+                      {formatCompactNumber(reviewCount, localeCode)}{' '}
+                      {copy.reviewCount}
+                    </p>
+                  </div>
+                </section>
+
+                <section className="min-w-0">
+                  {reviews.length > 0 ? (
+                    <div className="space-y-3">
+                      {reviews.map(review => (
+                        <article
+                          key={review.id}
+                          className="rounded-2xl border border-[color:var(--app-border)] p-4"
                         >
-                          <PhoneCall className="h-4 w-4" />
-                          WhatsApp
-                        </a>
-                      ) : null}
+                          <div className="flex items-start gap-3">
+                            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
+                              {review.avatarUrl ? (
+                                <Image
+                                  src={review.avatarUrl}
+                                  alt={review.name}
+                                  fill
+                                  unoptimized
+                                  sizes="40px"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-sm font-black text-emerald-700">
+                                  {review.name.slice(0, 1).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="font-black text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                                  {review.name}
+                                </p>
+
+                                {review.date ? (
+                                  <span className="text-[11px] text-[color:var(--app-text-soft)]">
+                                    {formatReviewDate(review.date, localeCode)}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="mt-1 flex gap-0.5">
+                                {Array.from({ length: 5 }).map((_, index) => (
+                                  <Star
+                                    key={index}
+                                    className={`h-3.5 w-3.5 ${
+                                      review.rating >= index + 1
+                                        ? 'fill-amber-400 text-amber-400'
+                                        : 'text-slate-300 dark:text-slate-600'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+
+                              {review.comment ? (
+                                <p className="mt-3 text-sm leading-6 text-[color:var(--app-text-soft)]">
+                                  {review.comment}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </article>
+                      ))}
                     </div>
-                  </section>
-                </aside>
+                  ) : (
+                    <EmptyState
+                      icon={Star}
+                      title={copy.noReviews}
+                      description={copy.noReviewsDescription}
+                    />
+                  )}
+                </section>
               </div>
-            )}
-          </section>
-        ) : null}
-
-        {activeProfileTab === 'reels' ? (
-          <section className={profileSectionClass}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                  <Clapperboard className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                    Reels
-                  </h2>
-                  <p className="text-sm text-[color:var(--app-text-soft)]">
-                    {localeCode === 'id'
-                      ? 'Video singkat dari creator ini, termasuk reels yang dibuat dari komunitas.'
-                      : 'Short videos from this creator, including reels created from community posts.'}
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/reels"
-                className="hidden shrink-0 text-sm font-semibold text-[color:var(--app-accent)] sm:inline-flex"
-              >
-                {localeCode === 'id' ? 'Buka Reels' : 'Open Reels'}
-              </Link>
             </div>
-            {profileActivityLoading ? (
-              <p className="mt-4 rounded-[16px] bg-[color:var(--app-surface-muted)] px-4 py-4 text-sm font-semibold text-[color:var(--app-text-soft)]">
-                {localeCode === 'id'
-                  ? 'Memuat reels profil...'
-                  : 'Loading profile reels...'}
-              </p>
-            ) : profileReels.length > 0 ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {profileReels.map(reel => {
-                  const mediaIsImage =
-                    reel.mediaType === 'image' ||
-                    isImageMediaUrl(reel.videoSrc);
-                  return (
-                    <Link
-                      key={reel.id}
-                      href={`/reels?reel=${encodeURIComponent(reel.id)}`}
-                      className="group overflow-hidden rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
-                    >
-                      <div className="relative aspect-[9/12] overflow-hidden bg-slate-950">
-                        {mediaIsImage ? (
-                          <Image
-                            src={reel.videoSrc || '/default-avatar.svg'}
-                            alt={reel.title}
-                            fill
-                            sizes="(max-width: 640px) 50vw, 220px"
-                            className="object-cover transition group-hover:scale-[1.03]"
-                            unoptimized
-                          />
-                        ) : (
-                          <video
-                            src={reel.videoSrc}
-                            muted
-                            playsInline
-                            preload="metadata"
-                            className="h-full w-full object-cover transition group-hover:scale-[1.03]"
-                          />
-                        )}
-                        <span className="absolute left-2 top-2 rounded-full bg-black/48 px-2 py-1 text-[10px] font-bold text-white ">
-                          {reel.tag || 'Reels'}
-                        </span>
-                      </div>
-                      <div className="p-3">
-                        <p className="line-clamp-2 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                          {reel.title}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                          {reel.caption}
-                        </p>
-                        <p className="mt-2 text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                          {reel.likes} suka - {reel.comments} komentar
-                        </p>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] px-4 py-5 text-sm text-[color:var(--app-text-soft)]">
-                {localeCode === 'id'
-                  ? 'Belum ada reels publik dari profil ini.'
-                  : 'No public reels from this profile yet.'}
-              </div>
-            )}
-          </section>
-        ) : null}
+          ) : null}
 
-        {activeProfileTab === 'komunitas' ? (
-          <section className={profileSectionClass}>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
-                  {localeCode === 'id' ? 'Info Usaha' : 'Business Info'}
-                </p>
-                <h2 className="mt-1 text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {localeCode === 'id'
-                    ? 'Detail yang perlu diketahui calon pelanggan'
-                    : 'Details visitors need to know'}
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id'
-                    ? 'Informasi ini diambil dari profil dan metadata usaha, jadi pemilik cukup edit sekali dari halaman profil.'
-                    : 'This information comes from profile and business metadata, so the owner only needs to edit it once.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleOpenChat(defaultChatDraft)}
-                className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-full bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)]"
-              >
-                <MessageCircle className="h-4 w-4" />
-                {localeCode === 'id' ? 'Tanya langsung' : 'Ask directly'}
-              </button>
-            </div>
+          {activeProfileTab === 'business' ? (
+            <div className="grid gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+              <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                <SectionTitle
+                  title={copy.businessInfo}
+                  subtitle={detail.headline}
+                />
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="grid gap-2 sm:grid-cols-2">
-                {businessInfoRows.map(item => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={item.label} className={profileRowClass}>
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[color:var(--app-accent-soft)] text-[color:var(--app-accent)]">
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[color:var(--app-text-soft)]">
+                {businessRows.length > 0 ? (
+                  <div className="mt-5 divide-y divide-[color:var(--app-border)]">
+                    {businessRows.map(item => {
+                      const Icon = item.icon;
+
+                      return (
+                        <div
+                          key={item.key}
+                          className="grid gap-2 py-4 sm:grid-cols-[180px_minmax(0,1fr)]"
+                        >
+                          <div className="flex items-center gap-2 text-xs font-bold text-[color:var(--app-text-soft)]">
+                            <Icon className="h-4 w-4 text-emerald-600" />
                             {item.label}
-                          </p>
-                          <p className="mt-1 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
+                          </div>
+
+                          <p className="text-sm font-semibold leading-6 text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
                             {item.value}
                           </p>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Store}
+                    title={copy.businessInfo}
+                    description={copy.noBusinessInfo}
+                  />
+                )}
+              </section>
 
-              <aside className="rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-4 dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
-                <h3 className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {localeCode === 'id' ? 'Hubungi' : 'Contact'}
-                </h3>
-                <div className="mt-3 space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenChat(defaultChatDraft)}
-                    className="flex w-full items-center gap-3 rounded-[14px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] px-3 py-3 text-left text-sm font-bold text-[color:var(--app-text)] transition hover:border-[color:var(--app-accent-border)] dark:border-[color:var(--app-border-strong)] dark:text-[color:var(--app-text-soft)]"
-                  >
-                    <MessageCircle className="h-4 w-4 text-[color:var(--app-accent)]" />
-                    <span>
-                      {localeCode === 'id'
-                        ? 'Chat di Lajukan'
-                        : 'Chat on Lajukan'}
-                    </span>
-                  </button>
-                  {whatsAppHref ? (
-                    <a
-                      href={whatsAppHref}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex w-full items-center gap-3 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-left text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-                    >
-                      <PhoneCall className="h-4 w-4" />
-                      <span>WhatsApp</span>
-                    </a>
-                  ) : null}
-                </div>
+              <aside className="space-y-4">
+                <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                  <SectionTitle title={copy.contact} />
+
+                  <div className="mt-4 space-y-3">
+                    {isOwnProfile ? (
+                      <>
+                        <Link
+                          href="/profile/edit"
+                          className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                        >
+                          <Edit3 className="h-5 w-5 text-emerald-600" />
+                          {copy.editProfile}
+                        </Link>
+
+                        <Link
+                          href="/my-listings"
+                          className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                        >
+                          <BriefcaseBusiness className="h-5 w-5 text-emerald-600" />
+                          {copy.managePosts}
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleOpenChat();
+                          }}
+                          disabled={startingChatKey === 'profile'}
+                          className="flex w-full items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-left text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] disabled:cursor-wait disabled:opacity-70 dark:text-[color:var(--app-text-inverse)]"
+                        >
+                          <MessageCircle className="h-5 w-5 text-emerald-600" />
+                          <span>
+                            {copy.chatOnLajukan}
+                            <span className="mt-0.5 block text-[10px] font-medium text-[color:var(--app-text-soft)]">
+                              {copy.fastResponse}
+                            </span>
+                          </span>
+                        </button>
+
+                        {whatsAppHref ? (
+                          <a
+                            href={whatsAppHref}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="flex items-center gap-3 rounded-xl border border-[color:var(--app-border)] p-3 text-sm font-bold text-[color:var(--app-text)] transition hover:bg-[color:var(--app-surface-muted)] dark:text-[color:var(--app-text-inverse)]"
+                          >
+                            <PhoneCall className="h-5 w-5 text-emerald-600" />
+                            <span>
+                              {copy.whatsapp}
+                              <span className="mt-0.5 block text-[10px] font-medium text-[color:var(--app-text-soft)]">
+                                {publicPhone}
+                              </span>
+                            </span>
+                          </a>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-[color:var(--app-border)] p-5">
+                  <SectionTitle title={copy.verified} />
+
+                  <div className="mt-4 space-y-3 text-sm">
+                    {[
+                      {
+                        label: 'Email',
+                        ready: Boolean(profile.email_verified),
+                      },
+                      {
+                        label: localeCode === 'id' ? 'Telepon' : 'Phone',
+                        ready: Boolean(profile.phone_verified),
+                      },
+                      {
+                        label: localeCode === 'id' ? 'Identitas' : 'Identity',
+                        ready: Boolean(profile.identity_verified),
+                      },
+                      ...(!PROMO_ONLY_MODE
+                        ? [
+                            {
+                              label:
+                                localeCode === 'id'
+                                  ? 'Siap transaksi'
+                                  : 'Transaction ready',
+                              ready: Boolean(profile.transaction_eligible),
+                            },
+                          ]
+                        : []),
+                    ].map(item => (
+                      <div
+                        key={item.label}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="text-[color:var(--app-text-soft)]">
+                          {item.label}
+                        </span>
+
+                        {item.ready ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                        ) : (
+                          <span className="h-5 w-5 rounded-full border border-slate-300 dark:border-slate-600" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
               </aside>
             </div>
-          </section>
-        ) : null}
-
-        {activeProfileTab === 'trust' ? (
-          <section className={profileSectionClass}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                  {localeCode === 'id' ? 'Ulasan' : 'Reviews'}
-                </h2>
-                <p className="mt-1 text-sm text-[color:var(--app-text-soft)]">
-                  {localeCode === 'id'
-                    ? 'Ulasan transaksi akan aktif setelah flow pembayaran dan pesanan selesai. Untuk sekarang, profil menampilkan sinyal kepercayaan dasar.'
-                    : 'Transaction reviews will be active after payment and order flows are ready. For now, this profile shows basic trust signals.'}
-                </p>
-              </div>
-              <span className="rounded-full bg-[color:var(--app-accent-soft)] px-3 py-1 text-sm font-bold text-[color:var(--app-accent)]">
-                {typeof profile.rating === 'number' && profile.rating > 0
-                  ? `${profile.rating.toFixed(1)}/5`
-                  : localeCode === 'id'
-                    ? 'Belum ada'
-                    : 'No reviews'}
-              </span>
-            </div>
-            <div className="mt-4 rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-center dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface)]">
-              <Star className="mx-auto h-9 w-9 text-amber-400" />
-              <p className="mt-3 text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {localeCode === 'id'
-                  ? 'Ulasan belum tersedia'
-                  : 'Reviews are not available yet'}
-              </p>
-              <p className="mx-auto mt-1 max-w-lg text-sm leading-6 text-[color:var(--app-text-soft)]">
-                {localeCode === 'id'
-                  ? 'Calon pelanggan masih bisa menilai dari postingan, profil, verifikasi, chat, dan aktivitas yang tampil.'
-                  : 'Visitors can still evaluate posts, profile details, verification, chat, and visible activity.'}
-              </p>
-            </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {trustItems.map(item => (
-                <div key={item.label} className={profileRowClass}>
-                  <div className="flex items-center gap-2">
-                    {item.ready ? (
-                      <CheckCircle2 className="h-4 w-4 text-[color:var(--app-success)]" />
-                    ) : (
-                      <Clock3 className="h-4 w-4 text-[color:var(--app-text-soft)]" />
-                    )}
-                    <span className="text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                      {item.label}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.15rem)] z-[65] lg:hidden">
-          <div className="mx-auto flex max-w-[520px] items-center gap-2 rounded-[22px] border border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_94%,transparent)] p-2 shadow-[0_20px_46px_-28px_rgba(15,23,42,0.48)] ring-1 ring-white/60  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,var(--app-surface)_94%,transparent)] dark:ring-white/10">
-            <div className="min-w-0 flex-1 px-1.5">
-              <p className="truncate text-xs font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                {detail.displayName}
-              </p>
-              <p className="truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
-                {localeCode === 'id'
-                  ? 'Mulai ngobrol sebelum transaksi'
-                  : 'Start a conversation first'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleOpenChat()}
-              className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[color:var(--app-accent)] px-4 text-sm font-bold text-[color:var(--app-text-inverse)] shadow-[0_14px_28px_-20px_rgba(22,163,74,0.7)]"
-            >
-              <MessageCircle className="h-4 w-4" />
-              Chat
-            </button>
-          </div>
-        </div>
-
-        <Modal
-          open={Boolean(socialModal)}
-          onClose={() => setSocialModal(null)}
-          title={
-            socialModal === 'followers'
-              ? localeCode === 'id'
-                ? 'Pengikut'
-                : 'Followers'
-              : localeCode === 'id'
-                ? 'Mengikuti'
-                : 'Following'
-          }
-        >
-          <div className="space-y-2">
-            {socialModalUsers.length === 0 ? (
-              <div className="rounded-[18px] border border-dashed border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] p-5 text-center text-sm text-[color:var(--app-text-soft)] dark:border-[color:var(--app-border-strong)]">
-                {localeCode === 'id'
-                  ? 'Belum ada data koneksi.'
-                  : 'No connection data yet.'}
-              </div>
-            ) : (
-              socialModalUsers.map(item => (
-                <div
-                  key={item.id}
-                  className="flex min-w-0 items-center gap-3 rounded-[18px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-3 dark:border-[color:var(--app-border-strong)]"
-                >
-                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
-                    <Image
-                      src={profileAvatarSrc(item.avatarUrl)}
-                      alt={item.name}
-                      fill
-                      sizes="44px"
-                      className="object-cover"
-                      unoptimized
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <p className="truncate text-sm font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
-                        {item.name}
-                      </p>
-                      {item.verified ? (
-                        <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-[color:var(--app-accent)]" />
-                      ) : null}
-                    </div>
-                    <p className="truncate text-xs text-[color:var(--app-text-soft)]">
-                      {item.handle} · {item.badge}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleSocialFollowToggle(item.id)}
-                    className="inline-flex min-h-[36px] shrink-0 items-center rounded-full bg-[color:var(--app-accent-soft)] px-3 text-xs font-bold text-[color:var(--app-accent)]"
-                  >
-                    {followedSocialIds.includes(item.id)
-                      ? localeCode === 'id'
-                        ? 'Diikuti'
-                        : 'Following'
-                      : 'Follow'}
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </Modal>
-      </div>
+          ) : null}
+        </section>
+      </main>
     </div>
   );
 }

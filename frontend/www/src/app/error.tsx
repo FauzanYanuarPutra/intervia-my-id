@@ -55,7 +55,7 @@ export default function Error({
   }, [reset, retryCount, shouldAutoRetry]);
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center p-4 sm:p-6 bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)] container-touch">
+    <div className="min-h-screen min-h-[100svh] flex items-center justify-center p-4 sm:p-6 bg-[color:var(--app-surface-muted)] dark:bg-[color:var(--app-surface-strong)] container-touch">
       <div className="max-w-md w-full rounded-2xl border border-[color:var(--app-border)] dark:border-[color:var(--app-border-strong)] bg-[color:var(--app-surface-strong)] dark:bg-[color:var(--app-surface-strong)] p-6 sm:p-8 shadow-sm">
         <h2 className="text-lg sm:text-xl font-semibold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">
           {t.title}

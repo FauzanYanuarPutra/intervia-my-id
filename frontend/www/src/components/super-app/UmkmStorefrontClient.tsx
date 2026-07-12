@@ -3209,7 +3209,7 @@ export function UmkmStorefrontClient({
   );
 
   return (
-    <main className="app-cohesive-theme min-h-screen min-h-[100dvh] overflow-x-hidden pb-24 pt-1 sm:pb-10 sm:pt-2">
+    <main className="app-cohesive-theme min-h-screen min-h-[100svh] overflow-x-hidden pb-24 pt-1 sm:pb-10 sm:pt-2">
       <div className="mx-auto flex w-full min-w-0 max-w-[var(--app-max-width)] flex-col gap-2.5 px-3 sm:gap-3 sm:px-4">
         <section>
           <div className={heroShellClass}>
@@ -5022,7 +5022,7 @@ export function UmkmStorefrontClient({
               {activeGalleryItem.mediaType === 'video' ? (
                 <video
                   src={activeGalleryItem.src}
-                  className="max-h-[72svh] w-full object-contain"
+                  className="max-h-[min(calc(var(--app-viewport-height)-8rem),720px)] w-full object-contain"
                   controls
                   playsInline
                   preload="metadata"
@@ -5032,7 +5032,7 @@ export function UmkmStorefrontClient({
                 <img
                   src={activeGalleryItem.src}
                   alt={activeGalleryItem.title}
-                  className="max-h-[72svh] w-full object-contain"
+                  className="max-h-[min(calc(var(--app-viewport-height)-8rem),720px)] w-full object-contain"
                 />
               )}
             </div>
@@ -5115,7 +5115,7 @@ export function UmkmStorefrontClient({
           open={checkoutOpen}
           title={checkoutModalTitle}
           onClose={closeOrderPanel}
-          className="max-h-[90svh] max-w-3xl"
+          className="max-h-[calc(var(--app-viewport-height)-1rem)] max-w-3xl"
           footer={
             <div className="flex flex-col gap-3 border-t border-[color:var(--app-accent-border)] pt-3 sm:flex-row sm:items-center sm:justify-between">
               <div>

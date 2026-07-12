@@ -64,6 +64,7 @@ import {
 } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
 import { PROMO_ONLY_MODE } from '@/lib/featureFlags';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 function normalizePathname(pathname: string): string {
   const clean = pathname.replace(/^\/(id|en)(?=\/|$)/, '');
@@ -586,24 +587,7 @@ export function Header() {
     };
   }, [mobileOpen, profileOpen]);
 
-  useEffect(() => {
-    if (!mobileOpen || typeof document === 'undefined') return;
-    const body = document.body;
-    const html = document.documentElement;
-    const prevBodyOverflow = body.style.overflow;
-    const prevHtmlOverflow = html.style.overflow;
-    const prevHtmlOverscroll = html.style.overscrollBehavior;
-
-    body.style.overflow = 'hidden';
-    html.style.overflow = 'hidden';
-    html.style.overscrollBehavior = 'none';
-
-    return () => {
-      body.style.overflow = prevBodyOverflow;
-      html.style.overflow = prevHtmlOverflow;
-      html.style.overscrollBehavior = prevHtmlOverscroll;
-    };
-  }, [mobileOpen]);
+  useBodyScrollLock(mobileOpen);
 
   const toggleMobileMenu = useCallback(() => {
     setMobileOpen(prev => !prev);

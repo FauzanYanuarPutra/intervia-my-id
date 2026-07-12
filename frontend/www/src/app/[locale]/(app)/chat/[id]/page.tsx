@@ -1660,6 +1660,7 @@ export default function ChatRoomPage() {
     rooms: inboxRooms,
     loading: inboxLoading,
     refetch: refetchInbox,
+    markRoomRead,
   } = useChatInbox();
 
   const handleBack = useAppBack(router, '/chat');
@@ -2109,6 +2110,7 @@ export default function ChatRoomPage() {
   const lastTypingSentRef = useRef<number>(0);
 
   const hasSentReadRef = useRef(false);
+  const lastReadInboxSyncRef = useRef(0);
   const isJoiningRef = useRef(false);
   const lastJoinAttemptRef = useRef<number>(0);
   const lastErrorTimeRef = useRef<number>(0);
@@ -2406,9 +2408,17 @@ export default function ChatRoomPage() {
   const notifyRead = async () => {
     if (isDraftRoom) return;
     if (!canonicalRoomId) return;
+    markRoomRead(canonicalRoomId);
     authFetch(`/api/chat/rooms/${encodeURIComponent(canonicalRoomId)}/read`, {
       method: 'POST',
-    }).catch(() => { });
+    })
+      .then(() => {
+        const now = Date.now();
+        if (now - lastReadInboxSyncRef.current < 2500) return;
+        lastReadInboxSyncRef.current = now;
+        return refetchInbox();
+      })
+      .catch(() => { });
     try {
       channelRef.current?.push('read', {});
     } catch {
@@ -2826,24 +2836,6 @@ export default function ChatRoomPage() {
     });
     return () => window.cancelAnimationFrame(raf);
   }, [messages.length, scrollMessagesToBottom]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const body = document.body;
-    const prevRootOverflow = root.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
-    const prevBodyOverscroll = body.style.overscrollBehaviorY;
-
-    root.style.overflow = 'hidden';
-    body.style.overflow = 'hidden';
-    body.style.overscrollBehaviorY = 'none';
-
-    return () => {
-      root.style.overflow = prevRootOverflow;
-      body.style.overflow = prevBodyOverflow;
-      body.style.overscrollBehaviorY = prevBodyOverscroll;
-    };
-  }, []);
 
   const startOutgoingCall = useCallback(
     async (type: 'video' | 'voice') => {
@@ -4885,7 +4877,7 @@ export default function ChatRoomPage() {
   if (roomAllowed === null) {
     return (
       <div className="flex h-full max-h-full min-h-0 w-full min-w-0 flex-col overflow-hidden overscroll-none bg-[#efeae2] dark:bg-[#0b141a]">
-        <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
+        <header className="sticky top-0 z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
           <div className="flex min-w-0 items-center gap-3 px-2.5 py-2 sm:px-4 sm:py-2.5">
             <div className="h-10 w-10 shrink-0 rounded-full bg-[#dfe5e7] dark:bg-[#2a3942]" />
             <div className="min-w-0 flex-1">
@@ -4937,7 +4929,7 @@ export default function ChatRoomPage() {
         backgroundColor: 'transparent',
       }}
     >
-      <header className="relative z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-black/5 bg-[#f0f2f5]/95 pt-[env(safe-area-inset-top)]  dark:border-white/6 dark:bg-[#202c33]/95">
         <div className="min-w-0 px-2.5 py-2 sm:px-4 sm:py-2.5">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
@@ -5086,7 +5078,7 @@ export default function ChatRoomPage() {
       </header>
 
       {!PROMO_ONLY_MODE && roomSummaryTransaction ? (
-        <div className="border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
+        <div className="shrink-0 border-b border-black/5 bg-[#f7f5f3]/85 px-3 py-1.5 dark:border-white/6 dark:bg-[#162028]/85 sm:px-4">
           <div className="mx-auto w-full max-w-[920px]">
             <div className="rounded-[18px] border border-black/5 bg-white/90 px-3 py-2 shadow-[0_10px_24px_-24px_rgba(17,27,33,0.45)]  dark:border-white/8 dark:bg-[#202c33]/90">
               <button
@@ -5260,8 +5252,8 @@ export default function ChatRoomPage() {
       ) : null}
 
       {/* Messages */}
-      <main className="min-h-0 flex-1 min-w-0 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
-        <div className="relative h-full">
+      <main className="flex min-h-0 flex-1 min-w-0 flex-col overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+        <div className="relative flex min-h-0 flex-1 flex-col">
           <div
             className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-35"
             style={{
@@ -5273,7 +5265,7 @@ export default function ChatRoomPage() {
           />
           <div
             ref={messagesViewportRef}
-            className="relative h-full min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-2 py-3 pb-4 sm:px-5 sm:py-4"
+            className="relative min-h-0 flex-1 min-w-0 touch-pan-y overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 py-3 pb-4 [-webkit-overflow-scrolling:touch] sm:px-5 sm:py-4"
             data-auto-scrollbar
           >
             <div
@@ -6568,13 +6560,13 @@ export default function ChatRoomPage() {
                     <img
                       src={activeDraftAttachment.previewUrl}
                       alt={activeDraftAttachment.name}
-                      className="max-h-[52vh] w-full object-contain"
+                      className="max-h-[min(calc(var(--app-viewport-height)-14rem),520px)] w-full object-contain"
                     />
                   ) : activeDraftAttachment.type === 'video' &&
                     activeDraftAttachment.previewUrl ? (
                     <video
                       src={activeDraftAttachment.previewUrl}
-                      className="max-h-[52vh] w-full object-contain"
+                      className="max-h-[min(calc(var(--app-viewport-height)-14rem),520px)] w-full object-contain"
                       muted
                       loop
                       playsInline

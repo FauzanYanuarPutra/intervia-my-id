@@ -319,6 +319,19 @@ export const routes: RouteConfig[] = [
         access: AUTH_ACCESS,
       },
       {
+        path: `${RoutePath.PROFILE}/ai`,
+        name: 'AI Profile',
+        meta: {
+          topbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          immersive: true,
+        },
+        access: AUTH_ACCESS,
+        shared: false,
+      },
+      {
         path: `${RoutePath.PROFILE}/:slug`,
         name: 'Public Profile',
         meta: {
@@ -422,6 +435,7 @@ export const routes: RouteConfig[] = [
       navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
       footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+      immersive: true,
     },
     access: AUTH_ACCESS,
     children: [
@@ -433,6 +447,7 @@ export const routes: RouteConfig[] = [
           navbar: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           bottomNav: { isVisibleOnWeb: false, isVisibleOnMobile: false },
           footer: { isVisibleOnWeb: false, isVisibleOnMobile: false },
+          immersive: true,
         },
         access: AUTH_ACCESS,
       },

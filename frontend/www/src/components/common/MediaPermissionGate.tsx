@@ -10,6 +10,7 @@ import {
   hasNativePermissionsBridge,
   openNativeSettings,
 } from '@/lib/nativeBridge';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 type MediaNeed = {
   audio: boolean;
@@ -132,13 +133,9 @@ export function MediaPermissionGate({
 
   const targetLabel = useMemo(() => mediaTargetLabel(need, isId), [isId, need]);
   const Icon = need.video ? Camera : Mic;
-  const [canOpenSettings, setCanOpenSettings] = useState(false);
+  const [canOpenSettings] = useState(() => hasNativePermissionsBridge());
   const showSettingsButton =
     canOpenSettings && (state === 'denied' || state === 'error');
-
-  useEffect(() => {
-    setCanOpenSettings(hasNativePermissionsBridge());
-  }, []);
 
   const checkPermission = useCallback(async () => {
     if (!enabled) {
@@ -228,7 +225,10 @@ export function MediaPermissionGate({
   }, [enabled, isId, need.audio, need.video, onGranted, targetLabel]);
 
   useEffect(() => {
-    void checkPermission();
+    const timeout = window.setTimeout(() => {
+      void checkPermission();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [checkPermission]);
 
   const requestPermission = useCallback(async () => {
@@ -254,6 +254,8 @@ export function MediaPermissionGate({
     }
   }, [enabled, isId, need, onGranted]);
 
+  useBodyScrollLock(enabled === true && state !== 'granted');
+
   if (!enabled || state === 'granted') {
     return null;
   }
@@ -263,7 +265,7 @@ export function MediaPermissionGate({
       <section
         role="dialog"
         aria-modal="true"
-        className="max-h-[80svh] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-2xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
+        className="max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-5 shadow-2xl dark:border-[color:var(--app-border-strong)] dark:bg-[color:var(--app-surface-strong)]"
       >
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--app-accent)]">
           {isId ? 'Izin perangkat' : 'Device permission'}

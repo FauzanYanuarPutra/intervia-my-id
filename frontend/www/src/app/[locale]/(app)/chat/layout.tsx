@@ -21,6 +21,7 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 
@@ -629,10 +630,12 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
     };
   }, [authFetch, contactInput, showNewChat, user?.id]);
 
+  useBodyScrollLock(true, { resetScroll: true });
+
   if (!user) {
     return (
-      <div className="min-h-[var(--app-viewport-height)] bg-gradient-to-br from-[color:var(--app-accent-soft)] via-[color:var(--app-surface-strong)] to-[color:var(--app-info-soft)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)]">
-        <div className="flex min-h-[var(--app-viewport-height)] items-center justify-center px-0 sm:px-4">
+      <div className="h-[var(--app-viewport-height)] min-h-0 overflow-hidden bg-gradient-to-br from-[color:var(--app-accent-soft)] via-[color:var(--app-surface-strong)] to-[color:var(--app-info-soft)] dark:from-[color:var(--app-surface-strong)] dark:via-[color:var(--app-surface-strong)] dark:to-[color:color-mix(in_srgb,_var(--app-accent-strong)_20%,_transparent)]">
+        <div className="flex h-full min-h-0 items-center justify-center px-0 sm:px-4">
           <div className="w-full max-w-sm rounded-none border border-x-0 border-[color:color-mix(in_srgb,_var(--app-border)_70%,_transparent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] p-6 text-center shadow-sm  dark:border-[color:var(--app-border-strong)] dark:bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_90%,_transparent)] sm:rounded-3xl sm:border-x">
             <MessageCircle className="mx-auto mb-4 h-14 w-14 text-[color:var(--app-accent)]" />
             <p className="mb-4 text-sm text-[color:var(--app-text)] dark:text-[color:var(--app-text-soft)]">
@@ -653,7 +656,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] overflow-hidden bg-[#d9dbd5] dark:bg-[#0b141a]">
+    <div className="h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] min-h-0 overflow-hidden overscroll-none bg-[#d9dbd5] dark:bg-[#0b141a]">
       <div className="mx-auto flex h-full max-h-full min-h-0 w-full min-w-0 max-w-[1600px] overflow-hidden lg:px-4 lg:py-4">
         <div className="flex h-full w-full min-w-0 overflow-hidden bg-[#f7f5f3] shadow-none dark:bg-[#111b21] lg:rounded-[18px] lg:border lg:border-black/5 lg:shadow-[0_18px_46px_-30px_rgba(17,27,33,0.45)] dark:lg:border-white/10">
           <section
@@ -932,7 +935,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
               animate={{ y: 0 }}
               exit={{ y: 100 }}
               onClick={e => e.stopPropagation()}
-              className="max-h-[80svh] w-full overflow-y-auto rounded-t-3xl bg-[color:var(--app-surface-strong)] p-4 shadow-2xl dark:bg-[color:var(--app-surface-strong)] sm:max-w-md sm:rounded-3xl"
+              className="max-h-[calc(var(--app-viewport-height)-1rem)] w-full overflow-y-auto rounded-t-3xl bg-[color:var(--app-surface-strong)] p-4 shadow-2xl dark:bg-[color:var(--app-surface-strong)] sm:max-w-md sm:rounded-3xl"
             >
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-base font-bold text-[color:var(--app-text)] dark:text-[color:var(--app-text-inverse)]">

@@ -97,13 +97,18 @@ export async function uploadToMinIO(
   const client = getMinioClient();
 
   const ext = safeObjectExtension(originalName, mime);
-  // Support untuk content upload (roomId = 'content') atau chat upload
+  const personalAiUserId = roomId.startsWith('personal-ai/')
+    ? safeRoomKey(roomId.slice('personal-ai/'.length))
+    : '';
+  // Support content/forum public-ish media, personal AI private media, or chat media.
   const key =
     roomId === 'content'
       ? `content/${randomUUID()}${ext}`
       : roomId === 'forum'
         ? `forum/${randomUUID()}${ext}`
-        : `chat/${safeRoomKey(roomId)}/${randomUUID()}${ext}`;
+        : personalAiUserId
+          ? `personal-ai/${personalAiUserId}/${randomUUID()}${ext}`
+          : `chat/${safeRoomKey(roomId)}/${randomUUID()}${ext}`;
 
   await ensureBucket(client);
 
@@ -119,7 +124,9 @@ export async function uploadToMinIO(
   );
 
   // Prefer proxy URL so client fetches via our API (no CORS, MinIO stays internal)
-  const url = publicUrl
+  const url = personalAiUserId
+    ? `/api/ai/personal/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`
+    : publicUrl
     ? `${publicUrl.replace(/\/$/, '')}/${bucket}/${key}`
     : roomId === 'content' || roomId === 'forum'
       ? `/api/content/media/${encodeURIComponent(bucket)}/${key.split('/').map(encodeURIComponent).join('/')}`

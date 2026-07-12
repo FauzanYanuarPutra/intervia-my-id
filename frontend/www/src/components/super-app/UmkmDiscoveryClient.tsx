@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { useAppBack } from '@/lib/navigation/useAppBack';
 import { buildUsahaPath } from '@/lib/umkmSurface';
 import { cn } from '@/lib/utils';
@@ -201,6 +202,8 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
     : '/login';
   const requestHref = isAuthenticated ? '/create/butuh' : '/login';
 
+  useBodyScrollLock(true, { resetScroll: true });
+
   const submitSearch = useCallback(
     (nextQuery: string, nextCity: string, nextLane: MapLaneId = activeLane) => {
       router.push(buildUmkmPath(nextQuery, nextCity, nextLane));
@@ -225,7 +228,7 @@ export function UmkmDiscoveryClient(props: UmkmDiscoveryClientProps) {
   };
 
   return (
-    <main className="relative h-[var(--app-viewport-height)] min-h-[var(--app-viewport-height)] w-full overflow-hidden bg-slate-100 text-[color:var(--app-text)] dark:bg-slate-950">
+    <main className="relative h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] min-h-0 w-full overflow-hidden overscroll-none bg-slate-100 text-[color:var(--app-text)] dark:bg-slate-950">
       <UmkmDiscoveryPanel
         isId={isId}
         query={discoveryQuery}

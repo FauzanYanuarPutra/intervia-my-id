@@ -13,7 +13,7 @@ param(
     [switch]$SkipAiWarmup,
     [switch]$AiTextOnly,
     [string]$AiBusinessModel = "llama3.2:3b",
-    [string]$AiVisionModel = "moondream:latest",
+    [string]$AiVisionModel = "qwen2.5vl:7b",
     [string[]]$Services
 )
 
@@ -193,6 +193,9 @@ if ($aiEnabled) {
     }
     if (-not $AiTextOnly) {
         $env:OLLAMA_VISION_MODEL = $AiVisionModel
+        if ([string]::IsNullOrWhiteSpace($env:PERSONAL_AI_OLLAMA_VISION_MODELS)) {
+            $env:PERSONAL_AI_OLLAMA_VISION_MODELS = "$AiVisionModel,llava:7b"
+        }
     }
 
     Write-Host "Local AI enabled via Docker profile 'ai'. Business model: $AiBusinessModel" -ForegroundColor Cyan

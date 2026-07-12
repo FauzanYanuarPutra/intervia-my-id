@@ -25,8 +25,8 @@ import {
 } from '@/lib/notifications/presentation';
 import {
   notificationSocialContext,
+  notificationSocialSummary,
   notificationTargetHref,
-  notificationTargetLabel,
 } from '@/lib/notifications/social';
 import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
@@ -480,7 +480,10 @@ export function HeaderInboxDropdown({
                     <Link
                       key={id || name}
                       href={href}
-                      onClick={() => setOpen(false)}
+                      onClick={() => {
+                        setOpen(false);
+                        if (id) chatInbox.markRoomRead(id);
+                      }}
                       className="group flex min-h-[66px] items-center gap-3 rounded-[18px] px-2.5 py-2.5 transition hover:bg-[color:var(--app-surface-muted)]"
                     >
                       <span className="relative inline-flex h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[color:var(--app-surface-muted)]">
@@ -557,8 +560,26 @@ export function HeaderInboxDropdown({
                   message: item.message,
                 });
                 const Icon = visual.Icon;
-                const emoji = notificationEmoji(item, visual.label);
+                const legacyEmojiLabel = notificationEmoji(item, visual.label);
                 const social = notificationSocialContext(item);
+                const summary = notificationSocialSummary(
+                  item,
+                  idLocale ? 'id' : 'en',
+                );
+                const actorLabel = summary.actor;
+                const actorHandle = summary.handle;
+                const hasSocialActor = Boolean(
+                  actorLabel || social.actorAvatarUrl,
+                );
+                const actorAvatar = profileAvatarSrc(
+                  social.actorAvatarUrl,
+                  readProfileAvatarStyle(item.data),
+                  actorLabel ||
+                    item.title ||
+                    (idLocale ? 'Pengguna Lajukan' : 'Lajukan user'),
+                );
+                const notificationTitle = summary.title;
+                const notificationBody = summary.subtitle;
 
                 return (
                   <Link
@@ -584,23 +605,39 @@ export function HeaderInboxDropdown({
                         )}
                       />
                     ) : null}
-                    <span
-                      className={cn(
-                        'relative mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[15px] border text-[1.2rem]',
-                        visual.iconClassName,
-                      )}
-                      aria-hidden="true"
-                    >
-                      <span className="leading-none">{emoji}</span>
+                    {hasSocialActor ? (
+                      <span
+                        className="relative mt-0.5 inline-flex h-11 w-11 shrink-0 overflow-hidden rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)]"
+                        aria-hidden="true"
+                      >
+                        <Image
+                          src={actorAvatar}
+                          alt=""
+                          width={44}
+                          height={44}
+                          className="h-full w-full object-cover"
+                        />
+                        <span
+                          className={cn(
+                            'absolute -bottom-0.5 -right-0.5 grid h-5 w-5 place-items-center rounded-full border-2 border-white shadow-sm dark:border-slate-950',
+                            visual.badgeClassName,
+                          )}
+                        >
+                          <Icon className="h-3 w-3" />
+                        </span>
+                      </span>
+                    ) : (
                       <span
                         className={cn(
-                          'absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border bg-white shadow-sm dark:bg-slate-950',
-                          visual.badgeClassName,
+                          'relative mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border',
+                          visual.iconClassName,
                         )}
+                        aria-hidden="true"
                       >
-                        <Icon className="h-3 w-3" />
+                        <span className="sr-only">{legacyEmojiLabel}</span>
+                        <Icon className="h-4 w-4" />
                       </span>
-                    </span>
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
                         <span
@@ -609,8 +646,7 @@ export function HeaderInboxDropdown({
                             visual.titleClassName,
                           )}
                         >
-                          {item.title ||
-                            (idLocale ? 'Notifikasi baru' : 'New notification')}
+                          {notificationTitle}
                         </span>
                         {!item.is_read ? (
                           <span
@@ -621,30 +657,24 @@ export function HeaderInboxDropdown({
                           />
                         ) : null}
                       </span>
+                      {actorHandle ? (
+                        <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)]">
+                          {actorHandle}
+                        </span>
+                      ) : null}
                       <span className="mt-1 line-clamp-2 text-xs leading-5 text-[color:var(--app-text-soft)]">
-                        {item.message}
+                        {notificationBody}
                       </span>
-                      {(social.actorName ||
-                        social.actorHandle ||
-                        social.entityLabel ||
-                        social.entityType) ? (
+                      {(summary.entity || summary.entityTypeLabel) ? (
                         <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
-                          {social.actorName || social.actorHandle ? (
-                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-white/8">
-                              {social.actorName ||
-                                (social.actorHandle
-                                  ? `@${social.actorHandle}`
-                                  : '')}
-                            </span>
-                          ) : null}
-                          {social.entityLabel ? (
+                          {summary.entity ? (
                             <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {social.entityLabel}
+                              {summary.entity}
                             </span>
                           ) : null}
-                          {social.entityType ? (
+                          {summary.entityTypeLabel ? (
                             <span className="rounded-full border border-[color:var(--app-border)] bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {notificationTargetLabel(social.entityType)}
+                              {summary.entityTypeLabel}
                             </span>
                           ) : null}
                         </span>
@@ -656,7 +686,6 @@ export function HeaderInboxDropdown({
                             visual.badgeClassName,
                           )}
                         >
-                          {emoji}{' '}
                           {visual.label ||
                             item.category ||
                             item.event_type ||

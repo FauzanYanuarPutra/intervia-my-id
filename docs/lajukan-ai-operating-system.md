@@ -450,6 +450,13 @@ Example: buyer searches "supplier kemasan murah".
 6. After completion, ask review and suggest repeat order.
 7. Feed result back to supplier score and future ranking.
 
+Personal AI / AI Studio Builder loop:
+
+1. User provides source material such as a product photo, business context, raw idea, or reference.
+2. AI analyzes only visible/provided facts, then separates facts, creative assumptions, and items to confirm.
+3. AI can produce practical artifacts such as product analysis, captions, Google Flow/Veo scene prompts, voice over, subtitle, negative prompt, and production checklist.
+4. User stays responsible for confirming claims, pricing, legal statements, testimonials, and publishing decisions.
+
 ## 16. Privacy, Authorization, and Safety
 
 Hard rules:

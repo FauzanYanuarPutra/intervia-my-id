@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { trackLajukanEvent } from '@/lib/analytics/lajukanEvents';
 import { cn } from '@/lib/utils';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 type RequestTone = 'active' | 'waiting' | 'completed';
 type ProjectViewFilter = 'all' | 'active' | 'waiting' | 'completed';
@@ -1424,7 +1425,7 @@ function RequestDetailDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="request-detail-title"
-        className="relative z-10 flex max-h-[calc(100svh-1.5rem)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_80px_-38px_rgba(15,23,42,0.55)] sm:max-h-[calc(100svh-2.5rem)] sm:rounded-[26px]"
+        className="relative z-10 flex max-h-[calc(var(--app-viewport-height)-1.5rem)] w-full max-w-3xl min-w-0 flex-col overflow-hidden rounded-[22px] border border-[color:color-mix(in_srgb,var(--app-border)_88%,white_12%)] bg-[color:var(--app-surface-strong)] shadow-[0_28px_80px_-38px_rgba(15,23,42,0.55)] sm:max-h-[calc(var(--app-viewport-height)-2.5rem)] sm:rounded-[26px]"
       >
         <div className="sticky top-0 z-10 border-b border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,var(--app-surface-strong)_92%,transparent)] px-3 py-2.5  sm:px-4 sm:py-3">
           <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
@@ -1783,23 +1784,22 @@ export default function MyProjectsPage() {
     });
   };
 
+  useBodyScrollLock(Boolean(detailRequestId && detailRequest));
+
   useEffect(() => {
     if (!detailRequestId || !detailRequest) {
       return;
     }
 
-    const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setDetailRequestId(null);
       }
     };
 
-    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [detailRequest, detailRequestId]);

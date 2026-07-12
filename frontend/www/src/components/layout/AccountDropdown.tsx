@@ -315,7 +315,7 @@ export function AccountDropdown({
                 : { visibility: 'hidden', zIndex: 160 }
             }
             className={cn(
-              'fixed max-h-[min(78vh,620px)] overflow-y-auto rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 text-[color:var(--app-text)] shadow-[0_24px_70px_-38px_rgba(15,23,42,0.45)]',
+              'fixed max-h-[min(calc(var(--app-viewport-height)-1rem),620px)] overflow-y-auto rounded-[22px] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-2 text-[color:var(--app-text)] shadow-[0_24px_70px_-38px_rgba(15,23,42,0.45)]',
               menuClassName,
             )}
             data-auto-scrollbar

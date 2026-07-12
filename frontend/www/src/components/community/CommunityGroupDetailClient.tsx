@@ -417,7 +417,7 @@ export default function CommunityGroupDetailClient({
 
   if (loadingGroup) {
     return (
-      <main className="lajukan-home-compact min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+      <main className="lajukan-home-compact min-h-screen bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
         <div className="mx-auto w-full max-w-[980px] pt-2">
           <CommunityFeedSkeleton />
         </div>
@@ -460,7 +460,7 @@ export default function CommunityGroupDetailClient({
   ];
 
   return (
-    <main className="lajukan-home-compact min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <main className="lajukan-home-compact min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="sticky top-0 z-30 -mx-1 mb-3 border-b border-[color:var(--app-border)] bg-white/94 px-1 py-2  lg:hidden">
         <div className="flex items-center gap-2">
           <Link
@@ -489,7 +489,7 @@ export default function CommunityGroupDetailClient({
         </div>
       </div>
 
-      <div className="mx-auto grid min-h-0 w-full max-w-[1700px] gap-4 lg:h-[calc(100svh-4.625rem)] lg:grid-cols-[260px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_340px]">
+      <div className="mx-auto grid min-h-0 w-full max-w-[1700px] gap-4 lg:h-[calc(var(--app-viewport-height)-4.625rem)] lg:grid-cols-[260px_minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_340px]">
         <aside className="hidden min-h-0 overflow-y-auto overscroll-contain pb-6 lg:block">
           <section className="rounded-[24px] border border-[color:var(--app-border)] bg-white p-4 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.14)]">
             <Link

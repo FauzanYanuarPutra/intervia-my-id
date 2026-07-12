@@ -327,7 +327,7 @@ export function CreateMarketplaceShell({
   const pathname = usePathname();
 
   return (
-    <div className="lajukan-home-compact lajukan-market-page lajukan-market-create lajukan-create-compact relative min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)] sm:px-2 lg:h-[calc(100svh-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+    <div className="lajukan-home-compact lajukan-market-page lajukan-market-create lajukan-create-compact relative min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-1 pb-6 pt-3 dark:bg-[linear-gradient(180deg,#020617_0%,#0f172a_100%)] sm:px-2 lg:h-[calc(var(--app-viewport-height)-(60px+env(safe-area-inset-top)))] lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <div className="lajukan-home-shell lajukan-create-shell relative mx-auto lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
         <div className="lajukan-home-desktop-grid lajukan-create-desktop-grid relative z-0 mx-auto grid min-h-0 w-full max-w-[1540px] flex-1 grid-rows-[minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[232px_minmax(0,1fr)] 2xl:grid-cols-[244px_minmax(0,1fr)]">
           <CreateDesktopSidebar

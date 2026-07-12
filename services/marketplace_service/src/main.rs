@@ -375,6 +375,13 @@ struct ContentLikerRow {
     is_viewer: bool,
 }
 
+#[derive(Debug, FromRow)]
+struct UserReadModelBrief {
+    username: Option<String>,
+    full_name: Option<String>,
+    avatar_url: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ContentLikersResponse {
@@ -7001,6 +7008,22 @@ fn social_notification_copy(event_name: &str, is_id: bool) -> Option<(String, St
     Some((title, action))
 }
 
+async fn fetch_user_read_model_brief(db: &PgPool, user_id: Uuid) -> Option<UserReadModelBrief> {
+    sqlx::query_as::<_, UserReadModelBrief>(
+        r#"
+        SELECT username::text AS username, full_name, avatar_url
+        FROM users_read_model
+        WHERE user_id = $1
+          AND identity_deleted_at IS NULL
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(db)
+    .await
+    .ok()
+    .flatten()
+}
+
 async fn push_social_notification_for_event(
     state: &Arc<AppState>,
     actor_user_id: Option<Uuid>,
@@ -7042,6 +7065,14 @@ async fn push_social_notification_for_event(
     let Some((title, action)) = social_notification_copy(event.event_name.as_str(), is_id) else {
         return;
     };
+    let actor_profile = match actor_user_id {
+        Some(id) => fetch_user_read_model_brief(&state.db, id).await,
+        None => None,
+    };
+    let actor_profile_name = actor_profile
+        .as_ref()
+        .and_then(|profile| profile.full_name.as_deref().or(profile.username.as_deref()))
+        .map(str::to_string);
 
     let actor_label = event_property_clean_text(
         event,
@@ -7055,6 +7086,7 @@ async fn push_social_notification_for_event(
             "sender_username",
         ],
     )
+    .or(actor_profile_name)
     .map(|value| {
         if value.starts_with('@') {
             value
@@ -7218,7 +7250,12 @@ async fn push_social_notification_for_event(
     let actor_username = event_property_clean_text(
         event,
         &["actor_username", "viewer_username", "sender_username"],
-    );
+    )
+    .or_else(|| {
+        actor_profile
+            .as_ref()
+            .and_then(|profile| profile.username.clone())
+    });
     let actor_name = event_property_clean_text(
         event,
         &[
@@ -7227,11 +7264,21 @@ async fn push_social_notification_for_event(
             "viewer_name",
             "sender_name",
         ],
-    );
+    )
+    .or_else(|| {
+        actor_profile
+            .as_ref()
+            .and_then(|profile| profile.full_name.clone())
+    });
     let actor_avatar_url = event_property_clean_text(
         event,
         &["actor_avatar_url", "viewer_avatar_url", "sender_avatar_url"],
-    );
+    )
+    .or_else(|| {
+        actor_profile
+            .as_ref()
+            .and_then(|profile| profile.avatar_url.clone())
+    });
 
     let data = json!({
         "href": href,

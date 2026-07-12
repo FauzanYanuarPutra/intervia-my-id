@@ -359,7 +359,7 @@ export function MediaPreviewCarousel({
             <X className="h-6 w-6" />
           </button>
 
-          <div className="w-full max-w-5xl aspect-video md:h-[85vh]">
+          <div className="w-full max-w-5xl aspect-video md:h-[calc(var(--app-viewport-height)-2rem)]">
             <MediaPreviewCarousel
               items={visibleMediaItems}
               alt={alt}

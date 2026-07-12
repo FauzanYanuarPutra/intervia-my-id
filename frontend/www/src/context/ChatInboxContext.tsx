@@ -36,6 +36,7 @@ type ChatInboxContextValue = {
   totalUnread: number;
   loading: boolean;
   refetch: () => Promise<void>;
+  markRoomRead: (roomId: string) => void;
 };
 
 type InboxRoomSnapshot = {
@@ -88,6 +89,16 @@ function buildRoomSnapshot(room: InboxRoom): InboxRoomSnapshot | null {
     unreadCount: Number(room.unread_count ?? 0),
     lastSender: String(room.last_sender ?? '').toLowerCase(),
   };
+}
+
+function normalizeInboxRoomId(raw: unknown): string {
+  const value = String(raw ?? '').trim();
+  if (!value) return '';
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 export function ChatInboxProvider({ children }: { children: ReactNode }) {
@@ -203,6 +214,45 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
       setTotalUnread(prev => (prev === total ? prev : total));
     },
     [emitChatMessageNotifications, toSignature, userId],
+  );
+
+  const markRoomRead = useCallback(
+    (roomId: string) => {
+      const normalizedRoomId = normalizeInboxRoomId(roomId);
+      if (!normalizedRoomId) return;
+
+      setRooms(prev => {
+        let changed = false;
+        const next = prev.map(room => {
+          const currentRoomId = normalizeInboxRoomId(room.room_id ?? room.id);
+          if (currentRoomId !== normalizedRoomId) return room;
+          const unread = Number(room.unread_count ?? 0);
+          if (!Number.isFinite(unread) || unread <= 0) return room;
+          changed = true;
+          return {
+            ...room,
+            unread_count: 0,
+          };
+        });
+        return changed ? next : prev;
+      });
+
+      setTotalUnread(prev => {
+        const currentRoom = rooms.find(
+          room => normalizeInboxRoomId(room.room_id ?? room.id) === normalizedRoomId,
+        );
+        const unread = Number(currentRoom?.unread_count ?? 0);
+        const lastSender = String(currentRoom?.last_sender ?? '').toLowerCase();
+        const isOwnLast =
+          Boolean(userId) &&
+          lastSender &&
+          lastSender === String(userId).toLowerCase();
+        if (isOwnLast) return prev;
+        if (!Number.isFinite(unread) || unread <= 0) return prev;
+        return Math.max(0, prev - unread);
+      });
+    },
+    [rooms, userId],
   );
 
   const refetch = useCallback(
@@ -390,8 +440,9 @@ export function ChatInboxProvider({ children }: { children: ReactNode }) {
       totalUnread,
       loading,
       refetch: () => refetch({ silent: false }),
+      markRoomRead,
     }),
-    [rooms, totalUnread, loading, refetch],
+    [rooms, totalUnread, loading, refetch, markRoomRead],
   );
 
   return (
@@ -406,6 +457,7 @@ const defaultValue: ChatInboxContextValue = {
   totalUnread: 0,
   loading: false,
   refetch: async () => {},
+  markRoomRead: () => {},
 };
 
 export function useChatInbox() {

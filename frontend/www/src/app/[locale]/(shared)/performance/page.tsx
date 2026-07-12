@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 export default function PerformanceDashboardPage() {
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto flex min-h-[100svh] w-full max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.48)]">
         <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
           Performance

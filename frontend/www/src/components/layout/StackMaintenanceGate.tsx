@@ -202,7 +202,16 @@ export function StackMaintenanceGate({
     );
   }, [active, children, chrome, footer, locale, state]);
 
-  return <div className={cn(active && 'min-h-[var(--app-viewport-height)]')}>{content}</div>;
+  return (
+    <div
+      className={cn(
+        'flex min-h-0 flex-1 flex-col',
+        active && 'min-h-[var(--app-viewport-height)]',
+      )}
+    >
+      {content}
+    </div>
+  );
 }
 
 export default StackMaintenanceGate;

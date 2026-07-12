@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { LocalizedLink as Link } from '@/components/ui-kit';
 import {
@@ -19,9 +20,10 @@ import {
 } from '@/lib/notifications/presentation';
 import {
   notificationSocialContext,
+  notificationSocialSummary,
   notificationTargetHref,
-  notificationTargetLabel,
 } from '@/lib/notifications/social';
+import { profileAvatarSrc, readProfileAvatarStyle } from '@/lib/profile/avatar';
 import { cn } from '@/lib/utils';
 
 type LocaleCode = 'id' | 'en';
@@ -308,7 +310,7 @@ export default function NotificationsPage() {
                 message: item.message,
               });
               const Icon = visual.Icon;
-              const emoji = pickNotificationEmoji({
+              const legacyEmojiLabel = pickNotificationEmoji({
                 category: item.category,
                 eventType: item.event_type,
                 title: item.title,
@@ -317,6 +319,19 @@ export default function NotificationsPage() {
               });
               const href = notificationTargetHref(item);
               const social = notificationSocialContext(item);
+              const summary = notificationSocialSummary(item, locale);
+              const actorLabel = summary.actor;
+              const actorHandle = summary.handle;
+              const hasSocialActor = Boolean(actorLabel || social.actorAvatarUrl);
+              const actorAvatar = profileAvatarSrc(
+                social.actorAvatarUrl,
+                readProfileAvatarStyle(item.data),
+                actorLabel ||
+                  item.title ||
+                  (isId ? 'Pengguna Lajukan' : 'Lajukan user'),
+              );
+              const notificationTitle = summary.title;
+              const notificationBody = summary.subtitle;
 
               return (
                 <Link
@@ -339,23 +354,39 @@ export default function NotificationsPage() {
                     )}
                   />
                   <div className="flex min-w-0 items-start gap-3">
-                    <span
-                      className={cn(
-                        'relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[17px] border text-[1.22rem] shadow-[0_14px_24px_-22px_rgba(15,23,42,0.32)] sm:h-12 sm:w-12 sm:text-[1.35rem]',
-                        visual.iconClassName,
-                      )}
-                      aria-hidden="true"
-                    >
-                      <span className="leading-none">{emoji}</span>
+                    {hasSocialActor ? (
+                      <span
+                        className="relative inline-flex h-12 w-12 shrink-0 overflow-hidden rounded-full border border-[color:var(--app-border)] bg-[color:var(--app-surface-muted)] shadow-[0_14px_24px_-22px_rgba(15,23,42,0.32)]"
+                        aria-hidden="true"
+                      >
+                        <Image
+                          src={actorAvatar}
+                          alt=""
+                          width={48}
+                          height={48}
+                          className="h-full w-full object-cover"
+                        />
+                        <span
+                          className={cn(
+                            'absolute -bottom-0.5 -right-0.5 grid h-6 w-6 place-items-center rounded-full border-2 border-white shadow-sm dark:border-slate-950',
+                            visual.badgeClassName,
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                      </span>
+                    ) : (
                       <span
                         className={cn(
-                          'absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full border bg-white shadow-sm dark:bg-slate-950',
-                          visual.badgeClassName,
+                          'relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_14px_24px_-22px_rgba(15,23,42,0.32)] sm:h-12 sm:w-12',
+                          visual.iconClassName,
                         )}
+                        aria-hidden="true"
                       >
-                        <Icon className="h-3.5 w-3.5" />
+                        <span className="sr-only">{legacyEmojiLabel}</span>
+                        <Icon className="h-5 w-5" />
                       </span>
-                    </span>
+                    )}
 
                     <span className="min-w-0 flex-1">
                       <span className="flex min-w-0 items-start justify-between gap-2">
@@ -366,11 +397,15 @@ export default function NotificationsPage() {
                               visual.titleClassName,
                             )}
                           >
-                            {item.title ||
-                              (isId ? 'Notifikasi baru' : 'New notification')}
+                            {notificationTitle}
                           </span>
+                          {actorHandle ? (
+                            <span className="mt-0.5 block truncate text-[11px] font-semibold text-[color:var(--app-text-soft)] sm:text-xs">
+                              {actorHandle}
+                            </span>
+                          ) : null}
                           <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[color:var(--app-text-soft)] sm:text-[13px]">
-                            {item.message}
+                            {notificationBody}
                           </span>
                         </span>
 
@@ -391,13 +426,10 @@ export default function NotificationsPage() {
                             visual.badgeClassName,
                           )}
                         >
-                          {emoji} {visual.label}
+                          {visual.label}
                         </span>
                         <span className="rounded-full bg-white/75 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-white/8">
                           {formatRelativeTime(item.created_at, locale)}
-                        </span>
-                        <span className="hidden min-w-0 truncate rounded-full bg-white/75 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] ring-1 ring-[color:var(--app-border)] dark:bg-white/8 sm:inline-flex">
-                          {item.event_type || item.category || 'update'}
                         </span>
                         <span
                           className={cn(
@@ -417,27 +449,16 @@ export default function NotificationsPage() {
                         </span>
                       </span>
 
-                      {(social.actorName ||
-                        social.actorHandle ||
-                        social.entityLabel ||
-                        social.entityType) ? (
+                      {(summary.entity || summary.entityTypeLabel) ? (
                         <span className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
-                          {social.actorName || social.actorHandle ? (
-                            <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text)] dark:bg-white/8">
-                              {social.actorName ||
-                                (social.actorHandle
-                                  ? `@${social.actorHandle}`
-                                  : '')}
-                            </span>
-                          ) : null}
-                          {social.entityLabel ? (
+                          {summary.entity ? (
                             <span className="truncate rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {social.entityLabel}
+                              {summary.entity}
                             </span>
                           ) : null}
-                          {social.entityType ? (
+                          {summary.entityTypeLabel ? (
                             <span className="rounded-full border border-[color:var(--app-border)] bg-white/80 px-2.5 py-1 text-[10px] font-bold text-[color:var(--app-text-soft)] dark:bg-white/8">
-                              {notificationTargetLabel(social.entityType)}
+                              {summary.entityTypeLabel}
                             </span>
                           ) : null}
                         </span>

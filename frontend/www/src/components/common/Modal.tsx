@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 type ModalProps = {
   open: boolean;
@@ -23,6 +24,8 @@ export function Modal({
   footer,
   className,
 }: ModalProps) {
+  useBodyScrollLock(open);
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
@@ -33,7 +36,7 @@ export function Modal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="ui-layer-modal fixed inset-0 z-[10000] flex min-h-[100dvh] w-screen items-end justify-center overflow-y-auto bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-0  sm:items-center sm:p-4"
+          className="ui-layer-modal fixed inset-0 z-[10000] flex h-[var(--app-viewport-height)] w-screen items-end justify-center overflow-y-auto bg-[color:color-mix(in_srgb,_var(--app-overlay)_62%,_transparent)] p-0  sm:items-center sm:p-4"
         >
           <motion.section
             role="dialog"
@@ -44,7 +47,7 @@ export function Modal({
             exit={{ opacity: 0, y: 20, scale: 0.98 }}
             onClick={event => event.stopPropagation()}
             className={cn(
-              'flex max-h-[min(88svh,760px)] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] border border-[color:color-mix(in_srgb,var(--app-border)_92%,white_8%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_94%,transparent))] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-[0_32px_72px_-40px_rgba(15,23,42,0.3)] ring-1 ring-white/60 dark:border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] dark:ring-white/5 sm:max-h-[80svh] sm:rounded-2xl sm:p-5',
+              'flex max-h-[min(calc(var(--app-viewport-height)-1rem),760px)] w-full max-w-xl flex-col overflow-hidden rounded-t-[28px] border border-[color:color-mix(in_srgb,var(--app-border)_92%,white_8%)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--app-surface-strong)_98%,white_2%),color-mix(in_srgb,var(--app-surface)_94%,transparent))] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-[0_32px_72px_-40px_rgba(15,23,42,0.3)] ring-1 ring-white/60 dark:border-[color:color-mix(in_srgb,var(--app-border)_88%,transparent)] dark:ring-white/5 sm:max-h-[min(calc(var(--app-viewport-height)-2rem),760px)] sm:rounded-2xl sm:p-5',
               className,
             )}
           >

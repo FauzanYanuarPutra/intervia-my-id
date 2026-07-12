@@ -52,3 +52,9 @@ Use this file for approved product/architecture decisions. Do not record unappro
 - Decision: Lajukan should prioritize a dense regional business-needs cluster before broad national marketplace expansion.
 - Evidence: Product input emphasizes Indonesia's geography, local trust, WhatsApp behavior, and serviceability needs for machines, tools, materials, services, and places. Existing product docs already identify search, location, WhatsApp, trust, and `Mencari/Menawarkan` as core product primitives.
 - Consequence: New discovery, ranking, onboarding, and analytics work should improve regional supply-demand density first. `Usaha Sekitar` should be treated as a location capability across categories, and `Mencari` demand data should be treated as a first-class asset for matching and supplier acquisition.
+
+## 2026-07-12: Personal AI Evolves Into Configurable AI Mini-App Builder
+
+- Decision: `/profile/ai` is the canonical MVP surface for user-created AI mini-apps. Creators can configure steps, input fields, hidden instructions, quick actions, output sections, model policy, media support, and visibility without custom code.
+- Evidence: Product input asks for a Lajukan-native version of a wizard prompt generator where users can create private or public tools. Existing `personal_ai_agents.builder_config` already stores declarative JSON configuration and Personal AI already supports media, model routing, and private owner data.
+- Consequence: Keep the builder declarative and component-based for security. Visibility starts as `private`, `unlisted`, and `public`; public discovery/profile surfacing can be added later on top of the same canonical builder instead of creating a duplicate AI Tools flow.

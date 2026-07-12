@@ -2315,12 +2315,12 @@ export default function ReelsClient({
   }, [authLoading, initialUploadOpen, isAuthenticated]);
 
   return (
-    <main className="h-[100svh] overflow-hidden bg-black text-white">
+    <main className="h-[var(--app-viewport-height)] min-h-0 overflow-hidden bg-black text-white">
       <div className="relative h-full w-full overflow-hidden bg-[#050505]">
         <div className="relative h-full min-w-0 overflow-hidden bg-black lg:bg-[#050505]">
           <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_top_left,rgba(244,63,94,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(250,204,21,0.10),transparent_32%)] lg:block" />
 
-          <div className="relative mx-auto h-full w-full max-w-[430px] overflow-hidden bg-black shadow-2xl sm:max-w-[460px] lg:my-3 lg:h-[calc(100svh-24px)] lg:max-w-[430px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10">
+          <div className="relative mx-auto h-full w-full max-w-[430px] overflow-hidden bg-black shadow-2xl sm:max-w-[460px] lg:my-3 lg:h-[calc(var(--app-viewport-height)-24px)] lg:max-w-[430px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10">
             <ReelsTopBar
               locale={locale}
               feedTab={feedTab}
@@ -4398,9 +4398,9 @@ function DetailOverlay({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[92svh] w-full flex-col overflow-hidden rounded-t-[30px] bg-[#080808] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[460px] lg:rounded-none lg:border-l lg:border-white/10">
+      <section className="relative flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[30px] bg-[#080808] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[min(520px,42vw)] lg:min-w-[460px] lg:rounded-none lg:border-l lg:border-white/10">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/24 lg:hidden" />
-        <div className="relative min-h-[30svh] max-h-[42svh] overflow-hidden bg-black lg:min-h-[220px] lg:max-h-[260px]">
+        <div className="relative min-h-[180px] max-h-[min(calc(var(--app-viewport-height)-20rem),340px)] overflow-hidden bg-black lg:min-h-[220px] lg:max-h-[260px]">
           {imageMedia ? (
             <img
               src={reel.videoSrc}
@@ -5020,7 +5020,7 @@ function ShareSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[82svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+      <section className="relative flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center gap-3 px-4 pb-3 pt-4 sm:px-5">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-white">
@@ -5417,7 +5417,7 @@ function CommentsSheet({
         className="absolute inset-0 z-0"
       />
 
-      <section className="relative z-10 flex max-h-[86svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
+      <section className="relative z-10 flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[460px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[500px]">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div className="min-w-0">
@@ -5673,7 +5673,7 @@ function ProductSheet({
         className="absolute inset-0"
       />
 
-      <section className="relative flex max-h-[84svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
+      <section className="relative flex max-h-[calc(var(--app-viewport-height)-1rem)] w-full flex-col overflow-hidden rounded-t-[28px] bg-[#0b0f14] text-white shadow-2xl lg:h-full lg:max-h-none lg:w-[420px] lg:max-w-none lg:rounded-none lg:border-l lg:border-white/10 xl:w-[460px]">
         <div className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/18 lg:hidden" />
         <div className="flex items-start justify-between gap-3 p-4">
           <div className="min-w-0">
@@ -6591,10 +6591,10 @@ function UploadReelSheet({
         onSubmit={submit}
         data-lajukan-reels-studio="true"
         className={cn(
-          'relative flex h-[100svh] max-h-[100svh] w-full flex-col overflow-hidden bg-[color:var(--app-surface)] text-[color:var(--app-text)] shadow-2xl dark:bg-[#050505] dark:text-white',
+          'relative flex h-[var(--app-viewport-height)] max-h-[var(--app-viewport-height)] w-full flex-col overflow-hidden bg-[color:var(--app-surface)] text-[color:var(--app-text)] shadow-2xl dark:bg-[#050505] dark:text-white',
           step === 'media'
             ? 'lg:max-w-[460px] lg:rounded-[32px] lg:ring-1 lg:ring-white/10'
-            : 'lg:h-[calc(100svh-2rem)] lg:max-w-[960px] lg:rounded-[30px] lg:ring-1 lg:ring-white/10',
+            : 'lg:h-[calc(var(--app-viewport-height)-2rem)] lg:max-w-[960px] lg:rounded-[30px] lg:ring-1 lg:ring-white/10',
         )}
       >
         <div
@@ -6677,7 +6677,7 @@ function UploadReelSheet({
                   'relative overflow-hidden bg-[color:var(--app-surface-strong)] shadow-2xl ring-1 ring-[color:var(--app-border)] dark:bg-[#2d374b] dark:ring-white/10',
                   step === 'media'
                     ? 'h-full w-full rounded-[28px] sm:rounded-[32px]'
-                    : 'aspect-[9/16] max-h-[calc(100svh-128px)] rounded-[24px] lg:max-h-[calc(100svh-150px)]',
+                    : 'aspect-[9/16] max-h-[calc(var(--app-viewport-height)-128px)] rounded-[24px] lg:max-h-[calc(var(--app-viewport-height)-150px)]',
                 )}
               >
                 {mediaPreviewSrc ? (

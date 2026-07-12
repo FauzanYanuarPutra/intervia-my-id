@@ -2,14 +2,21 @@ import crypto from 'crypto';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import { getPostgresPool } from '@/lib/postgres';
+import {
+  createDefaultPersonalAiBuilderConfig,
+  sanitizePersonalAiBuilderConfig,
+  type PersonalAiBuilderConfig,
+} from './builder';
 
-export type PersonalAiVisibility = 'private' | 'shared';
+export type PersonalAiVisibility = 'private' | 'unlisted' | 'public' | 'shared';
 export type PersonalAiModelPreference = 'auto' | 'ollama' | 'groq' | 'openai';
 
 export type PersonalAiQuickButton = {
   id: string;
   label: string;
   prompt: string;
+  instructionAppend?: string;
+  negativeInstruction?: string;
 };
 
 export type PersonalAiAgent = {
@@ -24,6 +31,7 @@ export type PersonalAiAgent = {
   temperature: number;
   quick_buttons: PersonalAiQuickButton[];
   starter_prompts: string[];
+  builder_config: PersonalAiBuilderConfig;
   memory_enabled: boolean;
   share_id: string;
   usage_count: number;
@@ -131,7 +139,19 @@ function cleanText(value: unknown, maxLength: number): string {
 }
 
 function cleanVisibility(value: unknown): PersonalAiVisibility {
-  return value === 'shared' ? 'shared' : 'private';
+  if (value === 'public') return 'public';
+  if (value === 'unlisted' || value === 'shared') return 'unlisted';
+  return 'private';
+}
+
+function sharedVisibilitySql() {
+  return "visibility IN ('shared', 'unlisted', 'public')";
+}
+
+function canUseAgent(row: Record<string, unknown>, userId: string) {
+  const ownerId = String(row.owner_id || '');
+  const visibility = cleanVisibility(row.visibility);
+  return ownerId === userId || visibility === 'public';
 }
 
 function cleanModelPreference(value: unknown): PersonalAiModelPreference {
@@ -169,6 +189,14 @@ function cleanButtons(value: unknown): PersonalAiQuickButton[] {
     const record = item as Record<string, unknown>;
     const label = cleanText(record.label, 36);
     const prompt = cleanText(record.prompt, 600);
+    const instructionAppend = cleanText(
+      record.instructionAppend || record.instruction_append,
+      1200,
+    );
+    const negativeInstruction = cleanText(
+      record.negativeInstruction || record.negative_instruction,
+      700,
+    );
     const key = label.toLowerCase();
     if (!label || !prompt || seen.has(key)) continue;
     seen.add(key);
@@ -176,6 +204,8 @@ function cleanButtons(value: unknown): PersonalAiQuickButton[] {
       id: cleanText(record.id, 80) || id('btn'),
       label,
       prompt,
+      instructionAppend: instructionAppend || undefined,
+      negativeInstruction: negativeInstruction || undefined,
     });
     if (buttons.length >= 12) break;
   }
@@ -195,6 +225,7 @@ function normalizeAgent(row: Record<string, unknown>, canEdit = false): Personal
     temperature: cleanTemperature(row.temperature),
     quick_buttons: cleanButtons(row.quick_buttons),
     starter_prompts: cleanStringList(row.starter_prompts, 8),
+    builder_config: sanitizePersonalAiBuilderConfig(row.builder_config),
     memory_enabled: row.memory_enabled !== false,
     share_id: cleanText(row.share_id, 80) || shareId(),
     usage_count: Number(row.usage_count || 0),
@@ -250,6 +281,7 @@ function createDefaultAgent(userId: string): PersonalAiAgent {
       'Bantu cek kebutuhan alat dan bahan untuk minuman cup.',
       'Tolong hitungkan risiko sebelum saya bayar DP supplier ini.',
     ],
+    builder_config: createDefaultPersonalAiBuilderConfig(),
     memory_enabled: true,
     share_id: shareId(),
     usage_count: 0,
@@ -275,6 +307,7 @@ async function ensureSchema() {
       temperature REAL NOT NULL DEFAULT 0.4,
       quick_buttons JSONB NOT NULL DEFAULT '[]'::jsonb,
       starter_prompts JSONB NOT NULL DEFAULT '[]'::jsonb,
+      builder_config JSONB NOT NULL DEFAULT '{}'::jsonb,
       memory_enabled BOOLEAN NOT NULL DEFAULT TRUE,
       share_id TEXT NOT NULL UNIQUE,
       usage_count INTEGER NOT NULL DEFAULT 0,
@@ -285,6 +318,8 @@ async function ensureSchema() {
       ON personal_ai_agents(owner_id, updated_at DESC);
     CREATE INDEX IF NOT EXISTS personal_ai_agents_share_idx
       ON personal_ai_agents(share_id);
+    ALTER TABLE personal_ai_agents
+      ADD COLUMN IF NOT EXISTS builder_config JSONB NOT NULL DEFAULT '{}'::jsonb;
 
     CREATE TABLE IF NOT EXISTS personal_ai_threads (
       id TEXT PRIMARY KEY,
@@ -373,9 +408,9 @@ async function ensureDefaultAgent(userId: string): Promise<PersonalAiAgent> {
       await pool.query(
         `INSERT INTO personal_ai_agents
          (id, owner_id, name, description, visibility, instructions, tone, model_preference,
-          temperature, quick_buttons, starter_prompts, memory_enabled, share_id, usage_count,
+          temperature, quick_buttons, starter_prompts, builder_config, memory_enabled, share_id, usage_count,
           created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14,$15,$16,$17)`,
         [
           agent.id,
           agent.owner_id,
@@ -388,6 +423,7 @@ async function ensureDefaultAgent(userId: string): Promise<PersonalAiAgent> {
           agent.temperature,
           JSON.stringify(agent.quick_buttons),
           JSON.stringify(agent.starter_prompts),
+          JSON.stringify(agent.builder_config),
           agent.memory_enabled,
           agent.share_id,
           agent.usage_count,
@@ -422,7 +458,7 @@ export async function listPersonalAiAgents(userId: string, share?: string) {
       let sharedAgent: PersonalAiAgent | null = null;
       if (share) {
         const shared = await pool.query(
-          "SELECT * FROM personal_ai_agents WHERE share_id = $1 AND visibility = 'shared' LIMIT 1",
+          `SELECT * FROM personal_ai_agents WHERE share_id = $1 AND ${sharedVisibilitySql()} LIMIT 1`,
           [share],
         );
         if (shared.rows[0]) {
@@ -439,7 +475,7 @@ export async function listPersonalAiAgents(userId: string, share?: string) {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .map(agent => ({ ...agent, can_edit: true }));
   const shared = share
-    ? state.agents.find(agent => agent.share_id === share && agent.visibility === 'shared') || null
+    ? state.agents.find(agent => agent.share_id === share && agent.visibility !== 'private') || null
     : null;
   return {
     agents,
@@ -467,6 +503,7 @@ export async function createPersonalAiAgent(
       temperature: input.temperature,
       quick_buttons: input.quick_buttons,
       starter_prompts: input.starter_prompts,
+      builder_config: input.builder_config,
       memory_enabled: input.memory_enabled,
       share_id: shareId(),
       usage_count: 0,
@@ -490,9 +527,9 @@ export async function createPersonalAiAgent(
       await pool.query(
         `INSERT INTO personal_ai_agents
          (id, owner_id, name, description, visibility, instructions, tone, model_preference,
-          temperature, quick_buttons, starter_prompts, memory_enabled, share_id, usage_count,
+          temperature, quick_buttons, starter_prompts, builder_config, memory_enabled, share_id, usage_count,
           created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15,$16)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13,$14,$15,$16,$17)`,
         [
           agent.id,
           agent.owner_id,
@@ -505,6 +542,7 @@ export async function createPersonalAiAgent(
           agent.temperature,
           JSON.stringify(agent.quick_buttons),
           JSON.stringify(agent.starter_prompts),
+          JSON.stringify(agent.builder_config),
           agent.memory_enabled,
           agent.share_id,
           agent.usage_count,
@@ -537,25 +575,27 @@ export async function getPersonalAiAgentForUse(input: {
     if (pool) {
       const result = input.shareId
         ? await pool.query(
-            "SELECT * FROM personal_ai_agents WHERE share_id = $1 AND visibility = 'shared' LIMIT 1",
+            `SELECT * FROM personal_ai_agents WHERE share_id = $1 AND ${sharedVisibilitySql()} LIMIT 1`,
             [input.shareId],
           )
         : await pool.query(
-            "SELECT * FROM personal_ai_agents WHERE id = $1 AND (owner_id = $2 OR visibility = 'shared') LIMIT 1",
+            "SELECT * FROM personal_ai_agents WHERE id = $1 AND (owner_id = $2 OR visibility = 'public') LIMIT 1",
             [input.agentId, input.userId],
           );
       const row = result.rows[0];
-      return row ? normalizeAgent(row, row.owner_id === input.userId) : null;
+      return row && (input.shareId || canUseAgent(row, input.userId))
+        ? normalizeAgent(row, row.owner_id === input.userId)
+        : null;
     }
   }
 
   const state = await readFileState();
   const agent = input.shareId
-    ? state.agents.find(item => item.share_id === input.shareId && item.visibility === 'shared')
+    ? state.agents.find(item => item.share_id === input.shareId && item.visibility !== 'private')
     : state.agents.find(
         item =>
           item.id === input.agentId &&
-          (item.owner_id === input.userId || item.visibility === 'shared'),
+          (item.owner_id === input.userId || item.visibility === 'public'),
       );
   return agent ? { ...agent, can_edit: agent.owner_id === input.userId } : null;
 }
@@ -588,7 +628,8 @@ export async function updatePersonalAiAgent(
         `UPDATE personal_ai_agents
          SET name=$3, description=$4, visibility=$5, instructions=$6, tone=$7,
              model_preference=$8, temperature=$9, quick_buttons=$10::jsonb,
-             starter_prompts=$11::jsonb, memory_enabled=$12, updated_at=$13
+             starter_prompts=$11::jsonb, builder_config=$12::jsonb,
+             memory_enabled=$13, updated_at=$14
          WHERE id=$1 AND owner_id=$2`,
         [
           agentId,
@@ -602,6 +643,7 @@ export async function updatePersonalAiAgent(
           updated.temperature,
           JSON.stringify(updated.quick_buttons),
           JSON.stringify(updated.starter_prompts),
+          JSON.stringify(updated.builder_config),
           updated.memory_enabled,
           updated.updated_at,
         ],
@@ -827,6 +869,7 @@ export async function appendPersonalAiMessages(input: {
   threadId: string;
   userContent: string;
   assistantContent: string;
+  userMetadata?: Record<string, unknown>;
   metadata: Record<string, unknown>;
 }) {
   const at = nowIso();
@@ -837,7 +880,7 @@ export async function appendPersonalAiMessages(input: {
     owner_id: input.userId,
     role: 'user',
     content: input.userContent,
-    metadata: {},
+    metadata: input.userMetadata || {},
     created_at: at,
   });
   const assistantMessage = normalizeMessage({

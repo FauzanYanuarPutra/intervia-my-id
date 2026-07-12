@@ -31,6 +31,7 @@ import {
   UserPlus,
   UsersRound,
 } from 'lucide-react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 type SectionId =
   | 'dashboard'
@@ -219,14 +220,7 @@ export default function SaasAdminDashboard({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isSidebarOpen) return undefined;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [isSidebarOpen]);
+  useBodyScrollLock(isSidebarOpen);
 
   const currentSection = SECTION_COPY[activeSection];
   const toggleSidebar = () => {
@@ -253,7 +247,7 @@ export default function SaasAdminDashboard({
         onClick={() => setIsSidebarOpen(false)}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r text-[color:var(--app-accent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] text-[color:var(--app-accent)] shadow-[0_30px_70px_-24px_rgba(15,23,42,0.9)]  transition-all duration-300 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-[var(--app-viewport-height)] flex-col border-r text-[color:var(--app-accent)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] text-[color:var(--app-accent)] shadow-[0_30px_70px_-24px_rgba(15,23,42,0.9)]  transition-all duration-300 ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isSidebarCollapsed ? 'lg:w-24' : 'lg:w-72'} w-[86vw] max-w-[320px] lg:translate-x-0`}
       >

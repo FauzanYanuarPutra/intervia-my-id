@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguageModal } from './LanguageModalContext';
 import { Z_INDEX } from '@/components/constants/z-index';
 import { X, Check, Globe } from 'lucide-react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 const localeOrder = ['id', 'en'] as const;
 type LocaleChoice = (typeof localeOrder)[number];
@@ -33,6 +34,7 @@ export function LanguageModal() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isId = currentLocale === 'id';
+  useBodyScrollLock(isOpen);
 
   const switchLocale = (target: LocaleChoice) => {
     confirmLocale(target);
@@ -57,11 +59,11 @@ export function LanguageModal() {
           />
 
           <div
-            className="fixed inset-0 flex items-center justify-center pointer-events-none px-4"
+            className="fixed inset-0 flex h-[var(--app-viewport-height)] items-center justify-center pointer-events-none px-4"
             style={{ zIndex: Z_INDEX.modal + Z_INDEX.modal }}
           >
             <motion.div
-              className="pointer-events-auto max-h-[80svh] w-full max-w-[420px] overflow-y-auto rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:p-5"
+              className="pointer-events-auto max-h-[calc(var(--app-viewport-height)-2rem)] w-full max-w-[420px] overflow-y-auto rounded-[2rem] border border-[color:var(--app-border)] bg-[color:var(--app-surface-strong)] p-4 shadow-2xl dark:border-[color:color-mix(in_srgb,_var(--app-text-inverse)_10%,_transparent)] dark:bg-[color:var(--app-surface-strong)] sm:p-5"
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}

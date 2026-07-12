@@ -43,6 +43,7 @@ import {
   type UmkmMapTheme,
 } from './UmkmStoreMap';
 import { useViewerLocation } from './useViewerLocation';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 type UmkmDiscoveryPanelProps = {
   isId: boolean;
@@ -827,14 +828,7 @@ export function UmkmDiscoveryPanel({
     handleOpenMapPreview();
   }, [handleOpenMapPreview, openMapSignal, variant]);
 
-  useEffect(() => {
-    if (!mobileMapOpen || typeof document === 'undefined') return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [mobileMapOpen]);
+  useBodyScrollLock(mobileMapOpen && variant !== 'immersive');
 
   const totalLabel =
     loading && totalCount === null
@@ -1036,8 +1030,8 @@ export function UmkmDiscoveryPanel({
             className={cn(
               'absolute inset-x-2 bottom-[calc(0.30rem+env(safe-area-inset-bottom))] z-[1250] mx-auto flex max-w-[760px] flex-col overflow-hidden rounded-[26px] border border-white/86 bg-white/97 p-2 shadow-[0_24px_64px_-40px_rgba(15,23,42,0.48)]  transition-all duration-300 dark:border-white/10 dark:bg-slate-950/94 sm:inset-x-4 lg:inset-x-auto lg:bottom-3 lg:left-3 lg:top-[calc(env(safe-area-inset-top)+6.85rem)] lg:mx-0 lg:w-[486px] lg:max-w-none lg:rounded-[24px] lg:p-3',
               sheetExpanded
-                ? 'max-h-[min(72dvh,520px)] lg:max-h-[calc(100dvh-1.5rem)]'
-                : 'max-h-[100px] min-h-[100px] lg:max-h-[calc(100dvh-1.5rem)] lg:min-h-0',
+                ? 'max-h-[min(calc(var(--app-viewport-height)-7rem),520px)] lg:max-h-[calc(var(--app-viewport-height)-1.5rem)]'
+                : 'max-h-[100px] min-h-[100px] lg:max-h-[calc(var(--app-viewport-height)-1.5rem)] lg:min-h-0',
             )}
           >
             <button
@@ -1548,7 +1542,7 @@ export function UmkmDiscoveryPanel({
 
                 <div ref={mobileMapRef} className="lg:hidden">
                   {mobileMapOpen ? (
-                    <div className="fixed inset-0 z-[9999] flex min-h-[100dvh] flex-col bg-[color:var(--app-surface-strong)] dark:bg-slate-950">
+                    <div className="fixed inset-0 z-[9999] flex h-[var(--app-viewport-height)] min-h-0 flex-col overflow-hidden bg-[color:var(--app-surface-strong)] dark:bg-slate-950">
                       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.75rem)] dark:border-slate-800">
                         <div>
                           <p className="text-[15px] font-bold tracking-[-0.03em] text-[color:var(--app-text)]">

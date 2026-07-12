@@ -2381,7 +2381,7 @@ export function SuperAppOrderPanel({
             <div className="mx-auto max-w-[980px]">
               <div className="rounded-t-[30px] border border-b-0 border-[color:var(--app-border)] bg-[color:color-mix(in_srgb,_var(--app-surface-strong)_96%,_transparent)] shadow-2xl ">
                 <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-[color:var(--app-border)]" />
-                <div className="max-h-[56dvh] overflow-y-auto px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 sm:px-5">
+                <div className="max-h-[min(calc(var(--app-viewport-height)-12rem),520px)] overflow-y-auto px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 sm:px-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap gap-2">
